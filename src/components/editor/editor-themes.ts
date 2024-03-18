@@ -51,6 +51,7 @@ const darkTheme = createTheme({
     { tag: t.comment, color: "#787b8099" },
     { tag: t.link, color: "#0080ff" },
     { tag: t.heading, color: "#0080aa" },
+    { tag: t.heading, color: "#0080aa" },
     { tag: t.variableName, color: "#0080ff" },
     { tag: [t.string, t.special(t.brace)], color: "#5c6166" },
     { tag: t.number, color: "#5c6166" },
