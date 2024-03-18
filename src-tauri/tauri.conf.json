@@ -17,7 +17,8 @@
         "resizable": true,
         "decorations": true,
         "center": true,
-        "titleBarStyle": "Transparent"
+        "titleBarStyle": "Transparent",
+        "hiddenTitle": true
       }
     ],
     "security": {

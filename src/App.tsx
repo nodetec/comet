@@ -1,30 +1,31 @@
-import { useState } from "react";
-
-import { invoke } from "@tauri-apps/api/core";
-
 import "./styles/globals.css";
+
+import { useEffect } from "react";
 
 import { Route, Routes } from "react-router-dom";
 
 import { Toaster } from "./components/ui/sonner";
-import Layout from "./layouts/Layout";
+import useThemeChange from "./hooks/useThemeChange";
 import HomePage from "./pages/HomePage";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const handleThemeChange = (theme: string) => {
+    console.log("theme changed");
+    console.log("THEME", theme);
+  };
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  useThemeChange(handleThemeChange);
+
+  useEffect(() => {
+    localStorage.setItem("vite-ui-theme", "system");
+  }, []);
 
   return (
     <>
       <Routes>
         {/* <Route element={<Layout />}> */}
-          <Route path="/" element={<HomePage />} />
-          {/* <Route path="/u/:npub" element={<UserPage />} /> */}
+        <Route path="/" element={<HomePage />} />
+        {/* <Route path="/u/:npub" element={<UserPage />} /> */}
         {/* </Route> */}
       </Routes>
       <Toaster />

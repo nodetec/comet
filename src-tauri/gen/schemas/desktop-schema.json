@@ -85,7 +85,7 @@
           }
         },
         "platforms": {
-          "description": "Target platforms this capability applies. By default all platforms applies.",
+          "description": "Target platforms this capability applies. By default all platforms are affected by this capability.",
           "default": [
             "linux",
             "macOS",
@@ -924,6 +924,34 @@
           "type": "string",
           "enum": [
             "shell:deny-stdin-write"
+          ]
+        },
+        {
+          "description": "theme:allow-get-theme -> Enables the get_theme command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "theme:allow-get-theme"
+          ]
+        },
+        {
+          "description": "theme:allow-set-theme -> Enables the set_theme command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "theme:allow-set-theme"
+          ]
+        },
+        {
+          "description": "theme:deny-get-theme -> Denies the get_theme command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "theme:deny-get-theme"
+          ]
+        },
+        {
+          "description": "theme:deny-set-theme -> Denies the set_theme command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "theme:deny-set-theme"
           ]
         },
         {
