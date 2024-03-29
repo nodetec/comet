@@ -29,16 +29,6 @@ fn list_notes(note_service: State<'_, NoteService>) -> APIResponse<Vec<Note>> {
     note_service.list_notes()
 }
 
-//Tags
-
-#[tauri::command]
-fn create_tag(
-    create_tag_request: CreateTagRequest,
-    tag_service: State<'_, TagService>,
-) -> APIResponse<Tag> {
-    tag_service.create_tag(create_tag_request)
-}
-
 fn main() {
     let conn = db::establish_connection().expect("Failed to connect to database");
     let db_conn = DBConn(Arc::new(Mutex::new(conn)));
