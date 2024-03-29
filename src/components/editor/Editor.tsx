@@ -19,20 +19,23 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
-import { DOC } from "~/lib/constants";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
 import useThemeChange from "~/hooks/useThemeChange";
+import { useGlobalState } from "~/store";
 
 export const Editor = () => {
   const editor = useRef();
+
+  const { activeNote } = useGlobalState();
+
 
   const theme = useThemeChange();
 
   useEffect(() => {
     const startState = EditorState.create({
-      doc: DOC,
+      doc: activeNote?.content,
       extensions: [
         theme === "dark" ? darkTheme : lightTheme,
         vim(),
@@ -75,7 +78,7 @@ export const Editor = () => {
     return () => {
       view.destroy();
     };
-  }, [theme]);
+  }, [theme, activeNote]);
 
   return <div className="h-full overflow-y-auto px-4" ref={editor}></div>;
 };

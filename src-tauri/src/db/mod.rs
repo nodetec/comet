@@ -9,9 +9,12 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
+            status_id INTEGER,
+            notebook_id INTEGER,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            modified_at TEXT NOT NULL
+            modified_at TEXT NOT NULL,
+            deleted_at TEXT NOT NULL
         )",
         params![],
     )?;
@@ -23,6 +26,7 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         color TEXT,
         icon TEXT,
         created_at TEXT NOT NULL,
+        deleted_at TEXT NOT NULL,
         UNIQUE(name)
     )",
         params![],
@@ -38,6 +42,30 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         )",
         params![],
     )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS status (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        deleted_at TEXT NOT NULL,
+        UNIQUE(name)
+    )",
+        params![],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notebooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        deleted_at TEXT NOT NULL,
+        UNIQUE(name)
+    )",
+        params![],
+    )?;
+
+
 
     Ok(())
 }
