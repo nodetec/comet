@@ -24,3 +24,25 @@ export type ActiveNote = {
   createdAt: string;
   modifiedAt: string;
 };
+
+export type CreateTagRequest = {
+  name: string;
+  color: string;
+};
+
+export type Tag = {
+  id: number;
+  name: string;
+  color: string;
+  createdAt: string;
+  modifiedAt: string;
+};
+
+export type ActiveTag = {
+  id?: number;
+  name?: string;
+  color?: string;
+  createdAt: string;
+  modifiedAt: string;
+};
+

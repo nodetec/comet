@@ -1,30 +1,27 @@
-import { useEffect, useState } from "react";
-
 import { listNotes } from "~/api";
 import { type Note } from "~/types";
 
 import NoteCard from "./NoteCard";
 import { ScrollArea } from "~/components/ui/scroll-area"
+import { useQuery } from "@tanstack/react-query";
 
 export default function NoteFeed() {
-  const [notes, setNotes] = useState<Note[]>([]);
-
   async function fetchNotes() {
     const apiResponse = await listNotes();
     console.log(apiResponse);
     if (apiResponse.data) {
-      setNotes(apiResponse.data);
+      return apiResponse.data;
     }
   }
 
-  useEffect(() => {
-    void fetchNotes();
-  }, []);
+  const { data:notesData, isLoading, error } = useQuery({ queryKey: ['notes'], queryFn: fetchNotes});
+
+  if (isLoading) return "Loading...";
 
   return (
     <ScrollArea 
       className="flex h-full flex-col p-2">
-      {notes.map((note) => (
+      {notesData && notesData.map((note) => (
         <NoteCard key={note.id} note={note} />
       ))}
     </ScrollArea>
