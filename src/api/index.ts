@@ -18,9 +18,11 @@ export const updateNote = async (updateNoteRequest: UpdateNoteRequest) => {
 };
 
 
-export const listNotes = async () => {
+export const listNotes = async (tagId: Number | undefined) => {
   // TODO: error handling
-  const response: APIResponse<Note[]> = await invoke("list_notes");
+  const response: APIResponse<Note[]> = await invoke("list_notes", {
+    tagId,
+  });
   return response;
 };
 

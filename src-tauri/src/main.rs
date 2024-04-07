@@ -33,8 +33,11 @@ fn update_note(
 }
 
 #[tauri::command]
-fn list_notes(note_service: State<'_, NoteService>) -> APIResponse<Vec<Note>> {
-    note_service.list_notes()
+fn list_notes(
+    tag_id: Option<i64>,
+    note_service: State<'_, NoteService>
+) -> APIResponse<Vec<Note>> {
+    note_service.list_notes(tag_id)
 }
 
 // Tags

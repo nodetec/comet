@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useGlobalState } from "~/store";
 import { type Tag } from "~/types";
 
@@ -7,10 +9,12 @@ type Props = {
 
 export default function TagItem({ tag }: Props) {
   const { setActiveTag } = useGlobalState();
+  const queryClient = useQueryClient();
 
   const handleSetActiveTag = (e: any) => {
     e.preventDefault()
     setActiveTag(tag)
+    queryClient.invalidateQueries({ queryKey: ["notes"] });
   }
 
   return (

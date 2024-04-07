@@ -19,8 +19,18 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
     Ok(conn.last_insert_rowid())
 }
 
-pub fn list_all_notes(conn: &Connection) -> Result<Vec<Note>> {
-    let mut stmt = conn.prepare("SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC")?;
+pub fn list_all_notes(conn: &Connection, tag_id: Option<i64>) -> Result<Vec<Note>> {
+    match tag_id {
+        Some(tag_id) => {
+            println!("tag id {tag_id}");
+        }
+        None => {
+            println!("no tag id");
+        }
+    }
+    let mut stmt = conn.prepare(
+        "SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
+    )?;
     let notes_iter = stmt.query_map(params![], |row| {
         let created_at: String = row.get(3)?;
         let modified_at: String = row.get(4)?;
