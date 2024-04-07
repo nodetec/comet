@@ -16,20 +16,21 @@ export default function NoteFeedHeader() {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
-    setActiveNote(undefined);
+    const newNote = {
+      id: -1,
+      title: "Untitled",
+      content: "",
+      createdAt: Date.now(),
+      modifiedAt: Date.now(),
+    }
 
-    queryClient.setQueryData(["notes"], (previousNotes) => {
+    queryClient.setQueryData(["notes"], (previousNotes) =>  {
       return [
-        {
-          id: -1,
-          title: "Untitled",
-          content: "",
-          createdAt: Date.now(),
-          modifiedAt: Date.now(),
-        },
+        newNote,
         ...previousNotes
       ];
     });
+    setActiveNote(newNote);
   }
 
   return (

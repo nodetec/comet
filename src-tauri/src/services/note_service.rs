@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateNoteRequest, DBConn, Note},
+    models::{APIResponse, CreateNoteRequest, DBConn, Note, UpdateNoteRequest},
 };
 use std::sync::Arc;
 
@@ -35,6 +35,33 @@ impl NoteService {
             Err(e) => APIResponse {
                 success: false,
                 message: Some(format!("Failed to create note: {}", e)),
+                data: None,
+            },
+        }
+    }
+
+    pub fn update_note(&self, update_note_request: UpdateNoteRequest) -> APIResponse<Note> {
+        let conn = self.db_conn.0.lock().unwrap();
+
+        match db::update_note(&conn, &update_note_request) {
+            Ok(note_id) => {
+                match db::get_note_by_id(&conn, note_id as i32) {
+                    // Ensure type matches your ID field
+                    Ok(note) => APIResponse {
+                        success: true,
+                        message: Some("Note updated successfully".to_string()),
+                        data: Some(note),
+                    },
+                    Err(e) => APIResponse {
+                        success: false,
+                        message: Some(format!("Failed to retrieve updated note: {}", e)),
+                        data: None,
+                    },
+                }
+            }
+            Err(e) => APIResponse {
+                success: false,
+                message: Some(format!("Failed to update note: {}", e)),
                 data: None,
             },
         }

@@ -9,6 +9,12 @@ export type CreateNoteRequest = {
   content: string;
 };
 
+export type UpdateNoteRequest = {
+  id: number;
+  title: string;
+  content: string;
+};
+
 export type Note = {
   id: number;
   title: string;

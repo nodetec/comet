@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { APIResponse, CreateNoteRequest, Note, Tag } from "~/types";
+import { APIResponse, CreateNoteRequest, Note, Tag, UpdateNoteRequest } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
   // TODO: error handling
@@ -8,6 +8,15 @@ export const createNote = async (createNoteRequest: CreateNoteRequest) => {
   });
   return response;
 };
+
+export const updateNote = async (updateNoteRequest: UpdateNoteRequest) => {
+  // TODO: error handling
+  const response: APIResponse<Note> = await invoke("update_note", {
+    updateNoteRequest,
+  });
+  return response;
+};
+
 
 export const listNotes = async () => {
   // TODO: error handling

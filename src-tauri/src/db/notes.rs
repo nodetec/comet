@@ -20,7 +20,7 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
 }
 
 pub fn list_all_notes(conn: &Connection) -> Result<Vec<Note>> {
-    let mut stmt = conn.prepare("SELECT id, title, content, created_at, modified_at FROM notes")?;
+    let mut stmt = conn.prepare("SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC")?;
     let notes_iter = stmt.query_map(params![], |row| {
         let created_at: String = row.get(3)?;
         let modified_at: String = row.get(4)?;
@@ -57,7 +57,7 @@ pub fn get_note_by_id(conn: &Connection, note_id: i32) -> Result<Note> {
     })
 }
 
-pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -> Result<usize> {
+pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -> Result<i64> {
     let sql = "UPDATE notes SET title = ?1, content = ?2, modified_at = ?3 WHERE id = ?4";
     conn.execute(
         sql,
@@ -67,7 +67,8 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
             Utc::now().to_rfc3339(),
             &update_note_request.id
         ],
-    )
+    );
+    Ok(update_note_request.id)
 }
 
 pub fn delete_note(conn: &Connection, note_id: i32) -> Result<usize> {

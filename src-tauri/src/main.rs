@@ -12,7 +12,7 @@ mod db;
 
 mod models;
 mod utils;
-use models::{APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, Note, Tag};
+use models::{APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, Note, Tag, UpdateNoteRequest};
 
 // Notes
 
@@ -22,6 +22,14 @@ fn create_note(
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Note> {
     note_service.create_note(create_note_request)
+}
+
+#[tauri::command]
+fn update_note(
+    update_note_request: UpdateNoteRequest,
+    note_service: State<'_, NoteService>,
+) -> APIResponse<Note> {
+    note_service.update_note(update_note_request)
 }
 
 #[tauri::command]
@@ -56,7 +64,7 @@ fn main() {
         .manage(note_service)
         .manage(tag_service)
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![create_note, list_notes, create_tag, list_tags])
+        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -24,14 +24,20 @@ import { EditorView } from "codemirror";
 import { darkTheme, lightTheme } from "./editor-themes";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useGlobalState } from "~/store";
+import type { ChangeEvent } from 'react'
+// import { useCountdown } from 'usehooks-ts'
 
 export const Editor = () => {
   const editor = useRef();
 
-  const { activeNote } = useGlobalState();
+  const { setActiveNote, activeNote } = useGlobalState();
 
 
   const theme = useThemeChange();
+
+  // const handleSaveNote = (event: ChangeEvent<HTMLInputElement>) => {
+  //   setActiveNote(event.target.value)
+  // }
 
   useEffect(() => {
     const startState = EditorState.create({
@@ -58,6 +64,21 @@ export const Editor = () => {
         // highlightSelectionMatches(),
 
         EditorView.lineWrapping,
+        EditorView.domEventHandlers({
+          blur: (event, view: EditorView) => {
+          }
+        }),
+        EditorView.updateListener.of(update => {
+          if(update.focusChanged){
+
+          }
+          if(update.docChanged){
+            if(activeNote){
+              activeNote.content = update.state.doc.toString()
+              setActiveNote(activeNote)
+            }
+          }
+        }),
         // basicSetup,
         markdown({
           base: markdownLanguage,
