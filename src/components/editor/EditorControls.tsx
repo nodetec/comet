@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createNote, updateNote } from "~/api";
+import { createNote, tagNote, updateNote } from "~/api";
 import { useGlobalState } from "~/store";
 import { ActiveNote } from "~/types";
 import { SaveIcon, SendIcon, TagIcon } from "lucide-react";
@@ -36,6 +36,13 @@ export default function EditorControls() {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
+
+    const noteId = activeNote?.id;
+    if (noteId === undefined) {
+      return;
+    }
+    const tagId = 2;
+    const response = await tagNote({ noteId, tagId });
   }
   async function handleSetBlueTag(
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,

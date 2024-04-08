@@ -7,21 +7,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useGlobalState } from "~/store";
 
 export default function NoteFeed() {
-  async function fetchNotes() {
+  async function fetchNotes(): Promise<Note[]> {
     const activeTag = useGlobalState.getState().activeTag;
 
     const tagId = activeTag?.id;
-
-    const apiResponse = await listNotes(tagId);
+    
+    const apiResponse = await listNotes({tagId});
     console.log(apiResponse);
-    if (apiResponse.data) {
-      return apiResponse.data;
+    if (!apiResponse.data) {
+      throw new Error('Data not found!')
     }
+    return apiResponse.data;
+
   }
 
   const { data:notesData, isLoading, error } = useQuery({ queryKey: ['notes'], queryFn: fetchNotes });
 
-  if (isLoading) return "Loading...";
+  if (isLoading) return "One Call NoteFeed...";
 
   return (
     <ScrollArea 

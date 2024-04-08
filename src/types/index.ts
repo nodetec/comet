@@ -52,3 +52,15 @@ export type ActiveTag = {
   modifiedAt: string;
 };
 
+export type TagNoteRequest = {
+  noteId: number;
+  tagId: number;
+};
+
+export type ListNotesRequest = {
+  tagId?: number;
+};
+
+
+
+

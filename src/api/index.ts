@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { APIResponse, CreateNoteRequest, Note, Tag, UpdateNoteRequest } from "~/types";
+import { APIResponse, CreateNoteRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
   // TODO: error handling
@@ -18,10 +18,10 @@ export const updateNote = async (updateNoteRequest: UpdateNoteRequest) => {
 };
 
 
-export const listNotes = async (tagId: Number | undefined) => {
+export const listNotes = async (listNotesRequest: ListNotesRequest) => {
   // TODO: error handling
   const response: APIResponse<Note[]> = await invoke("list_notes", {
-    tagId,
+    listNotesRequest,
   });
   return response;
 };
@@ -33,3 +33,10 @@ export const listTags = async () => {
   return response;
 };
 
+export const tagNote = async (tagNoteRequest: TagNoteRequest) => {
+  // TODO: error handling
+  const response: APIResponse<undefined> = await invoke("tag_note", {
+    tagNoteRequest,
+  });
+  return response;
+};

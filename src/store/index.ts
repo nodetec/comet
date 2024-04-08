@@ -10,16 +10,16 @@ interface State {
 }
 
 export const useGlobalState = create<State>()(
-    persist(
+    // persist(
       (set) => ({
         activeNote: undefined,
         setActiveNote: (note) => set({ activeNote: note }),
         activeTag: undefined,
         setActiveTag: (tag) => set({ activeTag: tag }),
       }),
-      {
-        name: "captains-log-storage",
-        storage: createJSONStorage(() => localStorage)
-      },
-    ),
+      // {
+      //   name: "captains-log-storage",
+      //   storage: createJSONStorage(() => localStorage)
+      // },
+    // ),
 );

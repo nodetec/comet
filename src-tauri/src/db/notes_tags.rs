@@ -1,7 +1,11 @@
 use rusqlite::{params, Connection, Result};
 
+use crate::models::TagNoteRequest;
+
 // Function to add an association between a note and a tag
-pub fn create_association(conn: &Connection, note_id: i32, tag_id: i32) -> Result<usize> {
+pub fn tag_note(conn: &Connection, tag_note_request: &TagNoteRequest) -> Result<usize> {
+    let note_id = tag_note_request.note_id;
+    let tag_id = tag_note_request.tag_id;
     let sql = "INSERT INTO notes_tags (note_id, tag_id) VALUES (?1, ?2)";
     conn.execute(sql, params![note_id, tag_id])
 }
@@ -23,7 +27,7 @@ pub fn list_notes_for_tag(conn: &Connection, tag_id: i32) -> Result<Vec<i32>> {
 }
 
 // Function to delete an association
-pub fn delete_association(conn: &Connection, note_id: i32, tag_id: i32) -> Result<usize> {
+pub fn untag_note(conn: &Connection, note_id: i32, tag_id: i32) -> Result<usize> {
     let sql = "DELETE FROM notes_tags WHERE note_id = ?1 AND tag_id = ?2";
     conn.execute(sql, params![note_id, tag_id])
 }

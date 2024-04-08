@@ -15,6 +15,12 @@ pub struct APIResponse<T> {
 
 // Notes
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListNotesRequest {
+    pub tag_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
 pub struct CreateNoteRequest {
     pub title: String,
     pub content: String,
@@ -62,3 +68,12 @@ pub struct Tag {
     pub icon: String,
     pub created_at: DateTime<Utc>,
 }
+
+// Note Tags
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagNoteRequest {
+    pub note_id: i64,
+    pub tag_id: i64,
+}
+

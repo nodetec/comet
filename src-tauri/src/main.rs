@@ -4,7 +4,7 @@
 use std::sync::{Arc, Mutex};
 
 mod services;
-use services::{NoteService, TagService};
+use services::{NoteService, TagService, NoteTagService};
 
 use tauri::State;
 
@@ -12,7 +12,7 @@ mod db;
 
 mod models;
 mod utils;
-use models::{APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, Note, Tag, UpdateNoteRequest};
+use models::{APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, Note, Tag, TagNoteRequest, UpdateNoteRequest, ListNotesRequest};
 
 // Notes
 
@@ -34,10 +34,10 @@ fn update_note(
 
 #[tauri::command]
 fn list_notes(
-    tag_id: Option<i64>,
+    list_notes_request: ListNotesRequest,
     note_service: State<'_, NoteService>
 ) -> APIResponse<Vec<Note>> {
-    note_service.list_notes(tag_id)
+    note_service.list_notes(list_notes_request)
 }
 
 // Tags
@@ -55,19 +55,31 @@ fn list_tags(tag_service: State<'_, TagService>) -> APIResponse<Vec<Tag>> {
     tag_service.list_tags()
 }
 
+//Tag Notes
+
+#[tauri::command]
+fn tag_note(
+    tag_note_request: TagNoteRequest,
+    tag_note_service: State<'_, NoteTagService>,
+) -> APIResponse<()> {
+    tag_note_service.tag_note(tag_note_request)
+}
+
 fn main() {
     let conn = db::establish_connection().expect("Failed to connect to database");
     let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
     let connection = Arc::new(db_conn);
     let note_service = NoteService::new(connection.clone());
     let tag_service = TagService::new(connection.clone());
+    let tag_note_service = NoteTagService::new(connection.clone());
 
     tauri::Builder::default()
         // Here you manage the instantiated NoteService with the Tauri state
         .manage(note_service)
         .manage(tag_service)
+        .manage(tag_note_service)
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags])
+        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags, tag_note])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

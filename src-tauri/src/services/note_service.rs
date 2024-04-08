@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateNoteRequest, DBConn, Note, UpdateNoteRequest},
+    models::{APIResponse, CreateNoteRequest, DBConn, ListNotesRequest, Note, UpdateNoteRequest},
 };
 use std::sync::Arc;
 
@@ -67,10 +67,10 @@ impl NoteService {
         }
     }
 
-    pub fn list_notes(&self, tag_id: Option<i64>) -> APIResponse<Vec<Note>> {
+    pub fn list_notes(&self, list_notes_request: ListNotesRequest) -> APIResponse<Vec<Note>> {
         let conn = self.db_conn.0.lock().unwrap();
 
-        match db::list_all_notes(&conn, tag_id) {
+        match db::list_all_notes(&conn, list_notes_request) {
             Ok(notes) => APIResponse {
                 success: true,
                 message: Some("Notes retrieved successfully".to_string()),

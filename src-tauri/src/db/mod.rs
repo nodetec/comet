@@ -108,4 +108,4 @@ pub fn establish_connection() -> Result<Connection> {
 
 pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note};
 pub use tags::{create_tag, delete_tag, get_tag_by_id, list_all_tags, update_tag};
-pub use notes_tags::{create_association, delete_association, list_notes_for_tag, list_tags_for_note};
+pub use notes_tags::{tag_note, untag_note, list_notes_for_tag, list_tags_for_note};
