@@ -19,20 +19,27 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
     Ok(conn.last_insert_rowid())
 }
 
-pub fn list_all_notes(conn: &Connection, list_notes_request: ListNotesRequest) -> Result<Vec<Note>> {
+pub fn list_all_notes(
+    conn: &Connection,
+    list_notes_request: &ListNotesRequest,
+) -> Result<Vec<Note>> {
     let mut stmt;
-    let query_with_tag = "SELECT id, title, content, created_at, modified_at FROM notes INNER JOIN notes_tags ON notes.id = notes_tags.note_id WHERE notes_tags.tag_id = ?1 ORDER BY modified_at DESC";
-    let query_without_tag = "SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC";
-
-    // Decide which query to prepare based on whether tag_id is Some or None.
-    stmt = match list_notes_request.tag_id {
-        Some(tag_id) => conn.prepare(query_with_tag)?,
-        None => conn.prepare(query_without_tag)?,
+    let tag_id = match list_notes_request.tag_id {
+        Some(tag_id) => {
+            println!("tag id {tag_id}");
+            tag_id
+        }
+        None => {
+            println!("no tag id");
+            -1
+        }
     };
 
-    // Using params! macro directly in the query_map call.
-    let notes_iter = match list_notes_request.tag_id {
-        Some(tag_id) => stmt.query_map(params![tag_id], |row| {
+    if tag_id != -1 {
+        stmt = conn.prepare(
+        "SELECT n.id, n.title, n.content, n.created_at, n.modified_at FROM notes n JOIN note_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
+    )?;
+        let notes_iter = stmt.query_map(params![tag_id], |row| {
             let created_at: String = row.get(3)?;
             let modified_at: String = row.get(4)?;
             Ok(Note {
@@ -42,26 +49,37 @@ pub fn list_all_notes(conn: &Connection, list_notes_request: ListNotesRequest) -
                 created_at: parse_datetime(&created_at)?,
                 modified_at: parse_datetime(&modified_at)?,
             })
-        }),
-        None => stmt.query_map(params![], |row| {
-            let created_at: String = row.get(3)?;
-            let modified_at: String = row.get(4)?;
-            Ok(Note {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                content: row.get(2)?,
-                created_at: parse_datetime(&created_at)?,
-                modified_at: parse_datetime(&modified_at)?,
-            })
-        }),
-    }?;
+        })?;
 
-    let mut notes = Vec::new();
-    for note in notes_iter {
-        notes.push(note?);
+        let mut notes = Vec::new();
+        for note in notes_iter {
+            notes.push(note?);
+        }
+
+        Ok(notes)
+    } else {
+        stmt = conn.prepare(
+        "SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
+    )?;
+        let notes_iter = stmt.query_map(params![], |row| {
+            let created_at: String = row.get(3)?;
+            let modified_at: String = row.get(4)?;
+            Ok(Note {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                content: row.get(2)?,
+                created_at: parse_datetime(&created_at)?,
+                modified_at: parse_datetime(&modified_at)?,
+            })
+        })?;
+
+        let mut notes = Vec::new();
+        for note in notes_iter {
+            notes.push(note?);
+        }
+
+        Ok(notes)
     }
-
-    Ok(notes)
 }
 
 pub fn get_note_by_id(conn: &Connection, note_id: i32) -> Result<Note> {

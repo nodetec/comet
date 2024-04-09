@@ -67,10 +67,10 @@ impl NoteService {
         }
     }
 
-    pub fn list_notes(&self, list_notes_request: ListNotesRequest) -> APIResponse<Vec<Note>> {
+    pub fn list_notes(&self, list_notes_request: &ListNotesRequest) -> APIResponse<Vec<Note>> {
         let conn = self.db_conn.0.lock().unwrap();
 
-        match db::list_all_notes(&conn, list_notes_request) {
+        match db::list_all_notes(&conn, &list_notes_request) {
             Ok(notes) => APIResponse {
                 success: true,
                 message: Some("Notes retrieved successfully".to_string()),

@@ -37,7 +37,7 @@ fn list_notes(
     list_notes_request: ListNotesRequest,
     note_service: State<'_, NoteService>
 ) -> APIResponse<Vec<Note>> {
-    note_service.list_notes(list_notes_request)
+    note_service.list_notes(&list_notes_request)
 }
 
 // Tags
