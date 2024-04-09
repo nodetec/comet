@@ -10,8 +10,11 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 const queryClient = new QueryClient()
 
+  // <React.StrictMode>
+  //
+  // </React.StrictMode>,
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
     <QueryClientProvider client={ queryClient }>
     <ReactQueryDevtools initialIsOpen={false} />
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -20,5 +23,4 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
-  </React.StrictMode>,
 );

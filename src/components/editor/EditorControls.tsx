@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createNote, tagNote, updateNote } from "~/api";
 import { useGlobalState } from "~/store";
-import { ActiveNote } from "~/types";
+import { type ActiveNote } from "~/types";
 import { SaveIcon, SendIcon, TagIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
@@ -30,7 +30,7 @@ export default function EditorControls() {
       setActiveNote(note.data as ActiveNote);
     }
 
-    queryClient.invalidateQueries({ queryKey: ["notes"] });
+    void queryClient.invalidateQueries({ queryKey: ["notes"] });
   }
   async function handleSetGreenTag(
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
@@ -42,7 +42,7 @@ export default function EditorControls() {
       return;
     }
     const tagId = 2;
-    const response = await tagNote({ noteId, tagId });
+    await tagNote({ noteId, tagId });
   }
   async function handleSetBlueTag(
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,

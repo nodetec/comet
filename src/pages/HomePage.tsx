@@ -1,5 +1,5 @@
 import Editor from "~/components/editor/Editor";
-import EditorControls from "~/components/editor/EditorControls";
+import EditorTitle from "~/components/editor/EditorTitle";
 import NoteFeed from "~/components/notes/NoteFeed";
 import NoteFeedHeader from "~/components/notes/NoteFeedHeader";
 import TagList from "~/components/tags/TagList";
@@ -14,7 +14,7 @@ export default function HomePage() {
     <div className="flex h-full w-full flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         <ResizablePanel defaultSize={15} minSize={15}>
-        <TagList />
+          <TagList />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>
@@ -23,7 +23,7 @@ export default function HomePage() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={10}>
-          <EditorControls/>
+          <EditorTitle />
           <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>

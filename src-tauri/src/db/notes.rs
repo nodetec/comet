@@ -37,7 +37,7 @@ pub fn list_all_notes(
 
     if tag_id != -1 {
         stmt = conn.prepare(
-        "SELECT n.id, n.title, n.content, n.created_at, n.modified_at FROM notes n JOIN note_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
+        "SELECT n.id, n.title, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
     )?;
         let notes_iter = stmt.query_map(params![tag_id], |row| {
             let created_at: String = row.get(3)?;
