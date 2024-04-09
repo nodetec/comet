@@ -14,7 +14,7 @@ export default function HomePage() {
     <div className="flex h-full w-full flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         <ResizablePanel defaultSize={15} minSize={15}>
-          <TagList />
+            <TagList />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>

@@ -7,7 +7,7 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const { setActiveTag } = useGlobalState();
+  const { activeTag, setActiveTag } = useGlobalState();
   const queryClient = useQueryClient();
 
   const handleSetActiveTag = async (
@@ -22,9 +22,13 @@ export default function TagItem({ tag }: Props) {
     <div
       onClick={handleSetActiveTag}
       key={tag.id}
-      className="flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm hover:bg-muted/80"
+      className={`flex h-full w-full cursor-pointer select-none flex-col rounded-md ml-2 p-2 text-sm font-medium ${tag.name === activeTag?.name && "bg-muted/80" }`}
     >
-      <span className="select-none text-muted-foreground">{tag.name}</span>
+      <span
+        className={`select-none text-muted-foreground ${tag.name === activeTag?.name && "text-secondary-foreground"}`}
+      >
+        {tag.name}
+      </span>
     </div>
   );
 }

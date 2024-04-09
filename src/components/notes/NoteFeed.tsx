@@ -8,11 +8,8 @@ import NoteCard from "./NoteCard";
 export default function NoteFeed() {
   async function fetchNotes() {
     const activeTag = useGlobalState.getState().activeTag;
-
     const tagId = activeTag?.id;
-
     const apiResponse = await listNotes({ tagId });
-    console.log(apiResponse);
     if (!apiResponse.data) {
       throw new Error("Data not found!");
     }
