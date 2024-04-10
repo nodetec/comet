@@ -1,6 +1,6 @@
 use crate::models::{CreateNoteRequest, ListNotesRequest, Note, UpdateNoteRequest};
 use crate::utils::parse_datetime;
-use rusqlite::{params, Connection, Result, ToSql}; // Import the Note struct
+use rusqlite::{params, Connection, Result}; // Import the Note struct
 
 use chrono::Utc;
 
@@ -35,51 +35,39 @@ pub fn list_all_notes(
         }
     };
 
+    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
     if tag_id != -1 {
+        // If tag_id is valid, add it to the parameters vector
+        params_vec.push(&tag_id);
         stmt = conn.prepare(
         "SELECT n.id, n.title, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
     )?;
-        let notes_iter = stmt.query_map(params![tag_id], |row| {
-            let created_at: String = row.get(3)?;
-            let modified_at: String = row.get(4)?;
-            Ok(Note {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                content: row.get(2)?,
-                created_at: parse_datetime(&created_at)?,
-                modified_at: parse_datetime(&modified_at)?,
-            })
-        })?;
-
-        let mut notes = Vec::new();
-        for note in notes_iter {
-            notes.push(note?);
-        }
-
-        Ok(notes)
     } else {
+        // No need to add parameters if tag_id is -1
         stmt = conn.prepare(
         "SELECT id, title, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
     )?;
-        let notes_iter = stmt.query_map(params![], |row| {
-            let created_at: String = row.get(3)?;
-            let modified_at: String = row.get(4)?;
-            Ok(Note {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                content: row.get(2)?,
-                created_at: parse_datetime(&created_at)?,
-                modified_at: parse_datetime(&modified_at)?,
-            })
-        })?;
-
-        let mut notes = Vec::new();
-        for note in notes_iter {
-            notes.push(note?);
-        }
-
-        Ok(notes)
     }
+
+    // Use params_vec.as_slice() when you need to pass the parameters
+    let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
+        let created_at: String = row.get(3)?;
+        let modified_at: String = row.get(4)?;
+        Ok(Note {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            content: row.get(2)?,
+            created_at: parse_datetime(&created_at)?,
+            modified_at: parse_datetime(&modified_at)?,
+        })
+    })?;
+
+    let mut notes = Vec::new();
+    for note in notes_iter {
+        notes.push(note?);
+    }
+
+    Ok(notes)
 }
 
 pub fn get_note_by_id(conn: &Connection, note_id: i32) -> Result<Note> {
