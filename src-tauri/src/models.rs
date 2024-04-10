@@ -18,6 +18,7 @@ pub struct APIResponse<T> {
 #[serde(rename_all = "camelCase")]
 pub struct ListNotesRequest {
     pub tag_id: Option<i64>,
+    pub search: Option<String>,
 }
 
 #[derive(Deserialize)]

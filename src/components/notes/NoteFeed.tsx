@@ -7,11 +7,12 @@ import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
   async function fetchNotes() {
-    const activeTag = useGlobalState.getState().activeTag;
-    const tagId = activeTag?.id;
-    const apiResponse = await listNotes({ tagId });
+    const activeTag = useGlobalState.getState().activeTag
+    const search = useGlobalState.getState().noteSearch
+    const tagId = activeTag?.id
+    const apiResponse = await listNotes({ tagId, search })
     if (!apiResponse.data) {
-      throw new Error("Data not found!");
+      throw new Error("Data not found!")
     }
     return apiResponse.data;
   }

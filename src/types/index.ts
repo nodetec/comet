@@ -59,6 +59,7 @@ export type TagNoteRequest = {
 
 export type ListNotesRequest = {
   tagId?: number;
+  search?: string;
 };
 
 

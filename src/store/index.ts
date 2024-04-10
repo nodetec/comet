@@ -7,6 +7,8 @@ interface State {
   setActiveNote: (note: ActiveNote | undefined) => void;
   activeTag: Tag | undefined;
   setActiveTag: (activeTag: Tag | undefined) => void;
+  noteSearch: string | undefined;
+  setNoteSearch: (noteSearch: string | undefined) => void;
 }
 
 export const useGlobalState = create<State>()(
@@ -16,6 +18,8 @@ export const useGlobalState = create<State>()(
         setActiveNote: (note) => set({ activeNote: note }),
         activeTag: undefined,
         setActiveTag: (tag) => set({ activeTag: tag }),
+        noteSearch: undefined,
+        setNoteSearch: (noteSearch) => set({ noteSearch: noteSearch }),
       }),
       // {
       //   name: "captains-log-storage",
