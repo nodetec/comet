@@ -7,12 +7,12 @@ import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
   async function fetchNotes() {
-    const activeTag = useGlobalState.getState().activeTag
-    const search = useGlobalState.getState().noteSearch
-    const tagId = activeTag?.id
-    const apiResponse = await listNotes({ tagId, search })
+    const activeTag = useGlobalState.getState().activeTag;
+    const search = useGlobalState.getState().noteSearch;
+    const tagId = activeTag?.id;
+    const apiResponse = await listNotes({ tagId, search });
     if (!apiResponse.data) {
-      throw new Error("Data not found!")
+      throw new Error("Data not found!");
     }
     return apiResponse.data;
   }
@@ -23,7 +23,7 @@ export default function NoteFeed() {
   });
 
   return (
-    <ScrollArea className="flex h-full flex-col px-2 pt-2 pb-12">
+    <ScrollArea className="flex h-full flex-col px-2 pb-24 pt-2">
       {data?.map((note) => <NoteCard key={note.id} note={note} />)}
     </ScrollArea>
   );

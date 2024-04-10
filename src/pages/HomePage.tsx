@@ -1,4 +1,5 @@
 import Editor from "~/components/editor/Editor";
+import EditorControls from "~/components/editor/EditorControls";
 import EditorTitle from "~/components/editor/EditorTitle";
 import NoteFeed from "~/components/notes/NoteFeed";
 import NoteFeedHeader from "~/components/notes/NoteFeedHeader";
@@ -26,6 +27,7 @@ export default function HomePage() {
         <ResizableHandle />
         <ResizablePanel minSize={10}>
           <EditorTitle />
+          <EditorControls />
           <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>

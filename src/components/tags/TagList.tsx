@@ -9,8 +9,8 @@ import {
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { TagsIcon } from "lucide-react";
 
-import TagItem from "./TagItem";
 import AllNotes from "./AllNotes";
+import TagItem from "./TagItem";
 
 export default function TagList() {
   async function fetchTags() {
@@ -32,7 +32,7 @@ export default function TagList() {
       <Accordion type="single" collapsible defaultValue="item-1">
         <AccordionItem className="border-none" value="item-1">
           <AccordionTrigger>
-            <div className="text-muted-foreground pl-2 flex">
+            <div className="flex pl-2 text-muted-foreground">
               <TagsIcon className="h-[1.2rem] w-[1.2rem]" />
               <span className="ml-1">Tags</span>
             </div>

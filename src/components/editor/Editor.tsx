@@ -24,7 +24,6 @@ import { EditorView } from "codemirror";
 import { darkTheme, lightTheme } from "./editor-themes";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useGlobalState } from "~/store";
-import type { ChangeEvent } from 'react'
 // import { useCountdown } from 'usehooks-ts'
 
 export const Editor = () => {
