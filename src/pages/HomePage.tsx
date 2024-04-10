@@ -2,6 +2,7 @@ import Editor from "~/components/editor/Editor";
 import EditorTitle from "~/components/editor/EditorTitle";
 import NoteFeed from "~/components/notes/NoteFeed";
 import NoteFeedHeader from "~/components/notes/NoteFeedHeader";
+import SearchNotes from "~/components/notes/SearchNotes";
 import TagList from "~/components/tags/TagList";
 import {
   ResizableHandle,
@@ -19,6 +20,7 @@ export default function HomePage() {
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>
           <NoteFeedHeader />
+          <SearchNotes />
           <NoteFeed />
         </ResizablePanel>
         <ResizableHandle />

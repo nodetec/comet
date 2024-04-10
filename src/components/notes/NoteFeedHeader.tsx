@@ -36,7 +36,7 @@ export default function NoteFeedHeader() {
       <div className="flex justify-center items-center">
         <Button
           disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground"
+          className="text-muted-foreground pl-2"
           onClick={handleNewNote}
           variant="ghost"
           size="icon"
@@ -48,21 +48,12 @@ export default function NoteFeedHeader() {
       <div>
         <Button
           disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground"
+          className="text-muted-foreground pr-2"
           onClick={handleNewNote}
           variant="ghost"
           size="icon"
         >
           <PenBoxIcon className="h-[1.2rem] w-[1.2rem]" />
-        </Button>
-        <Button
-          disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground"
-          onClick={handleNewNote}
-          variant="ghost"
-          size="icon"
-        >
-          <MagnifyingGlassIcon className="h-[1.2rem] w-[1.2rem]" />
         </Button>
       </div>
     </div>
