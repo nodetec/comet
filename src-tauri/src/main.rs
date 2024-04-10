@@ -56,8 +56,8 @@ fn list_tags(tag_service: State<'_, TagService>) -> APIResponse<Vec<Tag>> {
 }
 
 #[tauri::command]
-fn get_tag(get_tag_request: GetTagRequest, tag_service: State<'_, TagService>) -> APIResponse<Vec<Tag>> {
-    tag_service.list_tags()
+fn get_tag(get_tag_request: GetTagRequest, tag_service: State<'_, TagService>) -> APIResponse<Tag> {
+    tag_service.get_tag(get_tag_request)
 }
 
 //Tag Notes
@@ -84,7 +84,7 @@ fn main() {
         .manage(tag_service)
         .manage(tag_note_service)
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags, tag_note])
+        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags, get_tag, tag_note])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

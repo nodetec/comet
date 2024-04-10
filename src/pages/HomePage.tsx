@@ -20,23 +20,19 @@ export default function HomePage() {
           <TagList />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel defaultSize={30} minSize={30}>
-          <div className="px-2">
-            <NoteFeedHeader />
-            <SearchNotes />
-            <NoteFeed />
-          </div>
+        <ResizablePanel className="px-2" defaultSize={30} minSize={30}>
+          <NoteFeedHeader />
+          <SearchNotes />
+          <NoteFeed />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel minSize={10}>
-          <div className="px-4 pt-4">
-            <div className="flex items-center justify-between">
-              <EditorTitle />
-              <EditorControls />
-            </div>
-            <TagInput />
-            <Editor />
+        <ResizablePanel className="px-4 pt-4" minSize={10}>
+          <div className="flex items-center justify-between">
+            <EditorTitle />
+            <EditorControls />
           </div>
+          <TagInput />
+          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

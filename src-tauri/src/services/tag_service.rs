@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateTagRequest, DBConn, Tag},
+    models::{APIResponse, CreateTagRequest, DBConn, GetTagRequest, Tag},
 };
 use std::sync::Arc;
 
@@ -40,18 +40,39 @@ impl TagService {
         }
     }
 
-    pub fn get_tag(&self, tag_id: i64) -> APIResponse<Tag> {
+    pub fn get_tag(&self, get_tag_request: GetTagRequest) -> APIResponse<Tag> {
         let conn = self.db_conn.0.lock().unwrap();
 
-        match db::get_tag_by_id(&conn, tag_id) {
-            Ok(tag) => APIResponse {
-                success: true,
-                message: Some("Tag retrieved successfully".to_string()),
-                data: Some(tag),
+        match get_tag_request {
+            GetTagRequest { id: Some(id), .. } => match db::get_tag_by_id(&conn, id) {
+                Ok(tag) => APIResponse {
+                    success: true,
+                    message: Some("Tag retrieved successfully".to_string()),
+                    data: Some(tag),
+                },
+                Err(e) => APIResponse {
+                    success: false,
+                    message: Some(format!("Failed to retrieve tag by ID: {}", e)),
+                    data: None,
+                },
             },
-            Err(e) => APIResponse {
+            GetTagRequest {
+                name: Some(name), ..
+            } => match db::get_tag_by_name(&conn, &name) {
+                Ok(tag) => APIResponse {
+                    success: true,
+                    message: Some("Tag retrieved successfully".to_string()),
+                    data: Some(tag),
+                },
+                Err(e) => APIResponse {
+                    success: false,
+                    message: Some(format!("Failed to retrieve tag by name: {}", e)),
+                    data: None,
+                },
+            },
+            _ => APIResponse {
                 success: false,
-                message: Some(format!("Failed to retrieve tag: {}", e)),
+                message: Some("No ID or Name provided for tag retrieval".to_string()),
                 data: None,
             },
         }
