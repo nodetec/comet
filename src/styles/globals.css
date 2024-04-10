@@ -71,7 +71,16 @@
     @apply border-border;
   }
 
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  editor-container {
+    @apply overflow-hidden;
+  }
+
+  .editor-container .cm-editor {
+    height: calc(100vh - 7rem);
   }
 }

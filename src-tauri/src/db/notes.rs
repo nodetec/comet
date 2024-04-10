@@ -25,14 +25,8 @@ pub fn list_all_notes(
 ) -> Result<Vec<Note>> {
     let mut stmt;
     let tag_id = match list_notes_request.tag_id {
-        Some(tag_id) => {
-            println!("tag id {tag_id}");
-            tag_id
-        }
-        None => {
-            println!("no tag id");
-            -1
-        }
+        Some(tag_id) => tag_id,
+        None => -1,
     };
 
     let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();

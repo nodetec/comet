@@ -36,7 +36,7 @@ const lightTheme = createTheme({
 const darkTheme = createTheme({
   theme: "dark",
   settings: {
-    background: "#1d1e15",
+    background: "#1d1e1f",
     backgroundImage: "",
     foreground: "#c8c8c8",
     caret: "#cccccc",

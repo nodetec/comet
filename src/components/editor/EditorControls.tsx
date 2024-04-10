@@ -56,16 +56,16 @@ export default function EditorControls() {
   }
 
   return (
-    <div className="flex gap-x-4 p-2 border border-red-500">
+    <div className="flex gap-x-4">
       <Button onClick={handleSaveNote} variant="outline" size="icon">
         <SaveIcon className="h-[1.2rem] w-[1.2rem]" />
       </Button>
-      <Button onClick={handleSetGreenTag} variant="outline" size="icon">
-        <TagIcon className="h-[1.2rem] w-[1.2rem] text-green-400" />
-      </Button>
-      <Button onClick={handleSetBlueTag} variant="outline" size="icon">
-        <TagIcon className="h-[1.2rem] w-[1.2rem] text-blue-400" />
-      </Button>
+      {/* <Button onClick={handleSetGreenTag} variant="outline" size="icon"> */}
+      {/*   <TagIcon className="h-[1.2rem] w-[1.2rem] text-green-400" /> */}
+      {/* </Button> */}
+      {/* <Button onClick={handleSetBlueTag} variant="outline" size="icon"> */}
+      {/*   <TagIcon className="h-[1.2rem] w-[1.2rem] text-blue-400" /> */}
+      {/* </Button> */}
       <Button onClick={handleSendNote} variant="outline" size="icon">
         <SendIcon className="h-[1.2rem] w-[1.2rem]" />
       </Button>

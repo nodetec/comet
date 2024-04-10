@@ -24,7 +24,7 @@ export default function EditorTitle() {
   return (
     <Input
       type="text"
-      className="border border-sky-500 px-4 py-8 text-xl focus-visible:ring-0"
+      className="border-none py-0 px-1 text-xl focus-visible:ring-0"
       placeholder="Untitled"
       value={activeNote?.title}
       onChange={handleTitleChange}

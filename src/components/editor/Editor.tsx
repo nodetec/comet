@@ -1,14 +1,9 @@
 import { useEffect, useRef } from "react";
 
-import {
-  closeBrackets,
-} from "@codemirror/autocomplete";
+import { closeBrackets } from "@codemirror/autocomplete";
 import { history } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import {
-  bracketMatching,
-  indentOnInput,
-} from "@codemirror/language";
+import { bracketMatching, indentOnInput } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { EditorState } from "@codemirror/state";
 import {
@@ -16,21 +11,23 @@ import {
   drawSelection,
   dropCursor,
   highlightSpecialChars,
+  lineNumbers,
   rectangularSelection,
+  scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
+import useThemeChange from "~/hooks/useThemeChange";
+import { useGlobalState } from "~/store";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
-import useThemeChange from "~/hooks/useThemeChange";
-import { useGlobalState } from "~/store";
+
 // import { useCountdown } from 'usehooks-ts'
 
 export const Editor = () => {
-  const editor = useRef();
+  const editor = useRef<HTMLDivElement>(null);
 
   const { setActiveNote, activeNote } = useGlobalState();
-
 
   const theme = useThemeChange();
 
@@ -61,20 +58,19 @@ export const Editor = () => {
         crosshairCursor(),
         // highlightActiveLine(),
         // highlightSelectionMatches(),
+        scrollPastEnd(),
 
         EditorView.lineWrapping,
         EditorView.domEventHandlers({
-          blur: (event, view: EditorView) => {
-          }
+          blur: (event, view: EditorView) => {},
         }),
-        EditorView.updateListener.of(update => {
-          if(update.focusChanged){
-
+        EditorView.updateListener.of((update) => {
+          if (update.focusChanged) {
           }
-          if(update.docChanged){
-            if(activeNote){
-              activeNote.content = update.state.doc.toString()
-              setActiveNote(activeNote)
+          if (update.docChanged) {
+            if (activeNote) {
+              activeNote.content = update.state.doc.toString();
+              setActiveNote(activeNote);
             }
           }
         }),
@@ -89,7 +85,7 @@ export const Editor = () => {
 
     const view = new EditorView({
       state: startState,
-      parent: editor.current,
+      parent: editor.current!,
     });
 
     // const cm = getCM(view);
@@ -98,9 +94,9 @@ export const Editor = () => {
     return () => {
       view.destroy();
     };
-  }, [theme, activeNote]);
+  }, [theme, activeNote, setActiveNote]);
 
-  return <div className="h-full overflow-y-auto px-4" ref={editor}></div>;
+  return <div className="editor-container overflow-hidden" ref={editor}></div>;
 };
 
 export default Editor;
