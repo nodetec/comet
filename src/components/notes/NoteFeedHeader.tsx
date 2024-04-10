@@ -1,4 +1,3 @@
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
 import { useGlobalState } from "~/store";
@@ -32,11 +31,11 @@ export default function NoteFeedHeader() {
   }
 
   return (
-    <div className="flex justify-between p-0.5">
-      <div className="flex justify-center items-center">
+    <div className="flex justify-between pt-2">
+      <div className="flex justify-center items-center gap-x-1">
         <Button
           disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground pl-2"
+          className="text-muted-foreground"
           onClick={handleNewNote}
           variant="ghost"
           size="icon"
@@ -48,7 +47,7 @@ export default function NoteFeedHeader() {
       <div>
         <Button
           disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground pr-2"
+          className="text-muted-foreground"
           onClick={handleNewNote}
           variant="ghost"
           size="icon"

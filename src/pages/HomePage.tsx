@@ -21,9 +21,11 @@ export default function HomePage() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>
-          <NoteFeedHeader />
-          <SearchNotes />
-          <NoteFeed />
+          <div className="px-2">
+            <NoteFeedHeader />
+            <SearchNotes />
+            <NoteFeed />
+          </div>
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={10}>
