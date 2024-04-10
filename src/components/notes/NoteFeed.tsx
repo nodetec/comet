@@ -22,7 +22,7 @@ export default function NoteFeed() {
   });
 
   return (
-    <ScrollArea className="flex h-full flex-col p-2">
+    <ScrollArea className="flex h-full flex-col px-2 pt-2 pb-12">
       {data?.map((note) => <NoteCard key={note.id} note={note} />)}
     </ScrollArea>
   );
