@@ -1,5 +1,3 @@
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-
 import { Input } from "../ui/input";
 import { useGlobalState } from "~/store";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,7 +7,7 @@ export default function SearchNotes() {
   const queryClient = useQueryClient()
 
   const handleSetSearchNote = async (
-    e: any,
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
     e.preventDefault();
     const searchValue = e.target.value;
@@ -19,10 +17,9 @@ export default function SearchNotes() {
 
   return (
     <div className="flex items-center py-2">
-      {/* <MagnifyingGlassIcon className="pointer-events-none relative left-8 top-2.5 h-[1.2rem] w-[1.2rem] -translate-y-1/2 transform text-muted-foreground" /> */}
       <Input
         placeholder="Search..."
-        className="focus-visible:ring-muted-foreground/30"
+        className="focus-visible:ring-muted-foreground/30 text-muted-foreground/80 placeholder:text-muted-foreground/60"
         onChange={handleSetSearchNote}
       />
     </div>

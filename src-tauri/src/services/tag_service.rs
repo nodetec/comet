@@ -40,6 +40,23 @@ impl TagService {
         }
     }
 
+    pub fn get_tag(&self, tag_id: i64) -> APIResponse<Tag> {
+        let conn = self.db_conn.0.lock().unwrap();
+
+        match db::get_tag_by_id(&conn, tag_id) {
+            Ok(tag) => APIResponse {
+                success: true,
+                message: Some("Tag retrieved successfully".to_string()),
+                data: Some(tag),
+            },
+            Err(e) => APIResponse {
+                success: false,
+                message: Some(format!("Failed to retrieve tag: {}", e)),
+                data: None,
+            },
+        }
+    }
+
     pub fn list_tags(&self) -> APIResponse<Vec<Tag>> {
         let conn = self.db_conn.0.lock().unwrap();
 

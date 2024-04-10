@@ -60,6 +60,12 @@ pub struct UpdateTagRequest {
     pub icon: String,
 }
 
+#[derive(Deserialize)]
+pub struct GetTagRequest {
+    pub id: Option<i64>,
+    pub name: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Tag {

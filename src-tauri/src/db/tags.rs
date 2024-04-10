@@ -33,6 +33,20 @@ pub fn get_tag_by_id(conn: &Connection, tag_id: i64) -> Result<Tag> {
     })
 }
 
+pub fn get_tag_by_name(conn: &Connection, tag_name: &str) -> Result<Tag> {
+    let mut stmt = conn.prepare("SELECT id, name, color, icon FROM tags WHERE name = ?1")?;
+    stmt.query_row(params![tag_name], |row| {
+        let created_at: String = row.get(3)?;
+        Ok(Tag {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            color: row.get(2)?,
+            icon: row.get(3)?,
+            created_at: parse_datetime(&created_at)?,
+        })
+    })
+}
+
 pub fn list_all_tags(conn: &Connection) -> Result<Vec<Tag>> {
     let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags")?;
     let tag_iter = stmt.query_map(params![], |row| {

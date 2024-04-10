@@ -29,7 +29,7 @@ export default function HomePage() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={10}>
-          <div className="px-4">
+          <div className="px-4 pt-4">
             <div className="flex items-center justify-between">
               <EditorTitle />
               <EditorControls />
