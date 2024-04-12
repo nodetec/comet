@@ -46,10 +46,12 @@ pub struct Note {
 
 // Tags
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTagRequest {
     pub name: String,
     pub color: String,
     pub icon: String,
+    pub associated_note: Option<i64>,
 }
 
 #[derive(Deserialize)]

@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateTagRequest, DBConn, GetTagRequest, Tag},
+    models::{APIResponse, CreateTagRequest, DBConn, GetTagRequest, Tag, TagNoteRequest},
 };
 use std::sync::Arc;
 
@@ -15,10 +15,20 @@ impl TagService {
 
     pub fn create_tag(&self, create_tag_request: CreateTagRequest) -> APIResponse<Tag> {
         let conn = self.db_conn.0.lock().unwrap();
-
         match db::create_tag(&conn, &create_tag_request) {
             Ok(tag_id) => {
-                match db::get_tag_by_id(&conn, tag_id as i64) {
+                match create_tag_request.associated_note {
+                    Some(note_id) => {
+                        let tag_note_request = TagNoteRequest {
+                            tag_id: tag_id,
+                            note_id: note_id,
+                        };
+                        db::tag_note(&conn, &tag_note_request).unwrap();
+                    }
+                    None => (),
+                }
+
+                match db::get_tag_by_id(&conn, tag_id) {
                     // Ensure type matches your ID field
                     Ok(tag) => APIResponse {
                         success: true,

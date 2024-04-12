@@ -1,3 +1,4 @@
+import AssociatedTags from "~/components/editor/AssociatedTags";
 import Editor from "~/components/editor/Editor";
 import EditorControls from "~/components/editor/EditorControls";
 import EditorTitle from "~/components/editor/EditorTitle";
@@ -31,7 +32,10 @@ export default function HomePage() {
             <EditorTitle />
             <EditorControls />
           </div>
-          <TagInput />
+          <div className="flex items-center gap-x-2">
+            <AssociatedTags />
+            <TagInput />
+          </div>
           <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>

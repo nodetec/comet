@@ -35,6 +35,7 @@ export type CreateTagRequest = {
   name: string;
   color: string;
   icon: string;
+  associatedNote?: number;
 };
 
 export type GetTagRequest = {

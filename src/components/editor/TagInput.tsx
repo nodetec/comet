@@ -9,6 +9,7 @@ export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
   const { activeNote } = useGlobalState();
+  const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTagName = e.target.value;
@@ -23,27 +24,23 @@ export default function TagInput() {
         return;
       }
 
-      const response = await getTag({ name: tagName });
+      const getTagResponse = await getTag({ name: tagName });
+      const existingTag = getTagResponse.data;
 
-      console.log("Response", response);
+      console.log("Get Tag Response", getTagResponse);
 
-      if (!response.success) {
+      if (!getTagResponse.success) {
         console.log("Creating tag");
-        const response = await createTag({
+        const createTagResponse = await createTag({
           name: tagName,
           color: "",
           icon: "",
+          associatedNote: noteId
         });
-        if (!response.success) {
+        if (!createTagResponse.success) {
           return;
         }
-        if (response.data) {
-          await tagNote({ noteId, tagId: response.data.id });
-          console.log("Tagged note");
-        }
       }
-
-      const existingTag = response.data;
 
       if (existingTag) {
         // if exists, tag note
@@ -51,13 +48,14 @@ export default function TagInput() {
         console.log("Tagged note");
       }
       setTagName("");
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   };
 
   return (
     <Input
       type="text"
-      className="border-none px-1 text-xs focus-visible:ring-0"
+      className="border-none px-1 text-xs focus-visible:ring-0 min-w-12 max-w-28"
       placeholder="Add Tags"
       onKeyDown={handleKeyDown}
       value={tagName}
