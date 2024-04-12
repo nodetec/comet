@@ -42,6 +42,7 @@ impl TagService {
 
     pub fn get_tag(&self, get_tag_request: GetTagRequest) -> APIResponse<Tag> {
         let conn = self.db_conn.0.lock().unwrap();
+        println!("{:?}", get_tag_request);
 
         match get_tag_request {
             GetTagRequest { id: Some(id), .. } => match db::get_tag_by_id(&conn, id) {

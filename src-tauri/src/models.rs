@@ -61,6 +61,8 @@ pub struct UpdateTagRequest {
 }
 
 #[derive(Deserialize)]
+// add debug to print the struct
+#[derive(Debug)]
 pub struct GetTagRequest {
     pub id: Option<i64>,
     pub name: Option<String>,

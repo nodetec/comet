@@ -33,7 +33,8 @@ export type ActiveNote = {
 
 export type CreateTagRequest = {
   name: string;
-  color?: string;
+  color: string;
+  icon: string;
 };
 
 export type GetTagRequest = {

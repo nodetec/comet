@@ -9,7 +9,6 @@ export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
   const { activeNote } = useGlobalState();
-  const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTagName = e.target.value;
@@ -17,22 +16,31 @@ export default function TagInput() {
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-
-
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
-      console.log("Enter key pressed")
       const noteId = activeNote?.id;
       if (noteId === undefined) {
         return;
       }
-      // TODO:
 
-      // check if tag exists
       const response = await getTag({ name: tagName });
 
+      console.log("Response", response);
+
       if (!response.success) {
-        return;
+        console.log("Creating tag");
+        const response = await createTag({
+          name: tagName,
+          color: "",
+          icon: "",
+        });
+        if (!response.success) {
+          return;
+        }
+        if (response.data) {
+          await tagNote({ noteId, tagId: response.data.id });
+          console.log("Tagged note");
+        }
       }
 
       const existingTag = response.data;
@@ -40,15 +48,9 @@ export default function TagInput() {
       if (existingTag) {
         // if exists, tag note
         await tagNote({ noteId, tagId: existingTag.id });
-      } else {
-        const response = await createTag({ name: tagName });
-        if (!response.success) {
-          return;
-        }
-        if (response.data) {
-          await tagNote({ noteId, tagId: response.data.id });
-        }
+        console.log("Tagged note");
       }
+      setTagName("");
     }
   };
 
@@ -58,6 +60,7 @@ export default function TagInput() {
       className="border-none px-1 text-xs focus-visible:ring-0"
       placeholder="Add Tags"
       onKeyDown={handleKeyDown}
+      value={tagName}
       onChange={handleTagChange}
     />
   );
