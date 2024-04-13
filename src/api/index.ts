@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
-  contextMenuRequest,
   type APIResponse,
   type CreateNoteRequest,
   type CreateTagRequest,
@@ -10,6 +9,7 @@ import {
   type Tag,
   type TagNoteRequest,
   type UpdateNoteRequest,
+  CreateContextMenuRequest,
 } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
@@ -66,6 +66,8 @@ export const tagNote = async (tagNoteRequest: TagNoteRequest) => {
   return response;
 };
 
-export const createContextMenu = async (contextMenuRequest: contextMenuRequest ) => {
-  void (await invoke("create_context_menu"), {contextMenuRequest});
+export const createContextMenu = async (
+  createContextMenuRequest: CreateContextMenuRequest,
+) => {
+  void (await invoke("create_context_menu", { createContextMenuRequest }));
 };

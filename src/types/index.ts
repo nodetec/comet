@@ -69,7 +69,7 @@ export type ListNotesRequest = {
   search?: string;
 };
 
-export type contextMenuRequest = {
-  menuKind: "tagItem" | "noteItem";
-  id: number;
+export type CreateContextMenuRequest = {
+  menuKind: "TagItem" | "NoteItem";
+  id?: number;
 };

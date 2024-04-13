@@ -4,20 +4,17 @@
 use std::sync::{Arc, Mutex};
 
 mod services;
-use services::{NoteService, NoteTagService, TagService};
+use services::{ContextMenuService, NoteService, NoteTagService, TagService};
 
-use tauri::{
-    menu::{ContextMenu, Menu, MenuItem},
-    Manager, State,
-};
+use tauri::{AppHandle, State};
 
 mod db;
 
 mod models;
 mod utils;
 use models::{
-    APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest,
-    Note, Tag, TagNoteRequest, UpdateNoteRequest,
+    APIResponse, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest,
+    ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest,
 };
 
 // Notes
@@ -36,6 +33,14 @@ fn update_note(
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Note> {
     note_service.update_note(update_note_request)
+}
+
+#[tauri::command]
+fn delete_note(
+    note_id: i64,
+    note_service: State<'_, NoteService>,
+) -> () {
+    note_service.delete_note(&note_id)
 }
 
 #[tauri::command]
@@ -77,25 +82,13 @@ fn tag_note(
 }
 
 #[tauri::command]
-fn create_context_menu(window: tauri::Window) -> () {
-    let manager = window.app_handle();
-    let context_menu = Menu::with_items(
-        manager,
-        &[
-            &MenuItem::with_id(manager, "open_file", "Open File", true, None::<&str>).unwrap(),
-            &MenuItem::with_id(
-                manager,
-                "open_folder",
-                "Open File Folder",
-                true,
-                None::<&str>,
-            )
-            .unwrap(),
-        ],
-    )
-    .unwrap();
-
-    context_menu.popup(window).unwrap();
+fn create_context_menu(
+    window: tauri::Window,
+    create_context_menu_request: ContextMenuRequest,
+    app_handle: AppHandle,
+    create_menu_service: State<'_, ContextMenuService>,
+) -> APIResponse<()> {
+    create_menu_service.create_context_menu(window, app_handle, &create_context_menu_request)
 }
 
 fn main() {
@@ -104,14 +97,24 @@ fn main() {
     let connection = Arc::new(db_conn);
     let note_service = NoteService::new(connection.clone());
     let tag_service = TagService::new(connection.clone());
-    let tag_note_service = NoteTagService::new(connection.clone());
+    let tag_note_service: NoteTagService = NoteTagService::new(connection.clone());
+    let context_menu_service: ContextMenuService = ContextMenuService::new(connection.clone());
 
     tauri::Builder::default()
         // Here you manage the instantiated NoteService with the Tauri state
         .manage(note_service)
         .manage(tag_service)
         .manage(tag_note_service)
+        .manage(context_menu_service)
         .plugin(tauri_plugin_shell::init())
+        .setup(|app| {
+            {
+              app.on_menu_event(|app_handle: &tauri::AppHandle, event| {
+                println!("menu event: {:?}", event);
+              });
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             create_note,
             update_note,
@@ -120,8 +123,10 @@ fn main() {
             list_tags,
             get_tag,
             tag_note,
-            create_context_menu
+            create_context_menu,
+            delete_note
         ])
+
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

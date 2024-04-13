@@ -1,3 +1,4 @@
+import { createContextMenu } from "~/api";
 import { fromNow } from "~/lib/utils";
 import { useGlobalState } from "~/store";
 import { type Note } from "~/types";
@@ -16,8 +17,16 @@ export default function NoteCard({ note }: Props) {
     setActiveNote(note);
   };
 
+  const handleContextMenu = async (e: any) => {
+    e.preventDefault(); // prevent the default behaviour when right clicked
+    console.log("Right Click");
+    let id = activeNote?.id;
+    await createContextMenu({ menuKind: "NoteItem", id });
+  };
+
   return (
     <div
+      onContextMenu={handleContextMenu}
       onClick={handleSetActiveNote}
       key={note.id}
       className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm ${activeNote?.id === note.id && "bg-muted/80"}`}

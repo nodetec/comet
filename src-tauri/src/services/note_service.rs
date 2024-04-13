@@ -83,4 +83,9 @@ impl NoteService {
             },
         }
     }
+
+    pub fn delete_note(&self, note_id: &i64) -> () {
+        let conn = self.db_conn.0.lock().unwrap();
+        db::delete_note(&conn, &note_id);
+    }
 }

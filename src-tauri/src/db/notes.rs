@@ -94,7 +94,7 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
     Ok(update_note_request.id)
 }
 
-pub fn delete_note(conn: &Connection, note_id: i32) -> Result<usize> {
+pub fn delete_note(conn: &Connection, note_id: &i64) -> () {
     let sql = "DELETE FROM notes WHERE id = ?1";
-    conn.execute(sql, params![note_id])
+    conn.execute(sql, params![note_id]);
 }

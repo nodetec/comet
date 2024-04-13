@@ -88,3 +88,18 @@ pub struct TagNoteRequest {
     pub tag_id: i64,
 }
 
+#[derive(Deserialize)]
+pub enum MenuKind {
+    NoteItem,
+    TagItem,
+}
+
+// Context Menu
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextMenuRequest {
+    pub menu_kind: MenuKind,
+    pub id: Option<i64>,
+}
+
+
