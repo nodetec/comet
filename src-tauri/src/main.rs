@@ -4,15 +4,21 @@
 use std::sync::{Arc, Mutex};
 
 mod services;
-use services::{NoteService, TagService, NoteTagService};
+use services::{NoteService, NoteTagService, TagService};
 
-use tauri::State;
+use tauri::{
+    menu::{ContextMenu, Menu, MenuItem},
+    Manager, State,
+};
 
 mod db;
 
 mod models;
 mod utils;
-use models::{APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest};
+use models::{
+    APIResponse, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest,
+    Note, Tag, TagNoteRequest, UpdateNoteRequest,
+};
 
 // Notes
 
@@ -35,7 +41,7 @@ fn update_note(
 #[tauri::command]
 fn list_notes(
     list_notes_request: ListNotesRequest,
-    note_service: State<'_, NoteService>
+    note_service: State<'_, NoteService>,
 ) -> APIResponse<Vec<Note>> {
     note_service.list_notes(&list_notes_request)
 }
@@ -70,6 +76,28 @@ fn tag_note(
     tag_note_service.tag_note(tag_note_request)
 }
 
+#[tauri::command]
+fn create_context_menu(window: tauri::Window) -> () {
+    let manager = window.app_handle();
+    let context_menu = Menu::with_items(
+        manager,
+        &[
+            &MenuItem::with_id(manager, "open_file", "Open File", true, None::<&str>).unwrap(),
+            &MenuItem::with_id(
+                manager,
+                "open_folder",
+                "Open File Folder",
+                true,
+                None::<&str>,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+
+    context_menu.popup(window).unwrap();
+}
+
 fn main() {
     let conn = db::establish_connection().expect("Failed to connect to database");
     let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
@@ -84,7 +112,16 @@ fn main() {
         .manage(tag_service)
         .manage(tag_note_service)
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![create_note, update_note, list_notes, create_tag, list_tags, get_tag, tag_note])
+        .invoke_handler(tauri::generate_handler![
+            create_note,
+            update_note,
+            list_notes,
+            create_tag,
+            list_tags,
+            get_tag,
+            tag_note,
+            create_context_menu
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

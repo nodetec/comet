@@ -39,9 +39,9 @@ export type CreateTagRequest = {
 };
 
 export type GetTagRequest = {
- id?: number;
- name?: string;
-}
+  id?: number;
+  name?: string;
+};
 
 export type Tag = {
   id: number;
@@ -69,6 +69,7 @@ export type ListNotesRequest = {
   search?: string;
 };
 
-
-
-
+export type contextMenuRequest = {
+  menuKind: "tagItem" | "noteItem";
+  id: number;
+};
