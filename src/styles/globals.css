@@ -80,6 +80,11 @@
   }
 
   .editor-container .cm-editor {
-    height: calc(100vh - 7rem);
+    width: 100%;
+    height: 100%;
+    /* overflow: auto; */
+    /* margin-top: 1rem; */
+    /* padding-left: 1rem; */
+  /*   height: calc(100vh - 7rem); */
   }
 }

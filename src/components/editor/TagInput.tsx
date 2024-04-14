@@ -35,7 +35,7 @@ export default function TagInput() {
           name: tagName,
           color: "",
           icon: "",
-          associatedNote: noteId
+          associatedNote: noteId,
         });
         if (!createTagResponse.success) {
           return;
@@ -53,13 +53,15 @@ export default function TagInput() {
   };
 
   return (
-    <Input
-      type="text"
-      className="border-none px-1 text-xs focus-visible:ring-0 min-w-12 max-w-28"
-      placeholder="Add Tags"
-      onKeyDown={handleKeyDown}
-      value={tagName}
-      onChange={handleTagChange}
-    />
+    <div className="border-t border-muted w-full">
+      <Input
+        type="text"
+        className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"
+        placeholder="Add Tags"
+        onKeyDown={handleKeyDown}
+        value={tagName}
+        onChange={handleTagChange}
+      />
+    </div>
   );
 }

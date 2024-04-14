@@ -25,18 +25,15 @@ export default function HomePage() {
           <NoteFeed />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel className="px-4 pt-4" minSize={10}>
+        <ResizablePanel className="border border-sky-500" minSize={10}>
           <>
             {activeNote && (
               <>
-                <div className="flex justify-between">
-                  <div className="flex max-h-screen flex-col overflow-y-auto">
+                <div className="flex border border-green-500">
+                  {/* <div className="flex w-full py-4 flex-col border border-red-500"> */}
                     <Editor />
-                    <div className="flex items-center gap-x-2">
-                      {/* <AssociatedTags /> */}
-                      <TagInput />
-                    </div>
-                  </div>
+                    <TagInput />
+                  {/* </div> */}
                   <EditorControls />
                 </div>
               </>

@@ -93,6 +93,7 @@ fn create_indexes(conn: &Connection) -> Result<()> {
 }
 
 pub fn establish_connection(db_path: &str) -> Result<Connection> {
+    println!("Connecting to database at: {}", db_path);
     let conn = Connection::open(db_path)?;
     initialize_db(&conn)?;
     create_indexes(&conn)?;

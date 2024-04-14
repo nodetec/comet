@@ -13,6 +13,7 @@ import {
   highlightSpecialChars,
   // lineNumbers,
   rectangularSelection,
+  scrollPastEnd,
   // scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
@@ -58,7 +59,7 @@ export const Editor = () => {
         crosshairCursor(),
         // highlightActiveLine(),
         // highlightSelectionMatches(),
-        // scrollPastEnd(),
+        scrollPastEnd(),
 
         EditorView.lineWrapping,
         // EditorView.domEventHandlers({
@@ -99,7 +100,7 @@ export const Editor = () => {
   return (
     <>
       {activeNote && (
-        <div className="editor-container overflow-hidden" ref={editor}></div>
+        <div className="editor-container w-full overflow-y-auto max-h-screen" ref={editor}></div>
       )}
     </>
   );

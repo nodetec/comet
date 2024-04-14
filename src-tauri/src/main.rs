@@ -149,6 +149,7 @@ fn main() {
         .setup(|app| {
             let db_path = app
                 .path()
+                // create a captainslog directory in the user's data directory
                 .resolve("captains_log.db", BaseDirectory::Data)?;
             let conn = db::establish_connection(db_path.to_str().unwrap()).expect("Failed to connect to database");
             let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
