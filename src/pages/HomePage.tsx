@@ -29,16 +29,15 @@ export default function HomePage() {
           <>
             {activeNote && (
               <>
-                <div className="flex items-center justify-between">
-                  {/*   <EditorTitle /> */}
-                  <EditorControls />
-                </div>
-                <div className="flex max-h-screen flex-col overflow-y-auto">
-                  <Editor />
-                  <div className="flex items-center gap-x-2">
-                    <AssociatedTags />
-                    <TagInput />
+                <div className="flex justify-between">
+                  <div className="flex max-h-screen flex-col overflow-y-auto">
+                    <Editor />
+                    <div className="flex items-center gap-x-2">
+                      <AssociatedTags />
+                      <TagInput />
+                    </div>
                   </div>
+                  <EditorControls />
                 </div>
               </>
             )}
