@@ -1,6 +1,6 @@
 pub mod notes;
-pub mod tags;
 pub mod notes_tags;
+pub mod tags;
 
 use rusqlite::{params, Connection, Result};
 
@@ -65,8 +65,6 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         params![],
     )?;
 
-
-
     Ok(())
 }
 
@@ -107,5 +105,5 @@ pub fn establish_connection() -> Result<Connection> {
 }
 
 pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note};
+pub use notes_tags::{list_notes_for_tag, list_tags_for_note, tag_note, untag_note};
 pub use tags::{create_tag, delete_tag, get_tag_by_id, get_tag_by_name, list_all_tags, update_tag};
-pub use notes_tags::{tag_note, untag_note, list_notes_for_tag, list_tags_for_note};

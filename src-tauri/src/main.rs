@@ -72,7 +72,7 @@ fn get_tag(get_tag_request: GetTagRequest, tag_service: State<'_, TagService>) -
     tag_service.get_tag(get_tag_request)
 }
 
-//Tag Notes
+// Tag Notes
 
 #[tauri::command]
 fn tag_note(
@@ -81,6 +81,8 @@ fn tag_note(
 ) -> APIResponse<()> {
     tag_note_service.tag_note(tag_note_request)
 }
+
+// Context Menu
 
 #[tauri::command]
 fn create_context_menu(
@@ -97,21 +99,19 @@ fn create_context_menu(
 }
 
 #[tauri::command]
-fn handle_menu_event(
-    app_handle: &tauri::AppHandle,
-    event: MenuEvent,
-    // note_service: State<'_, NoteService>,
-) {
+fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
     let app_handle_clone = app_handle.clone();
     let note_service: State<NoteService> = app_handle_clone.state();
+    let tag_service: State<TagService> = app_handle_clone.state();
 
     let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
     let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
 
     let delete_note_menu_id = MenuId(String::from("delete_note"));
+    let delete_tag_menu_id = MenuId(String::from("delete_tag"));
 
     match event.id() {
-        delete_note_menu_id => {
+        id if id == &delete_note_menu_id => {
             note_service.delete_note(&context_menu_item_id.0.unwrap());
             let context_menu_event = ContextMenuEvent {
                 id: match context_menu_item_id.0 {
@@ -119,6 +119,18 @@ fn handle_menu_event(
                     None => 0,
                 },
                 event_kind: String::from("delete_note"),
+            };
+            app_handle.emit("menu_event", context_menu_event).unwrap();
+        }
+
+        id if id == &delete_tag_menu_id => {
+            tag_service.delete_tag(&context_menu_item_id.0.unwrap());
+            let context_menu_event = ContextMenuEvent {
+                id: match context_menu_item_id.0 {
+                    Some(id) => id,
+                    None => 0,
+                },
+                event_kind: String::from("delete_tag"),
             };
             app_handle.emit("menu_event", context_menu_event).unwrap();
         }
@@ -145,7 +157,6 @@ fn main() {
         .manage(tag_note_service)
         .manage(context_menu_service)
         .plugin(tauri_plugin_shell::init())
-        // .manage(MyState("some state value".into()))
         .manage(Mutex::new(ContextMenuItemId(None)))
         .setup(|app| {
             {

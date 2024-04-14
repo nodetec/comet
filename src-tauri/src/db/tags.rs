@@ -16,7 +16,7 @@ pub fn create_tag(conn: &Connection, create_tag_request: &CreateTagRequest) -> R
             &create_tag_request.icon,
             &now
         ],
-    );
+    ).unwrap();
     Ok(conn.last_insert_rowid())
 }
 
@@ -82,7 +82,7 @@ pub fn update_tag(conn: &Connection, update_tag_request: &UpdateTagRequest) -> R
     )
 }
 
-pub fn delete_tag(conn: &Connection, tag_id: i64) -> Result<usize> {
+pub fn delete_tag(conn: &Connection, tag_id: &i64) -> () {
     let sql = "DELETE FROM tags WHERE id = ?1";
-    conn.execute(sql, params![tag_id])
+    conn.execute(sql, params![tag_id]).unwrap();
 }

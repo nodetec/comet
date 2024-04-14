@@ -105,4 +105,9 @@ impl TagService {
             },
         }
     }
+
+    pub fn delete_tag(&self, tag_id: &i64) -> () {
+        let conn = self.db_conn.0.lock().unwrap();
+        db::delete_tag(&conn, &tag_id);
+    }
 }

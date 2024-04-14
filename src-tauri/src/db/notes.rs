@@ -15,7 +15,7 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
             &now,
             &now,
         ],
-    );
+    ).unwrap();
     Ok(conn.last_insert_rowid())
 }
 
@@ -90,11 +90,11 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
             Utc::now().to_rfc3339(),
             &update_note_request.id
         ],
-    );
+    ).unwrap();
     Ok(update_note_request.id)
 }
 
 pub fn delete_note(conn: &Connection, note_id: &i64) -> () {
     let sql = "DELETE FROM notes WHERE id = ?1";
-    conn.execute(sql, params![note_id]);
+    conn.execute(sql, params![note_id]).unwrap();
 }
