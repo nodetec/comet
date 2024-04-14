@@ -102,4 +102,6 @@ pub struct ContextMenuRequest {
     pub id: Option<i64>,
 }
 
+#[derive(Debug)]
+pub struct ContextMenuItemId(pub Option<i64>);
 

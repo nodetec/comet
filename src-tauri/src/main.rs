@@ -6,15 +6,15 @@ use std::sync::{Arc, Mutex};
 mod services;
 use services::{ContextMenuService, NoteService, NoteTagService, TagService};
 
-use tauri::{AppHandle, State};
+use tauri::{menu::{MenuEvent, MenuId}, AppHandle, Manager, State};
 
 mod db;
 
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest,
-    ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest,
+    APIResponse, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest,
+    DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest,
 };
 
 // Notes
@@ -36,10 +36,7 @@ fn update_note(
 }
 
 #[tauri::command]
-fn delete_note(
-    note_id: i64,
-    note_service: State<'_, NoteService>,
-) -> () {
+fn delete_note(note_id: i64, note_service: State<'_, NoteService>) -> () {
     note_service.delete_note(&note_id)
 }
 
@@ -87,8 +84,52 @@ fn create_context_menu(
     create_context_menu_request: ContextMenuRequest,
     app_handle: AppHandle,
     create_menu_service: State<'_, ContextMenuService>,
+    // context_menu_item_id: State<'_, Mutex<ContextMenuItemId>>,
+    // context_menu_item_id_mutex: State<'_, Mutex<ContextMenuItemId>>,
 ) -> APIResponse<()> {
+    let app_handle_clone = app_handle.clone();
+    let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
+    let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
+    // context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
+    context_menu_item_id.0 = Some(12345);
     create_menu_service.create_context_menu(window, app_handle, &create_context_menu_request)
+}
+
+#[tauri::command]
+fn handle_menu_event(
+    app_handle: &tauri::AppHandle,
+    event: MenuEvent,
+    // note_service: State<'_, NoteService>,
+) {
+    let app_handle_clone = app_handle.clone();
+    let note_service: State<'_, NoteService> = app_handle_clone.state();
+    let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
+    let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
+
+    let delete_note_menu_id = MenuId(String::from("delete_note"));
+
+    // match event.id() {
+    //     delete_note_menu_id => {
+    //         println!("id: {:?}", id);
+    //     },
+    //     _ => {
+    //         // context_menu_item_id.0 = None;
+    //     }
+    // }
+
+    // note_service.delete_note(&context_menu_item_id.0.unwrap());
+
+    println!("context_menu_item_id: {:?}", context_menu_item_id);
+    println!("menu event: {:?}", event);
+    // context_menu_item_id.0 = None;
+    // context_menu_item_id.0 = match event.id() {
+    //     Some(id) => id,
+    //     None => None,
+    // };
+    // let menu_item_id = match event.menu_item_id {
+    //     Some(id) => id,
+    //     None => return,
+    // };
 }
 
 fn main() {
@@ -107,11 +148,13 @@ fn main() {
         .manage(tag_note_service)
         .manage(context_menu_service)
         .plugin(tauri_plugin_shell::init())
+        // .manage(MyState("some state value".into()))
+        .manage(Mutex::new(ContextMenuItemId(None)))
         .setup(|app| {
             {
-              app.on_menu_event(|app_handle: &tauri::AppHandle, event| {
-                println!("menu event: {:?}", event);
-              });
+                app.on_menu_event(|app_handle: &tauri::AppHandle, event| {
+                    handle_menu_event(app_handle, event);
+                });
             }
             Ok(())
         })
@@ -126,7 +169,6 @@ fn main() {
             create_context_menu,
             delete_note
         ])
-
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
