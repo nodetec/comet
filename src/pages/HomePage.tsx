@@ -1,7 +1,3 @@
-import { useEffect } from "react";
-
-import { useQueryClient } from "@tanstack/react-query";
-import { listen } from "@tauri-apps/api/event";
 import AssociatedTags from "~/components/editor/AssociatedTags";
 import Editor from "~/components/editor/Editor";
 import EditorControls from "~/components/editor/EditorControls";
@@ -14,28 +10,9 @@ import {
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
 import { useGlobalState } from "~/store";
-import { type ContextMenuEventPayload } from "~/types";
 
 export default function HomePage() {
-  const { activeNote, setActiveNote } = useGlobalState();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    void listen("menu_event", (e) => {
-      console.log("Menu event", e);
-
-      const payload = e.payload as ContextMenuEventPayload;
-
-      console.log("Payload", payload);
-      console.log("Active Note", activeNote);
-
-      if (payload.id === activeNote?.id) {
-        setActiveNote(undefined);
-      }
-
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-    });
-  }, [activeNote, queryClient, setActiveNote]);
+  const { activeNote } = useGlobalState();
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center">

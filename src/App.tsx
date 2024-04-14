@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 
 import { Toaster } from "./components/ui/sonner";
+import { useContextMenuEvent } from "./hooks/useContextMenuEvent";
 import useThemeChange from "./hooks/useThemeChange";
 import HomePage from "./pages/HomePage";
 
@@ -15,6 +16,7 @@ function App() {
   };
 
   useThemeChange(handleThemeChange);
+  useContextMenuEvent();
 
   useEffect(() => {
     localStorage.setItem("vite-ui-theme", "system");
