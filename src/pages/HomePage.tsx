@@ -33,7 +33,7 @@ export default function HomePage() {
                   <div className="flex max-h-screen flex-col overflow-y-auto">
                     <Editor />
                     <div className="flex items-center gap-x-2">
-                      <AssociatedTags />
+                      {/* <AssociatedTags /> */}
                       <TagInput />
                     </div>
                   </div>
