@@ -49,7 +49,7 @@ pub fn get_tag_by_name(conn: &Connection, tag_name: &str) -> Result<Tag> {
 }
 
 pub fn list_all_tags(conn: &Connection) -> Result<Vec<Tag>> {
-    let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags")?;
+    let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags ORDER BY name ASC")?;
     let tag_iter = stmt.query_map(params![], |row| {
         let created_at: String = row.get(4)?;
         Ok(Tag {
