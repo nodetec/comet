@@ -88,15 +88,12 @@ fn create_context_menu(
     create_context_menu_request: ContextMenuRequest,
     app_handle: AppHandle,
     create_menu_service: State<'_, ContextMenuService>,
-    // context_menu_item_id: State<'_, Mutex<ContextMenuItemId>>,
-    // context_menu_item_id_mutex: State<'_, Mutex<ContextMenuItemId>>,
 ) -> APIResponse<()> {
-    let app_handle_clone = app_handle.clone();
-    let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
-    let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
-    // context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
-    context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
-    create_menu_service.create_context_menu(window, app_handle, &create_context_menu_request)
+    create_menu_service.create_context_menu(
+        window,
+        app_handle.clone(),
+        &create_context_menu_request,
+    )
 }
 
 #[tauri::command]
@@ -123,31 +120,13 @@ fn handle_menu_event(
                 },
                 event_kind: String::from("delete_note"),
             };
-            // event_kind: String::from("delete_note"),
-            app_handle
-                .emit("menu_event", context_menu_event)
-                .unwrap();
+            app_handle.emit("menu_event", context_menu_event).unwrap();
         }
 
         _ => {
             context_menu_item_id.0 = None;
         }
     }
-
-    // note_service.delete_note(&context_menu_item_id.0.unwrap());
-
-    println!("context_menu_item_id: {:?}", context_menu_item_id);
-    println!("menu event: {:?}", event);
-
-    // context_menu_item_id.0 = None;
-    // context_menu_item_id.0 = match event.id() {
-    //     Some(id) => id,
-    //     None => None,
-    // };
-    // let menu_item_id = match event.menu_item_id {
-    //     Some(id) => id,
-    //     None => return,
-    // };
 }
 
 fn main() {
@@ -157,7 +136,7 @@ fn main() {
     let note_service = NoteService::new(connection.clone());
     let tag_service = TagService::new(connection.clone());
     let tag_note_service: NoteTagService = NoteTagService::new(connection.clone());
-    let context_menu_service: ContextMenuService = ContextMenuService::new(connection.clone());
+    let context_menu_service: ContextMenuService = ContextMenuService::new();
 
     tauri::Builder::default()
         // Here you manage the instantiated NoteService with the Tauri state

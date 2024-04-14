@@ -1,23 +1,18 @@
+use std::sync::Mutex;
+
 use tauri::{
-    menu::{ContextMenu, Menu, MenuItem}, AppHandle, Manager, Window
+    menu::{ContextMenu, Menu, MenuItem},
+    AppHandle, Manager, State, Window,
 };
 
-use crate::{
-    db,
-    models::{APIResponse, ContextMenuRequest, DBConn, MenuKind},
-};
-use std::sync::Arc;
+use crate::models::{APIResponse, ContextMenuItemId, ContextMenuRequest, MenuKind};
 
-pub struct ContextMenuService {
-    db_conn: Arc<DBConn>,
-}
+pub struct ContextMenuService {}
 fn create_note_context_menu(window: Window) -> APIResponse<()> {
     let manager = window.app_handle();
     let context_menu = Menu::with_items(
         manager,
-        &[
-            &MenuItem::with_id(manager, "delete_note", "Delete", true, None::<&str>).unwrap(),
-        ],
+        &[&MenuItem::with_id(manager, "delete_note", "Delete", true, None::<&str>).unwrap()],
     )
     .unwrap();
 
@@ -30,40 +25,22 @@ fn create_note_context_menu(window: Window) -> APIResponse<()> {
 }
 
 impl ContextMenuService {
-    pub fn new(db_conn: Arc<DBConn>) -> Self {
-        ContextMenuService { db_conn }
+    pub fn new() -> Self {
+        ContextMenuService {}
     }
-
 
     pub fn create_context_menu(
         &self,
         window: Window,
         app_handle: AppHandle,
-        create_menu_request: &ContextMenuRequest,
+        create_context_menu_request: &ContextMenuRequest,
     ) -> APIResponse<()> {
-        
-        match create_menu_request.menu_kind {
-            MenuKind::NoteItem => {
-                println!("Lucky penny!");
-                create_note_context_menu(window)
-            },
-            MenuKind::TagItem => {
-                println!("poobus penny!");
-                create_note_context_menu(window)
-            },
+        let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle.state();
+        let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
+        context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
+        match create_context_menu_request.menu_kind {
+            MenuKind::NoteItem => create_note_context_menu(window),
+            MenuKind::TagItem => create_note_context_menu(window),
         }
-
-        // match db::tag_note(&conn, &tag_note_request) {
-        //     Ok(tag_id) => APIResponse {
-        //         success: true,
-        //         message: Some(format!("Tagged note successfully")),
-        //         data: Some(()),
-        //     },
-        //     Err(e) => APIResponse {
-        //         success: false,
-        //         message: Some(format!("Failed to tag note")),
-        //         data: None,
-        //     },
-        // }
     }
 }
