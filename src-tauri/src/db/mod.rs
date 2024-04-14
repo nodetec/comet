@@ -5,6 +5,8 @@ pub mod tags;
 use rusqlite::{params, Connection, Result};
 
 fn initialize_db(conn: &Connection) -> Result<()> {
+    // TODO: add deleted_at column to all tables
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +26,6 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         color TEXT,
         icon TEXT,
         created_at TEXT NOT NULL,
-        deleted_at TEXT NOT NULL,
         UNIQUE(name)
     )",
         params![],

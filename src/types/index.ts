@@ -10,7 +10,6 @@ export type CreateNoteRequest = {
 
 export type UpdateNoteRequest = {
   id: number;
-  title: string;
   content: string;
 };
 

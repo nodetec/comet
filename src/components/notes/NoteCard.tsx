@@ -28,10 +28,10 @@ export default function NoteCard({ note }: Props) {
 
   const parseTitle = (content: string) => {
     const firstLine = content.split("\n")[0];
-    if (firstLine.length > 0) {
-      return firstLine;
+    if (firstLine.length === 0) {
+      return "New Note";
     }
-    return undefined;
+    return firstLine;
   };
 
   return (
@@ -42,7 +42,7 @@ export default function NoteCard({ note }: Props) {
       className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm ${activeNote?.id === note.id && "bg-muted/80"}`}
     >
       <h2 className="select-none font-semibold text-primary">
-        {parseTitle(note.content) ?? "New Note"}
+        {parseTitle(note.content)}
       </h2>
       <span className="select-none text-muted-foreground">
         {note.content || "No Content"}

@@ -20,7 +20,7 @@ export default function EditorControls() {
       if (title === undefined || content === undefined) {
         return;
       }
-      const note = await createNote({ title, content });
+      const note = await createNote({ content });
       setActiveNote(note.data as ActiveNote);
     } else {
       if (id === undefined || title === undefined || content === undefined) {
