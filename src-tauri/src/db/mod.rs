@@ -92,8 +92,8 @@ fn create_indexes(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn establish_connection() -> Result<Connection> {
-    let conn = Connection::open("captains_log.db")?;
+pub fn establish_connection(db_path: &str) -> Result<Connection> {
+    let conn = Connection::open(db_path)?;
     initialize_db(&conn)?;
     create_indexes(&conn)?;
     Ok(conn)

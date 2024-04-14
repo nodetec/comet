@@ -8,6 +8,7 @@ use services::{ContextMenuService, NoteService, NoteTagService, TagService};
 
 use tauri::{
     menu::{MenuEvent, MenuId},
+    path::BaseDirectory,
     AppHandle, Manager, State,
 };
 
@@ -142,23 +143,24 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
 }
 
 fn main() {
-    let conn = db::establish_connection().expect("Failed to connect to database");
-    let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
-    let connection = Arc::new(db_conn);
-    let note_service = NoteService::new(connection.clone());
-    let tag_service = TagService::new(connection.clone());
-    let tag_note_service: NoteTagService = NoteTagService::new(connection.clone());
-    let context_menu_service: ContextMenuService = ContextMenuService::new();
-
     tauri::Builder::default()
-        // Here you manage the instantiated NoteService with the Tauri state
-        .manage(note_service)
-        .manage(tag_service)
-        .manage(tag_note_service)
-        .manage(context_menu_service)
         .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(ContextMenuItemId(None)))
         .setup(|app| {
+            let db_path = app
+                .path()
+                .resolve("captains_log.db", BaseDirectory::Data)?;
+            let conn = db::establish_connection(db_path.to_str().unwrap()).expect("Failed to connect to database");
+            let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
+            let connection = Arc::new(db_conn);
+            let note_service = NoteService::new(connection.clone());
+            let tag_service = TagService::new(connection.clone());
+            let tag_note_service: NoteTagService = NoteTagService::new(connection.clone());
+            let context_menu_service: ContextMenuService = ContextMenuService::new();
+            app.manage(note_service);
+            app.manage(tag_service);
+            app.manage(tag_note_service);
+            app.manage(context_menu_service);
             {
                 app.on_menu_event(|app_handle: &tauri::AppHandle, event| {
                     handle_menu_event(app_handle, event);
