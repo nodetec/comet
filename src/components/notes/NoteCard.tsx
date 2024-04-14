@@ -26,6 +26,14 @@ export default function NoteCard({ note }: Props) {
     await createContextMenu({ menuKind: "NoteItem", id });
   };
 
+  const parseTitle = (content: string) => {
+    const firstLine = content.split("\n")[0];
+    if (firstLine.length > 0) {
+      return firstLine;
+    }
+    return undefined;
+  };
+
   return (
     <div
       onContextMenu={handleContextMenu}
@@ -33,8 +41,12 @@ export default function NoteCard({ note }: Props) {
       key={note.id}
       className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm ${activeNote?.id === note.id && "bg-muted/80"}`}
     >
-      <h2 className="select-none font-semibold text-primary">{note.title}</h2>
-      <span className="select-none text-muted-foreground">{note.content}</span>
+      <h2 className="select-none font-semibold text-primary">
+        {parseTitle(note.content) ?? "New Note"}
+      </h2>
+      <span className="select-none text-muted-foreground">
+        {note.content || "No Content"}
+      </span>
       <span className="select-none text-xs text-muted-foreground/80">
         {fromNow(note.createdAt)}
       </span>
