@@ -23,14 +23,12 @@ pub struct ListNotesRequest {
 
 #[derive(Deserialize)]
 pub struct CreateNoteRequest {
-    pub title: String,
     pub content: String,
 }
 
 #[derive(Deserialize)]
 pub struct UpdateNoteRequest {
     pub id: i64,
-    pub title: String,
     pub content: String,
 }
 
@@ -38,7 +36,6 @@ pub struct UpdateNoteRequest {
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     pub id: i64,
-    pub title: String,
     pub content: String,
     pub created_at: DateTime<Utc>,
     pub modified_at: DateTime<Utc>,

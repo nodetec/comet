@@ -5,7 +5,6 @@ export type APIResponse<T> = {
 };
 
 export type CreateNoteRequest = {
-  title: string;
   content: string;
 };
 

@@ -6,16 +6,15 @@ import { useGlobalState } from "~/store";
 import { type ContextMenuEventPayload } from "~/types";
 
 export const useContextMenuEvent = () => {
-  const { activeNote, setActiveNote } = useGlobalState();
-
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!activeNote) {
-      return;
-    }
+    const setActiveNote = useGlobalState.getState().setActiveNote;
+    const setActiveTag = useGlobalState.getState().setActiveTag;
 
     void listen("menu_event", (e) => {
+      const activeNote = useGlobalState.getState().activeNote;
+      const activeTag = useGlobalState.getState().activeTag;
       const payload = e.payload as ContextMenuEventPayload;
 
       switch (payload.eventKind) {
@@ -25,9 +24,16 @@ export const useContextMenuEvent = () => {
           }
           void queryClient.invalidateQueries({ queryKey: ["notes"] });
           break;
+        case "delete_tag":
+          console.log("delete_tag", payload.id, activeTag?.id);
+          if (payload.id === activeTag?.id) {
+            setActiveTag(undefined);
+          }
+          void queryClient.invalidateQueries({ queryKey: ["tags"] });
+          break;
         default:
           break;
       }
     });
-  }, [activeNote, queryClient, setActiveNote]);
+  }, []);
 };

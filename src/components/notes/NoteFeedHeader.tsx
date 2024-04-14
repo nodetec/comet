@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { createNote } from "~/api";
 import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
 import { useGlobalState } from "~/store";
-import { type Note } from "~/types";
+import { type CreateNoteRequest, type Note } from "~/types";
 import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
@@ -16,23 +17,29 @@ export default function NoteFeedHeader() {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
-    const newNote: Note = {
-      id: -1,
-      title: "Untitled",
+    const createNoteRequest: CreateNoteRequest = {
       content: "",
-      createdAt: Date.now().toString(),
-      modifiedAt: Date.now().toString(),
     };
 
-    queryClient.setQueryData(["notes"], (previousNotes: Note[]) => {
-      return [newNote, ...previousNotes];
-    });
+    const response = await createNote(createNoteRequest);
+
+    if (!response.success) {
+      console.error("Failed to create note");
+    }
+
+    const newNote = response.data;
+
+    if (!newNote) {
+      console.error("Failed to create note");
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ["notes"] });
     setActiveNote(newNote);
   }
 
   return (
     <div className="flex justify-between pt-2">
-      <div className="flex justify-center items-center gap-x-1">
+      <div className="flex items-center justify-center gap-x-1">
         <Button
           disabled={data?.[0] && data[0].id === -1}
           className="text-muted-foreground"
@@ -42,7 +49,9 @@ export default function NoteFeedHeader() {
         >
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
-        <h1 className="text-lg cursor-default font-bold">{activeTag?.name ?? "All Notes"}</h1>
+        <h1 className="cursor-default text-lg font-bold">
+          {activeTag?.name ?? "All Notes"}
+        </h1>
       </div>
       <div>
         <Button

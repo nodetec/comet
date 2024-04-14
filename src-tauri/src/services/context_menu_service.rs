@@ -24,6 +24,22 @@ fn create_note_context_menu(window: Window) -> APIResponse<()> {
     }
 }
 
+fn create_tag_context_menu(window: Window) -> APIResponse<()> {
+    let manager = window.app_handle();
+    let context_menu = Menu::with_items(
+        manager,
+        &[&MenuItem::with_id(manager, "delete_tag", "Delete", true, None::<&str>).unwrap()],
+    )
+    .unwrap();
+
+    context_menu.popup(window).unwrap();
+    APIResponse {
+        success: true,
+        message: Some(format!("Success")),
+        data: None,
+    }
+}
+
 impl ContextMenuService {
     pub fn new() -> Self {
         ContextMenuService {}
@@ -40,7 +56,7 @@ impl ContextMenuService {
         context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
         match create_context_menu_request.menu_kind {
             MenuKind::NoteItem => create_note_context_menu(window),
-            MenuKind::TagItem => create_note_context_menu(window),
+            MenuKind::TagItem => create_tag_context_menu(window),
         }
     }
 }

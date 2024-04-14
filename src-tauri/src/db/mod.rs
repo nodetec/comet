@@ -8,13 +8,11 @@ fn initialize_db(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
             status_id INTEGER,
             notebook_id INTEGER,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            modified_at TEXT NOT NULL,
-            deleted_at TEXT NOT NULL
+            modified_at TEXT NOT NULL
         )",
         params![],
     )?;
@@ -70,10 +68,6 @@ fn initialize_db(conn: &Connection) -> Result<()> {
 
 fn create_indexes(conn: &Connection) -> Result<()> {
     // Create indexes for notes table
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_notes_title ON notes (title)",
-        params![],
-    )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes (created_at)",
         params![],
