@@ -73,3 +73,8 @@ export type CreateContextMenuRequest = {
   menuKind: "TagItem" | "NoteItem";
   id?: number;
 };
+
+export type ContextMenuEventPayload = {
+  eventKind: string;
+  id?: number;
+};

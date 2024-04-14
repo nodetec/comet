@@ -1,5 +1,3 @@
-import { useGlobalState } from "~/store";
-
 import { Badge } from "../ui/badge";
 
 const tags = ["donut", "sprinkle", "icening", "icening", "icening", "icening", "icening"];

@@ -17,10 +17,12 @@ export default function NoteCard({ note }: Props) {
     setActiveNote(note);
   };
 
-  const handleContextMenu = async (e: any) => {
+  const handleContextMenu = async (
+    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  ) => {
     e.preventDefault(); // prevent the default behaviour when right clicked
     console.log("Right Click");
-    let id = activeNote?.id;
+    const id = note.id;
     await createContextMenu({ menuKind: "NoteItem", id });
   };
 

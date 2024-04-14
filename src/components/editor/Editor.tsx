@@ -11,9 +11,9 @@ import {
   drawSelection,
   dropCursor,
   highlightSpecialChars,
-  lineNumbers,
+  // lineNumbers,
   rectangularSelection,
-  scrollPastEnd,
+  // scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import useThemeChange from "~/hooks/useThemeChange";
@@ -58,12 +58,12 @@ export const Editor = () => {
         crosshairCursor(),
         // highlightActiveLine(),
         // highlightSelectionMatches(),
-        scrollPastEnd(),
+        // scrollPastEnd(),
 
         EditorView.lineWrapping,
-        EditorView.domEventHandlers({
-          blur: (event, view: EditorView) => {},
-        }),
+        // EditorView.domEventHandlers({
+        //   blur: (event, view: EditorView) => {},
+        // }),
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }
@@ -96,7 +96,13 @@ export const Editor = () => {
     };
   }, [theme, activeNote, setActiveNote]);
 
-  return <div className="editor-container overflow-hidden" ref={editor}></div>;
+  return (
+    <>
+      {activeNote && (
+        <div className="editor-container overflow-hidden" ref={editor}></div>
+      )}
+    </>
+  );
 };
 
 export default Editor;

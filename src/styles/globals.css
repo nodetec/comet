@@ -71,7 +71,6 @@
     @apply border-border;
   }
 
-
   body {
     @apply bg-background text-foreground;
   }
@@ -82,16 +81,5 @@
 
   .editor-container .cm-editor {
     height: calc(100vh - 7rem);
-  }
-
-  /* Hide scrollbar for Chrome, Safari and Opera */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Hide scrollbar for IE, Edge and Firefox */
-  .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
   }
 }

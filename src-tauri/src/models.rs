@@ -105,3 +105,10 @@ pub struct ContextMenuRequest {
 #[derive(Debug)]
 pub struct ContextMenuItemId(pub Option<i64>);
 
+#[derive(Serialize)]
+#[derive(Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextMenuEvent {
+    pub event_kind: String,
+    pub id: i64,
+}

@@ -9,7 +9,7 @@ import {
   type Tag,
   type TagNoteRequest,
   type UpdateNoteRequest,
-  CreateContextMenuRequest,
+  type CreateContextMenuRequest,
 } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {

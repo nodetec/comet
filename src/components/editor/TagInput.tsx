@@ -48,7 +48,7 @@ export default function TagInput() {
         console.log("Tagged note");
       }
       setTagName("");
-      queryClient.invalidateQueries({ queryKey: ["tags"] });
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   };
 

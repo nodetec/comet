@@ -6,15 +6,19 @@ use std::sync::{Arc, Mutex};
 mod services;
 use services::{ContextMenuService, NoteService, NoteTagService, TagService};
 
-use tauri::{menu::{MenuEvent, MenuId}, AppHandle, Manager, State};
+use tauri::{
+    menu::{MenuEvent, MenuId},
+    AppHandle, Manager, State,
+};
 
 mod db;
 
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest,
-    DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest,
+    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
+    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest,
+    UpdateNoteRequest,
 };
 
 // Notes
@@ -91,7 +95,7 @@ fn create_context_menu(
     let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
     let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
     // context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
-    context_menu_item_id.0 = Some(12345);
+    context_menu_item_id.0 = Some(create_context_menu_request.id.unwrap());
     create_menu_service.create_context_menu(window, app_handle, &create_context_menu_request)
 }
 
@@ -102,25 +106,39 @@ fn handle_menu_event(
     // note_service: State<'_, NoteService>,
 ) {
     let app_handle_clone = app_handle.clone();
-    let note_service: State<'_, NoteService> = app_handle_clone.state();
+    let note_service: State<NoteService> = app_handle_clone.state();
+
     let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
     let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
 
     let delete_note_menu_id = MenuId(String::from("delete_note"));
 
-    // match event.id() {
-    //     delete_note_menu_id => {
-    //         println!("id: {:?}", id);
-    //     },
-    //     _ => {
-    //         // context_menu_item_id.0 = None;
-    //     }
-    // }
+    match event.id() {
+        delete_note_menu_id => {
+            note_service.delete_note(&context_menu_item_id.0.unwrap());
+            let context_menu_event = ContextMenuEvent {
+                id: match context_menu_item_id.0 {
+                    Some(id) => id,
+                    None => 0,
+                },
+                event_kind: String::from("delete_note"),
+            };
+            // event_kind: String::from("delete_note"),
+            app_handle
+                .emit("menu_event", context_menu_event)
+                .unwrap();
+        }
+
+        _ => {
+            context_menu_item_id.0 = None;
+        }
+    }
 
     // note_service.delete_note(&context_menu_item_id.0.unwrap());
 
     println!("context_menu_item_id: {:?}", context_menu_item_id);
     println!("menu event: {:?}", event);
+
     // context_menu_item_id.0 = None;
     // context_menu_item_id.0 = match event.id() {
     //     Some(id) => id,

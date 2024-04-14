@@ -4,6 +4,8 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { useGlobalState } from "~/store";
 
 import NoteCard from "./NoteCard";
+import NoteFeedHeader from "./NoteFeedHeader";
+import SearchNotes from "./SearchNotes";
 
 export default function NoteFeed() {
   async function fetchNotes() {
@@ -23,8 +25,12 @@ export default function NoteFeed() {
   });
 
   return (
-    <ScrollArea className="flex h-full flex-col pb-24 pt-2">
-      {data?.map((note) => <NoteCard key={note.id} note={note} />)}
-    </ScrollArea>
+    <div className="flex flex-col overflow-y-auto max-h-screen">
+      <NoteFeedHeader />
+      <SearchNotes />
+      <ScrollArea className="flex h-full flex-col pt-2">
+        {data?.map((note) => <NoteCard key={note.id} note={note} />)}
+      </ScrollArea>
+    </div>
   );
 }
