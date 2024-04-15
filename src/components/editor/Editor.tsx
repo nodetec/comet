@@ -11,14 +11,9 @@ import {
   drawSelection,
   dropCursor,
   highlightSpecialChars,
-  lineNumbers,
-  // lineNumbers,
   rectangularSelection,
-  scrollPastEnd,
   // scrollPastEnd,
 } from "@codemirror/view";
-
-import "@codemirror/commands";
 
 import { vim } from "@replit/codemirror-vim";
 import useThemeChange from "~/hooks/useThemeChange";
@@ -26,10 +21,7 @@ import { useGlobalState } from "~/store";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
-import EditorControls from "./EditorControls";
 import TagInput from "./TagInput";
-
-// import { useCountdown } from 'usehooks-ts'
 
 export const Editor = () => {
   const editor = useRef<HTMLDivElement>(null);
@@ -64,23 +56,17 @@ export const Editor = () => {
         rectangularSelection(),
         crosshairCursor(),
         // tabSize.of(2),
-
+        
         // highlightActiveLine(),
         // highlightSelectionMatches(),
         // TODO: scroll past end but only half
         // scrollPastEnd(),
+        
 
         EditorView.lineWrapping,
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
         // }),
-        EditorView.scrollMargins.of((view) => {
-          console.log(view);
-          return {
-            bottom: 100000,
-          };
-        }),
-
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }
