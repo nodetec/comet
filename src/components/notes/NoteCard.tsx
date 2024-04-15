@@ -81,7 +81,7 @@ export default function NoteCard({ note }: Props) {
   };
 
   return (
-    <div className="px-2">
+    <div className="px-3">
       <div
         onContextMenu={handleContextMenu}
         onClick={handleSetActiveNote}

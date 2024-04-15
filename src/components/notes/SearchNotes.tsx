@@ -17,7 +17,7 @@ export default function SearchNotes() {
   };
 
   return (
-    <div className="flex items-center px-2 py-2">
+    <div className="flex items-center px-3 py-2">
       <Input
         placeholder="Search..."
         className="text-muted-foreground/80 placeholder:text-muted-foreground/60 focus-visible:ring-muted-foreground/30"
