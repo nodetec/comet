@@ -11,10 +11,15 @@ export default function NoteFeed() {
   async function fetchNotes() {
     const activeTag = useGlobalState.getState().activeTag;
     const search = useGlobalState.getState().noteSearch;
+    const activeNote = useGlobalState.getState().activeNote;
+    const setActiveNote = useGlobalState.getState().setActiveNote;
     const tagId = activeTag?.id;
     const apiResponse = await listNotes({ tagId, search });
     if (!apiResponse.data) {
       throw new Error("Data not found!");
+    }
+    if (!activeNote) {
+      setActiveNote(apiResponse.data[0])
     }
     return apiResponse.data;
   }
