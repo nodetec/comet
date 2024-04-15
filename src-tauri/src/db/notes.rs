@@ -4,6 +4,8 @@ use rusqlite::{params, Connection, Result}; // Import the Note struct
 
 use chrono::Utc;
 
+use super::list_tags_for_note;
+
 pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -> Result<i64> {
     let now = Utc::now().to_rfc3339();
     let sql = "INSERT INTO notes (content, created_at, modified_at) VALUES (?1, ?2, ?3)";
@@ -56,7 +58,7 @@ pub fn list_all_notes(
     Ok(notes)
 }
 
-pub fn get_note_by_id(conn: &Connection, note_id: i32) -> Result<Note> {
+pub fn get_note_by_id(conn: &Connection, note_id: &i64) -> Result<Note> {
     let mut stmt =
         conn.prepare("SELECT id, content, created_at, modified_at FROM notes WHERE id = ?1")?;
     stmt.query_row(params![note_id], |row| {
@@ -86,6 +88,30 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
 }
 
 pub fn delete_note(conn: &Connection, note_id: &i64) -> () {
-    let sql = "DELETE FROM notes WHERE id = ?1";
-    conn.execute(sql, params![note_id]).unwrap();
+    let now = Utc::now().to_rfc3339();
+    match get_note_by_id(&conn, &note_id) {
+        Ok(note) => {
+            let sql =
+                "INSERT INTO archived_notes (note_id, content, archived_at) VALUES (?1, ?2, ?3)";
+            conn.execute(sql, params![note.id, note.content, &now,])
+                .unwrap();
+            let archived_note_id = conn.last_insert_rowid();
+            match list_tags_for_note(&conn, &note_id) {
+                Ok(tags) => {
+                    for (tag_id) in &tags {
+                        let sql =
+                            "INSERT INTO archived_notes_tags (archived_note_id, tag_id) VALUES (?1, ?2)";
+                        conn.execute(sql, params![archived_note_id, tag_id])
+                            .unwrap();
+                    }
+                    let sql = "DELETE FROM notes_tags WHERE note_id = ?1";
+                    conn.execute(sql, params![note_id]).unwrap();
+                }
+                Err(e) => (),
+            }
+            let sql = "DELETE FROM notes WHERE id = ?1";
+            conn.execute(sql, params![note_id]).unwrap();
+        }
+        Err(e) => (),
+    }
 }

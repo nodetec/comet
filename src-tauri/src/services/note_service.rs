@@ -18,7 +18,7 @@ impl NoteService {
 
         match db::create_note(&conn, &create_note_request) {
             Ok(note_id) => {
-                match db::get_note_by_id(&conn, note_id as i32) {
+                match db::get_note_by_id(&conn, &note_id) {
                     // Ensure type matches your ID field
                     Ok(note) => APIResponse {
                         success: true,
@@ -45,7 +45,7 @@ impl NoteService {
 
         match db::update_note(&conn, &update_note_request) {
             Ok(note_id) => {
-                match db::get_note_by_id(&conn, note_id as i32) {
+                match db::get_note_by_id(&conn, &note_id) {
                     // Ensure type matches your ID field
                     Ok(note) => APIResponse {
                         success: true,

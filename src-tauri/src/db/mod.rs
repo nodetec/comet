@@ -64,6 +64,27 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         params![],
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS archived_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            note_id INTEGER,
+            content TEXT NOT NULL,
+            archived_at TEXT NOT NULL
+        )",
+        params![],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS archived_notes_tags (
+            archived_note_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL,
+            PRIMARY KEY (archived_note_id, tag_id),
+            FOREIGN KEY (archived_note_id) REFERENCES archived_notes(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        )",
+        params![],
+    )?;
+
     Ok(())
 }
 
