@@ -25,20 +25,8 @@ export default function HomePage() {
           <NoteFeed />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel className="border border-sky-500" minSize={10}>
-          <>
-            {activeNote && (
-              <>
-                <div className="flex border border-green-500">
-                  {/* <div className="flex w-full py-4 flex-col border border-red-500"> */}
-                    <Editor />
-                    <TagInput />
-                  {/* </div> */}
-                  <EditorControls />
-                </div>
-              </>
-            )}
-          </>
+        <ResizablePanel className="border-sky-500" minSize={10}>
+          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

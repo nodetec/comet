@@ -11,6 +11,7 @@ import {
   drawSelection,
   dropCursor,
   highlightSpecialChars,
+  lineNumbers,
   // lineNumbers,
   rectangularSelection,
   scrollPastEnd,
@@ -22,6 +23,8 @@ import { useGlobalState } from "~/store";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
+import EditorControls from "./EditorControls";
+import TagInput from "./TagInput";
 
 // import { useCountdown } from 'usehooks-ts'
 
@@ -59,6 +62,7 @@ export const Editor = () => {
         crosshairCursor(),
         // highlightActiveLine(),
         // highlightSelectionMatches(),
+        // TODO: scroll past end but only half
         scrollPastEnd(),
 
         EditorView.lineWrapping,
@@ -100,7 +104,13 @@ export const Editor = () => {
   return (
     <>
       {activeNote && (
-        <div className="editor-container w-full overflow-y-auto max-h-screen" ref={editor}></div>
+        <div className="flex h-full flex-col border-pink-500">
+          <div
+            className="editor-container h-full w-full overflow-y-auto border-orange-500"
+            ref={editor}
+          />
+          <TagInput />
+        </div>
       )}
     </>
   );

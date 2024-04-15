@@ -44,7 +44,7 @@ const darkTheme = createTheme({
     selection: "#036dd6ff",
     selectionMatch: "#036dd6ff",
     lineHighlight: "#8a9199ff",
-    gutterBackground: "#fff",
+    gutterBackground: "#1d1e1f",
     gutterForeground: "#8a919966",
   },
   styles: [
