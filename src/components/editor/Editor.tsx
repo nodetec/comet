@@ -29,11 +29,6 @@ export const Editor = () => {
   const { setActiveNote, activeNote } = useGlobalState();
 
   const theme = useThemeChange();
-
-  // const handleSaveNote = (event: ChangeEvent<HTMLInputElement>) => {
-  //   setActiveNote(event.target.value)
-  // }
-
   useEffect(() => {
     const startState = EditorState.create({
       doc: activeNote?.content,
@@ -55,14 +50,7 @@ export const Editor = () => {
         // autocompletion(),
         rectangularSelection(),
         crosshairCursor(),
-        // tabSize.of(2),
-        
-        // highlightActiveLine(),
-        // highlightSelectionMatches(),
-        // TODO: scroll past end but only half
         // scrollPastEnd(),
-        
-
         EditorView.lineWrapping,
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
@@ -102,9 +90,9 @@ export const Editor = () => {
   return (
     <>
       {activeNote && (
-        <div className="flex h-full flex-col border-pink-500">
+        <div className="flex h-full flex-col">
           <div
-            className="editor-container h-full w-full overflow-y-auto border-orange-500"
+            className="editor-container h-full w-full overflow-y-auto"
             ref={editor}
           />
           <div className="flex items-center">
