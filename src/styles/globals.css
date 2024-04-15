@@ -81,6 +81,7 @@
 
   .editor-container .cm-scroller {
     overflow: auto;
+    /* padding-bottom: 10rem; */
     /* @apply overflow-hidden; */
   }
 

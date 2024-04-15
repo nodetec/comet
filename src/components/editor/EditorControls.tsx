@@ -30,7 +30,7 @@ export default function EditorControls() {
   }
 
   return (
-    <div className="flex flex-col gap-y-2">
+    <div className="flex gap-y-2 p-4">
       <Button onClick={handleSaveNote} variant="outline" size="icon">
         <SaveIcon className="h-[1.2rem] w-[1.2rem]" />
       </Button>

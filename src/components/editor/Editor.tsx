@@ -17,6 +17,9 @@ import {
   scrollPastEnd,
   // scrollPastEnd,
 } from "@codemirror/view";
+
+import "@codemirror/commands";
+
 import { vim } from "@replit/codemirror-vim";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useGlobalState } from "~/store";
@@ -60,15 +63,24 @@ export const Editor = () => {
         // autocompletion(),
         rectangularSelection(),
         crosshairCursor(),
+        // tabSize.of(2),
+
         // highlightActiveLine(),
         // highlightSelectionMatches(),
         // TODO: scroll past end but only half
-        scrollPastEnd(),
+        // scrollPastEnd(),
 
         EditorView.lineWrapping,
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
         // }),
+        EditorView.scrollMargins.of((view) => {
+          console.log(view);
+          return {
+            bottom: 100000,
+          };
+        }),
+
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }
@@ -109,7 +121,10 @@ export const Editor = () => {
             className="editor-container h-full w-full overflow-y-auto border-orange-500"
             ref={editor}
           />
-          <TagInput />
+          <div className="flex items-center">
+            <TagInput />
+            {/* <EditorControls /> */}
+          </div>
         </div>
       )}
     </>
