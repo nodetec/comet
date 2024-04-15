@@ -38,7 +38,7 @@ export default function NoteFeedHeader() {
   }
 
   return (
-    <div className="flex justify-between pt-2">
+    <div className="flex justify-between px-2 pt-2">
       <div className="flex items-center justify-center gap-x-1">
         <Button
           disabled={data?.[0] && data[0].id === -1}

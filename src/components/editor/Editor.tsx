@@ -22,6 +22,7 @@ import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
 import TagInput from "./TagInput";
+import EditorControls from "./EditorControls";
 
 export const Editor = () => {
   const editor = useRef<HTMLDivElement>(null);
@@ -95,9 +96,9 @@ export const Editor = () => {
             className="editor-container h-full w-full overflow-y-auto"
             ref={editor}
           />
-          <div className="flex items-center">
+          <div className="flex items-center border-t border-muted">
             <TagInput />
-            {/* <EditorControls /> */}
+            <EditorControls />
           </div>
         </div>
       )}

@@ -21,7 +21,7 @@ export default function HomePage() {
           <TagList />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel className="px-2" defaultSize={30} minSize={30}>
+        <ResizablePanel defaultSize={30} minSize={30}>
           <NoteFeed />
         </ResizablePanel>
         <ResizableHandle />

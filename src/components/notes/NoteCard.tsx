@@ -46,7 +46,10 @@ export default function NoteCard({ note }: Props) {
 
       for (const line of lines) {
         if (isMarkdownHeading(line)) {
-          return { title: line.replace(/^#+\s/, ""), lineNumber: lines.indexOf(line)};
+          return {
+            title: line.replace(/^#+\s/, ""),
+            lineNumber: lines.indexOf(line),
+          };
         }
       }
     }
@@ -62,9 +65,8 @@ export default function NoteCard({ note }: Props) {
       title += "...";
     }
 
-
     title = title || "New Note";
-    return { title, lineNumber: 0};
+    return { title, lineNumber: 0 };
   };
 
   // whatever the title is, remove it from the content
@@ -79,21 +81,23 @@ export default function NoteCard({ note }: Props) {
   };
 
   return (
-    <div
-      onContextMenu={handleContextMenu}
-      onClick={handleSetActiveNote}
-      key={note.id}
-      className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm ${activeNote?.id === note.id && "bg-muted/80"}`}
-    >
-      <h2 className="select-none font-semibold text-primary">
-        {parseTitle(note.content).title}
-      </h2>
-      <span className="select-none pb-6 text-muted-foreground">
-        {parseContent(note.content)}
-      </span>
-      <span className="select-none text-xs text-muted-foreground/80">
-        {fromNow(note.modifiedAt)}
-      </span>
+    <div className="px-2">
+      <div
+        onContextMenu={handleContextMenu}
+        onClick={handleSetActiveNote}
+        key={note.id}
+        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-2 text-sm ${activeNote?.id === note.id && "bg-muted/80"}`}
+      >
+        <h2 className="select-none font-semibold text-primary">
+          {parseTitle(note.content).title}
+        </h2>
+        <span className="select-none pb-6 text-muted-foreground">
+          {parseContent(note.content)}
+        </span>
+        <span className="select-none text-xs text-muted-foreground/80">
+          {fromNow(note.modifiedAt)}
+        </span>
+      </div>
     </div>
   );
 }

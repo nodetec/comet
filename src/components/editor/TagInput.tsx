@@ -53,7 +53,7 @@ export default function TagInput() {
   };
 
   return (
-    <div className="border-t border-muted w-full">
+    <div className="px-2 py-2 w-full">
       <Input
         type="text"
         className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"
