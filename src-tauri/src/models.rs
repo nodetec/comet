@@ -41,6 +41,16 @@ pub struct Note {
     pub modified_at: DateTime<Utc>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedNote {
+    pub id: i64,
+    pub note_id: i64,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+    pub deleted_at: DateTime<Utc>,
+}
+
 // Tags
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

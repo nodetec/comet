@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateNoteRequest, DBConn, ListNotesRequest, Note, UpdateNoteRequest},
+    models::{APIResponse, ArchivedNote, CreateNoteRequest, DBConn, ListNotesRequest, Note, UpdateNoteRequest},
 };
 use std::sync::Arc;
 
@@ -82,6 +82,28 @@ impl NoteService {
                 data: None,
             },
         }
+    }
+
+    pub fn list_archived_notes(&self, list_notes_request: &ListNotesRequest) -> APIResponse<Vec<ArchivedNote>> {
+        let conn = self.db_conn.0.lock().unwrap();
+
+        match db::list_archived_notes(&conn, &list_notes_request) {
+            Ok(notes) => APIResponse {
+                success: true,
+                message: Some("Notes retrieved successfully".to_string()),
+                data: Some(notes),
+            },
+            Err(e) => APIResponse {
+                success: false,
+                message: Some(format!("Failed to retrieve notes: {}", e)),
+                data: None,
+            },
+        }
+    }
+
+    pub fn archive_note(&self, note_id: &i64) -> () {
+        let conn = self.db_conn.0.lock().unwrap();
+        db::archive_note(&conn, &note_id);
     }
 
     pub fn delete_note(&self, note_id: &i64) -> () {

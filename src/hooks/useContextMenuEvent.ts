@@ -18,7 +18,7 @@ export const useContextMenuEvent = () => {
       const payload = e.payload as ContextMenuEventPayload;
 
       switch (payload.eventKind) {
-        case "delete_note":
+        case "archive_note":
           if (payload.id === activeNote?.id) {
             setActiveNote(undefined);
           }

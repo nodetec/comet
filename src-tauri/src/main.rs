@@ -17,9 +17,7 @@ mod db;
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
-    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest,
-    UpdateNoteRequest,
+    APIResponse, ArchivedNote, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest
 };
 
 // Notes
@@ -41,6 +39,11 @@ fn update_note(
 }
 
 #[tauri::command]
+fn archive_note(note_id: i64, note_service: State<'_, NoteService>) -> () {
+    note_service.archive_note(&note_id)
+}
+
+#[tauri::command]
 fn delete_note(note_id: i64, note_service: State<'_, NoteService>) -> () {
     note_service.delete_note(&note_id)
 }
@@ -51,6 +54,14 @@ fn list_notes(
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Vec<Note>> {
     note_service.list_notes(&list_notes_request)
+}
+
+#[tauri::command]
+fn list_archived_notes(
+    list_notes_request: ListNotesRequest,
+    note_service: State<'_, NoteService>,
+) -> APIResponse<Vec<ArchivedNote>> {
+    note_service.list_archived_notes(&list_notes_request)
 }
 
 // Tags
@@ -108,18 +119,18 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
     let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
     let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
 
-    let delete_note_menu_id = MenuId(String::from("delete_note"));
+    let archive_note_menu_id = MenuId(String::from("archive_note"));
     let delete_tag_menu_id = MenuId(String::from("delete_tag"));
 
     match event.id() {
-        id if id == &delete_note_menu_id => {
-            note_service.delete_note(&context_menu_item_id.0.unwrap());
+        id if id == &archive_note_menu_id => {
+            note_service.archive_note(&context_menu_item_id.0.unwrap());
             let context_menu_event = ContextMenuEvent {
                 id: match context_menu_item_id.0 {
                     Some(id) => id,
                     None => 0,
                 },
-                event_kind: String::from("delete_note"),
+                event_kind: String::from("archive_note"),
             };
             app_handle.emit("menu_event", context_menu_event).unwrap();
         }
@@ -178,7 +189,9 @@ fn main() {
             get_tag,
             tag_note,
             create_context_menu,
-            delete_note
+            delete_note,
+            archive_note,
+            list_archived_notes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

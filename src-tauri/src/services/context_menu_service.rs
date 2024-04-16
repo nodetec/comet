@@ -12,7 +12,7 @@ fn create_note_context_menu(window: Window) -> APIResponse<()> {
     let manager = window.app_handle();
     let context_menu = Menu::with_items(
         manager,
-        &[&MenuItem::with_id(manager, "delete_note", "Delete", true, None::<&str>).unwrap()],
+        &[&MenuItem::with_id(manager, "archive_note", "Delete", true, None::<&str>).unwrap()],
     )
     .unwrap();
 

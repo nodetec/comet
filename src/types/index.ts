@@ -21,6 +21,15 @@ export type Note = {
   modifiedAt: string;
 };
 
+export type ArchivedNote = {
+  id: number;
+  noteId: number;
+  title: string;
+  content: string;
+  createdAt: string;
+  deletedAt: string;
+};
+
 export type ActiveNote = {
   id?: number;
   title?: string;
