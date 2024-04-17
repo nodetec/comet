@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 export default function NoteFeedHeader() {
   const queryClient = useQueryClient();
 
-  const { setActiveNote, activeTag } = useGlobalState();
+  const { activeNote, setActiveNote } = useGlobalState();
   const data = useGetCachedQueryData("notes") as Note[];
 
   async function handleNewNote(
@@ -34,7 +34,26 @@ export default function NoteFeedHeader() {
     }
 
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    setActiveNote(newNote);
+    setActiveNote({
+      context: activeNote.context,
+      note: newNote,
+      tag: activeNote.tag,
+      archivedNote: undefined,
+    });
+  }
+
+  const getHeaderTitle = () => {
+    if (activeNote.tag) {
+      return activeNote.tag.name;
+    }
+
+    if (activeNote.context === "all") {
+      return "All Notes";
+    }
+
+    if (activeNote.context === "archived") {
+      return "Trash";
+    }
   }
 
   return (
@@ -50,7 +69,7 @@ export default function NoteFeedHeader() {
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
         <h1 className="cursor-default text-lg font-bold">
-          {activeTag?.name ?? "All Notes"}
+          {getHeaderTitle()}
         </h1>
       </div>
       <div>

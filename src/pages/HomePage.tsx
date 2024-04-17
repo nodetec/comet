@@ -1,9 +1,7 @@
-import AssociatedTags from "~/components/editor/AssociatedTags";
+import ContextSidebar from "~/components/context/ContextSidebar";
 import Editor from "~/components/editor/Editor";
-import EditorControls from "~/components/editor/EditorControls";
-import TagInput from "~/components/editor/TagInput";
+import ArchiveNoteFeed from "~/components/notes/ArchiveNoteFeed";
 import NoteFeed from "~/components/notes/NoteFeed";
-import TagList from "~/components/tags/TagList";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -18,11 +16,14 @@ export default function HomePage() {
     <div className="flex h-full w-full flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         <ResizablePanel defaultSize={15} minSize={15}>
-          <TagList />
+          <ContextSidebar />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>
-          <NoteFeed />
+          {(activeNote.context === "all" || activeNote.context === "tag") && (
+            <NoteFeed />
+          )}
+          {activeNote.context === "archived" && <ArchiveNoteFeed />}
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel className="border-sky-500" minSize={10}>

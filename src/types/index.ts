@@ -31,11 +31,10 @@ export type ArchivedNote = {
 };
 
 export type ActiveNote = {
-  id?: number;
-  title?: string;
-  content?: string;
-  createdAt: string;
-  modifiedAt: string;
+  context: "all" | "archived" | "tag";
+  note?: Note;
+  tag?: Tag;
+  archivedNote?: ArchivedNote;
 };
 
 export type CreateTagRequest = {
@@ -54,14 +53,6 @@ export type Tag = {
   id: number;
   name: string;
   color: string;
-  createdAt: string;
-  modifiedAt: string;
-};
-
-export type ActiveTag = {
-  id?: number;
-  name?: string;
-  color?: string;
   createdAt: string;
   modifiedAt: string;
 };

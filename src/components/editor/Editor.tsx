@@ -32,7 +32,7 @@ export const Editor = () => {
   const theme = useThemeChange();
   useEffect(() => {
     const startState = EditorState.create({
-      doc: activeNote?.content,
+      doc: activeNote.note?.content,
       extensions: [
         theme === "dark" ? darkTheme : lightTheme,
         vim(),
@@ -60,8 +60,8 @@ export const Editor = () => {
           if (update.focusChanged) {
           }
           if (update.docChanged) {
-            if (activeNote) {
-              activeNote.content = update.state.doc.toString();
+            if (activeNote.note) {
+              activeNote.note.content = update.state.doc.toString();
               setActiveNote(activeNote);
             }
           }

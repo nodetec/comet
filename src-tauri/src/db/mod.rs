@@ -69,6 +69,7 @@ fn initialize_db(conn: &Connection) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             note_id INTEGER,
             content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
             archived_at TEXT NOT NULL
         )",
         params![],
