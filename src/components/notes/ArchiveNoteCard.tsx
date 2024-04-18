@@ -1,19 +1,25 @@
 import { createContextMenu } from "~/api";
+import { fromNow } from "~/lib/utils";
 import { useGlobalState } from "~/store";
-import { ActiveArchiveNote } from "~/types";
+import { ArchivedNote } from "~/types";
 
 type Props = {
-  note: ActiveArchiveNote;
+  note: ArchivedNote;
 };
 
 export default function ArchiveNoteCard({ note }: Props) {
-  const { activeArchiveNote, setActiveArchiveNote } = useGlobalState();
+  const { activeNote, setActiveNote } = useGlobalState();
 
   const handleSetActiveNote = (
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
     e.preventDefault();
-    setActiveArchiveNote(note);
+    setActiveNote({
+      context: "archived",
+      note: undefined,
+      tag: undefined,
+      archivedNote: note,
+    });
   };
 
   const handleContextMenu = async (
@@ -85,7 +91,7 @@ export default function ArchiveNoteCard({ note }: Props) {
         onContextMenu={handleContextMenu}
         onClick={handleSetActiveNote}
         key={note.id}
-        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md border-b px-2 pb-3 pt-3 text-sm ${activeArchiveNote?.id === note.id && "bg-muted/80"}`}
+        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md border-b px-2 pb-3 pt-3 text-sm ${activeNote.archivedNote?.id === note.id && "bg-muted/80"}`}
       >
         <h2 className="select-none font-semibold text-primary">
           {parseTitle(note.content).title}
@@ -93,9 +99,9 @@ export default function ArchiveNoteCard({ note }: Props) {
         <span className="select-none pb-6 text-muted-foreground">
           {parseContent(note.content)}
         </span>
-        {/* <span className="select-none text-xs text-muted-foreground/80"> */}
-        {/*   {fromNow(note.modifiedAt)} */}
-        {/* </span> */}
+        <span className="select-none text-xs text-muted-foreground/80">
+          {fromNow(note.createdAt)}
+        </span>
       </div>
     </div>
   );

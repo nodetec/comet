@@ -32,8 +32,8 @@ export default function ContextSidebar() {
 
   return (
     <ScrollArea className="flex h-full flex-col p-2">
-      <div>activeNote {activeNote.note?.id}</div>
-      <div>archivedNote {activeNote.archivedNote?.id}</div>
+      {/* <div>activeNote {activeNote.note?.id}</div> */}
+      {/* <div>archivedNote {activeNote.archivedNote?.id}</div> */}
       <AllNotes />
       <ArchivedNotes />
       <Accordion type="single" collapsible defaultValue="item-1">

@@ -61,6 +61,7 @@ fn list_archived_notes(
     list_notes_request: ListNotesRequest,
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Vec<ArchivedNote>> {
+    println!("list_archived_notes");
     note_service.list_archived_notes(&list_notes_request)
 }
 

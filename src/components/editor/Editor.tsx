@@ -14,15 +14,14 @@ import {
   rectangularSelection,
   // scrollPastEnd,
 } from "@codemirror/view";
-
 import { vim } from "@replit/codemirror-vim";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useGlobalState } from "~/store";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
-import TagInput from "./TagInput";
 import EditorControls from "./EditorControls";
+import TagInput from "./TagInput";
 
 export const Editor = () => {
   const editor = useRef<HTMLDivElement>(null);
@@ -56,6 +55,7 @@ export const Editor = () => {
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
         // }),
+        EditorState.readOnly.of(activeNote.context === "archived"),
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }

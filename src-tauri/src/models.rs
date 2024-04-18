@@ -48,7 +48,7 @@ pub struct ArchivedNote {
     pub note_id: i64,
     pub content: String,
     pub created_at: DateTime<Utc>,
-    pub deleted_at: DateTime<Utc>,
+    pub archived_at: DateTime<Utc>,
 }
 
 // Tags
