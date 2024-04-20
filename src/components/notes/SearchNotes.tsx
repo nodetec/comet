@@ -4,7 +4,7 @@ import { useGlobalState } from "~/store";
 import { Input } from "../ui/input";
 
 export default function SearchNotes() {
-  const { setNoteSearch } = useGlobalState();
+  const { noteSearch, setNoteSearch } = useGlobalState();
   const queryClient = useQueryClient();
 
   const handleSetSearchNote = async (
@@ -22,6 +22,7 @@ export default function SearchNotes() {
         placeholder="Search..."
         className="text-muted-foreground/80 placeholder:text-muted-foreground/60 focus-visible:ring-muted-foreground/30"
         onChange={handleSetSearchNote}
+        value={noteSearch}
       />
     </div>
   );
