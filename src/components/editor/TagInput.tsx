@@ -19,7 +19,7 @@ export default function TagInput() {
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
-      const noteId = activeNote?.id;
+      const noteId = activeNote.note?.id;
       if (noteId === undefined) {
         return;
       }
