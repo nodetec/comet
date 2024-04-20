@@ -12,9 +12,13 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
     conn.execute(sql, params![&create_note_request.content, &now, &now,])
         .unwrap();
     let rowid = conn.last_insert_rowid();
-    let sql_fts5 = "INSERT INTO notes_fts (rowid, content, created_at, modified_at) VALUES (?1, ?2, ?3, ?4)";
-    conn.execute(sql_fts5, params![rowid, &create_note_request.content, &now, &now,])
-        .unwrap();
+    let sql_fts5 =
+        "INSERT INTO notes_fts (rowid, content, created_at, modified_at) VALUES (?1, ?2, ?3, ?4)";
+    conn.execute(
+        sql_fts5,
+        params![rowid, &create_note_request.content, &now, &now,],
+    )
+    .unwrap();
     Ok(rowid)
 }
 
@@ -33,22 +37,36 @@ pub fn list_all_notes(
         None => "",
     };
 
-    // let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
-    // if tag_id != -1 {
-    //     // If tag_id is valid, add it to the parameters vector
-    //     params_vec.push(&tag_id);
-    //     stmt = conn.prepare(
-    //     "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
-    // )?;
-    // } else {
-    //     // No need to add parameters if tag_id is -1
-    //     stmt = conn.prepare(
-    //         "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
-    //     )?;
-    // }
+    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
-    stmt = conn.prepare("SELECT rowid, content, created_at, modified_at FROM notes_fts WHERE notes_fts MATCH ?")?;
-    let notes_iter = stmt.query_map(params![format!("\"{}\"", search)], |row| {
+    if tag_id != -1 {
+        // If tag_id is valid, add it to the parameters vector
+        params_vec.push(&tag_id);
+        stmt = conn.prepare(
+        "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
+    )?;
+    } else {
+        // No need to add parameters if tag_id is -1
+        stmt = conn.prepare(
+            "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
+        )?;
+    }
+
+    // TODO: search with active tag
+
+    let search = format!("{}", search);
+
+    if search != "" {
+        params_vec.push(&search);
+        stmt = conn.prepare(
+            "SELECT rowid, content, created_at, modified_at FROM notes_fts WHERE notes_fts MATCH ? ORDER BY modified_at DESC",
+        )?;
+    }
+
+    println!("search: {}", search);
+
+    // Use params_vec.as_slice() when you need to pass the parameters
+    let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
         let created_at: String = row.get(2)?;
         let modified_at: String = row.get(3)?;
         Ok(Note {
@@ -58,18 +76,6 @@ pub fn list_all_notes(
             modified_at: parse_datetime(&modified_at)?,
         })
     })?;
-
-    // Use params_vec.as_slice() when you need to pass the parameters
-    // let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
-    //     let created_at: String = row.get(2)?;
-    //     let modified_at: String = row.get(3)?;
-    //     Ok(Note {
-    //         id: row.get(0)?,
-    //         content: row.get(1)?,
-    //         created_at: parse_datetime(&created_at)?,
-    //         modified_at: parse_datetime(&modified_at)?,
-    //     })
-    // })?;
 
     let mut notes = Vec::new();
     for note in notes_iter {
@@ -131,8 +137,11 @@ pub fn archive_note(conn: &Connection, note_id: &i64) -> () {
         Ok(note) => {
             let sql =
                 "INSERT INTO archived_notes (note_id, content, created_at, archived_at) VALUES (?1, ?2, ?3, ?4)";
-            conn.execute(sql, params![note.id, note.content, note.created_at.to_rfc3339(), &now,])
-                .unwrap();
+            conn.execute(
+                sql,
+                params![note.id, note.content, note.created_at.to_rfc3339(), &now,],
+            )
+            .unwrap();
             let archived_note_id = conn.last_insert_rowid();
             match list_tags_for_note(&conn, &note_id) {
                 Ok(tags) => {
@@ -200,3 +209,4 @@ pub fn list_archived_notes(
 
     Ok(notes)
 }
+
