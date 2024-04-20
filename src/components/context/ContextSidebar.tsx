@@ -7,7 +7,6 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { useGlobalState } from "~/store";
 import { TagsIcon } from "lucide-react";
 
 import AllNotes from "./AllNotes";
@@ -15,11 +14,8 @@ import ArchivedNotes from "./ArchivedNotes";
 import TagItem from "./TagItem";
 
 export default function ContextSidebar() {
-  const { activeNote } = useGlobalState();
-
   async function fetchTags() {
     const apiResponse = await listTags();
-    console.log(apiResponse);
     if (apiResponse.data) {
       return apiResponse.data;
     }
@@ -28,12 +24,11 @@ export default function ContextSidebar() {
   const { data } = useQuery({
     queryKey: ["tags"],
     queryFn: fetchTags,
+    refetchOnWindowFocus: false,
   });
 
   return (
     <ScrollArea className="flex h-full flex-col p-2">
-      {/* <div>activeNote {activeNote.note?.id}</div> */}
-      {/* <div>archivedNote {activeNote.archivedNote?.id}</div> */}
       <AllNotes />
       <ArchivedNotes />
       <Accordion type="single" collapsible defaultValue="item-1">

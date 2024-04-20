@@ -11,7 +11,6 @@ import HomePage from "./pages/HomePage";
 
 function App() {
   const handleThemeChange = (theme: string) => {
-    console.log("theme changed");
     console.log("THEME", theme);
   };
 

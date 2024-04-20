@@ -26,7 +26,6 @@ export default function ArchiveNoteCard({ note }: Props) {
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
     e.preventDefault(); // prevent the default behaviour when right clicked
-    console.log("Right Click");
     const id = note.id;
     await createContextMenu({ menuKind: "NoteItem", id });
   };

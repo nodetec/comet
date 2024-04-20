@@ -10,24 +10,23 @@ export const useContextMenuEvent = () => {
 
   useEffect(() => {
     const setActiveNote = useGlobalState.getState().setActiveNote;
-    const setActiveTag = useGlobalState.getState().setActiveTag;
 
     void listen("menu_event", (e) => {
       const activeNote = useGlobalState.getState().activeNote;
-      const activeTag = useGlobalState.getState().activeTag;
       const payload = e.payload as ContextMenuEventPayload;
 
       switch (payload.eventKind) {
         case "archive_note":
-          if (payload.id === activeNote?.id) {
-            setActiveNote(undefined);
+          if (payload.id === activeNote.note?.id) {
+            activeNote.note = undefined;
+            setActiveNote(activeNote);
           }
           void queryClient.invalidateQueries({ queryKey: ["notes"] });
           break;
         case "delete_tag":
-          console.log("delete_tag", payload.id, activeTag?.id);
-          if (payload.id === activeTag?.id) {
-            setActiveTag(undefined);
+          if (payload.id === activeNote.tag?.id) {
+            activeNote.tag = undefined;
+            setActiveNote(activeNote);
           }
           void queryClient.invalidateQueries({ queryKey: ["tags"] });
           break;

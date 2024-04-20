@@ -9,22 +9,18 @@ import ArchiveNoteCard from "./ArchiveNoteCard";
 
 export default function ArchiveNoteFeed() {
   async function fetchNotes() {
-    console.log("fetchNotes archive");
     const search = useGlobalState.getState().noteSearch;
-    const activeNote = useGlobalState.getState().activeNote;
-    const setActiveNote = useGlobalState.getState().setActiveNote;
+    // const activeNote = useGlobalState.getState().activeNote;
+    // const setActiveNote = useGlobalState.getState().setActiveNote;
     const apiResponse = await listArchivedNotes({ tagId: undefined, search });
-
-    console.log("apiResponse archive", apiResponse);
 
     if (!apiResponse.data) {
       throw new Error("Data not found!");
     }
+
     // if (!activeArchiveNote) {
     //   setActiveArchiveNote(apiResponse.data[0])
     // }
-
-    console.log("apiResponse archive", apiResponse);
 
     return apiResponse.data;
   }
@@ -32,6 +28,7 @@ export default function ArchiveNoteFeed() {
   const { data } = useQuery({
     queryKey: ["archived_notes"],
     queryFn: fetchNotes,
+    refetchOnWindowFocus: false,
   });
 
   return (

@@ -27,10 +27,7 @@ export default function TagInput() {
       const getTagResponse = await getTag({ name: tagName });
       const existingTag = getTagResponse.data;
 
-      console.log("Get Tag Response", getTagResponse);
-
       if (!getTagResponse.success) {
-        console.log("Creating tag");
         const createTagResponse = await createTag({
           name: tagName,
           color: "",
@@ -45,7 +42,6 @@ export default function TagInput() {
       if (existingTag) {
         // if exists, tag note
         await tagNote({ noteId, tagId: existingTag.id });
-        console.log("Tagged note");
       }
       setTagName("");
       void queryClient.invalidateQueries({ queryKey: ["tags"] });

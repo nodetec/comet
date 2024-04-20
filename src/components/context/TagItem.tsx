@@ -30,7 +30,6 @@ export default function TagItem({ tag }: Props) {
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
     e.preventDefault(); // prevent the default behaviour when right clicked
-    console.log("Right Click");
     const id = tag.id;
     await createContextMenu({ menuKind: "TagItem", id });
   };

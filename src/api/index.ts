@@ -48,7 +48,6 @@ export const listArchivedNotes = async (listNotesRequest: ListNotesRequest) => {
 export const listTags = async () => {
   // TODO: error handling
   const response: APIResponse<Tag[]> = await invoke("list_tags");
-  console.log(response, "tags");
   return response;
 };
 
