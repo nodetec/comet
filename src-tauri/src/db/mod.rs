@@ -86,6 +86,16 @@ fn initialize_db(conn: &Connection) -> Result<()> {
         params![],
     )?;
 
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+            content,
+            notebook_id UNINDEXED,
+            created_at UNINDEXED,
+            modified_at UNINDEXED
+        )",
+        params![],
+    )?;
+
     Ok(())
 }
 

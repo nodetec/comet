@@ -11,7 +11,11 @@ pub fn create_note(conn: &Connection, create_note_request: &CreateNoteRequest) -
     let sql = "INSERT INTO notes (content, created_at, modified_at) VALUES (?1, ?2, ?3)";
     conn.execute(sql, params![&create_note_request.content, &now, &now,])
         .unwrap();
-    Ok(conn.last_insert_rowid())
+    let rowid = conn.last_insert_rowid();
+    let sql_fts5 = "INSERT INTO notes_fts (rowid, content, created_at, modified_at) VALUES (?1, ?2, ?3, ?4)";
+    conn.execute(sql_fts5, params![rowid, &create_note_request.content, &now, &now,])
+        .unwrap();
+    Ok(rowid)
 }
 
 pub fn list_all_notes(
@@ -24,22 +28,27 @@ pub fn list_all_notes(
         None => -1,
     };
 
-    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
-    if tag_id != -1 {
-        // If tag_id is valid, add it to the parameters vector
-        params_vec.push(&tag_id);
-        stmt = conn.prepare(
-        "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
-    )?;
-    } else {
-        // No need to add parameters if tag_id is -1
-        stmt = conn.prepare(
-            "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
-        )?;
-    }
+    let search = match &list_notes_request.search {
+        Some(search) => search,
+        None => "",
+    };
 
-    // Use params_vec.as_slice() when you need to pass the parameters
-    let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
+    // let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    // if tag_id != -1 {
+    //     // If tag_id is valid, add it to the parameters vector
+    //     params_vec.push(&tag_id);
+    //     stmt = conn.prepare(
+    //     "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
+    // )?;
+    // } else {
+    //     // No need to add parameters if tag_id is -1
+    //     stmt = conn.prepare(
+    //         "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
+    //     )?;
+    // }
+
+    stmt = conn.prepare("SELECT rowid, content, created_at, modified_at FROM notes_fts WHERE notes_fts MATCH ?")?;
+    let notes_iter = stmt.query_map(params![format!("\"{}\"", search)], |row| {
         let created_at: String = row.get(2)?;
         let modified_at: String = row.get(3)?;
         Ok(Note {
@@ -49,6 +58,18 @@ pub fn list_all_notes(
             modified_at: parse_datetime(&modified_at)?,
         })
     })?;
+
+    // Use params_vec.as_slice() when you need to pass the parameters
+    // let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
+    //     let created_at: String = row.get(2)?;
+    //     let modified_at: String = row.get(3)?;
+    //     Ok(Note {
+    //         id: row.get(0)?,
+    //         content: row.get(1)?,
+    //         created_at: parse_datetime(&created_at)?,
+    //         modified_at: parse_datetime(&modified_at)?,
+    //     })
+    // })?;
 
     let mut notes = Vec::new();
     for note in notes_iter {
@@ -84,6 +105,18 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
         ],
     )
     .unwrap();
+
+    let sql_fts5 = "UPDATE notes_fts SET content = ?1, modified_at = ?2 WHERE rowid = ?3";
+    conn.execute(
+        sql_fts5,
+        params![
+            &update_note_request.content,
+            Utc::now().to_rfc3339(),
+            &update_note_request.id
+        ],
+    )
+    .unwrap();
+
     Ok(update_note_request.id)
 }
 
@@ -116,6 +149,8 @@ pub fn archive_note(conn: &Connection, note_id: &i64) -> () {
             }
             let sql = "DELETE FROM notes WHERE id = ?1";
             conn.execute(sql, params![note_id]).unwrap();
+            let sql_fts5 = "DELETE FROM notes_fts WHERE rowid = ?1";
+            conn.execute(sql_fts5, params![note_id]).unwrap();
         }
         Err(e) => (),
     }
