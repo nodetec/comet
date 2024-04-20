@@ -24,7 +24,7 @@
     "@replit/codemirror-vim": "^6.2.1",
     "@tanstack/react-query": "^5.28.9",
     "@tanstack/react-query-devtools": "^5.28.10",
-    "@tauri-apps/api": "^2.0.0-beta.7",
+    "@tauri-apps/api": "^2.0.0-beta.8",
     "@tauri-apps/plugin-shell": "^2.0.0-beta.2",
     "@uiw/codemirror-themes": "^4.21.24",
     "class-variance-authority": "^0.7.0",
@@ -47,7 +47,7 @@
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.2.1",
     "@tailwindcss/typography": "^0.5.12",
-    "@tauri-apps/cli": "^2.0.0-beta.12",
+    "@tauri-apps/cli": "^2.0.0-beta.13",
     "@types/eslint": "^8.56.6",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.67",
