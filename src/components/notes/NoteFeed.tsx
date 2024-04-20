@@ -15,8 +15,6 @@ export default function NoteFeed() {
     const tagId = activeNote?.tag?.id;
     const apiResponse = await listNotes({ tagId, search });
 
-    console.log("apiResponse", apiResponse);
-
     if (!apiResponse.data) {
       throw new Error("Data not found!");
     }
@@ -46,7 +44,6 @@ export default function NoteFeed() {
         tag: activeNote.tag,
         archivedNote: undefined,
       });
-      console.log("test 3");
       return apiResponse.data;
     }
 
@@ -77,6 +74,7 @@ export default function NoteFeed() {
   const { data } = useQuery({
     queryKey: ["notes"],
     queryFn: fetchNotes,
+    refetchOnWindowFocus: false,
   });
 
   return (
