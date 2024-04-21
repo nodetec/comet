@@ -1,7 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::sync::{Arc, Mutex};
+use std::{
+    fs,
+    sync::{Arc, Mutex},
+};
 
 mod services;
 use services::{ContextMenuService, NoteService, NoteTagService, TagService};
@@ -17,7 +20,9 @@ mod db;
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest
+    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
+    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest,
+    UpdateNoteRequest,
 };
 
 // Notes
@@ -150,11 +155,14 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(ContextMenuItemId(None)))
         .setup(|app| {
-            let db_path = app
+            let db_dir = app
                 .path()
-                // create a captainslog directory in the user's data directory
-                .resolve("captains_log.db", BaseDirectory::Data)?;
-            let conn = db::establish_connection(db_path.to_str().unwrap()).expect("Failed to connect to database");
+                .resolve("captainslog", BaseDirectory::Data)
+                .expect("Failed to resolve data directory path");
+            fs::create_dir_all(&db_dir).expect("Failed to create directory");
+            let db_path = db_dir.join("captains_log.db");
+            let conn = db::establish_connection(db_path.to_str().unwrap())
+                .expect("Failed to connect to database");
             let db_conn: DBConn = DBConn(Arc::new(Mutex::new(conn)));
             let connection = Arc::new(db_conn);
             let note_service = NoteService::new(connection.clone());

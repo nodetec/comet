@@ -133,5 +133,5 @@ pub fn establish_connection(db_path: &str) -> Result<Connection> {
 }
 
 pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note, trash_note, list_trashed_notes};
-pub use notes_tags::{list_notes_for_tag, list_tags_for_note, tag_note, untag_note};
+pub use notes_tags::{list_tags_for_note, tag_note, untag_note};
 pub use tags::{create_tag, delete_tag, get_tag_by_id, get_tag_by_name, list_all_tags, update_tag};
