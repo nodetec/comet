@@ -1,8 +1,6 @@
-export type APIResponse<T> = {
-  success: boolean;
-  message: string | undefined;
-  data: T | undefined;
-};
+export type APIResponse<T> =
+  | { data: T; error: never }
+  | { data: never; error: string };
 
 export type CreateNoteRequest = {
   content: string;
@@ -18,30 +16,24 @@ export type Note = {
   title: string;
   content: string;
   createdAt: string;
-  modifiedAt: string;
+  modifiedAt: string | null;
+  trashedAt: string | null;
 };
 
-export type ArchivedNote = {
-  id: number;
-  noteId: number;
-  title: string;
-  content: string;
-  createdAt: string;
-  deletedAt: string;
-};
+type Filter = "all" | "trashed" | "archived";
 
-export type ActiveNote = {
-  context: "all" | "archived" | "tag";
-  note?: Note;
-  tag?: Tag;
-  archivedNote?: ArchivedNote;
+export type AppContext = {
+  filter: Filter;
+  currentNote?: Note;
+  currentTrashedNote?: Note;
+  activeTag?: Tag;
 };
 
 export type CreateTagRequest = {
   name: string;
   color: string;
   icon: string;
-  associatedNote?: number;
+  noteId?: number;
 };
 
 export type GetTagRequest = {
@@ -63,8 +55,13 @@ export type TagNoteRequest = {
 };
 
 export type ListNotesRequest = {
+  filter: Filter;
+  page: number;
+  pageSize: number;
   tagId?: number;
   search?: string;
+  sortBy?: string;
+  status?: "active" | "completed" | "pending" | "published";
 };
 
 export type CreateContextMenuRequest = {

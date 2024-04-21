@@ -8,7 +8,7 @@ import { useGlobalState } from "~/store";
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
-  const { activeNote } = useGlobalState();
+  const { appContext } = useGlobalState();
   const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,22 +19,23 @@ export default function TagInput() {
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
-      const noteId = activeNote.note?.id;
+      const noteId = appContext.currentNote?.id;
       if (noteId === undefined) {
         return;
       }
 
+
       const getTagResponse = await getTag({ name: tagName });
       const existingTag = getTagResponse.data;
 
-      if (!getTagResponse.success) {
+      if (getTagResponse.error) {
         const createTagResponse = await createTag({
           name: tagName,
           color: "",
           icon: "",
-          associatedNote: noteId,
+          noteId,
         });
-        if (!createTagResponse.success) {
+        if (createTagResponse.error) {
           return;
         }
       }

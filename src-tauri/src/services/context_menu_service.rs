@@ -12,16 +12,12 @@ fn create_note_context_menu(window: Window) -> APIResponse<()> {
     let manager = window.app_handle();
     let context_menu = Menu::with_items(
         manager,
-        &[&MenuItem::with_id(manager, "archive_note", "Delete", true, None::<&str>).unwrap()],
+        &[&MenuItem::with_id(manager, "trash_note", "Move To Trash", true, None::<&str>).unwrap()],
     )
     .unwrap();
 
     context_menu.popup(window).unwrap();
-    APIResponse {
-        success: true,
-        message: Some(format!("Success")),
-        data: None,
-    }
+    APIResponse::Data(None)
 }
 
 fn create_tag_context_menu(window: Window) -> APIResponse<()> {
@@ -33,11 +29,7 @@ fn create_tag_context_menu(window: Window) -> APIResponse<()> {
     .unwrap();
 
     context_menu.popup(window).unwrap();
-    APIResponse {
-        success: true,
-        message: Some(format!("Success")),
-        data: None,
-    }
+    APIResponse::Data(None)
 }
 
 impl ContextMenuService {

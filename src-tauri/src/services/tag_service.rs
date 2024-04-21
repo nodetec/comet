@@ -17,7 +17,7 @@ impl TagService {
         let conn = self.db_conn.0.lock().unwrap();
         match db::create_tag(&conn, &create_tag_request) {
             Ok(tag_id) => {
-                match create_tag_request.associated_note {
+                match create_tag_request.note_id {
                     Some(note_id) => {
                         let tag_note_request = TagNoteRequest {
                             tag_id: tag_id,
@@ -30,23 +30,11 @@ impl TagService {
 
                 match db::get_tag_by_id(&conn, tag_id) {
                     // Ensure type matches your ID field
-                    Ok(tag) => APIResponse {
-                        success: true,
-                        message: Some("Tag created successfully".to_string()),
-                        data: Some(tag),
-                    },
-                    Err(e) => APIResponse {
-                        success: false,
-                        message: Some(format!("Failed to retrieve created tag: {}", e)),
-                        data: None,
-                    },
+                    Ok(tag) => APIResponse::Data(Some(tag)),
+                    Err(e) => APIResponse::Error(format!("Failed to retrieve created tag: {}", e)),
                 }
             }
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to create tag: {}", e)),
-                data: None,
-            },
+            Err(e) => APIResponse::Error(format!("Failed to create tag: {}", e)),
         }
     }
 
@@ -56,36 +44,17 @@ impl TagService {
 
         match get_tag_request {
             GetTagRequest { id: Some(id), .. } => match db::get_tag_by_id(&conn, id) {
-                Ok(tag) => APIResponse {
-                    success: true,
-                    message: Some("Tag retrieved successfully".to_string()),
-                    data: Some(tag),
-                },
-                Err(e) => APIResponse {
-                    success: false,
-                    message: Some(format!("Failed to retrieve tag by ID: {}", e)),
-                    data: None,
-                },
+                Ok(tag) => APIResponse::Data(Some(tag)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve tag by ID: {}", e)),
             },
             GetTagRequest {
                 name: Some(name), ..
             } => match db::get_tag_by_name(&conn, &name) {
-                Ok(tag) => APIResponse {
-                    success: true,
-                    message: Some("Tag retrieved successfully".to_string()),
-                    data: Some(tag),
-                },
-                Err(e) => APIResponse {
-                    success: false,
-                    message: Some(format!("Failed to retrieve tag by name: {}", e)),
-                    data: None,
-                },
+                // APIResponse::Success(Some(tag)) => APIResponse::Success(Some(tag)),
+                Ok(tag) => APIResponse::Data(Some(tag)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve tag by name: {}", e)),
             },
-            _ => APIResponse {
-                success: false,
-                message: Some("No ID or Name provided for tag retrieval".to_string()),
-                data: None,
-            },
+            _ => APIResponse::Error("Failed to retrieve tag: no ID or name provided".to_string()),
         }
     }
 
@@ -93,16 +62,8 @@ impl TagService {
         let conn = self.db_conn.0.lock().unwrap();
 
         match db::list_all_tags(&conn) {
-            Ok(tags) => APIResponse {
-                success: true,
-                message: Some("Tags retrieved successfully".to_string()),
-                data: Some(tags),
-            },
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to retrieve tags: {}", e)),
-                data: None,
-            },
+            Ok(tags) => APIResponse::Data(Some(tags)),
+            Err(e) => APIResponse::Error(format!("Failed to retrieve tags: {}", e)),
         }
     }
 

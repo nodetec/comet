@@ -10,7 +10,6 @@ import {
   type TagNoteRequest,
   type UpdateNoteRequest,
   type CreateContextMenuRequest,
-  type ArchivedNote,
 } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
@@ -32,14 +31,6 @@ export const updateNote = async (updateNoteRequest: UpdateNoteRequest) => {
 export const listNotes = async (listNotesRequest: ListNotesRequest) => {
   // TODO: error handling
   const response: APIResponse<Note[]> = await invoke("list_notes", {
-    listNotesRequest,
-  });
-  return response;
-};
-
-export const listArchivedNotes = async (listNotesRequest: ListNotesRequest) => {
-  // TODO: error handling
-  const response: APIResponse<ArchivedNote[]> = await invoke("list_archived_notes", {
     listNotesRequest,
   });
   return response;

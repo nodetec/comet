@@ -1,29 +1,27 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { updateNote } from "~/api";
 import { useGlobalState } from "~/store";
-import { Note } from "~/types";
 import { SaveIcon, SendIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
 
 export default function EditorControls() {
-  const { setActiveNote, activeNote } = useGlobalState();
+  const { setAppContext, appContext } = useGlobalState();
   const queryClient = useQueryClient();
   async function handleSaveNote(
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
-    const content = activeNote.note?.content;
-    const id = activeNote.note?.id;
+    const content = appContext.currentNote?.content;
+    const id = appContext.currentNote?.id;
     if (id === undefined || content === undefined) {
       return;
     }
     const apiResponse = await updateNote({ id, content });
-    setActiveNote({
-      context: activeNote.context,
-      note: apiResponse.data as Note,
-      tag: activeNote.tag,
-      archivedNote: undefined,
+    setAppContext({
+      ...appContext,
+      currentNote: apiResponse.data,
+      currentTrashedNote: undefined,
     });
 
     void queryClient.invalidateQueries({ queryKey: ["notes"] });

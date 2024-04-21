@@ -1,4 +1,4 @@
-use crate::models::{ArchivedNote, CreateNoteRequest, ListNotesRequest, Note, UpdateNoteRequest};
+use crate::models::{CreateNoteRequest, ListNotesRequest, Note, UpdateNoteRequest};
 use crate::utils::parse_datetime;
 use rusqlite::{params, Connection, Result}; // Import the Note struct
 
@@ -73,7 +73,8 @@ pub fn list_all_notes(
             id: row.get(0)?,
             content: row.get(1)?,
             created_at: parse_datetime(&created_at)?,
-            modified_at: parse_datetime(&modified_at)?,
+            modified_at: Some(parse_datetime(&modified_at).unwrap()),
+            trashed_at: None,
         })
     })?;
 
@@ -95,7 +96,8 @@ pub fn get_note_by_id(conn: &Connection, note_id: &i64) -> Result<Note> {
             id: row.get(0)?,
             content: row.get(1)?,
             created_at: parse_datetime(&created_at)?,
-            modified_at: parse_datetime(&modified_at)?,
+            modified_at: Some(parse_datetime(&modified_at).unwrap()),
+            trashed_at: None,
         })
     })
 }
@@ -127,28 +129,28 @@ pub fn update_note(conn: &Connection, update_note_request: &UpdateNoteRequest) -
 }
 
 pub fn delete_note(conn: &Connection, note_id: &i64) -> () {
-    let sql = "DELETE FROM archived_notes WHERE id = ?1";
+    let sql = "DELETE FROM trashed_notes WHERE id = ?1";
     conn.execute(sql, params![note_id]).unwrap();
 }
 
-pub fn archive_note(conn: &Connection, note_id: &i64) -> () {
+pub fn trash_note(conn: &Connection, note_id: &i64) -> () {
     let now = Utc::now().to_rfc3339();
     match get_note_by_id(&conn, &note_id) {
         Ok(note) => {
             let sql =
-                "INSERT INTO archived_notes (note_id, content, created_at, archived_at) VALUES (?1, ?2, ?3, ?4)";
+                "INSERT INTO trashed_notes (note_id, content, created_at, trashed_at) VALUES (?1, ?2, ?3, ?4)";
             conn.execute(
                 sql,
                 params![note.id, note.content, note.created_at.to_rfc3339(), &now,],
             )
             .unwrap();
-            let archived_note_id = conn.last_insert_rowid();
+            let trashed_note_id = conn.last_insert_rowid();
             match list_tags_for_note(&conn, &note_id) {
                 Ok(tags) => {
                     tags.iter().for_each(|tag_id| {
                         let sql =
-                                "INSERT INTO archived_notes_tags (archived_note_id, tag_id) VALUES (?1, ?2)";
-                        conn.execute(sql, params![archived_note_id, tag_id])
+                                "INSERT INTO trashed_notes_tags (trashed_note_id, tag_id) VALUES (?1, ?2)";
+                        conn.execute(sql, params![trashed_note_id, tag_id])
                             .unwrap();
                     });
                     let sql = "DELETE FROM notes_tags WHERE note_id = ?1";
@@ -165,10 +167,10 @@ pub fn archive_note(conn: &Connection, note_id: &i64) -> () {
     }
 }
 
-pub fn list_archived_notes(
+pub fn list_trashed_notes(
     conn: &Connection,
     list_notes_request: &ListNotesRequest,
-) -> Result<Vec<ArchivedNote>> {
+) -> Result<Vec<Note>> {
     let mut stmt;
     let tag_id = match list_notes_request.tag_id {
         Some(tag_id) => tag_id,
@@ -180,25 +182,25 @@ pub fn list_archived_notes(
         // If tag_id is valid, add it to the parameters vector
         params_vec.push(&tag_id);
         stmt = conn.prepare(
-        "SELECT an.id, an.note_id, an.content, an.created_at, an.archived_at FROM archived_notes an JOIN archived_notes_tags ant ON an.id = ant.note_id WHERE ant.tag_id = ?1 ORDER BY an.archived_at DESC",
+        "SELECT an.id, an.note_id, an.content, an.created_at, an.trashed_at FROM trashed_notes an JOIN trashed_notes_tags ant ON an.id = ant.note_id WHERE ant.tag_id = ?1 ORDER BY an.trashed_at DESC",
     )?;
     } else {
         // No need to add parameters if tag_id is -1
         stmt = conn.prepare(
-            "SELECT id, note_id, content, created_at, archived_at FROM archived_notes ORDER BY archived_at DESC",
+            "SELECT id, note_id, content, created_at, trashed_at FROM trashed_notes ORDER BY trashed_at DESC",
         )?;
     }
 
     // Use params_vec.as_slice() when you need to pass the parameters
     let notes_iter = stmt.query_map(params_vec.as_slice(), |row| {
         let created_at: String = row.get(3)?;
-        let archived_at: String = row.get(4)?;
-        Ok(ArchivedNote {
+        let trashed_at: String = row.get(4)?;
+        Ok(Note {
             id: row.get(0)?,
-            note_id: row.get(1)?,
             content: row.get(2)?,
+            modified_at: None,
             created_at: parse_datetime(&created_at)?,
-            archived_at: parse_datetime(&archived_at)?,
+            trashed_at: Some(parse_datetime(&trashed_at).unwrap()),
         })
     })?;
 

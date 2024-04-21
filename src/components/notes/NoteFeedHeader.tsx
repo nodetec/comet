@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 export default function NoteFeedHeader() {
   const queryClient = useQueryClient();
 
-  const { activeNote, setActiveNote } = useGlobalState();
+  const { appContext, setAppContext } = useGlobalState();
   const data = useGetCachedQueryData("notes") as Note[];
 
   async function handleNewNote(
@@ -23,8 +23,8 @@ export default function NoteFeedHeader() {
 
     const response = await createNote(createNoteRequest);
 
-    if (!response.success) {
-      console.error("Failed to create note");
+    if (response.error) {
+      console.error(response.error);
     }
 
     const newNote = response.data;
@@ -34,27 +34,25 @@ export default function NoteFeedHeader() {
     }
 
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    setActiveNote({
-      context: activeNote.context,
-      note: newNote,
-      tag: activeNote.tag,
-      archivedNote: undefined,
+    setAppContext({
+      ...appContext,
+      currentNote: newNote,
     });
   }
 
   const getHeaderTitle = () => {
-    if (activeNote.tag) {
-      return activeNote.tag.name;
+    if (appContext.activeTag) {
+      return appContext.activeTag.name;
     }
 
-    if (activeNote.context === "all") {
+    if (appContext.filter === "all") {
       return "All Notes";
     }
 
-    if (activeNote.context === "archived") {
+    if (appContext.filter === "trashed") {
       return "Trash";
     }
-  }
+  };
 
   return (
     <div className="flex justify-between px-3 pt-2">
@@ -68,9 +66,7 @@ export default function NoteFeedHeader() {
         >
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
-        <h1 className="cursor-default text-lg font-bold">
-          {getHeaderTitle()}
-        </h1>
+        <h1 className="cursor-default text-lg font-bold">{getHeaderTitle()}</h1>
       </div>
       <div>
         <Button

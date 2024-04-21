@@ -6,19 +6,43 @@ use serde::{Deserialize, Serialize};
 
 pub struct DBConn(pub Arc<Mutex<Connection>>);
 
+// response
 #[derive(Serialize)]
-pub struct APIResponse<T> {
-    pub success: bool,
-    pub message: Option<String>,
-    pub data: Option<T>,
+#[serde(rename_all = "camelCase")]
+pub enum APIResponse<T> {
+    Data(Option<T>),
+    Error(String),
 }
 
 // Notes
 #[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NoteFilter {
+    All,
+    Trashed,
+    // Archived,
+    // Saved,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NoteStatus {
+    Active,
+    Completed,
+    Pending,
+    Published,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListNotesRequest {
+    pub filter: NoteFilter,
+    pub page: u32,
+    pub page_size: u32,
     pub tag_id: Option<i64>,
     pub search: Option<String>,
+    pub sort_by: Option<String>,
+    pub status: Option<NoteStatus>,
 }
 
 #[derive(Deserialize)]
@@ -38,17 +62,8 @@ pub struct Note {
     pub id: i64,
     pub content: String,
     pub created_at: DateTime<Utc>,
-    pub modified_at: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArchivedNote {
-    pub id: i64,
-    pub note_id: i64,
-    pub content: String,
-    pub created_at: DateTime<Utc>,
-    pub archived_at: DateTime<Utc>,
+    pub modified_at: Option<DateTime<Utc>>,
+    pub trashed_at: Option<DateTime<Utc>>,
 }
 
 // Tags
@@ -58,7 +73,7 @@ pub struct CreateTagRequest {
     pub name: String,
     pub color: String,
     pub icon: String,
-    pub associated_note: Option<i64>,
+    pub note_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -112,8 +127,7 @@ pub struct ContextMenuRequest {
 #[derive(Debug)]
 pub struct ContextMenuItemId(pub Option<i64>);
 
-#[derive(Serialize)]
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextMenuEvent {
     pub event_kind: String,

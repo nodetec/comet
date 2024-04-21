@@ -1,6 +1,9 @@
 use crate::{
     db,
-    models::{APIResponse, ArchivedNote, CreateNoteRequest, DBConn, ListNotesRequest, Note, UpdateNoteRequest},
+    models::{
+        APIResponse, CreateNoteRequest, DBConn, ListNotesRequest, Note, NoteFilter,
+        UpdateNoteRequest,
+    },
 };
 use std::sync::Arc;
 
@@ -17,26 +20,11 @@ impl NoteService {
         let conn = self.db_conn.0.lock().unwrap();
 
         match db::create_note(&conn, &create_note_request) {
-            Ok(note_id) => {
-                match db::get_note_by_id(&conn, &note_id) {
-                    // Ensure type matches your ID field
-                    Ok(note) => APIResponse {
-                        success: true,
-                        message: Some("Note created successfully".to_string()),
-                        data: Some(note),
-                    },
-                    Err(e) => APIResponse {
-                        success: false,
-                        message: Some(format!("Failed to retrieve created note: {}", e)),
-                        data: None,
-                    },
-                }
-            }
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to create note: {}", e)),
-                data: None,
+            Ok(note_id) => match db::get_note_by_id(&conn, &note_id) {
+                Ok(note) => APIResponse::Data(Some(note)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve created note: {}", e)),
             },
+            Err(e) => APIResponse::Error(format!("Failed to create note: {}", e)),
         }
     }
 
@@ -44,66 +32,33 @@ impl NoteService {
         let conn = self.db_conn.0.lock().unwrap();
 
         match db::update_note(&conn, &update_note_request) {
-            Ok(note_id) => {
-                match db::get_note_by_id(&conn, &note_id) {
-                    // Ensure type matches your ID field
-                    Ok(note) => APIResponse {
-                        success: true,
-                        message: Some("Note updated successfully".to_string()),
-                        data: Some(note),
-                    },
-                    Err(e) => APIResponse {
-                        success: false,
-                        message: Some(format!("Failed to retrieve updated note: {}", e)),
-                        data: None,
-                    },
-                }
-            }
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to update note: {}", e)),
-                data: None,
+            Ok(note_id) => match db::get_note_by_id(&conn, &note_id) {
+                Ok(note) => APIResponse::Data(Some(note)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve updated note: {}", e)),
             },
+            Err(e) => APIResponse::Error(format!("Failed to update note: {}", e)),
         }
     }
 
     pub fn list_notes(&self, list_notes_request: &ListNotesRequest) -> APIResponse<Vec<Note>> {
         let conn = self.db_conn.0.lock().unwrap();
 
-        match db::list_all_notes(&conn, &list_notes_request) {
-            Ok(notes) => APIResponse {
-                success: true,
-                message: Some("Notes retrieved successfully".to_string()),
-                data: Some(notes),
+        match list_notes_request.filter {
+            NoteFilter::All => match db::list_all_notes(&conn, &list_notes_request) {
+                Ok(notes) => APIResponse::Data(Some(notes)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve notes: {}", e)),
             },
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to retrieve notes: {}", e)),
-                data: None,
+
+            NoteFilter::Trashed => match db::list_trashed_notes(&conn, &list_notes_request) {
+                Ok(notes) => APIResponse::Data(Some(notes)),
+                Err(e) => APIResponse::Error(format!("Failed to retrieve notes: {}", e)),
             },
         }
     }
 
-    pub fn list_archived_notes(&self, list_notes_request: &ListNotesRequest) -> APIResponse<Vec<ArchivedNote>> {
+    pub fn trash_note(&self, note_id: &i64) -> () {
         let conn = self.db_conn.0.lock().unwrap();
-
-        match db::list_archived_notes(&conn, &list_notes_request) {
-            Ok(notes) => APIResponse {
-                success: true,
-                message: Some("Notes retrieved successfully".to_string()),
-                data: Some(notes),
-            },
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to retrieve notes: {}", e)),
-                data: None,
-            },
-        }
-    }
-
-    pub fn archive_note(&self, note_id: &i64) -> () {
-        let conn = self.db_conn.0.lock().unwrap();
-        db::archive_note(&conn, &note_id);
+        db::trash_note(&conn, &note_id);
     }
 
     pub fn delete_note(&self, note_id: &i64) -> () {

@@ -1,25 +1,24 @@
-import { type ActiveNote } from "~/types";
+import { type AppContext } from "~/types";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
-  activeNote: ActiveNote;
-  setActiveNote: (note: ActiveNote) => void;
+  appContext: AppContext;
+  setAppContext: (appContext: AppContext) => void;
   noteSearch: string | undefined;
   setNoteSearch: (noteSearch: string | undefined) => void;
 }
 
-// TODO: partial state storage, leave out search
 export const useGlobalState = create<State>()(
   persist(
     (set) => ({
-      activeNote: {
-        context: "all",
-        note: undefined,
-        tag: undefined,
-        archivedNote: undefined,
+      appContext: {
+        filter: "all",
+        currentNote: undefined,
+        activeTag: undefined,
+        currentTrashedNote: undefined,
       },
-      setActiveNote: (note) => set({ activeNote: note }),
+      setAppContext: (appContext) => set({ appContext }),
       noteSearch: undefined,
       setNoteSearch: (noteSearch) => set({ noteSearch: noteSearch }),
     }),

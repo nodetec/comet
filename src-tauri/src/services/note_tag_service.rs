@@ -1,5 +1,3 @@
-use serde_json::Number;
-
 use crate::{
     db,
     models::{APIResponse, DBConn, TagNoteRequest},
@@ -19,17 +17,8 @@ impl NoteTagService {
         let conn = self.db_conn.0.lock().unwrap();
 
         match db::tag_note(&conn, &tag_note_request) {
-            Ok(tag_id) => APIResponse {
-                success: true,
-                message: Some(format!("Tagged note successfully")),
-                data: Some(()),
-
-            },
-            Err(e) => APIResponse {
-                success: false,
-                message: Some(format!("Failed to tag note")),
-                data: None,
-            },
+            Ok(_) => APIResponse::Data(None),
+            Err(e) => APIResponse::Error(format!("Failed to tag note: {}", e)),
         }
     }
 }

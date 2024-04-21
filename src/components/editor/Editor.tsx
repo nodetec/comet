@@ -26,12 +26,15 @@ import TagInput from "./TagInput";
 export const Editor = () => {
   const editor = useRef<HTMLDivElement>(null);
 
-  const { setActiveNote, activeNote } = useGlobalState();
+  const { setAppContext, appContext } = useGlobalState();
 
   const theme = useThemeChange();
   useEffect(() => {
     const startState = EditorState.create({
-      doc: activeNote.note?.content,
+      doc:
+        appContext.currentNote?.content ??
+        appContext.currentTrashedNote?.content
+      ,
       extensions: [
         theme === "dark" ? darkTheme : lightTheme,
         vim(),
@@ -55,14 +58,14 @@ export const Editor = () => {
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
         // }),
-        EditorState.readOnly.of(activeNote.context === "archived"),
+        EditorState.readOnly.of(appContext.filter === "archived" || appContext.filter === "trashed"),
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }
           if (update.docChanged) {
-            if (activeNote.note) {
-              activeNote.note.content = update.state.doc.toString();
-              setActiveNote(activeNote);
+            if (appContext.currentNote) {
+              appContext.currentNote.content = update.state.doc.toString();
+              setAppContext(appContext);
             }
           }
         }),
@@ -86,11 +89,11 @@ export const Editor = () => {
     return () => {
       view.destroy();
     };
-  }, [theme, activeNote, setActiveNote]);
+  }, [theme, appContext, setAppContext]);
 
   return (
     <>
-      {activeNote && (
+      {(appContext.currentNote || appContext.currentTrashedNote) && (
         <div className="flex h-full flex-col">
           <div
             className="editor-container h-full w-full overflow-y-auto"

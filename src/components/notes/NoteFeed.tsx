@@ -9,61 +9,71 @@ import SearchNotes from "./SearchNotes";
 
 export default function NoteFeed() {
   async function fetchNotes() {
-    const activeNote = useGlobalState.getState().activeNote;
+    const appContext = useGlobalState.getState().appContext;
     const search = useGlobalState.getState().noteSearch;
-    const setActiveNote = useGlobalState.getState().setActiveNote;
-    const tagId = activeNote?.tag?.id;
-    const apiResponse = await listNotes({ tagId, search });
+    const setAppContext = useGlobalState.getState().setAppContext;
+    const tagId = appContext.activeTag?.id;
+    const page = 1;
+    const pageSize = 100;
+    const filter = appContext.filter;
+    const apiResponse = await listNotes({
+      filter,
+      tagId,
+      search,
+      page,
+      pageSize,
+    });
 
-    if (!apiResponse.data) {
-      throw new Error("Data not found!");
+    if (apiResponse.error) {
+      throw new Error(apiResponse.error);
     }
 
-    if (apiResponse.data.length === 0 && !activeNote.tag) {
+    if (apiResponse.data.length === 0 && !appContext.activeTag) {
       return [];
     }
 
-    if (apiResponse.data.length === 0 && activeNote.tag) {
-      setActiveNote({
-        context: "tag",
-        note: undefined,
-        tag: activeNote.tag,
-        archivedNote: undefined,
+    if (apiResponse.data.length === 0 && appContext.activeTag) {
+      setAppContext({
+        ...appContext,
+        filter: "all",
+        currentNote: undefined,
+        currentTrashedNote: undefined,
       });
       return [];
     }
 
     if (
-      activeNote.context === "all" &&
-      activeNote.note === undefined &&
+      appContext.filter === "all" &&
+      appContext.currentNote === undefined &&
+      appContext.activeTag === undefined &&
       apiResponse.data.length > 0
     ) {
-      setActiveNote({
-        context: "all",
-        note: apiResponse.data[0],
-        tag: activeNote.tag,
-        archivedNote: undefined,
+      setAppContext({
+        ...appContext,
+        filter: "all",
+        currentNote: apiResponse.data[0],
+        activeTag: undefined,
       });
       return apiResponse.data;
     }
 
-    if (activeNote.context === "tag" && apiResponse.data.length > 0) {
+    if (appContext.filter === "all" && appContext.activeTag !== undefined && apiResponse.data.length > 0) {
       for (const note of apiResponse.data) {
-        if (note.id === activeNote.note?.id) {
-          setActiveNote({
-            context: "tag",
-            note: note,
-            tag: activeNote.tag,
-            archivedNote: undefined,
+        if (note.id === appContext.currentNote?.id) {
+          setAppContext({
+            ...appContext,
+            filter: "all",
+            currentNote: note,
+            currentTrashedNote: undefined,
           });
           return apiResponse.data;
         }
       }
-      setActiveNote({
-        context: "tag",
-        note: undefined,
-        tag: activeNote.tag,
-        archivedNote: undefined,
+      setAppContext({
+        ...appContext,
+        filter: "all",
+        currentNote: undefined,
+        currentTrashedNote: undefined,
       });
       return apiResponse.data;
     }

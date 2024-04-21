@@ -65,22 +65,22 @@ fn initialize_db(conn: &Connection) -> Result<()> {
     )?;
 
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS archived_notes (
+        "CREATE TABLE IF NOT EXISTS trashed_notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             note_id INTEGER,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            archived_at TEXT NOT NULL
+            trashed_at TEXT NOT NULL
         )",
         params![],
     )?;
 
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS archived_notes_tags (
-            archived_note_id INTEGER NOT NULL,
+        "CREATE TABLE IF NOT EXISTS trashed_notes_tags (
+            trashed_note_id INTEGER NOT NULL,
             tag_id INTEGER NOT NULL,
-            PRIMARY KEY (archived_note_id, tag_id),
-            FOREIGN KEY (archived_note_id) REFERENCES archived_notes(id) ON DELETE CASCADE,
+            PRIMARY KEY (trashed_note_id, tag_id),
+            FOREIGN KEY (trashed_note_id) REFERENCES trashed_notes(id) ON DELETE CASCADE,
             FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
         )",
         params![],
@@ -132,6 +132,6 @@ pub fn establish_connection(db_path: &str) -> Result<Connection> {
     Ok(conn)
 }
 
-pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note, archive_note, list_archived_notes};
+pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note, trash_note, list_trashed_notes};
 pub use notes_tags::{list_notes_for_tag, list_tags_for_note, tag_note, untag_note};
 pub use tags::{create_tag, delete_tag, get_tag_by_id, get_tag_by_name, list_all_tags, update_tag};
