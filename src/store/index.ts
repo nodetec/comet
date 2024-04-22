@@ -15,8 +15,8 @@ interface State {
   currentTrashedNote: Note | undefined;
   setCurrentTrashedNote: (currentTrashedNote: Note | undefined) => void;
 
-  noteSearch: string | undefined;
-  setNoteSearch: (noteSearch: string | undefined) => void;
+  noteSearch: string;
+  setNoteSearch: (noteSearch: string) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -34,7 +34,7 @@ export const useAppContext = create<State>()(
       currentTrashedNote: undefined,
       setCurrentTrashedNote: (currentTrashedNote) => set({ currentTrashedNote }),
 
-      noteSearch: undefined,
+      noteSearch: "",
       setNoteSearch: (noteSearch) => set({ noteSearch: noteSearch }),
     }),
     {

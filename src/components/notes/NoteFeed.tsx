@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { listNotes } from "~/api";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -10,6 +12,9 @@ import SearchNotes from "./SearchNotes";
 
 export default function NoteFeed() {
   const { noteSearch } = useAppContext();
+
+  const scrollContainerRef = useRef(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   async function fetchNotes({ pageParam = 1 }) {
     const app = useAppContext.getState();
@@ -27,7 +32,7 @@ export default function NoteFeed() {
       pageSize,
     });
 
-    console.log("apiResponse", apiResponse);
+    // console.log("apiResponse", apiResponse);
 
     if (apiResponse.error) {
       throw new Error(apiResponse.error);
@@ -61,6 +66,7 @@ export default function NoteFeed() {
     status,
   } = useInfiniteQuery({
     queryKey: ["notes", { search: !!noteSearch }],
+    // queryKey: ["notes"],
     queryFn: fetchNotes,
     initialPageParam: 0,
     refetchOnWindowFocus: false,
@@ -88,13 +94,41 @@ export default function NoteFeed() {
     },
   });
 
+  // // Save scroll position when noteSearch changes
+  // useEffect(() => {
+  //   return () => {
+  //     // Cleanup function to run before unmounting or dependencies update
+  //     if (scrollContainerRef.current && noteSearch === "") {
+  //       setScrollPosition(scrollContainerRef.current.scrollTop);
+  //     }
+  //   };
+  // }, [noteSearch]); // Dependency array includes noteSearch to detect when it changes
+  //
+  // // Restore scroll position when returning to the view
+  // useEffect(() => {
+  //   console.log("scrollContainerRef.current", scrollContainerRef.current);
+  //   if (scrollContainerRef.current) {
+  //     scrollContainerRef.current.scrollTop = scrollPosition;
+  //     console.log("scrollPosition", scrollPosition);
+  //   }
+  // }, [scrollPosition]);
+
+  function handleScroll(event: any) {
+    console.log("event.target.scrollTop", event.target.scrollTop);
+    setScrollPosition(event.target.scrollTop);
+  }
+
   if (status === "error") return <p>Error: {error.message}</p>;
 
   return (
-    <div className="flex max-h-screen flex-col overflow-y-auto">
+    <div
+      className="flex max-h-screen flex-col overflow-y-auto"
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+    >
       <NoteFeedHeader />
       <SearchNotes />
-      <ScrollArea className="flex h-full flex-col pt-2">
+      <ScrollArea className="flex h-full flex-col">
         {data &&
           data.pages.map((group, pageIndex) => (
             <ul key={pageIndex}>
