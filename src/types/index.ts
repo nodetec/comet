@@ -13,7 +13,6 @@ export type UpdateNoteRequest = {
 
 export type Note = {
   id: number;
-  title: string;
   content: string;
   createdAt: string;
   modifiedAt: string | null;

@@ -16,7 +16,7 @@ import {
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import useThemeChange from "~/hooks/useThemeChange";
-import { useGlobalState } from "~/store";
+import { useAppContext } from "~/store";
 import { EditorView } from "codemirror";
 
 import { darkTheme, lightTheme } from "./editor-themes";
@@ -26,14 +26,14 @@ import TagInput from "./TagInput";
 export const Editor = () => {
   const editor = useRef<HTMLDivElement>(null);
 
-  const { setAppContext, appContext } = useGlobalState();
+  const { filter, currentNote, currentTrashedNote, setCurrentNote } = useAppContext();
 
   const theme = useThemeChange();
   useEffect(() => {
     const startState = EditorState.create({
       doc:
-        appContext.currentNote?.content ??
-        appContext.currentTrashedNote?.content
+        currentNote?.content ??
+        currentTrashedNote?.content
       ,
       extensions: [
         theme === "dark" ? darkTheme : lightTheme,
@@ -58,14 +58,14 @@ export const Editor = () => {
         // EditorView.domEventHandlers({
         //   blur: (event, view: EditorView) => {},
         // }),
-        EditorState.readOnly.of(appContext.filter === "archived" || appContext.filter === "trashed"),
+        EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
         EditorView.updateListener.of((update) => {
           if (update.focusChanged) {
           }
           if (update.docChanged) {
-            if (appContext.currentNote) {
-              appContext.currentNote.content = update.state.doc.toString();
-              setAppContext(appContext);
+            if (currentNote) {
+              currentNote.content = update.state.doc.toString();
+              setCurrentNote(currentNote);
             }
           }
         }),
@@ -89,11 +89,11 @@ export const Editor = () => {
     return () => {
       view.destroy();
     };
-  }, [theme, appContext, setAppContext]);
+  }, [theme, currentNote, setCurrentNote]);
 
   return (
     <>
-      {(appContext.currentNote || appContext.currentTrashedNote) && (
+      {(currentNote || currentTrashedNote) && (
         <div className="flex h-full flex-col">
           <div
             className="editor-container h-full w-full overflow-y-auto"

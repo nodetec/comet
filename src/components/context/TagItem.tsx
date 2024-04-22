@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContextMenu } from "~/api";
-import { useGlobalState } from "~/store";
+import { useAppContext } from "~/store";
 import { type Tag } from "~/types";
 
 type Props = {
@@ -8,7 +8,9 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const { appContext, setAppContext } = useGlobalState();
+  const { activeTag, setFilter, setActiveTag, setCurrentTrashedNote } =
+    useAppContext();
+
   const queryClient = useQueryClient();
 
   const handleSetActiveTag = async (
@@ -16,14 +18,10 @@ export default function TagItem({ tag }: Props) {
   ) => {
     e.preventDefault();
 
-    setAppContext({
-      ...appContext,
-      filter: "all",
-      activeTag: tag,
-      currentTrashedNote: undefined,
-    });
-
-    await queryClient.invalidateQueries({ queryKey: ["notes"] });
+    setFilter("all");
+    setActiveTag(tag);
+    setCurrentTrashedNote(undefined);
+    void queryClient.invalidateQueries({ queryKey: ["notes"] });
   };
 
   const handleContextMenu = async (
@@ -39,10 +37,10 @@ export default function TagItem({ tag }: Props) {
       onContextMenu={handleContextMenu}
       onClick={handleSetActiveTag}
       key={tag.id}
-      className={`flex h-full w-full cursor-pointer select-none flex-col rounded-md px-4 py-2 text-sm font-medium ${tag.name === appContext.activeTag?.name && "bg-muted/80"}`}
+      className={`flex h-full w-full cursor-pointer select-none flex-col rounded-md px-4 py-2 text-sm font-medium ${tag.name === activeTag?.name && "bg-muted/80"}`}
     >
       <span
-        className={`select-none text-muted-foreground ${tag.name === appContext.activeTag?.name && "text-secondary-foreground"}`}
+        className={`select-none text-muted-foreground ${tag.name === activeTag?.name && "text-secondary-foreground"}`}
       >
         {tag.name}
       </span>

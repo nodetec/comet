@@ -3,12 +3,12 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createTag, getTag, tagNote } from "~/api";
 import { Input } from "~/components/ui/input";
-import { useGlobalState } from "~/store";
+import { useAppContext } from "~/store";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
-  const { appContext } = useGlobalState();
+  const { currentNote } = useAppContext();
   const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -19,11 +19,10 @@ export default function TagInput() {
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
-      const noteId = appContext.currentNote?.id;
+      const noteId = currentNote?.id;
       if (noteId === undefined) {
         return;
       }
-
 
       const getTagResponse = await getTag({ name: tagName });
       const existingTag = getTagResponse.data;
@@ -50,7 +49,7 @@ export default function TagInput() {
   };
 
   return (
-    <div className="px-2 py-2 w-full">
+    <div className="w-full px-2 py-2">
       <Input
         type="text"
         className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"

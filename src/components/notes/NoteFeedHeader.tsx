@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createNote } from "~/api";
 import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
-import { useGlobalState } from "~/store";
+import { useAppContext } from "~/store";
 import { type CreateNoteRequest, type Note } from "~/types";
 import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
 
@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 export default function NoteFeedHeader() {
   const queryClient = useQueryClient();
 
-  const { appContext, setAppContext } = useGlobalState();
+  const { filter, activeTag, setCurrentNote } = useAppContext();
   const data = useGetCachedQueryData("notes") as Note[];
 
   async function handleNewNote(
@@ -34,22 +34,19 @@ export default function NoteFeedHeader() {
     }
 
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    setAppContext({
-      ...appContext,
-      currentNote: newNote,
-    });
+    setCurrentNote(newNote);
   }
 
   const getHeaderTitle = () => {
-    if (appContext.activeTag) {
-      return appContext.activeTag.name;
+    if (activeTag) {
+      return activeTag.name;
     }
 
-    if (appContext.filter === "all") {
+    if (filter === "all") {
       return "All Notes";
     }
 
-    if (appContext.filter === "trashed") {
+    if (filter === "trashed") {
       return "Trash";
     }
   };

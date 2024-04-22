@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useGlobalState } from "~/store";
+import { useAppContext } from "~/store";
 
 import { Input } from "../ui/input";
 
 export default function SearchNotes() {
-  const { noteSearch, setNoteSearch } = useGlobalState();
+  const { noteSearch, setNoteSearch } = useAppContext();
   const queryClient = useQueryClient();
 
   const handleSetSearchNote = async (

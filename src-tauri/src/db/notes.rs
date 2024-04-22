@@ -39,16 +39,26 @@ pub fn list_all_notes(
 
     let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
+    // params_vec.push(&list_notes_request.limit);
+    // params_vec.push(&list_notes_request.offset);
+    println!("page: {}", list_notes_request.page);
+    println!("page_size: {}", list_notes_request.page_size);
+    let offset = (list_notes_request.page) * list_notes_request.page_size;
+    let limit = list_notes_request.page_size;
+    println!("offset: {}", offset);
+    params_vec.push(&limit);
+    params_vec.push(&offset);
+
     if tag_id != -1 {
         // If tag_id is valid, add it to the parameters vector
         params_vec.push(&tag_id);
         stmt = conn.prepare(
-        "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?1 ORDER BY n.modified_at DESC",
+        "SELECT n.id, n.content, n.created_at, n.modified_at FROM notes n JOIN notes_tags nt ON n.id = nt.note_id WHERE nt.tag_id = ?3 ORDER BY n.modified_at DESC LIMIT ?1 OFFSET ?2",
     )?;
     } else {
         // No need to add parameters if tag_id is -1
         stmt = conn.prepare(
-            "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC",
+            "SELECT id, content, created_at, modified_at FROM notes ORDER BY modified_at DESC LIMIT ?1 OFFSET ?2",
         )?;
     }
 
@@ -59,7 +69,7 @@ pub fn list_all_notes(
     if search != "" {
         params_vec.push(&search);
         stmt = conn.prepare(
-            "SELECT rowid, content, created_at, modified_at FROM notes_fts WHERE notes_fts MATCH ? ORDER BY modified_at DESC",
+            "SELECT rowid, content, created_at, modified_at FROM notes_fts WHERE notes_fts MATCH ?3 ORDER BY modified_at DESC LIMIT ?1 OFFSET ?2",
         )?;
     }
 
@@ -211,4 +221,3 @@ pub fn list_trashed_notes(
 
     Ok(notes)
 }
-
