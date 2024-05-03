@@ -15,7 +15,7 @@ import TrashedNotes from "./TrashedNotes";
 
 export default function ContextSidebar() {
   async function fetchTags() {
-    const apiResponse = await listTags();
+    const apiResponse = await listTags({});
     if (apiResponse.data) {
       return apiResponse.data;
     }

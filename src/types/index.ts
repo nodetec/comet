@@ -17,6 +17,7 @@ export type Note = {
   createdAt: string;
   modifiedAt: string | null;
   trashedAt: string | null;
+  tags: Tag[];
 };
 
 type Filter = "all" | "trashed" | "archived";
@@ -38,6 +39,10 @@ export type CreateTagRequest = {
 export type GetTagRequest = {
   id?: number;
   name?: string;
+};
+
+export type ListTagsRequest = {
+  noteId?: number;
 };
 
 export type Tag = {

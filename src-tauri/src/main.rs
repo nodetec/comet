@@ -20,9 +20,7 @@ mod db;
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
-    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, Note, Tag, TagNoteRequest,
-    UpdateNoteRequest,
+    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, ListTagsRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest
 };
 
 // Notes
@@ -72,8 +70,11 @@ fn create_tag(
 }
 
 #[tauri::command]
-fn list_tags(tag_service: State<'_, TagService>) -> APIResponse<Vec<Tag>> {
-    tag_service.list_tags()
+fn list_tags(
+    list_tags_request: ListTagsRequest,
+    tag_service: State<'_, TagService>,
+) -> APIResponse<Vec<Tag>> {
+    tag_service.list_tags(&list_tags_request)
 }
 
 #[tauri::command]

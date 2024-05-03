@@ -10,6 +10,7 @@ import {
   type TagNoteRequest,
   type UpdateNoteRequest,
   type CreateContextMenuRequest,
+  ListTagsRequest,
 } from "~/types";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
@@ -36,9 +37,11 @@ export const listNotes = async (listNotesRequest: ListNotesRequest) => {
   return response;
 };
 
-export const listTags = async () => {
+export const listTags = async (listTagsRequest: ListTagsRequest) => {
   // TODO: error handling
-  const response: APIResponse<Tag[]> = await invoke("list_tags");
+  const response: APIResponse<Tag[]> = await invoke("list_tags", {
+    listTagsRequest,
+  });
   return response;
 };
 

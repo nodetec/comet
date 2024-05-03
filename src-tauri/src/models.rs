@@ -46,6 +46,12 @@ pub struct ListNotesRequest {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListTagsRequest {
+    pub note_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
 pub struct CreateNoteRequest {
     pub content: String,
 }

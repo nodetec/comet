@@ -1,5 +1,5 @@
 use crate::{
-    models::{CreateTagRequest, Tag, UpdateTagRequest},
+    models::{CreateTagRequest, ListTagsRequest, Tag, UpdateTagRequest},
     utils::parse_datetime,
 };
 use chrono::Utc;
@@ -48,9 +48,33 @@ pub fn get_tag_by_name(conn: &Connection, tag_name: &str) -> Result<Tag> {
     })
 }
 
-pub fn list_all_tags(conn: &Connection) -> Result<Vec<Tag>> {
-    let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags ORDER BY name ASC")?;
-    let tag_iter = stmt.query_map(params![], |row| {
+pub fn list_all_tags(
+    conn: &Connection,
+    list_notes_request: &ListTagsRequest,
+) -> Result<Vec<Tag>> {
+    let mut stmt;
+    let note_id = match list_notes_request.note_id {
+        Some(note_id) => note_id,
+        None => -1,
+    };
+    println!("{note_id}");
+    let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::new();
+
+    if note_id != -1 {
+        // If note_id is valid, add it to the parameters vector
+        params_vec.push(&note_id);
+        stmt = conn.prepare(
+        "SELECT t.id, t.name, t.color, t.icon, t.created_at FROM tags t JOIN notes_tags nt ON t.id = nt.tag_id WHERE nt.note_id = ?1 ORDER BY t.name ASC",
+    )?;
+    } else {
+        // No need to add parameters if note_id is -1
+        stmt = conn.prepare(
+            "SELECT id, name, color, icon, created_at FROM tags ORDER BY name ASC",
+        )?;
+    }
+
+    // let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags ORDER BY name ASC")?;
+    let tag_iter = stmt.query_map(params_vec.as_slice(), |row| {
         let created_at: String = row.get(4)?;
         Ok(Tag {
             id: row.get(0)?,
