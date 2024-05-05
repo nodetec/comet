@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{APIResponse, CreateTagRequest, DBConn, GetTagRequest, Tag, TagNoteRequest},
+    models::{APIResponse, CreateTagRequest, DBConn, GetTagRequest, ListTagsRequest, Tag, TagNoteRequest},
 };
 use std::sync::Arc;
 
@@ -58,10 +58,10 @@ impl TagService {
         }
     }
 
-    pub fn list_tags(&self) -> APIResponse<Vec<Tag>> {
+    pub fn list_tags(&self, list_tags_request: &ListTagsRequest) -> APIResponse<Vec<Tag>> {
         let conn = self.db_conn.0.lock().unwrap();
 
-        match db::list_all_tags(&conn) {
+        match db::list_all_tags(&conn, &list_tags_request) {
             Ok(tags) => APIResponse::Data(Some(tags)),
             Err(e) => APIResponse::Error(format!("Failed to retrieve tags: {}", e)),
         }

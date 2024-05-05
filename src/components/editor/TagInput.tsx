@@ -4,11 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createTag, getTag, tagNote } from "~/api";
 import { Input } from "~/components/ui/input";
 import { useAppContext } from "~/store";
+import { Badge } from "../ui/badge";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
-  const { currentNote } = useAppContext();
+  const { currentNote, setCurrentNote } = useAppContext();
   const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,6 +35,11 @@ export default function TagInput() {
           icon: "",
           noteId,
         });
+        console.log(createTagResponse);
+        if(createTagResponse.data && currentNote){
+          currentNote.tags.push(createTagResponse.data);
+          setCurrentNote(currentNote);
+        }
         if (createTagResponse.error) {
           return;
         }
@@ -42,6 +48,10 @@ export default function TagInput() {
       if (existingTag) {
         // if exists, tag note
         await tagNote({ noteId, tagId: existingTag.id });
+        if(currentNote){
+          currentNote.tags.push(existingTag);
+          setCurrentNote(currentNote);
+        }
       }
       setTagName("");
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
@@ -50,14 +60,20 @@ export default function TagInput() {
 
   return (
     <div className="w-full px-2 py-2">
-      <Input
-        type="text"
-        className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"
-        placeholder="Add Tags"
-        onKeyDown={handleKeyDown}
-        value={tagName}
-        onChange={handleTagChange}
-      />
+      <div className="flex gap-x-2">
+        {currentNote?.tags &&
+          currentNote?.tags.map((tag, tagIndex) => {
+            return <Badge key={tagIndex} variant="secondary">{tag.name}</Badge>;
+          })}
+        <Input
+          type="text"
+          className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"
+          placeholder="Add Tags"
+          onKeyDown={handleKeyDown}
+          value={tagName}
+          onChange={handleTagChange}
+        />
+      </div>
     </div>
   );
 }

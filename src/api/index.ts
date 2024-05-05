@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  ListTagsRequest,
   type APIResponse,
   type CreateContextMenuRequest,
   type CreateNoteRequest,
@@ -36,9 +37,11 @@ export const listNotes = async (listNotesRequest: ListNotesRequest) => {
   return response;
 };
 
-export const listTags = async () => {
+export const listTags = async (listTagsRequest: ListTagsRequest) => {
   // TODO: error handling
-  const response: APIResponse<Tag[]> = await invoke("list_tags");
+  const response: APIResponse<Tag[]> = await invoke("list_tags", {
+    listTagsRequest,
+  });
   return response;
 };
 
@@ -72,6 +75,6 @@ export const createContextMenu = async (
 };
 
 export const signEvent = async (event: String) => {
-  const response = (await invoke("sign_event", { event }));
+  const response = await invoke("sign_event", { event });
   return response;
 };
