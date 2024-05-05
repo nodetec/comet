@@ -1,7 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { updateNote } from "~/api";
+import { signEvent, updateNote } from "~/api";
 import { useAppContext } from "~/store";
 import { SaveIcon, SendIcon } from "lucide-react";
+import {
+  Event,
+  EventTemplate,
+  getEventHash,
+  Relay,
+  UnsignedEvent,
+} from "nostr-tools";
 
 import { Button } from "../ui/button";
 
@@ -29,6 +36,27 @@ export default function EditorControls() {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
+
+    const t: UnsignedEvent = {
+      kind: 1,
+      tags: [],
+      content: currentNote?.content ?? "",
+      pubkey:
+        "220522c2c32b3bf29006b275e224b285d64bb19f79bda906991bcb3861e18cb4",
+      created_at: Math.floor(Date.now() / 1000),
+    };
+
+    const eventHash = getEventHash(t);
+
+    t.id = eventHash;
+
+    const signedEvent = (await signEvent(JSON.stringify(t))) as string;
+
+    const relay = await Relay.connect("wss://nos.lol");
+
+    console.log(signedEvent);
+
+    await relay.publish(JSON.parse(signedEvent));
   }
 
   return (

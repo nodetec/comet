@@ -6,7 +6,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use nostr_sdk::prelude::*;
+
 mod services;
+use nostr_sdk::UnsignedEvent;
 use services::{ContextMenuService, NoteService, NoteTagService, TagService};
 
 use tauri::{
@@ -108,6 +111,24 @@ fn create_context_menu(
 }
 
 #[tauri::command]
+async fn sign_event(event: String) -> String {
+    println!("{:?}", event);
+
+    let unsigned_event = UnsignedEvent::from_json(event).unwrap();
+
+    println!("{:?}", unsigned_event);
+
+    let signed_event = nip_70::Nip70Client::default()
+        .sign_event(unsigned_event)
+        .await
+        .unwrap();
+
+    return signed_event.as_json().to_string();
+
+    // println!("{:?}", nip_70::sign_event(event).await.unwrap());
+}
+
+#[tauri::command]
 fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
     let app_handle_clone = app_handle.clone();
     let note_service: State<NoteService> = app_handle_clone.state();
@@ -181,6 +202,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            sign_event,
             create_note,
             update_note,
             list_notes,

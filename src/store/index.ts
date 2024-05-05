@@ -17,6 +17,9 @@ interface State {
 
   noteSearch: string;
   setNoteSearch: (noteSearch: string) => void;
+
+  noteContent: string | undefined;
+  setNoteContent: (noteContent: string | undefined) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -36,6 +39,9 @@ export const useAppContext = create<State>()(
 
       noteSearch: "",
       setNoteSearch: (noteSearch) => set({ noteSearch: noteSearch }),
+
+      noteContent: undefined,
+      setNoteContent: (noteContent) => set({ noteContent }),
     }),
     {
       name: "captains-log-storage",
