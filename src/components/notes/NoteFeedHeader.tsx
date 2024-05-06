@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createNote } from "~/api";
+import { createNote, tagNote } from "~/api";
 import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
 import { useAppContext } from "~/store";
 import { type CreateNoteRequest, type Note } from "~/types";
@@ -34,6 +34,12 @@ export default function NoteFeedHeader() {
     }
 
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
+
+    if (activeTag) {
+      newNote.tags = [activeTag];
+      await tagNote({ noteId: newNote.id, tagId: activeTag.id });
+    }
+
     setCurrentNote(newNote);
   }
 

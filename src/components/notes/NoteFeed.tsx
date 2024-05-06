@@ -11,7 +11,7 @@ import NoteFeedHeader from "./NoteFeedHeader";
 import SearchNotes from "./SearchNotes";
 
 export default function NoteFeed() {
-  const { noteSearch } = useAppContext();
+  const { noteSearch, setCurrentNote, currentNote } = useAppContext();
 
   const scrollContainerRef = useRef(null);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -32,10 +32,15 @@ export default function NoteFeed() {
       pageSize,
     });
 
-    // console.log("apiResponse", apiResponse);
-
     if (apiResponse.error) {
       throw new Error(apiResponse.error);
+    }
+
+    if (tagId && currentNote?.tags) {
+      const tagIds = currentNote.tags.map((tag) => tag.id);
+      if (!tagIds.includes(tagId)) {
+        setCurrentNote(undefined);
+      }
     }
 
     const notes = apiResponse.data;

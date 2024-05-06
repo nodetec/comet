@@ -1,7 +1,7 @@
 import { createContextMenu, listTags } from "~/api";
 import { fromNow } from "~/lib/utils";
 import { useAppContext } from "~/store";
-import { Tag, type Note } from "~/types";
+import { type Note } from "~/types";
 
 type Props = {
   note: Note;
@@ -10,10 +10,10 @@ type Props = {
 export default function NoteCard({ note }: Props) {
   const { currentNote, setCurrentNote } = useAppContext();
 
-  async function fetchNoteTags() : Promise<Tag[]> {
+  async function fetchNoteTags() {
     const noteId = note.id;
     const apiResponse = await listTags({
-      noteId
+      noteId,
     });
 
     if (apiResponse.error) {
@@ -23,14 +23,12 @@ export default function NoteCard({ note }: Props) {
     return apiResponse.data;
   }
 
-  const handleSetActiveNote = (
+  const handleSetActiveNote = async (
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
     e.preventDefault();
-    fetchNoteTags().then(result => {
-      note.tags = result;
-    });
-
+    const currentNoteTags = await fetchNoteTags();
+    note.tags = currentNoteTags;
     setCurrentNote(note);
   };
 

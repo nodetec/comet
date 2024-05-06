@@ -3,13 +3,17 @@ import { useAppContext } from "~/store";
 import { NotepadText } from "lucide-react";
 
 export default function AllNotes() {
-  const { filter, activeTag, setFilter, setActiveTag, setCurrentTrashedNote } = useAppContext();
+  const { filter, activeTag, setFilter, setActiveTag, setCurrentNote, setCurrentTrashedNote } = useAppContext();
   const queryClient = useQueryClient();
 
   const handleSetAllNotes = async (
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
   ) => {
     e.preventDefault();
+
+    if (filter === "trashed" || filter === "archived") {
+      setCurrentNote(undefined);
+    }
 
     setFilter("all");
     setActiveTag(undefined);
