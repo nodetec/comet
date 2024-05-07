@@ -63,7 +63,7 @@ export default function TagInput() {
       <div className="flex gap-x-2">
         {currentNote?.tags &&
           currentNote?.tags.map((tag, tagIndex) => {
-            return <Badge key={tagIndex} variant="secondary">{tag.name}</Badge>;
+            return <Badge key={tagIndex} className="select-none cursor-default rounded-full" variant="secondary">{tag.name}</Badge>;
           })}
         <Input
           type="text"
