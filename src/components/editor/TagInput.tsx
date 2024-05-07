@@ -4,12 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createTag, getTag, tagNote } from "~/api";
 import { Input } from "~/components/ui/input";
 import { useAppContext } from "~/store";
+
 import { Badge } from "../ui/badge";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
 
-  const { currentNote, setCurrentNote } = useAppContext();
+  const { currentNote, setCurrentNote, filter } = useAppContext();
   const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,7 +37,7 @@ export default function TagInput() {
           noteId,
         });
         console.log(createTagResponse);
-        if(createTagResponse.data && currentNote){
+        if (createTagResponse.data && currentNote) {
           currentNote.tags.push(createTagResponse.data);
           setCurrentNote(currentNote);
         }
@@ -48,7 +49,7 @@ export default function TagInput() {
       if (existingTag) {
         // if exists, tag note
         await tagNote({ noteId, tagId: existingTag.id });
-        if(currentNote){
+        if (currentNote) {
           currentNote.tags.push(existingTag);
           setCurrentNote(currentNote);
         }
@@ -63,16 +64,27 @@ export default function TagInput() {
       <div className="flex gap-x-2">
         {currentNote?.tags &&
           currentNote?.tags.map((tag, tagIndex) => {
-            return <Badge key={tagIndex} className="select-none cursor-default rounded-full" variant="secondary">{tag.name}</Badge>;
+            return (
+              <Badge
+                key={tagIndex}
+                className="cursor-default select-none rounded-full"
+                variant="secondary"
+              >
+                {tag.name}
+              </Badge>
+            );
           })}
-        <Input
-          type="text"
-          className="min-w-12 max-w-28 border-none px-1 text-xs focus-visible:ring-0"
-          placeholder="Add Tags"
-          onKeyDown={handleKeyDown}
-          value={tagName}
-          onChange={handleTagChange}
-        />
+
+        {filter !== "trashed" && filter !== "archived" && (
+          <Input
+            type="text"
+            className="min-w-12 max-w-full border-none px-1 text-xs focus-visible:ring-0"
+            placeholder="Add Tags"
+            onKeyDown={handleKeyDown}
+            value={tagName}
+            onChange={handleTagChange}
+          />
+        )}
       </div>
     </div>
   );
