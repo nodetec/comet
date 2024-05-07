@@ -1,10 +1,9 @@
 import { useEffect } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { updateNote } from "~/api";
 import { useCM6Editor } from "~/hooks/useCM6Editor";
-import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
 import { useAppContext } from "~/store";
-import { Note } from "~/types";
 
 import EditorControls from "./EditorControls";
 import TagInput from "./TagInput";
@@ -17,10 +16,10 @@ export const Editor = () => {
 
   const onChange = (doc: string) => {
     console.log("hello");
-    if (currentNote) {
-      currentNote.content = doc;
-      setCurrentNote(currentNote);
-    }
+    if (!currentNote) return;
+    currentNote.content = doc;
+    setCurrentNote(currentNote);
+    // @ts-ignore
     const notes = data.pages[0].data;
 
     const firstNote = notes[0];
@@ -31,6 +30,9 @@ export const Editor = () => {
     //
     if (firstNote.id !== currentNote?.id) {
       console.log("firstNote.id", firstNote.id);
+
+      updateNote({ id: currentNote.id, content: doc });
+
       void queryClient.invalidateQueries({
         queryKey: [
           "notes",
