@@ -8,6 +8,7 @@ type Props = {
 };
 
 export default function NoteCard({ note }: Props) {
+
   const { currentNote, setCurrentNote } = useAppContext();
 
   async function fetchNoteTags() {

@@ -1,95 +1,57 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-import { closeBrackets } from "@codemirror/autocomplete";
-import { history } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { bracketMatching, indentOnInput } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
-import { EditorState } from "@codemirror/state";
-import {
-  crosshairCursor,
-  drawSelection,
-  dropCursor,
-  highlightSpecialChars,
-  rectangularSelection,
-  // scrollPastEnd,
-} from "@codemirror/view";
-import { vim } from "@replit/codemirror-vim";
-import useThemeChange from "~/hooks/useThemeChange";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCM6Editor } from "~/hooks/useCM6Editor";
+import { useGetCachedQueryData } from "~/hooks/useGetCachedQueryData";
 import { useAppContext } from "~/store";
-import { EditorView } from "codemirror";
+import { Note } from "~/types";
 
-import { darkTheme, lightTheme } from "./editor-themes";
 import EditorControls from "./EditorControls";
 import TagInput from "./TagInput";
 
 export const Editor = () => {
-  const editor = useRef<HTMLDivElement>(null);
+  const { currentNote, setCurrentNote, currentTrashedNote } = useAppContext();
 
-  const { filter, currentNote, currentTrashedNote, setCurrentNote } = useAppContext();
+  const queryClient = useQueryClient();
+  const data = queryClient.getQueryData(["notes", { search: false }]);
 
-  const theme = useThemeChange();
+  const onChange = (doc: string) => {
+    console.log("hello");
+    if (currentNote) {
+      currentNote.content = doc;
+      setCurrentNote(currentNote);
+    }
+    const notes = data.pages[0].data;
+
+    const firstNote = notes[0];
+
+    console.log("firstNote", firstNote);
+    //
+    if (!firstNote) return;
+    //
+    if (firstNote.id !== currentNote?.id) {
+      console.log("firstNote.id", firstNote.id);
+      void queryClient.invalidateQueries({
+        queryKey: [
+          "notes",
+          {
+            search: false,
+          },
+        ],
+      });
+    }
+  };
+
+  const { editorRef, editorView } = useCM6Editor({
+    initialDoc: currentNote?.content || currentTrashedNote?.content || "",
+    onChange,
+  });
+
   useEffect(() => {
-    const startState = EditorState.create({
-      doc:
-        currentNote?.content ??
-        currentTrashedNote?.content
-      ,
-      extensions: [
-        theme === "dark" ? darkTheme : lightTheme,
-        vim(),
-        // lineNumbers(),
-        // highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        // foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        // EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        // syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        bracketMatching(),
-        closeBrackets(),
-        // autocompletion(),
-        rectangularSelection(),
-        crosshairCursor(),
-        // scrollPastEnd(),
-        EditorView.lineWrapping,
-        // EditorView.domEventHandlers({
-        //   blur: (event, view: EditorView) => {},
-        // }),
-        EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
-        EditorView.updateListener.of((update) => {
-          if (update.focusChanged) {
-          }
-          if (update.docChanged) {
-            if (currentNote) {
-              currentNote.content = update.state.doc.toString();
-              setCurrentNote(currentNote);
-            }
-          }
-        }),
-        // basicSetup,
-        markdown({
-          base: markdownLanguage,
-          codeLanguages: languages,
-          // addKeymap: true,
-        }),
-      ],
-    });
-
-    const view = new EditorView({
-      state: startState,
-      parent: editor.current!,
-    });
-
-    // const cm = getCM(view);
-    // Vim.map("U", "u", "normal"); // in insert mode
-
-    return () => {
-      view.destroy();
-    };
-  }, [theme, currentNote, setCurrentNote]);
+    //   if (!editor.current) return;
+    //   const currentEditor = editor.current;
+    //   currentEditor.
+  }, [currentNote, currentTrashedNote]);
 
   return (
     <>
@@ -97,7 +59,7 @@ export const Editor = () => {
         <div className="flex h-full flex-col">
           <div
             className="editor-container h-full w-full overflow-y-auto"
-            ref={editor}
+            ref={editorRef}
           />
           <div className="flex items-center border-t border-muted">
             <TagInput />
