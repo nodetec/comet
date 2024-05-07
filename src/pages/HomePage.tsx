@@ -8,6 +8,7 @@ import {
 } from "~/components/ui/resizable";
 
 export default function HomePage() {
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">

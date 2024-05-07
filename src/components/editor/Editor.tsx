@@ -15,45 +15,31 @@ export const Editor = () => {
   const data = queryClient.getQueryData(["notes", { search: false }]);
 
   const onChange = (doc: string) => {
-    console.log("hello");
     if (!currentNote) return;
-    currentNote.content = doc;
-    setCurrentNote(currentNote);
+    setCurrentNote({ ...currentNote, content: doc });
     // @ts-ignore
     const notes = data.pages[0].data;
-
+    if (!notes) return;
     const firstNote = notes[0];
-
-    console.log("firstNote", firstNote);
-    //
     if (!firstNote) return;
-    //
-    if (firstNote.id !== currentNote?.id) {
-      console.log("firstNote.id", firstNote.id);
+    if (firstNote.id === currentNote.id) return;
 
-      updateNote({ id: currentNote.id, content: doc });
+    updateNote({ id: currentNote.id, content: doc });
 
-      void queryClient.invalidateQueries({
-        queryKey: [
-          "notes",
-          {
-            search: false,
-          },
-        ],
-      });
-    }
+    void queryClient.invalidateQueries({
+      queryKey: [
+        "notes",
+        {
+          search: false,
+        },
+      ],
+    });
   };
 
   const { editorRef, editorView } = useCM6Editor({
     initialDoc: currentNote?.content || currentTrashedNote?.content || "",
     onChange,
   });
-
-  useEffect(() => {
-    //   if (!editor.current) return;
-    //   const currentEditor = editor.current;
-    //   currentEditor.
-  }, [currentNote, currentTrashedNote]);
 
   return (
     <>
