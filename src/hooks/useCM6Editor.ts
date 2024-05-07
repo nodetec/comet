@@ -98,7 +98,7 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     return () => {
       view.destroy();
     };
-  }, [theme, currentNote]);
+  }, [theme, currentNote?.id]);
 
   return { editorRef, editorView };
 };
