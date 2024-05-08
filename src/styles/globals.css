@@ -75,26 +75,13 @@
     @apply bg-background text-foreground;
   }
 
-  /* .editor-container { */
-    /* background-color: blue !important; */
-  /* } */
-
   .editor-container .cm-scroller {
     overflow: auto;
-    /* padding-bottom: 10rem; */
-    /* @apply overflow-hidden; */
   }
 
   .editor-container .cm-editor {
     width: 100%;
     height: 100%;
-    /* border: dashed 1px purple; */
-    /* height: 100vh; */
-    /* overflow: auto; */
-    /* margin-bottom: 10rem; */
-    /* padding-right: 1rem; */
-    /* padding-left: 1rem; */
-    /*   height: calc(100vh - 7rem); */
   }
 
   .editor-container .cm-content {
@@ -102,7 +89,5 @@
     padding-left: 1rem;
     padding-top: 1rem;
     padding-bottom: 10rem;
-    /*   height: calc(100vh - 7rem); */
   }
-
 }
