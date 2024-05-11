@@ -19,6 +19,8 @@ export const Editor = () => {
   const onChange = (doc: string) => {
     if (!currentNote) return;
     setCurrentNote({ ...currentNote, content: doc });
+    if (!data) return;
+    if (!data.pages) return;
     const notes = data.pages[0].data;
     if (!notes) return;
     const firstNote = notes[0];

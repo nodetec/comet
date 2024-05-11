@@ -79,13 +79,13 @@ export type ContextMenuEventPayload = {
 };
 
 type Page<T> = {
-  data: T[];
-  nextPage: number | null;
-  nextCursor: number | null;
-  prevCursor: number | null;
+  data: T[] | undefined;
+  nextPage: number | undefined;
+  nextCursor: number | undefined;
+  prevCursor: number | undefined;
 };
 
 export type InfiniteQueryData<T> = {
   pageParams: number[];
-  pages: Page<T>[];
+  pages: Page<T>[] | undefined;
 };
