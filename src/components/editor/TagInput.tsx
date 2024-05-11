@@ -67,24 +67,26 @@ export default function TagInput() {
   };
 
   return (
-    <div className="w-full px-2 py-2">
-      <div className="flex gap-x-2 border border-blue-500">
+    <div className="w-full px-2">
+      <div className="flex gap-x-2 items-center">
         {currentNote?.tags?.map((tag, tagIndex) => {
           return (
-            <Badge
-              key={tagIndex}
-              className="cursor-default select-none rounded-full"
-              variant="secondary"
-            >
-              {tag.name}
-            </Badge>
+            <div>
+              <Badge
+                key={tagIndex}
+                className="cursor-default select-none rounded-full"
+                variant="secondary"
+              >
+                {tag.name}
+              </Badge>
+            </div>
           );
         })}
 
         {filter !== "trashed" && filter !== "archived" && (
           <Input
             type="text"
-            className="min-w-12 border border-red-500 max-w-full border-none px-1 text-xs focus-visible:ring-0"
+            className="min-w-12 max-w-full border-none px-1 text-xs focus-visible:ring-0"
             placeholder="Add Tags"
             onKeyDown={handleKeyDown}
             value={tagName}

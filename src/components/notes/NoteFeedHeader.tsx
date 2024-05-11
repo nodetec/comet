@@ -63,7 +63,7 @@ export default function NoteFeedHeader() {
         <Button
           disabled={data?.[0] && data[0].id === -1}
           className="text-muted-foreground"
-          onClick={handleNewNote}
+          // onClick={handleNewNote}
           variant="ghost"
           size="icon"
         >
