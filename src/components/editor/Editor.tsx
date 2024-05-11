@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-
 import { useQueryClient } from "@tanstack/react-query";
 import { updateNote } from "~/api";
 import { useCM6Editor } from "~/hooks/useCM6Editor";
@@ -37,13 +35,13 @@ export const Editor = () => {
   };
 
   const { editorRef, editorView } = useCM6Editor({
-    initialDoc: currentNote?.content || currentTrashedNote?.content || "",
+    initialDoc: currentNote?.content ?? currentTrashedNote?.content ?? "",
     onChange,
   });
 
   return (
     <>
-      {(currentNote || currentTrashedNote) && (
+      {(currentNote ?? currentTrashedNote) && (
         <div className="flex h-full flex-col">
           <div
             className="editor-container h-full w-full overflow-y-auto"

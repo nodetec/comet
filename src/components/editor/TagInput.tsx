@@ -49,9 +49,16 @@ export default function TagInput() {
       if (existingTag) {
         // if exists, tag note
         await tagNote({ noteId, tagId: existingTag.id });
-        if (currentNote) {
-          currentNote.tags.push(existingTag);
-          setCurrentNote(currentNote);
+
+        if (!currentNote) return;
+
+        if (currentNote?.tags) {
+          setCurrentNote({
+            ...currentNote,
+            tags: [...currentNote.tags, existingTag],
+          });
+        } else {
+          setCurrentNote({ ...currentNote, tags: [existingTag] });
         }
       }
       setTagName("");
@@ -62,18 +69,17 @@ export default function TagInput() {
   return (
     <div className="w-full px-2 py-2">
       <div className="flex gap-x-2">
-        {currentNote?.tags &&
-          currentNote?.tags.map((tag, tagIndex) => {
-            return (
-              <Badge
-                key={tagIndex}
-                className="cursor-default select-none rounded-full"
-                variant="secondary"
-              >
-                {tag.name}
-              </Badge>
-            );
-          })}
+        {currentNote?.tags?.map((tag, tagIndex) => {
+          return (
+            <Badge
+              key={tagIndex}
+              className="cursor-default select-none rounded-full"
+              variant="secondary"
+            >
+              {tag.name}
+            </Badge>
+          );
+        })}
 
         {filter !== "trashed" && filter !== "archived" && (
           <Input
