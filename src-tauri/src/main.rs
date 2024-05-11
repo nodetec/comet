@@ -23,7 +23,9 @@ mod db;
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, ListTagsRequest, Note, Tag, TagNoteRequest, UpdateNoteRequest
+    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
+    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, ListTagsRequest, Note, Tag,
+    TagNoteRequest, UpdateNoteRequest,
 };
 
 // Notes
@@ -61,6 +63,11 @@ fn list_notes(
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Vec<Note>> {
     note_service.list_notes(&list_notes_request)
+}
+
+#[tauri::command]
+fn get_note(note_id: i64, note_service: State<'_, NoteService>) -> APIResponse<Note> {
+    note_service.get_note(&note_id)
 }
 
 // Tags
@@ -204,6 +211,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_note,
             sign_event,
             create_note,
             update_note,

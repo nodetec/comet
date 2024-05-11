@@ -16,7 +16,7 @@ import {
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
-import { updateNote } from "~/api";
+import { getNote, updateNote } from "~/api";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useAppContext } from "~/store";
 import { EditorView } from "codemirror";
@@ -37,14 +37,35 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
   const queryClient = useQueryClient();
 
   const theme = useThemeChange();
+
+  async function handleBlur(view: EditorView) {
+    const content = currentNote?.content;
+    const id = currentNote?.id;
+    if (id === undefined || content === undefined) {
+      return;
+    }
+    const response = await getNote(id);
+    if (response.data.content !== view.state.doc.toString()) {
+      void updateNote({ id, content: view.state.doc.toString() });
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    }
+  }
+
+  const blurHandlerExtension = EditorView.domEventHandlers({
+    blur: (_, view) => {
+      void handleBlur(view);
+      return false; // Return false if you don't want to prevent the default behavior
+    },
+  });
+
   useEffect(() => {
     if (!editorRef.current) return;
 
     const startState = EditorState.create({
-      // doc: currentNote?.content ?? currentTrashedNote?.content,
       doc: initialDoc,
       extensions: [
         theme === "dark" ? darkTheme : lightTheme,
+        blurHandlerExtension,
         vim(),
         // lineNumbers(),
         // highlightActiveLineGutter(),
@@ -63,18 +84,6 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
         crosshairCursor(),
         // scrollPastEnd(),
         EditorView.lineWrapping,
-        EditorView.domEventHandlers({
-          blur: (_, view: EditorView) => {
-            const content = currentNote?.content;
-            const id = currentNote?.id;
-            console.log("id", id);
-            if (id === undefined || content === undefined) {
-              return;
-            }
-            void updateNote({ id, content: view.state.doc.toString() });
-            void queryClient.invalidateQueries({ queryKey: ["notes"] });
-          },
-        }),
         EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
         EditorView.updateListener.of((update) => {
           if (

@@ -56,6 +56,14 @@ impl NoteService {
         }
     }
 
+    pub fn get_note(&self, note_id: &i64) -> APIResponse<Note> {
+        let conn = self.db_conn.0.lock().unwrap();
+        match db::get_note_by_id(&conn, &note_id) {
+            Ok(note) => APIResponse::Data(Some(note)),
+            Err(e) => APIResponse::Error(format!("Failed to retrieve note: {}", e)),
+        }
+    }
+
     pub fn trash_note(&self, note_id: &i64) -> () {
         let conn = self.db_conn.0.lock().unwrap();
         db::trash_note(&conn, &note_id);
