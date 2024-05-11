@@ -1,4 +1,4 @@
-import { Note, Tag } from "~/types";
+import { type Note, type Tag } from "~/types";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -20,6 +20,9 @@ interface State {
 
   noteContent: string | undefined;
   setNoteContent: (noteContent: string | undefined) => void;
+
+  noteFeedScrollPosition: number | undefined;
+  setNoteFeedScrollPosition: (noteFeedScrollPosition: number) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -42,6 +45,9 @@ export const useAppContext = create<State>()(
 
       noteContent: undefined,
       setNoteContent: (noteContent) => set({ noteContent }),
+
+      noteFeedScrollPosition: undefined,
+      setNoteFeedScrollPosition: (noteFeedScrollPosition) => set({ noteFeedScrollPosition }),
     }),
     {
       name: "captains-log-storage",

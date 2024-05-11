@@ -1,21 +1,18 @@
-import { useEffect, useRef } from "react";
-
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { listNotes } from "~/api";
 import { useAppContext } from "~/store";
 import { useInView } from "react-intersection-observer";
 
 import NoteCard from "./NoteCard";
+import NoteFeedHeader from "./NoteFeedHeader";
+import SearchNotes from "./SearchNotes";
 
-export default function NoteFeed() {
-  const {
-    noteSearch,
-    setCurrentNote,
-    currentNote,
-    noteFeedScrollPosition,
-    setNoteFeedScrollPosition,
-  } = useAppContext();
-  const scrollRef = useRef<HTMLDivElement>(null);
+type Props = {
+  noteSearch: string;
+};
+
+export default function SearchFeed({ noteSearch }: Props) {
+  const { setCurrentNote, currentNote } = useAppContext();
 
   async function fetchNotes({ pageParam = 1 }) {
     const app = useAppContext.getState();
@@ -71,7 +68,7 @@ export default function NoteFeed() {
     // isFetching,
     status,
   } = useInfiniteQuery({
-    queryKey: ["notes", { search: false }],
+    queryKey: ["notes", { search: true }],
     // queryKey: ["notes"],
     queryFn: fetchNotes,
     initialPageParam: 0,
@@ -100,42 +97,12 @@ export default function NoteFeed() {
     },
   });
 
-  // useEffect(() => {
-  // TODO: scroll to particular note
-  //   if (noteSearch === "" && activeNotePositionRef.current) {
-  //     activeNotePositionRef.current?.scrollIntoView();
-  //   }
-  // }, [noteSearch]);
-
-  useEffect(() => {
-    if (noteSearch !== "") return;
-    if (!noteFeedScrollPosition) return;
-    if (!scrollRef.current) return;
-    if (noteFeedScrollPosition <= 0) return;
-    scrollRef.current.scrollTo(0, noteFeedScrollPosition);
-  }, [noteSearch]);
-
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const position = scrollRef.current.scrollTop;
-    setNoteFeedScrollPosition(position);
-  };
-
-  useEffect(() => {
-    if (!scrollRef.current) return;
-    const refCurrent = scrollRef.current;
-    refCurrent.addEventListener("scroll", handleScroll);
-
-    // Clean up the event listener when the component unmounts
-    return () => {
-      refCurrent.removeEventListener("scroll", handleScroll);
-    };
-  }, [noteSearch]);
-
   if (status === "error") return <p>Error: {error.message}</p>;
 
+  // TODO: if you select a note in the search feed it should become the active note and automatically be scrolled to after leavin search
+
   return (
-    <div className="flex h-full flex-col overflow-y-auto" ref={scrollRef}>
+    <div className="flex h-full flex-col overflow-y-auto">
       {data?.pages.map((group, pageIndex) => (
         <ul key={pageIndex}>
           {group.data?.map((note, noteIndex) => {
