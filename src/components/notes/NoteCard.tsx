@@ -96,12 +96,12 @@ export default function NoteCard({ note }: Props) {
   };
 
   return (
-    <div className="px-3">
+    <div className="mx-3 border-b">
       <div
         onContextMenu={handleContextMenu}
         onClick={handleSetActiveNote}
         key={note.id}
-        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md border-b px-2 pb-3 pt-3 text-sm ${currentNote?.id === note.id && "bg-muted/80"}`}
+        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md px-2 pb-3 pt-3 text-sm ${currentNote?.id === note.id && "bg-muted/80"}`}
       >
         <h2 className="select-none font-semibold text-primary">
           {parseTitle(note.content).title}
