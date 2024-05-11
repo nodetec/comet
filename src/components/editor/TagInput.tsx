@@ -68,12 +68,11 @@ export default function TagInput() {
 
   return (
     <div className="w-full px-2">
-      <div className="flex gap-x-2 items-center">
+      <div className="flex items-center gap-x-2">
         {currentNote?.tags?.map((tag, tagIndex) => {
           return (
-            <div>
+            <div key={tagIndex}>
               <Badge
-                key={tagIndex}
                 className="cursor-default select-none rounded-full"
                 variant="secondary"
               >
