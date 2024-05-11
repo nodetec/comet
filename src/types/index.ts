@@ -77,3 +77,15 @@ export type ContextMenuEventPayload = {
   eventKind: string;
   id?: number;
 };
+
+type Page<T> = {
+  data: T[];
+  nextPage: number | null;
+  nextCursor: number | null;
+  prevCursor: number | null;
+};
+
+export type InfiniteQueryData<T> = {
+  pageParams: number[];
+  pages: Page<T>[];
+};

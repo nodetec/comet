@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { updateNote } from "~/api";
 import { useCM6Editor } from "~/hooks/useCM6Editor";
 import { useAppContext } from "~/store";
+import { type InfiniteQueryData, type Note } from "~/types";
 
 import EditorControls from "./EditorControls";
 import TagInput from "./TagInput";
@@ -10,19 +11,21 @@ export const Editor = () => {
   const { currentNote, setCurrentNote, currentTrashedNote } = useAppContext();
 
   const queryClient = useQueryClient();
-  const data = queryClient.getQueryData(["notes", { search: false }]);
+  const data = queryClient.getQueryData([
+    "notes",
+    { search: false },
+  ]) as InfiniteQueryData<Note>;
 
   const onChange = (doc: string) => {
     if (!currentNote) return;
     setCurrentNote({ ...currentNote, content: doc });
-    // @ts-ignore
     const notes = data.pages[0].data;
     if (!notes) return;
     const firstNote = notes[0];
     if (!firstNote) return;
     if (firstNote.id === currentNote.id) return;
 
-    updateNote({ id: currentNote.id, content: doc });
+    void updateNote({ id: currentNote.id, content: doc });
 
     void queryClient.invalidateQueries({
       queryKey: [

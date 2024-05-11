@@ -1,43 +1,20 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { signEvent, updateNote } from "~/api";
+import { signEvent } from "~/api";
 import { useAppContext } from "~/store";
-import { SaveIcon, SendIcon } from "lucide-react";
-import {
-  Event,
-  EventTemplate,
-  getEventHash,
-  Relay,
-  UnsignedEvent,
-} from "nostr-tools";
+import { SendIcon } from "lucide-react";
+import { getEventHash, Relay, type Event } from "nostr-tools";
 
 import { Button } from "../ui/button";
 
 export default function EditorControls() {
-  const { currentNote, setCurrentNote, setCurrentTrashedNote } =
-    useAppContext();
-  const queryClient = useQueryClient();
-  async function handleSaveNote(
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
-  ) {
-    e.preventDefault();
-    const content = currentNote?.content;
-    const id = currentNote?.id;
-    if (id === undefined || content === undefined) {
-      return;
-    }
-    const apiResponse = await updateNote({ id, content });
-
-    setCurrentNote(apiResponse.data);
-    setCurrentTrashedNote(undefined);
-
-    void queryClient.invalidateQueries({ queryKey: ["notes"] });
-  }
+  const { currentNote } = useAppContext();
   async function handleSendNote(
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) {
     e.preventDefault();
 
-    const t: UnsignedEvent = {
+    const event: Event = {
+      id: "",
+      sig: "",
       kind: 1,
       tags: [],
       content: currentNote?.content ?? "",
@@ -46,17 +23,17 @@ export default function EditorControls() {
       created_at: Math.floor(Date.now() / 1000),
     };
 
-    const eventHash = getEventHash(t);
+    const eventHash = getEventHash(event);
 
-    t.id = eventHash;
+    event.id = eventHash;
 
-    const signedEvent = (await signEvent(JSON.stringify(t))) as string;
+    const signedEventStr = (await signEvent(JSON.stringify(event))) as string;
 
     const relay = await Relay.connect("wss://nos.lol");
 
-    console.log(signedEvent);
+    const signedEvent = JSON.parse(signedEventStr) as Event;
 
-    await relay.publish(JSON.parse(signedEvent));
+    await relay.publish(signedEvent);
   }
 
   return (

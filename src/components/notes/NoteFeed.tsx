@@ -14,7 +14,7 @@ export default function NoteFeed() {
   const { noteSearch, setCurrentNote, currentNote } = useAppContext();
 
   const scrollContainerRef = useRef(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
+  // const [scrollPosition, setScrollPosition] = useState(0);
 
   async function fetchNotes({ pageParam = 1 }) {
     const app = useAppContext.getState();
@@ -84,7 +84,7 @@ export default function NoteFeed() {
   const { ref: firstNoteRef } = useInView({
     onChange: (inView) => {
       if (inView && !isFetchingPreviousPage && hasPreviousPage) {
-        fetchPreviousPage();
+        void fetchPreviousPage();
         console.log("fetchPreviousPage");
       }
     },
@@ -93,7 +93,7 @@ export default function NoteFeed() {
   const { ref: lastNoteRef } = useInView({
     onChange: (inView) => {
       if (inView && !isFetchingNextPage && hasNextPage) {
-        fetchNextPage();
+        void fetchNextPage();
         console.log("fetchNextPage");
       }
     },
@@ -118,10 +118,10 @@ export default function NoteFeed() {
   //   }
   // }, [scrollPosition]);
 
-  function handleScroll(event: any) {
-    console.log("event.target.scrollTop", event.target.scrollTop);
-    setScrollPosition(event.target.scrollTop);
-  }
+  // function handleScroll(event: any) {
+  //   console.log("event.target.scrollTop", event.target.scrollTop);
+  //   setScrollPosition(event.target.scrollTop);
+  // }
 
   if (status === "error") return <p>Error: {error.message}</p>;
 
@@ -129,34 +129,33 @@ export default function NoteFeed() {
     <div
       className="flex max-h-screen flex-col overflow-y-auto"
       ref={scrollContainerRef}
-      onScroll={handleScroll}
+      // onScroll={handleScroll}
     >
       <NoteFeedHeader />
       <SearchNotes />
       <ScrollArea className="flex h-full flex-col">
-        {data &&
-          data.pages.map((group, pageIndex) => (
-            <ul key={pageIndex}>
-              {group.data?.map((note, noteIndex) => {
-                // Determine if the note is the first or the last in the list
-                const isFirstNote = pageIndex === 0 && noteIndex === 0;
-                const isLastNote =
-                  pageIndex === data.pages.length - 1 &&
-                  noteIndex === group.data.length - 1;
-                const refProp = isFirstNote
-                  ? firstNoteRef
-                  : isLastNote
-                    ? lastNoteRef
-                    : undefined;
+        {data?.pages.map((group, pageIndex) => (
+          <ul key={pageIndex}>
+            {group.data?.map((note, noteIndex) => {
+              // Determine if the note is the first or the last in the list
+              const isFirstNote = pageIndex === 0 && noteIndex === 0;
+              const isLastNote =
+                pageIndex === data.pages.length - 1 &&
+                noteIndex === group.data.length - 1;
+              const refProp = isFirstNote
+                ? firstNoteRef
+                : isLastNote
+                  ? lastNoteRef
+                  : undefined;
 
-                return (
-                  <li ref={refProp} key={note.id}>
-                    <NoteCard note={note} />
-                  </li>
-                );
-              })}
-            </ul>
-          ))}
+              return (
+                <li ref={refProp} key={note.id}>
+                  <NoteCard note={note} />
+                </li>
+              );
+            })}
+          </ul>
+        ))}
       </ScrollArea>
     </div>
   );
