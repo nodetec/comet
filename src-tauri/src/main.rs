@@ -41,6 +41,7 @@ fn update_note(
     update_note_request: UpdateNoteRequest,
     note_service: State<'_, NoteService>,
 ) -> APIResponse<Note> {
+    println!("{:?}", update_note_request.content);
     note_service.update_note(update_note_request)
 }
 

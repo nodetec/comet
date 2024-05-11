@@ -15,6 +15,7 @@ import {
   // scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
+import { useQueryClient } from "@tanstack/react-query";
 import { updateNote } from "~/api";
 import useThemeChange from "~/hooks/useThemeChange";
 import { useAppContext } from "~/store";
@@ -31,7 +32,9 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
-  const { filter, currentNote, setCurrentNote } = useAppContext();
+  const { filter, currentNote } = useAppContext();
+
+  const queryClient = useQueryClient();
 
   const theme = useThemeChange();
   useEffect(() => {
@@ -61,13 +64,15 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
         // scrollPastEnd(),
         EditorView.lineWrapping,
         EditorView.domEventHandlers({
-          blur: (event, view: EditorView) => {
+          blur: (_, view: EditorView) => {
             const content = currentNote?.content;
             const id = currentNote?.id;
+            console.log("id", id);
             if (id === undefined || content === undefined) {
               return;
             }
-            updateNote({ id, content });
+            void updateNote({ id, content: view.state.doc.toString() });
+            void queryClient.invalidateQueries({ queryKey: ["notes"] });
           },
         }),
         EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
