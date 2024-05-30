@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    collections::HashMap,
     fs,
     sync::{Arc, Mutex},
 };
@@ -9,8 +10,7 @@ use std::{
 use nostr_sdk::prelude::*;
 
 mod services;
-use nostr_sdk::UnsignedEvent;
-use services::{ContextMenuService, NoteService, NoteTagService, TagService};
+use services::{ContextMenuService, NoteService, NoteTagService, SettingsService, TagService};
 
 use tauri::{
     menu::{MenuEvent, MenuId},
@@ -103,6 +103,29 @@ fn tag_note(
     tag_note_service.tag_note(tag_note_request)
 }
 
+// Settings
+
+#[tauri::command]
+fn get_setting(key: String, settings_service: State<'_, SettingsService>) -> APIResponse<String> {
+    settings_service.get_setting(&key)
+}
+
+#[tauri::command]
+fn set_setting(
+    key: String,
+    value: String,
+    settings_service: State<'_, SettingsService>,
+) -> APIResponse<()> {
+    settings_service.set_setting(&key, &value)
+}
+
+#[tauri::command]
+fn get_all_settings(
+    settings_service: State<'_, SettingsService>,
+) -> APIResponse<HashMap<String, String>> {
+    settings_service.get_all_settings()
+}
+
 // Context Menu
 
 #[tauri::command]
@@ -133,8 +156,6 @@ async fn sign_event(event: String) -> String {
         .unwrap();
 
     return signed_event.as_json().to_string();
-
-    // println!("{:?}", nip_70::sign_event(event).await.unwrap());
 }
 
 #[tauri::command]
@@ -223,6 +244,9 @@ fn main() {
             create_context_menu,
             delete_note,
             trash_note,
+            get_setting,
+            get_all_settings,
+            set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

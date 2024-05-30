@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { TagsIcon } from "lucide-react";
 
+import { Button } from "../ui/button";
 import AllNotes from "./AllNotes";
 import Login from "./Login";
 import TagItem from "./TagItem";
@@ -28,10 +29,15 @@ export default function ContextSidebar() {
     refetchOnWindowFocus: false,
   });
 
+  // const handleSettings = () => {
+  //   console.log("settings");
+  // };
+
   return (
     <div className="flex h-full flex-col justify-between">
       <ScrollArea className="flex h-full flex-col p-2">
         <div>
+          {/* <Button onClick={handleSettings}>settings</Button> */}
           <AllNotes />
           <TrashedNotes />
           <Accordion type="single" collapsible defaultValue="item-1">

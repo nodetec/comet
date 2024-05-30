@@ -1,10 +1,13 @@
-import { type Note, type Tag } from "~/types";
+import { type Note, type Settings, type Tag } from "~/types";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
   filter: "all" | "trashed" | "archived";
   setFilter: (filter: "all" | "trashed" | "archived") => void;
+
+  activePage: "editor" | "settings";
+  setActivePage: (activePage: "editor" | "settings") => void;
 
   activeTag: Tag | undefined;
   setActiveTag: (activeTag: Tag | undefined) => void;
@@ -23,6 +26,9 @@ interface State {
 
   noteFeedScrollPosition: number | undefined;
   setNoteFeedScrollPosition: (noteFeedScrollPosition: number) => void;
+
+  settings: Settings;
+  setSettings: (settings: Settings) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -31,6 +37,9 @@ export const useAppContext = create<State>()(
       filter: "all",
       setFilter: (filter) => set({ filter }),
 
+      activePage: "editor",
+      setActivePage: (activePage) => set({ activePage }),
+
       activeTag: undefined,
       setActiveTag: (activeTag) => set({ activeTag }),
 
@@ -38,7 +47,8 @@ export const useAppContext = create<State>()(
       setCurrentNote: (currentNote) => set({ currentNote }),
 
       currentTrashedNote: undefined,
-      setCurrentTrashedNote: (currentTrashedNote) => set({ currentTrashedNote }),
+      setCurrentTrashedNote: (currentTrashedNote) =>
+        set({ currentTrashedNote }),
 
       noteSearch: "",
       setNoteSearch: (noteSearch) => set({ noteSearch: noteSearch }),
@@ -47,7 +57,11 @@ export const useAppContext = create<State>()(
       setNoteContent: (noteContent) => set({ noteContent }),
 
       noteFeedScrollPosition: undefined,
-      setNoteFeedScrollPosition: (noteFeedScrollPosition) => set({ noteFeedScrollPosition }),
+      setNoteFeedScrollPosition: (noteFeedScrollPosition) =>
+        set({ noteFeedScrollPosition }),
+
+      settings: {},
+      setSettings: (settings) => set({ settings }),
     }),
     {
       name: "captains-log-storage",

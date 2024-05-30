@@ -86,3 +86,8 @@ export const signEvent = async (event: string) => {
   const response = await invoke("sign_event", { event });
   return response;
 };
+
+export const getSettings = async () => {
+  const response = await invoke("get_settings");
+  return response;
+}

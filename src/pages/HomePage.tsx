@@ -11,8 +11,10 @@ import {
 } from "~/components/ui/resizable";
 import { useAppContext } from "~/store";
 
+import Settings from "./Settings";
+
 export default function HomePage() {
-  const { noteSearch } = useAppContext();
+  const { noteSearch, activePage } = useAppContext();
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center">
@@ -30,7 +32,8 @@ export default function HomePage() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel className="border-sky-500" minSize={10}>
-          <Editor />
+          {activePage === "settings" && <Settings />}
+          {activePage === "editor" && <Editor />}
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
