@@ -1,5 +1,6 @@
 pub mod notes;
 pub mod notes_tags;
+pub mod settings;
 pub mod tags;
 
 use rusqlite::{params, Connection, Result};
@@ -87,11 +88,19 @@ fn initialize_db(conn: &Connection) -> Result<()> {
     )?;
 
     conn.execute(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
             content,
             notebook_id UNINDEXED,
             created_at UNINDEXED,
             modified_at UNINDEXED
+        )",
+        params![],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )",
         params![],
     )?;
@@ -121,6 +130,12 @@ fn create_indexes(conn: &Connection) -> Result<()> {
         params![],
     )?;
 
+    // Create idices for settings table
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_settings_key ON settings (key)",
+        params![],
+    )?;
+
     Ok(())
 }
 
@@ -129,9 +144,14 @@ pub fn establish_connection(db_path: &str) -> Result<Connection> {
     let conn = Connection::open(db_path)?;
     initialize_db(&conn)?;
     create_indexes(&conn)?;
+    insert_initial_settings(&conn)?;
     Ok(conn)
 }
 
-pub use notes::{create_note, delete_note, get_note_by_id, list_all_notes, update_note, trash_note, list_trashed_notes};
+pub use notes::{
+    create_note, delete_note, get_note_by_id, list_all_notes, list_trashed_notes, trash_note,
+    update_note,
+};
 pub use notes_tags::{list_tags_for_note, tag_note, untag_note};
+pub use settings::{get_all_settings, get_setting, insert_initial_settings, set_setting};
 pub use tags::{create_tag, delete_tag, get_tag_by_id, get_tag_by_name, list_all_tags, update_tag};

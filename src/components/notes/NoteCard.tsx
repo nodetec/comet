@@ -7,12 +7,15 @@ import {
   type NoteItemContextMenuRequest,
 } from "~/types/contextMenuTypes";
 
+import { Separator } from "../ui/separator";
+
 type Props = {
   note: Note;
 };
 
 export default function NoteCard({ note }: Props) {
-  const { currentNote, setCurrentNote } = useAppContext();
+  const { currentNote, setCurrentNote, activePage, setActivePage } =
+    useAppContext();
 
   async function fetchNoteTags() {
     const noteId = note.id;
@@ -34,6 +37,10 @@ export default function NoteCard({ note }: Props) {
     const currentNoteTags = await fetchNoteTags();
     note.tags = currentNoteTags;
     setCurrentNote(note);
+
+    if (activePage === "settings") {
+      setActivePage("editor");
+    }
   };
 
   const handleContextMenu = async (
@@ -103,11 +110,12 @@ export default function NoteCard({ note }: Props) {
       return "";
     }
     const contentWithoutTitle = lines.slice(1).join("\n");
-    return contentWithoutTitle;
+    // only show the first 3 lines of the content
+    return contentWithoutTitle.split("\n").slice(0, 3).join("\n");
   };
 
   return (
-    <div className="mx-3 border-b">
+    <div className="mx-3">
       <div
         onContextMenu={handleContextMenu}
         onClick={handleSetActiveNote}
@@ -126,6 +134,9 @@ export default function NoteCard({ note }: Props) {
             ? fromNow(note.trashedAt)
             : note.modifiedAt && fromNow(note.modifiedAt)}
         </span>
+      </div>
+      <div className="px-[0.30rem]">
+        <Separator />
       </div>
     </div>
   );

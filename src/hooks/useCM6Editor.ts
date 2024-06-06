@@ -32,7 +32,7 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
-  const { filter, currentNote } = useAppContext();
+  const { filter, currentNote, settings } = useAppContext();
 
   const queryClient = useQueryClient();
 
@@ -61,46 +61,51 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
   useEffect(() => {
     if (!editorRef.current) return;
 
+    const extensions = [
+      theme === "dark" ? darkTheme : lightTheme,
+      blurHandlerExtension,
+      // lineNumbers(),
+      // highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      // foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      // EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      // syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      bracketMatching(),
+      closeBrackets(),
+      // autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      // scrollPastEnd(),
+      EditorView.lineWrapping,
+      EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
+      EditorView.updateListener.of((update) => {
+        if (
+          update.changes &&
+          currentNote?.content !== update.state.doc.toString()
+        ) {
+          onChange(update.state.doc.toString());
+        }
+      }),
+
+      // basicSetup,
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: languages,
+        // addKeymap: true,
+      }),
+    ];
+
+    if (settings.vim === "true") {
+      extensions.push(vim());
+    }
+
     const startState = EditorState.create({
       doc: initialDoc,
-      extensions: [
-        theme === "dark" ? darkTheme : lightTheme,
-        blurHandlerExtension,
-        vim(),
-        // lineNumbers(),
-        // highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        // foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        // EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        // syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        bracketMatching(),
-        closeBrackets(),
-        // autocompletion(),
-        rectangularSelection(),
-        crosshairCursor(),
-        // scrollPastEnd(),
-        EditorView.lineWrapping,
-        EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
-        EditorView.updateListener.of((update) => {
-          if (
-            update.changes &&
-            currentNote?.content !== update.state.doc.toString()
-          ) {
-            onChange(update.state.doc.toString());
-          }
-        }),
-
-        // basicSetup,
-        markdown({
-          base: markdownLanguage,
-          codeLanguages: languages,
-          // addKeymap: true,
-        }),
-      ],
+      extensions,
     });
 
     const view = new EditorView({

@@ -79,3 +79,8 @@ export type InfiniteQueryData<T> = {
   pageParams: number[];
   pages: Page<T>[] | undefined;
 };
+
+export type Settings = {
+  theme?: "light" | "dark";
+  vim?: "true" | "false";
+};
