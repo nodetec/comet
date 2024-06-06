@@ -45,6 +45,24 @@ export const useContextMenuEvent = () => {
               if (tagItemEvent.id === app.activeTag?.id) {
                 app.setActiveTag(undefined);
               }
+              const filteredTags = app.currentNote?.tags.filter(
+                (tag) => tag.id !== tagItemEvent.id,
+              );
+              console.log("tag id", tagItemEvent.id);
+              console.log("current tags", app.currentNote?.tags);
+
+              console.log(app.currentNote);
+
+              if (app.currentNote?.tags && filteredTags) {
+                console.log("here");
+                app.setCurrentNote({
+                  ...app.currentNote,
+                  tags: filteredTags,
+                });
+              } else {
+                console.log("filteredTags", filteredTags);
+                console.log("current note tags", app.currentNote?.tags);
+              }
               void queryClient.invalidateQueries({ queryKey: ["tags"] });
               break;
             default:
@@ -59,11 +77,11 @@ export const useContextMenuEvent = () => {
           switch (noteTagItemEvent.eventKind) {
             case "untag_note":
               const { tagId } = noteTagItemEvent;
-              const filteredItems = app.currentNote?.tags.filter(
+              const filteredTags = app.currentNote?.tags.filter(
                 (tag) => !(tag.id === tagId),
               );
-              if (app.currentNote?.tags && filteredItems) {
-                app.currentNote.tags = filteredItems;
+              if (app.currentNote?.tags && filteredTags) {
+                app.currentNote.tags = filteredTags;
                 app.setCurrentNote({
                   ...app.currentNote,
                 });

@@ -11,7 +11,7 @@ import {
   type TagNoteRequest,
   type UpdateNoteRequest,
 } from "~/types";
-import { typeCreateContextMenuRequest } from "~/types/contextMenuTypes";
+import { type CreateContextMenuRequest } from "~/types/contextMenuTypes";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
   // TODO: error handling

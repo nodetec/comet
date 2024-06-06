@@ -204,7 +204,7 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
         id if id == &delete_tag_menu_id => {
             tag_service.delete_tag(&tag_id.unwrap());
             let tag_item_context_menu_event = TagItemContextMenuEvent {
-                id: match note_id {
+                id: match tag_id {
                     Some(id) => id,
                     None => 0,
                 },
@@ -248,10 +248,12 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
         }
 
         _ => {
-            context_menu_state.note_id = None;
-            context_menu_state.tag_id = None;
+            // context_menu_state.note_id = None;
+            // context_menu_state.tag_id = None;
         }
     }
+    context_menu_state.note_id = None;
+    context_menu_state.tag_id = None;
 }
 
 fn main() {
