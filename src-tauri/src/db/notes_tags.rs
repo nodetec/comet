@@ -27,8 +27,9 @@ pub fn list_notes_for_tag(conn: &Connection, tag_id: &i64) -> Result<Vec<i32>> {
 }
 
 // Function to delete an association
-pub fn untag_note(conn: &Connection, note_id: &i64, tag_id: &i64) -> Result<usize> {
+pub fn untag_note(conn: &Connection, tag_note_request: &TagNoteRequest) -> Result<usize> {
+    let note_id = tag_note_request.note_id;
+    let tag_id = tag_note_request.tag_id;
     let sql = "DELETE FROM notes_tags WHERE note_id = ?1 AND tag_id = ?2";
     conn.execute(sql, params![note_id, tag_id])
 }
-
