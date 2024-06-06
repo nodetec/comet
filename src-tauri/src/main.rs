@@ -228,6 +228,9 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
                 },
             };
             tag_note_service.untag_note(&tag_note_request);
+
+            println!("{:?}", tag_note_request);
+
             let note_tag_item_context_menu_event = NoteTagItemContextMenuEvent {
                 note_id: match note_id {
                     Some(id) => id,
@@ -244,16 +247,17 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
                     note_tag_item_context_menu_event,
                 ),
             };
+            println!("{:?}", context_menu_event);
             app_handle.emit("menu_event", context_menu_event).unwrap();
+            context_menu_state.note_id = None;
+            context_menu_state.tag_id = None;
         }
 
         _ => {
-            // context_menu_state.note_id = None;
-            // context_menu_state.tag_id = None;
+            context_menu_state.note_id = None;
+            context_menu_state.tag_id = None;
         }
     }
-    context_menu_state.note_id = None;
-    context_menu_state.tag_id = None;
 }
 
 fn main() {

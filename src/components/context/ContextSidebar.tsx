@@ -7,6 +7,7 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { useAppContext } from "~/store";
 import { TagsIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
@@ -16,6 +17,8 @@ import TagItem from "./TagItem";
 import TrashedNotes from "./TrashedNotes";
 
 export default function ContextSidebar() {
+  const { currentNote } = useAppContext();
+
   async function fetchTags() {
     const apiResponse = await listTags({});
     if (apiResponse.data) {

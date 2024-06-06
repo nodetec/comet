@@ -22,12 +22,22 @@ export default function TagInput() {
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
       const noteId = currentNote?.id;
+
+      console.log("noteId", noteId);
+
       if (noteId === undefined) {
         return;
       }
 
       const getTagResponse = await getTag({ name: tagName });
+
+      console.log("getTagResponse", getTagResponse);
+
       const existingTag = getTagResponse.data;
+
+      console.log("existingTag", existingTag);
+
+      console.log("getTagResponse.error", getTagResponse.error);
 
       if (getTagResponse.error) {
         const createTagResponse = await createTag({
@@ -38,8 +48,16 @@ export default function TagInput() {
         });
         console.log(createTagResponse);
         if (createTagResponse.data && currentNote) {
-          currentNote.tags.push(createTagResponse.data);
-          setCurrentNote(currentNote);
+          // currentNote.tags.push(createTagResponse.data);
+
+          // setCurrentNote(currentNote);
+
+          setCurrentNote({
+            ...currentNote,
+            tags: [...currentNote.tags, createTagResponse.data],
+          });
+
+          console.log("set CURRENT NOTE");
         }
         if (createTagResponse.error) {
           return;
@@ -57,8 +75,10 @@ export default function TagInput() {
             ...currentNote,
             tags: [...currentNote.tags, existingTag],
           });
+          console.log("set CURRENT NOTE");
         } else {
           setCurrentNote({ ...currentNote, tags: [existingTag] });
+          console.log("set CURRENT NOTE");
         }
       }
       setTagName("");

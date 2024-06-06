@@ -111,6 +111,7 @@ pub struct Tag {
 // Note Tags
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct TagNoteRequest {
     pub note_id: i64,
     pub tag_id: i64,
@@ -159,6 +160,7 @@ pub struct ContextMenuTagItemId(pub i64);
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct NoteItemContextMenuEvent {
     pub id: i64,
     pub event_kind: String,
@@ -166,6 +168,7 @@ pub struct NoteItemContextMenuEvent {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct TagItemContextMenuEvent {
     pub id: i64,
     pub event_kind: String,
@@ -173,6 +176,7 @@ pub struct TagItemContextMenuEvent {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct NoteTagItemContextMenuEvent {
     pub note_id: i64,
     pub tag_id: i64,
@@ -180,6 +184,7 @@ pub struct NoteTagItemContextMenuEvent {
 }
 
 #[derive(Serialize, Clone)]
+#[derive(Debug)]
 pub enum ContextMenuEventKind {
     NoteItem(NoteItemContextMenuEvent),
     TagItem(TagItemContextMenuEvent),
@@ -188,6 +193,7 @@ pub enum ContextMenuEventKind {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct ContextMenuEvent {
     pub context_menu_event_kind: ContextMenuEventKind,
 }

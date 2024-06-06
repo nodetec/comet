@@ -61,7 +61,7 @@ fn create_note_tag_context_menu(
     let manager = window.app_handle();
     let context_menu = Menu::with_items(
         manager,
-        &[&MenuItem::with_id(manager, "untag_note", "Delete", true, None::<&str>).unwrap()],
+        &[&MenuItem::with_id(manager, "untag_note", "Remove", true, None::<&str>).unwrap()],
     )
     .unwrap();
 

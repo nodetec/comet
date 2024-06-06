@@ -38,6 +38,8 @@ export default function NoteCard({ note }: Props) {
     note.tags = currentNoteTags;
     setCurrentNote(note);
 
+    console.log("currentNote", currentNote);
+
     if (activePage === "settings") {
       setActivePage("editor");
     }

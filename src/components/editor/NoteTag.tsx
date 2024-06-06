@@ -21,6 +21,7 @@ export default function NoteTag({ tag }: Props) {
     e.preventDefault(); // prevent the default behaviour when right clicked
     const tagId = tag.id;
     const noteId = currentNote?.id;
+    console.log("currentNote", currentNote);
     if (noteId) {
       const menuKind: NoteTagItemContextMenuRequest = {
         NoteTag: {
