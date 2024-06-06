@@ -2,6 +2,10 @@ import { createContextMenu, listTags } from "~/api";
 import { fromNow } from "~/lib/utils";
 import { useAppContext } from "~/store";
 import { type Note } from "~/types";
+import {
+  type CreateContextMenuRequest,
+  type NoteItemContextMenuRequest,
+} from "~/types/contextMenuTypes";
 
 import { Separator } from "../ui/separator";
 
@@ -44,7 +48,15 @@ export default function NoteCard({ note }: Props) {
   ) => {
     e.preventDefault(); // prevent the default behaviour when right clicked
     const id = note.id;
-    await createContextMenu({ menuKind: "NoteItem", id });
+    const menuKind: NoteItemContextMenuRequest = {
+      NoteItem: {
+        id,
+      },
+    };
+    const noteItemRequest: CreateContextMenuRequest = {
+      menuKind,
+    };
+    await createContextMenu(noteItemRequest);
   };
 
   // what can the title be?

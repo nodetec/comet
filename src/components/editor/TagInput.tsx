@@ -5,7 +5,7 @@ import { createTag, getTag, tagNote } from "~/api";
 import { Input } from "~/components/ui/input";
 import { useAppContext } from "~/store";
 
-import { Badge } from "../ui/badge";
+import NoteTag from "./NoteTag";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
@@ -70,16 +70,7 @@ export default function TagInput() {
     <div className="w-full px-2">
       <div className="flex items-center gap-x-2">
         {currentNote?.tags?.map((tag, tagIndex) => {
-          return (
-            <div key={tagIndex}>
-              <Badge
-                className="cursor-default select-none rounded-full"
-                variant="secondary"
-              >
-                {tag.name}
-              </Badge>
-            </div>
-          );
+          return <NoteTag key={tagIndex} tag={tag} />;
         })}
 
         {filter !== "trashed" && filter !== "archived" && (

@@ -21,4 +21,13 @@ impl NoteTagService {
             Err(e) => APIResponse::Error(format!("Failed to tag note: {}", e)),
         }
     }
+
+    pub fn untag_note(&self, tag_note_request: &TagNoteRequest) -> APIResponse<()> {
+        let conn = self.db_conn.0.lock().unwrap();
+
+        match db::untag_note(&conn, &tag_note_request) {
+            Ok(_) => APIResponse::Data(None),
+            Err(e) => APIResponse::Error(format!("Failed to untag note: {}", e)),
+        }
+    }
 }

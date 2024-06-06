@@ -68,16 +68,6 @@ export type ListNotesRequest = {
   status?: "active" | "completed" | "pending" | "published";
 };
 
-export type CreateContextMenuRequest = {
-  menuKind: "TagItem" | "NoteItem";
-  id?: number;
-};
-
-export type ContextMenuEventPayload = {
-  eventKind: string;
-  id?: number;
-};
-
 type Page<T> = {
   data: T[] | undefined;
   nextPage: number | undefined;
