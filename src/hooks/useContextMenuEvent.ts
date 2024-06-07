@@ -78,8 +78,11 @@ export const useContextMenuEvent = () => {
                 (tag) => !(tag.id === tagId),
               );
 
+              if (tagId === activeTag?.id) {
+                void queryClient.invalidateQueries({ queryKey: ["notes"] });
+              }
+
               if (currentNote?.tags && filteredTags) {
-                // currentNote.tags = filteredTags;
                 if (currentNote) {
                   app.setCurrentNote({ ...currentNote, tags: filteredTags });
                 }
@@ -101,5 +104,5 @@ export const useContextMenuEvent = () => {
       unlisten();
     }
     void listenHandler();
-  }, [currentNote]);
+  }, [currentNote, activeTag]);
 };
