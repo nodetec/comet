@@ -16,7 +16,7 @@ export const useContextMenuEvent = () => {
     useAppContext();
   const [unlisten, setUnlisten] = useState<() => void>(() => () => {});
 
-  async function stupidFuckingFunction() {
+  async function listenHandler() {
     const app = useAppContext.getState();
 
     const unlisten = await listen("menu_event", (e) => {
@@ -51,20 +51,13 @@ export const useContextMenuEvent = () => {
               const filteredTags = currentNote?.tags.filter(
                 (tag) => tag.id !== tagItemEvent.id,
               );
-              // console.log("tag id", tagItemEvent.id);
-              // console.log("current tags", app.currentNote?.tags);
-
-              // console.log(app.currentNote);
 
               if (currentNote?.tags && filteredTags) {
-                // console.log("here");
                 setCurrentNote({
                   ...currentNote,
                   tags: filteredTags,
                 });
               } else {
-                // console.log("filteredTags", filteredTags);
-                // console.log("current note tags", app.currentNote?.tags);
               }
               void queryClient.invalidateQueries({ queryKey: ["tags"] });
               break;
@@ -81,19 +74,9 @@ export const useContextMenuEvent = () => {
             case "untag_note":
               const { tagId } = noteTagItemEvent;
 
-              // console.log("tagId", tagId);
-
-              // console.log("currentNote", currentNote);
-
-              console.log("currentNote", currentNote);
-
-              console.log("currentNote tags", currentNote?.tags);
-
               const filteredTags = currentNote?.tags.filter(
                 (tag) => !(tag.id === tagId),
               );
-
-              console.log("filteredTags", filteredTags);
 
               if (currentNote?.tags && filteredTags) {
                 // currentNote.tags = filteredTags;
@@ -117,6 +100,6 @@ export const useContextMenuEvent = () => {
     if (unlisten) {
       unlisten();
     }
-    void stupidFuckingFunction();
+    void listenHandler();
   }, [currentNote]);
 };
