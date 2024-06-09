@@ -61,6 +61,13 @@ export const createTag = async (createTagRequest: CreateTagRequest) => {
   return response;
 };
 
+export const deleteTag = async (tagId: number) => {
+  // TODO: error handling
+  void await invoke("delete_tag", {
+    tagId,
+  });
+};
+
 export const getTag = async (getTagRequest: GetTagRequest) => {
   const response: APIResponse<Tag> = await invoke("get_tag", {
     getTagRequest,

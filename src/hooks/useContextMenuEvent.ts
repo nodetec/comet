@@ -12,7 +12,7 @@ import {
 
 export const useContextMenuEvent = () => {
   const queryClient = useQueryClient();
-  const { currentNote, setCurrentNote, activeTag, setActiveTag } =
+  const { currentNote, setCurrentNote, activeTag, setConfirmTagDelete } =
     useAppContext();
   const [unlisten, setUnlisten] = useState<() => void>(() => () => {});
 
@@ -45,21 +45,7 @@ export const useContextMenuEvent = () => {
           const tagItemEvent = tagItemContextMenuEventPayload.TagItem;
           switch (tagItemEvent.eventKind) {
             case "delete_tag":
-              if (tagItemEvent.id === activeTag?.id) {
-                setActiveTag(undefined);
-              }
-              const filteredTags = currentNote?.tags.filter(
-                (tag) => tag.id !== tagItemEvent.id,
-              );
-
-              if (currentNote?.tags && filteredTags) {
-                setCurrentNote({
-                  ...currentNote,
-                  tags: filteredTags,
-                });
-              } else {
-              }
-              void queryClient.invalidateQueries({ queryKey: ["tags"] });
+              setConfirmTagDelete(true);
               break;
             default:
               break;

@@ -82,6 +82,11 @@ fn create_tag(
 }
 
 #[tauri::command]
+fn delete_tag(tag_id: i64, tag_service: State<'_, TagService>) -> () {
+    tag_service.delete_tag(&tag_id)
+}
+
+#[tauri::command]
 fn list_tags(
     list_tags_request: ListTagsRequest,
     tag_service: State<'_, TagService>,
@@ -202,7 +207,6 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
         }
 
         id if id == &delete_tag_menu_id => {
-            tag_service.delete_tag(&tag_id.unwrap());
             let tag_item_context_menu_event = TagItemContextMenuEvent {
                 id: match tag_id {
                     Some(id) => id,
@@ -304,6 +308,7 @@ fn main() {
             list_tags,
             get_tag,
             tag_note,
+            delete_tag,
             untag_note,
             create_context_menu,
             delete_note,
