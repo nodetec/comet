@@ -29,6 +29,9 @@ interface State {
 
   settings: Settings;
   setSettings: (settings: Settings) => void;
+
+  confirmTagDelete: boolean;
+  setConfirmTagDelete: (confirmTagDelete: boolean) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -62,6 +65,9 @@ export const useAppContext = create<State>()(
 
       settings: {},
       setSettings: (settings) => set({ settings }),
+
+      confirmTagDelete: false,
+      setConfirmTagDelete: (confirmTagDelete) => set({ confirmTagDelete }),
     }),
     {
       name: "captains-log-storage",
