@@ -273,6 +273,24 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(context_menu_state))
         .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow};
+                use cocoa::base::{id, nil};
+
+                let ns_window = window.ns_window().unwrap() as id;
+                unsafe {
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                        nil,
+                        29.0 / 255.0,
+                        30.0 / 255.0,
+                        31.0 / 255.0,
+                        1.0,
+                    );
+                    ns_window.setBackgroundColor_(bg_color);
+                }
+            }
             let db_dir = app
                 .path()
                 .resolve("captainslog", BaseDirectory::Data)
