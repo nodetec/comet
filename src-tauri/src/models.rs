@@ -111,31 +111,89 @@ pub struct Tag {
 // Note Tags
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct TagNoteRequest {
     pub note_id: i64,
     pub tag_id: i64,
 }
 
 #[derive(Deserialize)]
-pub enum MenuKind {
-    NoteItem,
-    TagItem,
+#[serde(rename_all = "camelCase")]
+pub struct NoteItemContextMenuRequest {
+    pub id: i64,
 }
 
-// Context Menu
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagItemContextMenuRequest {
+    pub id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteTagItemContextMenuRequest {
+    pub note_id: i64,
+    pub tag_id: i64,
+}
+
+#[derive(Deserialize)]
+pub enum MenuKind {
+    NoteItem(NoteItemContextMenuRequest),
+    TagItem(TagItemContextMenuRequest),
+    NoteTag(NoteTagItemContextMenuRequest),
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextMenuRequest {
     pub menu_kind: MenuKind,
-    pub id: Option<i64>,
 }
 
 #[derive(Debug)]
-pub struct ContextMenuItemId(pub Option<i64>);
+pub struct ContextMenuState{
+    pub note_id: Option<i64>,
+    pub tag_id: Option<i64>,
+}
+
+#[derive(Debug)]
+pub struct ContextMenuTagItemId(pub i64);
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ContextMenuEvent {
-    pub event_kind: String,
+#[derive(Debug)]
+pub struct NoteItemContextMenuEvent {
     pub id: i64,
+    pub event_kind: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
+pub struct TagItemContextMenuEvent {
+    pub id: i64,
+    pub event_kind: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
+pub struct NoteTagItemContextMenuEvent {
+    pub note_id: i64,
+    pub tag_id: i64,
+    pub event_kind: String,
+}
+
+#[derive(Serialize, Clone)]
+#[derive(Debug)]
+pub enum ContextMenuEventKind {
+    NoteItem(NoteItemContextMenuEvent),
+    TagItem(TagItemContextMenuEvent),
+    NoteTag(NoteTagItemContextMenuEvent),
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
+pub struct ContextMenuEvent {
+    pub context_menu_event_kind: ContextMenuEventKind,
 }

@@ -2,14 +2,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createContextMenu } from "~/api";
 import { useAppContext } from "~/store";
 import { type Tag } from "~/types";
+import {
+  type CreateContextMenuRequest,
+  type TagItemContextMenuRequest,
+} from "~/types/contextMenuTypes";
 
 type Props = {
   tag: Tag;
 };
 
 export default function TagItem({ tag }: Props) {
-  const { activeTag, setFilter, setActiveTag, setCurrentTrashedNote } =
-    useAppContext();
+  const {
+    activeTag,
+    setFilter,
+    setActiveTag,
+    setCurrentTrashedNote,
+  } = useAppContext();
 
   const queryClient = useQueryClient();
 
@@ -29,7 +37,15 @@ export default function TagItem({ tag }: Props) {
   ) => {
     e.preventDefault(); // prevent the default behaviour when right clicked
     const id = tag.id;
-    await createContextMenu({ menuKind: "TagItem", id });
+    const menuKind: TagItemContextMenuRequest = {
+      TagItem: {
+        id,
+      },
+    };
+    const tagItemRequest: CreateContextMenuRequest = {
+      menuKind,
+    };
+    await createContextMenu(tagItemRequest);
   };
 
   return (

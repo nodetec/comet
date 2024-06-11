@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   type APIResponse,
-  type CreateContextMenuRequest,
   type CreateNoteRequest,
   type CreateTagRequest,
   type GetTagRequest,
@@ -13,6 +12,7 @@ import {
   type TagNoteRequest,
   type UpdateNoteRequest,
 } from "~/types";
+import { type CreateContextMenuRequest } from "~/types/contextMenuTypes";
 
 export const createNote = async (createNoteRequest: CreateNoteRequest) => {
   // TODO: error handling
@@ -60,6 +60,13 @@ export const createTag = async (createTagRequest: CreateTagRequest) => {
     createTagRequest,
   });
   return response;
+};
+
+export const deleteTag = async (tagId: number) => {
+  // TODO: error handling
+  void await invoke("delete_tag", {
+    tagId,
+  });
 };
 
 export const getTag = async (getTagRequest: GetTagRequest) => {

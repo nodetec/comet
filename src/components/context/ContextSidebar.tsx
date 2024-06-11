@@ -9,13 +9,14 @@ import {
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { TagsIcon } from "lucide-react";
 
-import { Button } from "../ui/button";
 import AllNotes from "./AllNotes";
 import Login from "./Login";
 import TagItem from "./TagItem";
 import TrashedNotes from "./TrashedNotes";
+import DeleteTagDialog from "../tags/DeleteTagDialog";
 
 export default function ContextSidebar() {
+
   async function fetchTags() {
     const apiResponse = await listTags({});
     if (apiResponse.data) {
@@ -49,6 +50,7 @@ export default function ContextSidebar() {
                 </div>
               </AccordionTrigger>
               <AccordionContent>
+                <DeleteTagDialog />
                 {data?.map((tag) => <TagItem key={tag.id} tag={tag} />)}
               </AccordionContent>
             </AccordionItem>

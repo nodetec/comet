@@ -29,6 +29,12 @@ interface State {
 
   settings: Settings;
   setSettings: (settings: Settings) => void;
+
+  deleteTagDialog: boolean;
+  setDeleteTagDialog: (deleteTagDialog: boolean) => void;
+
+  deleteTagDialogId: number | undefined;
+  setDeleteTagDialogId: (deleteTagDialogId: number | undefined) => void;
 }
 
 export const useAppContext = create<State>()(
@@ -62,6 +68,12 @@ export const useAppContext = create<State>()(
 
       settings: {},
       setSettings: (settings) => set({ settings }),
+
+      deleteTagDialog: false,
+      setDeleteTagDialog: (deleteTagDialog) => set({ deleteTagDialog }),
+
+      deleteTagDialogId: undefined,
+      setDeleteTagDialogId: (deleteTagDialogId) => set({ deleteTagDialogId }),
     }),
     {
       name: "captains-log-storage",

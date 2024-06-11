@@ -23,8 +23,9 @@ mod db;
 mod models;
 mod utils;
 use models::{
-    APIResponse, ContextMenuEvent, ContextMenuItemId, ContextMenuRequest, CreateNoteRequest,
-    CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, ListTagsRequest, Note, Tag,
+    APIResponse, ContextMenuEvent, ContextMenuEventKind, ContextMenuRequest, ContextMenuState,
+    CreateNoteRequest, CreateTagRequest, DBConn, GetTagRequest, ListNotesRequest, ListTagsRequest,
+    Note, NoteItemContextMenuEvent, NoteTagItemContextMenuEvent, Tag, TagItemContextMenuEvent,
     TagNoteRequest, UpdateNoteRequest,
 };
 
@@ -81,6 +82,11 @@ fn create_tag(
 }
 
 #[tauri::command]
+fn delete_tag(tag_id: i64, tag_service: State<'_, TagService>) -> () {
+    tag_service.delete_tag(&tag_id)
+}
+
+#[tauri::command]
 fn list_tags(
     list_tags_request: ListTagsRequest,
     tag_service: State<'_, TagService>,
@@ -103,6 +109,15 @@ fn tag_note(
     tag_note_service.tag_note(tag_note_request)
 }
 
+// Tag Notes
+
+#[tauri::command]
+fn untag_note(
+    tag_note_request: TagNoteRequest,
+    tag_note_service: State<'_, NoteTagService>,
+) -> APIResponse<()> {
+    tag_note_service.untag_note(&tag_note_request)
+}
 // Settings
 
 #[tauri::command]
@@ -133,9 +148,9 @@ fn create_context_menu(
     window: tauri::Window,
     create_context_menu_request: ContextMenuRequest,
     app_handle: AppHandle,
-    create_menu_service: State<'_, ContextMenuService>,
+    context_menu_service: State<'_, ContextMenuService>,
 ) -> APIResponse<()> {
-    create_menu_service.create_context_menu(
+    context_menu_service.create_context_menu(
         window,
         app_handle.clone(),
         &create_context_menu_request,
@@ -163,49 +178,119 @@ fn handle_menu_event(app_handle: &tauri::AppHandle, event: MenuEvent) {
     let app_handle_clone = app_handle.clone();
     let note_service: State<NoteService> = app_handle_clone.state();
     let tag_service: State<TagService> = app_handle_clone.state();
+    let tag_note_service: State<NoteTagService> = app_handle_clone.state();
 
-    let context_menu_item_id: State<Mutex<ContextMenuItemId>> = app_handle_clone.state();
-    let mut context_menu_item_id = context_menu_item_id.lock().unwrap();
+    let context_menu_state: State<Mutex<ContextMenuState>> = app_handle_clone.state();
 
+    let mut context_menu_state = context_menu_state.lock().unwrap();
+    let note_id = context_menu_state.note_id;
+    let tag_id = context_menu_state.tag_id;
     let trash_note_menu_id = MenuId(String::from("trash_note"));
     let delete_tag_menu_id = MenuId(String::from("delete_tag"));
-
+    let untag_note_menu_id = MenuId(String::from("untag_note"));
     match event.id() {
         id if id == &trash_note_menu_id => {
-            note_service.trash_note(&context_menu_item_id.0.unwrap());
-            let context_menu_event = ContextMenuEvent {
-                id: match context_menu_item_id.0 {
+            note_service.trash_note(&note_id.unwrap());
+            let note_item_context_menu_event = NoteItemContextMenuEvent {
+                id: match note_id {
                     Some(id) => id,
                     None => 0,
                 },
                 event_kind: String::from("trash_note"),
             };
+            let context_menu_event = ContextMenuEvent {
+                context_menu_event_kind: ContextMenuEventKind::NoteItem(
+                    note_item_context_menu_event,
+                ),
+            };
             app_handle.emit("menu_event", context_menu_event).unwrap();
         }
 
         id if id == &delete_tag_menu_id => {
-            tag_service.delete_tag(&context_menu_item_id.0.unwrap());
-            let context_menu_event = ContextMenuEvent {
-                id: match context_menu_item_id.0 {
+            let tag_item_context_menu_event = TagItemContextMenuEvent {
+                id: match tag_id {
                     Some(id) => id,
                     None => 0,
                 },
                 event_kind: String::from("delete_tag"),
             };
+            let context_menu_event = ContextMenuEvent {
+                context_menu_event_kind: ContextMenuEventKind::TagItem(tag_item_context_menu_event),
+            };
             app_handle.emit("menu_event", context_menu_event).unwrap();
         }
 
+        id if id == &untag_note_menu_id => {
+            let tag_note_request = TagNoteRequest {
+                note_id: match note_id {
+                    Some(id) => id,
+                    None => 0,
+                },
+                tag_id: match tag_id {
+                    Some(id) => id,
+                    None => 0,
+                },
+            };
+            tag_note_service.untag_note(&tag_note_request);
+
+            println!("{:?}", tag_note_request);
+
+            let note_tag_item_context_menu_event = NoteTagItemContextMenuEvent {
+                note_id: match note_id {
+                    Some(id) => id,
+                    None => 0,
+                },
+                tag_id: match tag_id {
+                    Some(id) => id,
+                    None => 0,
+                },
+                event_kind: String::from("untag_note"),
+            };
+            let context_menu_event = ContextMenuEvent {
+                context_menu_event_kind: ContextMenuEventKind::NoteTag(
+                    note_tag_item_context_menu_event,
+                ),
+            };
+            println!("{:?}", context_menu_event);
+            app_handle.emit("menu_event", context_menu_event).unwrap();
+            context_menu_state.note_id = None;
+            context_menu_state.tag_id = None;
+        }
+
         _ => {
-            context_menu_item_id.0 = None;
+            context_menu_state.note_id = None;
+            context_menu_state.tag_id = None;
         }
     }
 }
 
 fn main() {
+    let context_menu_state = ContextMenuState {
+        note_id: None,
+        tag_id: None,
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(Mutex::new(ContextMenuItemId(None)))
+        .manage(Mutex::new(context_menu_state))
         .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow};
+                use cocoa::base::{id, nil};
+
+                let ns_window = window.ns_window().unwrap() as id;
+                unsafe {
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                        nil,
+                        29.0 / 255.0,
+                        30.0 / 255.0,
+                        31.0 / 255.0,
+                        1.0,
+                    );
+                    ns_window.setBackgroundColor_(bg_color);
+                }
+            }
             let db_dir = app
                 .path()
                 .resolve("captainslog", BaseDirectory::Data)
@@ -243,6 +328,8 @@ fn main() {
             list_tags,
             get_tag,
             tag_note,
+            delete_tag,
+            untag_note,
             create_context_menu,
             delete_note,
             trash_note,

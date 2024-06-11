@@ -5,7 +5,7 @@ import { createTag, getTag, tagNote } from "~/api";
 import { Input } from "~/components/ui/input";
 import { useAppContext } from "~/store";
 
-import { Badge } from "../ui/badge";
+import NoteTag from "./NoteTag";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
@@ -22,13 +22,13 @@ export default function TagInput() {
     if (e.key === "Enter") {
       e.preventDefault(); // Prevents the default action of the Enter key if needed
       const noteId = currentNote?.id;
-      if (noteId === undefined) {
-        return;
-      }
+
+      if (noteId === undefined) return;
+
+      if (currentNote?.tags.some(tag => tag.name === tagName)) return;
 
       const getTagResponse = await getTag({ name: tagName });
       const existingTag = getTagResponse.data;
-
       if (getTagResponse.error) {
         const createTagResponse = await createTag({
           name: tagName,
@@ -36,10 +36,11 @@ export default function TagInput() {
           icon: "",
           noteId,
         });
-        console.log(createTagResponse);
         if (createTagResponse.data && currentNote) {
-          currentNote.tags.push(createTagResponse.data);
-          setCurrentNote(currentNote);
+          setCurrentNote({
+            ...currentNote,
+            tags: [...currentNote.tags, createTagResponse.data],
+          });
         }
         if (createTagResponse.error) {
           return;
@@ -70,16 +71,7 @@ export default function TagInput() {
     <div className="w-full px-2">
       <div className="flex items-center gap-x-2">
         {currentNote?.tags?.map((tag, tagIndex) => {
-          return (
-            <div key={tagIndex}>
-              <Badge
-                className="cursor-default select-none rounded-full"
-                variant="secondary"
-              >
-                {tag.name}
-              </Badge>
-            </div>
-          );
+          return <NoteTag key={tagIndex} tag={tag} />;
         })}
 
         {filter !== "trashed" && filter !== "archived" && (
