@@ -21,14 +21,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 const FormSchema = z.object({
-  nsec: z.string(),
+  fontSize: z.number(),
 });
 
-export default function NostrSettings() {
+export default function GeneralSettings() {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      nsec: "",
+      fontSize: 14,
     },
   });
 
@@ -39,24 +39,24 @@ export default function NostrSettings() {
   return (
     <Card className="bg-card/20">
       <CardHeader>
-        <CardTitle>Nostr</CardTitle>
-        <CardDescription>
-          Enter your Nostr private key to enable Nostr features
-        </CardDescription>
+        <CardTitle>General</CardTitle>
+        <CardDescription>Configure your general settings</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <FormField
               control={form.control}
-              name="nsec"
+              name="fontSize"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nostr Private Key</FormLabel>
+                  <FormLabel>Font Size</FormLabel>
                   <FormControl>
-                    <Input placeholder="nsec" {...field} />
+                    <Input placeholder="14" {...field} />
                   </FormControl>
-                  <FormDescription>Nostr private key</FormDescription>
+                  <FormDescription>
+                    Font size of the application
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

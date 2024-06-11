@@ -7,6 +7,7 @@ import {
   type ListNotesRequest,
   type ListTagsRequest,
   type Note,
+  type Settings,
   type Tag,
   type TagNoteRequest,
   type UpdateNoteRequest,
@@ -94,7 +95,16 @@ export const signEvent = async (event: string) => {
   return response;
 };
 
-export const getSettings = async () => {
-  const response = await invoke("get_settings");
+export const getAllSettings = async () => {
+  const response: APIResponse<Settings> = await invoke("get_all_settings");
   return response;
-}
+};
+
+export const getSetting = async (key: string) => {
+  const response: APIResponse<string> = await invoke("get_setting", { key });
+  return response;
+};
+
+export const setSetting = async (key: string, value: string) => {
+  void (await invoke("set_setting", { key, value }));
+};

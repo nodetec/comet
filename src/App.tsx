@@ -2,6 +2,7 @@ import "./styles/globals.css";
 
 import { useEffect } from "react";
 
+import { getAllSettings } from "~/api";
 import { Route, Routes } from "react-router-dom";
 
 import { Toaster } from "./components/ui/sonner";
@@ -22,7 +23,12 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("vite-ui-theme", "system");
-    setSettings({ vim: "true" });
+    const loadInitialSettings = async () => {
+      const allSettings = await getAllSettings();
+      setSettings(allSettings.data);
+    };
+
+    loadInitialSettings().catch(console.error);
   }, []);
 
   return (

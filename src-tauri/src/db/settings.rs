@@ -7,8 +7,10 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         // theme
         ("theme", "dark"),
         // editor
-        ("line_numbers", "false"),
         ("vim", "true"),
+        ("line_numbers", "false"),
+        ("highlight_active_line", "false"),
+        ("line_wrapping", "false"),
         // nostr
         ("public_key", ""),
         ("private_key", ""),
