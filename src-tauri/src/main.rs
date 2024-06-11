@@ -121,6 +121,13 @@ fn untag_note(
 // Settings
 
 #[tauri::command]
+fn get_all_settings(
+    settings_service: State<'_, SettingsService>,
+) -> APIResponse<HashMap<String, String>> {
+    settings_service.get_all_settings()
+}
+
+#[tauri::command]
 fn get_setting(key: String, settings_service: State<'_, SettingsService>) -> APIResponse<String> {
     settings_service.get_setting(&key)
 }
@@ -132,13 +139,6 @@ fn set_setting(
     settings_service: State<'_, SettingsService>,
 ) -> APIResponse<()> {
     settings_service.set_setting(&key, &value)
-}
-
-#[tauri::command]
-fn get_all_settings(
-    settings_service: State<'_, SettingsService>,
-) -> APIResponse<HashMap<String, String>> {
-    settings_service.get_all_settings()
 }
 
 // Context Menu
@@ -273,6 +273,24 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(context_menu_state))
         .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow};
+                use cocoa::base::{id, nil};
+
+                let ns_window = window.ns_window().unwrap() as id;
+                unsafe {
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                        nil,
+                        29.0 / 255.0,
+                        30.0 / 255.0,
+                        31.0 / 255.0,
+                        1.0,
+                    );
+                    ns_window.setBackgroundColor_(bg_color);
+                }
+            }
             let db_dir = app
                 .path()
                 .resolve("captainslog", BaseDirectory::Data)
@@ -287,10 +305,12 @@ fn main() {
             let tag_service = TagService::new(connection.clone());
             let tag_note_service: NoteTagService = NoteTagService::new(connection.clone());
             let context_menu_service: ContextMenuService = ContextMenuService::new();
+            let settings_service: SettingsService = SettingsService::new(connection.clone());
             app.manage(note_service);
             app.manage(tag_service);
             app.manage(tag_note_service);
             app.manage(context_menu_service);
+            app.manage(settings_service);
             {
                 app.on_menu_event(|app_handle: &tauri::AppHandle, event| {
                     handle_menu_event(app_handle, event);

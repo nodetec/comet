@@ -13,21 +13,21 @@ impl SettingsService {
         SettingsService { db_conn }
     }
 
-    pub fn get_setting(&self, key: &String) -> APIResponse<String> {
-        let conn = self.db_conn.0.lock().unwrap();
-
-        match db::get_setting(&conn, key) {
-            Ok(setting) => APIResponse::Data(Some(setting)),
-            Err(e) => APIResponse::Error(format!("Failed to retrieve setting: {}", e)),
-        }
-    }
-
     pub fn get_all_settings(&self) -> APIResponse<HashMap<String, String>> {
         let conn = self.db_conn.0.lock().unwrap();
 
         match db::get_all_settings(&conn) {
             Ok(settings) => APIResponse::Data(Some(settings)),
             Err(e) => APIResponse::Error(format!("Failed to retrieve settings: {}", e)),
+        }
+    }
+
+    pub fn get_setting(&self, key: &String) -> APIResponse<String> {
+        let conn = self.db_conn.0.lock().unwrap();
+
+        match db::get_setting(&conn, key) {
+            Ok(setting) => APIResponse::Data(Some(setting)),
+            Err(e) => APIResponse::Error(format!("Failed to retrieve setting: {}", e)),
         }
     }
 

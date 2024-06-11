@@ -11,6 +11,7 @@ import {
   drawSelection,
   dropCursor,
   highlightSpecialChars,
+  lineNumbers,
   rectangularSelection,
   // scrollPastEnd,
 } from "@codemirror/view";
@@ -64,7 +65,6 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     const extensions = [
       theme === "dark" ? darkTheme : lightTheme,
       blurHandlerExtension,
-      // lineNumbers(),
       // highlightActiveLineGutter(),
       highlightSpecialChars(),
       history(),
@@ -101,6 +101,9 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
 
     if (settings.vim === "true") {
       extensions.push(vim());
+    }
+    if (settings.line_numbers === "true") {
+      extensions.push(lineNumbers());
     }
 
     const startState = EditorState.create({

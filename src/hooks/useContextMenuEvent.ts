@@ -12,7 +12,7 @@ import {
 
 export const useContextMenuEvent = () => {
   const queryClient = useQueryClient();
-  const { currentNote, setCurrentNote, activeTag, setConfirmTagDelete } =
+  const { currentNote, setCurrentNote, activeTag, setDeleteTagDialog, setDeleteTagDialogId } =
     useAppContext();
   const [unlisten, setUnlisten] = useState<() => void>(() => () => {});
 
@@ -45,7 +45,9 @@ export const useContextMenuEvent = () => {
           const tagItemEvent = tagItemContextMenuEventPayload.TagItem;
           switch (tagItemEvent.eventKind) {
             case "delete_tag":
-              setConfirmTagDelete(true);
+              const { id } = tagItemEvent;
+              setDeleteTagDialogId(id);
+              setDeleteTagDialog(true);
               break;
             default:
               break;
