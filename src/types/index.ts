@@ -91,6 +91,20 @@ export type InfiniteQueryData<T> = {
 };
 
 export type Settings = {
+  // theme
   theme?: "light" | "dark";
+  // editor
   vim?: "true" | "false";
+  line_numbers?: "true" | "false";
+  highlight_active_line?: "true" | "false";
+  line_wrapping?: "true" | "false";
+  // nostr
+  public_key?: string;
+  private_key?: string;
 };
+
+export type SettingsSwitchKeys =
+  | "vim"
+  | "line_numbers"
+  | "highlight_active_line"
+  | "line_wrapping"

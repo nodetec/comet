@@ -21,14 +21,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 const FormSchema = z.object({
-  nsec: z.string(),
+  uiTheme: z.string(),
 });
 
-export default function NostrSettings() {
+export default function ThemeSettings() {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      nsec: "",
+      uiTheme: "Default",
     },
   });
 
@@ -39,24 +39,25 @@ export default function NostrSettings() {
   return (
     <Card className="bg-card/20">
       <CardHeader>
-        <CardTitle>Nostr</CardTitle>
-        <CardDescription>
-          Enter your Nostr private key to enable Nostr features
-        </CardDescription>
+        <CardTitle>Theme</CardTitle>
+        <CardDescription>Configure your theme</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <FormField
               control={form.control}
-              name="nsec"
+              name="uiTheme"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nostr Private Key</FormLabel>
+                  <FormLabel>UI Theme</FormLabel>
                   <FormControl>
-                    <Input placeholder="nsec" {...field} />
+                    <Input placeholder="Default" {...field} />
                   </FormControl>
-                  <FormDescription>Nostr private key</FormDescription>
+                  <FormDescription>
+                    This styles the buttons, side bar, note list, and other
+                    common components
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
