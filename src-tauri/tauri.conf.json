@@ -1,7 +1,7 @@
 {
   "productName": "captains-log",
   "version": "0.0.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "captains-log",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
