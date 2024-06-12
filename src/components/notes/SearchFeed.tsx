@@ -4,8 +4,6 @@ import { useAppContext } from "~/store";
 import { useInView } from "react-intersection-observer";
 
 import NoteCard from "./NoteCard";
-import NoteFeedHeader from "./NoteFeedHeader";
-import SearchNotes from "./SearchNotes";
 
 type Props = {
   noteSearch: string;

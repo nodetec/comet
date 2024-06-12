@@ -39,7 +39,7 @@ export const Editor = () => {
     });
   };
 
-  const { editorRef, editorView } = useCM6Editor({
+  const { editorRef } = useCM6Editor({
     initialDoc: currentNote?.content ?? currentTrashedNote?.content ?? "",
     onChange,
   });
