@@ -9,11 +9,11 @@ To get started, clone the repository and run the following commands:
 To install the dependencies:
 
 ```bash
-bun install
+npm install
 ```
 
 To run the application:
 
 ```bash
-bun run tauri dev
+npm run tauri dev
 ```
