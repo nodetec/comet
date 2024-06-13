@@ -65,6 +65,10 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     },
   });
 
+  function indentUnitWhitespace(indentUnitSetting: string) {
+    return " ".repeat(Number(indentUnitSetting));
+  }
+
   useEffect(() => {
     if (!editorRef.current) return;
 
@@ -104,7 +108,7 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
         codeLanguages: languages,
         // addKeymap: true,
       }),
-      indentUnit.of("  "),
+      indentUnit.of(indentUnitWhitespace(settings.indent_unit)),
     ];
 
     if (settings.vim === "true") {
