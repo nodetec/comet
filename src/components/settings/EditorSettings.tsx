@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { getSetting, setSetting } from "~/api";
+import { setSetting } from "~/api";
 import {
   Card,
   CardContent,
@@ -19,48 +19,54 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { useAppContext } from "~/store";
-import { type SettingsSwitchKeys } from "~/types";
 
 export default function EditorSettings() {
   const { settings, setSettings } = useAppContext();
 
   const [loading, setLoading] = useState(false);
+  const [indentUnit, setIndentUnit] = useState(settings.indent_unit);
+  const [tabSize, setTabSize] = useState(settings.tab_size);
+  const [fontSize, setFontSize] = useState(settings.font_size);
+  const [fontFamily, setFontFamily] = useState(settings.font_family);
+  const [fontWeight, setFontWeight] = useState(settings.font_weight);
+  const [lineHeight, setLineHeight] = useState(settings.line_height);
+
+  async function updateSetting(key: string, value: string) {
+    if (key in settings) {
+      await setSetting(key, value);
+      setSettings({ ...settings, [key]: value });
+    }
+  }
 
   async function handleSwitchOnClick(
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
-    settingKey: SettingsSwitchKeys,
+    key: string,
   ) {
     if (event.target instanceof HTMLButtonElement) {
       setLoading(true);
-      const updatedSettings = { ...settings };
       try {
         if (event.target.dataset.state === "unchecked") {
-          await setSetting(settingKey, "true");
-          const getSettingResponse = await getSetting(settingKey);
-          if (getSettingResponse.data === "true") {
-            updatedSettings[settingKey] = getSettingResponse.data;
-            setSettings(updatedSettings);
-          }
+          await updateSetting(key, "true");
         } else if (event.target.dataset.state === "checked") {
-          await setSetting(settingKey, "false");
-          const getSettingResponse = await getSetting(settingKey);
-          if (getSettingResponse.data === "false") {
-            updatedSettings[settingKey] = getSettingResponse.data;
-            setSettings(updatedSettings);
-          }
+          await updateSetting(key, "false");
         }
       } catch (error) {
-        console.error("Settings error: ", error);
+        console.error("Editor settings error: ", error);
       } finally {
         setLoading(false);
       }
     }
   }
 
-  async function handleInputOnChange(
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) {
-    console.log("handleInputOnChange event: ", event);
+  async function handleInputOnBlur(key: string, value: string) {
+    setLoading(true);
+    try {
+      await updateSetting(key, value);
+    } catch (error) {
+      console.error("Editor settings error: ", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -72,10 +78,10 @@ export default function EditorSettings() {
       <CardContent>
         <div className="space-y-8">
           <div className="space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <Label>Vim Mode</Label>
               <Switch
-                checked={settings?.vim === "true"}
+                checked={settings.vim === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "vim")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -86,10 +92,10 @@ export default function EditorSettings() {
             </p>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <Label>Line Numbers</Label>
               <Switch
-                checked={settings?.line_numbers === "true"}
+                checked={settings.line_numbers === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "line_numbers")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -100,10 +106,10 @@ export default function EditorSettings() {
             </p>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <Label>Highlight Active Line</Label>
               <Switch
-                checked={settings?.highlight_active_line === "true"}
+                checked={settings.highlight_active_line === "true"}
                 onClick={(event) =>
                   handleSwitchOnClick(event, "highlight_active_line")
                 }
@@ -116,10 +122,10 @@ export default function EditorSettings() {
             </p>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center justify-between">
               <Label>Line Wrapping</Label>
               <Switch
-                checked={settings?.line_wrapping === "true"}
+                checked={settings.line_wrapping === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "line_wrapping")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -155,8 +161,11 @@ export default function EditorSettings() {
                 name="editor-settings-indent-unit-input"
                 type="number"
                 placeholder="2"
-                defaultValue="2"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={indentUnit}
+                onChange={(event) => setIndentUnit(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("indent_unit", indentUnit)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -171,8 +180,11 @@ export default function EditorSettings() {
                 name="editor-settings-tab-size-input"
                 type="number"
                 placeholder="4"
-                defaultValue="4"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={tabSize}
+                onChange={(event) => setTabSize(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("tab_size", tabSize)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -187,8 +199,11 @@ export default function EditorSettings() {
                 name="editor-settings-font-size-input"
                 type="number"
                 placeholder="14"
-                defaultValue="14"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={fontSize}
+                onChange={(event) => setFontSize(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("font_size", fontSize)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -203,8 +218,11 @@ export default function EditorSettings() {
                 name="editor-settings-font-family-input"
                 type="text"
                 placeholder=""
-                defaultValue="SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={fontFamily}
+                onChange={(event) => setFontFamily(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("font_family", fontFamily)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -219,8 +237,11 @@ export default function EditorSettings() {
                 name="editor-settings-font-weight-input"
                 type="text"
                 placeholder="lighter, normal, bold, or bolder"
-                defaultValue="normal"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={fontWeight}
+                onChange={(event) => setFontWeight(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("font_weight", fontWeight)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -235,8 +256,11 @@ export default function EditorSettings() {
                 name="editor-settings-line-height-input"
                 type="number"
                 placeholder="1.5"
-                defaultValue="1.5"
-                onChange={(event) => handleInputOnChange(event)}
+                className="disabled:cursor-text disabled:opacity-100"
+                disabled={loading}
+                value={lineHeight}
+                onChange={(event) => setLineHeight(event.currentTarget.value)}
+                onBlur={() => handleInputOnBlur("line_height", lineHeight)}
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">

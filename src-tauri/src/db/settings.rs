@@ -11,6 +11,16 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         ("line_numbers", "false"),
         ("highlight_active_line", "false"),
         ("line_wrapping", "false"),
+        ("unordered_list_bullet", "*"),
+        ("indent_unit", "2"),
+        ("tab_size", "4"),
+        ("font_size", "4"),
+        (
+            "font_family",
+            "SFMono-Regular,Consolas,Liberation Mono,Menlo,Courier,monospace",
+        ),
+        ("font_weight", "normal"),
+        ("line_height", "1.5"),
         // nostr
         ("public_key", ""),
         ("private_key", ""),

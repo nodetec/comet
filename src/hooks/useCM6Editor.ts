@@ -1,19 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 
 import { closeBrackets } from "@codemirror/autocomplete";
-import { history } from "@codemirror/commands";
+import { history, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { bracketMatching, indentOnInput } from "@codemirror/language";
+import {
+  bracketMatching,
+  indentOnInput,
+  indentUnit,
+} from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { EditorState } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
   dropCursor,
+  highlightActiveLine,
   highlightSpecialChars,
+  keymap,
+  // scrollPastEnd,
   lineNumbers,
   rectangularSelection,
-  // scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
@@ -59,6 +65,10 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     },
   });
 
+  function indentUnitWhitespace(indentUnitSetting: string) {
+    return " ".repeat(Number(indentUnitSetting));
+  }
+
   useEffect(() => {
     if (!editorRef.current) return;
 
@@ -80,7 +90,8 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
       rectangularSelection(),
       crosshairCursor(),
       // scrollPastEnd(),
-      EditorView.lineWrapping,
+      keymap.of([indentWithTab]),
+      EditorState.tabSize.of(Number(settings.tab_size)),
       EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
       EditorView.updateListener.of((update) => {
         if (
@@ -97,6 +108,7 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
         codeLanguages: languages,
         // addKeymap: true,
       }),
+      indentUnit.of(indentUnitWhitespace(settings.indent_unit)),
     ];
 
     if (settings.vim === "true") {
@@ -104,6 +116,12 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     }
     if (settings.line_numbers === "true") {
       extensions.push(lineNumbers());
+    }
+    if (settings.highlight_active_line === "true") {
+      extensions.push(highlightActiveLine());
+    }
+    if (settings.line_wrapping === "true") {
+      extensions.push(EditorView.lineWrapping);
     }
 
     const startState = EditorState.create({
