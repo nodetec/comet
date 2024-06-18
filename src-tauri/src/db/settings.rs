@@ -7,14 +7,14 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         // theme
         ("theme", "dark"),
         // editor
-        ("vim", "true"),
+        ("vim", "false"),
         ("line_numbers", "false"),
         ("highlight_active_line", "false"),
-        ("line_wrapping", "false"),
+        ("line_wrapping", "true"),
         ("unordered_list_bullet", "*"),
-        ("indent_unit", "2"),
+        ("indent_unit", "4"),
         ("tab_size", "4"),
-        ("font_size", "4"),
+        ("font_size", "16"),
         (
             "font_family",
             r#"SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace"#,
