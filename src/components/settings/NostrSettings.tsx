@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { setSetting } from "~/api";
@@ -21,7 +21,7 @@ import {
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { useAppContext } from "~/store";
-import { nip19 } from "nostr-tools";
+import { getPublicKey, nip19 } from "nostr-tools";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -60,9 +60,13 @@ export default function NostrSettings() {
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setLoading(true);
+    const privateKey = nip19.decode(data.nsec).data as Uint8Array;
+    const publicKey = getPublicKey(privateKey);
+    const npub = nip19.npubEncode(publicKey);
     const { nsec } = data;
     await setSetting("nsec", nsec);
-    setSettings({ ...settings, nsec: nsec });
+    await setSetting("npub", npub);
+    setSettings({ ...settings, nsec: nsec, npub: npub });
     setLoading(false);
   }
 
@@ -84,10 +88,7 @@ export default function NostrSettings() {
                 <FormItem>
                   <FormLabel>Nostr Private Key</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="nsec"
-                      {...field}
-                    />
+                    <Input placeholder="nsec" {...field} />
                   </FormControl>
                   <FormDescription>Nostr private key</FormDescription>
                   <FormMessage />
@@ -103,4 +104,3 @@ export default function NostrSettings() {
     </Card>
   );
 }
-

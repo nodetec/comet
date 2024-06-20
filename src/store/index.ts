@@ -79,9 +79,8 @@ export const useAppContext = create<State>()(
         font_family: "",
         font_weight: "normal",
         line_height: "",
-        public_key: "",
-        private_key: "",
         nsec: "",
+        npub: "",
       },
       setSettings: (settings) => set({ settings }),
 
