@@ -66,7 +66,22 @@ export const useAppContext = create<State>()(
       setNoteFeedScrollPosition: (noteFeedScrollPosition) =>
         set({ noteFeedScrollPosition }),
 
-      settings: {},
+      settings: {
+        theme: "dark",
+        vim: "false",
+        line_numbers: "false",
+        highlight_active_line: "false",
+        line_wrapping: "true",
+        unordered_list_bullet: "*",
+        indent_unit: "",
+        tab_size: "",
+        font_size: "",
+        font_family: "",
+        font_weight: "normal",
+        line_height: "",
+        public_key: "",
+        private_key: "",
+      },
       setSettings: (settings) => set({ settings }),
 
       deleteTagDialog: false,

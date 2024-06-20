@@ -93,7 +93,7 @@ export type Settings = {
   tab_size: string;
   font_size: string;
   font_family: string;
-  font_weight: string;
+  font_weight: "lighter" | "normal" | "bold" | "bolder";
   line_height: string;
   // nostr
   public_key: string;
