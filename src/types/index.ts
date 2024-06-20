@@ -96,6 +96,6 @@ export type Settings = {
   font_weight: "lighter" | "normal" | "bold" | "bolder";
   line_height: string;
   // nostr
-  public_key: string;
-  private_key: string;
+  nsec: string;
+  npub: string;
 };

@@ -22,8 +22,8 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         ("font_weight", "normal"),
         ("line_height", "1.5"),
         // nostr
-        ("public_key", ""),
-        ("private_key", ""),
+        ("npub", ""),
+        ("nsec", ""),
     ];
 
     for (key, value) in initial_settings {

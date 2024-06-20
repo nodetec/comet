@@ -1,4 +1,7 @@
+import { useState, useEffect } from "react";
+
 import { zodResolver } from "@hookform/resolvers/zod";
+import { setSetting } from "~/api";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -17,23 +20,50 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { useAppContext } from "~/store";
+import { nip19 } from "nostr-tools";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-const FormSchema = z.object({
-  nsec: z.string(),
+const isValidNsec = (nsec: string) => {
+  try {
+    return nip19.decode(nsec).type === "nsec";
+  } catch (e) {
+    return false;
+  }
+};
+
+const formSchema = z.object({
+  nsec: z.string().refine(isValidNsec, {
+    message: "Invalid nsec.",
+  }),
 });
 
 export default function NostrSettings() {
-  const form = useForm<z.infer<typeof FormSchema>>({
-    resolver: zodResolver(FormSchema),
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const { settings, setSettings } = useAppContext();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      nsec: "",
+      nsec: settings.nsec || "", // Set the default value from settings
     },
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    console.log(data);
+  // If settings.nsec is not available at the initial render, update the form state once settings are fetched
+  useEffect(() => {
+    if (settings.nsec) {
+      form.reset({ nsec: settings.nsec });
+    }
+  }, [settings.nsec, form]);
+
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    setLoading(true);
+    const { nsec } = data;
+    await setSetting("nsec", nsec);
+    setSettings({ ...settings, nsec: nsec });
+    setLoading(false);
   }
 
   return (
@@ -54,17 +84,23 @@ export default function NostrSettings() {
                 <FormItem>
                   <FormLabel>Nostr Private Key</FormLabel>
                   <FormControl>
-                    <Input placeholder="nsec" {...field} />
+                    <Input
+                      placeholder="nsec"
+                      {...field}
+                    />
                   </FormControl>
                   <FormDescription>Nostr private key</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">Save</Button>
+            <Button disabled={loading} type="submit">
+              Save
+            </Button>
           </form>
         </Form>
       </CardContent>
     </Card>
   );
 }
+

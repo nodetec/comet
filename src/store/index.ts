@@ -81,6 +81,7 @@ export const useAppContext = create<State>()(
         line_height: "",
         public_key: "",
         private_key: "",
+        nsec: "",
       },
       setSettings: (settings) => set({ settings }),
 
