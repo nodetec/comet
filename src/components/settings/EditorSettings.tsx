@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import * as React from "react";
 
+import { CaretSortIcon } from "@radix-ui/react-icons";
 import { setSetting } from "~/api";
+import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,8 +11,21 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -18,43 +34,32 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
+import { comboboxPrioritizedFontFamilies } from "~/lib/settings/constants";
+import {
+  initialUserSelectedFontFamily,
+  prioritizeUserFontFamilies,
+} from "~/lib/settings/utils";
+import { cn } from "~/lib/utils";
 import { useAppContext } from "~/store";
-import { z } from "zod";
-
-type UnorderedListBullet = "-" | "*" | "+";
-type FontWeight = "lighter" | "normal" | "bold" | "bolder";
-
-const editorSettingsSchema = z.object({
-  indent_unit: z.string().regex(/^([0-9]|[1-9][0-9]|100)$/, {
-    message: "Must be an integer from 0 to 100",
-  }),
-  tab_size: z.string().regex(/^([0-9]|[1-9][0-9]|100)$/, {
-    message: "Must be an integer from 0 to 100",
-  }),
-  font_size: z.string().regex(/^([1-9]|[1-9][0-9]|100)$/, {
-    message: "Must be an integer from 1 to 100",
-  }),
-  line_height: z.string().regex(/^(([1-9](\.[0-9])?)|(10(\.0)?))$/, {
-    message: "Must be a number with one decimal from 1.0 to 10.0",
-  }),
-});
-
-const partialEditorSettingsSchema = editorSettingsSchema.partial();
+import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
+import { partialEditorSettingsSchema } from "~/validation/schemas";
+import { Check } from "lucide-react";
 
 export default function EditorSettings() {
   const { settings, setSettings } = useAppContext();
 
   const [loading, setLoading] = useState(false);
-  const [unorderedListBullet, setUnorderedListBullet] =
-    useState<UnorderedListBullet>(settings.unordered_list_bullet);
-  const [indentUnit, setIndentUnit] = useState(settings.indent_unit);
-  const [tabSize, setTabSize] = useState(settings.tab_size);
-  const [fontSize, setFontSize] = useState(settings.font_size);
-  const [fontFamily, setFontFamily] = useState(settings.font_family);
-  const [fontWeight, setFontWeight] = useState<FontWeight>(
-    settings.font_weight,
-  );
-  const [lineHeight, setLineHeight] = useState(settings.line_height);
+  const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
+
+  const [editorSettings, setEditorSettings] = useState({
+    unorderedListBullet: settings.unordered_list_bullet,
+    indentUnit: settings.indent_unit,
+    tabSize: settings.tab_size,
+    fontSize: settings.font_size,
+    selectedFontFamily: "",
+    fontWeight: settings.font_weight,
+    lineHeight: settings.line_height,
+  });
 
   const [errorMessages, setErrorMessages] = useState({
     indent_unit: "",
@@ -62,6 +67,13 @@ export default function EditorSettings() {
     font_size: "",
     line_height: "",
   });
+
+  useEffect(() => {
+    setEditorSettings({
+      ...editorSettings,
+      selectedFontFamily: initialUserSelectedFontFamily(settings.font_family),
+    });
+  }, []);
 
   async function updateSetting(key: string, value: string) {
     if (key in settings) {
@@ -98,14 +110,14 @@ export default function EditorSettings() {
     try {
       await updateSetting(key, value);
       if (value === "-" || value === "*" || value === "+") {
-        setUnorderedListBullet(value);
+        setEditorSettings({ ...editorSettings, unorderedListBullet: value });
       } else if (
         value === "lighter" ||
         value === "normal" ||
         value === "bold" ||
         value === "bolder"
       ) {
-        setFontWeight(value);
+        setEditorSettings({ ...editorSettings, fontWeight: value });
       }
     } catch (error) {
       console.error("Editor settings error: ", error);
@@ -130,6 +142,23 @@ export default function EditorSettings() {
           [key]: validationResult.error.issues[0].message,
         });
       }
+    } catch (error) {
+      console.error("Editor settings error: ", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleComboxOnSelect(key: string, value: string) {
+    setLoading(true);
+    try {
+      await updateSetting(key, prioritizeUserFontFamilies(value));
+      setEditorSettings({
+        ...editorSettings,
+        selectedFontFamily:
+          value === editorSettings.selectedFontFamily ? "" : value,
+      });
+      setOpenFontFamilyCombobox(false);
     } catch (error) {
       console.error("Editor settings error: ", error);
     } finally {
@@ -207,7 +236,7 @@ export default function EditorSettings() {
             <Label>Unordered List Bullet</Label>
             <Select
               name="editor-settings-unordered-list-bullet-select"
-              value={unorderedListBullet}
+              value={editorSettings.unorderedListBullet}
               disabled={loading}
               onValueChange={(value: UnorderedListBullet) =>
                 handleSelectOnValueChange("unordered_list_bullet", value)
@@ -239,14 +268,21 @@ export default function EditorSettings() {
                 id="editor-settings-indent-unit-input"
                 name="editor-settings-indent-unit-input"
                 type="number"
-                placeholder="2"
+                placeholder="4"
                 className="disabled:cursor-text disabled:opacity-100"
                 disabled={loading}
                 min="0"
                 max="100"
-                value={indentUnit}
-                onChange={(event) => setIndentUnit(event.currentTarget.value)}
-                onBlur={() => handleInputOnBlur("indent_unit", indentUnit)}
+                value={editorSettings.indentUnit}
+                onChange={(event) =>
+                  setEditorSettings({
+                    ...editorSettings,
+                    indentUnit: event.currentTarget.value,
+                  })
+                }
+                onBlur={() =>
+                  handleInputOnBlur("indent_unit", editorSettings.indentUnit)
+                }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -277,9 +313,16 @@ export default function EditorSettings() {
                 disabled={loading}
                 min="0"
                 max="100"
-                value={tabSize}
-                onChange={(event) => setTabSize(event.currentTarget.value)}
-                onBlur={() => handleInputOnBlur("tab_size", tabSize)}
+                value={editorSettings.tabSize}
+                onChange={(event) =>
+                  setEditorSettings({
+                    ...editorSettings,
+                    tabSize: event.currentTarget.value,
+                  })
+                }
+                onBlur={() =>
+                  handleInputOnBlur("tab_size", editorSettings.tabSize)
+                }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -305,14 +348,21 @@ export default function EditorSettings() {
                 id="editor-settings-font-size-input"
                 name="editor-settings-font-size-input"
                 type="number"
-                placeholder="14"
+                placeholder="16"
                 className="disabled:cursor-text disabled:opacity-100"
                 disabled={loading}
                 min="1"
                 max="100"
-                value={fontSize}
-                onChange={(event) => setFontSize(event.currentTarget.value)}
-                onBlur={() => handleInputOnBlur("font_size", fontSize)}
+                value={editorSettings.fontSize}
+                onChange={(event) =>
+                  setEditorSettings({
+                    ...editorSettings,
+                    fontSize: event.currentTarget.value,
+                  })
+                }
+                onBlur={() =>
+                  handleInputOnBlur("font_size", editorSettings.fontSize)
+                }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
@@ -330,17 +380,61 @@ export default function EditorSettings() {
           <div className="space-y-2">
             <Label>Font Family</Label>
             <div>
-              <Input
-                id="editor-settings-font-family-input"
-                name="editor-settings-font-family-input"
-                type="text"
-                placeholder=""
-                className="disabled:cursor-text disabled:opacity-100"
-                disabled={loading}
-                value={fontFamily}
-                onChange={(event) => setFontFamily(event.currentTarget.value)}
-                onBlur={() => handleInputOnBlur("font_family", fontFamily)}
-              />
+              <Popover
+                open={openFontFamilyCombobox}
+                onOpenChange={setOpenFontFamilyCombobox}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    id="editor-settings-font-family-btn"
+                    name="editor-settings-font-family-btn"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openFontFamilyCombobox}
+                    className="w-full justify-between bg-transparent px-3 font-normal hover:bg-transparent disabled:opacity-100"
+                    disabled={loading}
+                  >
+                    {editorSettings.selectedFontFamily
+                      ? comboboxPrioritizedFontFamilies.find(
+                          (fontFamily) =>
+                            fontFamily.value ===
+                            editorSettings.selectedFontFamily,
+                        )?.label
+                      : "Select font family..."}
+                    <CaretSortIcon className="h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align={"start"} className="p-0">
+                  <Command>
+                    <CommandInput placeholder="Search font families..." />
+                    <CommandList>
+                      <CommandEmpty>No font family found</CommandEmpty>
+                      <CommandGroup>
+                        {comboboxPrioritizedFontFamilies.map((fontFamily) => (
+                          <CommandItem
+                            key={fontFamily.value}
+                            value={fontFamily.value}
+                            onSelect={(currentValue) =>
+                              handleComboxOnSelect("font_family", currentValue)
+                            }
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                editorSettings.selectedFontFamily ===
+                                  fontFamily.value
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {fontFamily.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
               The name of the font family used for editor text
@@ -350,7 +444,7 @@ export default function EditorSettings() {
             <Label>Font Weight</Label>
             <Select
               name="editor-settings-font-weight-select"
-              value={fontWeight}
+              value={editorSettings.fontWeight}
               disabled={loading}
               onValueChange={(value: FontWeight) =>
                 handleSelectOnValueChange("font_weight", value)
@@ -389,9 +483,16 @@ export default function EditorSettings() {
                 min="1"
                 max="10"
                 step="0.5"
-                value={lineHeight}
-                onChange={(event) => setLineHeight(event.currentTarget.value)}
-                onBlur={() => handleInputOnBlur("line_height", lineHeight)}
+                value={editorSettings.lineHeight}
+                onChange={(event) =>
+                  setEditorSettings({
+                    ...editorSettings,
+                    lineHeight: event.currentTarget.value,
+                  })
+                }
+                onBlur={() =>
+                  handleInputOnBlur("line_height", editorSettings.lineHeight)
+                }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
