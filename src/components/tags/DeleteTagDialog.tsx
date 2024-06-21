@@ -49,11 +49,10 @@ export default function DeleteTagDialog() {
     <Dialog open={deleteTagDialog} onOpenChange={setDeleteTagDialog}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            Are you sure?
-          </DialogTitle>
+          <DialogTitle>Are you sure?</DialogTitle>
           <DialogDescription>
-            This action cannot be undone. Are you sure you want to delete this tag?
+            This action cannot be undone. Are you sure you want to delete this
+            tag?
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
