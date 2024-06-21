@@ -98,4 +98,5 @@ export type Settings = {
   // nostr
   nsec: string;
   npub: string;
+  relays: string;
 };

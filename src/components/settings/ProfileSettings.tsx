@@ -75,7 +75,7 @@ export default function ProfileSettings() {
       <CardHeader>
         <CardTitle>Profile</CardTitle>
         <CardDescription>
-          Enter your Profile Details
+          Enter your profile Details
         </CardDescription>
       </CardHeader>
       <CardContent>

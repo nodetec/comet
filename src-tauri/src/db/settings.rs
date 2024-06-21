@@ -21,9 +21,12 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         ),
         ("font_weight", "normal"),
         ("line_height", "1.5"),
-        // nostr
+        // profile
         ("npub", ""),
         ("nsec", ""),
+        // relays
+        ("relays", "[\"relay.damus.io\", \"nos.lol\"]"),
+
     ];
 
     for (key, value) in initial_settings {

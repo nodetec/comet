@@ -3,6 +3,7 @@ import { useState } from "react";
 import EditorSettings from "~/components/settings/EditorSettings";
 import GeneralSettings from "~/components/settings/GeneralSettings";
 import ProfileSettings from "~/components/settings/ProfileSettings";
+import RelaySettings from "~/components/settings/RelaySettings";
 import ThemeSettings from "~/components/settings/ThemeSettings";
 
 type Tab = "General" | "Editor" | "Theme" | "Profile" | "Relays";
@@ -58,7 +59,7 @@ export default function Settings() {
           {currentTab === "Editor" && <EditorSettings />}
           {currentTab === "Theme" && <ThemeSettings />}
           {currentTab === "Profile" && <ProfileSettings />}
-          {currentTab === "Relays" && <ProfileSettings />}
+          {currentTab === "Relays" && <RelaySettings/>}
         </div>
       </div>
     </div>

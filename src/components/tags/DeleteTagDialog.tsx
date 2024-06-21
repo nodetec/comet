@@ -50,11 +50,10 @@ export default function DeleteTagDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Are you absolutely sure? {deleteTagDialogId}
+            Are you sure?
           </DialogTitle>
           <DialogDescription>
-            This action cannot be undone. Are you sure you want to permanently
-            delete this tag?
+            This action cannot be undone. Are you sure you want to delete this tag?
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

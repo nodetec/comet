@@ -81,6 +81,7 @@ export const useAppContext = create<State>()(
         line_height: "",
         nsec: "",
         npub: "",
+        relays: "[\"relay.damus.io\", \"nos.lol\"]",
       },
       setSettings: (settings) => set({ settings }),
 
