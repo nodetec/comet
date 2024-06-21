@@ -39,7 +39,7 @@ const formSchema = z.object({
   }),
 });
 
-export default function NostrSettings() {
+export default function ProfileSettings() {
   const [loading, setLoading] = useState<boolean>(false);
 
   const { settings, setSettings } = useAppContext();
@@ -73,9 +73,9 @@ export default function NostrSettings() {
   return (
     <Card className="bg-card/20">
       <CardHeader>
-        <CardTitle>Nostr</CardTitle>
+        <CardTitle>Profile</CardTitle>
         <CardDescription>
-          Enter your Nostr private key to enable Nostr features
+          Enter your Profile Details
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -86,11 +86,11 @@ export default function NostrSettings() {
               name="nsec"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nostr Private Key</FormLabel>
+                  <FormLabel>Secret Key</FormLabel>
                   <FormControl>
                     <Input placeholder="nsec" {...field} />
                   </FormControl>
-                  <FormDescription>Nostr private key</FormDescription>
+                  <FormDescription>Your secret key, keep this safe!</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
