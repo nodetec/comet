@@ -44,4 +44,11 @@ If you are using Mac OS you might notice that the app says it's damaged, you may
 xattr -cr /Applications/captains-log.app
 ```
 
+## Some notes on Mac OS code signing
+
+```bash
+security find-identity -v -p codesigning
+```
+
 https://developer.apple.com
+
