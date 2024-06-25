@@ -43,3 +43,5 @@ If you are using Mac OS you might notice that the app says it's damaged, you may
 ```bash
 xattr -cr /Applications/captains-log.app
 ```
+
+https://developer.apple.com
