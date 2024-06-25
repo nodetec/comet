@@ -43,7 +43,7 @@
     "coverage",
     "public",
     "vite.config.d.ts"
-  ]
+  ],
 
   "references": [
     {
