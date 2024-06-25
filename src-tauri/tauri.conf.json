@@ -1,6 +1,6 @@
 {
   "productName": "captains-log",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "identifier": "captains-log",
   "build": {
     "beforeDevCommand": "npm run dev",
