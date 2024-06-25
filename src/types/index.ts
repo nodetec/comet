@@ -84,17 +84,19 @@ export type Settings = {
   // theme
   theme?: "light" | "dark";
   // editor
-  vim?: "true" | "false";
-  line_numbers?: "true" | "false";
-  highlight_active_line?: "true" | "false";
-  line_wrapping?: "true" | "false";
+  vim: "true" | "false";
+  line_numbers: "true" | "false";
+  highlight_active_line: "true" | "false";
+  line_wrapping: "true" | "false";
+  unordered_list_bullet: "-" | "*" | "+";
+  indent_unit: string;
+  tab_size: string;
+  font_size: string;
+  font_family: string;
+  font_weight: "lighter" | "normal" | "bold" | "bolder";
+  line_height: string;
   // nostr
-  public_key?: string;
-  private_key?: string;
+  nsec: string;
+  npub: string;
+  relays: string;
 };
-
-export type SettingsSwitchKeys =
-  | "vim"
-  | "line_numbers"
-  | "highlight_active_line"
-  | "line_wrapping"

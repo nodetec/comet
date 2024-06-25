@@ -2,10 +2,11 @@ import { useState } from "react";
 
 import EditorSettings from "~/components/settings/EditorSettings";
 import GeneralSettings from "~/components/settings/GeneralSettings";
-import NostrSettings from "~/components/settings/NostrSettings";
+import ProfileSettings from "~/components/settings/ProfileSettings";
+import RelaySettings from "~/components/settings/RelaySettings";
 import ThemeSettings from "~/components/settings/ThemeSettings";
 
-type Tab = "General" | "Editor" | "Theme" | "Nostr";
+type Tab = "General" | "Editor" | "Theme" | "Profile" | "Relays";
 
 export default function Settings() {
   const [currentTab, setCurrentTab] = useState<Tab>("General");
@@ -15,9 +16,9 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex h-full flex-col p-8">
-      <h1 className="mb-8 border-b pb-4 text-xl font-bold">Settings</h1>
-      <div className="flex gap-x-20 overflow-auto">
+    <div className="flex h-full flex-col pt-8">
+      <h1 className="mb-8 border-b px-8 pb-4 text-xl font-bold">Settings</h1>
+      <div className="flex gap-x-20 overflow-auto pl-8">
         <nav className="flex flex-col gap-y-4 text-sm text-muted-foreground">
           <span
             className={`cursor-pointer ${currentTab === "General" ? "font-semibold text-primary" : ""}`}
@@ -38,20 +39,27 @@ export default function Settings() {
             Theme
           </span>
           <span
-            className={`cursor-pointer ${currentTab === "Nostr" ? "font-semibold text-primary" : ""}`}
-            onClick={() => handleCurrentTabOnClick("Nostr")}
+            className={`cursor-pointer ${currentTab === "Profile" ? "font-semibold text-primary" : ""}`}
+            onClick={() => handleCurrentTabOnClick("Profile")}
           >
-            Nostr
+            Profile
+          </span>
+          <span
+            className={`cursor-pointer ${currentTab === "Relays" ? "font-semibold text-primary" : ""}`}
+            onClick={() => handleCurrentTabOnClick("Relays")}
+          >
+            Relays
           </span>
           {/* <span>Support</span> */}
           {/* <span>Donate</span> */}
         </nav>
 
-        <div className="w-full overflow-auto">
+        <div className="w-full overflow-auto pb-8 pr-8">
           {currentTab === "General" && <GeneralSettings />}
           {currentTab === "Editor" && <EditorSettings />}
           {currentTab === "Theme" && <ThemeSettings />}
-          {currentTab === "Nostr" && <NostrSettings />}
+          {currentTab === "Profile" && <ProfileSettings />}
+          {currentTab === "Relays" && <RelaySettings/>}
         </div>
       </div>
     </div>

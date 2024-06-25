@@ -91,3 +91,31 @@
     padding-bottom: 10rem;
   }
 }
+
+/* TODO: fix this so that the shadcn scroll area bar can be used */
+
+/* Scrollbar background */
+::-webkit-scrollbar {
+  @apply bg-background;
+}
+
+/* Scrollbar thumb (foreground) */
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/10;
+  @apply rounded-full;
+}
+
+/* Scrollbar thumb on hover */
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/15;
+}
+
+/* Optional: Scrollbar width */
+::-webkit-scrollbar {
+  @apply w-2.5;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}

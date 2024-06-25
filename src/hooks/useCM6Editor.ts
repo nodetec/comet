@@ -1,24 +1,40 @@
 import { useEffect, useRef, useState } from "react";
 
 import { closeBrackets } from "@codemirror/autocomplete";
-import { history } from "@codemirror/commands";
+import { history, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { bracketMatching, indentOnInput } from "@codemirror/language";
+import {
+  bracketMatching,
+  indentOnInput,
+  indentUnit,
+} from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { EditorState } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
   dropCursor,
+  highlightActiveLine,
   highlightSpecialChars,
+  keymap,
+  // scrollPastEnd,
   lineNumbers,
   rectangularSelection,
-  // scrollPastEnd,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
 import { getNote, updateNote } from "~/api";
 import useThemeChange from "~/hooks/useThemeChange";
+import {
+  fontFamily,
+  fontSize,
+  fontWeight,
+  lineHeight,
+} from "~/lib/editor/compartments";
+import {
+  customizeEditorThemeStyles,
+  indentUnitWhitespace,
+} from "~/lib/editor/utils";
 import { useAppContext } from "~/store";
 import { EditorView } from "codemirror";
 
@@ -37,7 +53,7 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
 
   const queryClient = useQueryClient();
 
-  const theme = useThemeChange();
+  const preferredTheme = useThemeChange();
 
   async function handleBlur(view: EditorView) {
     const content = currentNote?.content;
@@ -62,8 +78,19 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
   useEffect(() => {
     if (!editorRef.current) return;
 
+    let theme;
+    if (preferredTheme === "dark") {
+      theme = darkTheme;
+    } else {
+      theme = lightTheme;
+    }
+
     const extensions = [
-      theme === "dark" ? darkTheme : lightTheme,
+      theme,
+      fontSize.of(theme),
+      fontFamily.of(theme),
+      fontWeight.of(theme),
+      lineHeight.of(theme),
       blurHandlerExtension,
       // highlightActiveLineGutter(),
       highlightSpecialChars(),
@@ -80,7 +107,8 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
       rectangularSelection(),
       crosshairCursor(),
       // scrollPastEnd(),
-      EditorView.lineWrapping,
+      keymap.of([indentWithTab]),
+      EditorState.tabSize.of(Number(settings.tab_size)),
       EditorState.readOnly.of(filter === "archived" || filter === "trashed"),
       EditorView.updateListener.of((update) => {
         if (
@@ -91,12 +119,11 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
         }
       }),
 
-      // basicSetup,
       markdown({
         base: markdownLanguage,
         codeLanguages: languages,
-        // addKeymap: true,
       }),
+      indentUnit.of(indentUnitWhitespace(settings.indent_unit)),
     ];
 
     if (settings.vim === "true") {
@@ -105,22 +132,49 @@ export const useCM6Editor = ({ initialDoc, onChange }: Props) => {
     if (settings.line_numbers === "true") {
       extensions.push(lineNumbers());
     }
+    if (settings.highlight_active_line === "true") {
+      extensions.push(highlightActiveLine());
+    }
+    if (settings.line_wrapping === "true") {
+      extensions.push(EditorView.lineWrapping);
+    }
 
-    const startState = EditorState.create({
+    const initialState = EditorState.create({
       doc: initialDoc,
       extensions,
     });
 
     const view = new EditorView({
-      state: startState,
+      state: initialState,
       parent: editorRef.current,
     });
+
+    customizeEditorThemeStyles(view, fontSize, "fontSize", settings.font_size);
+    customizeEditorThemeStyles(
+      view,
+      fontFamily,
+      "fontFamily",
+      settings.font_family,
+    );
+    customizeEditorThemeStyles(
+      view,
+      fontWeight,
+      "fontWeight",
+      settings.font_weight,
+    );
+    customizeEditorThemeStyles(
+      view,
+      lineHeight,
+      "lineHeight",
+      settings.line_height,
+    );
+
     setEditorView(view);
 
     return () => {
       view.destroy();
     };
-  }, [theme, currentNote?.id]);
+  }, [preferredTheme, currentNote?.id]);
 
   return { editorRef, editorView };
 };

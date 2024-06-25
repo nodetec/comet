@@ -7,13 +7,26 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
         // theme
         ("theme", "dark"),
         // editor
-        ("vim", "true"),
+        ("vim", "false"),
         ("line_numbers", "false"),
         ("highlight_active_line", "false"),
-        ("line_wrapping", "false"),
-        // nostr
-        ("public_key", ""),
-        ("private_key", ""),
+        ("line_wrapping", "true"),
+        ("unordered_list_bullet", "*"),
+        ("indent_unit", "4"),
+        ("tab_size", "4"),
+        ("font_size", "16"),
+        (
+            "font_family",
+            r#"SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace"#,
+        ),
+        ("font_weight", "normal"),
+        ("line_height", "1.5"),
+        // profile
+        ("npub", ""),
+        ("nsec", ""),
+        // relays
+        ("relays", "[\"relay.damus.io\", \"nos.lol\"]"),
+
     ];
 
     for (key, value) in initial_settings {
