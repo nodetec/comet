@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
@@ -12,85 +12,108 @@ import {
 
 export const useContextMenuEvent = () => {
   const queryClient = useQueryClient();
-  const { currentNote, setCurrentNote, activeTag, setDeleteTagDialog, setDeleteTagDialogId } =
-    useAppContext();
-  const [unlisten, setUnlisten] = useState<() => void>(() => () => {});
+  const [unlisten, setUnlisten] = useState<() => void | undefined>(
+    () => undefined,
+  );
 
-  async function listenHandler() {
-    const app = useAppContext.getState();
-
+  const listenHandler = useCallback(async () => {
     const unlisten = await listen("menu_event", (e) => {
       const payload = e.payload as ContextMenuEventPayload;
       const contextMenuEventKind = payload.contextMenuEventKind;
       const eventKey = Object.keys(contextMenuEventKind)[0];
+
+      const app = useAppContext.getState();
+
+      const handleNoteItemEvent = (
+        noteItemEvent: NoteItemContextMenuEventPayload["NoteItem"],
+      ) => {
+        switch (noteItemEvent.eventKind) {
+          case "trash_note":
+            if (noteItemEvent.id === app.currentNote?.id) {
+              app.setCurrentNote(undefined);
+            }
+            void queryClient.invalidateQueries({ queryKey: ["notes"] });
+            break;
+          default:
+            break;
+        }
+      };
+
+      const handleTagItemEvent = (
+        tagItemEvent: TagItemContextMenuEventPayload["TagItem"],
+      ) => {
+        switch (tagItemEvent.eventKind) {
+          case "delete_tag":
+            const { id } = tagItemEvent;
+            app.setDeleteTagDialogId(id);
+            app.setDeleteTagDialog(true);
+            break;
+          default:
+            break;
+        }
+      };
+
+      const handleNoteTagItemEvent = (
+        noteTagItemEvent: NoteTagItemContextMenuEventPayload["NoteTag"],
+      ) => {
+        switch (noteTagItemEvent.eventKind) {
+          case "untag_note":
+            const { tagId } = noteTagItemEvent;
+            const filteredTags = app.currentNote?.tags.filter(
+              (tag) => !(tag.id === tagId),
+            );
+
+            if (tagId === app.activeTag?.id) {
+              void queryClient.invalidateQueries({ queryKey: ["notes"] });
+            }
+
+            if (app.currentNote?.tags && filteredTags) {
+              if (app.currentNote) {
+                app.setCurrentNote({ ...app.currentNote, tags: filteredTags });
+              }
+            }
+            break;
+          default:
+            break;
+        }
+      };
+
       switch (eventKey) {
         case "NoteItem":
-          const noteItemContextMenuEventPayload =
-            contextMenuEventKind as NoteItemContextMenuEventPayload;
-          const noteItemEvent = noteItemContextMenuEventPayload.NoteItem;
-          switch (noteItemEvent.eventKind) {
-            case "trash_note":
-              if (noteItemEvent.id === currentNote?.id) {
-                setCurrentNote(undefined);
-              }
-              void queryClient.invalidateQueries({ queryKey: ["notes"] });
-              break;
-            default:
-              break;
-          }
+          handleNoteItemEvent(
+            (contextMenuEventKind as NoteItemContextMenuEventPayload).NoteItem,
+          );
           break;
         case "TagItem":
-          const tagItemContextMenuEventPayload =
-            contextMenuEventKind as TagItemContextMenuEventPayload;
-          const tagItemEvent = tagItemContextMenuEventPayload.TagItem;
-          switch (tagItemEvent.eventKind) {
-            case "delete_tag":
-              const { id } = tagItemEvent;
-              setDeleteTagDialogId(id);
-              setDeleteTagDialog(true);
-              break;
-            default:
-              break;
-          }
+          handleTagItemEvent(
+            (contextMenuEventKind as TagItemContextMenuEventPayload).TagItem,
+          );
           break;
-
         case "NoteTag":
-          const noteTagItemContextMenuEventPayload =
-            contextMenuEventKind as NoteTagItemContextMenuEventPayload;
-          const noteTagItemEvent = noteTagItemContextMenuEventPayload.NoteTag;
-          switch (noteTagItemEvent.eventKind) {
-            case "untag_note":
-              const { tagId } = noteTagItemEvent;
-
-              const filteredTags = currentNote?.tags.filter(
-                (tag) => !(tag.id === tagId),
-              );
-
-              if (tagId === activeTag?.id) {
-                void queryClient.invalidateQueries({ queryKey: ["notes"] });
-              }
-
-              if (currentNote?.tags && filteredTags) {
-                if (currentNote) {
-                  app.setCurrentNote({ ...currentNote, tags: filteredTags });
-                }
-              }
-              break;
-            default:
-              break;
-          }
+          handleNoteTagItemEvent(
+            (contextMenuEventKind as NoteTagItemContextMenuEventPayload)
+              .NoteTag,
+          );
           break;
         default:
           break;
       }
     });
+
     setUnlisten(() => unlisten);
-  }
+  }, [queryClient]);
 
   useEffect(() => {
     if (unlisten) {
       unlisten();
     }
+
     void listenHandler();
-  }, [currentNote, activeTag]);
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [listenHandler, unlisten]);
 };
