@@ -42,6 +42,7 @@
     "build",
     "coverage",
     "public",
+    "vite.config.ts",
     "vite.config.d.ts"
   ],
   "references": [
