@@ -34,7 +34,7 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.cjs",
-    "**/*.js",
+    "**/*.js"
   ],
   "exclude": [
     "node_modules",
@@ -43,8 +43,7 @@
     "coverage",
     "public",
     "vite.config.d.ts"
-  ]
-
+  ],
   "references": [
     {
       "path": "./tsconfig.node.json"
