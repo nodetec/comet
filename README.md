@@ -1,5 +1,5 @@
 <div align="center"><p>
-    <h1>Captain's Log</h1>
+    <h1>Captain's Log 📝</h1>
     <a href="https://github.com/nodetec/captains-log/releases/latest">
       <img alt="Latest release" src="https://img.shields.io/github/v/release/nodetec/captains-log?style=for-the-badge&logo=starship&color=C9CBFF&logoColor=D9E0EE&labelColor=302D41" />
     </a>
