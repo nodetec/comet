@@ -1,13 +1,16 @@
+use crate::db::queries::{
+    GET_TAG, GET_TAG_BY_NAME, INSERT_TAG, LIST_ALL_TAGS, LIST_ALL_TAGS_BY_NOTE, UPDATE_TAG, DELETE_TAG
+};
 use crate::{
     models::{CreateTagRequest, ListTagsRequest, Tag, UpdateTagRequest},
     utils::parse_datetime,
 };
 use chrono::Utc;
-use rusqlite::{params, Connection, Result}; // Assuming you have a Tag struct defined in your models
+use rusqlite::{params, Connection, Result};
 
 pub fn create_tag(conn: &Connection, create_tag_request: &CreateTagRequest) -> Result<i64> {
     let now = Utc::now().to_rfc3339();
-    let sql = "INSERT INTO tags (name, color, icon, created_at) VALUES (?1, ?2, ?3, ?4)";
+    let sql = INSERT_TAG;
     conn.execute(
         sql,
         params![
@@ -21,7 +24,7 @@ pub fn create_tag(conn: &Connection, create_tag_request: &CreateTagRequest) -> R
 }
 
 pub fn get_tag_by_id(conn: &Connection, tag_id: i64) -> Result<Tag> {
-    let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags WHERE id = ?1")?;
+    let mut stmt = conn.prepare(GET_TAG)?;
     stmt.query_row(params![tag_id], |row| {
         let created_at: String = row.get(4)?;
         Ok(Tag {
@@ -35,7 +38,7 @@ pub fn get_tag_by_id(conn: &Connection, tag_id: i64) -> Result<Tag> {
 }
 
 pub fn get_tag_by_name(conn: &Connection, tag_name: &str) -> Result<Tag> {
-    let mut stmt = conn.prepare("SELECT id, name, color, icon, created_at FROM tags WHERE name = ?1")?;
+    let mut stmt = conn.prepare(GET_TAG_BY_NAME)?;
     stmt.query_row(params![tag_name], |row| {
         let created_at: String = row.get(4)?;
         Ok(Tag {
@@ -64,12 +67,12 @@ pub fn list_all_tags(
         // If note_id is valid, add it to the parameters vector
         params_vec.push(&note_id);
         stmt = conn.prepare(
-        "SELECT t.id, t.name, t.color, t.icon, t.created_at FROM tags t JOIN notes_tags nt ON t.id = nt.tag_id WHERE nt.note_id = ?1 ORDER BY t.name ASC",
+            LIST_ALL_TAGS,
     )?;
     } else {
         // No need to add parameters if note_id is -1
         stmt = conn.prepare(
-            "SELECT id, name, color, icon, created_at FROM tags ORDER BY name ASC",
+            LIST_ALL_TAGS_BY_NOTE,
         )?;
     }
 
@@ -94,7 +97,7 @@ pub fn list_all_tags(
 }
 
 pub fn update_tag(conn: &Connection, update_tag_request: &UpdateTagRequest) -> Result<usize> {
-    let sql = "UPDATE tags SET name = ?1, color = ?2, icon = ?3 WHERE id = ?4";
+    let sql = UPDATE_TAG;
     conn.execute(
         sql,
         params![
@@ -107,6 +110,6 @@ pub fn update_tag(conn: &Connection, update_tag_request: &UpdateTagRequest) -> R
 }
 
 pub fn delete_tag(conn: &Connection, tag_id: &i64) -> () {
-    let sql = "DELETE FROM tags WHERE id = ?1";
+    let sql = DELETE_TAG;
     conn.execute(sql, params![tag_id]).unwrap();
 }
