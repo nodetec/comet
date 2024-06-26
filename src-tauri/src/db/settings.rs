@@ -1,3 +1,7 @@
+use crate::db::queries::{
+    INSERT_SETTING, GET_SETTING, SET_SETTING, LIST_SETTINGS
+};
+
 use std::collections::HashMap;
 
 use rusqlite::{params, Connection, Result}; // Import the Note struct
@@ -31,7 +35,7 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
 
     for (key, value) in initial_settings {
         conn.execute(
-            "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+            INSERT_SETTING,
             params![key, value],
         )?;
     }
@@ -40,13 +44,13 @@ pub fn insert_initial_settings(conn: &Connection) -> Result<()> {
 }
 
 pub fn get_setting(conn: &Connection, key: &str) -> Result<String> {
-    let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+    let mut stmt = conn.prepare(GET_SETTING)?;
     stmt.query_row(params![key], |row| Ok(row.get(0)?))
 }
 
 pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
     conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        SET_SETTING,
         params![key, value],
     )?;
 
@@ -54,7 +58,7 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
 }
 
 pub fn get_all_settings(conn: &Connection) -> Result<HashMap<String, String>> {
-    let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+    let mut stmt = conn.prepare(LIST_SETTINGS)?;
     let settings_iter = stmt.query_map(params![], |row| {
         let key: String = row.get(0)?;
         let value: String = row.get(1)?;

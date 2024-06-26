@@ -2,6 +2,7 @@ pub mod notes;
 pub mod notes_tags;
 pub mod settings;
 pub mod tags;
+pub mod queries;
 
 use rusqlite::{params, Connection, Result};
 
