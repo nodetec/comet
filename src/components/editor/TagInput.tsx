@@ -25,7 +25,7 @@ export default function TagInput() {
 
       if (noteId === undefined) return;
 
-      if (currentNote?.tags.some(tag => tag.name === tagName)) return;
+      if (currentNote?.tags.some((tag) => tag.name === tagName)) return;
 
       const getTagResponse = await getTag({ name: tagName });
       const existingTag = getTagResponse.data;
@@ -68,7 +68,7 @@ export default function TagInput() {
   };
 
   return (
-    <div className="w-full px-2">
+    <div className="w-full pl-4 pr-2">
       <div className="flex items-center gap-x-2">
         {currentNote?.tags?.map((tag, tagIndex) => {
           return <NoteTag key={tagIndex} tag={tag} />;

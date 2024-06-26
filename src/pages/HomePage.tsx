@@ -1,5 +1,5 @@
 import ContextSidebar from "~/components/context/ContextSidebar";
-import Editor from "~/components/editor/Editor";
+import EditorWrapper from "~/components/editor/EditorWrapper";
 import NoteFeed from "~/components/notes/NoteFeed";
 import NoteFeedHeader from "~/components/notes/NoteFeedHeader";
 import SearchFeed from "~/components/notes/SearchFeed";
@@ -33,7 +33,7 @@ export default function HomePage() {
         <ResizableHandle />
         <ResizablePanel className="border-sky-500" minSize={10}>
           {activePage === "settings" && <Settings />}
-          {activePage === "editor" && <Editor />}
+          {activePage === "editor" && <EditorWrapper />}
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
