@@ -75,13 +75,13 @@
     @apply bg-background text-foreground;
   }
 
-  .editor-container .cm-scroller {
-    overflow: auto;
-  }
-
   .editor-container .cm-editor {
     width: 100%;
     height: 100%;
+  }
+
+  .editor-container .cm-scroller {
+    overflow: auto;
   }
 
   .editor-container .cm-content {
@@ -90,6 +90,13 @@
     padding-top: 1rem;
     padding-bottom: 10rem;
   }
+}
+
+.wmde-markdown {
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+  @apply !text-foreground;
+  @apply !bg-background;
 }
 
 /* TODO: fix this so that the shadcn scroll area bar can be used */

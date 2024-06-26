@@ -4,9 +4,6 @@ import { useCM6Editor } from "~/hooks/useCM6Editor";
 import { useAppContext } from "~/store";
 import { type InfiniteQueryData, type Note } from "~/types";
 
-import EditorControls from "./EditorControls";
-import TagInput from "./TagInput";
-
 export const Editor = () => {
   const { currentNote, setCurrentNote, currentTrashedNote } = useAppContext();
 
@@ -45,20 +42,10 @@ export const Editor = () => {
   });
 
   return (
-    <>
-      {(currentNote ?? currentTrashedNote) && (
-        <div className="flex h-full flex-col">
-          <div
-            className="editor-container h-full w-full overflow-y-auto"
-            ref={editorRef}
-          />
-          <div className="flex items-center border-t border-muted">
-            <TagInput />
-            <EditorControls />
-          </div>
-        </div>
-      )}
-    </>
+    <div
+      className="editor-container h-full w-full overflow-y-auto"
+      ref={editorRef}
+    />
   );
 };
 
