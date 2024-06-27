@@ -81,8 +81,8 @@ const notes = [
 
 export default function NoteFeed() {
   return (
-    <ScrollArea className="h-full w-full rounded-md">
-      <div className="flex h-full flex-col overflow-y-auto">
+    <ScrollArea className="h-[41.8rem] w-full rounded-md">
+      <div className="flex flex-col">
         <ul>
           {notes.map((note) => (
             <li key={note.id}>

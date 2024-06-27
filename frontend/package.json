@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mdxeditor/editor": "^3.6.1",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-icons": "^1.3.0",
     "@radix-ui/react-scroll-area": "^1.1.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.3.0",
+    "@tailwindcss/typography": "^0.5.13",
     "@types/node": "^20.14.9",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

@@ -4,10 +4,10 @@ import SearchNotes from "./SearchNotes";
 
 export default function Notes() {
   return (
-    <>
-      <NoteFeedHeader />
-      <SearchNotes />
+    <div className="h-full overflow-y-auto border-4 border-blue-500">
+      {/* <NoteFeedHeader /> */}
+      {/* <SearchNotes /> */}
       <NoteFeed />
-    </>
+    </div>
   );
 }
