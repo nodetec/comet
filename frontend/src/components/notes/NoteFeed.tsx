@@ -81,7 +81,7 @@ const notes = [
 
 export default function NoteFeed() {
   return (
-    <ScrollArea className="h-[41.8rem] w-full rounded-md">
+    <ScrollArea className="w-full rounded-md">
       <div className="flex flex-col">
         <ul>
           {notes.map((note) => (

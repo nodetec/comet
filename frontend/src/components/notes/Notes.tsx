@@ -4,9 +4,9 @@ import SearchNotes from "./SearchNotes";
 
 export default function Notes() {
   return (
-    <div className="h-full overflow-y-auto border-4 border-blue-500">
-      {/* <NoteFeedHeader /> */}
-      {/* <SearchNotes /> */}
+    <div className="border border-blue-300 h-full flex flex-col">
+      <NoteFeedHeader />
+      <SearchNotes />
       <NoteFeed />
     </div>
   );
