@@ -1,4 +1,4 @@
-module changeme
+module github.com/nodetec/captains-log
 
 go 1.22.4
 

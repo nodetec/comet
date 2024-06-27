@@ -5,9 +5,11 @@ import (
 	_ "embed"
 	"log"
 
-	"database/sql"
+	// "database/sql"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/nodetec/captains-log/service"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -20,23 +22,23 @@ var ddl string
 
 func main() {
 
-	ctx := context.Background()
-
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return err
-	}
-
-	// create tables
-	if _, err := db.ExecContext(ctx, ddl); err != nil {
-		return err
-	}
+	// ctx := context.Background()
+	//
+	// db, err := sql.Open("sqlite3", ":memory:")
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// // create tables
+	// if _, err := db.ExecContext(ctx, ddl); err != nil {
+	// 	return err
+	// }
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
-			application.NewService(&NoteService{}),
+			application.NewService(&service.NoteService{}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
