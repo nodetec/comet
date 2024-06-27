@@ -50,6 +50,8 @@ func main() {
 
 	app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
 		Title: "Window 1",
+		Width:       1200,
+		Height:      600,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
