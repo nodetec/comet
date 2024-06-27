@@ -5,8 +5,7 @@ import {
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
 
-// import Editor from "./components/editor/Editor";
-import Editor1 from "./components/editor/Editor1";
+import Editor from "./components/editor/Editor";
 import Notes from "./components/notes/Notes";
 
 export default function App() {
@@ -22,8 +21,7 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          {/* <Editor /> */}
-          <Editor1 />
+          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
