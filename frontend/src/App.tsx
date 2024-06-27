@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
+import Notes from "./components/notes/Notes";
 
 export default function App() {
   return (
@@ -14,9 +15,7 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={30} minSize={30}>
-          <div className="flex h-full w-full items-center justify-center">
-            <span className="text-4xl">Two</span>
-          </div>
+          <Notes />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
