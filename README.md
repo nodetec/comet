@@ -1,56 +1,59 @@
-<div align="center"><p>
-    <h1>Captain's Log 📝</h1>
-    <a href="https://github.com/nodetec/captains-log/releases/latest">
-      <img alt="Latest release" src="https://img.shields.io/github/v/release/nodetec/captains-log?style=for-the-badge&logo=starship&color=C9CBFF&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/captains-log/pulse">
-      <img alt="Last commit" src="https://img.shields.io/github/last-commit/nodetec/captains-log?style=for-the-badge&logo=starship&color=8bd5ca&logoColor=D9E0EE&labelColor=302D41"/>
-    </a>
-    <a href="https://github.com/nodetec/captains-log/stargazers">
-      <img alt="Stars" src="https://img.shields.io/github/stars/nodetec/captains-log?style=for-the-badge&logo=starship&color=c69ff5&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/captains-log/issues">
-      <img alt="Issues" src="https://img.shields.io/github/issues/nodetec/captains-log?style=for-the-badge&logo=bilibili&color=F5E0DC&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/captains-log">
-      <img alt="Repo Size" src="https://img.shields.io/github/repo-size/nodetec/captains-log?color=%23DDB6F2&label=SIZE&logo=codesandbox&style=for-the-badge&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
+# Welcome to Your New Wails3 Project!
 
-</div>
+Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
 
-Captain's Log is a note-taking app for nostr.
+## Getting Started
 
-![demo](https://private-user-images.githubusercontent.com/29136904/342766691-5ccfc513-665d-4231-9962-52443a00639c.gif?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTkzMjUyMzUsIm5iZiI6MTcxOTMyNDkzNSwicGF0aCI6Ii8yOTEzNjkwNC8zNDI3NjY2OTEtNWNjZmM1MTMtNjY1ZC00MjMxLTk5NjItNTI0NDNhMDA2MzljLmdpZj9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA2MjUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNjI1VDE0MTUzNVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWFmOGEwMGQwZDEyYzlhY2RhN2YxMmYyMzc4ZWE5YmJkZGFjMDE3ZDIxMzYzYTY1ZGViODg3NzMyNTBhNDJjOWEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.5Pm88ki38an7dQEtapIrtuP33YgB0vsz4N32mCGCVIc)
+1. Navigate to your project directory in the terminal.
 
-## For Developers
+2. To run your application in development mode, use the following command:
 
-To get started, clone the repository and run the following commands:
+   ```
+   wails3 dev
+   ```
 
-To install the dependencies:
+   This will start your application and enable hot-reloading for both frontend and backend changes.
 
-```bash
-npm install
-```
+3. To build your application for production, use:
 
-To run the application:
+   ```
+   wails3 build
+   ```
 
-```bash
-npm run tauri dev
-```
+   This will create a production-ready executable in the `build` directory.
 
-## Note on Mac OS
+## Exploring Wails3 Features
 
-If you are using Mac OS you might notice that the app says it's damaged, you may need to remove the extended attributes from the application bundle. To do this, run the following command:
+Now that you have your project set up, it's time to explore the features that Wails3 offers:
 
-```bash
-xattr -cr /Applications/captains-log.app
-```
+1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
 
-## Some notes on Mac OS code signing
+2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
 
-```bash
-security find-identity -v -p codesigning
-```
+   ```
+   go run .
+   ```
 
-https://developer.apple.com
+   Note: Some examples may be under development during the alpha phase.
 
+3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3alpha.wails.io/) for in-depth guides and API references.
+
+4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+
+## Project Structure
+
+Take a moment to familiarize yourself with your project structure:
+
+- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
+- `main.go`: The entry point of your Go backend
+- `app.go`: Define your application structure and methods here
+- `wails.json`: Configuration file for your Wails project
+
+## Next Steps
+
+1. Modify the frontend in the `frontend/` directory to create your desired UI.
+2. Add backend functionality in `main.go`.
+3. Use `wails3 dev` to see your changes in real-time.
+4. When ready, build your application with `wails3 build`.
+
+Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
