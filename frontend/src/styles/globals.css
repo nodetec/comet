@@ -93,24 +93,38 @@
     -ms-user-select: none;
   }
 
-  .editor-container .cm-editor {
-    width: 100%;
-    height: 100%;
-    /* font-family: monospace; */
-  }
-
   .editor-container .cm-scroller {
-    overflow: auto;
-    /* font-family: monospace; */
-    /* fontFamily: "inherit" */
+    position: absolute !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    /* overflow-y: auto; */
   }
+}
 
-  .editor-container .cm-content {
-    padding-right: 1rem;
-    padding-left: 1rem;
-    padding-top: 1rem;
-    padding-bottom: 10rem;
-    /* font-size: 16px; */
-    /* font-family: monospace; */
-  }
+/* Scrollbar background */
+::-webkit-scrollbar {
+  @apply bg-background;
+}
+
+/* Scrollbar thumb (foreground) */
+::-webkit-scrollbar-thumb {
+  @apply bg-secondary;
+  @apply rounded-full;
+}
+
+/* Scrollbar thumb on hover */
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary;
+}
+
+/* Optional: Scrollbar width */
+::-webkit-scrollbar {
+  @apply w-2.5;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
 }

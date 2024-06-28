@@ -9,7 +9,7 @@ export default function Sidebar() {
   return (
     <div className="flex h-full flex-col justify-between pt-8">
       <ScrollArea className="flex h-full flex-col p-2">
-        <div>
+        <div className="px-1">
           <AllNotes />
           <Trash />
           <Tags />
