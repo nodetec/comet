@@ -8,8 +8,6 @@ import {
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { bracketMatching, indentOnInput } from "@codemirror/language";
-// import { defaultKeymap } from "@codemirror/commands";
-
 import { languages } from "@codemirror/language-data";
 import { EditorState } from "@codemirror/state";
 import {
@@ -38,10 +36,8 @@ const theme = EditorView.theme({
     fontFamily: "monospace",
     lineHeight: "2",
     caretColor: "white !important",
-    border: "1px solid black", // very important you keep this border or the cursor disapears
   },
   ".cm-gutters": {
-    // minHeight: "200px",
     backgroundColor: "transparent",
     borderRight: "transparent",
   },
@@ -50,9 +46,6 @@ const theme = EditorView.theme({
     color: "yellow",
   },
   ".cm-scroller": {
-    // overflow: "auto",
-    // maxHeight: "100%",
-    // backgroundColor: "blue",
     height: "100%",
   },
   ".cm-activeLine": {
