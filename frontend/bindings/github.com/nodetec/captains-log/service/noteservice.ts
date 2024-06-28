@@ -5,7 +5,47 @@
 // @ts-ignore: Unused imports
 import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 
-export function Greet(name: string): Promise<string> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3601734515, name) as any;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as db$0 from "../db/models.js";
+
+export function CreateNote(params: db$0.CreateNoteParams): Promise<db$0.Note> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(718095870, params) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType0($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function DeleteNote(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2694105033, id) as any;
     return $resultPromise;
 }
+
+export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1682701374, id) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType0($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function ListNotes(): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3066540231) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType1($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function UpdateNote(params: db$0.UpdateNoteParams): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3047331695, params) as any;
+    return $resultPromise;
+}
+
+// Private type creation functions
+const $$createType0 = db$0.Note.createFrom;
+const $$createType1 = $Create.Array($$createType0);
