@@ -160,3 +160,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .task/checksum
+
+.termdbms
