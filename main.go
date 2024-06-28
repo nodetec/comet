@@ -24,7 +24,7 @@ var ddl string
 func main() {
 	ctx := context.Background()
 
-	dbConn, err := sql.Open("sqlite3", ":memory:")
+	dbConn, err := sql.Open("sqlite3", "notes.db")
 	if err != nil {
 		log.Fatal(err)
 	}

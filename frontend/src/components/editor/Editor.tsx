@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { closeBrackets } from "@codemirror/autocomplete";
 import {
+  defaultKeymap,
   history,
   indentWithTab,
   insertNewlineAndIndent,
@@ -25,21 +26,31 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
+import { NullInt64, NullString } from "&/database/sql/models";
+import { CreateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
+import { SaveIcon } from "lucide-react";
 
+import { NoteService } from "../../../bindings/github.com/nodetec/captains-log/service/";
+import { Button } from "../ui/button";
 import TagInput from "./TagInput";
-
-// In your extensions...
 
 const Editor = () => {
   const editor = useRef<HTMLDivElement>(undefined!);
+  const [content, setContent] = useState("");
+
+  const onUpdate = EditorView.updateListener.of((view) => {
+    setContent(view.state.doc.toString());
+  });
 
   useEffect(() => {
     const extensions = [
       syntaxHighlighting(neovimHighlightStyle),
       highlightActiveLine(),
-      keymap.of([{ key: "Enter", run: insertNewlineAndIndent }]),
+      vim(),
+      keymap.of(defaultKeymap),
+      keymap.of([{ key: "Enter", run: insertNewlineAndIndent }, indentWithTab]),
       darkTheme,
       highlightSpecialChars(),
       history(),
@@ -54,15 +65,13 @@ const Editor = () => {
       crosshairCursor(),
       // highlightActiveLineGutter(),
       // scrollPastEnd(),
-      vim(),
       keymap.of([indentWithTab]),
-
       EditorView.lineWrapping,
-
       markdown({
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      onUpdate,
     ];
 
     const startState = EditorState.create({
@@ -77,12 +86,40 @@ const Editor = () => {
     };
   }, []);
 
+  async function handleSave(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    // console.log(editorView.current.state.doc.toString());
+    const noteParams: CreateNoteParams = {
+      StatusID: new NullInt64({ Int64: undefined, Valid: false }),
+      NotebookID: new NullInt64({ Int64: undefined, Valid: false }),
+      Content: content,
+      Title: "test",
+      CreatedAt: new Date().toISOString(),
+      ModifiedAt: new Date().toISOString(),
+      PublishedAt: new NullString({ String: undefined, Valid: false }),
+      PublishedID: new NullString({ String: undefined, Valid: false }),
+    };
+
+    const res = await NoteService.CreateNote(noteParams);
+    console.log(res);
+  }
+
   return (
     <div className="flex h-full flex-col pt-11">
       <div className="h-full overflow-auto">
         <div className="h-full w-full px-4" ref={editor}></div>
       </div>
-      <TagInput />
+      <div className="flex items-center justify-between">
+        <TagInput />
+        <Button
+          onClick={handleSave}
+          variant="ghost"
+          size="icon"
+          className="mr-2 text-muted-foreground"
+        >
+          <SaveIcon className="h-[1.2rem] w-[1.2rem]" />
+        </Button>
+      </div>
     </div>
   );
 };
