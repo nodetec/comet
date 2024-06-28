@@ -7,7 +7,11 @@ import {
   insertNewlineAndIndent,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { bracketMatching, indentOnInput } from "@codemirror/language";
+import {
+  bracketMatching,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { EditorState } from "@codemirror/state";
 import {
@@ -20,87 +24,23 @@ import {
   keymap,
   rectangularSelection,
 } from "@codemirror/view";
-import { Table } from "@lezer/markdown";
 import { vim } from "@replit/codemirror-vim";
-import richEditor from "~/lib/codemirror-rich-editor";
+import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
+import darkTheme from "~/lib/codemirror/theme/dark";
 
-import config from "./markdoc";
 import TagInput from "./TagInput";
 
-const theme = EditorView.theme({
-  "&": {
-    fontSize: "12pt",
-    height: "100%",
-  },
-  ".cm-content": {
-    fontFamily: "monospace",
-    lineHeight: "2",
-    caretColor: "white !important",
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    borderRight: "transparent",
-  },
-  ".cm-activeLineGutter": {
-    backgroundColor: "transparent",
-    color: "yellow",
-  },
-  ".cm-scroller": {
-    height: "100%",
-  },
-  ".cm-activeLine": {
-    backgroundColor: "#151515",
-  },
-  ".cm-fat-cursor": {
-    position: "absolute",
-    background: `white !important`,
-    border: "none",
-    whiteSpace: "pre",
-  },
-  ".cm-cursor, .cm-dropCursor": {
-    borderLeftColor: "white !important",
-  },
-  "&:not(.cm-focused) .cm-fat-cursor": {
-    background: "none !important",
-    outline: `solid 1px white !important`,
-    color: "transparent !important",
-  },
-  ".cm-vimMode .cm-line, & ::selection, &::selection": {
-    caretColor: "transparent !important",
-  },
-  "&.cm-focused": {
-    outline: "none",
-  },
-  "&.cm-focused .cm-selectionBackground, & .cm-line::selection, & .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection":
-    {
-      backgroundColor: "#151515 !important",
-      // background: "red"
-    },
-  "& .cm-selectionMatch": {
-    backgroundColor: "#ffcc00",
-  },
-  ".cm-panels .cm-panels-bottom": {
-    background: "#252525 !important",
-    height: "100%",
-  },
-});
+// In your extensions...
 
 const Editor = () => {
   const editor = useRef<HTMLDivElement>(undefined!);
 
   useEffect(() => {
     const extensions = [
+      syntaxHighlighting(neovimHighlightStyle),
       highlightActiveLine(),
       keymap.of([{ key: "Enter", run: insertNewlineAndIndent }]),
-
-      theme,
-      richEditor({
-        markdoc: config,
-        lezer: {
-          codeLanguages: languages,
-          extensions: [Table],
-        },
-      }),
+      darkTheme,
       highlightSpecialChars(),
       history(),
       drawSelection(),
@@ -126,7 +66,7 @@ const Editor = () => {
     ];
 
     const startState = EditorState.create({
-      doc: "# Hello World\n\nThis is a test of the markdown editor\n**bold** *italic* `code`",
+      doc: "# Hello World\n\nThis is a test of the markdown editor\n**bold** *italic* `code`\n\n```javascript\n// test comment\nconst x = 9;\n```",
       extensions,
     });
 
