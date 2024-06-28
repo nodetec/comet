@@ -68,9 +68,12 @@ const theme = EditorView.theme({
   ".cm-vimMode .cm-line, & ::selection, &::selection": {
     caretColor: "transparent !important",
   },
+  "&.cm-focused": {
+    outline: "none",
+  },
   "&.cm-focused .cm-selectionBackground, & .cm-line::selection, & .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection":
     {
-      background: "#656565 !important",
+      backgroundColor: "#151515 !important",
       // background: "red"
     },
   "& .cm-selectionMatch": {
@@ -137,7 +140,7 @@ const Editor = () => {
   return (
     <div className="flex h-full flex-col pt-11">
       <div className="h-full overflow-auto">
-        <div className="h-full w-full" ref={editor}></div>
+        <div className="h-full w-full px-4" ref={editor}></div>
       </div>
       <TagInput />
     </div>

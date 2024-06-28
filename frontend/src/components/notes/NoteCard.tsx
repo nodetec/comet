@@ -1,5 +1,7 @@
 // import { Separator } from "../ui/separator";
 
+import { Separator } from "../ui/separator";
+
 type Note = {
   id: string;
   title: string;
@@ -32,7 +34,9 @@ export default function NoteCard({ note }: Props) {
         {/*     : note.modifiedAt && fromNow(note.modifiedAt)} */}
         {/* </span> */}
       </div>
-      <div className="px-[0.30rem]">{/* <Separator /> */}</div>
+      <div className="px-[0.30rem]">
+        <Separator className="bg-border/30" />
+      </div>
     </div>
   );
 }
