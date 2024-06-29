@@ -17,9 +17,15 @@ export default function NoteCard({ note }: Props) {
     setActiveNote(note);
   }
 
+  const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    console.log("Right Clicked");
+  };
+
   return (
     <div className="mx-3">
       <div
+        onContextMenu={handleContextMenu}
         key={note.ID}
         onClick={handleSetActiveNote}
         className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md px-2 pb-3 pt-3 text-sm ${activeNote?.ID === note.ID && "bg-muted/80"}`}
