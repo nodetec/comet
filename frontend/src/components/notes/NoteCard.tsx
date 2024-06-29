@@ -1,6 +1,7 @@
 // import { Separator } from "../ui/separator";
 
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
+import { fromNow } from "~/lib/utils";
 
 import { Separator } from "../ui/separator";
 
@@ -22,11 +23,9 @@ export default function NoteCard({ note }: Props) {
           {note.Content}
         </span>
 
-        {/* <span className="select-none text-xs text-muted-foreground/80"> */}
-        {/*   {note.trashedAt */}
-        {/*     ? fromNow(note.trashedAt) */}
-        {/*     : note.modifiedAt && fromNow(note.modifiedAt)} */}
-        {/* </span> */}
+        <span className="select-none text-xs text-muted-foreground/80">
+          {note.ModifiedAt && fromNow(note.ModifiedAt)}
+        </span>
       </div>
       <div className="px-[0.30rem]">
         <Separator className="bg-border/30" />

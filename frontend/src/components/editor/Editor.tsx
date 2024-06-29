@@ -37,6 +37,7 @@ import { SaveIcon } from "lucide-react";
 import { NoteService } from "../../../bindings/github.com/nodetec/captains-log/service/";
 import { Button } from "../ui/button";
 import TagInput from "./TagInput";
+import { useAppState } from "~/store";
 
 const Editor = () => {
   const queryClient = useQueryClient();
