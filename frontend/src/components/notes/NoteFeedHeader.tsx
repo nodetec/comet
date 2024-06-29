@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 
 export default function NoteFeedHeader() {
   const queryClient = useQueryClient();
-  const { activeNote, setActiveNote } = useAppState();
+  const { setActiveNote } = useAppState();
 
   async function handleCreateNote(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -38,9 +38,7 @@ export default function NoteFeedHeader() {
     <div className="flex justify-between px-3 pt-2">
       <div className="flex items-center justify-center gap-x-1">
         <Button
-          // disabled={data?.[0] && data[0].id === -1}
           className="text-muted-foreground"
-          // onClick={handleNewNote}
           variant="ghost"
           size="icon"
         >
