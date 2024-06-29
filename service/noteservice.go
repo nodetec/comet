@@ -1,4 +1,3 @@
-// service/note_service.go
 package service
 
 import (
@@ -11,6 +10,12 @@ import (
 type NoteService struct {
 	queries *db.Queries
 	logger  *log.Logger
+}
+
+type PaginatedNotes struct {
+	Notes      []db.Note `json:"notes"`
+	NextOffset int64     `json:"next_offset"`
+	PrevOffset int64     `json:"prev_offset"`
 }
 
 func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
@@ -38,13 +43,33 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context) ([]db.Note, error) {
-	notes, err := s.queries.ListNotes(ctx)
+func (s *NoteService) ListNotes(ctx context.Context, limit, offset int64) (PaginatedNotes, error) {
+	notes, err := s.queries.ListNotes(ctx, db.ListNotesParams{
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		s.logger.Println("Error listing notes:", err)
-		return nil, err
+		return PaginatedNotes{}, err
 	}
-	return notes, nil
+
+	nextOffset := offset + limit
+	prevOffset := offset - limit
+
+	if len(notes) < int(limit) {
+		nextOffset = -1
+	}
+
+	if prevOffset < 0 {
+		prevOffset = 0
+	}
+
+	return PaginatedNotes{
+		Notes:      notes,
+		NextOffset: nextOffset,
+		PrevOffset: prevOffset,
+	}, nil
+
 }
 
 func (s *NoteService) UpdateNote(ctx context.Context, params db.UpdateNoteParams) error {

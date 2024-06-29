@@ -17,7 +17,7 @@ type Note struct {
 	CreatedAt   string
 	ModifiedAt  string
 	PublishedAt sql.NullString
-	PublishedID sql.NullString
+	EventID     sql.NullString
 }
 
 type NoteTag struct {

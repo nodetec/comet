@@ -26,10 +26,12 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
+import { useQueryClient } from "@tanstack/react-query";
 import { NullInt64, NullString } from "&/database/sql/models";
 import { CreateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
+import { parseTitle } from "~/lib/markdown";
 import { SaveIcon } from "lucide-react";
 
 import { NoteService } from "../../../bindings/github.com/nodetec/captains-log/service/";
@@ -37,6 +39,7 @@ import { Button } from "../ui/button";
 import TagInput from "./TagInput";
 
 const Editor = () => {
+  const queryClient = useQueryClient();
   const editor = useRef<HTMLDivElement>(undefined!);
   const [content, setContent] = useState("");
 
@@ -93,14 +96,18 @@ const Editor = () => {
       StatusID: new NullInt64({ Int64: undefined, Valid: false }),
       NotebookID: new NullInt64({ Int64: undefined, Valid: false }),
       Content: content,
-      Title: "test",
+      Title: parseTitle(content).title,
       CreatedAt: new Date().toISOString(),
       ModifiedAt: new Date().toISOString(),
       PublishedAt: new NullString({ String: undefined, Valid: false }),
-      PublishedID: new NullString({ String: undefined, Valid: false }),
+      EventID: new NullString({ String: undefined, Valid: false }),
     };
 
     const res = await NoteService.CreateNote(noteParams);
+
+    void queryClient.invalidateQueries({
+      queryKey: ["notes"],
+    });
     console.log(res);
   }
 

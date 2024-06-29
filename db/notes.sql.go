@@ -11,10 +11,27 @@ import (
 )
 
 const createNote = `-- name: CreateNote :one
-
-INSERT INTO notes (status_id, notebook_id, content, title, created_at, modified_at, published_at, published_id)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, status_id, notebook_id, content, title, created_at, modified_at, published_at, published_id
+INSERT INTO
+  notes (
+    status_id,
+    notebook_id,
+    content,
+    title,
+    created_at,
+    modified_at,
+    published_at,
+    event_id
+  )
+VALUES
+  (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
 `
 
 type CreateNoteParams struct {
@@ -25,7 +42,7 @@ type CreateNoteParams struct {
 	CreatedAt   string
 	ModifiedAt  string
 	PublishedAt sql.NullString
-	PublishedID sql.NullString
+	EventID     sql.NullString
 }
 
 // Note Queries
@@ -38,7 +55,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.CreatedAt,
 		arg.ModifiedAt,
 		arg.PublishedAt,
-		arg.PublishedID,
+		arg.EventID,
 	)
 	var i Note
 	err := row.Scan(
@@ -50,13 +67,15 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.CreatedAt,
 		&i.ModifiedAt,
 		&i.PublishedAt,
-		&i.PublishedID,
+		&i.EventID,
 	)
 	return i, err
 }
 
 const deleteNote = `-- name: DeleteNote :exec
-DELETE FROM notes WHERE id = ?
+DELETE FROM notes
+WHERE
+  id = ?
 `
 
 func (q *Queries) DeleteNote(ctx context.Context, id int64) error {
@@ -65,9 +84,20 @@ func (q *Queries) DeleteNote(ctx context.Context, id int64) error {
 }
 
 const getNote = `-- name: GetNote :one
-SELECT id, status_id, notebook_id, content, title, created_at, modified_at, published_at, published_id
-FROM notes
-WHERE id = ?
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+WHERE
+  id = ?
 `
 
 func (q *Queries) GetNote(ctx context.Context, id int64) (Note, error) {
@@ -82,18 +112,39 @@ func (q *Queries) GetNote(ctx context.Context, id int64) (Note, error) {
 		&i.CreatedAt,
 		&i.ModifiedAt,
 		&i.PublishedAt,
-		&i.PublishedID,
+		&i.EventID,
 	)
 	return i, err
 }
 
 const listNotes = `-- name: ListNotes :many
-SELECT id, status_id, notebook_id, content, title, created_at, modified_at, published_at, published_id
-FROM notes
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+ORDER BY
+  created_at DESC
+LIMIT
+  ?
+OFFSET
+  ?
 `
 
-func (q *Queries) ListNotes(ctx context.Context) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, listNotes)
+type ListNotesParams struct {
+	Limit  int64
+	Offset int64
+}
+
+func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]Note, error) {
+	rows, err := q.db.QueryContext(ctx, listNotes, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +161,7 @@ func (q *Queries) ListNotes(ctx context.Context) ([]Note, error) {
 			&i.CreatedAt,
 			&i.ModifiedAt,
 			&i.PublishedAt,
-			&i.PublishedID,
+			&i.EventID,
 		); err != nil {
 			return nil, err
 		}
@@ -127,8 +178,16 @@ func (q *Queries) ListNotes(ctx context.Context) ([]Note, error) {
 
 const updateNote = `-- name: UpdateNote :exec
 UPDATE notes
-SET status_id = ?, notebook_id = ?, content = ?, title = ?, modified_at = ?, published_at = ?, published_id = ?
-WHERE id = ?
+SET
+  status_id = ?,
+  notebook_id = ?,
+  content = ?,
+  title = ?,
+  modified_at = ?,
+  published_at = ?,
+  event_id = ?
+WHERE
+  id = ?
 `
 
 type UpdateNoteParams struct {
@@ -138,7 +197,7 @@ type UpdateNoteParams struct {
 	Title       string
 	ModifiedAt  string
 	PublishedAt sql.NullString
-	PublishedID sql.NullString
+	EventID     sql.NullString
 	ID          int64
 }
 
@@ -150,7 +209,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) error {
 		arg.Title,
 		arg.ModifiedAt,
 		arg.PublishedAt,
-		arg.PublishedID,
+		arg.EventID,
 		arg.ID,
 	)
 	return err

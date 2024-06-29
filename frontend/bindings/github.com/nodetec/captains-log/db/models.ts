@@ -17,7 +17,7 @@ export class CreateNoteParams {
     "CreatedAt": string;
     "ModifiedAt": string;
     "PublishedAt": sql$0.NullString;
-    "PublishedID": sql$0.NullString;
+    "EventID": sql$0.NullString;
 
     /** Creates a new CreateNoteParams instance. */
     constructor($$source: Partial<CreateNoteParams> = {}) {
@@ -42,8 +42,8 @@ export class CreateNoteParams {
         if (!("PublishedAt" in $$source)) {
             this["PublishedAt"] = (new sql$0.NullString());
         }
-        if (!("PublishedID" in $$source)) {
-            this["PublishedID"] = (new sql$0.NullString());
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
         }
 
         Object.assign(this, $$source);
@@ -67,8 +67,8 @@ export class CreateNoteParams {
         if ("PublishedAt" in $$parsedSource) {
             $$parsedSource["PublishedAt"] = $$createField6_0($$parsedSource["PublishedAt"]);
         }
-        if ("PublishedID" in $$parsedSource) {
-            $$parsedSource["PublishedID"] = $$createField7_0($$parsedSource["PublishedID"]);
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField7_0($$parsedSource["EventID"]);
         }
         return new CreateNoteParams($$parsedSource as Partial<CreateNoteParams>);
     }
@@ -83,7 +83,7 @@ export class Note {
     "CreatedAt": string;
     "ModifiedAt": string;
     "PublishedAt": sql$0.NullString;
-    "PublishedID": sql$0.NullString;
+    "EventID": sql$0.NullString;
 
     /** Creates a new Note instance. */
     constructor($$source: Partial<Note> = {}) {
@@ -111,8 +111,8 @@ export class Note {
         if (!("PublishedAt" in $$source)) {
             this["PublishedAt"] = (new sql$0.NullString());
         }
-        if (!("PublishedID" in $$source)) {
-            this["PublishedID"] = (new sql$0.NullString());
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
         }
 
         Object.assign(this, $$source);
@@ -136,8 +136,8 @@ export class Note {
         if ("PublishedAt" in $$parsedSource) {
             $$parsedSource["PublishedAt"] = $$createField7_0($$parsedSource["PublishedAt"]);
         }
-        if ("PublishedID" in $$parsedSource) {
-            $$parsedSource["PublishedID"] = $$createField8_0($$parsedSource["PublishedID"]);
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField8_0($$parsedSource["EventID"]);
         }
         return new Note($$parsedSource as Partial<Note>);
     }
@@ -150,7 +150,7 @@ export class UpdateNoteParams {
     "Title": string;
     "ModifiedAt": string;
     "PublishedAt": sql$0.NullString;
-    "PublishedID": sql$0.NullString;
+    "EventID": sql$0.NullString;
     "ID": number;
 
     /** Creates a new UpdateNoteParams instance. */
@@ -173,8 +173,8 @@ export class UpdateNoteParams {
         if (!("PublishedAt" in $$source)) {
             this["PublishedAt"] = (new sql$0.NullString());
         }
-        if (!("PublishedID" in $$source)) {
-            this["PublishedID"] = (new sql$0.NullString());
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
         }
         if (!("ID" in $$source)) {
             this["ID"] = 0;
@@ -201,8 +201,8 @@ export class UpdateNoteParams {
         if ("PublishedAt" in $$parsedSource) {
             $$parsedSource["PublishedAt"] = $$createField5_0($$parsedSource["PublishedAt"]);
         }
-        if ("PublishedID" in $$parsedSource) {
-            $$parsedSource["PublishedID"] = $$createField6_0($$parsedSource["PublishedID"]);
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField6_0($$parsedSource["EventID"]);
         }
         return new UpdateNoteParams($$parsedSource as Partial<UpdateNoteParams>);
     }

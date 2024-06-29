@@ -11,7 +11,9 @@ import (
 )
 
 const deleteTrashedNote = `-- name: DeleteTrashedNote :exec
-DELETE FROM trashed_notes WHERE id = ?
+DELETE FROM trashed_notes
+WHERE
+  id = ?
 `
 
 func (q *Queries) DeleteTrashedNote(ctx context.Context, id int64) error {
@@ -20,9 +22,16 @@ func (q *Queries) DeleteTrashedNote(ctx context.Context, id int64) error {
 }
 
 const getTrashedNote = `-- name: GetTrashedNote :one
-SELECT id, note_id, content, created_at, trashed_at
-FROM trashed_notes
-WHERE id = ?
+SELECT
+  id,
+  note_id,
+  content,
+  created_at,
+  trashed_at
+FROM
+  trashed_notes
+WHERE
+  id = ?
 `
 
 func (q *Queries) GetTrashedNote(ctx context.Context, id int64) (TrashedNote, error) {
@@ -39,8 +48,14 @@ func (q *Queries) GetTrashedNote(ctx context.Context, id int64) (TrashedNote, er
 }
 
 const listTrashedNotes = `-- name: ListTrashedNotes :many
-SELECT id, note_id, content, created_at, trashed_at
-FROM trashed_notes
+SELECT
+  id,
+  note_id,
+  content,
+  created_at,
+  trashed_at
+FROM
+  trashed_notes
 `
 
 func (q *Queries) ListTrashedNotes(ctx context.Context) ([]TrashedNote, error) {
@@ -73,10 +88,14 @@ func (q *Queries) ListTrashedNotes(ctx context.Context) ([]TrashedNote, error) {
 }
 
 const trashNote = `-- name: TrashNote :exec
-
-INSERT INTO trashed_notes (note_id, content, created_at, trashed_at)
-VALUES (?, ?, ?, ?)
-RETURNING id, note_id, content, created_at, trashed_at
+INSERT INTO
+  trashed_notes (note_id, content, created_at, trashed_at)
+VALUES
+  (?, ?, ?, ?) RETURNING id,
+  note_id,
+  content,
+  created_at,
+  trashed_at
 `
 
 type TrashNoteParams struct {

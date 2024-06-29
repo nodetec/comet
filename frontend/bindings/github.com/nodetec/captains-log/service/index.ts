@@ -5,3 +5,5 @@ import * as NoteService from "./noteservice.js";
 export {
     NoteService
 };
+
+export * from "./models.js";

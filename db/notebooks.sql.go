@@ -10,10 +10,12 @@ import (
 )
 
 const createNotebook = `-- name: CreateNotebook :one
-
-INSERT INTO notebooks (name, created_at)
-VALUES (?, ?)
-RETURNING id, name, created_at
+INSERT INTO
+  notebooks (name, created_at)
+VALUES
+  (?, ?) RETURNING id,
+  name,
+  created_at
 `
 
 type CreateNotebookParams struct {
@@ -30,7 +32,9 @@ func (q *Queries) CreateNotebook(ctx context.Context, arg CreateNotebookParams) 
 }
 
 const deleteNotebook = `-- name: DeleteNotebook :exec
-DELETE FROM notebooks WHERE id = ?
+DELETE FROM notebooks
+WHERE
+  id = ?
 `
 
 func (q *Queries) DeleteNotebook(ctx context.Context, id int64) error {
@@ -39,9 +43,14 @@ func (q *Queries) DeleteNotebook(ctx context.Context, id int64) error {
 }
 
 const getNotebook = `-- name: GetNotebook :one
-SELECT id, name, created_at
-FROM notebooks
-WHERE id = ?
+SELECT
+  id,
+  name,
+  created_at
+FROM
+  notebooks
+WHERE
+  id = ?
 `
 
 func (q *Queries) GetNotebook(ctx context.Context, id int64) (Notebook, error) {
@@ -52,8 +61,12 @@ func (q *Queries) GetNotebook(ctx context.Context, id int64) (Notebook, error) {
 }
 
 const listNotebooks = `-- name: ListNotebooks :many
-SELECT id, name, created_at
-FROM notebooks
+SELECT
+  id,
+  name,
+  created_at
+FROM
+  notebooks
 `
 
 func (q *Queries) ListNotebooks(ctx context.Context) ([]Notebook, error) {
@@ -81,8 +94,11 @@ func (q *Queries) ListNotebooks(ctx context.Context) ([]Notebook, error) {
 
 const updateNotebook = `-- name: UpdateNotebook :exec
 UPDATE notebooks
-SET name = ?, created_at = ?
-WHERE id = ?
+SET
+  name = ?,
+  created_at = ?
+WHERE
+  id = ?
 `
 
 type UpdateNotebookParams struct {

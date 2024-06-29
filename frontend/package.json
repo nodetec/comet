@@ -23,12 +23,14 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@replit/codemirror-vim": "^6.2.1",
     "@tanstack/react-query": "^5.48.0",
+    "@tanstack/react-query-devtools": "^5.48.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.1",
     "lucide-react": "^0.397.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-intersection-observer": "^9.10.3",
     "react-resizable-panels": "^2.0.19",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7"
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.3.0",
     "@tailwindcss/typography": "^0.5.13",
+    "@tanstack/eslint-plugin-query": "^5.47.0",
     "@types/node": "^20.14.9",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
