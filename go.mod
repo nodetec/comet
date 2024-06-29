@@ -3,6 +3,7 @@ module github.com/nodetec/captains-log
 go 1.22.4
 
 require (
+	github.com/adrg/xdg v0.4.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.4
 )

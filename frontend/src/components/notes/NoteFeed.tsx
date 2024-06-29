@@ -8,6 +8,7 @@ import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
   async function fetchNotes({ pageParam = 1 }) {
+    console.log("FETCHING NOTES");
     const pageSize = 50;
     const notes = await NoteService.ListNotes(pageSize, pageParam);
     return {

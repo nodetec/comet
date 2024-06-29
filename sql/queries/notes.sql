@@ -52,7 +52,7 @@ SELECT
 FROM
   notes
 ORDER BY
-  created_at DESC
+  modified_at DESC
 LIMIT
   ?
 OFFSET

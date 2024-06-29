@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/adrg/xdg"
 	"github.com/nodetec/captains-log/db"
 	"github.com/nodetec/captains-log/service"
 
@@ -24,7 +26,9 @@ var ddl string
 func main() {
 	ctx := context.Background()
 
-	dbConn, err := sql.Open("sqlite3", "notes.db")
+	dbPath := fmt.Sprintf("%s/captains-log/captains-log.db", xdg.DataHome)
+
+	dbConn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,4 +77,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
