@@ -9,10 +9,7 @@ import NoteCard from "./NoteCard";
 export default function NoteFeed() {
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    const offset = pageParam * pageSize;
-    const paginatedNotes = await NoteService.ListNotes(pageSize, offset);
-    const notes = paginatedNotes?.notes;
-
+    const notes = await NoteService.ListNotes(pageSize, pageParam);
     return {
       data: notes || [],
       nextPage: pageParam + 1,

@@ -12,12 +12,6 @@ type NoteService struct {
 	logger  *log.Logger
 }
 
-type PaginatedNotes struct {
-	Notes      []db.Note `json:"notes"`
-	NextOffset int64     `json:"next_offset"`
-	PrevOffset int64     `json:"prev_offset"`
-}
-
 func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
 	return &NoteService{
 		queries: queries,
@@ -43,33 +37,17 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context, limit, offset int64) (PaginatedNotes, error) {
+func (s *NoteService) ListNotes(ctx context.Context, limit, pageParam int64) ([]db.Note, error) {
+	offset := pageParam * limit
 	notes, err := s.queries.ListNotes(ctx, db.ListNotesParams{
 		Limit:  limit,
 		Offset: offset,
 	})
 	if err != nil {
 		s.logger.Println("Error listing notes:", err)
-		return PaginatedNotes{}, err
+		return []db.Note{}, err
 	}
-
-	nextOffset := offset + limit
-	prevOffset := offset - limit
-
-	if len(notes) < int(limit) {
-		nextOffset = -1
-	}
-
-	if prevOffset < 0 {
-		prevOffset = 0
-	}
-
-	return PaginatedNotes{
-		Notes:      notes,
-		NextOffset: nextOffset,
-		PrevOffset: prevOffset,
-	}, nil
-
+	return notes, nil
 }
 
 func (s *NoteService) UpdateNote(ctx context.Context, params db.UpdateNoteParams) error {
@@ -89,4 +67,3 @@ func (s *NoteService) DeleteNote(ctx context.Context, id int64) error {
 	}
 	return nil
 }
-

@@ -9,10 +9,6 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as db$0 from "../db/models.js";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as $models from "./models.js";
-
 export function CreateNote(params: db$0.CreateNoteParams): Promise<db$0.Note> & { cancel(): void } {
     let $resultPromise = $Call.ByID(718095870, params) as any;
     let $typingPromise = $resultPromise.then(($result) => {
@@ -36,8 +32,8 @@ export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
     return $typingPromise;
 }
 
-export function ListNotes(limit: number, offset: number): Promise<$models.PaginatedNotes> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3066540231, limit, offset) as any;
+export function ListNotes(limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3066540231, limit, pageParam) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
     }) as any;
@@ -52,4 +48,4 @@ export function UpdateNote(params: db$0.UpdateNoteParams): Promise<void> & { can
 
 // Private type creation functions
 const $$createType0 = db$0.Note.createFrom;
-const $$createType1 = $models.PaginatedNotes.createFrom;
+const $$createType1 = $Create.Array($$createType0);
