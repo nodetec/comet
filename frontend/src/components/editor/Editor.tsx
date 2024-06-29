@@ -13,8 +13,6 @@ const Editor = () => {
 
   const queryClient = useQueryClient();
 
-  // const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
-
   const onChange = async (doc: string) => {
     const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
     if (!activeNote) return;
@@ -54,7 +52,9 @@ const Editor = () => {
   if (activeNote === undefined) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-lg text-muted-foreground">Create a note to get started.</p>
+        <p className="text-lg text-muted-foreground">
+          Create a note to get started.
+        </p>
       </div>
     );
   }
