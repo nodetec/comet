@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
-// import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { useEditor } from "~/hooks/useEditor";
 import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
@@ -28,11 +27,8 @@ const Editor = () => {
     // if there is no first note, return
     if (!firstNote) return;
     // if the first note is the active note, return
-    console.log("firstNote.ID", firstNote.ID);
-    console.log("activeNote.ID", activeNote.ID);
     if (firstNote.ID === activeNote.ID) return;
 
-    console.log("SAVING TO DB ON CHANGE");
     void (await NoteService.UpdateNote({
       ...activeNote,
       ModifiedAt: new Date().toISOString(),
