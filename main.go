@@ -26,8 +26,16 @@ var ddl string
 func main() {
 	ctx := context.Background()
 
-	dbPath := fmt.Sprintf("%s/captains-log/captains-log.db", xdg.DataHome)
+	// Define the directory path for the SQLite database file
+	dbDir := fmt.Sprintf("%s/captains-log", xdg.DataHome)
+	dbPath := fmt.Sprintf("%s/captains-log.db", dbDir)
 
+	// Ensure the directory exists
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		log.Fatalf("failed to create directory: %v", err)
+	}
+
+	// Open the SQLite database
 	dbConn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
@@ -72,8 +80,8 @@ func main() {
 	})
 
 	err = app.Run()
-
 	if err != nil {
 		log.Fatal(err)
 	}
 }
+

@@ -47,9 +47,6 @@ export default function NoteFeedHeader() {
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
         <h1 className="cursor-default text-lg font-bold">All Notes</h1>
-        <h1 className="cursor-default text-lg font-bold">
-          {activeNote?.ID ?? "none"}
-        </h1>
       </div>
       <div>
         <Button

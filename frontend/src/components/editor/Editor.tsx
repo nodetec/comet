@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
@@ -12,6 +14,8 @@ const Editor = () => {
   const { activeNote, setActiveNote } = useAppState();
 
   const queryClient = useQueryClient();
+
+  // const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
 
   const onChange = async (doc: string) => {
     const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
@@ -48,6 +52,14 @@ const Editor = () => {
     initialDoc: activeNote?.Content ?? "",
     onChange,
   });
+
+  if (activeNote === undefined) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-lg text-muted-foreground">Create a note to get started.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col pt-11">
