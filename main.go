@@ -52,12 +52,14 @@ func main() {
 
 	// Create the NoteService with the queries and logger
 	noteService := service.NewNoteService(queries, logger)
+	tagService := service.NewTagService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
 			application.NewService(noteService),
+			application.NewService(tagService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -69,19 +71,19 @@ func main() {
 
 	// Custom event handling
 	app.Events.On("open-settings-window", func(e *application.WailsEvent) {
-    app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-      Title: "Settings",
-      Width: 1200,
-      Height: 600,
-      Mac: application.MacWindow{
-        InvisibleTitleBarHeight: 50,
-        Backdrop:                application.MacBackdropTranslucent,
-        TitleBar:                application.MacTitleBarHiddenInset,
-      },
-      BackgroundColour: application.NewRGB(27, 38, 54),
-      URL: "/windows/settings/index.html",
-    }).
-    Show()
+		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+			Title:  "Settings",
+			Width:  1200,
+			Height: 600,
+			Mac: application.MacWindow{
+				InvisibleTitleBarHeight: 50,
+				Backdrop:                application.MacBackdropTranslucent,
+				TitleBar:                application.MacTitleBarHiddenInset,
+			},
+			BackgroundColour: application.NewRGB(27, 38, 54),
+			URL:              "/windows/settings/index.html",
+		}).
+			Show()
 	})
 
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
@@ -98,7 +100,7 @@ func main() {
 	})
 
 	noteMenu := app.NewMenu()
-  
+
 	noteMenu.Add("Move to trash").OnClick(func(data *application.Context) {
 		contextData, ok := data.ContextMenuData().(string)
 

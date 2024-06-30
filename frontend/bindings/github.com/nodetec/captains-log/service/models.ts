@@ -7,41 +7,52 @@ import {Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as db$0 from "../db/models.js";
+import * as sql$0 from "../../../../database/sql/models.js";
 
-export class PaginatedNotes {
-    "notes": db$0.Note[];
-    "next_offset": number;
-    "prev_offset": number;
+export class Tag {
+    "ID": number;
+    "Name": string;
+    "Color": sql$0.NullString;
+    "Icon": sql$0.NullString;
+    "CreatedAt": string;
 
-    /** Creates a new PaginatedNotes instance. */
-    constructor($$source: Partial<PaginatedNotes> = {}) {
-        if (!("notes" in $$source)) {
-            this["notes"] = [];
+    /** Creates a new Tag instance. */
+    constructor($$source: Partial<Tag> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
         }
-        if (!("next_offset" in $$source)) {
-            this["next_offset"] = 0;
+        if (!("Name" in $$source)) {
+            this["Name"] = "";
         }
-        if (!("prev_offset" in $$source)) {
-            this["prev_offset"] = 0;
+        if (!("Color" in $$source)) {
+            this["Color"] = (new sql$0.NullString());
+        }
+        if (!("Icon" in $$source)) {
+            this["Icon"] = (new sql$0.NullString());
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
         }
 
         Object.assign(this, $$source);
     }
 
     /**
-     * Creates a new PaginatedNotes instance from a string or object.
+     * Creates a new Tag instance from a string or object.
      */
-    static createFrom($$source: any = {}): PaginatedNotes {
-        const $$createField0_0 = $$createType1;
+    static createFrom($$source: any = {}): Tag {
+        const $$createField2_0 = $$createType0;
+        const $$createField3_0 = $$createType0;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("notes" in $$parsedSource) {
-            $$parsedSource["notes"] = $$createField0_0($$parsedSource["notes"]);
+        if ("Color" in $$parsedSource) {
+            $$parsedSource["Color"] = $$createField2_0($$parsedSource["Color"]);
         }
-        return new PaginatedNotes($$parsedSource as Partial<PaginatedNotes>);
+        if ("Icon" in $$parsedSource) {
+            $$parsedSource["Icon"] = $$createField3_0($$parsedSource["Icon"]);
+        }
+        return new Tag($$parsedSource as Partial<Tag>);
     }
 }
 
 // Private type creation functions
-const $$createType0 = db$0.Note.createFrom;
-const $$createType1 = $Create.Array($$createType0);
+const $$createType0 = sql$0.NullString.createFrom;

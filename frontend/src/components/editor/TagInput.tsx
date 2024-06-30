@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-// import { useQueryClient } from "@tanstack/react-query";
+import { NullString } from "&/database/sql/models";
+import { TagService } from "&/github.com/nodetec/captains-log/service";
 import { Input } from "~/components/ui/input";
 
 export default function TagInput() {
@@ -13,12 +14,19 @@ export default function TagInput() {
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      e.preventDefault(); // Prevents the default action of the Enter key if needed
+      e.preventDefault();
+      await TagService.CreateTag(
+        tagName,
+        new NullString({ String: undefined, Valid: false }),
+        new NullString({ String: undefined, Valid: false }),
+        new Date().toISOString(),
+      );
+      setTagName("");
     }
   };
 
   return (
-    <div className="w-full pl-4 pr-2 border-t py-2">
+    <div className="w-full border-t py-2 pl-4 pr-2">
       <div className="flex items-center gap-x-2">
         {/* {currentNote?.tags?.map((tag, tagIndex) => { */}
         {/*   return <NoteTag key={tagIndex} tag={tag} />; */}
