@@ -8,7 +8,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function TagFeed() {
-  const { setActiveNote, activeNote, activeTag } = useAppState();
+  const { setActiveNote, activeTag } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;

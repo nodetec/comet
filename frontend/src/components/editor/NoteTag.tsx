@@ -1,30 +1,31 @@
+import { useEffect } from "react";
+
+import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { Tag } from "&/github.com/nodetec/captains-log/service";
-import { useAppState } from "~/store";
 
 import { Badge } from "../ui/badge";
 
 type Props = {
   tag: Tag;
+  note: Note;
 };
 
-export default function NoteTag({ tag }: Props) {
-  const { activeNote } = useAppState();
-
-  const handleContextMenu = async (
-    e: React.MouseEvent<HTMLDivElement, MouseEvent>,
-  ) => {
-    e.preventDefault(); // prevent the default behaviour when right clicked
-    // const tagId = tag.ID;
-    const noteId = activeNote?.ID;
-    if (noteId) {
-      // TODO: Implement tag removal context menu
-    }
-  };
+export default function NoteTag({ tag, note }: Props) {
+  useEffect(() => {
+    console.log(`TAG ID: ${tag.ID}`);
+    console.log(`NOTE ID: ${note.ID}`);
+  }, [tag, note]);
 
   return (
-    <div onContextMenu={handleContextMenu}>
+    <div>
       <Badge
-        className="cursor-default select-none rounded-full whitespace-nowrap"
+        style={
+          {
+            "--custom-contextmenu": "noteTagMenu",
+            "--custom-contextmenu-data": `${note.ID}:${tag.ID}`,
+          } as React.CSSProperties
+        }
+        className="cursor-default select-none whitespace-nowrap rounded-full"
         variant="secondary"
       >
         {tag.Name}

@@ -53,7 +53,7 @@ func main() {
 	// Create the NoteService with the queries and logger
 	noteService := service.NewNoteService(queries, logger)
 	tagService := service.NewTagService(queries, logger)
-	notetagService := service.NewNoteTagService(queries, logger)
+	noteTagService := service.NewNoteTagService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
@@ -61,7 +61,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(noteService),
 			application.NewService(tagService),
-			application.NewService(notetagService),
+			application.NewService(noteTagService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -103,6 +103,7 @@ func main() {
 
 	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService)
 	contextmenu.CreateTagMenu(app, mainWindow, ctx, tagService)
+	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
 
 	err = app.Run()
 	if err != nil {

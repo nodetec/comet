@@ -72,7 +72,7 @@ export default function TagInput({ note }: Props) {
     <div className="w-full border-t py-2 pl-4 pr-2">
       <div className="flex items-center gap-x-2">
         {data?.map((tag, tagIndex) => {
-          return <NoteTag key={tagIndex} tag={tag} />;
+          return <NoteTag key={tagIndex} note={note} tag={tag} />;
         })}
 
         <Input
