@@ -143,6 +143,51 @@ export class Note {
     }
 }
 
+export class Tag {
+    "ID": number;
+    "Name": string;
+    "Color": sql$0.NullString;
+    "Icon": sql$0.NullString;
+    "CreatedAt": string;
+
+    /** Creates a new Tag instance. */
+    constructor($$source: Partial<Tag> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Name" in $$source)) {
+            this["Name"] = "";
+        }
+        if (!("Color" in $$source)) {
+            this["Color"] = (new sql$0.NullString());
+        }
+        if (!("Icon" in $$source)) {
+            this["Icon"] = (new sql$0.NullString());
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Tag instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Tag {
+        const $$createField2_0 = $$createType1;
+        const $$createField3_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Color" in $$parsedSource) {
+            $$parsedSource["Color"] = $$createField2_0($$parsedSource["Color"]);
+        }
+        if ("Icon" in $$parsedSource) {
+            $$parsedSource["Icon"] = $$createField3_0($$parsedSource["Icon"]);
+        }
+        return new Tag($$parsedSource as Partial<Tag>);
+    }
+}
+
 export class UpdateNoteParams {
     "StatusID": sql$0.NullInt64;
     "NotebookID": sql$0.NullInt64;

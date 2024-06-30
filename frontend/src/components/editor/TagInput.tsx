@@ -3,9 +3,12 @@ import { useState } from "react";
 import { NullString } from "&/database/sql/models";
 import { TagService } from "&/github.com/nodetec/captains-log/service";
 import { Input } from "~/components/ui/input";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function TagInput() {
   const [tagName, setTagName] = useState<string>("");
+
+  const queryClient = useQueryClient();
 
   const handleTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTagName = e.target.value;
@@ -22,6 +25,7 @@ export default function TagInput() {
         new Date().toISOString(),
       );
       setTagName("");
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   };
 
