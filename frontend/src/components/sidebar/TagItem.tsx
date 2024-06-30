@@ -1,4 +1,4 @@
-import { Tag } from "&/github.com/nodetec/captains-log/service";
+import { NoteTagService, Tag } from "&/github.com/nodetec/captains-log/service";
 import { useAppState } from "~/store";
 
 type Props = {
@@ -6,11 +6,30 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const { activeTag, setActiveTag, feedType, setFeedType } = useAppState();
+  const {
+    activeTag,
+    setActiveTag,
+    activeNote,
+    setActiveNote,
+    feedType,
+    setFeedType,
+  } = useAppState();
 
-  const handleTagClick = () => {
+  const handleTagClick = async () => {
     setFeedType("tag");
     setActiveTag(tag);
+    // TODO: check if active note is has the tag
+    // if it does not, set active note to undefined
+
+    if (!activeNote) return;
+    const isTagAssociated = await NoteTagService.CheckTagForNote(
+      activeNote.ID,
+      tag.ID,
+    );
+
+    if (!isTagAssociated) {
+      setActiveNote(undefined);
+    }
   };
 
   return (
