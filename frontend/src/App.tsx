@@ -16,7 +16,7 @@ export default function App() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    Events.On("noteDeleted", (timeValue: any) => {
+    Events.On("noteDeleted", () => {
       void queryClient.invalidateQueries({
         queryKey: ["notes"],
       });

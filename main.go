@@ -81,9 +81,8 @@ func main() {
 	})
 
 	noteMenu := app.NewMenu()
+  
 	noteMenu.Add("Move to trash").OnClick(func(data *application.Context) {
-		app.Logger.Info("Context menu", "context data", data.ContextMenuData())
-
 		contextData, ok := data.ContextMenuData().(string)
 
 		if !ok {
