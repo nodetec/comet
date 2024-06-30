@@ -11,17 +11,20 @@ import {
 
 import Editor from "./components/editor/Editor";
 import Notes from "./components/notes/Notes";
+import useContextMenuListener from "./hooks/useContextMenuListeners";
 
 export default function App() {
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
 
-  useEffect(() => {
-    Events.On("noteDeleted", () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["notes"],
-      });
-    });
-  }, []);
+  useContextMenuListener();
+
+  // useEffect(() => {
+  //   Events.On("noteDeleted", () => {
+  //     void queryClient.invalidateQueries({
+  //       queryKey: ["notes"],
+  //     });
+  //   });
+  // }, []);
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
