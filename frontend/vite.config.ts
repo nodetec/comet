@@ -11,4 +11,12 @@ export default defineConfig({
       "&": path.resolve(__dirname, "./bindings"),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        settings: path.resolve(__dirname, "windows/settings/index.html"),
+      },
+    },
+  },
 });
