@@ -33,12 +33,8 @@ export default function TagInput({ note }: Props) {
       let noteTag: Tag | undefined;
       try {
         noteTag = await TagService.GetTagByName(tagName);
-      } catch (error) {
-        console.error(error);
-      }
-      console.log(noteTag);
-      // if it doesn't, create it
-      if (!noteTag) {
+      } catch (_) {
+        // if it doesn't, create it
         noteTag = await TagService.CreateTag(
           tagName,
           new NullString({ String: undefined, Valid: false }),
@@ -62,7 +58,6 @@ export default function TagInput({ note }: Props) {
   };
 
   async function fetchTags() {
-    console.log("fetching tags for note", note.ID);
     const note_tags = await NoteTagService.GetTagsForNote(note.ID);
     return note_tags;
   }
