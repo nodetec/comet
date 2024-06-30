@@ -1,7 +1,3 @@
-import { useEffect } from "react";
-
-import { useQueryClient } from "@tanstack/react-query";
-import { Events } from "@wailsio/runtime";
 import Sidebar from "~/components/sidebar/Sidebar";
 import {
   ResizableHandle,
@@ -14,17 +10,7 @@ import Notes from "./components/notes/Notes";
 import useContextMenuListener from "./hooks/useContextMenuListeners";
 
 export default function App() {
-  // const queryClient = useQueryClient();
-
   useContextMenuListener();
-
-  // useEffect(() => {
-  //   Events.On("noteDeleted", () => {
-  //     void queryClient.invalidateQueries({
-  //       queryKey: ["notes"],
-  //     });
-  //   });
-  // }, []);
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
