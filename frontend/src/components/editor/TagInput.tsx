@@ -2,18 +2,22 @@ import { useState } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NullString } from "&/database/sql/models";
+import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import {
   NoteTagService,
+  Tag,
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
 import { Input } from "~/components/ui/input";
-import { useAppState } from "~/store";
 
 import NoteTag from "./NoteTag";
 
-export default function TagInput() {
+type Props = {
+  note: Note;
+};
+
+export default function TagInput({ note }: Props) {
   const [tagName, setTagName] = useState<string>("");
-  const { activeNote } = useAppState();
 
   const queryClient = useQueryClient();
 
@@ -25,10 +29,13 @@ export default function TagInput() {
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (!activeNote) return;
-
       // check if tag already exists
-      let noteTag = await TagService.GetTagByName(tagName);
+      let noteTag: Tag | undefined;
+      try {
+        noteTag = await TagService.GetTagByName(tagName);
+      } catch (error) {
+        console.error(error);
+      }
       console.log(noteTag);
       // if it doesn't, create it
       if (!noteTag) {
@@ -42,28 +49,29 @@ export default function TagInput() {
       }
       // check if tag is associated with note
       const isTagAssociated = await NoteTagService.CheckTagForNote(
-        activeNote.ID,
+        note.ID,
         noteTag.ID,
       );
       // if it isn't, associate it with note
       if (!isTagAssociated) {
-        await NoteTagService.AddTagToNote(activeNote.ID, noteTag.ID);
+        await NoteTagService.AddTagToNote(note.ID, noteTag.ID);
         void queryClient.invalidateQueries({ queryKey: ["note_tags"] });
         setTagName("");
       }
     }
   };
 
-  const { data } = useQuery({
-    queryKey: ["note_tags"],
-    queryFn: () => fetchTags(),
-  });
-
   async function fetchTags() {
-    if (!activeNote) return;
-    const note_tags = await NoteTagService.GetTagsForNote(activeNote.ID);
+    console.log("fetching tags for note", note.ID);
+    const note_tags = await NoteTagService.GetTagsForNote(note.ID);
     return note_tags;
   }
+
+  const { data } = useQuery({
+    queryKey: ["note_tags", note.ID],
+    staleTime: 50,
+    queryFn: () => fetchTags(),
+  });
 
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">

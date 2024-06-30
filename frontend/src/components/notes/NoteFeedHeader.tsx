@@ -8,9 +8,13 @@ import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
 
-export default function NoteFeedHeader() {
+type Props = {
+  feedType: string;
+};
+
+export default function NoteFeedHeader({ feedType }: Props) {
   const queryClient = useQueryClient();
-  const { activeNote, setActiveNote } = useAppState();
+  const { setActiveNote, activeTag } = useAppState();
 
   async function handleCreateNote(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -34,14 +38,18 @@ export default function NoteFeedHeader() {
     });
   }
 
+  function title(feadType: string) {
+    if (feedType === "all") return "All notes";
+    if (feedType === "tag") return activeTag?.Name;
+  }
+
   return (
     <div className="flex justify-between px-3 pt-2">
       <div className="flex items-center justify-center gap-x-1">
         <Button className="text-muted-foreground" variant="ghost" size="icon">
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
-        <h1 className="cursor-default text-lg font-bold">All Notes</h1>
-        <h1 className="cursor-default text-lg font-bold">{activeNote?.ID}</h1>
+        <h1 className="cursor-default text-lg font-bold">{title(feedType)}</h1>
       </div>
       <div>
         <Button

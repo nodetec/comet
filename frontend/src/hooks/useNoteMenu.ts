@@ -5,7 +5,7 @@ import { Events } from "@wailsio/runtime";
 import { WailsEvent } from "@wailsio/runtime/types/events";
 import { useAppState } from "~/store";
 
-const useContextMenuListener = () => {
+const useNoteMenu = () => {
   const queryClient = useQueryClient();
   const { activeNote, setActiveNote } = useAppState();
 
@@ -29,4 +29,4 @@ const useContextMenuListener = () => {
   }, [activeNote, setActiveNote, queryClient]);
 };
 
-export default useContextMenuListener;
+export default useNoteMenu;

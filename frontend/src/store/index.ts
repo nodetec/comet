@@ -4,6 +4,9 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
+  feedType: "all" | "trash" | "tag" | "search";
+  setFeedType: (feedType: "all" | "trash" | "tag" | "search") => void;
+
   activeNote: Note | undefined;
   setActiveNote: (activeNote: Note | undefined) => void;
 
@@ -14,6 +17,9 @@ interface State {
 export const useAppState = create<State>()(
   persist(
     (set) => ({
+      feedType: "all",
+      setFeedType: (feedType) => set({ feedType }),
+
       activeNote: undefined,
       setActiveNote: (activeNote) => set({ activeNote }),
 

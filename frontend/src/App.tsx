@@ -7,10 +7,12 @@ import {
 
 import Editor from "./components/editor/Editor";
 import Notes from "./components/notes/Notes";
-import useContextMenuListener from "./hooks/useContextMenuListeners";
+import useNoteMenu from "./hooks/useNoteMenu";
+import useTagMenu from "./hooks/useTagMenu";
 
 export default function App() {
-  useContextMenuListener();
+  useNoteMenu();
+  useTagMenu();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">

@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { NoteService } from "&/github.com/nodetec/captains-log/service";
+import { NoteTagService } from "&/github.com/nodetec/captains-log/service";
 import { assignRef } from "~/lib/utils";
 import { useAppState } from "~/store";
 import { useInView } from "react-intersection-observer";
@@ -7,12 +7,17 @@ import { useInView } from "react-intersection-observer";
 import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
-export default function NoteFeed() {
-  const { setActiveNote } = useAppState();
+export default function TagFeed() {
+  const { setActiveNote, activeTag } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    const notes = await NoteService.ListNotes(pageSize, pageParam);
+    if (!activeTag) return { data: [], nextPage: 0, nextCursor: undefined };
+    const notes = await NoteTagService.GetNotesForTag(
+      activeTag.ID,
+      pageSize,
+      pageParam,
+    );
 
     if (notes.length === 0) {
       setActiveNote(undefined);
@@ -27,7 +32,7 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes"],
+      queryKey: [`notes-${activeTag?.ID}`],
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,

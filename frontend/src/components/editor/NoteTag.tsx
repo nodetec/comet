@@ -24,7 +24,7 @@ export default function NoteTag({ tag }: Props) {
   return (
     <div onContextMenu={handleContextMenu}>
       <Badge
-        className="cursor-default select-none rounded-full"
+        className="cursor-default select-none rounded-full whitespace-nowrap"
         variant="secondary"
       >
         {tag.Name}

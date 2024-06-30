@@ -61,7 +61,7 @@ const Editor = () => {
         <div className="h-full w-full px-4" ref={editorRef}></div>
       </div>
       <div className="flex items-center justify-between">
-        <TagInput />
+        <TagInput note={activeNote} />
       </div>
     </div>
   );
