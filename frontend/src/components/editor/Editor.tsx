@@ -1,9 +1,6 @@
-import { useEffect } from "react";
-
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
-// import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { useEditor } from "~/hooks/useEditor";
 import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
@@ -14,8 +11,6 @@ const Editor = () => {
   const { activeNote, setActiveNote } = useAppState();
 
   const queryClient = useQueryClient();
-
-  // const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
 
   const onChange = async (doc: string) => {
     const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
@@ -32,11 +27,8 @@ const Editor = () => {
     // if there is no first note, return
     if (!firstNote) return;
     // if the first note is the active note, return
-    console.log("firstNote.ID", firstNote.ID);
-    console.log("activeNote.ID", activeNote.ID);
     if (firstNote.ID === activeNote.ID) return;
 
-    console.log("SAVING TO DB ON CHANGE");
     void (await NoteService.UpdateNote({
       ...activeNote,
       ModifiedAt: new Date().toISOString(),
@@ -56,7 +48,9 @@ const Editor = () => {
   if (activeNote === undefined) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-lg text-muted-foreground">Create a note to get started.</p>
+        <p className="text-lg text-muted-foreground">
+          Create a note to get started.
+        </p>
       </div>
     );
   }

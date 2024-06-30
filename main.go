@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -83,7 +84,7 @@ func main() {
     Show()
 	})
 
-	app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
 		Title:  "Captain's Log",
 		Width:  1200,
 		Height: 600,
@@ -96,9 +97,35 @@ func main() {
 		URL:              "/",
 	})
 
+	noteMenu := app.NewMenu()
+	noteMenu.Add("Move to trash").OnClick(func(data *application.Context) {
+		app.Logger.Info("Context menu", "context data", data.ContextMenuData())
+
+		contextData, ok := data.ContextMenuData().(string)
+
+		if !ok {
+			app.Logger.Error("Invalid context menu data type")
+			return
+		}
+
+		noteId, err := strconv.ParseInt(contextData, 10, 64)
+		if err != nil {
+			app.Logger.Error("Error converting context data to int64", "error", err)
+			return
+		}
+
+		noteService.DeleteNote(ctx, noteId)
+
+		app.Events.Emit(&application.WailsEvent{
+			Name: "noteDeleted",
+			Data: noteId,
+		})
+
+	})
+	mainWindow.RegisterContextMenu("noteMenu", noteMenu)
+
 	err = app.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 }
-
