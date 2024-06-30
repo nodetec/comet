@@ -14,6 +14,11 @@ export function AddTagToNote(noteID: number, tagID: number): Promise<void> & { c
     return $resultPromise;
 }
 
+export function CheckTagForNote(noteID: number, tagID: number): Promise<boolean> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2860258327, noteID, tagID) as any;
+    return $resultPromise;
+}
+
 export function GetNotesForTag(tagID: number, limit: number, offset: number): Promise<db$0.Note[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1319145372, tagID, limit, offset) as any;
     let $typingPromise = $resultPromise.then(($result) => {

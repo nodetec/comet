@@ -66,3 +66,14 @@ func (s *NoteTagService) RemoveTagFromNote(ctx context.Context, noteID, tagID in
 	return nil
 }
 
+func (s *NoteTagService) CheckTagForNote(ctx context.Context, noteID, tagID int64) (bool, error) {
+	isAssociated, err := s.queries.CheckTagForNote(ctx, db.CheckTagForNoteParams{
+		NoteID: sql.NullInt64{Int64: noteID, Valid: true},
+		TagID:  sql.NullInt64{Int64: tagID, Valid: true},
+	})
+	if err != nil {
+		s.logger.Println("Error checking if tag is associated with note:", err)
+		return false, err
+	}
+	return isAssociated, nil
+}

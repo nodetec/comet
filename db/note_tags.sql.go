@@ -26,6 +26,24 @@ func (q *Queries) AddTagToNote(ctx context.Context, arg AddTagToNoteParams) erro
 	return err
 }
 
+const checkTagForNote = `-- name: CheckTagForNote :one
+SELECT COUNT(*) > 0 AS is_associated
+FROM note_tags
+WHERE note_id = ? AND tag_id = ?
+`
+
+type CheckTagForNoteParams struct {
+	NoteID sql.NullInt64
+	TagID  sql.NullInt64
+}
+
+func (q *Queries) CheckTagForNote(ctx context.Context, arg CheckTagForNoteParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkTagForNote, arg.NoteID, arg.TagID)
+	var is_associated bool
+	err := row.Scan(&is_associated)
+	return is_associated, err
+}
+
 const getNotesForTag = `-- name: GetNotesForTag :many
 SELECT n.id, n.status_id, n.notebook_id, n.content, n.title, n.created_at, n.modified_at, n.published_at, n.event_id
 FROM notes n

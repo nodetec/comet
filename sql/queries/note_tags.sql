@@ -19,3 +19,7 @@ LIMIT ? OFFSET ?;
 -- name: RemoveTagFromNote :exec
 DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?;
 
+-- name: CheckTagForNote :one
+SELECT COUNT(*) > 0 AS is_associated
+FROM note_tags
+WHERE note_id = ? AND tag_id = ?;

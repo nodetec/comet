@@ -73,6 +73,21 @@ func (s *TagService) GetTag(ctx context.Context, id int64) (Tag, error) {
 	}, nil
 }
 
+func (s *TagService) GetTagByName(ctx context.Context, name string) (Tag, error) {
+	tag, err := s.queries.GetTagByName(ctx, name)
+	if err != nil {
+		s.logger.Printf("Error getting tag with name %s: %v", name, err)
+		return Tag{}, err
+	}
+	return Tag{
+		ID:        tag.ID,
+		Name:      tag.Name,
+		Color:     tag.Color,
+		Icon:      tag.Icon,
+		CreatedAt: tag.CreatedAt,
+	}, nil
+}
+
 func (s *TagService) ListTags(ctx context.Context) ([]Tag, error) {
 	tags, err := s.queries.ListTags(ctx)
 	if err != nil {
