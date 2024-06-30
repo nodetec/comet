@@ -11,10 +11,11 @@ import (
 )
 
 const createSetting = `-- name: CreateSetting :one
-
-INSERT INTO settings (key, value)
-VALUES (?, ?)
-RETURNING key, value
+INSERT INTO
+  settings (key, value)
+VALUES
+  (?, ?) RETURNING key,
+  value
 `
 
 type CreateSettingParams struct {
@@ -31,7 +32,9 @@ func (q *Queries) CreateSetting(ctx context.Context, arg CreateSettingParams) (S
 }
 
 const deleteSetting = `-- name: DeleteSetting :exec
-DELETE FROM settings WHERE key = ?
+DELETE FROM settings
+WHERE
+  key = ?
 `
 
 func (q *Queries) DeleteSetting(ctx context.Context, key string) error {
@@ -40,9 +43,13 @@ func (q *Queries) DeleteSetting(ctx context.Context, key string) error {
 }
 
 const getSetting = `-- name: GetSetting :one
-SELECT key, value
-FROM settings
-WHERE key = ?
+SELECT
+  key,
+  value
+FROM
+  settings
+WHERE
+  key = ?
 `
 
 func (q *Queries) GetSetting(ctx context.Context, key string) (Setting, error) {
@@ -54,8 +61,10 @@ func (q *Queries) GetSetting(ctx context.Context, key string) (Setting, error) {
 
 const updateSetting = `-- name: UpdateSetting :exec
 UPDATE settings
-SET value = ?
-WHERE key = ?
+SET
+  value = ?
+WHERE
+  key = ?
 `
 
 type UpdateSettingParams struct {

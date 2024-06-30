@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT NOT NULL,
   modified_at TEXT NOT NULL,
   published_at TEXT,
-  published_id TEXT
+  event_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -50,10 +50,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
   modified_at UNINDEXED
 );
 
-CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY,
-  value TEXT
-);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes (created_at);
 
@@ -64,4 +61,3 @@ CREATE INDEX IF NOT EXISTS idx_tags_name ON tags (name);
 CREATE INDEX IF NOT EXISTS idx_tags_created_at ON tags (created_at);
 
 CREATE INDEX IF NOT EXISTS idx_settings_key ON settings (key);
-

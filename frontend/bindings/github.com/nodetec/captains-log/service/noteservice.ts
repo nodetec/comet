@@ -32,8 +32,8 @@ export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
     return $typingPromise;
 }
 
-export function ListNotes(): Promise<db$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3066540231) as any;
+export function ListNotes(limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3066540231, limit, pageParam) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
     }) as any;

@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
-  "embed"
+	"embed"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/adrg/xdg"
 	"github.com/nodetec/captains-log/db"
 	"github.com/nodetec/captains-log/service"
 
@@ -24,7 +26,17 @@ var ddl string
 func main() {
 	ctx := context.Background()
 
-	dbConn, err := sql.Open("sqlite3", ":memory:")
+	// Define the directory path for the SQLite database file
+	dbDir := fmt.Sprintf("%s/captains-log", xdg.DataHome)
+	dbPath := fmt.Sprintf("%s/captains-log.db", dbDir)
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		log.Fatalf("failed to create directory: %v", err)
+	}
+
+	// Open the SQLite database
+	dbConn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -85,7 +97,6 @@ func main() {
 	})
 
 	err = app.Run()
-
 	if err != nil {
 		log.Fatal(err)
 	}

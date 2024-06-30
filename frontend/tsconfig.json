@@ -27,9 +27,14 @@
     "paths": {
       "~/*": [
         "./src/*"
+      ],
+      "&/*": [
+        "./bindings/*"
       ]
     }
   },
+  "esModuleInterop": true,
+  "allowSyntheticDefaultImports": true,
   "include": [
     "src"
   ],

@@ -11,10 +11,14 @@ import (
 )
 
 const createTag = `-- name: CreateTag :one
-
-INSERT INTO tags (name, color, icon, created_at)
-VALUES (?, ?, ?, ?)
-RETURNING id, name, color, icon, created_at
+INSERT INTO
+  tags (name, color, icon, created_at)
+VALUES
+  (?, ?, ?, ?) RETURNING id,
+  name,
+  color,
+  icon,
+  created_at
 `
 
 type CreateTagParams struct {
@@ -44,7 +48,9 @@ func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, erro
 }
 
 const deleteTag = `-- name: DeleteTag :exec
-DELETE FROM tags WHERE id = ?
+DELETE FROM tags
+WHERE
+  id = ?
 `
 
 func (q *Queries) DeleteTag(ctx context.Context, id int64) error {
@@ -53,9 +59,16 @@ func (q *Queries) DeleteTag(ctx context.Context, id int64) error {
 }
 
 const getTag = `-- name: GetTag :one
-SELECT id, name, color, icon, created_at
-FROM tags
-WHERE id = ?
+SELECT
+  id,
+  name,
+  color,
+  icon,
+  created_at
+FROM
+  tags
+WHERE
+  id = ?
 `
 
 func (q *Queries) GetTag(ctx context.Context, id int64) (Tag, error) {
@@ -72,8 +85,14 @@ func (q *Queries) GetTag(ctx context.Context, id int64) (Tag, error) {
 }
 
 const listTags = `-- name: ListTags :many
-SELECT id, name, color, icon, created_at
-FROM tags
+SELECT
+  id,
+  name,
+  color,
+  icon,
+  created_at
+FROM
+  tags
 `
 
 func (q *Queries) ListTags(ctx context.Context) ([]Tag, error) {
@@ -107,8 +126,13 @@ func (q *Queries) ListTags(ctx context.Context) ([]Tag, error) {
 
 const updateTag = `-- name: UpdateTag :exec
 UPDATE tags
-SET name = ?, color = ?, icon = ?, created_at = ?
-WHERE id = ?
+SET
+  name = ?,
+  color = ?,
+  icon = ?,
+  created_at = ?
+WHERE
+  id = ?
 `
 
 type UpdateTagParams struct {

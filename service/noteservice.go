@@ -1,4 +1,3 @@
-// service/note_service.go
 package service
 
 import (
@@ -38,11 +37,15 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context) ([]db.Note, error) {
-	notes, err := s.queries.ListNotes(ctx)
+func (s *NoteService) ListNotes(ctx context.Context, limit, pageParam int64) ([]db.Note, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.ListNotes(ctx, db.ListNotesParams{
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		s.logger.Println("Error listing notes:", err)
-		return nil, err
+		return []db.Note{}, err
 	}
 	return notes, nil
 }
@@ -64,4 +67,3 @@ func (s *NoteService) DeleteNote(ctx context.Context, id int64) error {
 	}
 	return nil
 }
-
