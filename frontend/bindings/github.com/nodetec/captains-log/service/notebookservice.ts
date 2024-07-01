@@ -9,8 +9,8 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as db$0 from "../db/models.js";
 
-export function CreateNotebook(name: string, createdAt: string): Promise<db$0.Notebook> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1869216282, name, createdAt) as any;
+export function CreateNotebook(name: string): Promise<db$0.Notebook> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1869216282, name) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType0($result);
     }) as any;
