@@ -1,6 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "~/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import {
   Form,
   FormControl,
   FormField,
@@ -10,14 +17,6 @@ import {
 import { Input } from "~/components/ui/input";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 
 const profileFormSchema = z.object({
   urls: z
