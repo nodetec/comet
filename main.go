@@ -77,7 +77,7 @@ func main() {
 	app.Events.On("open-settings-window", func(e *application.WailsEvent) {
     app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
       Title: "Settings",
-      Width: 1200,
+      Width: 800,
       Height: 600,
       Mac: application.MacWindow{
         InvisibleTitleBarHeight: 50,
