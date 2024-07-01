@@ -10,7 +10,7 @@ export default function ReadOnlyTagList({ trashNote }: Props) {
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
       <div className="flex items-center gap-x-2">
-        {trashNote.Tags?.String.split(",").map((tag, tagIndex) => {
+        {trashNote.Tags?.String.split(",").map((tag) => {
           return (
             <div>
               <Badge

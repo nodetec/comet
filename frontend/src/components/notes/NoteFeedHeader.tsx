@@ -38,7 +38,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
     });
   }
 
-  function title(feadType: string) {
+  function title(feedType: string) {
     if (feedType === "all") return "All notes";
     if (feedType === "tag") return activeTag?.Name;
     if (feedType === "trash") return "Trash";
