@@ -51,7 +51,7 @@ export default function TagFeed() {
   });
 
   if (status === "pending") {
-    return <div>Loading...</div>;
+    return undefined;
   }
 
   if (status === "error") {

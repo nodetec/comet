@@ -5,10 +5,12 @@ import { useEditor } from "~/hooks/useEditor";
 import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
 
+import ReadOnlyTagList from "./ReadOnlyTagList";
 import TagInput from "./TagInput";
 
 const Editor = () => {
-  const { activeNote, setActiveNote } = useAppState();
+  const { activeNote, setActiveNote, activeTrashNote, feedType } =
+    useAppState();
 
   const queryClient = useQueryClient();
 
@@ -41,16 +43,27 @@ const Editor = () => {
   };
 
   const { editorRef } = useEditor({
-    initialDoc: activeNote?.Content ?? "",
+    initialDoc:
+      feedType === "trash"
+        ? activeTrashNote?.Content || ""
+        : activeNote?.Content || "",
     onChange,
   });
 
-  if (activeNote === undefined) {
+  if (activeNote === undefined && (feedType === "all" || feedType === "tag")) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-lg text-muted-foreground">
           Create a note to get started.
         </p>
+      </div>
+    );
+  }
+
+  if (activeTrashNote === undefined && feedType === "trash") {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-lg text-muted-foreground">No notes in the trash.</p>
       </div>
     );
   }
@@ -61,7 +74,9 @@ const Editor = () => {
         <div className="h-full w-full px-4" ref={editorRef}></div>
       </div>
       <div className="flex items-center justify-between">
-        <TagInput note={activeNote} />
+        {feedType === "trash"
+          ? activeTrashNote && <ReadOnlyTagList trashNote={activeTrashNote} />
+          : activeNote && <TagInput note={activeNote} />}
       </div>
     </div>
   );

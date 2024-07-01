@@ -49,7 +49,7 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
-  const { activeNote } = useAppState();
+  const { activeNote, activeTrashNote, feedType } = useAppState();
 
   const queryClient = useQueryClient();
 
@@ -108,6 +108,7 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
       crosshairCursor(),
       // highlightActiveLineGutter(),
       // scrollPastEnd(),
+      EditorState.readOnly.of(feedType === "trash" ? true : false),
       keymap.of([indentWithTab]),
       EditorView.lineWrapping,
       markdown({
@@ -145,7 +146,7 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
     return () => {
       view.destroy();
     };
-  }, [activeNote?.ID]);
+  }, [activeNote?.ID, activeTrashNote?.ID, feedType]);
 
   return { editorRef, editorView };
 };

@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { Tag } from "&/github.com/nodetec/captains-log/service";
 
@@ -11,11 +9,6 @@ type Props = {
 };
 
 export default function NoteTag({ tag, note }: Props) {
-  useEffect(() => {
-    console.log(`TAG ID: ${tag.ID}`);
-    console.log(`NOTE ID: ${note.ID}`);
-  }, [tag, note]);
-
   return (
     <div>
       <Badge
