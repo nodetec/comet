@@ -54,6 +54,7 @@ func main() {
 	noteService := service.NewNoteService(queries, logger)
 	tagService := service.NewTagService(queries, logger)
 	noteTagService := service.NewNoteTagService(queries, logger)
+  notebookService := service.NewNotebookService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
@@ -62,6 +63,7 @@ func main() {
 			application.NewService(noteService),
 			application.NewService(tagService),
 			application.NewService(noteTagService),
+      application.NewService(notebookService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

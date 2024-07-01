@@ -143,6 +143,35 @@ export class Note {
     }
 }
 
+export class Notebook {
+    "ID": number;
+    "Name": string;
+    "CreatedAt": string;
+
+    /** Creates a new Notebook instance. */
+    constructor($$source: Partial<Notebook> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Name" in $$source)) {
+            this["Name"] = "";
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Notebook instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Notebook {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Notebook($$parsedSource as Partial<Notebook>);
+    }
+}
+
 export class Tag {
     "ID": number;
     "Name": string;
