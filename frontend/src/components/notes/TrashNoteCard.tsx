@@ -21,16 +21,18 @@ export default function TrashNoteCard({ trashNote }: Props) {
     <div className="mx-3">
       <div
         key={trashNote.ID}
-        onClick={handleSetActiveNote}
         style={
           {
             "--custom-contextmenu": "trashNoteMenu",
             "--custom-contextmenu-data": `${trashNote.ID}`,
           } as React.CSSProperties
         }
+        onClick={handleSetActiveNote}
         className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md px-2 pb-3 pt-3 text-sm ${activeTrashNote?.ID === trashNote.ID && "bg-muted/80"}`}
       >
-        <h2 className="select-none font-semibold text-primary">{trashNote.Title}</h2>
+        <h2 className="select-none font-semibold text-primary">
+          {trashNote.Title}
+        </h2>
         <span className="select-none pb-6 text-muted-foreground">
           {parseContent(trashNote.Content)}
         </span>

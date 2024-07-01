@@ -61,11 +61,7 @@ const Editor = () => {
   }
 
   if (activeTrashNote === undefined && feedType === "trash") {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-lg text-muted-foreground">No notes in the trash.</p>
-      </div>
-    );
+    return null;
   }
 
   return (

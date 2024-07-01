@@ -106,6 +106,7 @@ func main() {
 	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 	contextmenu.CreateTagMenu(app, mainWindow, ctx, tagService)
 	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
+  contextmenu.CreateTrashNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 
 	err = app.Run()
 	if err != nil {

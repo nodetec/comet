@@ -10,11 +10,13 @@ import Notes from "./components/notes/Notes";
 import useNoteMenu from "./hooks/useNoteMenu";
 import useTagMenu from "./hooks/useTagMenu";
 import useNoteTagMenu from "./hooks/useNoteTagMenu";
+import useTrashNoteMenu from "./hooks/useTrashNoteMenu";
 
 export default function App() {
   useNoteMenu();
   useTagMenu();
   useNoteTagMenu();
+  useTrashNoteMenu();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
