@@ -79,7 +79,7 @@ func main() {
         TitleBar:                application.MacTitleBarHiddenInset,
       },
       BackgroundColour: application.NewRGB(27, 38, 54),
-      URL: "/windows/settings/index.html",
+      URL: "/src/windows/settings/index.html",
     }).
     Show()
 	})
