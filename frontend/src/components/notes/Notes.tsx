@@ -4,6 +4,7 @@ import NoteFeed from "./NoteFeed";
 import NoteFeedHeader from "./NoteFeedHeader";
 import SearchNotes from "./SearchNotes";
 import TagFeed from "./TagFeed";
+import TrashFeed from "./TrashFeed";
 
 export default function Notes() {
   const { feedType } = useAppState();
@@ -14,6 +15,7 @@ export default function Notes() {
       <SearchNotes />
       {feedType === "all" && <NoteFeed />}
       {feedType === "tag" && <TagFeed />}
+      {feedType === "trash" && <TrashFeed />}
     </div>
   );
 }

@@ -101,7 +101,7 @@ func main() {
 		URL:              "/",
 	})
 
-	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService)
+	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 	contextmenu.CreateTagMenu(app, mainWindow, ctx, tagService)
 	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
 

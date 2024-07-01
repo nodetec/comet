@@ -11,8 +11,10 @@ import (
 )
 
 const addTagToNote = `-- name: AddTagToNote :exec
-
-INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?)
+INSERT INTO
+  note_tags (note_id, tag_id)
+VALUES
+  (?, ?)
 `
 
 type AddTagToNoteParams struct {
@@ -27,9 +29,13 @@ func (q *Queries) AddTagToNote(ctx context.Context, arg AddTagToNoteParams) erro
 }
 
 const checkTagForNote = `-- name: CheckTagForNote :one
-SELECT COUNT(*) > 0 AS is_associated
-FROM note_tags
-WHERE note_id = ? AND tag_id = ?
+SELECT
+  COUNT(*) > 0 AS is_associated
+FROM
+  note_tags
+WHERE
+  note_id = ?
+  AND tag_id = ?
 `
 
 type CheckTagForNoteParams struct {
@@ -45,11 +51,25 @@ func (q *Queries) CheckTagForNote(ctx context.Context, arg CheckTagForNoteParams
 }
 
 const getNotesForTag = `-- name: GetNotesForTag :many
-SELECT n.id, n.status_id, n.notebook_id, n.content, n.title, n.created_at, n.modified_at, n.published_at, n.event_id
-FROM notes n
-JOIN note_tags nt ON n.id = nt.note_id
-WHERE nt.tag_id = ?
-LIMIT ? OFFSET ?
+SELECT
+  n.id,
+  n.status_id,
+  n.notebook_id,
+  n.content,
+  n.title,
+  n.created_at,
+  n.modified_at,
+  n.published_at,
+  n.event_id
+FROM
+  notes n
+  JOIN note_tags nt ON n.id = nt.note_id
+WHERE
+  nt.tag_id = ?
+LIMIT
+  ?
+OFFSET
+  ?
 `
 
 type GetNotesForTagParams struct {
@@ -92,10 +112,17 @@ func (q *Queries) GetNotesForTag(ctx context.Context, arg GetNotesForTagParams) 
 }
 
 const getTagsForNote = `-- name: GetTagsForNote :many
-SELECT t.id, t.name, t.color, t.icon, t.created_at
-FROM tags t
-JOIN note_tags nt ON t.id = nt.tag_id
-WHERE nt.note_id = ?
+SELECT
+  t.id,
+  t.name,
+  t.color,
+  t.icon,
+  t.created_at
+FROM
+  tags t
+  JOIN note_tags nt ON t.id = nt.tag_id
+WHERE
+  nt.note_id = ?
 `
 
 func (q *Queries) GetTagsForNote(ctx context.Context, noteID sql.NullInt64) ([]Tag, error) {
@@ -127,8 +154,22 @@ func (q *Queries) GetTagsForNote(ctx context.Context, noteID sql.NullInt64) ([]T
 	return items, nil
 }
 
+const removeAllTagsFromNote = `-- name: RemoveAllTagsFromNote :exec
+DELETE FROM note_tags
+WHERE
+  note_id = ?
+`
+
+func (q *Queries) RemoveAllTagsFromNote(ctx context.Context, noteID sql.NullInt64) error {
+	_, err := q.db.ExecContext(ctx, removeAllTagsFromNote, noteID)
+	return err
+}
+
 const removeTagFromNote = `-- name: RemoveTagFromNote :exec
-DELETE FROM note_tags WHERE note_id = ? AND tag_id = ?
+DELETE FROM note_tags
+WHERE
+  note_id = ?
+  AND tag_id = ?
 `
 
 type RemoveTagFromNoteParams struct {

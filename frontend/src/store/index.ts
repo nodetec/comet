@@ -1,4 +1,4 @@
-import { Note } from "&/github.com/nodetec/captains-log/db/models";
+import { Note, Trash } from "&/github.com/nodetec/captains-log/db/models";
 import { Tag } from "&/github.com/nodetec/captains-log/service";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -12,6 +12,9 @@ interface State {
 
   activeTag: Tag | undefined;
   setActiveTag: (activeNote: Tag | undefined) => void;
+
+  activeTrashNote: Trash | undefined;
+  setActiveTrashNote: (activeTrashNote: Trash | undefined) => void;
 }
 
 export const useAppState = create<State>()(
@@ -25,6 +28,9 @@ export const useAppState = create<State>()(
 
       activeTag: undefined,
       setActiveTag: (activeTag) => set({ activeTag }),
+
+      activeTrashNote: undefined,
+      setActiveTrashNote: (activeTrashNote) => set({ activeTrashNote }),
     }),
     {
       name: "captains-log-storage",

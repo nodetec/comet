@@ -32,7 +32,8 @@ func (s *NoteTagService) AddTagToNote(ctx context.Context, noteID, tagID int64) 
 	return nil
 }
 
-func (s *NoteTagService) GetNotesForTag(ctx context.Context, tagID, limit, offset int64) ([]db.Note, error) {
+func (s *NoteTagService) GetNotesForTag(ctx context.Context, tagID, limit, pageParam int64) ([]db.Note, error) {
+  offset := pageParam * limit
 	notes, err := s.queries.GetNotesForTag(ctx, db.GetNotesForTagParams{
 		TagID:  sql.NullInt64{Int64: tagID, Valid: true},
 		Limit:  limit,

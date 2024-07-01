@@ -34,12 +34,14 @@ CREATE TABLE IF NOT EXISTS notebooks (
   UNIQUE (name)
 );
 
-CREATE TABLE IF NOT EXISTS trashed_notes (
+CREATE TABLE IF NOT EXISTS trash (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   note_id INTEGER,
   content TEXT NOT NULL,
+  title TEXT NOT NULL,
   created_at TEXT NOT NULL,
   trashed_at TEXT NOT NULL,
+  tags TEXT, -- Field to store tags
   FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
 );
 

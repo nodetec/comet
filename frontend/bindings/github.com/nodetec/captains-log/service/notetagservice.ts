@@ -19,8 +19,8 @@ export function CheckTagForNote(noteID: number, tagID: number): Promise<boolean>
     return $resultPromise;
 }
 
-export function GetNotesForTag(tagID: number, limit: number, offset: number): Promise<db$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1319145372, tagID, limit, offset) as any;
+export function GetNotesForTag(tagID: number, limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1319145372, tagID, limit, pageParam) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
     }) as any;
