@@ -60,6 +60,15 @@ export function ListNotes(limit: number, pageParam: number): Promise<db$0.Note[]
     return $typingPromise;
 }
 
+export function ListNotesByNotebook(notebookID: number, limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2619100179, notebookID, limit, pageParam) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType2($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function ListNotesFromTrash(limit: number, pageParam: number): Promise<db$0.Trash[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3687280279, limit, pageParam) as any;
     let $typingPromise = $resultPromise.then(($result) => {

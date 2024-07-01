@@ -132,3 +132,17 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 	}
 	return nil
 }
+
+func (s *NoteService) ListNotesByNotebook(ctx context.Context, notebookID int64, limit, pageParam int64) ([]db.Note, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
+		NotebookID: sql.NullInt64{Int64: notebookID, Valid: true},
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		s.logger.Println("Error listing notes by notebook:", err)
+		return []db.Note{}, err
+	}
+	return notes, nil
+}
