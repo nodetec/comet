@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/adrg/xdg"
+	"github.com/nodetec/captains-log/contextmenu"
 	"github.com/nodetec/captains-log/db"
 	"github.com/nodetec/captains-log/service"
 
@@ -52,12 +52,18 @@ func main() {
 
 	// Create the NoteService with the queries and logger
 	noteService := service.NewNoteService(queries, logger)
+	tagService := service.NewTagService(queries, logger)
+	noteTagService := service.NewNoteTagService(queries, logger)
+  notebookService := service.NewNotebookService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
 			application.NewService(noteService),
+			application.NewService(tagService),
+			application.NewService(noteTagService),
+      application.NewService(notebookService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -97,31 +103,10 @@ func main() {
 		URL:              "/",
 	})
 
-	noteMenu := app.NewMenu()
-  
-	noteMenu.Add("Move to trash").OnClick(func(data *application.Context) {
-		contextData, ok := data.ContextMenuData().(string)
-
-		if !ok {
-			app.Logger.Error("Invalid context menu data type")
-			return
-		}
-
-		noteId, err := strconv.ParseInt(contextData, 10, 64)
-		if err != nil {
-			app.Logger.Error("Error converting context data to int64", "error", err)
-			return
-		}
-
-		noteService.DeleteNote(ctx, noteId)
-
-		app.Events.Emit(&application.WailsEvent{
-			Name: "noteDeleted",
-			Data: noteId,
-		})
-
-	})
-	mainWindow.RegisterContextMenu("noteMenu", noteMenu)
+	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
+	contextmenu.CreateTagMenu(app, mainWindow, ctx, tagService)
+	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
+  contextmenu.CreateTrashNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 
 	err = app.Run()
 	if err != nil {

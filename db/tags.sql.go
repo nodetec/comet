@@ -84,6 +84,25 @@ func (q *Queries) GetTag(ctx context.Context, id int64) (Tag, error) {
 	return i, err
 }
 
+const getTagByName = `-- name: GetTagByName :one
+SELECT id, name, color, icon, created_at
+FROM tags
+WHERE name = ?
+`
+
+func (q *Queries) GetTagByName(ctx context.Context, name string) (Tag, error) {
+	row := q.db.QueryRowContext(ctx, getTagByName, name)
+	var i Tag
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Color,
+		&i.Icon,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listTags = `-- name: ListTags :many
 SELECT
   id,

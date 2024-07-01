@@ -51,10 +51,12 @@ type Tag struct {
 	CreatedAt string
 }
 
-type TrashedNote struct {
+type Trash struct {
 	ID        int64
 	NoteID    sql.NullInt64
 	Content   string
+	Title     string
 	CreatedAt string
 	TrashedAt string
+	Tags      sql.NullString
 }

@@ -9,6 +9,11 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as db$0 from "../db/models.js";
 
+export function AddNoteToTrash(note: db$0.Note, tags: db$0.Tag[]): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3629355206, note, tags) as any;
+    return $resultPromise;
+}
+
 export function CreateNote(params: db$0.CreateNoteParams): Promise<db$0.Note> & { cancel(): void } {
     let $resultPromise = $Call.ByID(718095870, params) as any;
     let $typingPromise = $resultPromise.then(($result) => {
@@ -23,6 +28,11 @@ export function DeleteNote(id: number): Promise<void> & { cancel(): void } {
     return $resultPromise;
 }
 
+export function DeleteNoteFromTrash(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3062769697, id) as any;
+    return $resultPromise;
+}
+
 export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1682701374, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
@@ -32,10 +42,37 @@ export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
     return $typingPromise;
 }
 
+export function GetNoteFromTrash(id: number): Promise<db$0.Trash> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2404583840, id) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType1($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function ListNotes(limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3066540231, limit, pageParam) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function ListNotesByNotebook(notebookID: number, limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(2619100179, notebookID, limit, pageParam) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType2($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function ListNotesFromTrash(limit: number, pageParam: number): Promise<db$0.Trash[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3687280279, limit, pageParam) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType3($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -48,4 +85,6 @@ export function UpdateNote(params: db$0.UpdateNoteParams): Promise<void> & { can
 
 // Private type creation functions
 const $$createType0 = db$0.Note.createFrom;
-const $$createType1 = $Create.Array($$createType0);
+const $$createType1 = db$0.Trash.createFrom;
+const $$createType2 = $Create.Array($$createType0);
+const $$createType3 = $Create.Array($$createType1);

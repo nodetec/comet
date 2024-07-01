@@ -5,18 +5,24 @@ import { useAppState } from "~/store";
 import { useInView } from "react-intersection-observer";
 
 import { ScrollArea } from "../ui/scroll-area";
-import NoteCard from "./NoteCard";
+import TrashNoteCard from "./TrashNoteCard";
 
-export default function NoteFeed() {
-  const { setActiveNote } = useAppState();
+export default function TrashFeed() {
+  const { setActiveTrashNote } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    const notes = await NoteService.ListNotes(pageSize, pageParam);
+    console.log("fetching trash notes");
+    const notes = await NoteService.ListNotesFromTrash(pageSize, pageParam);
+    console.log(notes);
 
     if (notes.length === 0) {
-      setActiveNote(undefined);
+      setActiveTrashNote(undefined);
     }
+
+    // if (!activeTrashNote && notes.length > 0) {
+    //   setActiveTrashNote(notes[0]);
+    // }
 
     return {
       data: notes || [],
@@ -27,7 +33,7 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes"],
+      queryKey: ["trash-notes"],
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,
@@ -52,12 +58,12 @@ export default function NoteFeed() {
     <ScrollArea className="w-full rounded-md">
       {data.pages.map((page, pageIndex) => (
         <ul key={pageIndex}>
-          {page.data.map((project, noteIndex) => (
+          {page.data.map((trashNote, noteIndex) => (
             <li
               key={noteIndex}
               ref={assignRef(lastNoteRef, pageIndex, noteIndex, data)}
             >
-              <NoteCard note={project} />
+              <TrashNoteCard trashNote={trashNote} />
             </li>
           ))}
         </ul>

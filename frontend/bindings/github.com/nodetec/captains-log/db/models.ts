@@ -143,6 +143,133 @@ export class Note {
     }
 }
 
+export class Notebook {
+    "ID": number;
+    "Name": string;
+    "CreatedAt": string;
+
+    /** Creates a new Notebook instance. */
+    constructor($$source: Partial<Notebook> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Name" in $$source)) {
+            this["Name"] = "";
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Notebook instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Notebook {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Notebook($$parsedSource as Partial<Notebook>);
+    }
+}
+
+export class Tag {
+    "ID": number;
+    "Name": string;
+    "Color": sql$0.NullString;
+    "Icon": sql$0.NullString;
+    "CreatedAt": string;
+
+    /** Creates a new Tag instance. */
+    constructor($$source: Partial<Tag> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Name" in $$source)) {
+            this["Name"] = "";
+        }
+        if (!("Color" in $$source)) {
+            this["Color"] = (new sql$0.NullString());
+        }
+        if (!("Icon" in $$source)) {
+            this["Icon"] = (new sql$0.NullString());
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Tag instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Tag {
+        const $$createField2_0 = $$createType1;
+        const $$createField3_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Color" in $$parsedSource) {
+            $$parsedSource["Color"] = $$createField2_0($$parsedSource["Color"]);
+        }
+        if ("Icon" in $$parsedSource) {
+            $$parsedSource["Icon"] = $$createField3_0($$parsedSource["Icon"]);
+        }
+        return new Tag($$parsedSource as Partial<Tag>);
+    }
+}
+
+export class Trash {
+    "ID": number;
+    "NoteID": sql$0.NullInt64;
+    "Content": string;
+    "Title": string;
+    "CreatedAt": string;
+    "TrashedAt": string;
+    "Tags": sql$0.NullString;
+
+    /** Creates a new Trash instance. */
+    constructor($$source: Partial<Trash> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("NoteID" in $$source)) {
+            this["NoteID"] = (new sql$0.NullInt64());
+        }
+        if (!("Content" in $$source)) {
+            this["Content"] = "";
+        }
+        if (!("Title" in $$source)) {
+            this["Title"] = "";
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+        if (!("TrashedAt" in $$source)) {
+            this["TrashedAt"] = "";
+        }
+        if (!("Tags" in $$source)) {
+            this["Tags"] = (new sql$0.NullString());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Trash instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Trash {
+        const $$createField1_0 = $$createType0;
+        const $$createField6_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("NoteID" in $$parsedSource) {
+            $$parsedSource["NoteID"] = $$createField1_0($$parsedSource["NoteID"]);
+        }
+        if ("Tags" in $$parsedSource) {
+            $$parsedSource["Tags"] = $$createField6_0($$parsedSource["Tags"]);
+        }
+        return new Trash($$parsedSource as Partial<Trash>);
+    }
+}
+
 export class UpdateNoteParams {
     "StatusID": sql$0.NullInt64;
     "NotebookID": sql$0.NullInt64;
