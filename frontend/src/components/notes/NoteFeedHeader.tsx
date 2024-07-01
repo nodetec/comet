@@ -16,8 +16,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
   const queryClient = useQueryClient();
   const { setActiveNote, activeTag } = useAppState();
 
-  async function handleCreateNote(event: React.MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
+  async function handleCreateNote() {
     const noteParams: CreateNoteParams = {
       StatusID: new NullInt64({ Int64: undefined, Valid: false }),
       NotebookID: new NullInt64({ Int64: undefined, Valid: false }),
@@ -52,16 +51,11 @@ export default function NoteFeedHeader({ feedType }: Props) {
         </Button>
         <h1 className="cursor-default text-lg font-bold">{title(feedType)}</h1>
       </div>
-      <div>
-        <Button
-          // disabled={data?.[0] && data[0].id === -1}
-          className="text-muted-foreground"
+      <div className="pr-1 pt-2">
+        <PenBoxIcon
           onClick={handleCreateNote}
-          variant="ghost"
-          size="icon"
-        >
-          <PenBoxIcon className="h-[1.2rem] w-[1.2rem]" />
-        </Button>
+          className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
+        />
       </div>
     </div>
   );
