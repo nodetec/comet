@@ -1,4 +1,3 @@
-import { GearIcon } from "@radix-ui/react-icons";
 import { NotebookService } from "&/github.com/nodetec/captains-log/service";
 import AllNotes from "~/components/sidebar/AllNotes";
 import { ScrollArea } from "~/components/ui/scroll-area";
