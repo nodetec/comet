@@ -8,7 +8,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import TrashNoteCard from "./TrashNoteCard";
 
 export default function TrashFeed() {
-  const { setActiveTrashNote, activeTrashNote } = useAppState();
+  const { setActiveTrashNote } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -20,9 +20,9 @@ export default function TrashFeed() {
       setActiveTrashNote(undefined);
     }
 
-    if (!activeTrashNote && notes.length > 0) {
-      setActiveTrashNote(notes[0]);
-    }
+    // if (!activeTrashNote && notes.length > 0) {
+    //   setActiveTrashNote(notes[0]);
+    // }
 
     return {
       data: notes || [],
