@@ -14,7 +14,7 @@ export default function AllNotes() {
       className={`flex cursor-pointer rounded-md p-2 text-sm font-medium text-muted-foreground ${feedType === "all" && "bg-muted text-secondary-foreground"}`}
     >
       <NotepadText className="h-[1.2rem] w-[1.2rem]" />
-      <span className="ml-1">All Notes</span>
+      <span className="ml-2">All Notes</span>
     </span>
   );
 }
