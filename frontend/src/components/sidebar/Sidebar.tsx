@@ -1,7 +1,5 @@
-import { NotebookService } from "&/github.com/nodetec/captains-log/service";
-import AllNotes from "~/components/sidebar/AllNotes";
+// import { NotebookService } from "&/github.com/nodetec/captains-log/service";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { NotebookPen } from "lucide-react";
 
 import Login from "./Login";
 import { NotebookComboBox } from "./NotebookComboBox";
@@ -9,9 +7,9 @@ import Tags from "./Tags";
 import Trash from "./Trash";
 
 export default function Sidebar() {
-  const handleCreateNotebook = () => {
-    NotebookService.CreateNotebook("New Notebook");
-  };
+  // const handleCreateNotebook = () => {
+  //   NotebookService.CreateNotebook("New Notebook");
+  // };
 
   return (
     <div className="flex h-full flex-col justify-between pt-11">
