@@ -4,8 +4,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
-  feedType: "all" | "trash" | "tag" | "search";
-  setFeedType: (feedType: "all" | "trash" | "tag" | "search") => void;
+  feedType: "all" | "notebook" | "trash" | "tag" | "search";
+  setFeedType: (feedType: "all" | "notebook" | "trash" | "tag" | "search") => void;
 
   activeNote: Note | undefined;
   setActiveNote: (activeNote: Note | undefined) => void;

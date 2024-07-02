@@ -20,10 +20,16 @@ export default function NoteFeed() {
       Valid: valid,
     });
 
+    console.log("ACTIVE NOTEBOOK ID", notebookId);
+    console.log("PAGE SIZE", pageSize);
+    console.log("PAGE PARAM", pageParam);
+
     const notes = await NoteService.ListNotes(notebookId, pageSize, pageParam);
 
-    console.log("ACTIVE NOTEBOOK",activeNotebook);
-    console.log("NOTES",notes);
+    console.log("NOTES", notes);
+
+    // console.log("ACTIVE NOTEBOOK",activeNotebook);
+    // console.log("NOTES",notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);

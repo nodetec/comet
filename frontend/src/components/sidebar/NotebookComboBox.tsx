@@ -1,17 +1,28 @@
-import * as React from "react";
+import { useState } from "react";
 
-// import { useEffect } from "react";
-
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Notebook } from "&/github.com/nodetec/captains-log/db/models";
 import { NotebookService } from "&/github.com/nodetec/captains-log/service";
+import { Button } from "~/components/ui/button";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "~/components/ui/command";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -21,15 +32,26 @@ import { useAppState } from "~/store";
 import { Check, ChevronsUpDown, NotebookIcon, PlusIcon } from "lucide-react";
 
 export function NotebookComboBox() {
-  const { activeNotebook } = useAppState();
-  const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState("");
+  const { activeNotebook, setActiveNotebook, setFeedType } = useAppState();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
 
-  // const { feedType, setFeedType } = useAppState();
+  const queryClient = useQueryClient();
 
-  // function handleAllNotesClick() {
-  //   setFeedType("all");
-  // }
+  const [notebookName, setNotebookName] = useState("");
+
+  const handleNotebookNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newNotebookName = e.target.value;
+    setNotebookName(newNotebookName);
+  };
+
+  const handleSubmitNewNotebook = async () => {
+    await NotebookService.CreateNotebook(notebookName);
+
+    void queryClient.invalidateQueries({
+      queryKey: ["notebooks"],
+    });
+  };
 
   async function fetchNotebooks() {
     const notebooks = await NotebookService.ListNotebooks();
@@ -42,62 +64,116 @@ export function NotebookComboBox() {
     queryFn: () => fetchNotebooks(),
   });
 
+  const selectNotebook = (notebookName: string, notebook: Notebook) => {
+    setActiveNotebook(notebook);
+    setValue(notebookName);
+    setOpen(false);
+    setFeedType("notebook");
+    void queryClient.invalidateQueries({
+      queryKey: ["notes"],
+    });
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span
-          role="combobox"
-          aria-expanded={open}
-          className="hover:bg-muted-hover flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-sm font-medium text-muted-foreground transition-colors"
-        >
-          {activeNotebook === undefined ? (
-            <span className="flex items-center">
-              <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem]" />
-              {/* <NotepadText className="mr-1 h-4" /> */}
-              Notebooks
-            </span>
-          ) : (
-            activeNotebook.Name
-          )}
-          <ChevronsUpDown className="h-4 w-4" />
-        </span>
-      </PopoverTrigger>
-      <PopoverContent className="popover-content-width-full p-0">
-        <Command>
-          <CommandList>
-            <CommandEmpty>No framework found.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value={"_New Notebook_"}
-                onSelect={(currentValue) => {
-                  setValue(currentValue === value ? "" : currentValue);
-                  setOpen(false);
-                }}
-              >
-                <PlusIcon className="mr-2 h-4" />
-                New Notebook
-              </CommandItem>
-              <div className="mt-1 border-b border-primary/20"></div>
-              <CommandInput placeholder="Search..." />
-              {data?.map((notebook) => (
+    <Dialog>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>New Notebook</DialogTitle>
+          <DialogDescription>
+            Create a new notebook to organize your notes.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              className="col-span-3"
+              value={notebookName}
+              onChange={handleNotebookNameChange}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="submit" onClick={handleSubmitNewNotebook}>
+              Create
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <span
+            role="combobox"
+            aria-expanded={open}
+            className="hover:bg-muted-hover flex w-full cursor-pointer items-center justify-between rounded-md text-sm font-medium text-muted-foreground transition-colors"
+          >
+            {activeNotebook === undefined ? (
+              <span className="flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-sm font-medium text-muted-foreground">
+                <span className="flex">
+                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem]" />
+                  Notebooks
+                </span>
+                <ChevronsUpDown className="h-4 w-4" />
+              </span>
+            ) : (
+              <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted p-2 text-sm font-medium text-secondary-foreground">
+                <span className="flex">
+                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem]" />
+                  {activeNotebook.Name}
+                </span>
+                <ChevronsUpDown className="h-4 w-4" />
+              </span>
+            )}
+          </span>
+        </PopoverTrigger>
+        <PopoverContent className="popover-content-width-full p-0">
+          <Command>
+            <CommandList>
+              <CommandEmpty>No framework found.</CommandEmpty>
+              <CommandGroup>
                 <CommandItem
-                  key={notebook.ID}
-                  value={notebook.Name}
+                  className="whitespace-nowrap pl-0"
+                  value={"_New Notebook_"}
                   onSelect={(currentValue) => {
                     setValue(currentValue === value ? "" : currentValue);
                     setOpen(false);
                   }}
                 >
-                  {activeNotebook?.ID === notebook.ID && (
-                    <Check className="mr-2 h-4 w-4" />
-                  )}
-                  {notebook.Name}
+                  <DialogTrigger asChild>
+                    <span className="flex w-full items-center">
+                      <PlusIcon className="h-4" />
+                      New
+                    </span>
+                  </DialogTrigger>
+                  {/* </NewNotebookDialog> */}
                 </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                <div className="my-1 border-b border-primary/20"></div>
+                {/* <CommandInput placeholder="Search..." /> */}
+                {data?.map((notebook) => (
+                  <CommandItem
+                    className="flex w-full justify-between whitespace-nowrap"
+                    key={notebook.ID}
+                    value={notebook.Name}
+                    onSelect={(currentValue) =>
+                      selectNotebook(currentValue, notebook)
+                    }
+                  >
+                    {notebook.Name}
+                    {activeNotebook?.ID === notebook.ID && (
+                      <Check className="h-4 w-4" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </Dialog>
   );
 }

@@ -51,6 +51,8 @@ SELECT
   event_id
 FROM
   notes
+WHERE
+  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
 ORDER BY
   modified_at DESC
 LIMIT
@@ -75,25 +77,3 @@ WHERE
 DELETE FROM notes
 WHERE
   id = ?;
-
--- name: ListNotesByNotebook :many
-SELECT
-  id,
-  status_id,
-  notebook_id,
-  content,
-  title,
-  created_at,
-  modified_at,
-  published_at,
-  event_id
-FROM
-  notes
-WHERE
-  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
-ORDER BY
-  modified_at DESC
-LIMIT
-  ?
-OFFSET
-  ?;

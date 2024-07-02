@@ -24,7 +24,7 @@ export default function Sidebar() {
       {/*   /> */}
       {/* </div> */}
       <ScrollArea className="flex h-full flex-col gap-y-2">
-        <div className="flex flex-col gap-y-2 px-4">
+        <div className="flex flex-col gap-y-2 px-3">
           <AllNotes />
           <NotebookComboBox />
           <Trash />

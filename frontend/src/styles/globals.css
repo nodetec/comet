@@ -111,7 +111,7 @@
 
 /* Scrollbar thumb on hover */
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary;
+  @apply bg-secondary;
 }
 
 /* Optional: Scrollbar width */

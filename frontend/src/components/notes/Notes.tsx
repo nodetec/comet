@@ -14,6 +14,7 @@ export default function Notes() {
       <NoteFeedHeader feedType={feedType} />
       <SearchNotes />
       {feedType === "all" && <NoteFeed />}
+      {feedType === "notebook" && <NoteFeed />}
       {feedType === "tag" && <TagFeed />}
       {feedType === "trash" && <TrashFeed />}
     </div>

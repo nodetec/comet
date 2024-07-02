@@ -2,10 +2,11 @@ import { useAppState } from "~/store";
 import { NotepadText } from "lucide-react";
 
 export default function AllNotes() {
-  const { feedType, setFeedType } = useAppState();
+  const { feedType, setFeedType, setActiveNotebook } = useAppState();
 
   function handleAllNotesClick() {
     setFeedType("all");
+    setActiveNotebook(undefined);
   }
 
   return (
