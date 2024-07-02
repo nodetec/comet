@@ -5,9 +5,6 @@ import { useEditor } from "~/hooks/useEditor";
 import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
 
-import ReadOnlyTagList from "./ReadOnlyTagList";
-import TagInput from "./TagInput";
-
 const Editor = () => {
   const { activeNote, setActiveNote, activeTrashNote, feedType } =
     useAppState();
@@ -50,31 +47,8 @@ const Editor = () => {
     onChange,
   });
 
-  if (activeNote === undefined && (feedType === "all" || feedType === "tag")) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-lg text-muted-foreground">
-          Create a note to get started.
-        </p>
-      </div>
-    );
-  }
-
-  if (activeTrashNote === undefined && feedType === "trash") {
-    return null;
-  }
-
   return (
-    <div className="flex h-full flex-col pt-11">
-      <div className="h-full overflow-auto">
-        <div className="h-full w-full px-4" ref={editorRef}></div>
-      </div>
-      <div className="flex items-center justify-between">
-        {feedType === "trash"
-          ? activeTrashNote && <ReadOnlyTagList trashNote={activeTrashNote} />
-          : activeNote && <TagInput note={activeNote} />}
-      </div>
-    </div>
+    <div className="h-full w-full overflow-auto pl-4" ref={editorRef}></div>
   );
 };
 

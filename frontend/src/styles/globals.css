@@ -68,16 +68,6 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-@layer base {
   :root {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -91,7 +81,21 @@
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    @apply border-border;
   }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.wmde-markdown {
+  @apply !bg-background;
+  @apply !text-foreground;
+  font-family: monospace, ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+  font-size: 12pt;
+  line-height: 2;
 }
 
 /* Scrollbar background */

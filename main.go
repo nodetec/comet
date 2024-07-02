@@ -54,7 +54,7 @@ func main() {
 	noteService := service.NewNoteService(queries, logger)
 	tagService := service.NewTagService(queries, logger)
 	noteTagService := service.NewNoteTagService(queries, logger)
-  notebookService := service.NewNotebookService(queries, logger)
+	notebookService := service.NewNotebookService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
@@ -63,7 +63,7 @@ func main() {
 			application.NewService(noteService),
 			application.NewService(tagService),
 			application.NewService(noteTagService),
-      application.NewService(notebookService),
+			application.NewService(notebookService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -75,19 +75,19 @@ func main() {
 
 	// Custom event handling
 	app.Events.On("open-settings-window", func(e *application.WailsEvent) {
-    app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-      Title: "Settings",
-      Width: 1200,
-      Height: 600,
-      Mac: application.MacWindow{
-        InvisibleTitleBarHeight: 50,
-        Backdrop:                application.MacBackdropTranslucent,
-        TitleBar:                application.MacTitleBarHiddenInset,
-      },
-      BackgroundColour: application.NewRGB(27, 38, 54),
-      URL: "/src/windows/settings/index.html",
-    }).
-    Show()
+		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+			Title:  "Settings",
+			Width:  1200,
+			Height: 600,
+			Mac: application.MacWindow{
+				InvisibleTitleBarHeight: 50,
+				Backdrop:                application.MacBackdropTranslucent,
+				TitleBar:                application.MacTitleBarHiddenInset,
+			},
+			BackgroundColour: application.NewRGB(27, 38, 54),
+			URL:              "/src/windows/settings/index.html",
+		}).
+			Show()
 	})
 
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
@@ -106,7 +106,7 @@ func main() {
 	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 	contextmenu.CreateTagMenu(app, mainWindow, ctx, tagService)
 	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
-  contextmenu.CreateTrashNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
+	contextmenu.CreateTrashNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 
 	err = app.Run()
 	if err != nil {
