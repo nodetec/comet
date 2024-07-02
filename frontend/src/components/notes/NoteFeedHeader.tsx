@@ -19,10 +19,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
     const note = await NoteService.CreateNote(
       dayjs().format("YYYY-MM-DD"),
       "",
-      new NullInt64({
-        Int64: activeNotebook?.ID,
-        Valid: !activeNotebook ? false : true,
-      }),
+      activeNotebook?.ID ?? 0,
       new NullInt64({
         Int64: undefined,
         Valid: false,

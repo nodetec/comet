@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -23,7 +22,7 @@ func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
 	}
 }
 
-func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID sql.NullInt64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
+func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID int64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
 
 	params := db.CreateNoteParams{
 		Title:       title,
@@ -53,18 +52,43 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context, notebookID sql.NullInt64, limit, pageParam int64) ([]db.Note, error) {
+func (s *NoteService) ListAllNotes(ctx context.Context, limit, pageParam int64) ([]db.Note, error) {
 	offset := pageParam * limit
-  fmt.Println("notebookID", notebookID)
-	notes, err := s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
-		NotebookID: notebookID,
-		Limit:      limit,
-		Offset:     offset,
+	notes, err := s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
+		Limit:  limit,
+		Offset: offset,
 	})
 	if err != nil {
-		s.logger.Println("Error listing notes by notebook:", err)
+		s.logger.Println("Error listing all notes:", err)
 		return []db.Note{}, err
 	}
+	return notes, nil
+}
+
+func (s *NoteService) ListNotes(ctx context.Context, notebookID int64, limit, pageParam int64) ([]db.Note, error) {
+	offset := pageParam * limit
+
+	var notes []db.Note
+	var err error
+
+	if notebookID == 0 {
+		notes, err = s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
+			Limit:  limit,
+			Offset: offset,
+		})
+	} else {
+
+		notes, err = s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
+			NotebookID: notebookID,
+			Limit:      limit,
+			Offset:     offset,
+		})
+	}
+	if err != nil {
+		s.logger.Println("Error listing notes :", err)
+		return []db.Note{}, err
+	}
+
 	return notes, nil
 }
 

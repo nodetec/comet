@@ -1,5 +1,4 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { NullInt64 } from "&/database/sql/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { assignRef } from "~/lib/utils";
 import { useAppState } from "~/store";
@@ -13,23 +12,12 @@ export default function NoteFeed() {
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    const valid = !activeNotebook ? false : true;
 
-    const notebookId = new NullInt64({
-      Int64: activeNotebook?.ID,
-      Valid: valid,
-    });
-
-    console.log("ACTIVE NOTEBOOK ID", notebookId);
-    console.log("PAGE SIZE", pageSize);
-    console.log("PAGE PARAM", pageParam);
+    const notebookId = activeNotebook?.ID ?? 0;
 
     const notes = await NoteService.ListNotes(notebookId, pageSize, pageParam);
 
     console.log("NOTES", notes);
-
-    // console.log("ACTIVE NOTEBOOK",activeNotebook);
-    // console.log("NOTES",notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);

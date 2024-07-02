@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   status_id INTEGER,
-  notebook_id INTEGER,
+  notebook_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
