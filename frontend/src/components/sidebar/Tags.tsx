@@ -29,7 +29,7 @@ export default function Tags() {
         <AccordionTrigger className="py-2">
           <div className="flex text-muted-foreground">
             <TagsIcon className="h-[1.2rem] w-[1.2rem]" />
-            <span className="ml-2">Tags</span>
+            <span className="ml-1.5">Tags</span>
           </div>
         </AccordionTrigger>
         <AccordionContent>

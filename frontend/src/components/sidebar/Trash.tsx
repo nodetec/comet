@@ -14,7 +14,7 @@ export default function Trash() {
       className={`flex cursor-pointer rounded-md p-2 text-sm font-medium text-muted-foreground ${feedType === "trash" && "bg-muted text-secondary-foreground"}`}
     >
       <Trash2 className="h-[1.2rem] w-[1.2rem]" />
-      <span className="ml-2">Trash</span>
+      <span className="ml-1.5">Trash</span>
     </span>
   );
 }
