@@ -26,7 +26,7 @@ export default function Tags() {
   return (
     <Accordion type="single" collapsible defaultValue="item-1">
       <AccordionItem className="border-none px-2" value="item-1">
-        <AccordionTrigger>
+        <AccordionTrigger className="py-2">
           <div className="flex text-muted-foreground">
             <TagsIcon className="h-[1.2rem] w-[1.2rem]" />
             <span className="ml-1">Tags</span>

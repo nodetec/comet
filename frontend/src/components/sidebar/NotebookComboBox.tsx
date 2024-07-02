@@ -54,7 +54,7 @@ export function NotebookComboBox() {
             <span className="flex items-center">
               <NotebookIcon className="mr-1 h-[1.2rem] w-[1.2rem]" />
               {/* <NotepadText className="mr-1 h-4" /> */}
-              Choose notebook
+              Notebooks
             </span>
           ) : (
             activeNotebook.Name
