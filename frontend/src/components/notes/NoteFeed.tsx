@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { NullInt64 } from "&/database/sql/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { assignRef } from "~/lib/utils";
 import { useAppState } from "~/store";
@@ -8,11 +9,21 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
-  const { setActiveNote } = useAppState();
+  const { setActiveNote, activeNotebook } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    const notes = await NoteService.ListNotes(pageSize, pageParam);
+    const valid = !activeNotebook ? false : true;
+
+    const notebookId = new NullInt64({
+      Int64: activeNotebook?.ID,
+      Valid: valid,
+    });
+
+    const notes = await NoteService.ListNotes(notebookId, pageSize, pageParam);
+
+    console.log("ACTIVE NOTEBOOK",activeNotebook);
+    console.log("NOTES",notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);
@@ -27,7 +38,7 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes"],
+      queryKey: ["notes", activeNotebook?.ID],
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,

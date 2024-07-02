@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { NullInt64, NullString } from "&/database/sql/models";
-import { CreateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { useAppState } from "~/store";
 import dayjs from "dayjs";
@@ -14,21 +13,29 @@ type Props = {
 
 export default function NoteFeedHeader({ feedType }: Props) {
   const queryClient = useQueryClient();
-  const { setActiveNote, activeTag } = useAppState();
+  const { setActiveNote, activeTag, activeNotebook } = useAppState();
 
   async function handleCreateNote() {
-    const noteParams: CreateNoteParams = {
-      StatusID: new NullInt64({ Int64: undefined, Valid: false }),
-      NotebookID: new NullInt64({ Int64: undefined, Valid: false }),
-      Content: "",
-      Title: dayjs().format("YYYY-MM-DD"),
-      CreatedAt: new Date().toISOString(),
-      ModifiedAt: new Date().toISOString(),
-      PublishedAt: new NullString({ String: undefined, Valid: false }),
-      EventID: new NullString({ String: undefined, Valid: false }),
-    };
-
-    const note = await NoteService.CreateNote(noteParams);
+    const note = await NoteService.CreateNote(
+      dayjs().format("YYYY-MM-DD"),
+      "",
+      new NullInt64({
+        Int64: activeNotebook?.ID,
+        Valid: !activeNotebook ? false : true,
+      }),
+      new NullInt64({
+        Int64: undefined,
+        Valid: false,
+      }),
+      new NullString({
+        String: undefined,
+        Valid: false,
+      }),
+      new NullString({
+        String: undefined,
+        Valid: false,
+      }),
+    );
 
     setActiveNote(note);
 
@@ -38,7 +45,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
   }
 
   function title(feedType: string) {
-    if (feedType === "all") return "All notes";
+    if (feedType === "all") return "All Notes";
     if (feedType === "tag") return activeTag?.Name;
     if (feedType === "trash") return "Trash";
   }

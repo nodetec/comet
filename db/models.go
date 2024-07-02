@@ -31,8 +31,14 @@ type Notebook struct {
 	CreatedAt string
 }
 
+type NotebookTag struct {
+	NotebookID sql.NullInt64
+	TagID      sql.NullInt64
+}
+
 type NotesFt struct {
 	Content    string
+	Title      string
 	NotebookID string
 	CreatedAt  string
 	ModifiedAt string
@@ -53,7 +59,7 @@ type Tag struct {
 
 type Trash struct {
 	ID        int64
-	NoteID    sql.NullInt64
+	NoteID    int64
 	Content   string
 	Title     string
 	CreatedAt string

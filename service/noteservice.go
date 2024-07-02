@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -22,7 +23,19 @@ func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
 	}
 }
 
-func (s *NoteService) CreateNote(ctx context.Context, params db.CreateNoteParams) (db.Note, error) {
+func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID sql.NullInt64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
+
+	params := db.CreateNoteParams{
+		Title:       title,
+		Content:     content,
+		NotebookID:  notebookID,
+		StatusID:    statusID,
+		CreatedAt:   time.Now().Format(time.RFC3339),
+		ModifiedAt:  time.Now().Format(time.RFC3339),
+		PublishedAt: publishedAt,
+		EventID:     eventId,
+	}
+
 	note, err := s.queries.CreateNote(ctx, params)
 	if err != nil {
 		s.logger.Println("Error creating note:", err)
@@ -40,14 +53,16 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context, limit, pageParam int64) ([]db.Note, error) {
+func (s *NoteService) ListNotes(ctx context.Context, notebookID sql.NullInt64, limit, pageParam int64) ([]db.Note, error) {
 	offset := pageParam * limit
-	notes, err := s.queries.ListNotes(ctx, db.ListNotesParams{
-		Limit:  limit,
-		Offset: offset,
+  fmt.Println("notebookID", notebookID)
+	notes, err := s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
+		NotebookID: notebookID,
+		Limit:      limit,
+		Offset:     offset,
 	})
 	if err != nil {
-		s.logger.Println("Error listing notes:", err)
+		s.logger.Println("Error listing notes by notebook:", err)
 		return []db.Note{}, err
 	}
 	return notes, nil
@@ -87,7 +102,7 @@ func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []d
 	stringifiedTags := builder.String()
 
 	params := db.AddNoteToTrashParams{
-		NoteID:    sql.NullInt64{Int64: note.ID, Valid: true},
+		NoteID:    note.ID,
 		Content:   note.Content,
 		Title:     note.Title,
 		CreatedAt: note.CreatedAt,
@@ -131,18 +146,4 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 		return err
 	}
 	return nil
-}
-
-func (s *NoteService) ListNotesByNotebook(ctx context.Context, notebookID int64, limit, pageParam int64) ([]db.Note, error) {
-	offset := pageParam * limit
-	notes, err := s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
-		NotebookID: sql.NullInt64{Int64: notebookID, Valid: true},
-		Limit:      limit,
-		Offset:     offset,
-	})
-	if err != nil {
-		s.logger.Println("Error listing notes by notebook:", err)
-		return []db.Note{}, err
-	}
-	return notes, nil
 }

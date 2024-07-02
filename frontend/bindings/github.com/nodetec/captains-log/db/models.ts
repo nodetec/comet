@@ -9,71 +9,6 @@ import {Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as sql$0 from "../../../../database/sql/models.js";
 
-export class CreateNoteParams {
-    "StatusID": sql$0.NullInt64;
-    "NotebookID": sql$0.NullInt64;
-    "Content": string;
-    "Title": string;
-    "CreatedAt": string;
-    "ModifiedAt": string;
-    "PublishedAt": sql$0.NullString;
-    "EventID": sql$0.NullString;
-
-    /** Creates a new CreateNoteParams instance. */
-    constructor($$source: Partial<CreateNoteParams> = {}) {
-        if (!("StatusID" in $$source)) {
-            this["StatusID"] = (new sql$0.NullInt64());
-        }
-        if (!("NotebookID" in $$source)) {
-            this["NotebookID"] = (new sql$0.NullInt64());
-        }
-        if (!("Content" in $$source)) {
-            this["Content"] = "";
-        }
-        if (!("Title" in $$source)) {
-            this["Title"] = "";
-        }
-        if (!("CreatedAt" in $$source)) {
-            this["CreatedAt"] = "";
-        }
-        if (!("ModifiedAt" in $$source)) {
-            this["ModifiedAt"] = "";
-        }
-        if (!("PublishedAt" in $$source)) {
-            this["PublishedAt"] = (new sql$0.NullString());
-        }
-        if (!("EventID" in $$source)) {
-            this["EventID"] = (new sql$0.NullString());
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new CreateNoteParams instance from a string or object.
-     */
-    static createFrom($$source: any = {}): CreateNoteParams {
-        const $$createField0_0 = $$createType0;
-        const $$createField1_0 = $$createType0;
-        const $$createField6_0 = $$createType1;
-        const $$createField7_0 = $$createType1;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("StatusID" in $$parsedSource) {
-            $$parsedSource["StatusID"] = $$createField0_0($$parsedSource["StatusID"]);
-        }
-        if ("NotebookID" in $$parsedSource) {
-            $$parsedSource["NotebookID"] = $$createField1_0($$parsedSource["NotebookID"]);
-        }
-        if ("PublishedAt" in $$parsedSource) {
-            $$parsedSource["PublishedAt"] = $$createField6_0($$parsedSource["PublishedAt"]);
-        }
-        if ("EventID" in $$parsedSource) {
-            $$parsedSource["EventID"] = $$createField7_0($$parsedSource["EventID"]);
-        }
-        return new CreateNoteParams($$parsedSource as Partial<CreateNoteParams>);
-    }
-}
-
 export class Note {
     "ID": number;
     "StatusID": sql$0.NullInt64;
@@ -219,7 +154,7 @@ export class Tag {
 
 export class Trash {
     "ID": number;
-    "NoteID": sql$0.NullInt64;
+    "NoteID": number;
     "Content": string;
     "Title": string;
     "CreatedAt": string;
@@ -232,7 +167,7 @@ export class Trash {
             this["ID"] = 0;
         }
         if (!("NoteID" in $$source)) {
-            this["NoteID"] = (new sql$0.NullInt64());
+            this["NoteID"] = 0;
         }
         if (!("Content" in $$source)) {
             this["Content"] = "";
@@ -257,12 +192,8 @@ export class Trash {
      * Creates a new Trash instance from a string or object.
      */
     static createFrom($$source: any = {}): Trash {
-        const $$createField1_0 = $$createType0;
         const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("NoteID" in $$parsedSource) {
-            $$parsedSource["NoteID"] = $$createField1_0($$parsedSource["NoteID"]);
-        }
         if ("Tags" in $$parsedSource) {
             $$parsedSource["Tags"] = $$createField6_0($$parsedSource["Tags"]);
         }

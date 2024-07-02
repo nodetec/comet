@@ -90,7 +90,7 @@ SELECT
 FROM
   notes
 WHERE
-  notebook_id = ?
+  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
 ORDER BY
   modified_at DESC
 LIMIT

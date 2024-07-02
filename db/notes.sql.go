@@ -190,7 +190,7 @@ SELECT
 FROM
   notes
 WHERE
-  notebook_id = ?
+  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
 ORDER BY
   modified_at DESC
 LIMIT
@@ -201,12 +201,18 @@ OFFSET
 
 type ListNotesByNotebookParams struct {
 	NotebookID sql.NullInt64
+	Column2    interface{}
 	Limit      int64
 	Offset     int64
 }
 
 func (q *Queries) ListNotesByNotebook(ctx context.Context, arg ListNotesByNotebookParams) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, listNotesByNotebook, arg.NotebookID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listNotesByNotebook,
+		arg.NotebookID,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
