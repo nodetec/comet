@@ -64,11 +64,9 @@ export function NotebookComboBox() {
       </PopoverTrigger>
       <PopoverContent className="popover-content-width-full p-0">
         <Command>
-          <CommandInput placeholder="Search..." />
           <CommandList>
             <CommandEmpty>No framework found.</CommandEmpty>
             <CommandGroup>
-              <div className="my-1"></div>
               <CommandItem
                 value={"_New Notebook_"}
                 onSelect={(currentValue) => {
@@ -79,8 +77,8 @@ export function NotebookComboBox() {
                 <PlusIcon className="mr-2 h-4" />
                 New Notebook
               </CommandItem>
-              <div className="my-1 border-b border-primary/20"></div>
-
+              <div className="mt-1 border-b border-primary/20"></div>
+              <CommandInput placeholder="Search..." />
               {data?.map((notebook) => (
                 <CommandItem
                   key={notebook.ID}
