@@ -22,9 +22,16 @@ WHERE
   id = ?;
 
 -- name: GetTagByName :one
-SELECT id, name, color, icon, created_at
-FROM tags
-WHERE name = ?;
+SELECT
+  id,
+  name,
+  color,
+  icon,
+  created_at
+FROM
+  tags
+WHERE
+  name = ?;
 
 -- name: ListTags :many
 SELECT

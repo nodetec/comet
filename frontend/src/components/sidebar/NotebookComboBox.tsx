@@ -17,10 +17,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { useAppState } from "~/store";
 // import { cn } from "~/lib/utils";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, PlusIcon } from "lucide-react";
 
-export function Notebook() {
+import { Separator } from "../ui/separator";
+import AllNotes from "./AllNotes";
+
+export function NotebookComboBox() {
+  const { activeNotebook } = useAppState();
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState("");
 
@@ -48,7 +53,7 @@ export function Notebook() {
           aria-expanded={open}
           className="mb-2 w-full justify-between"
         >
-          {"General"}
+          {activeNotebook === undefined ? "All Notes" : activeNotebook.Name}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -58,6 +63,31 @@ export function Notebook() {
           <CommandList>
             <CommandEmpty>No framework found.</CommandEmpty>
             <CommandGroup>
+              <div className="my-1"></div>
+              <CommandItem
+                value={"All Notes"}
+                onSelect={(currentValue) => {
+                  setValue(currentValue === value ? "" : currentValue);
+                  setOpen(false);
+                }}
+              >
+                {activeNotebook === undefined && (
+                  <Check className="mr-2 h-4 w-4" />
+                )}
+                All Notes
+              </CommandItem>
+              <CommandItem
+                value={"_New Notebook_"}
+                onSelect={(currentValue) => {
+                  setValue(currentValue === value ? "" : currentValue);
+                  setOpen(false);
+                }}
+              >
+                <PlusIcon className="mr-2 h-4 w-4" />
+                New Notebook
+              </CommandItem>
+              <div className="my-1 border-b border-primary/20"></div>
+
               {data?.map((notebook) => (
                 <CommandItem
                   key={notebook.ID}
@@ -67,7 +97,9 @@ export function Notebook() {
                     setOpen(false);
                   }}
                 >
-                  <Check className="mr-2 h-4 w-4" />
+                  {activeNotebook?.ID === notebook.ID && (
+                    <Check className="mr-2 h-4 w-4" />
+                  )}
                   {notebook.Name}
                 </CommandItem>
               ))}

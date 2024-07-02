@@ -85,9 +85,16 @@ func (q *Queries) GetTag(ctx context.Context, id int64) (Tag, error) {
 }
 
 const getTagByName = `-- name: GetTagByName :one
-SELECT id, name, color, icon, created_at
-FROM tags
-WHERE name = ?
+SELECT
+  id,
+  name,
+  color,
+  icon,
+  created_at
+FROM
+  tags
+WHERE
+  name = ?
 `
 
 func (q *Queries) GetTagByName(ctx context.Context, name string) (Tag, error) {

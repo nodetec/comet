@@ -34,9 +34,18 @@ CREATE TABLE IF NOT EXISTS notebooks (
   UNIQUE (name)
 );
 
+CREATE TABLE IF NOT EXISTS notebook_tags (
+  notebook_id INTEGER,
+  tag_id INTEGER,
+  PRIMARY KEY (notebook_id, tag_id),
+  FOREIGN KEY (notebook_id) REFERENCES notebooks (id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+);
+
+-- TODO: maybe add notebook
 CREATE TABLE IF NOT EXISTS trash (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  note_id INTEGER,
+  note_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -47,6 +56,7 @@ CREATE TABLE IF NOT EXISTS trash (
 
 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
   content,
+  title,
   notebook_id UNINDEXED,
   created_at UNINDEXED,
   modified_at UNINDEXED
@@ -54,9 +64,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes (created_at);
 
 CREATE INDEX IF NOT EXISTS idx_notes_modified_at ON notes (modified_at);
+
+CREATE INDEX IF NOT EXISTS idx_title ON notes (title);
 
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags (name);
 

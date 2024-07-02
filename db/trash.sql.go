@@ -31,7 +31,7 @@ VALUES
 `
 
 type AddNoteToTrashParams struct {
-	NoteID    sql.NullInt64
+	NoteID    int64
 	Content   string
 	Title     string
 	CreatedAt string
