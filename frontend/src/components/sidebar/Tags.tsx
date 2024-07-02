@@ -8,6 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../ui/accordion";
+import { ScrollArea } from "../ui/scroll-area";
 import TagItem from "./TagItem";
 
 export default function Tags() {
