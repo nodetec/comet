@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/nodetec/captains-log/db"
 )
@@ -19,7 +20,8 @@ func NewNotebookService(queries *db.Queries, logger *log.Logger) *NotebookServic
 	}
 }
 
-func (s *NotebookService) CreateNotebook(ctx context.Context, name, createdAt string) (db.Notebook, error) {
+func (s *NotebookService) CreateNotebook(ctx context.Context, name string) (db.Notebook, error) {
+	createdAt := time.Now().Format(time.RFC3339)
 	params := db.CreateNotebookParams{
 		Name:      name,
 		CreatedAt: createdAt,
