@@ -8,7 +8,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../ui/accordion";
-import { ScrollArea } from "../ui/scroll-area";
 import TagItem from "./TagItem";
 
 export default function Tags() {
@@ -26,9 +25,9 @@ export default function Tags() {
 
   return (
     <Accordion type="single" collapsible defaultValue="item-1">
-      <AccordionItem className="border-none" value="item-1">
+      <AccordionItem className="border-none px-2" value="item-1">
         <AccordionTrigger>
-          <div className="flex pl-2 pr-2 text-muted-foreground">
+          <div className="flex text-muted-foreground">
             <TagsIcon className="h-[1.2rem] w-[1.2rem]" />
             <span className="ml-1">Tags</span>
           </div>
