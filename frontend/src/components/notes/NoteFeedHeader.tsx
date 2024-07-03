@@ -1,6 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { NullInt64, NullString } from "&/database/sql/models";
-import { NoteService } from "&/github.com/nodetec/captains-log/service";
+import {
+  NoteService,
+  NoteTagService,
+} from "&/github.com/nodetec/captains-log/service";
 import { useAppState } from "~/store";
 import dayjs from "dayjs";
 import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
@@ -33,6 +36,10 @@ export default function NoteFeedHeader({ feedType }: Props) {
         Valid: false,
       }),
     );
+
+    if (activeTag) {
+      await NoteTagService.AddTagToNote(note.ID, activeTag.ID);
+    }
 
     setActiveNote(note);
 
