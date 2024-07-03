@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NullString } from "&/database/sql/models";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import {
-  NoteTagService,
   NotebookService,
+  NoteTagService,
   Tag,
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
@@ -19,7 +19,7 @@ type Props = {
 };
 
 export default function TagInput({ note }: Props) {
-  const { activeNotebook } = useAppState();
+  const { activeNote } = useAppState();
   const [tagName, setTagName] = useState<string>("");
 
   const queryClient = useQueryClient();
@@ -59,14 +59,18 @@ export default function TagInput({ note }: Props) {
         setTagName("");
       }
       // check if tag is associated with notebook
-      if(activeNotebook){
+      if (activeNote?.NotebookID && activeNote?.NotebookID !== 0) {
         isTagAssociatedWithNotebook = await NotebookService.CheckTagForNotebook(
-          activeNotebook.ID,
+          activeNote.NotebookID,
           noteTag.ID,
         );
         // if it isn't, associate it with notebook
         if (!isTagAssociatedWithNotebook) {
-          await NotebookService.AddTagToNotebook(activeNotebook.ID, noteTag.ID);
+          await NotebookService.AddTagToNotebook(
+            activeNote.NotebookID,
+            noteTag.ID,
+          );
+          void queryClient.invalidateQueries({ queryKey: ["tags"] });
         }
       }
     }
@@ -78,7 +82,7 @@ export default function TagInput({ note }: Props) {
   }
 
   const { data } = useQuery({
-    queryKey: ["note_tags", note.ID, activeNotebook?.ID],
+    queryKey: ["note_tags", note.ID, activeNote?.NotebookID],
     staleTime: 50,
     queryFn: () => fetchTags(),
   });

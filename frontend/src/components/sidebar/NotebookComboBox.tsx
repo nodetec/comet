@@ -61,7 +61,6 @@ export function NotebookComboBox() {
 
   async function fetchNotebooks() {
     const notebooks = await NotebookService.ListNotebooks();
-    console.log("notebooks", notebooks);
     return notebooks;
   }
 
@@ -76,11 +75,13 @@ export function NotebookComboBox() {
     setOpen(false);
     setFeedType("notebook");
     if (activeNote?.NotebookID !== notebook.ID) {
-      console.log("SETTING ACTIVE NOTE TO UNDEFINED");
       setActiveNote(undefined);
     }
     void queryClient.invalidateQueries({
       queryKey: ["notes"],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["tags"],
     });
   };
 
