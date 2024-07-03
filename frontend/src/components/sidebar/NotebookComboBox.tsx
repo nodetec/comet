@@ -163,7 +163,9 @@ export function NotebookComboBox() {
                   </DialogTrigger>
                   {/* </NewNotebookDialog> */}
                 </CommandItem>
-                <div className="my-1 border-b border-primary/20"></div>
+                {data && data?.length > 0 && (
+                  <div className="my-1 border-b border-primary/20"></div>
+                )}
                 {/* <CommandInput placeholder="Search..." /> */}
                 {data?.map((notebook) => (
                   <CommandItem
