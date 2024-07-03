@@ -10,7 +10,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex items-center gap-4 border-t bg-black/10 p-2">
+    <div className="flex items-center gap-4 border-t bg-black/10 py-2">
       <div className="flex w-full items-center justify-between">
         <Button
           variant="ghost"
