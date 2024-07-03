@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -52,38 +53,46 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListAllNotes(ctx context.Context, limit, pageParam int64) ([]db.Note, error) {
-	offset := pageParam * limit
-	notes, err := s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
-		Limit:  limit,
-		Offset: offset,
-	})
-	if err != nil {
-		s.logger.Println("Error listing all notes:", err)
-		return []db.Note{}, err
-	}
-	return notes, nil
-}
-
-func (s *NoteService) ListNotes(ctx context.Context, notebookID int64, limit, pageParam int64) ([]db.Note, error) {
+func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int64, limit, pageParam int64) ([]db.Note, error) {
 	offset := pageParam * limit
 
 	var notes []db.Note
 	var err error
 
-	if notebookID == 0 {
-		notes, err = s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
-			Limit:  limit,
-			Offset: offset,
-		})
-	} else {
-
-		notes, err = s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
-			NotebookID: notebookID,
+	if notebookId != 0 && tagId != 0 {
+		notes, err = s.queries.ListNotesByNotebookAndTag(ctx, db.ListNotesByNotebookAndTagParams{
+			NotebookID: notebookId,
+			TagID:      sql.NullInt64{Int64: tagId, Valid: true},
 			Limit:      limit,
 			Offset:     offset,
 		})
 	}
+
+	if notebookId != 0 && tagId == 0 {
+		notes, err = s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
+			NotebookID: notebookId,
+			Limit:      limit,
+			Offset:     offset,
+		})
+	}
+
+	if notebookId == 0 && tagId != 0 {
+		notes, err = s.queries.GetNotesForTag(ctx, db.GetNotesForTagParams{
+			TagID:  sql.NullInt64{Int64: tagId, Valid: true},
+			Limit:  limit,
+			Offset: offset,
+		})
+	}
+
+	if notebookId == 0 && tagId == 0 {
+    fmt.Println("List all notes")
+		notes, err = s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
+			Limit:  limit,
+			Offset: offset,
+		})
+	}
+
+
 	if err != nil {
 		s.logger.Println("Error listing notes :", err)
 		return []db.Note{}, err

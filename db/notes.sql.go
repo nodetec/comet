@@ -238,6 +238,82 @@ func (q *Queries) ListNotesByNotebook(ctx context.Context, arg ListNotesByNotebo
 	return items, nil
 }
 
+const listNotesByNotebookAndTag = `-- name: ListNotesByNotebookAndTag :many
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+WHERE
+  notebook_id = ?
+  AND id IN (
+    SELECT
+      note_id
+    FROM
+      note_tags
+    WHERE
+      tag_id = ?
+  )
+ORDER BY
+  modified_at DESC
+LIMIT
+  ?
+OFFSET
+  ?
+`
+
+type ListNotesByNotebookAndTagParams struct {
+	NotebookID int64
+	TagID      sql.NullInt64
+	Limit      int64
+	Offset     int64
+}
+
+func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, arg ListNotesByNotebookAndTagParams) ([]Note, error) {
+	rows, err := q.db.QueryContext(ctx, listNotesByNotebookAndTag,
+		arg.NotebookID,
+		arg.TagID,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Note
+	for rows.Next() {
+		var i Note
+		if err := rows.Scan(
+			&i.ID,
+			&i.StatusID,
+			&i.NotebookID,
+			&i.Content,
+			&i.Title,
+			&i.CreatedAt,
+			&i.ModifiedAt,
+			&i.PublishedAt,
+			&i.EventID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateNote = `-- name: UpdateNote :exec
 UPDATE notes
 SET

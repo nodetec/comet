@@ -8,14 +8,25 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
-  const { setActiveNote, activeNotebook } = useAppState();
+  const { setActiveNote, activeNotebook, activeTag } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
 
     const notebookId = activeNotebook?.ID ?? 0;
+    const tagId = activeTag?.ID ?? 0;
 
-    const notes = await NoteService.ListNotes(notebookId, pageSize, pageParam);
+    console.log("NOTEBOOK ID", notebookId);
+    console.log("TAG ID", tagId);
+    console.log("PAGE PARAM", pageParam);
+    console.log("PAGE SIZE", pageSize);
+
+    const notes = await NoteService.ListNotes(
+      notebookId,
+      tagId,
+      pageSize,
+      pageParam,
+    );
 
     console.log("NOTES", notes);
 
@@ -32,7 +43,7 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes", activeNotebook?.ID],
+      queryKey: ["notes", activeNotebook?.ID, activeTag?.ID],
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,
