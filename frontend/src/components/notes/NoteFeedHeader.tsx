@@ -51,17 +51,23 @@ export default function NoteFeedHeader({ feedType }: Props) {
   return (
     <div className="flex justify-between px-3 pt-2">
       <div className="flex items-center justify-center gap-x-1">
-        <Button className="text-muted-foreground" variant="ghost" size="icon">
+        <Button
+          variant="ghost"
+          className="cursor-pointer text-muted-foreground hover:bg-background hover:text-foreground"
+          size="icon"
+        >
           <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
         </Button>
         <h1 className="cursor-default text-lg font-bold">{title(feedType)}</h1>
       </div>
-      <div className="pr-1 pt-2">
-        <PenBoxIcon
-          onClick={handleCreateNote}
-          className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
-        />
-      </div>
+      <Button
+        disabled={feedType === "trash"}
+        variant="ghost"
+        className="cursor-pointer text-muted-foreground hover:bg-background hover:text-foreground"
+        size="icon"
+      >
+        <PenBoxIcon onClick={handleCreateNote} className="h-5 w-5" />
+      </Button>
     </div>
   );
 }
