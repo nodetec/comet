@@ -37,11 +37,8 @@ type NotebookTag struct {
 }
 
 type NotesFt struct {
-	Content    string
-	Title      string
-	NotebookID string
-	CreatedAt  string
-	ModifiedAt string
+	Title   string
+	Content string
 }
 
 type Setting struct {

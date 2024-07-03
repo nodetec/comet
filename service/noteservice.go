@@ -85,13 +85,12 @@ func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int
 	}
 
 	if notebookId == 0 && tagId == 0 {
-    fmt.Println("List all notes")
+		fmt.Println("List all notes")
 		notes, err = s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
 			Limit:  limit,
 			Offset: offset,
 		})
 	}
-
 
 	if err != nil {
 		s.logger.Println("Error listing notes :", err)
@@ -122,7 +121,6 @@ func (s *NoteService) DeleteNote(ctx context.Context, id int64) error {
 // Trash-related methods
 
 func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []db.Tag) error {
-
 	var builder strings.Builder
 
 	for i, tag := range tags {
@@ -179,4 +177,13 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 		return err
 	}
 	return nil
+}
+
+func (s *NoteService) SearchNotes(ctx context.Context, searchTerm string, notebookID, tagID int64, limit, pageParam int) ([]db.Note, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.CustomSearch(ctx, searchTerm, notebookID, tagID, int64(limit), int64(offset))
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
 }

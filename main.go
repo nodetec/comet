@@ -48,6 +48,7 @@ func main() {
 	}
 
 	queries := db.New(dbConn)
+  // customQueries := db.CustomQueries(dbConn)
 	logger := log.New(os.Stdout, "INFO: ", log.LstdFlags)
 
 	// Create the NoteService with the queries and logger
@@ -75,19 +76,19 @@ func main() {
 
 	// Custom event handling
 	app.Events.On("open-settings-window", func(e *application.WailsEvent) {
-    app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-      Title: "Settings",
-      Width: 800,
-      Height: 600,
-      Mac: application.MacWindow{
-        InvisibleTitleBarHeight: 50,
-        Backdrop:                application.MacBackdropTranslucent,
-        TitleBar:                application.MacTitleBarHiddenInset,
-      },
-      BackgroundColour: application.NewRGB(27, 38, 54),
-      URL: "/src/windows/settings/index.html",
-    }).
-    Show()
+		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
+			Title:  "Settings",
+			Width:  800,
+			Height: 600,
+			Mac: application.MacWindow{
+				InvisibleTitleBarHeight: 50,
+				Backdrop:                application.MacBackdropTranslucent,
+				TitleBar:                application.MacTitleBarHiddenInset,
+			},
+			BackgroundColour: application.NewRGB(27, 38, 54),
+			URL:              "/src/windows/settings/index.html",
+		}).
+			Show()
 	})
 
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
