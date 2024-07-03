@@ -4,8 +4,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
-  feedType: "all" | "notebook" | "trash" | "tag" | "search";
-  setFeedType: (feedType: "all" | "notebook" | "trash" | "tag" | "search") => void;
+  feedType: "all" | "notebook" | "trash" | "tag";
+  setFeedType: (feedType: "all" | "notebook" | "trash" | "tag") => void;
 
   activeNote: Note | undefined;
   setActiveNote: (activeNote: Note | undefined) => void;
@@ -18,6 +18,12 @@ interface State {
 
   activeTrashNote: Trash | undefined;
   setActiveTrashNote: (activeTrashNote: Trash | undefined) => void;
+
+  searchActive: boolean;
+  setSearchActive: (searchActive: boolean) => void;
+
+  noteSearch: string;
+  setNoteSearch: (noteSearch: string) => void;
 }
 
 export const useAppState = create<State>()(
@@ -37,6 +43,12 @@ export const useAppState = create<State>()(
 
       activeTrashNote: undefined,
       setActiveTrashNote: (activeTrashNote) => set({ activeTrashNote }),
+
+      searchActive: false,
+      setSearchActive: (searchActive) => set({ searchActive }),
+
+      noteSearch: "",
+      setNoteSearch: (noteSearch) => set({ noteSearch }),
     }),
     {
       name: "captains-log-storage",

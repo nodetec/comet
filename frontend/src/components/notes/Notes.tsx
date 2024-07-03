@@ -3,20 +3,20 @@ import { useAppState } from "~/store";
 import NoteFeed from "./NoteFeed";
 import NoteFeedHeader from "./NoteFeedHeader";
 import SearchNotes from "./SearchNotes";
-import TagFeed from "./TagFeed";
 import TrashFeed from "./TrashFeed";
+import SearchFeed from "./SearchFeed";
 
 export default function Notes() {
-  const { feedType } = useAppState();
+  const { feedType, searchActive } = useAppState();
 
   return (
     <div className="flex h-full flex-col">
       <NoteFeedHeader feedType={feedType} />
       <SearchNotes />
-      {feedType === "all" && <NoteFeed />}
-      {feedType === "notebook" && <NoteFeed />}
-      {feedType === "tag" && <TagFeed />}
-      {feedType === "trash" && <TrashFeed />}
+      {searchActive && <SearchFeed />}
+      {(feedType === "all" || feedType === "tag" || feedType === "notebook") &&
+        !searchActive && <NoteFeed />}
+      {feedType === "trash" && !searchActive && <TrashFeed />}
     </div>
   );
 }

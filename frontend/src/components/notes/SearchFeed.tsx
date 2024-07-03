@@ -7,8 +7,9 @@ import { useInView } from "react-intersection-observer";
 import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
-export default function NoteFeed() {
-  const { setActiveNote, activeNotebook, activeTag } = useAppState();
+export default function SearchFeed() {
+  const { setActiveNote, noteSearch, activeNotebook, activeTag } =
+    useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -21,7 +22,8 @@ export default function NoteFeed() {
     console.log("PAGE PARAM", pageParam);
     console.log("PAGE SIZE", pageSize);
 
-    const notes = await NoteService.ListNotes(
+    const notes = await NoteService.SearchNotes(
+      noteSearch, // TODO: Replace with actual search query
       notebookId,
       tagId,
       pageSize,
@@ -43,7 +45,8 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes", activeNotebook?.ID, activeTag?.ID],
+      queryKey: ["search", noteSearch],
+      gcTime: 3000,
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,

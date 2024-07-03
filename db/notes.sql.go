@@ -36,7 +36,7 @@ VALUES
 
 type CreateNoteParams struct {
 	StatusID    sql.NullInt64
-	NotebookID  sql.NullInt64
+	NotebookID  int64
 	Content     string
 	Title       string
 	CreatedAt   string
@@ -117,7 +117,7 @@ func (q *Queries) GetNote(ctx context.Context, id int64) (Note, error) {
 	return i, err
 }
 
-const listNotes = `-- name: ListNotes :many
+const listAllNotes = `-- name: ListAllNotes :many
 SELECT
   id,
   status_id,
@@ -138,13 +138,13 @@ OFFSET
   ?
 `
 
-type ListNotesParams struct {
+type ListAllNotesParams struct {
 	Limit  int64
 	Offset int64
 }
 
-func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, listNotes, arg.Limit, arg.Offset)
+func (q *Queries) ListAllNotes(ctx context.Context, arg ListAllNotesParams) ([]Note, error) {
+	rows, err := q.db.QueryContext(ctx, listAllNotes, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ SELECT
 FROM
   notes
 WHERE
-  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
+  (notebook_id = ?)
 ORDER BY
   modified_at DESC
 LIMIT
@@ -200,16 +200,86 @@ OFFSET
 `
 
 type ListNotesByNotebookParams struct {
-	NotebookID sql.NullInt64
-	Column2    interface{}
+	NotebookID int64
 	Limit      int64
 	Offset     int64
 }
 
 func (q *Queries) ListNotesByNotebook(ctx context.Context, arg ListNotesByNotebookParams) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, listNotesByNotebook,
+	rows, err := q.db.QueryContext(ctx, listNotesByNotebook, arg.NotebookID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Note
+	for rows.Next() {
+		var i Note
+		if err := rows.Scan(
+			&i.ID,
+			&i.StatusID,
+			&i.NotebookID,
+			&i.Content,
+			&i.Title,
+			&i.CreatedAt,
+			&i.ModifiedAt,
+			&i.PublishedAt,
+			&i.EventID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotesByNotebookAndTag = `-- name: ListNotesByNotebookAndTag :many
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+WHERE
+  notebook_id = ?
+  AND id IN (
+    SELECT
+      note_id
+    FROM
+      note_tags
+    WHERE
+      tag_id = ?
+  )
+ORDER BY
+  modified_at DESC
+LIMIT
+  ?
+OFFSET
+  ?
+`
+
+type ListNotesByNotebookAndTagParams struct {
+	NotebookID int64
+	TagID      sql.NullInt64
+	Limit      int64
+	Offset     int64
+}
+
+func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, arg ListNotesByNotebookAndTagParams) ([]Note, error) {
+	rows, err := q.db.QueryContext(ctx, listNotesByNotebookAndTag,
 		arg.NotebookID,
-		arg.Column2,
+		arg.TagID,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -260,7 +330,7 @@ WHERE
 
 type UpdateNoteParams struct {
 	StatusID    sql.NullInt64
-	NotebookID  sql.NullInt64
+	NotebookID  int64
 	Content     string
 	Title       string
 	ModifiedAt  string

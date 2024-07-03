@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   status_id INTEGER,
-  notebook_id INTEGER,
+  notebook_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -54,13 +54,41 @@ CREATE TABLE IF NOT EXISTS trash (
   FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
-  content,
-  title,
-  notebook_id UNINDEXED,
-  created_at UNINDEXED,
-  modified_at UNINDEXED
-);
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
+
+-- Create the FTS5 virtual table if it doesn't exist
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (content);
+
+-- Insert trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+INSERT INTO
+  notes_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+-- Delete trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+DELETE FROM notes_fts
+WHERE
+  rowid = old.id;
+
+END;
+
+-- Update trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_au AFTER
+UPDATE ON notes BEGIN
+DELETE FROM notes_fts
+WHERE
+  rowid = old.id;
+
+INSERT INTO
+  notes_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 

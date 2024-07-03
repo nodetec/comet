@@ -48,6 +48,7 @@ func main() {
 	}
 
 	queries := db.New(dbConn)
+  // customQueries := db.CustomQueries(dbConn)
 	logger := log.New(os.Stdout, "INFO: ", log.LstdFlags)
 
 	// Create the NoteService with the queries and logger

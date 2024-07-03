@@ -18,21 +18,6 @@ FROM
 WHERE
   nt.notebook_id = ?;
 
--- name: GetNotebooksForTag :many
-SELECT
-  n.id,
-  n.name,
-  n.created_at
-FROM
-  notebooks n
-  JOIN notebook_tags nt ON n.id = nt.notebook_id
-WHERE
-  nt.tag_id = ?
-LIMIT
-  ?
-OFFSET
-  ?;
-
 -- name: RemoveTagFromNotebook :exec
 DELETE FROM notebook_tags
 WHERE

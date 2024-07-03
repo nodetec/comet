@@ -11,7 +11,7 @@ import (
 type Note struct {
 	ID          int64
 	StatusID    sql.NullInt64
-	NotebookID  sql.NullInt64
+	NotebookID  int64
 	Content     string
 	Title       string
 	CreatedAt   string
@@ -37,11 +37,8 @@ type NotebookTag struct {
 }
 
 type NotesFt struct {
-	Content    string
-	Title      string
-	NotebookID string
-	CreatedAt  string
-	ModifiedAt string
+	Title   string
+	Content string
 }
 
 type Setting struct {

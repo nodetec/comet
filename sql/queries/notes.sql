@@ -38,7 +38,27 @@ FROM
 WHERE
   id = ?;
 
--- name: ListNotes :many
+-- name: ListAllNotes :many
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+ORDER BY
+  modified_at DESC
+LIMIT
+  ?
+OFFSET
+  ?;
+
+-- name: ListNotesByNotebook :many
 SELECT
   id,
   status_id,
@@ -52,7 +72,37 @@ SELECT
 FROM
   notes
 WHERE
-  (notebook_id = ? OR (? IS NULL AND notebook_id IS NULL))
+  (notebook_id = ?)
+ORDER BY
+  modified_at DESC
+LIMIT
+  ?
+OFFSET
+  ?;
+
+-- name: ListNotesByNotebookAndTag :many
+SELECT
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id
+FROM
+  notes
+WHERE
+  notebook_id = ?
+  AND id IN (
+    SELECT
+      note_id
+    FROM
+      note_tags
+    WHERE
+      tag_id = ?
+  )
 ORDER BY
   modified_at DESC
 LIMIT

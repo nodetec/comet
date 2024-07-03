@@ -50,51 +50,6 @@ func (q *Queries) CheckTagForNotebook(ctx context.Context, arg CheckTagForNotebo
 	return is_associated, err
 }
 
-const getNotebooksForTag = `-- name: GetNotebooksForTag :many
-SELECT
-  n.id,
-  n.name,
-  n.created_at
-FROM
-  notebooks n
-  JOIN notebook_tags nt ON n.id = nt.notebook_id
-WHERE
-  nt.tag_id = ?
-LIMIT
-  ?
-OFFSET
-  ?
-`
-
-type GetNotebooksForTagParams struct {
-	TagID  sql.NullInt64
-	Limit  int64
-	Offset int64
-}
-
-func (q *Queries) GetNotebooksForTag(ctx context.Context, arg GetNotebooksForTagParams) ([]Notebook, error) {
-	rows, err := q.db.QueryContext(ctx, getNotebooksForTag, arg.TagID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Notebook
-	for rows.Next() {
-		var i Notebook
-		if err := rows.Scan(&i.ID, &i.Name, &i.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTagsForNotebook = `-- name: GetTagsForNotebook :many
 SELECT
   t.id,

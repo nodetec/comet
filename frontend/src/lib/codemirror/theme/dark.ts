@@ -47,7 +47,6 @@ const darkTheme = EditorView.theme({
   "&.cm-focused .cm-selectionBackground, & .cm-line::selection, & .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection":
     {
       backgroundColor: "#151515 !important",
-      // background: "red"
     },
   "& .cm-selectionMatch": {
     backgroundColor: "#ffcc00",

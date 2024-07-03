@@ -32,7 +32,13 @@ import { useAppState } from "~/store";
 import { Check, ChevronsUpDown, NotebookIcon, PlusIcon } from "lucide-react";
 
 export function NotebookComboBox() {
-  const { activeNotebook, setActiveNotebook, setFeedType } = useAppState();
+  const {
+    activeNotebook,
+    setActiveNotebook,
+    setFeedType,
+    activeNote,
+    setActiveNote,
+  } = useAppState();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
 
@@ -55,7 +61,6 @@ export function NotebookComboBox() {
 
   async function fetchNotebooks() {
     const notebooks = await NotebookService.ListNotebooks();
-    console.log("notebooks", notebooks);
     return notebooks;
   }
 
@@ -69,8 +74,14 @@ export function NotebookComboBox() {
     setValue(notebookName);
     setOpen(false);
     setFeedType("notebook");
+    if (activeNote?.NotebookID !== notebook.ID) {
+      setActiveNote(undefined);
+    }
     void queryClient.invalidateQueries({
       queryKey: ["notes"],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["tags"],
     });
   };
 
@@ -137,7 +148,7 @@ export function NotebookComboBox() {
               <CommandEmpty>No framework found.</CommandEmpty>
               <CommandGroup>
                 <CommandItem
-                  className="whitespace-nowrap pl-0"
+                  className="cursor-pointer whitespace-nowrap pl-0"
                   value={"_New Notebook_"}
                   onSelect={(currentValue) => {
                     setValue(currentValue === value ? "" : currentValue);
@@ -145,18 +156,20 @@ export function NotebookComboBox() {
                   }}
                 >
                   <DialogTrigger asChild>
-                    <span className="flex w-full items-center">
+                    <span className="flex w-full cursor-pointer items-center">
                       <PlusIcon className="h-4" />
                       New
                     </span>
                   </DialogTrigger>
                   {/* </NewNotebookDialog> */}
                 </CommandItem>
-                <div className="my-1 border-b border-primary/20"></div>
+                {data && data?.length > 0 && (
+                  <div className="my-1 border-b border-primary/20"></div>
+                )}
                 {/* <CommandInput placeholder="Search..." /> */}
                 {data?.map((notebook) => (
                   <CommandItem
-                    className="flex w-full justify-between whitespace-nowrap"
+                    className="flex w-full cursor-pointer justify-between whitespace-nowrap"
                     key={notebook.ID}
                     value={notebook.Name}
                     onSelect={(currentValue) =>

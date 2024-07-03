@@ -12,7 +12,7 @@ import * as sql$0 from "../../../../database/sql/models.js";
 export class Note {
     "ID": number;
     "StatusID": sql$0.NullInt64;
-    "NotebookID": sql$0.NullInt64;
+    "NotebookID": number;
     "Content": string;
     "Title": string;
     "CreatedAt": string;
@@ -29,7 +29,7 @@ export class Note {
             this["StatusID"] = (new sql$0.NullInt64());
         }
         if (!("NotebookID" in $$source)) {
-            this["NotebookID"] = (new sql$0.NullInt64());
+            this["NotebookID"] = 0;
         }
         if (!("Content" in $$source)) {
             this["Content"] = "";
@@ -58,15 +58,11 @@ export class Note {
      */
     static createFrom($$source: any = {}): Note {
         const $$createField1_0 = $$createType0;
-        const $$createField2_0 = $$createType0;
         const $$createField7_0 = $$createType1;
         const $$createField8_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("StatusID" in $$parsedSource) {
             $$parsedSource["StatusID"] = $$createField1_0($$parsedSource["StatusID"]);
-        }
-        if ("NotebookID" in $$parsedSource) {
-            $$parsedSource["NotebookID"] = $$createField2_0($$parsedSource["NotebookID"]);
         }
         if ("PublishedAt" in $$parsedSource) {
             $$parsedSource["PublishedAt"] = $$createField7_0($$parsedSource["PublishedAt"]);
@@ -203,7 +199,7 @@ export class Trash {
 
 export class UpdateNoteParams {
     "StatusID": sql$0.NullInt64;
-    "NotebookID": sql$0.NullInt64;
+    "NotebookID": number;
     "Content": string;
     "Title": string;
     "ModifiedAt": string;
@@ -217,7 +213,7 @@ export class UpdateNoteParams {
             this["StatusID"] = (new sql$0.NullInt64());
         }
         if (!("NotebookID" in $$source)) {
-            this["NotebookID"] = (new sql$0.NullInt64());
+            this["NotebookID"] = 0;
         }
         if (!("Content" in $$source)) {
             this["Content"] = "";
@@ -246,15 +242,11 @@ export class UpdateNoteParams {
      */
     static createFrom($$source: any = {}): UpdateNoteParams {
         const $$createField0_0 = $$createType0;
-        const $$createField1_0 = $$createType0;
         const $$createField5_0 = $$createType1;
         const $$createField6_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("StatusID" in $$parsedSource) {
             $$parsedSource["StatusID"] = $$createField0_0($$parsedSource["StatusID"]);
-        }
-        if ("NotebookID" in $$parsedSource) {
-            $$parsedSource["NotebookID"] = $$createField1_0($$parsedSource["NotebookID"]);
         }
         if ("PublishedAt" in $$parsedSource) {
             $$parsedSource["PublishedAt"] = $$createField5_0($$parsedSource["PublishedAt"]);
