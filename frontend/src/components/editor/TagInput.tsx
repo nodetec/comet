@@ -9,6 +9,7 @@ import {
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
 import { Input } from "~/components/ui/input";
+import { useAppState } from "~/store";
 
 import NoteTag from "./NoteTag";
 
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export default function TagInput({ note }: Props) {
+  const { activeNotebook } = useAppState();
   const [tagName, setTagName] = useState<string>("");
 
   const queryClient = useQueryClient();
@@ -63,7 +65,7 @@ export default function TagInput({ note }: Props) {
   }
 
   const { data } = useQuery({
-    queryKey: ["note_tags", note.ID],
+    queryKey: ["note_tags", note.ID, activeNotebook?.ID],
     staleTime: 50,
     queryFn: () => fetchTags(),
   });

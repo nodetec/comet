@@ -9,6 +9,16 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as db$0 from "../db/models.js";
 
+export function AddTagToNotebook(notebookID: number, tagID: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(413074938, notebookID, tagID) as any;
+    return $resultPromise;
+}
+
+export function CheckTagForNotebook(notebookID: number, tagID: number): Promise<boolean> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1014327243, notebookID, tagID) as any;
+    return $resultPromise;
+}
+
 export function CreateNotebook(name: string): Promise<db$0.Notebook> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1869216282, name) as any;
     let $typingPromise = $resultPromise.then(($result) => {
@@ -32,13 +42,32 @@ export function GetNotebook(id: number): Promise<db$0.Notebook> & { cancel(): vo
     return $typingPromise;
 }
 
-export function ListNotebooks(): Promise<db$0.Notebook[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3041603755) as any;
+export function GetTagsForNotebook(notebookID: number): Promise<db$0.Tag[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1296614222, notebookID) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
+}
+
+export function ListNotebooks(): Promise<db$0.Notebook[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3041603755) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType3($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function RemoveAllTagsFromNotebook(notebookID: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3020598822, notebookID) as any;
+    return $resultPromise;
+}
+
+export function RemoveTagFromNotebook(notebookID: number, tagID: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1292342828, notebookID, tagID) as any;
+    return $resultPromise;
 }
 
 export function UpdateNotebook(id: number, name: string, createdAt: string): Promise<void> & { cancel(): void } {
@@ -48,4 +77,6 @@ export function UpdateNotebook(id: number, name: string, createdAt: string): Pro
 
 // Private type creation functions
 const $$createType0 = db$0.Notebook.createFrom;
-const $$createType1 = $Create.Array($$createType0);
+const $$createType1 = db$0.Tag.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $Create.Array($$createType0);

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"log"
 	"time"
 
@@ -73,4 +75,59 @@ func (s *NotebookService) DeleteNotebook(ctx context.Context, id int64) error {
 		return err
 	}
 	return nil
+}
+
+func (s *NotebookService) AddTagToNotebook(ctx context.Context, notebookID, tagID int64) error {
+	if notebookID <= 0 || tagID <= 0 {
+		return errors.New("invalid notebook or tag ID")
+	}
+
+	params := db.AddTagToNotebookParams{
+		NotebookID: sql.NullInt64{Int64: notebookID, Valid: true},
+		TagID:      sql.NullInt64{Int64: tagID, Valid: true},
+	}
+
+	return s.queries.AddTagToNotebook(ctx, params)
+}
+
+func (s *NotebookService) CheckTagForNotebook(ctx context.Context, notebookID, tagID int64) (bool, error) {
+	if notebookID <= 0 || tagID <= 0 {
+		return false, errors.New("invalid notebook or tag ID")
+	}
+
+	params := db.CheckTagForNotebookParams{
+		NotebookID: sql.NullInt64{Int64: notebookID, Valid: true},
+		TagID:      sql.NullInt64{Int64: tagID, Valid: true},
+	}
+
+	return s.queries.CheckTagForNotebook(ctx, params)
+}
+
+func (s *NotebookService) GetTagsForNotebook(ctx context.Context, notebookID int64) ([]db.Tag, error) {
+	if notebookID <= 0 {
+		return nil, errors.New("invalid notebook ID")
+	}
+
+	return s.queries.GetTagsForNotebook(ctx, sql.NullInt64{Int64: notebookID, Valid: true})
+}
+
+func (s *NotebookService) RemoveAllTagsFromNotebook(ctx context.Context, notebookID int64) error {
+	if notebookID <= 0 {
+		return errors.New("invalid notebook ID")
+	}
+
+	return s.queries.RemoveAllTagsFromNotebook(ctx, sql.NullInt64{Int64: notebookID, Valid: true})
+}
+
+func (s *NotebookService) RemoveTagFromNotebook(ctx context.Context, notebookID, tagID int64) error {
+	if notebookID <= 0 || tagID <= 0 {
+		return errors.New("invalid notebook or tag ID")
+	}
+
+	params := db.RemoveTagFromNotebookParams{
+		NotebookID: sql.NullInt64{Int64: notebookID, Valid: true},
+		TagID:      sql.NullInt64{Int64: tagID, Valid: true},
+	}
+
+	return s.queries.RemoveTagFromNotebook(ctx, params)
 }
