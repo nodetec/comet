@@ -1,6 +1,7 @@
 import { GearIcon } from "@radix-ui/react-icons";
 import * as wails from "@wailsio/runtime";
 import { ArrowRightIcon } from "lucide-react";
+import { Button } from "../ui/button";
 
 export default function Login() {
   const handleOpenSettings = () => {
@@ -8,12 +9,14 @@ export default function Login() {
   };
 
   return (
-    <div className="flex items-center gap-4 border-t bg-black/10 p-4">
+    <div className="flex items-center gap-4 border-t bg-black/10 p-2">
       <div className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-x-1">
+        <Button 
+          variant="ghost"
+          className="flex items-center gap-x-1 my-0">
           <p className="text-sm text-muted-foreground/90">Login</p>
-          <ArrowRightIcon className="h-4 w-4 text-muted-foreground/90" />
-        </div>
+          <ArrowRightIcon className="h-3 w-3 text-muted-foreground/90" />
+        </Button>
 
         <GearIcon
           onClick={handleOpenSettings}
