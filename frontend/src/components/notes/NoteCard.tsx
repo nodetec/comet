@@ -35,7 +35,7 @@ export default function NoteCard({ note }: Props) {
             "--custom-contextmenu-data": `${note.ID}`,
           } as React.CSSProperties
         }
-        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md px-2 pb-3 pt-3 text-sm ${activeNote?.ID === note.ID && "bg-muted/80"}`}
+        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-3 text-sm ${activeNote?.ID === note.ID && "bg-muted/80"}`}
       >
         <h2 className="select-none font-semibold text-primary">{note.Title}</h2>
         <span className="select-none pb-6 text-muted-foreground">
