@@ -5,6 +5,7 @@ import { NullString } from "&/database/sql/models";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import {
   NoteTagService,
+  NotebookService,
   Tag,
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
@@ -33,6 +34,7 @@ export default function TagInput({ note }: Props) {
       e.preventDefault();
       // check if tag already exists
       let noteTag: Tag | undefined;
+      let isTagAssociatedWithNotebook = false;
       try {
         noteTag = await TagService.GetTagByName(tagName);
       } catch (_) {
@@ -55,6 +57,17 @@ export default function TagInput({ note }: Props) {
         await NoteTagService.AddTagToNote(note.ID, noteTag.ID);
         void queryClient.invalidateQueries({ queryKey: ["note_tags"] });
         setTagName("");
+      }
+      // check if tag is associated with notebook
+      if(activeNotebook){
+        isTagAssociatedWithNotebook = await NotebookService.CheckTagForNotebook(
+          activeNotebook.ID,
+          noteTag.ID,
+        );
+        // if it isn't, associate it with notebook
+        if (!isTagAssociatedWithNotebook) {
+          await NotebookService.AddTagToNotebook(activeNotebook.ID, noteTag.ID);
+        }
       }
     }
   };
