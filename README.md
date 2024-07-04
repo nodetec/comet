@@ -24,8 +24,6 @@ Captain's Log is a note-taking app for nostr.
 
 ## For Developers
 
-To get started, clone the repository and run the following commands:
-
 To install the dependencies & run the app in development mode, run the following command:
 
 ```bash
