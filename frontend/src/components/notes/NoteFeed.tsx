@@ -8,14 +8,23 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
-  const { setActiveNote, activeNotebook, activeTag, orderBy, sortDirection } =
-    useAppState();
+  const {
+    setActiveNote,
+    activeNotebook,
+    activeTag,
+    orderBy,
+    timeSortDirection,
+    titleSortDirection,
+  } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
 
     const notebookId = activeNotebook?.ID ?? 0;
     const tagId = activeTag?.ID ?? 0;
+
+    const sortDirection =
+      orderBy === "title" ? titleSortDirection : timeSortDirection;
 
     const notes = await NoteService.ListNotes(
       notebookId,

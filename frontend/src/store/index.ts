@@ -32,8 +32,11 @@ interface State {
   orderBy: "modified_at" | "created_at" | "title";
   setOrderBy: (orderBy: "modified_at" | "created_at" | "title") => void;
 
-  sortDirection: "ASC" | "DESC";
-  setSortDirection: (sortDirection: "ASC" | "DESC") => void;
+  timeSortDirection: "ASC" | "DESC";
+  setTimeSortDirection: (sortDirection: "ASC" | "DESC") => void;
+
+  titleSortDirection: "ASC" | "DESC";
+  setTitleSortDirection: (sortDirection: "ASC" | "DESC") => void;
 }
 
 export const useAppState = create<State>()(
@@ -63,8 +66,12 @@ export const useAppState = create<State>()(
       orderBy: "modified_at",
       setOrderBy: (orderBy) => set({ orderBy }),
 
-      sortDirection: "DESC",
-      setSortDirection: (sortDirection) => set({ sortDirection }),
+      timeSortDirection: "DESC",
+      setTimeSortDirection: (timeSortDirection) => set({ timeSortDirection }),
+
+      titleSortDirection: "ASC",
+      setTitleSortDirection: (titleSortDirection) =>
+        set({ titleSortDirection }),
     }),
     {
       name: "captains-log-storage",
