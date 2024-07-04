@@ -81,9 +81,9 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
                   value={titleSortDirection}
                   onValueChange={handleDirectionChange}
                 >
-                  <DropdownMenuRadioItem value="DESC">A-Z</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="ASC">A-Z</DropdownMenuRadioItem>
 
-                  <DropdownMenuRadioItem value="ASC">
+                  <DropdownMenuRadioItem value="DESC">
                     Z-A
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -92,10 +92,10 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
                   value={timeSortDirection}
                   onValueChange={handleDirectionChange}
                 >
-                  <DropdownMenuRadioItem value="ASC">
+                  <DropdownMenuRadioItem value="DESC">
                     Newest On Top
                   </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="DESC">
+                  <DropdownMenuRadioItem value="ASC">
                     Oldest On Top
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>

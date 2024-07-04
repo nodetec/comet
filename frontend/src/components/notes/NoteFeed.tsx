@@ -48,8 +48,16 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["notes", activeNotebook?.ID, activeTag?.ID],
+      queryKey: [
+        "notes",
+        activeNotebook?.ID,
+        activeTag?.ID,
+        orderBy,
+        timeSortDirection,
+        titleSortDirection,
+      ],
       queryFn: fetchNotes,
+      gcTime: 3000,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,
     });
