@@ -6,14 +6,14 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const {
-    activeTag,
-    setActiveTag,
-    activeNote,
-    setActiveNote,
-  } = useAppState();
+  const { activeTag, setActiveTag, activeNote, setActiveNote } = useAppState();
 
   const handleTagClick = async () => {
+    if (activeTag?.Name === tag.Name) {
+      setActiveTag(undefined);
+      return;
+    }
+
     setActiveTag(tag);
     // TODO: check if active note is has the tag
     // if it does not, set active note to undefined
