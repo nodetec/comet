@@ -8,7 +8,8 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function NoteFeed() {
-  const { setActiveNote, activeNotebook, activeTag } = useAppState();
+  const { setActiveNote, activeNotebook, activeTag, orderBy, sortDirection } =
+    useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -16,19 +17,14 @@ export default function NoteFeed() {
     const notebookId = activeNotebook?.ID ?? 0;
     const tagId = activeTag?.ID ?? 0;
 
-    console.log("NOTEBOOK ID", notebookId);
-    console.log("TAG ID", tagId);
-    console.log("PAGE PARAM", pageParam);
-    console.log("PAGE SIZE", pageSize);
-
     const notes = await NoteService.ListNotes(
       notebookId,
       tagId,
       pageSize,
       pageParam,
+      orderBy,
+      sortDirection,
     );
-
-    console.log("NOTES", notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);

@@ -17,7 +17,7 @@ INSERT INTO
     content,
     title,
     created_at,
-    trashed_at,
+    modified_at,
     tags
   )
 VALUES
@@ -26,17 +26,17 @@ VALUES
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 `
 
 type AddNoteToTrashParams struct {
-	NoteID    int64
-	Content   string
-	Title     string
-	CreatedAt string
-	TrashedAt string
-	Tags      sql.NullString
+	NoteID     int64
+	Content    string
+	Title      string
+	CreatedAt  string
+	ModifiedAt string
+	Tags       sql.NullString
 }
 
 // Trashed Note Queries
@@ -46,7 +46,7 @@ func (q *Queries) AddNoteToTrash(ctx context.Context, arg AddNoteToTrashParams) 
 		arg.Content,
 		arg.Title,
 		arg.CreatedAt,
-		arg.TrashedAt,
+		arg.ModifiedAt,
 		arg.Tags,
 	)
 	var i Trash
@@ -56,7 +56,7 @@ func (q *Queries) AddNoteToTrash(ctx context.Context, arg AddNoteToTrashParams) 
 		&i.Content,
 		&i.Title,
 		&i.CreatedAt,
-		&i.TrashedAt,
+		&i.ModifiedAt,
 		&i.Tags,
 	)
 	return i, err
@@ -80,7 +80,7 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash
@@ -97,7 +97,7 @@ func (q *Queries) GetNoteFromTrash(ctx context.Context, id int64) (Trash, error)
 		&i.Content,
 		&i.Title,
 		&i.CreatedAt,
-		&i.TrashedAt,
+		&i.ModifiedAt,
 		&i.Tags,
 	)
 	return i, err
@@ -110,7 +110,7 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash
@@ -140,7 +140,7 @@ func (q *Queries) ListNotesFromTrash(ctx context.Context, arg ListNotesFromTrash
 			&i.Content,
 			&i.Title,
 			&i.CreatedAt,
-			&i.TrashedAt,
+			&i.ModifiedAt,
 			&i.Tags,
 		); err != nil {
 			return nil, err

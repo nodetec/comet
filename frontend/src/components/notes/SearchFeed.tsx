@@ -8,7 +8,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function SearchFeed() {
-  const { setActiveNote, noteSearch, activeNotebook, activeTag } =
+  const { setActiveNote, noteSearch, activeNotebook, activeTag, orderBy, sortDirection } =
     useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
@@ -28,6 +28,8 @@ export default function SearchFeed() {
       tagId,
       pageSize,
       pageParam,
+      orderBy,
+      sortDirection,
     );
 
     console.log("NOTES", notes);

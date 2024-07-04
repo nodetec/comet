@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -53,43 +52,50 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int64, limit, pageParam int64) ([]db.Note, error) {
+func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int64, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Note, error) {
 	offset := pageParam * limit
 
 	var notes []db.Note
 	var err error
 
 	if notebookId != 0 && tagId != 0 {
-		notes, err = s.queries.ListNotesByNotebookAndTag(ctx, db.ListNotesByNotebookAndTagParams{
-			NotebookID: notebookId,
-			TagID:      sql.NullInt64{Int64: tagId, Valid: true},
-			Limit:      limit,
-			Offset:     offset,
-		})
+		notes, err = s.queries.ListNotesByNotebookAndTag(ctx,
+			notebookId,
+			tagId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
 	}
 
 	if notebookId != 0 && tagId == 0 {
-		notes, err = s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
-			NotebookID: notebookId,
-			Limit:      limit,
-			Offset:     offset,
-		})
+		notes, err = s.queries.ListNotesByNotebook(ctx,
+			notebookId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
 	}
 
 	if notebookId == 0 && tagId != 0 {
-		notes, err = s.queries.GetNotesForTag(ctx, db.GetNotesForTagParams{
-			TagID:  sql.NullInt64{Int64: tagId, Valid: true},
-			Limit:  limit,
-			Offset: offset,
-		})
+		notes, err = s.queries.GetNotesForTag(ctx,
+			tagId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
 	}
 
 	if notebookId == 0 && tagId == 0 {
-		fmt.Println("List all notes")
-		notes, err = s.queries.ListAllNotes(ctx, db.ListAllNotesParams{
-			Limit:  limit,
-			Offset: offset,
-		})
+		notes, err = s.queries.ListAllNotes(ctx,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
 	}
 
 	if err != nil {
@@ -100,7 +106,27 @@ func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int
 	return notes, nil
 }
 
-func (s *NoteService) UpdateNote(ctx context.Context, params db.UpdateNoteParams) error {
+func (s *NoteService) UpdateNote(ctx context.Context, id int64, title string, content string, notebookID int64, statusID sql.NullInt64, published bool, eventId sql.NullString) error {
+
+	var publishedAt sql.NullString
+
+	if published {
+		publishedAt = sql.NullString{String: time.Now().Format(time.RFC3339), Valid: true}
+	} else {
+		publishedAt = sql.NullString{String: "", Valid: false}
+	}
+
+	params := db.UpdateNoteParams{
+		ID:          id,
+		Title:       title,
+		Content:     content,
+		NotebookID:  notebookID,
+		StatusID:    statusID,
+		ModifiedAt:  time.Now().Format(time.RFC3339),
+		PublishedAt: publishedAt,
+		EventID:     eventId,
+	}
+
 	err := s.queries.UpdateNote(ctx, params)
 	if err != nil {
 		s.logger.Println("Error updating note:", err)
@@ -133,12 +159,12 @@ func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []d
 	stringifiedTags := builder.String()
 
 	params := db.AddNoteToTrashParams{
-		NoteID:    note.ID,
-		Content:   note.Content,
-		Title:     note.Title,
-		CreatedAt: note.CreatedAt,
-		TrashedAt: time.Now().Format(time.RFC3339),
-		Tags:      sql.NullString{String: stringifiedTags, Valid: true},
+		NoteID:     note.ID,
+		Content:    note.Content,
+		Title:      note.Title,
+		CreatedAt:  note.CreatedAt,
+		ModifiedAt: time.Now().Format(time.RFC3339),
+		Tags:       sql.NullString{String: stringifiedTags, Valid: true},
 	}
 	_, err := s.queries.AddNoteToTrash(ctx, params)
 	if err != nil {
@@ -179,9 +205,9 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *NoteService) SearchNotes(ctx context.Context, searchTerm string, notebookID, tagID int64, limit, pageParam int) ([]db.Note, error) {
+func (s *NoteService) SearchNotes(ctx context.Context, searchTerm string, notebookID, tagID int64, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Note, error) {
 	offset := pageParam * limit
-	notes, err := s.queries.CustomSearch(ctx, searchTerm, notebookID, tagID, int64(limit), int64(offset))
+	notes, err := s.queries.SearchNotes(ctx, searchTerm, notebookID, tagID, limit, offset, orderBy, sortDirection)
 	if err != nil {
 		return nil, err
 	}

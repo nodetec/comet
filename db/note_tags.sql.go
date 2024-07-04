@@ -50,67 +50,6 @@ func (q *Queries) CheckTagForNote(ctx context.Context, arg CheckTagForNoteParams
 	return is_associated, err
 }
 
-const getNotesForTag = `-- name: GetNotesForTag :many
-SELECT
-  n.id,
-  n.status_id,
-  n.notebook_id,
-  n.content,
-  n.title,
-  n.created_at,
-  n.modified_at,
-  n.published_at,
-  n.event_id
-FROM
-  notes n
-  JOIN note_tags nt ON n.id = nt.note_id
-WHERE
-  nt.tag_id = ?
-LIMIT
-  ?
-OFFSET
-  ?
-`
-
-type GetNotesForTagParams struct {
-	TagID  sql.NullInt64
-	Limit  int64
-	Offset int64
-}
-
-func (q *Queries) GetNotesForTag(ctx context.Context, arg GetNotesForTagParams) ([]Note, error) {
-	rows, err := q.db.QueryContext(ctx, getNotesForTag, arg.TagID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Note
-	for rows.Next() {
-		var i Note
-		if err := rows.Scan(
-			&i.ID,
-			&i.StatusID,
-			&i.NotebookID,
-			&i.Content,
-			&i.Title,
-			&i.CreatedAt,
-			&i.ModifiedAt,
-			&i.PublishedAt,
-			&i.EventID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getTagsForNote = `-- name: GetTagsForNote :many
 SELECT
   t.id,
@@ -166,6 +105,7 @@ func (q *Queries) RemoveAllTagsFromNote(ctx context.Context, noteID sql.NullInt6
 }
 
 const removeTagFromNote = `-- name: RemoveTagFromNote :exec
+
 DELETE FROM note_tags
 WHERE
   note_id = ?
@@ -177,6 +117,35 @@ type RemoveTagFromNoteParams struct {
 	TagID  sql.NullInt64
 }
 
+// -- name: GetNotesForTag :many
+// SELECT
+//
+//	n.id,
+//	n.status_id,
+//	n.notebook_id,
+//	n.content,
+//	n.title,
+//	n.created_at,
+//	n.modified_at,
+//	n.published_at,
+//	n.event_id
+//
+// FROM
+//
+//	notes n
+//	JOIN note_tags nt ON n.id = nt.note_id
+//
+// WHERE
+//
+//	nt.tag_id = ?
+//
+// LIMIT
+//
+//	?
+//
+// OFFSET
+//
+//	?;
 func (q *Queries) RemoveTagFromNote(ctx context.Context, arg RemoveTagFromNoteParams) error {
 	_, err := q.db.ExecContext(ctx, removeTagFromNote, arg.NoteID, arg.TagID)
 	return err

@@ -14,7 +14,7 @@ export default function Notes() {
       <NoteFeedHeader feedType={feedType} />
       <SearchNotes />
       {searchActive && <SearchFeed />}
-      {(feedType === "all" || feedType === "tag" || feedType === "notebook") &&
+      {(feedType === "all" || feedType === "notebook") &&
         !searchActive && <NoteFeed />}
       {feedType === "trash" && !searchActive && <TrashFeed />}
     </div>

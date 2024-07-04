@@ -18,26 +18,26 @@ FROM
 WHERE
   nt.note_id = ?;
 
--- name: GetNotesForTag :many
-SELECT
-  n.id,
-  n.status_id,
-  n.notebook_id,
-  n.content,
-  n.title,
-  n.created_at,
-  n.modified_at,
-  n.published_at,
-  n.event_id
-FROM
-  notes n
-  JOIN note_tags nt ON n.id = nt.note_id
-WHERE
-  nt.tag_id = ?
-LIMIT
-  ?
-OFFSET
-  ?;
+-- -- name: GetNotesForTag :many
+-- SELECT
+--   n.id,
+--   n.status_id,
+--   n.notebook_id,
+--   n.content,
+--   n.title,
+--   n.created_at,
+--   n.modified_at,
+--   n.published_at,
+--   n.event_id
+-- FROM
+--   notes n
+--   JOIN note_tags nt ON n.id = nt.note_id
+-- WHERE
+--   nt.tag_id = ?
+-- LIMIT
+--   ?
+-- OFFSET
+--   ?;
 
 -- name: RemoveTagFromNote :exec
 DELETE FROM note_tags

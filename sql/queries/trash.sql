@@ -6,7 +6,7 @@ INSERT INTO
     content,
     title,
     created_at,
-    trashed_at,
+    modified_at,
     tags
   )
 VALUES
@@ -15,7 +15,7 @@ VALUES
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags;
 
 -- name: GetNoteFromTrash :one
@@ -25,7 +25,7 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash
@@ -39,7 +39,7 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash

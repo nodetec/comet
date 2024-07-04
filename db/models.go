@@ -37,7 +37,6 @@ type NotebookTag struct {
 }
 
 type NotesFt struct {
-	Title   string
 	Content string
 }
 
@@ -55,11 +54,15 @@ type Tag struct {
 }
 
 type Trash struct {
-	ID        int64
-	NoteID    int64
-	Content   string
-	Title     string
-	CreatedAt string
-	TrashedAt string
-	Tags      sql.NullString
+	ID         int64
+	NoteID     int64
+	Content    string
+	Title      string
+	CreatedAt  string
+	ModifiedAt string
+	Tags       sql.NullString
+}
+
+type TrashFt struct {
+	Content string
 }

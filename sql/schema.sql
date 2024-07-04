@@ -49,13 +49,12 @@ CREATE TABLE IF NOT EXISTS trash (
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  trashed_at TEXT NOT NULL,
+  modified_at TEXT NOT NULL,
   tags TEXT, -- Field to store tags
   FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
-
+-- CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
 -- Create the FTS5 virtual table if it doesn't exist
 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (content);
 
@@ -85,6 +84,40 @@ WHERE
 
 INSERT INTO
   notes_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+-- Create the FTS5 virtual table if it doesn't exist
+CREATE VIRTUAL TABLE IF NOT EXISTS trash_fts USING fts5 (content);
+
+-- Insert trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_ai AFTER INSERT ON trash BEGIN
+INSERT INTO
+  trash_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+-- Delete trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_ad AFTER DELETE ON trash BEGIN
+DELETE FROM trash_fts
+WHERE
+  rowid = old.id;
+
+END;
+
+-- Update trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_au AFTER
+UPDATE ON trash BEGIN
+DELETE FROM trash_fts
+WHERE
+  rowid = old.id;
+
+INSERT INTO
+  trash_fts (rowid, content)
 VALUES
   (new.id, new.content);
 
