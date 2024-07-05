@@ -6,9 +6,20 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const { activeTag, setActiveTag, activeNote, setActiveNote } = useAppState();
+  const {
+    activeTag,
+    setActiveTag,
+    activeNote,
+    setActiveNote,
+    feedType,
+    setFeedType,
+  } = useAppState();
 
   const handleTagClick = async () => {
+    if (feedType === "trash") {
+      setFeedType("all");
+    }
+
     if (activeTag?.Name === tag.Name) {
       setActiveTag(undefined);
       return;

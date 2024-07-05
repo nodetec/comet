@@ -2,7 +2,7 @@
 
 import * as wails from "@wailsio/runtime";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { CloudOffIcon, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 
 import AllNotes from "./AllNotes";
 import { NotebookComboBox } from "./NotebookComboBox";
@@ -18,10 +18,10 @@ export default function Sidebar() {
     <div className="flex h-full flex-col justify-between pt-4">
       <div className="flex justify-end gap-x-4 pb-4 pr-4">
         <div className="flex justify-end">
-          <CloudOffIcon
-            // onClick={handleCreateNotebook}
-            className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
-          />
+          {/* <CloudOffIcon */}
+          {/*   // onClick={handleCreateNotebook} */}
+          {/*   className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" */}
+          {/* /> */}
         </div>
         <div className="flex justify-end">
           <Settings2
