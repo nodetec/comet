@@ -111,36 +111,6 @@ func main() {
 	contextmenu.CreateNoteTagMenu(app, mainWindow, ctx, noteTagService)
 	contextmenu.CreateTrashNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
 
-	// TODO
-	// Move to a separate function
-	initialSettings := map[string]string{
-		// theme
-		"theme": "dark",
-		// editor
-		"vim":                 "false",
-		"lineNumbers":         "false",
-		"highlightActiveLine": "false",
-		"lineWrapping":        "true",
-		"unorderedListBullet": "*",
-		"indentUnit":          "4",
-		"tabSize":             "4",
-		"fontSize":            "16",
-		"fontFamily":          "SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, Courier, monospace",
-		"fontWeight":          "normal",
-		"lineHeight":          "1.5",
-		// profile
-		"npub": "",
-		"nsec": "",
-		// relays
-		"relays": "[\"relay.damus.io\", \"nos.lol\"]",
-	}
-
-	// TODO
-	// Check if key exists and the value is a string in sql
-	for key, value := range initialSettings {
-		settingService.CreateSetting(ctx, key, value)
-	}
-
 	err = app.Run()
 	if err != nil {
 		log.Fatal(err)

@@ -47,22 +47,6 @@ func NewSettingService(queries *db.Queries, logger *log.Logger) *SettingService 
 	}
 }
 
-func (s *SettingService) CreateSetting(ctx context.Context, key string, value string) (Setting, error) {
-	params := db.CreateSettingParams{
-		Key:   key,
-		Value: value,
-	}
-	setting, err := s.queries.CreateSetting(ctx, params)
-	if err != nil {
-		s.logger.Printf("Error creating setting: %v", err)
-		return Setting{}, err
-	}
-	return Setting{
-		Key:   setting.Key,
-		Value: setting.Value,
-	}, nil
-}
-
 func (s *SettingService) GetSetting(ctx context.Context, key string) (Setting, error) {
 	setting, err := s.queries.GetSetting(ctx, key)
 	if err != nil {
@@ -140,15 +124,6 @@ func (s *SettingService) UpdateSetting(ctx context.Context, key string, value st
 	err := s.queries.UpdateSetting(ctx, params)
 	if err != nil {
 		s.logger.Printf("Error updating setting with Key %s: %v", key, err)
-		return err
-	}
-	return nil
-}
-
-func (s *SettingService) DeleteSetting(ctx context.Context, key string) error {
-	err := s.queries.DeleteSetting(ctx, key)
-	if err != nil {
-		s.logger.Printf("Error deleting setting with Key %s: %v", key, err)
 		return err
 	}
 	return nil

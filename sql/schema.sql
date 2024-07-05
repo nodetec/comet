@@ -104,3 +104,25 @@ CREATE INDEX IF NOT EXISTS idx_tags_name ON tags (name);
 CREATE INDEX IF NOT EXISTS idx_tags_created_at ON tags (created_at);
 
 CREATE INDEX IF NOT EXISTS idx_settings_key ON settings (key);
+
+-- Insert initial settings only if they do not already exist
+INSERT OR IGNORE INTO settings (key, value) VALUES
+		-- theme
+    ('theme', 'dark'),
+		-- editor
+		('vim', 'false'),
+		('lineNumbers', 'false'),
+		('highlightActiveLine', 'false'),
+		('lineWrapping',        'true'),
+		('unorderedListBullet', '*'),
+		('indentUnit',          '4'),
+		('tabSize',             '4'),
+		('fontSize',            '16'),
+		('fontFamily',          'SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, Courier, monospace'),
+		('fontWeight',          'normal'),
+		('lineHeight',          '1.5'),
+		-- profile
+		('npub', ''),
+		('nsec', ''),
+		-- relays
+		('relays', '[\"relay.damus.io\", \"nos.lol\"]');
