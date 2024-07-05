@@ -13,7 +13,7 @@ export const EditorWrapper = () => {
   const { activeNote, activeTrashNote, feedType } = useAppState();
   const [showPreview, setShowPreview] = useState(false);
 
-  if (activeNote === undefined && (feedType === "all" || feedType === "tag" || feedType === "notebook")) {
+  if (activeNote === undefined && (feedType === "all" || feedType === "notebook")) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-lg text-muted-foreground">

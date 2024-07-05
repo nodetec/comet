@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { useEditor } from "~/hooks/useEditor";
+import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
 
@@ -28,11 +29,16 @@ const Editor = () => {
     // if the first note is the active note, return
     if (firstNote.ID === activeNote.ID) return;
 
-    void (await NoteService.UpdateNote({
-      ...activeNote,
-      ModifiedAt: new Date().toISOString(),
-      Content: doc,
-    }));
+    void NoteService.UpdateNote(
+      activeNote.ID,
+      parseTitle(doc).title,
+      doc,
+      activeNote.NotebookID,
+      activeNote.StatusID,
+      // TODO: rethink published indicator
+      false,
+      activeNote.EventID,
+    );
 
     void queryClient.invalidateQueries({
       queryKey: ["notes"],

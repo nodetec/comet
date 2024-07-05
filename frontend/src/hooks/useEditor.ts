@@ -26,7 +26,6 @@ import {
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
-import { UpdateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
@@ -49,7 +48,6 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
   let timeoutId: NodeJS.Timeout;
 
   const saveDocument = async (view: EditorView) => {
-    console.log("SAVING");
     const content = activeNote?.Content;
     const id = activeNote?.ID;
     if (activeNote === undefined || id === undefined || content === undefined) {
@@ -57,18 +55,16 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
     }
     const note = await NoteService.GetNote(id);
     if (note.Content !== view.state.doc.toString()) {
-      const noteParams: UpdateNoteParams = {
-        ID: id,
-        StatusID: activeNote.StatusID,
-        NotebookID: activeNote.NotebookID,
-        Content: view.state.doc.toString(),
-        Title: parseTitle(view.state.doc.toString()).title,
-        ModifiedAt: new Date().toISOString(),
-        PublishedAt: activeNote.PublishedAt,
-        EventID: activeNote.EventID,
-      };
-
-      void NoteService.UpdateNote(noteParams);
+      void NoteService.UpdateNote(
+        id,
+        parseTitle(view.state.doc.toString()).title,
+        view.state.doc.toString(),
+        activeNote.NotebookID,
+        activeNote.StatusID,
+        // TODO: rethink published indicator
+        false,
+        activeNote.EventID,
+      );
       console.log("SAVING TO DB");
     }
   };

@@ -8,12 +8,21 @@ import { ScrollArea } from "../ui/scroll-area";
 import TrashNoteCard from "./TrashNoteCard";
 
 export default function TrashFeed() {
-  const { setActiveTrashNote } = useAppState();
+  const { setActiveTrashNote, orderBy, timeSortDirection, titleSortDirection } =
+    useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
-    console.log("fetching trash notes");
-    const notes = await NoteService.ListNotesFromTrash(pageSize, pageParam);
+
+    const sortDirection =
+      orderBy === "title" ? titleSortDirection : timeSortDirection;
+
+    const notes = await NoteService.ListNotesFromTrash(
+      pageSize,
+      pageParam,
+      orderBy,
+      sortDirection,
+    );
     console.log(notes);
 
     if (notes.length === 0) {

@@ -6,9 +6,10 @@ import {
 } from "&/github.com/nodetec/captains-log/service";
 import { useAppState } from "~/store";
 import dayjs from "dayjs";
-import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
+import { ChevronDown, PenBoxIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
+import { SortDropdown } from "./SortDropdown";
 
 type Props = {
   feedType: string;
@@ -51,22 +52,17 @@ export default function NoteFeedHeader({ feedType }: Props) {
   function title(feedType: string) {
     if (feedType === "all") return "All Notes";
     if (feedType === "notebook") return activeNotebook?.Name;
-    if (feedType === "tag") return activeTag?.Name;
     if (feedType === "trash") return "Trash";
   }
 
   return (
     <div className="flex justify-between px-3 pt-2">
-      <div className="flex items-center justify-center gap-x-1">
-        <Button
-          variant="ghost"
-          className="cursor-pointer text-muted-foreground hover:bg-background hover:text-foreground"
-          size="icon"
-        >
-          <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
-        </Button>
-        <h1 className="cursor-default text-lg font-bold">{title(feedType)}</h1>
-      </div>
+      <SortDropdown>
+        <div className="flex cursor-pointer items-center justify-center gap-x-1 pl-2">
+          <h1 className="text-lg font-bold">{title(feedType)}</h1>
+          <ChevronDown className="mt-1 h-[1rem] w-[1rem] text-muted-foreground" />
+        </div>
+      </SortDropdown>
       <Button
         disabled={feedType === "trash"}
         variant="ghost"

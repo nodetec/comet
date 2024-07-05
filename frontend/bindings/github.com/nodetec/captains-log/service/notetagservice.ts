@@ -19,19 +19,10 @@ export function CheckTagForNote(noteID: number, tagID: number): Promise<boolean>
     return $resultPromise;
 }
 
-export function GetNotesForTag(tagID: number, limit: number, pageParam: number): Promise<db$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1319145372, tagID, limit, pageParam) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType1($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
 export function GetTagsForNote(noteID: number): Promise<db$0.Tag[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(385519868, noteID) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType3($result);
+        return $$createType1($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -43,7 +34,5 @@ export function RemoveTagFromNote(noteID: number, tagID: number): Promise<void> 
 }
 
 // Private type creation functions
-const $$createType0 = db$0.Note.createFrom;
+const $$createType0 = db$0.Tag.createFrom;
 const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = db$0.Tag.createFrom;
-const $$createType3 = $Create.Array($$createType2);
