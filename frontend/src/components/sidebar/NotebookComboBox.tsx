@@ -54,11 +54,13 @@ export function NotebookComboBox() {
   };
 
   const handleSubmitNewNotebook = async () => {
-    await NotebookService.CreateNotebook(notebookName);
+    const newNotebook = await NotebookService.CreateNotebook(notebookName);
     void queryClient.invalidateQueries({
       queryKey: ["notebooks"],
     });
+    setActiveNotebook(newNotebook);
     setNotebookName("");
+    setFeedType("notebook");
   };
 
   async function fetchNotebooks() {
