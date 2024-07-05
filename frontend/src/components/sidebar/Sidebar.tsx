@@ -1,28 +1,35 @@
 // import { NotebookService } from "&/github.com/nodetec/captains-log/service";
 
+import * as wails from "@wailsio/runtime";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { CloudOffIcon, Settings2 } from "lucide-react";
 
 import AllNotes from "./AllNotes";
-import Login from "./Login";
 import { NotebookComboBox } from "./NotebookComboBox";
 import Tags from "./Tags";
 import Trash from "./Trash";
 
-// import Trash from "./Trash";
-
 export default function Sidebar() {
-  // const handleCreateNotebook = () => {
-  //   NotebookService.CreateNotebook("New Notebook");
-  // };
+  const handleOpenSettings = () => {
+    wails.Events.Emit({ name: "open-settings-window", data: "" });
+  };
 
   return (
-    <div className="flex h-full flex-col justify-between pt-[3.25rem]">
-      {/* <div className="flex justify-end px-4 pb-2 pt-4"> */}
-      {/*   <NotebookPen */}
-      {/*     onClick={handleCreateNotebook} */}
-      {/*     className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" */}
-      {/*   /> */}
-      {/* </div> */}
+    <div className="flex h-full flex-col justify-between pt-4">
+      <div className="flex justify-end gap-x-4 pb-4 pr-4">
+        <div className="flex justify-end">
+          <CloudOffIcon
+            // onClick={handleCreateNotebook}
+            className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
+          />
+        </div>
+        <div className="flex justify-end">
+          <Settings2
+            onClick={handleOpenSettings}
+            className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
+          />
+        </div>
+      </div>
       <ScrollArea className="flex h-full flex-col gap-y-2">
         <div className="flex flex-col gap-y-2 px-3">
           <AllNotes />
@@ -31,7 +38,7 @@ export default function Sidebar() {
           <Tags />
         </div>
       </ScrollArea>
-      <Login />
+      {/* <Login /> */}
     </div>
   );
 }

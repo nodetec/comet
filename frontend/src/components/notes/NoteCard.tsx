@@ -1,4 +1,3 @@
-// import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { parseContent } from "~/lib/markdown";
 import { fromNow } from "~/lib/utils";
@@ -46,9 +45,11 @@ export default function NoteCard({ note }: Props) {
           {note.ModifiedAt && fromNow(note.ModifiedAt)}
         </span>
       </div>
-      <div className="px-[0.30rem]">
-        <Separator className="bg-border/30" />
-      </div>
+      {activeNote?.ID !== note.ID && (
+        <div className="px-[0.30rem]">
+          <Separator className="bg-border/30" />
+        </div>
+      )}
     </div>
   );
 }

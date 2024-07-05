@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -56,8 +55,10 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
         {/* </DropdownMenuLabel> */}
         {/* <DropdownMenuSeparator /> */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <span>Sort by</span>
+          <DropdownMenuSubTrigger
+            className="cursor-pointer"
+          >
+            Sort by
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
@@ -65,13 +66,19 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
                 value={orderBy}
                 onValueChange={handleSortChange}
               >
-                <DropdownMenuRadioItem value="modified_at">
+                <DropdownMenuRadioItem
+                  className="cursor-pointer"
+                  value="modified_at"
+                >
                   Modification Date
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="created_at">
+                <DropdownMenuRadioItem
+                  className="cursor-pointer"
+                  value="created_at"
+                >
                   Creation Date
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="title">
+                <DropdownMenuRadioItem className="cursor-pointer" value="title">
                   Title
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
@@ -81,9 +88,14 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
                   value={titleSortDirection}
                   onValueChange={handleDirectionChange}
                 >
-                  <DropdownMenuRadioItem value="ASC">A-Z</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem className="cursor-pointer" value="ASC">
+                    A-Z
+                  </DropdownMenuRadioItem>
 
-                  <DropdownMenuRadioItem value="DESC">
+                  <DropdownMenuRadioItem
+                    className="cursor-pointer"
+                    value="DESC"
+                  >
                     Z-A
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
@@ -92,10 +104,13 @@ export function SortDropdown({ children }: { children: React.ReactNode }) {
                   value={timeSortDirection}
                   onValueChange={handleDirectionChange}
                 >
-                  <DropdownMenuRadioItem value="DESC">
+                  <DropdownMenuRadioItem
+                    className="cursor-pointer"
+                    value="DESC"
+                  >
                     Newest On Top
                   </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="ASC">
+                  <DropdownMenuRadioItem className="cursor-pointer" value="ASC">
                     Oldest On Top
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
