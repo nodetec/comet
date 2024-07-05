@@ -7,9 +7,13 @@ import { useInView } from "react-intersection-observer";
 import { ScrollArea } from "../ui/scroll-area";
 import TrashNoteCard from "./TrashNoteCard";
 
-export default function TrashFeed() {
-  const { setActiveTrashNote, orderBy, timeSortDirection, titleSortDirection } =
-    useAppState();
+export default function TrashSearchFeed() {
+  const {
+    noteSearch,
+    orderBy,
+    timeSortDirection,
+    titleSortDirection,
+  } = useAppState();
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -17,21 +21,15 @@ export default function TrashFeed() {
     const sortDirection =
       orderBy === "title" ? titleSortDirection : timeSortDirection;
 
-    const notes = await NoteService.ListNotesFromTrash(
+    const notes = await NoteService.SearchTrash(
+      noteSearch,
       pageSize,
       pageParam,
       orderBy,
       sortDirection,
     );
-    console.log(notes);
 
-    if (notes.length === 0) {
-      setActiveTrashNote(undefined);
-    }
-
-    // if (!activeTrashNote && notes.length > 0) {
-    //   setActiveTrashNote(notes[0]);
-    // }
+    console.log("search trash",notes);
 
     return {
       data: notes || [],
@@ -42,7 +40,8 @@ export default function TrashFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: ["trash-notes"],
+      queryKey: ["search trash", noteSearch],
+      gcTime: 3000,
       queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,

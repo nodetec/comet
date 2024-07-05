@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func (q *Queries) SearchTrash(ctx context.Context, searchTerm string, limit, offset int64, orderBy, sortDirection string) ([]Note, error) {
+func (q *Queries) SearchTrash(ctx context.Context, searchTerm string, limit, offset int64, orderBy, sortDirection string) ([]Trash, error) {
 	orderClause := "trash.id DESC"
 	switch orderBy {
 	case "modified_at":
@@ -33,19 +33,25 @@ func (q *Queries) SearchTrash(ctx context.Context, searchTerm string, limit, off
 	}
 	defer rows.Close()
 
-	var notes []Note
+	// id INTEGER PRIMARY KEY AUTOINCREMENT,
+	// note_id INTEGER NOT NULL,
+	// content TEXT NOT NULL,
+	// title TEXT NOT NULL,
+	// created_at TEXT NOT NULL,
+	// modified_at TEXT NOT NULL,
+	// tags TEXT, -- Field to store tags
+
+	var notes []Trash
 	for rows.Next() {
-		var note Note
+		var note Trash
 		if err := rows.Scan(
 			&note.ID,
-			&note.StatusID,
-			&note.NotebookID,
+			&note.NoteID,
 			&note.Content,
 			&note.Title,
 			&note.CreatedAt,
 			&note.ModifiedAt,
-			&note.PublishedAt,
-			&note.EventID,
+			&note.Tags,
 		); err != nil {
 			return nil, err
 		}

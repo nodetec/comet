@@ -183,12 +183,14 @@ func (s *NoteService) GetNoteFromTrash(ctx context.Context, id int64) (db.Trash,
 	return trash, nil
 }
 
-func (s *NoteService) ListNotesFromTrash(ctx context.Context, limit, pageParam int64) ([]db.Trash, error) {
+func (s *NoteService) ListNotesFromTrash(ctx context.Context, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Trash, error) {
 	offset := pageParam * limit
-	trash, err := s.queries.ListNotesFromTrash(ctx, db.ListNotesFromTrashParams{
-		Limit:  limit,
-		Offset: offset,
-	})
+	trash, err := s.queries.ListNotesFromTrash(ctx,
+		limit,
+		offset,
+		orderBy,
+		sortDirection,
+	)
 	if err != nil {
 		s.logger.Printf("Error listing notes from trash: %v", err)
 		return nil, err
@@ -208,6 +210,15 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 func (s *NoteService) SearchNotes(ctx context.Context, searchTerm string, notebookID, tagID int64, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Note, error) {
 	offset := pageParam * limit
 	notes, err := s.queries.SearchNotes(ctx, searchTerm, notebookID, tagID, limit, offset, orderBy, sortDirection)
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
+}
+
+func (s *NoteService) SearchTrash(ctx context.Context, searchTerm string, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Trash, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.SearchTrash(ctx, searchTerm, limit, offset, orderBy, sortDirection)
 	if err != nil {
 		return nil, err
 	}
