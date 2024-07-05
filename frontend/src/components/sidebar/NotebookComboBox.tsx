@@ -38,6 +38,8 @@ export function NotebookComboBox() {
     setFeedType,
     activeNote,
     setActiveNote,
+    activeTag,
+    setActiveTag,
   } = useAppState();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
@@ -52,11 +54,13 @@ export function NotebookComboBox() {
   };
 
   const handleSubmitNewNotebook = async () => {
-    await NotebookService.CreateNotebook(notebookName);
-
+    const newNotebook = await NotebookService.CreateNotebook(notebookName);
     void queryClient.invalidateQueries({
       queryKey: ["notebooks"],
     });
+    setActiveNotebook(newNotebook);
+    setNotebookName("");
+    setFeedType("notebook");
   };
 
   async function fetchNotebooks() {
@@ -69,7 +73,7 @@ export function NotebookComboBox() {
     queryFn: () => fetchNotebooks(),
   });
 
-  const selectNotebook = (notebookName: string, notebook: Notebook) => {
+  const selectNotebook = async (notebookName: string, notebook: Notebook) => {
     setActiveNotebook(notebook);
     setValue(notebookName);
     setOpen(false);
@@ -83,6 +87,13 @@ export function NotebookComboBox() {
     void queryClient.invalidateQueries({
       queryKey: ["tags"],
     });
+    if (activeTag) {
+      const isTagAssociatedWithNotebook =
+        await NotebookService.CheckTagForNotebook(notebook.ID, activeTag?.ID);
+      if (!isTagAssociatedWithNotebook) {
+        setActiveTag(undefined);
+      }
+    }
   };
 
   return (

@@ -17,7 +17,7 @@ INSERT INTO
     content,
     title,
     created_at,
-    trashed_at,
+    modified_at,
     tags
   )
 VALUES
@@ -26,17 +26,17 @@ VALUES
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 `
 
 type AddNoteToTrashParams struct {
-	NoteID    int64
-	Content   string
-	Title     string
-	CreatedAt string
-	TrashedAt string
-	Tags      sql.NullString
+	NoteID     int64
+	Content    string
+	Title      string
+	CreatedAt  string
+	ModifiedAt string
+	Tags       sql.NullString
 }
 
 // Trashed Note Queries
@@ -46,7 +46,7 @@ func (q *Queries) AddNoteToTrash(ctx context.Context, arg AddNoteToTrashParams) 
 		arg.Content,
 		arg.Title,
 		arg.CreatedAt,
-		arg.TrashedAt,
+		arg.ModifiedAt,
 		arg.Tags,
 	)
 	var i Trash
@@ -56,7 +56,7 @@ func (q *Queries) AddNoteToTrash(ctx context.Context, arg AddNoteToTrashParams) 
 		&i.Content,
 		&i.Title,
 		&i.CreatedAt,
-		&i.TrashedAt,
+		&i.ModifiedAt,
 		&i.Tags,
 	)
 	return i, err
@@ -80,7 +80,7 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash
@@ -97,61 +97,8 @@ func (q *Queries) GetNoteFromTrash(ctx context.Context, id int64) (Trash, error)
 		&i.Content,
 		&i.Title,
 		&i.CreatedAt,
-		&i.TrashedAt,
+		&i.ModifiedAt,
 		&i.Tags,
 	)
 	return i, err
-}
-
-const listNotesFromTrash = `-- name: ListNotesFromTrash :many
-SELECT
-  id,
-  note_id,
-  content,
-  title,
-  created_at,
-  trashed_at,
-  tags
-FROM
-  trash
-LIMIT
-  ?
-OFFSET
-  ?
-`
-
-type ListNotesFromTrashParams struct {
-	Limit  int64
-	Offset int64
-}
-
-func (q *Queries) ListNotesFromTrash(ctx context.Context, arg ListNotesFromTrashParams) ([]Trash, error) {
-	rows, err := q.db.QueryContext(ctx, listNotesFromTrash, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Trash
-	for rows.Next() {
-		var i Trash
-		if err := rows.Scan(
-			&i.ID,
-			&i.NoteID,
-			&i.Content,
-			&i.Title,
-			&i.CreatedAt,
-			&i.TrashedAt,
-			&i.Tags,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

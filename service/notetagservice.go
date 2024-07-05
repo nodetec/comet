@@ -32,19 +32,19 @@ func (s *NoteTagService) AddTagToNote(ctx context.Context, noteID, tagID int64) 
 	return nil
 }
 
-func (s *NoteTagService) GetNotesForTag(ctx context.Context, tagID, limit, pageParam int64) ([]db.Note, error) {
-  offset := pageParam * limit
-	notes, err := s.queries.GetNotesForTag(ctx, db.GetNotesForTagParams{
-		TagID:  sql.NullInt64{Int64: tagID, Valid: true},
-		Limit:  limit,
-		Offset: offset,
-	})
-	if err != nil {
-		s.logger.Println("Error getting notes for tag:", err)
-		return nil, err
-	}
-	return notes, nil
-}
+// func (s *NoteTagService) GetNotesForTag(ctx context.Context, tagID, limit, pageParam int64) ([]db.Note, error) {
+//   offset := pageParam * limit
+// 	notes, err := s.queries.GetNotesForTag(ctx, db.GetNotesForTagParams{
+// 		TagID:  sql.NullInt64{Int64: tagID, Valid: true},
+// 		Limit:  limit,
+// 		Offset: offset,
+// 	})
+// 	if err != nil {
+// 		s.logger.Println("Error getting notes for tag:", err)
+// 		return nil, err
+// 	}
+// 	return notes, nil
+// }
 
 func (s *NoteTagService) GetTagsForNote(ctx context.Context, noteID int64) ([]db.Tag, error) {
 	tags, err := s.queries.GetTagsForNote(ctx, sql.NullInt64{Int64: noteID, Valid: true})
