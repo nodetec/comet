@@ -9,31 +9,6 @@ import {Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as sql$0 from "../../../../database/sql/models.js";
 
-export class Setting {
-    "Key": string;
-    "Value": string;
-
-    /** Creates a new Setting instance. */
-    constructor($$source: Partial<Setting> = {}) {
-        if (!("Key" in $$source)) {
-            this["Key"] = "";
-        }
-        if (!("Value" in $$source)) {
-            this["Value"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Setting instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Setting {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new Setting($$parsedSource as Partial<Setting>);
-    }
-}
-
 export class Settings {
     /**
      * theme

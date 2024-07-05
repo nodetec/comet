@@ -151,11 +151,11 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		('indentUnit',          '4'),
 		('tabSize',             '4'),
 		('fontSize',            '16'),
-		('fontFamily',          'SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, Courier, monospace'),
+		('fontFamily',          'SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace'),
 		('fontWeight',          'normal'),
 		('lineHeight',          '1.5'),
 		-- profile
 		('npub', ''),
 		('nsec', ''),
 		-- relays
-		('relays', '[\"relay.damus.io\", \"nos.lol\"]');
+		('relays', '["relay.damus.io", "nos.lol"]');

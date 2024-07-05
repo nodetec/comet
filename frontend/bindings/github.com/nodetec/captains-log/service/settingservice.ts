@@ -9,36 +9,18 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
-export function CreateSetting(key: string, value: string): Promise<$models.Setting> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(117606560, key, value) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType0($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
-export function DeleteSetting(key: string): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(4125236753, key) as any;
-    return $resultPromise;
-}
-
 export function GetAllSettings(): Promise<$models.Settings> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1009539482) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType1($result);
+        return $$createType0($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
 }
 
-export function GetSetting(key: string): Promise<$models.Setting> & { cancel(): void } {
+export function GetSetting(key: string): Promise<string> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1457156808, key) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType0($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
+    return $resultPromise;
 }
 
 export function UpdateSetting(key: string, value: string): Promise<void> & { cancel(): void } {
@@ -47,5 +29,4 @@ export function UpdateSetting(key: string, value: string): Promise<void> & { can
 }
 
 // Private type creation functions
-const $$createType0 = $models.Setting.createFrom;
-const $$createType1 = $models.Settings.createFrom;
+const $$createType0 = $models.Settings.createFrom;

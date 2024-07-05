@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/nodetec/captains-log/db"
@@ -47,27 +46,23 @@ func NewSettingService(queries *db.Queries, logger *log.Logger) *SettingService 
 	}
 }
 
-func (s *SettingService) GetSetting(ctx context.Context, key string) (Setting, error) {
+func (s *SettingService) GetSetting(ctx context.Context, key string) (string, error) {
 	setting, err := s.queries.GetSetting(ctx, key)
 	if err != nil {
 		s.logger.Printf("Error getting setting with Key %s: %v", key, err)
-		return Setting{}, err
+		return "", err
 	}
-	return Setting{
-		Key:   setting.Key,
-		Value: setting.Value,
-	}, nil
+	return setting.Value, nil
 }
 
 func (s *SettingService) GetAllSettings(ctx context.Context) (Settings, error) {
 	settings, err := s.queries.GetAllSettings(ctx)
-	fmt.Println("settings ", settings)
 	if err != nil {
 		s.logger.Printf("Error getting all settings: %v", err)
 		return Settings{}, err
 	}
 
-	settingsMap := make(map[string]interface{})
+	settingsMap := make(map[string]string)
 
 	for _, setting := range settings {
 		settingsMap[setting.Key] = setting.Value
@@ -78,38 +73,38 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (Settings, error) {
 		switch key {
 		// theme
 		case "theme":
-			result.Theme = value.(string)
+			result.Theme = value
 		// editor
 		case "vim":
-			result.Vim = value.(string)
+			result.Vim = value
 		case "lineNumbers":
-			result.LineNumbers = value.(string)
+			result.LineNumbers = value
 		case "highlightActiveLine":
-			result.HighlightActiveLine = value.(string)
+			result.HighlightActiveLine = value
 		case "lineWrapping":
-			result.LineWrapping = value.(string)
+			result.LineWrapping = value
 		case "unorderedListBullet":
-			result.UnorderedListBullet = value.(string)
+			result.UnorderedListBullet = value
 		case "indentUnit":
-			result.IndentUnit = value.(string)
+			result.IndentUnit = value
 		case "tabSize":
-			result.TabSize = value.(string)
+			result.TabSize = value
 		case "fontSize":
-			result.FontSize = value.(string)
+			result.FontSize = value
 		case "fontFamily":
-			result.FontFamily = value.(string)
+			result.FontFamily = value
 		case "fontWeight":
-			result.FontWeight = value.(string)
+			result.FontWeight = value
 		case "lineHeight":
-			result.LineHeight = value.(string)
+			result.LineHeight = value
 			// profile
 		case "npub":
-			result.Npub = value.(string)
+			result.Npub = value
 		case "nsec":
-			result.Nsec = value.(string)
+			result.Nsec = value
 			// relays
 		case "relays":
-			result.Relays = value.(string)
+			result.Relays = value
 		}
 	}
 
