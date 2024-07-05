@@ -88,7 +88,7 @@ export function NotebookComboBox() {
     if (activeTag) {
       const isTagAssociatedWithNotebook =
         await NotebookService.CheckTagForNotebook(notebook.ID, activeTag?.ID);
-      if (isTagAssociatedWithNotebook) {
+      if (!isTagAssociatedWithNotebook) {
         setActiveTag(undefined);
       }
     }
