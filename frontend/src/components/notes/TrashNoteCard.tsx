@@ -38,7 +38,7 @@ export default function TrashNoteCard({ trashNote }: Props) {
         </span>
 
         <span className="select-none text-xs text-muted-foreground/80">
-          {trashNote.TrashedAt && fromNow(trashNote.TrashedAt)}
+          {trashNote.ModifiedAt && fromNow(trashNote.ModifiedAt)}
         </span>
       </div>
       <div className="px-[0.30rem]">

@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   status_id INTEGER,
-  notebook_id INTEGER,
+  notebook_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -49,20 +49,81 @@ CREATE TABLE IF NOT EXISTS trash (
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  trashed_at TEXT NOT NULL,
+  modified_at TEXT NOT NULL,
   tags TEXT, -- Field to store tags
   FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (
-  content,
-  title,
-  notebook_id UNINDEXED,
-  created_at UNINDEXED,
-  modified_at UNINDEXED
-);
+-- CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
+-- Create the FTS5 virtual table if it doesn't exist
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (content);
 
-CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+-- Insert trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+INSERT INTO
+  notes_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+-- Delete trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+DELETE FROM notes_fts
+WHERE
+  rowid = old.id;
+
+END;
+
+-- Update trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS notes_au AFTER
+UPDATE ON notes BEGIN
+DELETE FROM notes_fts
+WHERE
+  rowid = old.id;
+
+INSERT INTO
+  notes_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- Create the FTS5 virtual table if it doesn't exist
+CREATE VIRTUAL TABLE IF NOT EXISTS trash_fts USING fts5 (content);
+
+-- Insert trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_ai AFTER INSERT ON trash BEGIN
+INSERT INTO
+  trash_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
+
+-- Delete trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_ad AFTER DELETE ON trash BEGIN
+DELETE FROM trash_fts
+WHERE
+  rowid = old.id;
+
+END;
+
+-- Update trigger to keep FTS table in sync with the main table
+CREATE TRIGGER IF NOT EXISTS trash_au AFTER
+UPDATE ON trash BEGIN
+DELETE FROM trash_fts
+WHERE
+  rowid = old.id;
+
+INSERT INTO
+  trash_fts (rowid, content)
+VALUES
+  (new.id, new.content);
+
+END;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes (created_at);
@@ -76,3 +137,25 @@ CREATE INDEX IF NOT EXISTS idx_tags_name ON tags (name);
 CREATE INDEX IF NOT EXISTS idx_tags_created_at ON tags (created_at);
 
 CREATE INDEX IF NOT EXISTS idx_settings_key ON settings (key);
+
+-- Insert initial settings only if they do not already exist
+INSERT OR IGNORE INTO settings (key, value) VALUES
+		-- theme
+    ('theme', 'dark'),
+		-- editor
+		('vim', 'false'),
+		('lineNumbers', 'false'),
+		('highlightActiveLine', 'false'),
+		('lineWrapping',        'true'),
+		('unorderedListBullet', '*'),
+		('indentUnit',          '4'),
+		('tabSize',             '4'),
+		('fontSize',            '16'),
+		('fontFamily',          'SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace'),
+		('fontWeight',          'normal'),
+		('lineHeight',          '1.5'),
+		-- profile
+		('npub', ''),
+		('nsec', ''),
+		-- relays
+		('relays', '["relay.damus.io", "nos.lol"]');

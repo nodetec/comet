@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { TagService } from "&/github.com/nodetec/captains-log/service";
+import {
+  NotebookService,
+  Tag,
+  TagService,
+} from "&/github.com/nodetec/captains-log/service";
+import { useAppState } from "~/store";
 import { TagsIcon } from "lucide-react";
 
 import {
@@ -11,13 +16,22 @@ import {
 import TagItem from "./TagItem";
 
 export default function Tags() {
+  const { activeNotebook } = useAppState();
+
   const { isPending, data } = useQuery({
-    queryKey: ["tags"],
+    queryKey: ["tags", activeNotebook?.ID],
     queryFn: () => fetchTags(),
   });
 
   async function fetchTags() {
-    const tags = await TagService.ListTags();
+    let tags: Tag[] = [];
+
+    if (!activeNotebook) {
+      tags = await TagService.ListTags();
+    } else {
+      tags = await NotebookService.GetTagsForNotebook(activeNotebook.ID);
+    }
+
     return tags;
   }
 

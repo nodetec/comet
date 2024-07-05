@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -23,7 +22,7 @@ func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
 	}
 }
 
-func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID sql.NullInt64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
+func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID int64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
 
 	params := db.CreateNoteParams{
 		Title:       title,
@@ -53,22 +52,81 @@ func (s *NoteService) GetNote(ctx context.Context, id int64) (db.Note, error) {
 	return note, nil
 }
 
-func (s *NoteService) ListNotes(ctx context.Context, notebookID sql.NullInt64, limit, pageParam int64) ([]db.Note, error) {
+func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int64, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Note, error) {
 	offset := pageParam * limit
-  fmt.Println("notebookID", notebookID)
-	notes, err := s.queries.ListNotesByNotebook(ctx, db.ListNotesByNotebookParams{
-		NotebookID: notebookID,
-		Limit:      limit,
-		Offset:     offset,
-	})
+
+	var notes []db.Note
+	var err error
+
+	if notebookId != 0 && tagId != 0 {
+		notes, err = s.queries.ListNotesByNotebookAndTag(ctx,
+			notebookId,
+			tagId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
+	}
+
+	if notebookId != 0 && tagId == 0 {
+		notes, err = s.queries.ListNotesByNotebook(ctx,
+			notebookId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
+	}
+
+	if notebookId == 0 && tagId != 0 {
+		notes, err = s.queries.GetNotesForTag(ctx,
+			tagId,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
+	}
+
+	if notebookId == 0 && tagId == 0 {
+		notes, err = s.queries.ListAllNotes(ctx,
+			limit,
+			offset,
+			orderBy,
+			sortDirection,
+		)
+	}
+
 	if err != nil {
-		s.logger.Println("Error listing notes by notebook:", err)
+		s.logger.Println("Error listing notes :", err)
 		return []db.Note{}, err
 	}
+
 	return notes, nil
 }
 
-func (s *NoteService) UpdateNote(ctx context.Context, params db.UpdateNoteParams) error {
+func (s *NoteService) UpdateNote(ctx context.Context, id int64, title string, content string, notebookID int64, statusID sql.NullInt64, published bool, eventId sql.NullString) error {
+
+	var publishedAt sql.NullString
+
+	if published {
+		publishedAt = sql.NullString{String: time.Now().Format(time.RFC3339), Valid: true}
+	} else {
+		publishedAt = sql.NullString{String: "", Valid: false}
+	}
+
+	params := db.UpdateNoteParams{
+		ID:          id,
+		Title:       title,
+		Content:     content,
+		NotebookID:  notebookID,
+		StatusID:    statusID,
+		ModifiedAt:  time.Now().Format(time.RFC3339),
+		PublishedAt: publishedAt,
+		EventID:     eventId,
+	}
+
 	err := s.queries.UpdateNote(ctx, params)
 	if err != nil {
 		s.logger.Println("Error updating note:", err)
@@ -89,7 +147,6 @@ func (s *NoteService) DeleteNote(ctx context.Context, id int64) error {
 // Trash-related methods
 
 func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []db.Tag) error {
-
 	var builder strings.Builder
 
 	for i, tag := range tags {
@@ -102,12 +159,12 @@ func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []d
 	stringifiedTags := builder.String()
 
 	params := db.AddNoteToTrashParams{
-		NoteID:    note.ID,
-		Content:   note.Content,
-		Title:     note.Title,
-		CreatedAt: note.CreatedAt,
-		TrashedAt: time.Now().Format(time.RFC3339),
-		Tags:      sql.NullString{String: stringifiedTags, Valid: true},
+		NoteID:     note.ID,
+		Content:    note.Content,
+		Title:      note.Title,
+		CreatedAt:  note.CreatedAt,
+		ModifiedAt: time.Now().Format(time.RFC3339),
+		Tags:       sql.NullString{String: stringifiedTags, Valid: true},
 	}
 	_, err := s.queries.AddNoteToTrash(ctx, params)
 	if err != nil {
@@ -126,12 +183,14 @@ func (s *NoteService) GetNoteFromTrash(ctx context.Context, id int64) (db.Trash,
 	return trash, nil
 }
 
-func (s *NoteService) ListNotesFromTrash(ctx context.Context, limit, pageParam int64) ([]db.Trash, error) {
+func (s *NoteService) ListNotesFromTrash(ctx context.Context, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Trash, error) {
 	offset := pageParam * limit
-	trash, err := s.queries.ListNotesFromTrash(ctx, db.ListNotesFromTrashParams{
-		Limit:  limit,
-		Offset: offset,
-	})
+	trash, err := s.queries.ListNotesFromTrash(ctx,
+		limit,
+		offset,
+		orderBy,
+		sortDirection,
+	)
 	if err != nil {
 		s.logger.Printf("Error listing notes from trash: %v", err)
 		return nil, err
@@ -146,4 +205,22 @@ func (s *NoteService) DeleteNoteFromTrash(ctx context.Context, id int64) error {
 		return err
 	}
 	return nil
+}
+
+func (s *NoteService) SearchNotes(ctx context.Context, searchTerm string, notebookID, tagID int64, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Note, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.SearchNotes(ctx, searchTerm, notebookID, tagID, limit, offset, orderBy, sortDirection)
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
+}
+
+func (s *NoteService) SearchTrash(ctx context.Context, searchTerm string, limit, pageParam int64, orderBy string, sortDirection string) ([]db.Trash, error) {
+	offset := pageParam * limit
+	notes, err := s.queries.SearchTrash(ctx, searchTerm, limit, offset, orderBy, sortDirection)
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
 }

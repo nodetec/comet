@@ -11,7 +11,6 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   bracketMatching,
   indentOnInput,
-  // indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
@@ -23,16 +22,10 @@ import {
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
-  // scrollPastEnd,
-  // lineNumbers,
   rectangularSelection,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
-import { UpdateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
-// import { useQueryClient } from "@tanstack/react-query";
-// import { NullInt64, NullString } from "&/database/sql/models";
-// import { UpdateNoteParams } from "&/github.com/nodetec/captains-log/db/models";
 import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
@@ -50,10 +43,11 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
   const [editorView, setEditorView] = useState<EditorView>();
 
   const { activeNote, activeTrashNote, feedType } = useAppState();
-
   const queryClient = useQueryClient();
 
-  async function handleBlur(view: EditorView) {
+  let timeoutId: NodeJS.Timeout;
+
+  const saveDocument = async (view: EditorView) => {
     const content = activeNote?.Content;
     const id = activeNote?.ID;
     if (activeNote === undefined || id === undefined || content === undefined) {
@@ -61,27 +55,25 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
     }
     const note = await NoteService.GetNote(id);
     if (note.Content !== view.state.doc.toString()) {
-      const noteParams: UpdateNoteParams = {
-        ID: id,
-        StatusID: activeNote.StatusID,
-        NotebookID: activeNote.NotebookID,
-        Content: view.state.doc.toString(),
-        Title: parseTitle(view.state.doc.toString()).title,
-        ModifiedAt: new Date().toISOString(),
-        PublishedAt: activeNote.PublishedAt,
-        EventID: activeNote.EventID,
-      };
-
-      void NoteService.UpdateNote(noteParams);
-      void queryClient.invalidateQueries({ queryKey: ["notes"] });
-      console.log("SAVING TO DB ON BLUR");
+      void NoteService.UpdateNote(
+        id,
+        parseTitle(view.state.doc.toString()).title,
+        view.state.doc.toString(),
+        activeNote.NotebookID,
+        activeNote.StatusID,
+        // TODO: rethink published indicator
+        false,
+        activeNote.EventID,
+      );
+      console.log("SAVING TO DB");
     }
-  }
+  };
 
   const blurHandlerExtension = EditorView.domEventHandlers({
     blur: (_, view) => {
-      void handleBlur(view);
-      return false; // Return false if you don't want to prevent the default behavior
+      void saveDocument(view);
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      return false;
     },
   });
 
@@ -101,13 +93,9 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
       dropCursor(),
       indentOnInput(),
       bracketMatching(),
-      // lineNumbers(),
       closeBrackets(),
       rectangularSelection(),
-      // highlightActiveLine(),
       crosshairCursor(),
-      // highlightActiveLineGutter(),
-      // scrollPastEnd(),
       EditorState.readOnly.of(feedType === "trash" ? true : false),
       keymap.of([indentWithTab]),
       EditorView.lineWrapping,
@@ -122,12 +110,9 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
           activeNote?.Content !== update.state.doc.toString()
         ) {
           onChange(update.state.doc.toString());
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => saveDocument(update.view), 500);
         }
-      }),
-
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: languages,
       }),
     ];
 
@@ -145,6 +130,7 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
 
     return () => {
       view.destroy();
+      clearTimeout(timeoutId); // Clear timeout on cleanup
     };
   }, [activeNote?.ID, activeTrashNote?.ID, feedType]);
 

@@ -1,11 +1,15 @@
-import { Note, Notebook, Trash } from "&/github.com/nodetec/captains-log/db/models";
+import {
+  Note,
+  Notebook,
+  Trash,
+} from "&/github.com/nodetec/captains-log/db/models";
 import { Tag } from "&/github.com/nodetec/captains-log/service";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
-  feedType: "all" | "notebook" | "trash" | "tag" | "search";
-  setFeedType: (feedType: "all" | "notebook" | "trash" | "tag" | "search") => void;
+  feedType: "all" | "notebook" | "trash";
+  setFeedType: (feedType: "all" | "notebook" | "trash") => void;
 
   activeNote: Note | undefined;
   setActiveNote: (activeNote: Note | undefined) => void;
@@ -18,6 +22,21 @@ interface State {
 
   activeTrashNote: Trash | undefined;
   setActiveTrashNote: (activeTrashNote: Trash | undefined) => void;
+
+  searchActive: boolean;
+  setSearchActive: (searchActive: boolean) => void;
+
+  noteSearch: string;
+  setNoteSearch: (noteSearch: string) => void;
+
+  orderBy: "modified_at" | "created_at" | "title";
+  setOrderBy: (orderBy: "modified_at" | "created_at" | "title") => void;
+
+  timeSortDirection: "ASC" | "DESC";
+  setTimeSortDirection: (sortDirection: "ASC" | "DESC") => void;
+
+  titleSortDirection: "ASC" | "DESC";
+  setTitleSortDirection: (sortDirection: "ASC" | "DESC") => void;
 }
 
 export const useAppState = create<State>()(
@@ -37,6 +56,22 @@ export const useAppState = create<State>()(
 
       activeTrashNote: undefined,
       setActiveTrashNote: (activeTrashNote) => set({ activeTrashNote }),
+
+      searchActive: false,
+      setSearchActive: (searchActive) => set({ searchActive }),
+
+      noteSearch: "",
+      setNoteSearch: (noteSearch) => set({ noteSearch }),
+
+      orderBy: "modified_at",
+      setOrderBy: (orderBy) => set({ orderBy }),
+
+      timeSortDirection: "DESC",
+      setTimeSortDirection: (timeSortDirection) => set({ timeSortDirection }),
+
+      titleSortDirection: "ASC",
+      setTitleSortDirection: (titleSortDirection) =>
+        set({ titleSortDirection }),
     }),
     {
       name: "captains-log-storage",

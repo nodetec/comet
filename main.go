@@ -48,6 +48,7 @@ func main() {
 	}
 
 	queries := db.New(dbConn)
+	// customQueries := db.CustomQueries(dbConn)
 	logger := log.New(os.Stdout, "INFO: ", log.LstdFlags)
 
 	// Create the NoteService with the queries and logger
@@ -55,6 +56,7 @@ func main() {
 	tagService := service.NewTagService(queries, logger)
 	noteTagService := service.NewNoteTagService(queries, logger)
 	notebookService := service.NewNotebookService(queries, logger)
+	settingService := service.NewSettingService(queries, logger)
 
 	app := application.New(application.Options{
 		Name:        "captains-log",
@@ -64,6 +66,7 @@ func main() {
 			application.NewService(tagService),
 			application.NewService(noteTagService),
 			application.NewService(notebookService),
+			application.NewService(settingService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

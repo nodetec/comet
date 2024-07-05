@@ -7,9 +7,10 @@ import { useInView } from "react-intersection-observer";
 import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
-export default function NoteFeed() {
+export default function SearchFeed() {
   const {
     setActiveNote,
+    noteSearch,
     activeNotebook,
     activeTag,
     orderBy,
@@ -26,7 +27,8 @@ export default function NoteFeed() {
     const sortDirection =
       orderBy === "title" ? titleSortDirection : timeSortDirection;
 
-    const notes = await NoteService.ListNotes(
+    const notes = await NoteService.SearchNotes(
+      noteSearch,
       notebookId,
       tagId,
       pageSize,
@@ -34,6 +36,8 @@ export default function NoteFeed() {
       orderBy,
       sortDirection,
     );
+
+    console.log("NOTES", notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);
@@ -48,16 +52,9 @@ export default function NoteFeed() {
 
   const { status, data, isFetchingNextPage, fetchNextPage, hasNextPage } =
     useInfiniteQuery({
-      queryKey: [
-        "notes",
-        activeNotebook?.ID,
-        activeTag?.ID,
-        orderBy,
-        timeSortDirection,
-        titleSortDirection,
-      ],
-      queryFn: fetchNotes,
+      queryKey: ["search", noteSearch],
       gcTime: 3000,
+      queryFn: fetchNotes,
       initialPageParam: 0,
       getNextPageParam: (lastPage, _pages) => lastPage.nextCursor ?? undefined,
     });

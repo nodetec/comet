@@ -9,6 +9,98 @@ import {Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as sql$0 from "../../../../database/sql/models.js";
 
+export class Settings {
+    /**
+     * theme
+     */
+    "Theme": string;
+
+    /**
+     * editor
+     */
+    "Vim": string;
+    "LineNumbers": string;
+    "HighlightActiveLine": string;
+    "LineWrapping": string;
+    "UnorderedListBullet": string;
+    "IndentUnit": string;
+    "TabSize": string;
+    "FontSize": string;
+    "FontFamily": string;
+    "FontWeight": string;
+    "LineHeight": string;
+
+    /**
+     * profile
+     */
+    "Npub": string;
+    "Nsec": string;
+
+    /**
+     * relays
+     */
+    "Relays": string;
+
+    /** Creates a new Settings instance. */
+    constructor($$source: Partial<Settings> = {}) {
+        if (!("Theme" in $$source)) {
+            this["Theme"] = "";
+        }
+        if (!("Vim" in $$source)) {
+            this["Vim"] = "";
+        }
+        if (!("LineNumbers" in $$source)) {
+            this["LineNumbers"] = "";
+        }
+        if (!("HighlightActiveLine" in $$source)) {
+            this["HighlightActiveLine"] = "";
+        }
+        if (!("LineWrapping" in $$source)) {
+            this["LineWrapping"] = "";
+        }
+        if (!("UnorderedListBullet" in $$source)) {
+            this["UnorderedListBullet"] = "";
+        }
+        if (!("IndentUnit" in $$source)) {
+            this["IndentUnit"] = "";
+        }
+        if (!("TabSize" in $$source)) {
+            this["TabSize"] = "";
+        }
+        if (!("FontSize" in $$source)) {
+            this["FontSize"] = "";
+        }
+        if (!("FontFamily" in $$source)) {
+            this["FontFamily"] = "";
+        }
+        if (!("FontWeight" in $$source)) {
+            this["FontWeight"] = "";
+        }
+        if (!("LineHeight" in $$source)) {
+            this["LineHeight"] = "";
+        }
+        if (!("Npub" in $$source)) {
+            this["Npub"] = "";
+        }
+        if (!("Nsec" in $$source)) {
+            this["Nsec"] = "";
+        }
+        if (!("Relays" in $$source)) {
+            this["Relays"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Settings instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Settings {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Settings($$parsedSource as Partial<Settings>);
+    }
+}
+
 export class Tag {
     "ID": number;
     "Name": string;

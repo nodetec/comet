@@ -1,11 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { NullInt64, NullString } from "&/database/sql/models";
-import { NoteService } from "&/github.com/nodetec/captains-log/service";
+import {
+  NoteService,
+  NoteTagService,
+} from "&/github.com/nodetec/captains-log/service";
 import { useAppState } from "~/store";
 import dayjs from "dayjs";
-import { ArrowDownNarrowWide, PenBoxIcon } from "lucide-react";
+import { ChevronDown, PenBoxIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
+import { SortDropdown } from "./SortDropdown";
 
 type Props = {
   feedType: string;
@@ -19,10 +23,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
     const note = await NoteService.CreateNote(
       dayjs().format("YYYY-MM-DD"),
       "",
-      new NullInt64({
-        Int64: activeNotebook?.ID,
-        Valid: !activeNotebook ? false : true,
-      }),
+      activeNotebook?.ID ?? 0,
       new NullInt64({
         Int64: undefined,
         Valid: false,
@@ -37,6 +38,10 @@ export default function NoteFeedHeader({ feedType }: Props) {
       }),
     );
 
+    if (activeTag) {
+      await NoteTagService.AddTagToNote(note.ID, activeTag.ID);
+    }
+
     setActiveNote(note);
 
     void queryClient.invalidateQueries({
@@ -47,24 +52,25 @@ export default function NoteFeedHeader({ feedType }: Props) {
   function title(feedType: string) {
     if (feedType === "all") return "All Notes";
     if (feedType === "notebook") return activeNotebook?.Name;
-    if (feedType === "tag") return activeTag?.Name;
     if (feedType === "trash") return "Trash";
   }
 
   return (
     <div className="flex justify-between px-3 pt-2">
-      <div className="flex items-center justify-center gap-x-1">
-        <Button className="text-muted-foreground" variant="ghost" size="icon">
-          <ArrowDownNarrowWide className="h-[1.2rem] w-[1.2rem]" />
-        </Button>
-        <h1 className="cursor-default text-lg font-bold">{title(feedType)}</h1>
-      </div>
-      <div className="pr-1 pt-2">
-        <PenBoxIcon
-          onClick={handleCreateNote}
-          className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
-        />
-      </div>
+      <SortDropdown>
+        <div className="flex cursor-pointer items-center justify-center gap-x-1 pl-2">
+          <h1 className="text-lg font-bold">{title(feedType)}</h1>
+          <ChevronDown className="mt-1 h-[1rem] w-[1rem] text-muted-foreground" />
+        </div>
+      </SortDropdown>
+      <Button
+        disabled={feedType === "trash"}
+        variant="ghost"
+        className="cursor-pointer text-muted-foreground hover:bg-background hover:text-foreground"
+        size="icon"
+      >
+        <PenBoxIcon onClick={handleCreateNote} className="h-5 w-5" />
+      </Button>
     </div>
   );
 }

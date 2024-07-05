@@ -13,11 +13,11 @@ export const EditorWrapper = () => {
   const { activeNote, activeTrashNote, feedType } = useAppState();
   const [showPreview, setShowPreview] = useState(false);
 
-  if (activeNote === undefined && (feedType === "all" || feedType === "tag")) {
+  if (activeNote === undefined && (feedType === "all" || feedType === "notebook")) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-lg text-muted-foreground">
-          Create a note to get started.
+          Something about notes...
         </p>
       </div>
     );
@@ -28,7 +28,7 @@ export const EditorWrapper = () => {
   }
 
   return (
-    <div className="flex h-full flex-col pt-16">
+    <div className="flex h-full flex-col pt-10">
       {!showPreview && <Editor />}
       {showPreview && <Preview />}
       <div className="fixed bottom-[3.75rem] right-2.5 p-2">

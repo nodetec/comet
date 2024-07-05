@@ -6,7 +6,7 @@ INSERT INTO
     content,
     title,
     created_at,
-    trashed_at,
+    modified_at,
     tags
   )
 VALUES
@@ -15,7 +15,7 @@ VALUES
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags;
 
 -- name: GetNoteFromTrash :one
@@ -25,28 +25,12 @@ SELECT
   content,
   title,
   created_at,
-  trashed_at,
+  modified_at,
   tags
 FROM
   trash
 WHERE
   id = ?;
-
--- name: ListNotesFromTrash :many
-SELECT
-  id,
-  note_id,
-  content,
-  title,
-  created_at,
-  trashed_at,
-  tags
-FROM
-  trash
-LIMIT
-  ?
-OFFSET
-  ?;
 
 -- name: DeleteNoteFromTrash :exec
 DELETE FROM trash

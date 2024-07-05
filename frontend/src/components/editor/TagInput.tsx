@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NullString } from "&/database/sql/models";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import {
+  NotebookService,
   NoteTagService,
   Tag,
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
 import { Input } from "~/components/ui/input";
+import { useAppState } from "~/store";
 
 import NoteTag from "./NoteTag";
 
@@ -17,6 +19,7 @@ type Props = {
 };
 
 export default function TagInput({ note }: Props) {
+  const { activeNote } = useAppState();
   const [tagName, setTagName] = useState<string>("");
 
   const queryClient = useQueryClient();
@@ -31,6 +34,7 @@ export default function TagInput({ note }: Props) {
       e.preventDefault();
       // check if tag already exists
       let noteTag: Tag | undefined;
+      let isTagAssociatedWithNotebook = false;
       try {
         noteTag = await TagService.GetTagByName(tagName);
       } catch (_) {
@@ -54,6 +58,21 @@ export default function TagInput({ note }: Props) {
         void queryClient.invalidateQueries({ queryKey: ["note_tags"] });
         setTagName("");
       }
+      // check if tag is associated with notebook
+      if (activeNote?.NotebookID && activeNote?.NotebookID !== 0) {
+        isTagAssociatedWithNotebook = await NotebookService.CheckTagForNotebook(
+          activeNote.NotebookID,
+          noteTag.ID,
+        );
+        // if it isn't, associate it with notebook
+        if (!isTagAssociatedWithNotebook) {
+          await NotebookService.AddTagToNotebook(
+            activeNote.NotebookID,
+            noteTag.ID,
+          );
+          void queryClient.invalidateQueries({ queryKey: ["tags"] });
+        }
+      }
     }
   };
 
@@ -63,7 +82,7 @@ export default function TagInput({ note }: Props) {
   }
 
   const { data } = useQuery({
-    queryKey: ["note_tags", note.ID],
+    queryKey: ["note_tags", note.ID, activeNote?.NotebookID],
     staleTime: 50,
     queryFn: () => fetchTags(),
   });
