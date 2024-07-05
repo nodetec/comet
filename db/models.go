@@ -43,7 +43,7 @@ type NotesFt struct {
 
 type Setting struct {
 	Key   string
-	Value sql.NullString
+	Value string
 }
 
 type Tag struct {

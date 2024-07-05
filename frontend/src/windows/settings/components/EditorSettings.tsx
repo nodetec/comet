@@ -1,9 +1,11 @@
-// import { useEffect, useState } from "react";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as React from "react";
 
 import { CaretSortIcon } from "@radix-ui/react-icons";
+import {
+  /* useMutation, */ useQuery /* useQueryClient */,
+} from "@tanstack/react-query";
+import { SettingService } from "&/github.com/nodetec/captains-log/service";
 // import { setSetting } from "~/api";
 import { Button } from "~/components/ui/button";
 import {
@@ -37,18 +39,48 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { comboboxPrioritizedFontFamilies } from "~/lib/settings/constants";
-import {
-  // initialUserSelectedFontFamily,
-  prioritizeUserFontFamilies,
-} from "~/lib/settings/utils";
+
+import "~/lib/settings/utils"; // initialUserSelectedFontFamily,
+
+// prioritizeUserFontFamilies,
+
 import { cn } from "~/lib/utils";
 // import { useAppContext } from "~/store";
+// import { useAppState } from "~/store";
 import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
 import { partialEditorSettingsSchema } from "~/validation/schemas";
 import { Check } from "lucide-react";
 
 export default function EditorSettings() {
+  // const queryClient = useQueryClient();
+
+  const { isPending, data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetchSettings(),
+  });
+
+  async function fetchSettings() {
+    const settings = await SettingService.GetAllSettings();
+    return settings;
+  }
+
+  // TODO
+  // Set up the mutation
+  // const mutation = useMutation({
+  //   mutationFn: updateSetting(key, value),
+  //   onSuccess: () => {
+  // Invalidate and refetch
+  // queryClient.invalidateQueries({ queryKey: ['settings'] })
+  // },
+  // })
+
+  // async function updateSetting(key: string, value: string) {
+  //   await SettingService.UpdateSetting(key, "true");
+  // return updateSettingResponse;
+  // }
+
   // const { settings, setSettings } = useAppContext();
+  // const { settings, setSettings } = useAppState();
 
   const [loading, setLoading] = useState(false);
   const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
@@ -80,19 +112,19 @@ export default function EditorSettings() {
     line_height: "",
   });
 
-  // useEffect(() => {
-  //   setEditorSettings({
-  //     ...editorSettings,
-  //     selectedFontFamily: initialUserSelectedFontFamily(settings.font_family),
-  //   });
-  // }, []);
+  useEffect(() => {
+    // setEditorSettings({
+    //   ...editorSettings,
+    //   selectedFontFamily: initialUserSelectedFontFamily(settings.font_family),
+    // });
+  }, []);
 
-  async function updateSetting(key: string, value: string) {
-    // if (key in settings) {
-    // await setSetting(key, value);
-    // setSettings({ ...settings, [key]: value });
-    // }
-  }
+  // async function updateSetting(key: string, value: string) {
+  // if (key in settings) {
+  // await setSetting(key, value);
+  // setSettings({ ...settings, [key]: value });
+  // }
+  // }
 
   async function handleSwitchOnClick(
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
@@ -102,9 +134,9 @@ export default function EditorSettings() {
       setLoading(true);
       try {
         if (event.target.dataset.state === "unchecked") {
-          await updateSetting(key, "true");
+          // mutation.mutate({ key: key, value: "true" })
         } else if (event.target.dataset.state === "checked") {
-          await updateSetting(key, "false");
+          // mutation.mutate({ key: key, value: "false" })
         }
       } catch (error) {
         console.error("Editor settings error: ", error);
@@ -120,7 +152,7 @@ export default function EditorSettings() {
   ) {
     setLoading(true);
     try {
-      await updateSetting(key, value);
+      // await updateSetting(key, value);
       if (value === "-" || value === "*" || value === "+") {
         setEditorSettings({ ...editorSettings, unorderedListBullet: value });
       } else if (
@@ -146,7 +178,7 @@ export default function EditorSettings() {
       });
 
       if (validationResult.success) {
-        await updateSetting(key, value);
+        // await updateSetting(key, value);
         setErrorMessages({ ...errorMessages, [key]: "" });
       } else {
         setErrorMessages({
@@ -164,7 +196,7 @@ export default function EditorSettings() {
   async function handleComboxOnSelect(key: string, value: string) {
     setLoading(true);
     try {
-      await updateSetting(key, prioritizeUserFontFamilies(value));
+      // await updateSetting(key, prioritizeUserFontFamilies(value));
       setEditorSettings({
         ...editorSettings,
         selectedFontFamily:
@@ -178,6 +210,8 @@ export default function EditorSettings() {
     }
   }
 
+  if (isPending) return <div>Loading...</div>;
+
   return (
     <Card className="bg-card/20">
       <CardHeader>
@@ -190,8 +224,8 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Vim Mode</Label>
               <Switch
-                // checked={settings.vim === "true"}
-                checked={true}
+                checked={data?.Vim === "true"}
+                // checked={true}
                 onClick={(event) => handleSwitchOnClick(event, "vim")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}

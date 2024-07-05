@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 )
 
 const createSetting = `-- name: CreateSetting :one
@@ -20,7 +19,7 @@ VALUES
 
 type CreateSettingParams struct {
 	Key   string
-	Value sql.NullString
+	Value string
 }
 
 // Settings Queries
@@ -40,6 +39,37 @@ WHERE
 func (q *Queries) DeleteSetting(ctx context.Context, key string) error {
 	_, err := q.db.ExecContext(ctx, deleteSetting, key)
 	return err
+}
+
+const getAllSettings = `-- name: GetAllSettings :many
+SELECT
+  key,
+  value
+FROM
+  settings
+`
+
+func (q *Queries) GetAllSettings(ctx context.Context) ([]Setting, error) {
+	rows, err := q.db.QueryContext(ctx, getAllSettings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Setting
+	for rows.Next() {
+		var i Setting
+		if err := rows.Scan(&i.Key, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getSetting = `-- name: GetSetting :one
@@ -68,7 +98,7 @@ WHERE
 `
 
 type UpdateSettingParams struct {
-	Value sql.NullString
+	Value string
 	Key   string
 }
 

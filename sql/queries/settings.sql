@@ -15,6 +15,13 @@ FROM
 WHERE
   key = ?;
 
+-- name: GetAllSettings :many
+SELECT
+  key,
+  value
+FROM
+  settings;
+
 -- name: UpdateSetting :exec
 UPDATE settings
 SET

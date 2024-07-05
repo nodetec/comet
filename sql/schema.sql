@@ -90,7 +90,7 @@ VALUES
 
 END;
 
-CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes (created_at);
