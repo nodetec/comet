@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import * as React from "react";
 
 import { CaretSortIcon } from "@radix-ui/react-icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SettingService } from "&/github.com/nodetec/captains-log/service";
+import {
+  Settings,
+  SettingService,
+} from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -44,18 +46,23 @@ import { cn } from "~/lib/utils";
 import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
 import { partialEditorSettingsSchema } from "~/validation/schemas";
 import { Check } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-export default function EditorSettings() {
-  // TODO
-  // Load the initial settings
+type Props = {
+  settings: Settings;
+};
+
+export default function EditorSettings({ settings }: Props) {
+
+  const queryClient = useQueryClient();
+
   const [editorSettings, setEditorSettings] = useState({
-    indentUnit: "",
-    tabSize: "",
-    fontSize: "",
-    // Initially was ""
-    selectedFontFamily: "",
-    fontWeight: "",
-    lineHeight: "",
+    indentUnit: settings.IndentUnit,
+    tabSize: settings.TabSize,
+    fontSize: settings.FontSize,
+    selectedFontFamily: settings.FontFamily,
+    fontWeight: settings.FontWeight,
+    lineHeight: settings.LineHeight,
   });
 
   const [errorMessages, setErrorMessages] = useState({
@@ -64,19 +71,6 @@ export default function EditorSettings() {
     fontSize: "",
     lineHeight: "",
   });
-  const queryClient = useQueryClient();
-
-  // TODO
-  // Where should the errors and loading be taken of?
-  const { isPending, data } = useQuery({
-    queryKey: ["settings"],
-    queryFn: () => fetchSettings(),
-  });
-
-  async function fetchSettings() {
-    const settings = await SettingService.GetAllSettings();
-    return settings;
-  }
 
   // TODO
   // Where should the errors and loading be taken of?
@@ -179,7 +173,7 @@ export default function EditorSettings() {
     }
   }
 
-  if (isPending) return <div>Loading...</div>;
+  // if (isPending) return <div>Loading...</div>;
 
   return (
     <Card className="bg-card/20">
@@ -193,7 +187,7 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Vim Mode</Label>
               <Switch
-                checked={data?.Vim === "true"}
+                checked={settings.Vim === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "vim")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -207,7 +201,7 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Line Numbers</Label>
               <Switch
-                checked={data?.LineNumbers === "true"}
+                checked={settings.LineNumbers === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "lineNumbers")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -221,7 +215,7 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Highlight Active Line</Label>
               <Switch
-                checked={data?.HighlightActiveLine === "true"}
+                checked={settings.HighlightActiveLine === "true"}
                 onClick={(event) =>
                   handleSwitchOnClick(event, "highlightActiveLine")
                 }
@@ -237,7 +231,7 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Line Wrapping</Label>
               <Switch
-                checked={data?.LineWrapping === "true"}
+                checked={settings.LineWrapping === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "lineWrapping")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -251,7 +245,7 @@ export default function EditorSettings() {
             <Label>Unordered List Bullet</Label>
             <Select
               name="editor-settings-unordered-list-bullet-select"
-              value={data?.UnorderedListBullet}
+              value={settings.UnorderedListBullet}
               disabled={loading}
               onValueChange={(value: UnorderedListBullet) =>
                 handleSelectOnValueChange("unorderedListBullet", value)
@@ -459,7 +453,7 @@ export default function EditorSettings() {
             <Label>Font Weight</Label>
             <Select
               name="editor-settings-font-weight-select"
-              value={data?.FontWeight}
+              value={settings.FontWeight}
               disabled={loading}
               onValueChange={(value: FontWeight) =>
                 handleSelectOnValueChange("fontWeight", value)

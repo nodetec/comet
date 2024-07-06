@@ -1,10 +1,13 @@
 import { useState } from "react";
 
+import { useQuery } from "@tanstack/react-query";
+
 import EditorSettings from "./components/EditorSettings";
 import GeneralSettings from "./components/GeneralSettings";
 import ProfileSettings from "./components/ProfileSettings";
 import RelaySettings from "./components/RelaySettings";
 import ThemeSettings from "./components/ThemeSettings";
+import { SettingService } from "&/github.com/nodetec/captains-log/service";
 
 type Tab = "General" | "Editor" | "Theme" | "Profile" | "Relays";
 
@@ -15,9 +18,19 @@ export default function Settings() {
     setCurrentTab(tab);
   };
 
+  async function fetchSettings() {
+    const settings = await SettingService.GetAllSettings();
+    return settings;
+  }
+
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetchSettings(),
+  });
+
   return (
     <div className="h-dvh w-dvw">
-      <div className="flex h-full w-full flex-col pt-8">
+      <div className="flex h-full w-full flex-col pt-10">
         <h1 className="mb-8 border-b px-8 pb-4 text-xl font-bold">Settings</h1>
         <div className="flex gap-x-20 overflow-auto pl-8">
           <nav className="flex flex-col gap-y-4 text-sm text-muted-foreground">
@@ -57,7 +70,7 @@ export default function Settings() {
 
           <div className="w-full overflow-auto pb-8 pr-8">
             {currentTab === "General" && <GeneralSettings />}
-            {currentTab === "Editor" && <EditorSettings />}
+            {data && currentTab === "Editor" && <EditorSettings settings={data} />}
             {currentTab === "Theme" && <ThemeSettings />}
             {currentTab === "Profile" && <ProfileSettings />}
             {currentTab === "Relays" && <RelaySettings />}
