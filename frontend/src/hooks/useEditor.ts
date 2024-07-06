@@ -57,7 +57,7 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
     if (note.Content !== view.state.doc.toString()) {
       void NoteService.UpdateNote(
         id,
-        parseTitle(view.state.doc.toString()).title,
+        parseTitle(view.state.doc.toString()),
         view.state.doc.toString(),
         activeNote.NotebookID,
         activeNote.StatusID,

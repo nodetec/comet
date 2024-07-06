@@ -31,7 +31,7 @@ const Editor = () => {
 
     void NoteService.UpdateNote(
       activeNote.ID,
-      parseTitle(doc).title,
+      parseTitle(doc),
       doc,
       activeNote.NotebookID,
       activeNote.StatusID,

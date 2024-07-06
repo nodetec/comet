@@ -1,55 +1,44 @@
 import dayjs from "dayjs";
 
-function isMarkdownHeading(text: string) {
-  // A regular expression that matches strings that start with one or more '#' characters followed by a space
-  const headingRegex = /^#+\s.*$/;
+export function parseTitle(markdownContent: string) {
+  // Split the content into lines
+  const lines = markdownContent.split("\n");
 
-  return headingRegex.test(text);
+  // Get the first line
+  const firstLine = lines[0].trim();
+
+  // Check if the first line is a header
+  const headerMatch = firstLine.match(/^#+\s+(.*)$/);
+
+  console.log("headerMatch", headerMatch);
+
+  if (headerMatch) {
+    // Extract and return the title without the header markdown
+    return headerMatch[1];
+  }
+
+  // Return null if no header is found on the first line
+  return dayjs().format("YYYY-MM-DD");
 }
 
-export const parseTitle = (content: string) => {
-  const firstLine = content.split("\n")[0];
+export function parseContent(markdownContent: string) {
+    // Split the content into lines
+    const lines = markdownContent.split("\n");
 
-  if (firstLine.length === 0) {
-    const lines = content.split("\n");
+    // Check if the first line is a header
+    const firstLine = lines[0].trim();
+    const isHeader = /^#+\s+(.*)$/.test(firstLine);
 
-    // dayjs().format("YYYY-MM-DD"),
+    // Determine the starting index for processing lines
+    const startIndex = isHeader ? 1 : 0;
 
-    for (const line of lines) {
-      if (isMarkdownHeading(line)) {
-        return {
-          title: line.replace(/^#+\s/, ""),
-          lineNumber: lines.indexOf(line),
-        };
-      }
-    }
-  }
+    // Filter out empty lines, ignoring the title if present
+    const filteredLines = lines
+        .slice(startIndex) // Start from the second line if the first line is a header
+        .filter((line) => line.trim() !== "");
 
-  let title = firstLine;
+    // Join the lines back together with newlines
+    const content = filteredLines.join("\n");
 
-  if (isMarkdownHeading(firstLine)) {
-    title = firstLine.replace(/^#+\s/, "");
-  }
-
-  if (title.length > 50) {
-    title = title.slice(0, 50);
-    title += "...";
-  }
-
-  if (title.length === 0) {
-    title = dayjs().format("YYYY-MM-DD");
-  }
-
-  title = title;
-  return { title, lineNumber: 0 };
-};
-
-export const parseContent = (content: string) => {
-  const lines = content.split("\n");
-  if (lines.length === 1) {
-    return "";
-  }
-  const contentWithoutTitle = lines.slice(1).join("\n");
-  // only show the first 3 lines of the content
-  return contentWithoutTitle.split("\n").slice(0, 3).join("\n");
-};
+    return content;
+}
