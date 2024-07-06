@@ -1,6 +1,6 @@
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { parseContent } from "~/lib/markdown";
-import { fromNow } from "~/lib/utils";
+import { cn, fromNow } from "~/lib/utils";
 import { useAppState } from "~/store";
 
 import { Separator } from "../ui/separator";
@@ -21,39 +21,43 @@ export default function NoteCard({ note }: Props) {
     event.preventDefault();
     console.log("Right Clicked");
   };
-
   return (
-    <div className="mx-3">
-      <div
-        onContextMenu={handleContextMenu}
-        key={note.ID}
-        onClick={handleSetActiveNote}
-        style={
-          {
-            "--custom-contextmenu": "noteMenu",
-            "--custom-contextmenu-data": `${note.ID}`,
-          } as React.CSSProperties
-        }
-        className={`flex h-full w-full cursor-pointer select-none flex-col gap-y-1 rounded-md p-3 text-sm ${activeNote?.ID === note.ID && "bg-muted/80"}`}
+    <div className="mx-3 flex w-full flex-col items-center">
+      <button
+        className={cn(
+          "flex w-full flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm transition-all",
+          activeNote?.ID === note.ID && "bg-muted/80",
+        )}
       >
-        <h2 className="select-none font-semibold text-primary">{note.Title}</h2>
-        <span className="select-none pb-6 text-muted-foreground">
-          {parseContent(note.Content)}
-        </span>
-
-        <span className="select-none text-xs text-muted-foreground/80">
-          {note.ModifiedAt && fromNow(note.ModifiedAt)}
-        </span>
+        <div
+          className="flex w-full flex-col gap-1"
+          onContextMenu={handleContextMenu}
+          onClick={handleSetActiveNote}
+          style={
+            {
+              "--custom-contextmenu": "noteMenu",
+              "--custom-contextmenu-data": `${note.ID}`,
+            } as React.CSSProperties
+          }
+        >
+          <div className="flex w-full flex-col gap-1.5">
+            {/* <div className="flex items-center gap-2"> */}
+            <h2 className="select-none truncate font-semibold text-primary">
+              {note.Title}
+            </h2>
+            {/* </div> */}
+            <div className="mt-0 line-clamp-2 text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground">
+              {parseContent(note.Content) || "No content \n "}
+            </div>
+            <span className="select-none text-xs text-muted-foreground/80">
+              {note.ModifiedAt && fromNow(note.ModifiedAt)}
+            </span>
+          </div>
+        </div>
+      </button>
+      <div className="flex w-full flex-col items-center px-[0.30rem]">
+        <Separator decorative className="bg-border/30" />
       </div>
-      {activeNote?.ID !== note.ID ? (
-        <div className="px-[0.30rem]">
-          <Separator className="bg-border/30" />
-        </div>
-      ) : (
-        <div className="px-[0.30rem]">
-          <Separator className="bg-transparent" />
-        </div>
-      )}
     </div>
   );
 }

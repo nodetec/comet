@@ -20,12 +20,12 @@ export default function App() {
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
-      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-        <ResizablePanel defaultSize={18} minSize={18}>
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full items-stretch">
+        <ResizablePanel defaultSize={16} minSize={16}>
           <Sidebar />
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel defaultSize={26} minSize={26}>
+        <ResizablePanel defaultSize={30} minSize={30}>
           <Notes />
         </ResizablePanel>
         <ResizableHandle />
