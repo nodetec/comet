@@ -51,7 +51,7 @@ export default function TagItem({ tag }: Props) {
         } as React.CSSProperties
       }
       onClick={handleTagClick}
-      className={`flex h-full w-full cursor-pointer select-none items-center gap-2 rounded-md pl-7 py-2 text-sm font-medium text-muted-foreground ${tag.Name === activeTag?.Name && "bg-muted text-secondary-foreground"}`}
+      className={`flex h-full w-full cursor-pointer select-none items-center gap-2 rounded-md pl-6 py-2 text-sm font-medium text-muted-foreground ${tag.Name === activeTag?.Name && "bg-muted text-secondary-foreground"}`}
     >
       <CircleIcon className="h-[0.7rem] w-[0.7rem] text-accent fill-accent" />
       {tag.Name}
