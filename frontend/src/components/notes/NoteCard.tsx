@@ -45,9 +45,13 @@ export default function NoteCard({ note }: Props) {
           {note.ModifiedAt && fromNow(note.ModifiedAt)}
         </span>
       </div>
-      {activeNote?.ID !== note.ID && (
+      {activeNote?.ID !== note.ID ? (
         <div className="px-[0.30rem]">
           <Separator className="bg-border/30" />
+        </div>
+      ) : (
+        <div className="px-[0.30rem]">
+          <Separator className="bg-transparent" />
         </div>
       )}
     </div>

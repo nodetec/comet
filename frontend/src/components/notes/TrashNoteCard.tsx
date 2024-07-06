@@ -41,9 +41,15 @@ export default function TrashNoteCard({ trashNote }: Props) {
           {trashNote.ModifiedAt && fromNow(trashNote.ModifiedAt)}
         </span>
       </div>
-      <div className="px-[0.30rem]">
-        <Separator className="bg-border/30" />
-      </div>
+      {activeTrashNote?.ID !== trashNote.ID ? (
+        <div className="px-[0.30rem]">
+          <Separator className="bg-border/30" />
+        </div>
+      ) : (
+        <div className="px-[0.30rem]">
+          <Separator className="bg-transparent" />
+        </div>
+      )}
     </div>
   );
 }
