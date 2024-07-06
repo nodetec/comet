@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as React from "react";
 
 import { CaretSortIcon } from "@radix-ui/react-icons";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Settings,
   SettingService,
@@ -38,30 +39,28 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { comboboxPrioritizedFontFamilies } from "~/lib/settings/constants";
-// import {
-//   initialUserSelectedFontFamily,
-//   prioritizeUserFontFamilies,
-// } from "~/lib/settings/utils";
+import {
+  initialUserSelectedFontFamily,
+  prioritizeUserFontFamilies,
+} from "~/lib/settings/utils";
 import { cn } from "~/lib/utils";
 import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
 import { partialEditorSettingsSchema } from "~/validation/schemas";
 import { Check } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 type Props = {
   settings: Settings;
 };
 
 export default function EditorSettings({ settings }: Props) {
-
-  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
 
   const [editorSettings, setEditorSettings] = useState({
     indentUnit: settings.IndentUnit,
     tabSize: settings.TabSize,
     fontSize: settings.FontSize,
     selectedFontFamily: settings.FontFamily,
-    fontWeight: settings.FontWeight,
     lineHeight: settings.LineHeight,
   });
 
@@ -71,6 +70,15 @@ export default function EditorSettings({ settings }: Props) {
     fontSize: "",
     lineHeight: "",
   });
+
+  useEffect(() => {
+    setEditorSettings({
+      ...editorSettings,
+      selectedFontFamily: initialUserSelectedFontFamily(settings.FontFamily),
+    });
+  }, []);
+
+  const queryClient = useQueryClient();
 
   // TODO
   // Where should the errors and loading be taken of?
@@ -86,18 +94,6 @@ export default function EditorSettings({ settings }: Props) {
     },
     onError: () => {},
   });
-
-  const [loading, setLoading] = useState(false);
-  const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
-
-  useEffect(() => {
-    // TODO
-    // Handle the font family
-    // setEditorSettings({
-    //   ...editorSettings,
-    //   selectedFontFamily: initialUserSelectedFontFamily(settings.font_family),
-    // });
-  }, []);
 
   async function handleSwitchOnClick(
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
@@ -159,7 +155,7 @@ export default function EditorSettings({ settings }: Props) {
   async function handleComboxOnSelect(key: string, value: string) {
     setLoading(true);
     try {
-      // await updateSetting(key, prioritizeUserFontFamilies(value));
+      mutation.mutate({ key, value: prioritizeUserFontFamilies(value) });
       setEditorSettings({
         ...editorSettings,
         selectedFontFamily:
@@ -172,8 +168,6 @@ export default function EditorSettings({ settings }: Props) {
       setLoading(false);
     }
   }
-
-  // if (isPending) return <div>Loading...</div>;
 
   return (
     <Card className="bg-card/20">
@@ -424,7 +418,7 @@ export default function EditorSettings({ settings }: Props) {
                             key={fontFamily.value}
                             value={fontFamily.value}
                             onSelect={(currentValue) =>
-                              handleComboxOnSelect("font_family", currentValue)
+                              handleComboxOnSelect("fontFamily", currentValue)
                             }
                           >
                             <Check

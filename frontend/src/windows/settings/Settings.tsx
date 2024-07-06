@@ -1,13 +1,13 @@
 import { useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
+import { SettingService } from "&/github.com/nodetec/captains-log/service";
 
 import EditorSettings from "./components/EditorSettings";
 import GeneralSettings from "./components/GeneralSettings";
 import ProfileSettings from "./components/ProfileSettings";
 import RelaySettings from "./components/RelaySettings";
 import ThemeSettings from "./components/ThemeSettings";
-import { SettingService } from "&/github.com/nodetec/captains-log/service";
 
 type Tab = "General" | "Editor" | "Theme" | "Profile" | "Relays";
 
@@ -18,6 +18,8 @@ export default function Settings() {
     setCurrentTab(tab);
   };
 
+  // TODO
+  // Where should the errors and loading be taken of?
   async function fetchSettings() {
     const settings = await SettingService.GetAllSettings();
     return settings;
@@ -68,13 +70,15 @@ export default function Settings() {
             {/* <span>Donate</span> */}
           </nav>
 
-          <div className="w-full overflow-auto pb-8 pr-8">
-            {currentTab === "General" && <GeneralSettings />}
-            {data && currentTab === "Editor" && <EditorSettings settings={data} />}
-            {currentTab === "Theme" && <ThemeSettings />}
-            {currentTab === "Profile" && <ProfileSettings />}
-            {currentTab === "Relays" && <RelaySettings />}
-          </div>
+          {data && (
+            <div className="w-full overflow-auto pb-8 pr-8">
+              {currentTab === "General" && <GeneralSettings />}
+              {currentTab === "Editor" && <EditorSettings settings={data} />}
+              {currentTab === "Theme" && <ThemeSettings />}
+              {currentTab === "Profile" && <ProfileSettings />}
+              {currentTab === "Relays" && <RelaySettings />}
+            </div>
+          )}
         </div>
       </div>
     </div>
