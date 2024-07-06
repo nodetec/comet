@@ -15,6 +15,8 @@ import (
 	"github.com/nodetec/captains-log/db"
 	"github.com/nodetec/captains-log/service"
 
+	"github.com/pressly/goose/v3"
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -23,6 +25,9 @@ var assets embed.FS
 
 //go:embed sql/schema.sql
 var ddl string
+
+//go:embed sql/migrations/*.sql
+var embedMigrations embed.FS
 
 func main() {
 	ctx := context.Background()
@@ -45,6 +50,16 @@ func main() {
 	// Create tables
 	if _, err := dbConn.ExecContext(ctx, ddl); err != nil {
 		log.Fatal(err)
+	}
+
+	goose.SetBaseFS(embedMigrations)
+
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		panic(err)
+	}
+
+	if err := goose.Up(dbConn, "sql/migrations"); err != nil {
+		panic(err)
 	}
 
 	queries := db.New(dbConn)
