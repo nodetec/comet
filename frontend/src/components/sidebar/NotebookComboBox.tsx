@@ -137,18 +137,18 @@ export function NotebookComboBox() {
             {activeNotebook === undefined ? (
               <span className="flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-sm font-medium text-muted-foreground">
                 <span className="flex">
-                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem]" />
+                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem] shrink-0" />
                   Notebooks
                 </span>
-                <ChevronsUpDown className="h-4 w-4" />
+                <ChevronsUpDown className="h-4 w-4 shrink-0" />
               </span>
             ) : (
               <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted p-2 text-sm font-medium text-secondary-foreground">
-                <span className="flex">
-                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem]" />
+                <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem] shrink-0" />
+                <span className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
                   {activeNotebook.Name}
                 </span>
-                <ChevronsUpDown className="h-4 w-4" />
+                <ChevronsUpDown className="h-4 w-4 shrink-0" />
               </span>
             )}
           </span>
@@ -187,9 +187,11 @@ export function NotebookComboBox() {
                       selectNotebook(currentValue, notebook)
                     }
                   >
-                    {notebook.Name}
+                    <span className="line-clamp-1 truncate text-ellipsis whitespace-break-spaces break-all">
+                      {notebook.Name}
+                    </span>
                     {activeNotebook?.ID === notebook.ID && (
-                      <Check className="h-4 w-4" />
+                      <Check className="h-4 w-4 shrink-0" />
                     )}
                   </CommandItem>
                 ))}
