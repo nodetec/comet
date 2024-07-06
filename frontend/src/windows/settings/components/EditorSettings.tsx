@@ -2,11 +2,8 @@ import { useEffect, useState } from "react";
 import * as React from "react";
 
 import { CaretSortIcon } from "@radix-ui/react-icons";
-import {
-  /* useMutation, */ useQuery /* useQueryClient */,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SettingService } from "&/github.com/nodetec/captains-log/service";
-// import { setSetting } from "~/api";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -39,21 +36,38 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { comboboxPrioritizedFontFamilies } from "~/lib/settings/constants";
-
-import "~/lib/settings/utils"; // initialUserSelectedFontFamily,
-
-// prioritizeUserFontFamilies,
-
+// import {
+//   initialUserSelectedFontFamily,
+//   prioritizeUserFontFamilies,
+// } from "~/lib/settings/utils";
 import { cn } from "~/lib/utils";
-// import { useAppContext } from "~/store";
-// import { useAppState } from "~/store";
 import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
 import { partialEditorSettingsSchema } from "~/validation/schemas";
 import { Check } from "lucide-react";
 
 export default function EditorSettings() {
-  // const queryClient = useQueryClient();
+  // TODO
+  // Load the initial settings
+  const [editorSettings, setEditorSettings] = useState({
+    indentUnit: "",
+    tabSize: "",
+    fontSize: "",
+    // Initially was ""
+    selectedFontFamily: "",
+    fontWeight: "",
+    lineHeight: "",
+  });
 
+  const [errorMessages, setErrorMessages] = useState({
+    indentUnit: "",
+    tabSize: "",
+    fontSize: "",
+    lineHeight: "",
+  });
+  const queryClient = useQueryClient();
+
+  // TODO
+  // Where should the errors and loading be taken of?
   const { isPending, data } = useQuery({
     queryKey: ["settings"],
     queryFn: () => fetchSettings(),
@@ -65,66 +79,31 @@ export default function EditorSettings() {
   }
 
   // TODO
-  // Set up the mutation
-  // const mutation = useMutation({
-  //   mutationFn: updateSetting(key, value),
-  //   onSuccess: () => {
-  // Invalidate and refetch
-  // queryClient.invalidateQueries({ queryKey: ['settings'] })
-  // },
-  // })
+  // Where should the errors and loading be taken of?
+  async function updateSetting(key, value) {
+    await SettingService.UpdateSetting(key, value);
+  }
 
-  // async function updateSetting(key: string, value: string) {
-  //   await SettingService.UpdateSetting(key, "true");
-  // return updateSettingResponse;
-  // }
-
-  // const { settings, setSettings } = useAppContext();
-  // const { settings, setSettings } = useAppState();
+  const mutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      updateSetting(key, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: () => {},
+  });
 
   const [loading, setLoading] = useState(false);
   const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
 
-  // const [editorSettings, setEditorSettings] = useState({
-  //   unorderedListBullet: settings.unordered_list_bullet,
-  //   indentUnit: settings.indent_unit,
-  //   tabSize: settings.tab_size,
-  //   fontSize: settings.font_size,
-  //   selectedFontFamily: "",
-  //   fontWeight: settings.font_weight,
-  //   lineHeight: settings.line_height,
-  // });
-
-  const [editorSettings, setEditorSettings] = useState({
-    unorderedListBullet: "",
-    indentUnit: "",
-    tabSize: "",
-    fontSize: "",
-    selectedFontFamily: "",
-    fontWeight: "",
-    lineHeight: "",
-  });
-
-  const [errorMessages, setErrorMessages] = useState({
-    indent_unit: "",
-    tab_size: "",
-    font_size: "",
-    line_height: "",
-  });
-
   useEffect(() => {
+    // TODO
+    // Handle the font family
     // setEditorSettings({
     //   ...editorSettings,
     //   selectedFontFamily: initialUserSelectedFontFamily(settings.font_family),
     // });
   }, []);
-
-  // async function updateSetting(key: string, value: string) {
-  // if (key in settings) {
-  // await setSetting(key, value);
-  // setSettings({ ...settings, [key]: value });
-  // }
-  // }
 
   async function handleSwitchOnClick(
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
@@ -134,9 +113,9 @@ export default function EditorSettings() {
       setLoading(true);
       try {
         if (event.target.dataset.state === "unchecked") {
-          // mutation.mutate({ key: key, value: "true" })
+          mutation.mutate({ key, value: "true" });
         } else if (event.target.dataset.state === "checked") {
-          // mutation.mutate({ key: key, value: "false" })
+          mutation.mutate({ key, value: "false" });
         }
       } catch (error) {
         console.error("Editor settings error: ", error);
@@ -152,17 +131,7 @@ export default function EditorSettings() {
   ) {
     setLoading(true);
     try {
-      // await updateSetting(key, value);
-      if (value === "-" || value === "*" || value === "+") {
-        setEditorSettings({ ...editorSettings, unorderedListBullet: value });
-      } else if (
-        value === "lighter" ||
-        value === "normal" ||
-        value === "bold" ||
-        value === "bolder"
-      ) {
-        setEditorSettings({ ...editorSettings, fontWeight: value });
-      }
+      mutation.mutate({ key, value });
     } catch (error) {
       console.error("Editor settings error: ", error);
     } finally {
@@ -178,7 +147,7 @@ export default function EditorSettings() {
       });
 
       if (validationResult.success) {
-        // await updateSetting(key, value);
+        mutation.mutate({ key, value });
         setErrorMessages({ ...errorMessages, [key]: "" });
       } else {
         setErrorMessages({
@@ -225,7 +194,6 @@ export default function EditorSettings() {
               <Label>Vim Mode</Label>
               <Switch
                 checked={data?.Vim === "true"}
-                // checked={true}
                 onClick={(event) => handleSwitchOnClick(event, "vim")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -239,9 +207,8 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Line Numbers</Label>
               <Switch
-                // checked={settings.line_numbers === "true"}
-                checked={true}
-                onClick={(event) => handleSwitchOnClick(event, "line_numbers")}
+                checked={data?.LineNumbers === "true"}
+                onClick={(event) => handleSwitchOnClick(event, "lineNumbers")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
               />
@@ -254,10 +221,9 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Highlight Active Line</Label>
               <Switch
-                // checked={settings.highlight_active_line === "true"}
-                checked={true}
+                checked={data?.HighlightActiveLine === "true"}
                 onClick={(event) =>
-                  handleSwitchOnClick(event, "highlight_active_line")
+                  handleSwitchOnClick(event, "highlightActiveLine")
                 }
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
@@ -271,9 +237,8 @@ export default function EditorSettings() {
             <div className="flex items-center justify-between">
               <Label>Line Wrapping</Label>
               <Switch
-                // checked={settings.line_wrapping === "true"}
-                checked={true}
-                onClick={(event) => handleSwitchOnClick(event, "line_wrapping")}
+                checked={data?.LineWrapping === "true"}
+                onClick={(event) => handleSwitchOnClick(event, "lineWrapping")}
                 className="ml-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
               />
@@ -286,10 +251,10 @@ export default function EditorSettings() {
             <Label>Unordered List Bullet</Label>
             <Select
               name="editor-settings-unordered-list-bullet-select"
-              value={editorSettings.unorderedListBullet}
+              value={data?.UnorderedListBullet}
               disabled={loading}
               onValueChange={(value: UnorderedListBullet) =>
-                handleSelectOnValueChange("unordered_list_bullet", value)
+                handleSelectOnValueChange("unorderedListBullet", value)
               }
             >
               <div>
@@ -309,7 +274,7 @@ export default function EditorSettings() {
           </div>
           <div className="space-y-2">
             <Label
-              className={`${errorMessages.indent_unit === "" ? "" : "text-destructive"}`}
+              className={`${errorMessages.indentUnit === "" ? "" : "text-destructive"}`}
             >
               Indent Unit
             </Label>
@@ -331,25 +296,25 @@ export default function EditorSettings() {
                   })
                 }
                 onBlur={() =>
-                  handleInputOnBlur("indent_unit", editorSettings.indentUnit)
+                  handleInputOnBlur("indentUnit", editorSettings.indentUnit)
                 }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
               How many spaces a block should be indented
             </p>
-            {errorMessages.indent_unit !== "" && (
+            {errorMessages.indentUnit !== "" && (
               <p
                 id="editor-settings-indent-unit-input-error-message"
                 className="text-[0.8rem] font-medium text-destructive"
               >
-                {errorMessages.indent_unit}
+                {errorMessages.indentUnit}
               </p>
             )}
           </div>
           <div className="space-y-2">
             <Label
-              className={`${errorMessages.tab_size === "" ? "" : "text-destructive"}`}
+              className={`${errorMessages.tabSize === "" ? "" : "text-destructive"}`}
             >
               Tab Size
             </Label>
@@ -371,25 +336,25 @@ export default function EditorSettings() {
                   })
                 }
                 onBlur={() =>
-                  handleInputOnBlur("tab_size", editorSettings.tabSize)
+                  handleInputOnBlur("tabSize", editorSettings.tabSize)
                 }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
               The width of the tab character
             </p>
-            {errorMessages.tab_size !== "" && (
+            {errorMessages.tabSize !== "" && (
               <p
                 id="editor-settings-tab-size-input-error-message"
                 className="text-[0.8rem] font-medium text-destructive"
               >
-                {errorMessages.tab_size}
+                {errorMessages.tabSize}
               </p>
             )}
           </div>
           <div className="space-y-2">
             <Label
-              className={`${errorMessages.font_size === "" ? "" : "text-destructive"}`}
+              className={`${errorMessages.fontSize === "" ? "" : "text-destructive"}`}
             >
               Font Size
             </Label>
@@ -411,19 +376,19 @@ export default function EditorSettings() {
                   })
                 }
                 onBlur={() =>
-                  handleInputOnBlur("font_size", editorSettings.fontSize)
+                  handleInputOnBlur("fontSize", editorSettings.fontSize)
                 }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
               Height in pixels of editor text
             </p>
-            {errorMessages.font_size !== "" && (
+            {errorMessages.fontSize !== "" && (
               <p
                 id="editor-settings-font-size-input-error-message"
                 className="text-[0.8rem] font-medium text-destructive"
               >
-                {errorMessages.font_size}
+                {errorMessages.fontSize}
               </p>
             )}
           </div>
@@ -494,10 +459,10 @@ export default function EditorSettings() {
             <Label>Font Weight</Label>
             <Select
               name="editor-settings-font-weight-select"
-              value={editorSettings.fontWeight}
+              value={data?.FontWeight}
               disabled={loading}
               onValueChange={(value: FontWeight) =>
-                handleSelectOnValueChange("font_weight", value)
+                handleSelectOnValueChange("fontWeight", value)
               }
             >
               <div>
@@ -518,7 +483,7 @@ export default function EditorSettings() {
           </div>
           <div className="space-y-2">
             <Label
-              className={`${errorMessages.line_height === "" ? "" : "text-destructive"}`}
+              className={`${errorMessages.lineHeight === "" ? "" : "text-destructive"}`}
             >
               Line Height
             </Label>
@@ -541,19 +506,19 @@ export default function EditorSettings() {
                   })
                 }
                 onBlur={() =>
-                  handleInputOnBlur("line_height", editorSettings.lineHeight)
+                  handleInputOnBlur("lineHeight", editorSettings.lineHeight)
                 }
               />
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
               Height of editor lines, as a multiplier of font size
             </p>
-            {errorMessages.line_height !== "" && (
+            {errorMessages.lineHeight !== "" && (
               <p
                 id="editor-settings-line-height-input-error-message"
                 className="text-[0.8rem] font-medium text-destructive"
               >
-                {errorMessages.line_height}
+                {errorMessages.lineHeight}
               </p>
             )}
           </div>
