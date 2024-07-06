@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+
 function isMarkdownHeading(text: string) {
   // A regular expression that matches strings that start with one or more '#' characters followed by a space
   const headingRegex = /^#+\s.*$/;
@@ -7,8 +9,11 @@ function isMarkdownHeading(text: string) {
 
 export const parseTitle = (content: string) => {
   const firstLine = content.split("\n")[0];
+
   if (firstLine.length === 0) {
     const lines = content.split("\n");
+
+    // dayjs().format("YYYY-MM-DD"),
 
     for (const line of lines) {
       if (isMarkdownHeading(line)) {
@@ -31,7 +36,11 @@ export const parseTitle = (content: string) => {
     title += "...";
   }
 
-  title = title || "New Note";
+  if (title.length === 0) {
+    title = dayjs().format("YYYY-MM-DD");
+  }
+
+  title = title;
   return { title, lineNumber: 0 };
 };
 
