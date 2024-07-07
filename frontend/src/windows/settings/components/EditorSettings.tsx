@@ -3,6 +3,7 @@ import * as React from "react";
 
 import { CaretSortIcon } from "@radix-ui/react-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as wails from "@wailsio/runtime";
 import {
   Settings,
   SettingService,
@@ -91,6 +92,7 @@ export default function EditorSettings({ settings }: Props) {
       updateSetting(key, value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
+      wails.Events.Emit({ name: "settingsChanged", data: "" });
     },
     onError: () => {},
   });

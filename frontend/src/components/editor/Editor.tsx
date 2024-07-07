@@ -1,6 +1,9 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
-import { NoteService } from "&/github.com/nodetec/captains-log/service";
+import {
+  NoteService,
+  SettingService,
+} from "&/github.com/nodetec/captains-log/service";
 import { useEditor } from "~/hooks/useEditor";
 import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
@@ -11,6 +14,18 @@ const Editor = () => {
     useAppState();
 
   const queryClient = useQueryClient();
+
+  // TODO
+  // Where should the errors and loading be taken of?
+  async function fetchSettings() {
+    const settings = await SettingService.GetAllSettings();
+    return settings;
+  }
+
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetchSettings(),
+  });
 
   const onChange = async (doc: string) => {
     const data = queryClient.getQueryData(["notes"]) as InfiniteQueryData<Note>;
@@ -51,10 +66,13 @@ const Editor = () => {
         ? activeTrashNote?.Content || ""
         : activeNote?.Content || "",
     onChange,
+    settings: data,
   });
 
   return (
-    <div className="h-full w-full overflow-auto" ref={editorRef}></div>
+    data && (
+      <div className="h-full w-full overflow-auto pl-4" ref={editorRef}></div>
+    )
   );
 };
 
