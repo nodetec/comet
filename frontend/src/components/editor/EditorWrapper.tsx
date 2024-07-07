@@ -31,7 +31,7 @@ export const EditorWrapper = () => {
   }
 
   return (
-    <div className="flex h-full flex-col pt-10">
+    <div className="flex h-full flex-col pt-12">
       {!showPreview && <Editor />}
       {showPreview && <Preview />}
       <div className="fixed bottom-[3.75rem] right-2.5 p-2">

@@ -59,8 +59,10 @@ export default function NoteFeedHeader({ feedType }: Props) {
     <div className="flex justify-between px-3 pt-2">
       <SortDropdown>
         <div className="flex cursor-pointer items-center justify-center gap-x-1 pl-2">
-          <h1 className="text-lg font-bold">{title(feedType)}</h1>
-          <ChevronDown className="mt-1 h-[1rem] w-[1rem] text-muted-foreground" />
+          <h1 className="line-clamp-1 truncate text-ellipsis whitespace-break-spaces break-all text-lg font-bold">
+            {title(feedType)}
+          </h1>
+          <ChevronDown className="mt-1 mr-4 h-[1rem] w-[1rem] text-muted-foreground shrink-0" />
         </div>
       </SortDropdown>
       <Button
