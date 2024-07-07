@@ -8,10 +8,10 @@ export const Preview = () => {
   const { activeNote, activeTrashNote } = useAppState();
 
   return (
-    <div className="h-full w-full overflow-auto py-1 pl-4">
+    <div className="h-full w-full overflow-auto py-1">
       <MarkdownPreview
         source={activeNote?.Content || activeTrashNote?.Content || ""}
-        className="pl-1.5 pr-0.5"
+        className="px-8"
         rehypePlugins={rehypePlugins}
       />
     </div>

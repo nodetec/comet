@@ -11,7 +11,7 @@ export default function Notes() {
   const { feedType, searchActive } = useAppState();
 
   return (
-    <div className="flex h-full flex-col">
+      <div className="h-full flex flex-col">
       <NoteFeedHeader feedType={feedType} />
       <SearchNotes />
       {(searchActive && feedType !== "trash") && <SearchFeed />}

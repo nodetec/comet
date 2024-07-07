@@ -2,11 +2,12 @@ import { useAppState } from "~/store";
 import { Trash2 } from "lucide-react";
 
 export default function Trash() {
-  const { feedType, setFeedType, setActiveNotebook } = useAppState();
+  const { feedType, setFeedType, setActiveNotebook, setActiveTag } = useAppState();
 
   function handleTrashNotesClick() {
     setFeedType("trash");
     setActiveNotebook(undefined);
+    setActiveTag(undefined);
   }
 
   return (

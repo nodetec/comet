@@ -8,6 +8,8 @@ const darkTheme = EditorView.theme({
   ".cm-content": {
     fontFamily: "monospace",
     lineHeight: "2",
+    paddingLeft: "2rem",
+    paddingRight: "2rem",
     caretColor: "white !important",
   },
   ".cm-gutters": {

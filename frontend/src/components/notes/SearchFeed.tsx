@@ -75,18 +75,19 @@ export default function SearchFeed() {
     return <div>Error fetching notes</div>;
   }
   return (
-    <ScrollArea className="w-full rounded-md">
+    <ScrollArea className="h-screen">
       {data.pages.map((page, pageIndex) => (
-        <ul key={pageIndex}>
+        <div className="flex flex-col items-center px-3">
           {page.data.map((project, noteIndex) => (
-            <li
+            <div
+              className="mx-3 flex w-full flex-col items-center"
               key={noteIndex}
               ref={assignRef(lastNoteRef, pageIndex, noteIndex, data)}
             >
               <NoteCard note={project} />
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       ))}
     </ScrollArea>
   );
