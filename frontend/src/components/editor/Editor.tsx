@@ -54,7 +54,7 @@ const Editor = () => {
   });
 
   return (
-    <div className="h-full w-full overflow-auto pl-4" ref={editorRef}></div>
+    <div className="h-full w-full overflow-auto" ref={editorRef}></div>
   );
 };
 
