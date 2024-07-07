@@ -15,7 +15,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
-        settings: path.resolve(__dirname, "src/windows/settings/index.html"),
+        // settings: path.resolve(__dirname, "src/windows/settings/index.html"),
       },
     },
   },

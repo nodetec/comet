@@ -26,7 +26,10 @@ import {
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { useQueryClient } from "@tanstack/react-query";
-import { NoteService } from "&/github.com/nodetec/captains-log/service";
+import {
+  NoteService,
+  Settings,
+} from "&/github.com/nodetec/captains-log/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
 import { parseTitle } from "~/lib/markdown";
@@ -36,9 +39,10 @@ import { EditorView } from "codemirror";
 interface Props {
   initialDoc: string;
   onChange: (state: string) => void;
+  settings: Settings | undefined;
 }
 
-export const useEditor = ({ initialDoc, onChange }: Props) => {
+export const useEditor = ({ initialDoc, onChange, settings }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
@@ -78,12 +82,12 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
   });
 
   useEffect(() => {
+    console.log("useEditor settings ", settings);
     if (!editorRef.current) return;
 
     const extensions = [
       syntaxHighlighting(neovimHighlightStyle),
       highlightActiveLine(),
-      vim(),
       keymap.of(defaultKeymap),
       keymap.of([{ key: "Enter", run: insertNewlineAndIndent }, indentWithTab]),
       darkTheme,
@@ -115,6 +119,10 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
         }
       }),
     ];
+
+    if (settings?.Vim === "true") {
+      extensions.push(vim());
+    }
 
     const initialState = EditorState.create({
       doc: initialDoc,
