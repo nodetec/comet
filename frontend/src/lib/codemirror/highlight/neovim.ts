@@ -26,49 +26,43 @@ const neovimHighlightStyle = HighlightStyle.define([
   {
     tag: t.heading1,
     fontWeight: "bold",
-    fontFamily: "monospace",
     // fontSize: "1.5rem",
     textDecoration: "none",
   },
   {
     tag: t.heading2,
     fontWeight: "bold",
-    fontFamily: "monospace",
     // fontSize: "1.2rem",
     textDecoration: "none",
   },
   {
     tag: t.heading3,
     fontWeight: "bold",
-    fontFamily: "monospace",
     // fontSize: "1.2rem",
     textDecoration: "none",
   },
   {
     tag: t.heading4,
     fontWeight: "bold",
-    fontFamily: "monospace",
     // fontSize: "1.2rem",
     textDecoration: "none",
   },
   {
     tag: t.heading5,
     fontWeight: "bold",
-    fontFamily: "monospace",
     // fontSize: "1.2rem",
     textDecoration: "none",
   },
   {
     tag: t.heading6,
     fontWeight: "bold",
-    fontFamily: "monospace",
     fontSize: "1rem",
     textDecoration: "none",
   },
-  { tag: t.emphasis, fontFamily: "monospace", fontStyle: "italic" },
-  { tag: t.strong, fontFamily: "monospace", fontWeight: "bold" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.strong, fontWeight: "bold" },
   { tag: t.monospace, fontFamily: "monospace", color: "#ffc0b9" },
-  { tag: t.content, fontFamily: "monospace" },
+  { tag: t.content },
 ]);
 
 export default neovimHighlightStyle;
