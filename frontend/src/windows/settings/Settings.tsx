@@ -7,9 +7,8 @@ import EditorSettings from "./components/EditorSettings";
 import GeneralSettings from "./components/GeneralSettings";
 import ProfileSettings from "./components/ProfileSettings";
 import RelaySettings from "./components/RelaySettings";
-import ThemeSettings from "./components/ThemeSettings";
 
-type Tab = "General" | "Editor" | "Theme" | "Profile" | "Relays";
+type Tab = "General" | "Editor" | "Profile" | "Relays";
 
 export default function Settings() {
   const [currentTab, setCurrentTab] = useState<Tab>("General");
@@ -49,12 +48,6 @@ export default function Settings() {
               Editor
             </span>
             <span
-              className={`cursor-pointer ${currentTab === "Theme" ? "font-semibold text-primary" : ""}`}
-              onClick={() => handleCurrentTabOnClick("Theme")}
-            >
-              Theme
-            </span>
-            <span
               className={`cursor-pointer ${currentTab === "Profile" ? "font-semibold text-primary" : ""}`}
               onClick={() => handleCurrentTabOnClick("Profile")}
             >
@@ -74,7 +67,6 @@ export default function Settings() {
             <div className="w-full overflow-auto pb-8 pr-8">
               {currentTab === "General" && <GeneralSettings />}
               {currentTab === "Editor" && <EditorSettings settings={data} />}
-              {currentTab === "Theme" && <ThemeSettings />}
               {currentTab === "Profile" && <ProfileSettings />}
               {currentTab === "Relays" && <RelaySettings />}
             </div>

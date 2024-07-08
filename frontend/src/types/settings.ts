@@ -1,3 +1,3 @@
-export type UnorderedListBullet = "-" | "*" | "+";
+export type IndentSpaces = "2" | "4" | "8";
 
-export type FontWeight = "lighter" | "normal" | "bold" | "bolder";
+export type FontSize = "small" | "default" | "large";

@@ -20,12 +20,9 @@ type Settings struct {
 	LineNumbers         string
 	HighlightActiveLine string
 	LineWrapping        string
-	UnorderedListBullet string
-	IndentUnit          string
-	TabSize             string
+	IndentSpaces        string
 	FontSize            string
 	FontFamily          string
-	FontWeight          string
 	LineHeight          string
 	// profile
 	Npub string
@@ -83,18 +80,12 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (Settings, error) {
 			result.HighlightActiveLine = value
 		case "lineWrapping":
 			result.LineWrapping = value
-		case "unorderedListBullet":
-			result.UnorderedListBullet = value
-		case "indentUnit":
-			result.IndentUnit = value
-		case "tabSize":
-			result.TabSize = value
+		case "indentSpaces":
+			result.IndentSpaces = value
 		case "fontSize":
 			result.FontSize = value
 		case "fontFamily":
 			result.FontFamily = value
-		case "fontWeight":
-			result.FontWeight = value
 		case "lineHeight":
 			result.LineHeight = value
 			// profile

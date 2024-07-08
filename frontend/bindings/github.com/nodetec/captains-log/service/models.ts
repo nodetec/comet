@@ -22,12 +22,9 @@ export class Settings {
     "LineNumbers": string;
     "HighlightActiveLine": string;
     "LineWrapping": string;
-    "UnorderedListBullet": string;
-    "IndentUnit": string;
-    "TabSize": string;
+    "IndentSpaces": string;
     "FontSize": string;
     "FontFamily": string;
-    "FontWeight": string;
     "LineHeight": string;
 
     /**
@@ -58,23 +55,14 @@ export class Settings {
         if (!("LineWrapping" in $$source)) {
             this["LineWrapping"] = "";
         }
-        if (!("UnorderedListBullet" in $$source)) {
-            this["UnorderedListBullet"] = "";
-        }
-        if (!("IndentUnit" in $$source)) {
-            this["IndentUnit"] = "";
-        }
-        if (!("TabSize" in $$source)) {
-            this["TabSize"] = "";
+        if (!("IndentSpaces" in $$source)) {
+            this["IndentSpaces"] = "";
         }
         if (!("FontSize" in $$source)) {
             this["FontSize"] = "";
         }
         if (!("FontFamily" in $$source)) {
             this["FontFamily"] = "";
-        }
-        if (!("FontWeight" in $$source)) {
-            this["FontWeight"] = "";
         }
         if (!("LineHeight" in $$source)) {
             this["LineHeight"] = "";

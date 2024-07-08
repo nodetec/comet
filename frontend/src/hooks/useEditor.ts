@@ -11,6 +11,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   bracketMatching,
   indentOnInput,
+  indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
@@ -32,6 +33,15 @@ import {
   SettingService,
 } from "&/github.com/nodetec/captains-log/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
+import {
+  fontFamily,
+  fontSize,
+  lineHeight,
+} from "~/lib/codemirror/text/compartments";
+import {
+  customizeEditorThemeStyles,
+  indentUnitWhitespace,
+} from "~/lib/codemirror/text/styles";
 import darkTheme from "~/lib/codemirror/theme/dark";
 import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
@@ -96,10 +106,12 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
 
     const extensions = [
       syntaxHighlighting(neovimHighlightStyle),
-      highlightActiveLine(),
       keymap.of(defaultKeymap),
       keymap.of([{ key: "Enter", run: insertNewlineAndIndent }, indentWithTab]),
       darkTheme,
+      fontSize.of(darkTheme),
+      fontFamily.of(darkTheme),
+      lineHeight.of(darkTheme),
       highlightSpecialChars(),
       history(),
       drawSelection(),
@@ -111,11 +123,11 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
       crosshairCursor(),
       EditorState.readOnly.of(feedType === "trash" ? true : false),
       keymap.of([indentWithTab]),
-      EditorView.lineWrapping,
       markdown({
         base: markdownLanguage,
         codeLanguages: languages,
       }),
+      indentUnit.of(indentUnitWhitespace(settings?.IndentSpaces)),
       blurHandlerExtension,
       EditorView.updateListener.of((update) => {
         if (
@@ -129,12 +141,23 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
       }),
     ];
 
+    // NOTE
+    // vim needs to be included before other keymaps in extensions
+    // drawSelection also needs to be in extensions if basicSetup isn't being used
     if (settings?.Vim === "true") {
-      extensions.push(vim());
+      extensions.unshift(vim());
     }
 
     if (settings?.LineNumbers === "true") {
       extensions.push(lineNumbers());
+    }
+
+    if (settings?.HighlightActiveLine === "true") {
+      extensions.push(highlightActiveLine());
+    }
+
+    if (settings?.LineWrapping === "true") {
+      extensions.push(EditorView.lineWrapping);
     }
 
     const initialState = EditorState.create({
@@ -146,6 +169,20 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
       state: initialState,
       parent: editorRef.current,
     });
+
+    customizeEditorThemeStyles(view, fontSize, "fontSize", settings?.FontSize);
+    customizeEditorThemeStyles(
+      view,
+      fontFamily,
+      "fontFamily",
+      settings?.FontFamily,
+    );
+    customizeEditorThemeStyles(
+      view,
+      lineHeight,
+      "lineHeight",
+      settings?.LineHeight,
+    );
 
     setEditorView(view);
 
