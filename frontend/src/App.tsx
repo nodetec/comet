@@ -11,12 +11,14 @@ import useNoteMenu from "./hooks/useNoteMenu";
 import useNoteTagMenu from "./hooks/useNoteTagMenu";
 import useTagMenu from "./hooks/useTagMenu";
 import useTrashNoteMenu from "./hooks/useTrashNoteMenu";
+import useSettingsRefresh from "./hooks/useSettingsRefresh";
 
 export default function App() {
   useNoteMenu();
   useTagMenu();
   useNoteTagMenu();
   useTrashNoteMenu();
+  useSettingsRefresh();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">

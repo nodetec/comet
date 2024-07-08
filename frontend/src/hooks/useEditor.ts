@@ -22,13 +22,14 @@ import {
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
+  lineNumbers,
   rectangularSelection,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   NoteService,
-  Settings,
+  SettingService,
 } from "&/github.com/nodetec/captains-log/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import darkTheme from "~/lib/codemirror/theme/dark";
@@ -39,15 +40,24 @@ import { EditorView } from "codemirror";
 interface Props {
   initialDoc: string;
   onChange: (state: string) => void;
-  settings: Settings | undefined;
 }
 
-export const useEditor = ({ initialDoc, onChange, settings }: Props) => {
+export const useEditor = ({ initialDoc, onChange }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
   const { activeNote, activeTrashNote, feedType } = useAppState();
   const queryClient = useQueryClient();
+
+  async function fetchSettings() {
+    const settings = await SettingService.GetAllSettings();
+    return settings;
+  }
+
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => fetchSettings(),
+  });
 
   let timeoutId: NodeJS.Timeout;
 
@@ -82,7 +92,6 @@ export const useEditor = ({ initialDoc, onChange, settings }: Props) => {
   });
 
   useEffect(() => {
-    console.log("useEditor settings ", settings);
     if (!editorRef.current) return;
 
     const extensions = [
@@ -124,6 +133,10 @@ export const useEditor = ({ initialDoc, onChange, settings }: Props) => {
       extensions.push(vim());
     }
 
+    if (settings?.LineNumbers === "true") {
+      extensions.push(lineNumbers());
+    }
+
     const initialState = EditorState.create({
       doc: initialDoc,
       extensions,
@@ -140,7 +153,7 @@ export const useEditor = ({ initialDoc, onChange, settings }: Props) => {
       view.destroy();
       clearTimeout(timeoutId); // Clear timeout on cleanup
     };
-  }, [activeNote?.ID, activeTrashNote?.ID, feedType]);
+  }, [activeNote?.ID, activeTrashNote?.ID, feedType, settings]);
 
   return { editorRef, editorView };
 };
