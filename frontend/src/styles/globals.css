@@ -119,6 +119,14 @@
   @apply w-2.5;
 }
 
+::-webkit-scrollbar:horizontal {
+  @apply h-2.5;
+}
+
+::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
