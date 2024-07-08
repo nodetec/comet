@@ -45,7 +45,7 @@ import {
   prioritizeUserFontFamilies,
 } from "~/lib/settings/utils";
 import { cn } from "~/lib/utils";
-import { type FontWeight, type UnorderedListBullet } from "~/types/settings";
+import { type FontSize, type IndentSpaces } from "~/types/settings";
 import { partialEditorSettingsSchema } from "~/validation/schemas";
 import { Check } from "lucide-react";
 
@@ -58,17 +58,11 @@ export default function EditorSettings({ settings }: Props) {
   const [openFontFamilyCombobox, setOpenFontFamilyCombobox] = useState(false);
 
   const [editorSettings, setEditorSettings] = useState({
-    indentUnit: settings.IndentUnit,
-    tabSize: settings.TabSize,
-    fontSize: settings.FontSize,
     selectedFontFamily: settings.FontFamily,
     lineHeight: settings.LineHeight,
   });
 
   const [errorMessages, setErrorMessages] = useState({
-    indentUnit: "",
-    tabSize: "",
-    fontSize: "",
     lineHeight: "",
   });
 
@@ -119,7 +113,7 @@ export default function EditorSettings({ settings }: Props) {
 
   async function handleSelectOnValueChange(
     key: string,
-    value: UnorderedListBullet | FontWeight,
+    value: FontSize | IndentSpaces,
   ) {
     setLoading(true);
     try {
@@ -181,7 +175,12 @@ export default function EditorSettings({ settings }: Props) {
         <div className="space-y-8">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Vim Mode</Label>
+              <div>
+                <Label>Vim Mode</Label>
+                <p className="mt-2 text-[0.8rem] text-muted-foreground">
+                  Enable vim mode
+                </p>
+              </div>
               <Switch
                 checked={settings.Vim === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "vim")}
@@ -189,13 +188,15 @@ export default function EditorSettings({ settings }: Props) {
                 disabled={loading}
               />
             </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Whether to enable vim mode in the editor
-            </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Line Numbers</Label>
+              <div>
+                <Label>Line Numbers</Label>
+                <p className="mt-2 text-[0.8rem] text-muted-foreground">
+                  Show line numbers
+                </p>
+              </div>
               <Switch
                 checked={settings.LineNumbers === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "lineNumbers")}
@@ -203,13 +204,15 @@ export default function EditorSettings({ settings }: Props) {
                 disabled={loading}
               />
             </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Whether to show line numbers to the left of the editor
-            </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Highlight Active Line</Label>
+              <div>
+                <Label>Highlight Active Line</Label>
+                <p className="mt-2 text-[0.8rem] text-muted-foreground">
+                  Highlight current cursor line
+                </p>
+              </div>
               <Switch
                 checked={settings.HighlightActiveLine === "true"}
                 onClick={(event) =>
@@ -219,13 +222,15 @@ export default function EditorSettings({ settings }: Props) {
                 disabled={loading}
               />
             </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Whether to highlight the current cursor line
-            </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Line Wrapping</Label>
+              <div>
+                <Label>Line Wrapping</Label>
+                <p className="mt-2 text-[0.8rem] text-muted-foreground">
+                  Scroll or wrap for long lines
+                </p>
+              </div>
               <Switch
                 checked={settings.LineWrapping === "true"}
                 onClick={(event) => handleSwitchOnClick(event, "lineWrapping")}
@@ -233,154 +238,56 @@ export default function EditorSettings({ settings }: Props) {
                 disabled={loading}
               />
             </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Whether the editor should scroll or wrap for long lines
-            </p>
           </div>
           <div className="space-y-2">
-            <Label>Unordered List Bullet</Label>
+            <Label>Indent Spaces</Label>
             <Select
-              name="editor-settings-unordered-list-bullet-select"
-              value={settings.UnorderedListBullet}
+              name="editor-settings-indent-spaces-select"
+              value={settings.IndentSpaces}
               disabled={loading}
-              onValueChange={(value: UnorderedListBullet) =>
-                handleSelectOnValueChange("unorderedListBullet", value)
+              onValueChange={(value: IndentSpaces) =>
+                handleSelectOnValueChange("indentSpaces", value)
               }
             >
               <div>
                 <SelectTrigger className="disabled:cursor-pointer disabled:opacity-100">
-                  <SelectValue placeholder="Select an unordered list bullet" />
+                  <SelectValue placeholder="Select an indent space value" />
                 </SelectTrigger>
               </div>
               <SelectContent>
-                <SelectItem value="-">-</SelectItem>
-                <SelectItem value="*">*</SelectItem>
-                <SelectItem value="+">+</SelectItem>
+                <SelectItem value="2">2</SelectItem>
+                <SelectItem value="4">4</SelectItem>
+                <SelectItem value="8">8</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-[0.8rem] text-muted-foreground">
-              Marker to use for the bullet of unordered list items
+              Number of spaces in a tab
             </p>
           </div>
           <div className="space-y-2">
-            <Label
-              className={`${errorMessages.indentUnit === "" ? "" : "text-destructive"}`}
+            <Label>Font Size</Label>
+            <Select
+              name="editor-settings-font-size-select"
+              value={settings.FontSize}
+              disabled={loading}
+              onValueChange={(value: FontSize) =>
+                handleSelectOnValueChange("fontSize", value)
+              }
             >
-              Indent Unit
-            </Label>
-            <div>
-              <Input
-                id="editor-settings-indent-unit-input"
-                name="editor-settings-indent-unit-input"
-                type="number"
-                placeholder="4"
-                className="disabled:cursor-text disabled:opacity-100"
-                disabled={loading}
-                min="0"
-                max="100"
-                value={editorSettings.indentUnit}
-                onChange={(event) =>
-                  setEditorSettings({
-                    ...editorSettings,
-                    indentUnit: event.currentTarget.value,
-                  })
-                }
-                onBlur={() =>
-                  handleInputOnBlur("indentUnit", editorSettings.indentUnit)
-                }
-              />
-            </div>
+              <div>
+                <SelectTrigger className="disabled:cursor-pointer disabled:opacity-100">
+                  <SelectValue placeholder="Select a font size" />
+                </SelectTrigger>
+              </div>
+              <SelectContent>
+                <SelectItem value="small">Small</SelectItem>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="large">Large</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-[0.8rem] text-muted-foreground">
-              How many spaces a block should be indented
+              Size of editor text
             </p>
-            {errorMessages.indentUnit !== "" && (
-              <p
-                id="editor-settings-indent-unit-input-error-message"
-                className="text-[0.8rem] font-medium text-destructive"
-              >
-                {errorMessages.indentUnit}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label
-              className={`${errorMessages.tabSize === "" ? "" : "text-destructive"}`}
-            >
-              Tab Size
-            </Label>
-            <div>
-              <Input
-                id="editor-settings-tab-size-input"
-                name="editor-settings-tab-size-input"
-                type="number"
-                placeholder="4"
-                className="disabled:cursor-text disabled:opacity-100"
-                disabled={loading}
-                min="0"
-                max="100"
-                value={editorSettings.tabSize}
-                onChange={(event) =>
-                  setEditorSettings({
-                    ...editorSettings,
-                    tabSize: event.currentTarget.value,
-                  })
-                }
-                onBlur={() =>
-                  handleInputOnBlur("tabSize", editorSettings.tabSize)
-                }
-              />
-            </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              The width of the tab character
-            </p>
-            {errorMessages.tabSize !== "" && (
-              <p
-                id="editor-settings-tab-size-input-error-message"
-                className="text-[0.8rem] font-medium text-destructive"
-              >
-                {errorMessages.tabSize}
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label
-              className={`${errorMessages.fontSize === "" ? "" : "text-destructive"}`}
-            >
-              Font Size
-            </Label>
-            <div>
-              <Input
-                id="editor-settings-font-size-input"
-                name="editor-settings-font-size-input"
-                type="number"
-                placeholder="16"
-                className="disabled:cursor-text disabled:opacity-100"
-                disabled={loading}
-                min="1"
-                max="100"
-                value={editorSettings.fontSize}
-                onChange={(event) =>
-                  setEditorSettings({
-                    ...editorSettings,
-                    fontSize: event.currentTarget.value,
-                  })
-                }
-                onBlur={() =>
-                  handleInputOnBlur("fontSize", editorSettings.fontSize)
-                }
-              />
-            </div>
-            <p className="text-[0.8rem] text-muted-foreground">
-              Height in pixels of editor text
-            </p>
-            {errorMessages.fontSize !== "" && (
-              <p
-                id="editor-settings-font-size-input-error-message"
-                className="text-[0.8rem] font-medium text-destructive"
-              >
-                {errorMessages.fontSize}
-              </p>
-            )}
           </div>
           <div className="space-y-2">
             <Label>Font Family</Label>
@@ -442,33 +349,7 @@ export default function EditorSettings({ settings }: Props) {
               </Popover>
             </div>
             <p className="text-[0.8rem] text-muted-foreground">
-              The name of the font family used for editor text
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label>Font Weight</Label>
-            <Select
-              name="editor-settings-font-weight-select"
-              value={settings.FontWeight}
-              disabled={loading}
-              onValueChange={(value: FontWeight) =>
-                handleSelectOnValueChange("fontWeight", value)
-              }
-            >
-              <div>
-                <SelectTrigger className="disabled:cursor-pointer disabled:opacity-100">
-                  <SelectValue placeholder="Select a font weight" />
-                </SelectTrigger>
-              </div>
-              <SelectContent>
-                <SelectItem value="lighter">lighter</SelectItem>
-                <SelectItem value="normal">normal</SelectItem>
-                <SelectItem value="bold">bold</SelectItem>
-                <SelectItem value="bolder">bolder</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-[0.8rem] text-muted-foreground">
-              The weight of the font used for editor text
+              Font family of editor text
             </p>
           </div>
           <div className="space-y-2">
@@ -482,11 +363,11 @@ export default function EditorSettings({ settings }: Props) {
                 id="editor-settings-line-height-input"
                 name="editor-settings-line-height-input"
                 type="number"
-                placeholder="1.5"
+                placeholder="2"
                 className="disabled:cursor-text disabled:opacity-100"
                 disabled={loading}
                 min="1"
-                max="10"
+                max="5"
                 step="0.5"
                 value={editorSettings.lineHeight}
                 onChange={(event) =>

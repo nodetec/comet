@@ -2,12 +2,9 @@ import { EditorView } from "@codemirror/view";
 
 const darkTheme = EditorView.theme({
   "&": {
-    fontSize: "12pt",
     height: "100%",
   },
   ".cm-content": {
-    fontFamily: "monospace",
-    lineHeight: "2",
     paddingLeft: "2rem",
     paddingRight: "2rem",
     caretColor: "white !important",
