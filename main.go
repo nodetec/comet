@@ -95,16 +95,21 @@ func main() {
 	// Custom event handling
 	app.Events.On("openSettingsWindow", func(e *application.WailsEvent) {
 		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-			Title:  "Settings",
-			Width:  800,
-			Height: 600,
+			Name:             "settings",
+			Title:            "Settings",
+			Width:            800,
+			Height:           600,
+			AlwaysOnTop:      true,
+			URL:              "/src/windows/settings/index.html",
+			MinWidth:         500,
+			MinHeight:        375,
+			Centered:         true,
+			BackgroundColour: application.NewRGB(27, 38, 54),
 			Mac: application.MacWindow{
 				InvisibleTitleBarHeight: 50,
 				Backdrop:                application.MacBackdropTranslucent,
 				TitleBar:                application.MacTitleBarHiddenInset,
 			},
-			BackgroundColour: application.NewRGB(27, 38, 54),
-			URL:              "/src/windows/settings/index.html",
 		}).RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 			app.Events.Emit(&application.WailsEvent{
 				Name: "settingsWindowClosed",
@@ -114,16 +119,20 @@ func main() {
 	})
 
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-		Title:  "Captain's Log",
-		Width:  1200,
-		Height: 600,
+		Name:             "main",
+		Title:            "Captain's Log",
+		Width:            1200,
+		Height:           600,
+		URL:              "/",
+		MinWidth:         500,
+		MinHeight:        250,
+		Centered:         true,
+		BackgroundColour: application.NewRGB(27, 38, 54),
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
-		BackgroundColour: application.NewRGB(27, 38, 54),
-		URL:              "/",
 	})
 
 	contextmenu.CreateNoteMenu(app, mainWindow, ctx, noteService, noteTagService)
