@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/adrg/xdg"
 	"github.com/nodetec/captains-log/contextmenu"
@@ -92,7 +93,7 @@ func main() {
 	})
 
 	// Custom event handling
-	app.Events.On("open-settings-window", func(e *application.WailsEvent) {
+	app.Events.On("openSettingsWindow", func(e *application.WailsEvent) {
 		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
 			Title:  "Settings",
 			Width:  800,
@@ -104,8 +105,12 @@ func main() {
 			},
 			BackgroundColour: application.NewRGB(27, 38, 54),
 			URL:              "/src/windows/settings/index.html",
-		}).
-			Show()
+		}).RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+			app.Events.Emit(&application.WailsEvent{
+				Name: "settingsWindowClosed",
+				Data: "",
+			})
+		})
 	})
 
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{

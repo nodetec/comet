@@ -9,9 +9,9 @@ import EditorWrapper from "./components/editor/EditorWrapper";
 import Notes from "./components/notes/Notes";
 import useNoteMenu from "./hooks/useNoteMenu";
 import useNoteTagMenu from "./hooks/useNoteTagMenu";
+import useSettingsRefresh from "./hooks/useSettingsRefresh";
 import useTagMenu from "./hooks/useTagMenu";
 import useTrashNoteMenu from "./hooks/useTrashNoteMenu";
-import useSettingsRefresh from "./hooks/useSettingsRefresh";
 
 export default function App() {
   useNoteMenu();

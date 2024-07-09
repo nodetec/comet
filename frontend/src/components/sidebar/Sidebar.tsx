@@ -1,6 +1,8 @@
-// import { NotebookService } from "&/github.com/nodetec/captains-log/service";
+import { useEffect, useState } from "react";
 
 import * as wails from "@wailsio/runtime";
+import { Events } from "@wailsio/runtime";
+import { WailsEvent } from "@wailsio/runtime/types/events";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Settings2 } from "lucide-react";
 
@@ -10,8 +12,23 @@ import Tags from "./Tags";
 import Trash from "./Trash";
 
 export default function Sidebar() {
+  const [settingsWindowClosed, setSettingsWindowClosed] = useState(true);
+
+  useEffect(() => {
+    const handleSettingsWindowClose = (_: WailsEvent) => {
+      setSettingsWindowClosed(true);
+    };
+
+    Events.On("settingsWindowClosed", handleSettingsWindowClose);
+
+    return () => {
+      Events.Off("settingsWindowClosed");
+    };
+  }, []);
+
   const handleOpenSettings = () => {
-    wails.Events.Emit({ name: "open-settings-window", data: "" });
+    wails.Events.Emit({ name: "openSettingsWindow", data: "" });
+    setSettingsWindowClosed(false);
   };
 
   return (
@@ -26,7 +43,7 @@ export default function Sidebar() {
         <div className="flex justify-end">
           <Settings2
             onClick={handleOpenSettings}
-            className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground"
+            className={`h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground ${settingsWindowClosed ? "" : "pointer-events-none opacity-50"}`}
           />
         </div>
       </div>
