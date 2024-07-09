@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 
 export default function Login() {
   const handleOpenSettings = () => {
-    wails.Events.Emit({ name: "open-settings-window", data: "" });
+    wails.Events.Emit({ name: "openSettingsWindow", data: "" });
   };
 
   return (

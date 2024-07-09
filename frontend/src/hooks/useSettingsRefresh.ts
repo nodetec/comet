@@ -17,7 +17,7 @@ const useSettingsRefresh = () => {
     Events.On("settingsChanged", handleSettingsUpdated);
 
     return () => {
-      Events.Off("noteDeleted");
+      Events.Off("settingsChanged");
     };
   }, []);
 };
