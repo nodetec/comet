@@ -51,8 +51,7 @@ CREATE TABLE IF NOT EXISTS trash (
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
   modified_at TEXT NOT NULL,
-  tags TEXT, -- Field to store tags
-  FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE
+  tags TEXT -- Field to store tags
 );
 
 -- CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
