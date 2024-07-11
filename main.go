@@ -43,7 +43,7 @@ func main() {
 	}
 
 	// Open the SQLite database
-	dbConn, err := sql.Open("sqlite3", dbPath)
+	dbConn, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
 	if err != nil {
 		log.Fatal(err)
 	}
