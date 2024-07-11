@@ -148,7 +148,7 @@ export default function EditorSettings({ settings }: Props) {
     }
   }
 
-  async function handleComboxOnSelect(key: string, value: string) {
+  async function handleComboboxOnSelect(key: string, value: string) {
     setLoading(true);
     try {
       mutation.mutate({ key, value: prioritizeUserFontFamilies(value) });
@@ -327,7 +327,7 @@ export default function EditorSettings({ settings }: Props) {
                             key={fontFamily.value}
                             value={fontFamily.value}
                             onSelect={(currentValue) =>
-                              handleComboxOnSelect("fontFamily", currentValue)
+                              handleComboboxOnSelect("fontFamily", currentValue)
                             }
                           >
                             <Check

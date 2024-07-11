@@ -9,38 +9,6 @@ import (
 	"context"
 )
 
-const createSetting = `-- name: CreateSetting :one
-INSERT INTO
-  settings (key, value)
-VALUES
-  (?, ?) RETURNING key,
-  value
-`
-
-type CreateSettingParams struct {
-	Key   string
-	Value string
-}
-
-// Settings Queries
-func (q *Queries) CreateSetting(ctx context.Context, arg CreateSettingParams) (Setting, error) {
-	row := q.db.QueryRowContext(ctx, createSetting, arg.Key, arg.Value)
-	var i Setting
-	err := row.Scan(&i.Key, &i.Value)
-	return i, err
-}
-
-const deleteSetting = `-- name: DeleteSetting :exec
-DELETE FROM settings
-WHERE
-  key = ?
-`
-
-func (q *Queries) DeleteSetting(ctx context.Context, key string) error {
-	_, err := q.db.ExecContext(ctx, deleteSetting, key)
-	return err
-}
-
 const getAllSettings = `-- name: GetAllSettings :many
 SELECT
   key,
@@ -82,6 +50,7 @@ WHERE
   key = ?
 `
 
+// Settings Queries
 func (q *Queries) GetSetting(ctx context.Context, key string) (Setting, error) {
 	row := q.db.QueryRowContext(ctx, getSetting, key)
 	var i Setting
