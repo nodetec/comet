@@ -80,10 +80,10 @@ export default function NoteFeed() {
   return (
     <ScrollArea className="h-screen">
       {data.pages.map((page, pageIndex) => (
-        <div className="flex flex-col items-center px-3">
+        <div className="flex flex-col items-center px-3" key={pageIndex}>
           {page.data.map((project, noteIndex) => (
             <div
-              className="flex w-full flex-col items-center mx-3"
+              className="mx-3 flex w-full flex-col items-center"
               key={noteIndex}
               ref={assignRef(lastNoteRef, pageIndex, noteIndex, data)}
             >

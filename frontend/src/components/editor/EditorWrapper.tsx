@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { useQuery } from "@tanstack/react-query";
+import { TagService } from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
 import { Eye } from "lucide-react";
@@ -12,6 +14,18 @@ import TagInput from "./TagInput";
 export const EditorWrapper = () => {
   const { activeNote, activeTrashNote, feedType } = useAppState();
   const [showPreview, setShowPreview] = useState(false);
+
+  // TODO
+  // Where should the errors and loading be taken care of?
+  async function fetchTags() {
+    const tags = await TagService.ListTags();
+    return tags;
+  }
+
+  const { data } = useQuery({
+    queryKey: ["tags"],
+    queryFn: () => fetchTags(),
+  });
 
   if (
     activeNote === undefined &&
@@ -50,7 +64,7 @@ export const EditorWrapper = () => {
       <div className="flex items-center justify-between">
         {feedType === "trash"
           ? activeTrashNote && <ReadOnlyTagList trashNote={activeTrashNote} />
-          : activeNote && <TagInput note={activeNote} />}
+          : data && activeNote && <TagInput note={activeNote} tags={data} />}
       </div>
     </div>
   );
