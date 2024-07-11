@@ -20,10 +20,11 @@ INSERT INTO
     created_at,
     modified_at,
     published_at,
-    event_id
+    event_id,
+    pinned
   )
 VALUES
-  (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
   status_id,
   notebook_id,
   content,
@@ -31,7 +32,8 @@ VALUES
   created_at,
   modified_at,
   published_at,
-  event_id
+  event_id,
+  pinned
 `
 
 type CreateNoteParams struct {
@@ -43,6 +45,7 @@ type CreateNoteParams struct {
 	ModifiedAt  string
 	PublishedAt sql.NullString
 	EventID     sql.NullString
+	Pinned      sql.NullBool
 }
 
 // Note Queries
@@ -56,6 +59,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.ModifiedAt,
 		arg.PublishedAt,
 		arg.EventID,
+		arg.Pinned,
 	)
 	var i Note
 	err := row.Scan(
@@ -68,6 +72,7 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.ModifiedAt,
 		&i.PublishedAt,
 		&i.EventID,
+		&i.Pinned,
 	)
 	return i, err
 }
@@ -93,7 +98,8 @@ SELECT
   created_at,
   modified_at,
   published_at,
-  event_id
+  event_id,
+  pinned
 FROM
   notes
 WHERE
@@ -113,6 +119,7 @@ func (q *Queries) GetNote(ctx context.Context, id int64) (Note, error) {
 		&i.ModifiedAt,
 		&i.PublishedAt,
 		&i.EventID,
+		&i.Pinned,
 	)
 	return i, err
 }
@@ -126,7 +133,8 @@ SET
   title = ?,
   modified_at = ?,
   published_at = ?,
-  event_id = ?
+  event_id = ?,
+  pinned = ?
 WHERE
   id = ?
 `
@@ -139,6 +147,7 @@ type UpdateNoteParams struct {
 	ModifiedAt  string
 	PublishedAt sql.NullString
 	EventID     sql.NullString
+	Pinned      sql.NullBool
 	ID          int64
 }
 
@@ -151,6 +160,7 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) error {
 		arg.ModifiedAt,
 		arg.PublishedAt,
 		arg.EventID,
+		arg.Pinned,
 		arg.ID,
 	)
 	return err

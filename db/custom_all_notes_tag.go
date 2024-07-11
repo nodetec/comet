@@ -29,6 +29,7 @@ func (q *Queries) GetNotesForTag(ctx context.Context, tagID, limit, offset int64
 		n.modified_at,
 		n.published_at,
 		n.event_id
+    n.pinned
 	FROM
 		notes n
 		JOIN note_tags nt ON n.id = nt.note_id
@@ -60,6 +61,7 @@ func (q *Queries) GetNotesForTag(ctx context.Context, tagID, limit, offset int64
 			&note.ModifiedAt,
 			&note.PublishedAt,
 			&note.EventID,
+      &note.Pinned,
 		); err != nil {
 			return nil, err
 		}

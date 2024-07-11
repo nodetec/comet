@@ -18,6 +18,7 @@ type Note struct {
 	ModifiedAt  string
 	PublishedAt sql.NullString
 	EventID     sql.NullString
+	Pinned      sql.NullBool
 }
 
 type NoteTag struct {

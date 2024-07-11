@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT NOT NULL,
   modified_at TEXT NOT NULL,
   published_at TEXT,
-  event_id TEXT
+  event_id TEXT,
+  pinned BOOLEAN
 );
 
 CREATE TABLE IF NOT EXISTS tags (

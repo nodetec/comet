@@ -28,7 +28,8 @@ func (q *Queries) ListAllNotes(ctx context.Context, limit, offset int64, orderBy
 		created_at,
 		modified_at,
 		published_at,
-		event_id
+		event_id,
+    pinned
 	FROM
 		notes
 	ORDER BY
@@ -57,6 +58,7 @@ func (q *Queries) ListAllNotes(ctx context.Context, limit, offset int64, orderBy
 			&note.ModifiedAt,
 			&note.PublishedAt,
 			&note.EventID,
+			&note.Pinned,
 		); err != nil {
 			return nil, err
 		}

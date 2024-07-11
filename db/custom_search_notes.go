@@ -50,6 +50,7 @@ func (q *Queries) SearchNotes(ctx context.Context, searchTerm string, notebookID
 			&note.ModifiedAt,
 			&note.PublishedAt,
 			&note.EventID,
+      &note.Pinned,
 		); err != nil {
 			return nil, err
 		}

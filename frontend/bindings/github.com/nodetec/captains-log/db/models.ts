@@ -19,6 +19,7 @@ export class Note {
     "ModifiedAt": string;
     "PublishedAt": sql$0.NullString;
     "EventID": sql$0.NullString;
+    "Pinned": sql$0.NullBool;
 
     /** Creates a new Note instance. */
     constructor($$source: Partial<Note> = {}) {
@@ -49,6 +50,9 @@ export class Note {
         if (!("EventID" in $$source)) {
             this["EventID"] = (new sql$0.NullString());
         }
+        if (!("Pinned" in $$source)) {
+            this["Pinned"] = (new sql$0.NullBool());
+        }
 
         Object.assign(this, $$source);
     }
@@ -60,6 +64,7 @@ export class Note {
         const $$createField1_0 = $$createType0;
         const $$createField7_0 = $$createType1;
         const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType2;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("StatusID" in $$parsedSource) {
             $$parsedSource["StatusID"] = $$createField1_0($$parsedSource["StatusID"]);
@@ -69,6 +74,9 @@ export class Note {
         }
         if ("EventID" in $$parsedSource) {
             $$parsedSource["EventID"] = $$createField8_0($$parsedSource["EventID"]);
+        }
+        if ("Pinned" in $$parsedSource) {
+            $$parsedSource["Pinned"] = $$createField9_0($$parsedSource["Pinned"]);
         }
         return new Note($$parsedSource as Partial<Note>);
     }
@@ -200,3 +208,4 @@ export class Trash {
 // Private type creation functions
 const $$createType0 = sql$0.NullInt64.createFrom;
 const $$createType1 = sql$0.NullString.createFrom;
+const $$createType2 = sql$0.NullBool.createFrom;

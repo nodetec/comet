@@ -28,7 +28,8 @@ func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, notebookID, tag
 		created_at,
 		modified_at,
 		published_at,
-		event_id
+		event_id,
+    pinned
 	FROM
 		notes
 	WHERE
@@ -67,6 +68,7 @@ func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, notebookID, tag
 			&note.ModifiedAt,
 			&note.PublishedAt,
 			&note.EventID,
+      &note.Pinned,
 		); err != nil {
 			return nil, err
 		}
