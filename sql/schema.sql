@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS notebook_tags (
   notebook_id INTEGER,
   tag_id INTEGER,
   PRIMARY KEY (notebook_id, tag_id),
-  FOREIGN KEY (notebook_id) REFERENCES notebooks (id) ON DELETE CASCADE,
-  FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+  FOREIGN KEY (notebook_id) REFERENCES notebooks (id),
+  FOREIGN KEY (tag_id) REFERENCES tags (id)
 );
 
 -- TODO: maybe add notebook
