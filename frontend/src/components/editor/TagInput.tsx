@@ -10,6 +10,11 @@ import {
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "~/components/ui/carousel";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -127,11 +132,22 @@ export default function TagInput({ note, tags }: Props) {
 
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
-      <div className="flex flex-col items-start justify-center gap-x-2">
-        <div className="flex">
-          {data?.map((tag, tagIndex) => {
-            return <NoteTag key={tagIndex} note={note} tag={tag} />;
-          })}
+      <div className="flex w-full flex-col items-start justify-center gap-x-2">
+        <div className="flex w-full">
+          <Carousel
+            opts={{
+              align: "start",
+            }}
+            className="w-full"
+          >
+            <CarouselContent>
+              {data?.map((tag, tagIndex) => (
+                <CarouselItem key={tagIndex} className="basis-auto">
+                  <NoteTag key={tagIndex} note={note} tag={tag} />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
         </div>
 
         <Popover
