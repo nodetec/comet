@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-import { CaretSortIcon } from "@radix-ui/react-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NullString } from "&/database/sql/models";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
@@ -10,7 +9,6 @@ import {
   Tag,
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
-import { Button } from "~/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -100,7 +98,7 @@ export default function TagInput({ note, tags }: Props) {
   };
 
   // TODO
-  // Handle errors
+  // Handle errors and loading
   async function handleComboboxOnSelect(tag: Tag, value: string) {
     setLoading(true);
     try {
@@ -127,42 +125,45 @@ export default function TagInput({ note, tags }: Props) {
 
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
-      <div className="flex items-center gap-x-2 pr-3">
-        {data?.map((tag, tagIndex) => {
-          return <NoteTag key={tagIndex} note={note} tag={tag} />;
-        })}
+      <div className="flex flex-col items-start justify-center gap-x-2">
+        <div className="flex">
+          {data?.map((tag, tagIndex) => {
+            return <NoteTag key={tagIndex} note={note} tag={tag} />;
+          })}
+        </div>
 
-        <Input
-          type="text"
-          className="w-3/4 min-w-12 border-none px-1 text-xs focus-visible:ring-0"
-          placeholder="Add Tags"
-          onKeyDown={handleKeyDown}
-          value={tagName}
-          onChange={handleTagChange}
-        />
         <Popover
           open={openTagInputCombobox}
           onOpenChange={setOpenTagInputCombobox}
         >
           <PopoverTrigger asChild>
-            <Button
-              id="editor-tag-input-combobox-btn"
-              name="editor-tag-input-combobox-btn"
-              variant="ghost"
+            <Input
+              id="editor-tag-input-combobox-input"
+              name="editor-tag-input-combobox-input"
+              type="text"
               role="combobox"
               aria-expanded={openTagInputCombobox}
-              className="w-1/4 justify-between pl-2 pr-0 text-xs font-normal text-muted-foreground hover:bg-transparent hover:text-muted-foreground disabled:opacity-100"
+              placeholder="Add Tags"
+              className="min-w-12 max-w-full border-none px-1 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
               disabled={loading}
-            >
-              Select tag...
-              <CaretSortIcon className="h-4 w-4" />
-            </Button>
+              onKeyDown={handleKeyDown}
+              value={tagName}
+              onChange={handleTagChange}
+            />
           </PopoverTrigger>
-          <PopoverContent align={"start"} className="p-0">
+          <PopoverContent
+            align={"start"}
+            className={`mb-10 ml-1 p-0 ${tags.length === 0 ? "hidden" : ""}`}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <Command>
-              <CommandInput placeholder="Search tags..." />
+              <div className="hidden">
+                <CommandInput value={tagName} />
+              </div>
               <CommandList>
-                <CommandEmpty>No tags found</CommandEmpty>
+                <CommandEmpty className="px-2 py-1.5 text-sm">
+                  No tags...
+                </CommandEmpty>
                 <CommandGroup>
                   {tags.map((tag) => (
                     <CommandItem
