@@ -37,6 +37,7 @@
     "cmdk": "^1.0.0",
     "codemirror": "^6.0.1",
     "dayjs": "^1.11.11",
+    "embla-carousel-react": "^8.1.6",
     "lucide-react": "^0.397.0",
     "nostr-tools": "^2.7.0",
     "react": "^18.2.0",
