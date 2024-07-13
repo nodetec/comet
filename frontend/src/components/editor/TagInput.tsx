@@ -77,14 +77,16 @@ export default function TagInput({ note, tags }: Props) {
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      const trimmedTagName = tagName.trim();
+
       // check if tag already exists
       let noteTag: Tag | undefined;
       try {
-        noteTag = await TagService.GetTagByName(tagName);
+        noteTag = await TagService.GetTagByName(trimmedTagName);
       } catch (_) {
         // if it doesn't, create it
         noteTag = await TagService.CreateTag(
-          tagName,
+          trimmedTagName,
           new NullString({ String: undefined, Valid: false }),
           new NullString({ String: undefined, Valid: false }),
           new Date().toISOString(),
@@ -146,6 +148,8 @@ export default function TagInput({ note, tags }: Props) {
               placeholder="Add Tags"
               className="min-w-12 max-w-full border-none px-1 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
               disabled={loading}
+              minLength={1}
+              maxLength={32}
               onKeyDown={handleKeyDown}
               value={tagName}
               onChange={handleTagChange}
