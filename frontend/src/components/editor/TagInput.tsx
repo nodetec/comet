@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NullString } from "&/database/sql/models";
@@ -43,6 +43,7 @@ export default function TagInput({ note, tags }: Props) {
   const [loading, setLoading] = useState(false);
   const [tagName, setTagName] = useState<string>("");
   const [openTagInputCombobox, setOpenTagInputCombobox] = useState(false);
+  const [comboboxTags, setComboboxTags] = useState(tags);
 
   const queryClient = useQueryClient();
 
@@ -130,6 +131,12 @@ export default function TagInput({ note, tags }: Props) {
     queryFn: () => fetchTags(),
   });
 
+  useEffect(() => {
+    const dataIDs = new Set(data?.map(({ ID }) => ID));
+    const comboboxTags = [...tags.filter(({ ID }) => !dataIDs.has(ID))];
+    setComboboxTags(comboboxTags);
+  }, [data]);
+
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
       <div className="flex items-center gap-x-2 pr-3">
@@ -183,7 +190,7 @@ export default function TagInput({ note, tags }: Props) {
                   No tags...
                 </CommandEmpty>
                 <CommandGroup>
-                  {tags.map((tag) => (
+                  {comboboxTags.map((tag) => (
                     <CommandItem
                       key={tag.ID}
                       value={tag.Name}
