@@ -132,23 +132,21 @@ export default function TagInput({ note, tags }: Props) {
 
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
-      <div className="flex w-full flex-col items-start justify-center gap-x-2">
-        <div className="flex w-full">
-          <Carousel
-            opts={{
-              align: "start",
-            }}
-            className="w-full"
-          >
-            <CarouselContent>
-              {data?.map((tag, tagIndex) => (
-                <CarouselItem key={tagIndex} className="basis-auto">
-                  <NoteTag key={tagIndex} note={note} tag={tag} />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
-        </div>
+      <div className="flex items-center gap-x-2 pr-3">
+        <Carousel
+          opts={{
+            align: "start",
+          }}
+          className="max-w-[70%]"
+        >
+          <CarouselContent>
+            {data?.map((tag, tagIndex) => (
+              <CarouselItem key={tagIndex} className="basis-auto">
+                <NoteTag key={tagIndex} note={note} tag={tag} />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+        </Carousel>
 
         <Popover
           open={openTagInputCombobox}
@@ -162,7 +160,7 @@ export default function TagInput({ note, tags }: Props) {
               role="combobox"
               aria-expanded={openTagInputCombobox}
               placeholder="Add Tags"
-              className="min-w-12 max-w-full border-none px-1 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
+              className="min-w-[30%] border-none px-1 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
               disabled={loading}
               minLength={1}
               maxLength={32}
@@ -173,7 +171,7 @@ export default function TagInput({ note, tags }: Props) {
           </PopoverTrigger>
           <PopoverContent
             align={"start"}
-            className={`mb-10 ml-1 p-0 ${tags.length === 0 ? "hidden" : ""}`}
+            className={`mb-4 p-0 ${tags.length === 0 ? "hidden" : ""}`}
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <Command>

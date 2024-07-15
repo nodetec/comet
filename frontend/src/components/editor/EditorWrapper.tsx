@@ -48,7 +48,7 @@ export const EditorWrapper = () => {
     <div className="flex h-full flex-col pt-12">
       {!showPreview && <Editor />}
       {showPreview && <Preview />}
-      <div className="fixed bottom-[3.75rem] right-2.5 px-2 pb-6 pt-2">
+      <div className="fixed bottom-[3.75rem] right-2.5 p-2">
         <Button
           id="editor-preview-btn"
           name="editor-preview-btn"
