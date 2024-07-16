@@ -10,11 +10,6 @@ import {
   TagService,
 } from "&/github.com/nodetec/captains-log/service";
 import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "~/components/ui/carousel";
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -30,6 +25,7 @@ import {
 } from "~/components/ui/popover";
 import { useAppState } from "~/store";
 
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import NoteTag from "./NoteTag";
 
 type Props = {
@@ -140,26 +136,22 @@ export default function TagInput({ note, tags }: Props) {
   return (
     <div className="w-full border-t py-2 pl-4 pr-2">
       <div className="flex items-center gap-x-2 pr-3">
-        <Carousel
-          opts={{
-            align: "start",
-          }}
-          className="max-w-[70%]"
-        >
-          <CarouselContent>
+        {/* TODO: give this more space */}
+        <ScrollArea className="flex w-full overflow-x-auto whitespace-nowrap">
+          <div className="flex w-max gap-1.5">
             {data?.map((tag, tagIndex) => (
-              <CarouselItem key={tagIndex} className="basis-auto">
-                <NoteTag key={tagIndex} note={note} tag={tag} />
-              </CarouselItem>
+              <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
-          </CarouselContent>
-        </Carousel>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
         <Popover
           open={openTagInputCombobox}
           onOpenChange={setOpenTagInputCombobox}
         >
           <PopoverTrigger asChild>
+            {/* TODO: fix padding when no text in field */}
             <Input
               id="editor-tag-input-combobox-input"
               name="editor-tag-input-combobox-input"
