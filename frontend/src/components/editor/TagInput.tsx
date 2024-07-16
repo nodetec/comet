@@ -134,11 +134,10 @@ export default function TagInput({ note, tags }: Props) {
   }, [data]);
 
   return (
-    <div className="w-full border-t py-2 pl-4 pr-2">
+    <div className="w-full border-t py-0.5 pl-4 pr-2">
       <div className="flex items-center gap-x-2 pr-3">
-        {/* TODO: give this more space */}
-        <ScrollArea className="flex w-full overflow-x-auto whitespace-nowrap">
-          <div className="flex w-max gap-1.5">
+        <ScrollArea className="flex max-w-[70%] overflow-x-auto whitespace-nowrap">
+          <div className="flex w-max gap-1.5 py-3">
             {data?.map((tag, tagIndex) => (
               <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
@@ -151,7 +150,6 @@ export default function TagInput({ note, tags }: Props) {
           onOpenChange={setOpenTagInputCombobox}
         >
           <PopoverTrigger asChild>
-            {/* TODO: fix padding when no text in field */}
             <Input
               id="editor-tag-input-combobox-input"
               name="editor-tag-input-combobox-input"
@@ -159,7 +157,7 @@ export default function TagInput({ note, tags }: Props) {
               role="combobox"
               aria-expanded={openTagInputCombobox}
               placeholder="Add Tags"
-              className="min-w-[30%] border-none px-1 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
+              className="min-w-[30%] border-none px-1 py-3 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
               disabled={loading}
               minLength={1}
               maxLength={32}
