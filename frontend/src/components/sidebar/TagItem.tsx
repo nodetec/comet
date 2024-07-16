@@ -42,7 +42,7 @@ export default function TagItem({ tag }: Props) {
   };
 
   return (
-    <span
+    <div
       key={tag.ID}
       style={
         {
@@ -51,10 +51,10 @@ export default function TagItem({ tag }: Props) {
         } as React.CSSProperties
       }
       onClick={handleTagClick}
-      className={`flex h-full w-full cursor-pointer select-none items-center gap-2 rounded-md py-2 pl-6 text-sm font-medium text-muted-foreground ${tag.Name === activeTag?.Name && "bg-muted text-secondary-foreground"}`}
+      className={`flex cursor-pointer select-none items-center gap-2 rounded-md py-2 pl-6 text-sm font-medium text-muted-foreground ${tag.Name === activeTag?.Name && "bg-muted text-secondary-foreground"}`}
     >
       <CircleIcon className="h-[0.7rem] w-[0.7rem] fill-accent text-accent" />
-      {tag.Name}
-    </span>
+      <span className={`w-full truncate`}>{tag.Name}</span>
+    </div>
   );
 }

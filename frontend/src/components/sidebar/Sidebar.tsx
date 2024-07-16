@@ -47,7 +47,7 @@ export default function Sidebar() {
           />
         </div>
       </div>
-      <ScrollArea className="flex h-full flex-col gap-y-2">
+      <ScrollArea className="flex h-full flex-col gap-y-2 [&>div>div[style]]:!block">
         <div className="flex flex-col gap-y-2 px-3">
           <AllNotes />
           <NotebookComboBox />
