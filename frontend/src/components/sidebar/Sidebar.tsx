@@ -7,6 +7,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Settings2 } from "lucide-react";
 
 import AllNotes from "./AllNotes";
+import Login from "./Login";
 import { NotebookComboBox } from "./NotebookComboBox";
 import Tags from "./Tags";
 import Trash from "./Trash";
@@ -55,7 +56,7 @@ export default function Sidebar() {
           <Tags />
         </div>
       </ScrollArea>
-      {/* <Login /> */}
+      <Login />
     </div>
   );
 }
