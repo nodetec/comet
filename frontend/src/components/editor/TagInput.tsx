@@ -142,7 +142,7 @@ export default function TagInput({ note, tags }: Props) {
               <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
           </div>
-          <ScrollBar orientation="horizontal" />
+          <ScrollBar className="hidden" orientation="horizontal" />
         </ScrollArea>
 
         <Popover
