@@ -9,6 +9,80 @@ import {Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as sql$0 from "../../../../database/sql/models.js";
 
+export class NostrKey {
+    "ID": number;
+    "Nsec": string;
+    "Npub": string;
+    "Active": boolean;
+    "LoggedIn": boolean;
+
+    /** Creates a new NostrKey instance. */
+    constructor($$source: Partial<NostrKey> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Nsec" in $$source)) {
+            this["Nsec"] = "";
+        }
+        if (!("Npub" in $$source)) {
+            this["Npub"] = "";
+        }
+        if (!("Active" in $$source)) {
+            this["Active"] = false;
+        }
+        if (!("LoggedIn" in $$source)) {
+            this["LoggedIn"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new NostrKey instance from a string or object.
+     */
+    static createFrom($$source: any = {}): NostrKey {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new NostrKey($$parsedSource as Partial<NostrKey>);
+    }
+}
+
+export class Relay {
+    "ID": number;
+    "Url": string;
+    "Read": boolean;
+    "Write": boolean;
+    "Sync": boolean;
+
+    /** Creates a new Relay instance. */
+    constructor($$source: Partial<Relay> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("Url" in $$source)) {
+            this["Url"] = "";
+        }
+        if (!("Read" in $$source)) {
+            this["Read"] = false;
+        }
+        if (!("Write" in $$source)) {
+            this["Write"] = false;
+        }
+        if (!("Sync" in $$source)) {
+            this["Sync"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new Relay instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Relay {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Relay($$parsedSource as Partial<Relay>);
+    }
+}
+
 export class Settings {
     /**
      * theme
