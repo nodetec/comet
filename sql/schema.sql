@@ -54,6 +54,26 @@ CREATE TABLE IF NOT EXISTS trash (
   tags TEXT -- Field to store tags
 );
 
+CREATE TABLE IF NOT EXISTS relay (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    read BOOLEAN NOT NULL DEFAULT FALSE,
+    write BOOLEAN NOT NULL DEFAULT TRUE,
+    sync BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL,
+    modified_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS nostr_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nsec TEXT NOT NULL,
+    npub TEXT NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT FALSE,
+    logged_in BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL,
+    modified_at TEXT NOT NULL
+);
+
 -- CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (title, content, content_rowid = 'id');
 -- Create the FTS5 virtual table if it doesn't exist
 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5 (content);

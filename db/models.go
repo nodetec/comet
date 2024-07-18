@@ -8,6 +8,16 @@ import (
 	"database/sql"
 )
 
+type NostrKey struct {
+	ID         int64
+	Nsec       string
+	Npub       string
+	Active     bool
+	LoggedIn   bool
+	CreatedAt  string
+	ModifiedAt string
+}
+
 type Note struct {
 	ID          int64
 	StatusID    sql.NullInt64
@@ -39,6 +49,16 @@ type NotebookTag struct {
 
 type NotesFt struct {
 	Content string
+}
+
+type Relay struct {
+	ID         int64
+	Url        string
+	Read       bool
+	Write      bool
+	Sync       bool
+	CreatedAt  string
+	ModifiedAt string
 }
 
 type Setting struct {
