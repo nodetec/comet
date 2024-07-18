@@ -135,9 +135,9 @@ export default function TagInput({ note, tags }: Props) {
 
   return (
     <div className="w-full border-t py-0.5 pl-4 pr-2">
-      <div className="flex items-center gap-x-2 pr-3">
-        <ScrollArea className="flex max-w-[70%] overflow-x-auto whitespace-nowrap">
-          <div className="flex w-max gap-1.5 py-3">
+      <div className="flex items-center gap-x-2 py-1.5 w-full">
+        <ScrollArea className="max-w-[65%] shrink-0 whitespace-nowrap">
+          <div className="flex w-full gap-1.5">
             {data?.map((tag, tagIndex) => (
               <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
