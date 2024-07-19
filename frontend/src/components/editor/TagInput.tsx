@@ -134,15 +134,15 @@ export default function TagInput({ note, tags }: Props) {
   }, [data]);
 
   return (
-    <div className="w-full border-t py-0.5 pl-4 pr-2">
-      <div className="flex items-center gap-x-2 py-1.5 w-full">
+    <div className="w-full flex border-t pl-4 min-h-12 pr-2">
+      <div className="flex items-center gap-x-2 w-full">
         <ScrollArea className="max-w-[65%] shrink-0 whitespace-nowrap">
-          <div className="flex w-full gap-1.5">
+          <div className="flex w-full gap-1.5 my-2">
             {data?.map((tag, tagIndex) => (
               <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
           </div>
-          <ScrollBar className="hidden" orientation="horizontal" />
+          <ScrollBar className="-mb-0.5" orientation="horizontal" />
         </ScrollArea>
 
         <Popover
