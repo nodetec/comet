@@ -17,6 +17,7 @@ import { ArrowRightIcon, Check, Copy } from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { CopyToClipboard } from "react-copy-to-clipboard";
+import { CreateNostrKey } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,7 @@ export default function Login() {
   const [createNpub, setCreateNpub] = useState("");
   const [isNsecCopied, setIsNsecCopied] = useState(false);
   const [isNpubCopied, setIsNpubCopied] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const generateNsecAndNpub = () => {
     let sk = generateSecretKey();
@@ -45,7 +47,8 @@ export default function Login() {
   };
 
   const handleCreateBtnOnClick = () => {
-    generateNsecAndNpub();
+    CreateNostrKey(createNsec, createNpub, true, true);
+    setOpen(false);
   };
 
   const handleNsecOnCopy = (text, result) => {
@@ -72,7 +75,7 @@ export default function Login() {
 
   return (
     <div className="flex items-center gap-4 border-t py-2">
-      <Dialog>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button
             id="sidebar-login-btn"

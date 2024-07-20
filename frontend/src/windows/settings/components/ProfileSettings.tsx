@@ -22,8 +22,11 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Check, Copy } from "lucide-react";
 // import { useAppContext } from "~/store";
 import { /* getPublicKey, */ nip19 } from "nostr-tools";
+import { CopyToClipboard } from "react-copy-to-clipboard";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -43,6 +46,7 @@ const formSchema = z.object({
 
 export default function ProfileSettings() {
   const [loading, setLoading] = useState<boolean>(false);
+  const [isNpubCopied, setIsNpubCopied] = useState(false);
 
   // const { settings, setSettings } = useAppContext();
 
@@ -73,6 +77,17 @@ export default function ProfileSettings() {
     setLoading(false);
   }
 
+  const handleNpubOnCopy = (text, result) => {
+    setLoading(true);
+    if (result) {
+      setIsNpubCopied(true);
+      setTimeout(() => setIsNpubCopied(false), 500);
+    } else {
+      alert("Failed to copy Npub!");
+    }
+    setLoading(false);
+  };
+
   return (
     <Card className="bg-card/20">
       <CardHeader>
@@ -80,6 +95,31 @@ export default function ProfileSettings() {
         <CardDescription>Enter your profile Details</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="flex w-full items-center justify-start py-4">
+          <div className="flex w-full flex-col gap-4">
+            <Label htmlFor="create-dialog-npub-input">Npub</Label>
+            <Input
+              id="create-dialog-npub-input"
+              name="create-dialog-npub-input"
+              readOnly
+              value="Need to get from DB"
+              className="focus-visible:ring-0 disabled:cursor-pointer"
+            />
+          </div>
+          <CopyToClipboard text="Need to get from DB" onCopy={handleNpubOnCopy}>
+            <Button
+              id="create-dialog-npub-copy-btn"
+              name="create-dialog-nub-copy-btn"
+              type="button"
+              variant="outline"
+              className="ml-3 h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:pointer-events-none disabled:opacity-50"
+              disabled={loading}
+            >
+              {!isNpubCopied && <Copy className="h-4 w-4" />}
+              {isNpubCopied && <Check className="h-4 w-4" />}
+            </Button>
+          </CopyToClipboard>
+        </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <FormField
