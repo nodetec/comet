@@ -161,6 +161,7 @@ export default function Login() {
                       <FormControl>
                         <div className="flex gap-4">
                           <Input
+                            className="overflow-ellipsis"
                             id="create-dialog-nsec-input"
                             placeholder="nsec"
                             {...field}
@@ -200,6 +201,7 @@ export default function Login() {
                       <FormControl>
                         <div className="flex gap-4">
                           <Input
+                            className="overflow-ellipsis"
                             id="create-dialog-npub-input"
                             disabled
                             placeholder="npub"
