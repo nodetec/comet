@@ -24,9 +24,10 @@ import {
 import { Input } from "~/components/ui/input";
 // import { Label } from "~/components/ui/label";
 // import { ArrowRightIcon, Check, Copy } from "lucide-react";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, Check, Copy } from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import CopyToClipboard from "react-copy-to-clipboard";
 // import { CopyToClipboard } from "react-copy-to-clipboard";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -47,9 +48,9 @@ const formSchema = z.object({
 });
 
 export default function Login() {
-  // const [loading, setLoading] = useState(false);
-  // const [isNsecCopied, setIsNsecCopied] = useState(false);
-  // const [isNpubCopied, setIsNpubCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isNsecCopied, setIsNsecCopied] = useState(false);
+  const [isNpubCopied, setIsNpubCopied] = useState(false);
   const [open, setOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -63,6 +64,7 @@ export default function Login() {
   const { reset, watch, setValue } = form;
 
   const nsecValue = watch("nsec");
+  const npubValue = watch("npub");
 
   const generateKepair = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -91,27 +93,27 @@ export default function Login() {
     // setIsNpubCopied(false);
   };
 
-  // const handleNsecOnCopy = (_: string, result: boolean) => {
-  //   setLoading(true);
-  //   if (result) {
-  //     setIsNsecCopied(true);
-  //     setTimeout(() => setIsNsecCopied(false), 500);
-  //   } else {
-  //     alert("Failed to copy Nsec!");
-  //   }
-  //   setLoading(false);
-  // };
-  //
-  // const handleNpubOnCopy = (_: string, result: boolean) => {
-  //   setLoading(true);
-  //   if (result) {
-  //     setIsNpubCopied(true);
-  //     setTimeout(() => setIsNpubCopied(false), 500);
-  //   } else {
-  //     alert("Failed to copy Npub!");
-  //   }
-  //   setLoading(false);
-  // };
+  const handleNsecOnCopy = (_: string, result: boolean) => {
+    setLoading(true);
+    if (result) {
+      setIsNsecCopied(true);
+      setTimeout(() => setIsNsecCopied(false), 500);
+    } else {
+      alert("Failed to copy Nsec!");
+    }
+    setLoading(false);
+  };
+
+  const handleNpubOnCopy = (_: string, result: boolean) => {
+    setLoading(true);
+    if (result) {
+      setIsNpubCopied(true);
+      setTimeout(() => setIsNpubCopied(false), 500);
+    } else {
+      alert("Failed to copy Npub!");
+    }
+    setLoading(false);
+  };
   useEffect(() => {
     if (isValidNsec(nsecValue)) {
       const secretKey = nip19.decode(nsecValue).data as Uint8Array;
@@ -166,22 +168,22 @@ export default function Login() {
                             placeholder="nsec"
                             {...field}
                           />
-                          {/* <CopyToClipboard */}
-                          {/*   text={nsec} */}
-                          {/*   onCopy={handleNsecOnCopy} */}
-                          {/* > */}
-                          {/*   <Button */}
-                          {/*     id="create-dialog-nsec-copy-btn" */}
-                          {/*     name="create-dialog-nsec-copy-btn" */}
-                          {/*     type="button" */}
-                          {/*     variant="outline" */}
-                          {/*     className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:cursor-pointer disabled:opacity-100" */}
-                          {/*     disabled={loading} */}
-                          {/*   > */}
-                          {/*     {!isNsecCopied && <Copy className="h-4 w-4" />} */}
-                          {/*     {isNsecCopied && <Check className="h-4 w-4" />} */}
-                          {/*   </Button> */}
-                          {/* </CopyToClipboard> */}
+                          <CopyToClipboard
+                            text={nsecValue}
+                            onCopy={handleNsecOnCopy}
+                          >
+                            <Button
+                              id="create-dialog-nsec-copy-btn"
+                              name="create-dialog-nsec-copy-btn"
+                              type="button"
+                              variant="outline"
+                              className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:cursor-pointer disabled:opacity-100"
+                              disabled={loading}
+                            >
+                              {!isNsecCopied && <Copy className="h-4 w-4" />}
+                              {isNsecCopied && <Check className="h-4 w-4" />}
+                            </Button>
+                          </CopyToClipboard>
                         </div>
                       </FormControl>
                       {/* <FormDescription> */}
@@ -208,22 +210,22 @@ export default function Login() {
                             {...field}
                           />
 
-                          {/* <CopyToClipboard */}
-                          {/*   text={npub} */}
-                          {/*   onCopy={handleNpubOnCopy} */}
-                          {/* > */}
-                          {/*   <Button */}
-                          {/*     id="create-dialog-npub-copy-btn" */}
-                          {/*     name="create-dialog-nub-copy-btn" */}
-                          {/*     type="button" */}
-                          {/*     variant="outline" */}
-                          {/*     className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:pointer-events-none disabled:opacity-50" */}
-                          {/*     disabled={loading} */}
-                          {/*   > */}
-                          {/*     {!isNpubCopied && <Copy className="h-4 w-4" />} */}
-                          {/*     {isNpubCopied && <Check className="h-4 w-4" />} */}
-                          {/*   </Button> */}
-                          {/* </CopyToClipboard> */}
+                          <CopyToClipboard
+                            text={npubValue}
+                            onCopy={handleNpubOnCopy}
+                          >
+                            <Button
+                              id="create-dialog-npub-copy-btn"
+                              name="create-dialog-nub-copy-btn"
+                              type="button"
+                              variant="outline"
+                              className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:pointer-events-none disabled:opacity-50"
+                              disabled={loading}
+                            >
+                              {!isNpubCopied && <Copy className="h-4 w-4" />}
+                              {isNpubCopied && <Check className="h-4 w-4" />}
+                            </Button>
+                          </CopyToClipboard>
                         </div>
                       </FormControl>
                       {/* <FormDescription> */}
