@@ -22,13 +22,10 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-// import { Label } from "~/components/ui/label";
-// import { ArrowRightIcon, Check, Copy } from "lucide-react";
 import { ArrowRightIcon, Check, Copy } from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import CopyToClipboard from "react-copy-to-clipboard";
-// import { CopyToClipboard } from "react-copy-to-clipboard";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
