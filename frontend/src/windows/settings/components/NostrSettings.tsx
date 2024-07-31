@@ -35,7 +35,7 @@ const defaultValues: Partial<ProfileFormValues> = {
   urls: [{ value: "wss://relay.damus.io" }, { value: "wss://nos.lol" }],
 };
 
-export default function RelaySettings() {
+export function NostrSettings() {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues,

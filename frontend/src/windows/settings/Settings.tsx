@@ -5,10 +5,10 @@ import { SettingService } from "&/github.com/nodetec/captains-log/service";
 
 import EditorSettings from "./components/EditorSettings";
 import GeneralSettings from "./components/GeneralSettings";
-import ProfileSettings from "./components/ProfileSettings";
-import RelaySettings from "./components/RelaySettings";
+// import ProfileSettings from "./components/ProfileSettings";
+import { NostrSettings } from "./components/NostrSettings";
 
-type Tab = "General" | "Editor" | "Profile" | "Relays";
+type Tab = "General" | "Editor" | "Profile" | "Nostr";
 
 export default function Settings() {
   const [currentTab, setCurrentTab] = useState<Tab>("General");
@@ -47,17 +47,17 @@ export default function Settings() {
             >
               Editor
             </span>
+            {/* <span */}
+            {/*   className={`cursor-pointer ${currentTab === "Profile" ? "font-semibold text-primary" : ""}`} */}
+            {/*   onClick={() => handleCurrentTabOnClick("Profile")} */}
+            {/* > */}
+            {/*   Profile */}
+            {/* </span> */}
             <span
-              className={`cursor-pointer ${currentTab === "Profile" ? "font-semibold text-primary" : ""}`}
-              onClick={() => handleCurrentTabOnClick("Profile")}
+              className={`cursor-pointer ${currentTab === "Nostr" ? "font-semibold text-primary" : ""}`}
+              onClick={() => handleCurrentTabOnClick("Nostr")}
             >
-              Profile
-            </span>
-            <span
-              className={`cursor-pointer ${currentTab === "Relays" ? "font-semibold text-primary" : ""}`}
-              onClick={() => handleCurrentTabOnClick("Relays")}
-            >
-              Relays
+              Nostr
             </span>
             {/* <span>Support</span> */}
             {/* <span>Donate</span> */}
@@ -67,8 +67,8 @@ export default function Settings() {
             <div className="w-full overflow-auto pb-8 pr-8">
               {currentTab === "General" && <GeneralSettings />}
               {currentTab === "Editor" && <EditorSettings settings={data} />}
-              {currentTab === "Profile" && <ProfileSettings />}
-              {currentTab === "Relays" && <RelaySettings />}
+              {/* {currentTab === "Profile" && <ProfileSettings />} */}
+              {currentTab === "Nostr" && <NostrSettings />}
             </div>
           )}
         </div>

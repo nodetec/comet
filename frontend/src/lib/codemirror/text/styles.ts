@@ -9,11 +9,11 @@ export function customizeEditorThemeStyles(
 ) {
   if (className === "fontSize") {
     if (setting === "small") {
-      setting = "12px";
+      setting = "13px";
     } else if (setting === "default") {
-      setting = "16px";
+      setting = "15px";
     } else {
-      setting = "20px";
+      setting = "17px";
     }
   }
 

@@ -13,7 +13,6 @@ type NostrKey struct {
 	Nsec       string
 	Npub       string
 	Active     bool
-	LoggedIn   bool
 	CreatedAt  string
 	ModifiedAt string
 }

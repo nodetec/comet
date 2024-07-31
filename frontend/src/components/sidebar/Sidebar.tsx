@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 
+import { useQuery } from "@tanstack/react-query";
 import * as wails from "@wailsio/runtime";
 import { Events } from "@wailsio/runtime";
 import { WailsEvent } from "@wailsio/runtime/types/events";
+import { ListNostrKeys } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { Settings2 } from "lucide-react";
+import { CloudIcon, Settings2 } from "lucide-react";
 
 import AllNotes from "./AllNotes";
 import Login from "./Login";
+// import Login from "./Login";
 import { NotebookComboBox } from "./NotebookComboBox";
 import Tags from "./Tags";
 import Trash from "./Trash";
@@ -32,16 +35,26 @@ export default function Sidebar() {
     setSettingsWindowClosed(false);
   };
 
+  const getKeys = async () => {
+    const keys = await ListNostrKeys();
+    return keys;
+  };
+
+  const { data: keys } = useQuery({
+    queryKey: ["nostrKeys"],
+    queryFn: getKeys,
+  });
+
   return (
     <div className="flex h-full flex-col justify-between pt-4">
       <div className="flex justify-end gap-x-4 pb-4 pr-4">
-        <div className="flex justify-end">
-          {/* <CloudOffIcon */}
-          {/*   // onClick={handleCreateNotebook} */}
-          {/*   className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" */}
-          {/* /> */}
-        </div>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-4">
+          {keys?.length === 1 ? (
+            <CloudIcon className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
+          ) : (
+            <Login />
+          )}
+
           <Settings2
             onClick={handleOpenSettings}
             className={`h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground ${settingsWindowClosed ? "" : "pointer-events-none opacity-50"}`}
@@ -56,7 +69,6 @@ export default function Sidebar() {
           <Tags />
         </div>
       </ScrollArea>
-      <Login />
     </div>
   );
 }

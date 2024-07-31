@@ -7,6 +7,7 @@ import { useAppState } from "~/store";
 import { Eye } from "lucide-react";
 
 import Editor from "./Editor";
+import { PostButton } from "./PostButton";
 import Preview from "./Preview";
 import ReadOnlyTagList from "./ReadOnlyTagList";
 import TagInput from "./TagInput";
@@ -60,6 +61,9 @@ export const EditorWrapper = () => {
         >
           <Eye className="h-[1.2rem] w-[1.2rem]" />
         </Button>
+      </div>
+      <div className="fixed bottom-[6.25rem] right-2.5 p-2">
+        <PostButton note={activeNote} />
       </div>
       <div className="flex items-center justify-between">
         {feedType === "trash"

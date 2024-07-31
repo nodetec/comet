@@ -13,7 +13,6 @@ type NostrKey struct {
 	Nsec     string
 	Npub     string
 	Active   bool
-	LoggedIn bool
 }
 
 type NostrKeyService struct {
@@ -28,12 +27,11 @@ func NewNostrKeyService(queries *db.Queries, logger *log.Logger) *NostrKeyServic
 	}
 }
 
-func (s *NostrKeyService) CreateNostrKey(ctx context.Context, nsec string, npub string, active bool, loggedIn bool) (NostrKey, error) {
+func (s *NostrKeyService) CreateNostrKey(ctx context.Context, nsec string, npub string, active bool) (NostrKey, error) {
 	params := db.CreateNostrKeyParams{
 		Nsec:       nsec,
 		Npub:       npub,
 		Active:     active,
-		LoggedIn:   loggedIn,
 		CreatedAt:  time.Now().Format(time.RFC3339),
 		ModifiedAt: time.Now().Format(time.RFC3339),
 	}
@@ -47,7 +45,6 @@ func (s *NostrKeyService) CreateNostrKey(ctx context.Context, nsec string, npub 
 		Nsec:     nostrKey.Nsec,
 		Npub:     nostrKey.Npub,
 		Active:   nostrKey.Active,
-		LoggedIn: nostrKey.LoggedIn,
 	}, nil
 }
 
@@ -71,7 +68,6 @@ func (s *NostrKeyService) GetNostrKey(ctx context.Context, id int64) (NostrKey, 
 		Nsec:     nostrKey.Nsec,
 		Npub:     nostrKey.Npub,
 		Active:   nostrKey.Active,
-		LoggedIn: nostrKey.LoggedIn,
 	}, nil
 }
 
@@ -88,18 +84,16 @@ func (s *NostrKeyService) ListNostrKeys(ctx context.Context) ([]NostrKey, error)
 			Nsec:     nk.Nsec,
 			Npub:     nk.Npub,
 			Active:   nk.Active,
-			LoggedIn: nk.LoggedIn,
 		})
 	}
 	return result, nil
 }
 
-func (s *NostrKeyService) UpdateNostrKey(ctx context.Context, id int64, nsec string, npub string, active bool, loggedIn bool) error {
+func (s *NostrKeyService) UpdateNostrKey(ctx context.Context, id int64, nsec string, npub string, active bool) error {
 	params := db.UpdateNostrKeyParams{
 		Nsec:       nsec,
 		Npub:       npub,
 		Active:     active,
-		LoggedIn:   loggedIn,
 		ModifiedAt: time.Now().Format(time.RFC3339),
 	}
 	err := s.queries.UpdateNostrKey(ctx, params)

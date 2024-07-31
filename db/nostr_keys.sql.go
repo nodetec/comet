@@ -11,13 +11,12 @@ import (
 
 const createNostrKey = `-- name: CreateNostrKey :one
 INSERT INTO
-  nostr_keys (nsec, npub, active, logged_in, created_at, modified_at)
+  nostr_keys (nsec, npub, active, created_at, modified_at)
 VALUES
-  (?, ?, ?, ?, ?, ?) RETURNING id,
+  (?, ?, ?, ?, ?) RETURNING id,
   nsec,
   npub,
   active,
-  logged_in,
   created_at,
   modified_at
 `
@@ -26,7 +25,6 @@ type CreateNostrKeyParams struct {
 	Nsec       string
 	Npub       string
 	Active     bool
-	LoggedIn   bool
 	CreatedAt  string
 	ModifiedAt string
 }
@@ -37,7 +35,6 @@ func (q *Queries) CreateNostrKey(ctx context.Context, arg CreateNostrKeyParams) 
 		arg.Nsec,
 		arg.Npub,
 		arg.Active,
-		arg.LoggedIn,
 		arg.CreatedAt,
 		arg.ModifiedAt,
 	)
@@ -47,7 +44,6 @@ func (q *Queries) CreateNostrKey(ctx context.Context, arg CreateNostrKeyParams) 
 		&i.Nsec,
 		&i.Npub,
 		&i.Active,
-		&i.LoggedIn,
 		&i.CreatedAt,
 		&i.ModifiedAt,
 	)
@@ -64,7 +60,7 @@ func (q *Queries) DeleteNostrKey(ctx context.Context, id int64) error {
 }
 
 const getNostrKey = `-- name: GetNostrKey :one
-SELECT id, nsec, npub, active, logged_in, created_at, modified_at FROM nostr_keys WHERE id = ?
+SELECT id, nsec, npub, active, created_at, modified_at FROM nostr_keys WHERE id = ?
 `
 
 func (q *Queries) GetNostrKey(ctx context.Context, id int64) (NostrKey, error) {
@@ -75,7 +71,6 @@ func (q *Queries) GetNostrKey(ctx context.Context, id int64) (NostrKey, error) {
 		&i.Nsec,
 		&i.Npub,
 		&i.Active,
-		&i.LoggedIn,
 		&i.CreatedAt,
 		&i.ModifiedAt,
 	)
@@ -83,7 +78,7 @@ func (q *Queries) GetNostrKey(ctx context.Context, id int64) (NostrKey, error) {
 }
 
 const listNostrKeys = `-- name: ListNostrKeys :many
-SELECT id, nsec, npub, active, logged_in, created_at, modified_at FROM nostr_keys
+SELECT id, nsec, npub, active, created_at, modified_at FROM nostr_keys
 `
 
 func (q *Queries) ListNostrKeys(ctx context.Context) ([]NostrKey, error) {
@@ -100,7 +95,6 @@ func (q *Queries) ListNostrKeys(ctx context.Context) ([]NostrKey, error) {
 			&i.Nsec,
 			&i.Npub,
 			&i.Active,
-			&i.LoggedIn,
 			&i.CreatedAt,
 			&i.ModifiedAt,
 		); err != nil {
@@ -118,14 +112,13 @@ func (q *Queries) ListNostrKeys(ctx context.Context) ([]NostrKey, error) {
 }
 
 const updateNostrKey = `-- name: UpdateNostrKey :exec
-UPDATE nostr_keys SET nsec = ?, npub = ?, active = ?, logged_in = ?, created_at = ?, modified_at = ? WHERE id = ?
+UPDATE nostr_keys SET nsec = ?, npub = ?, active = ?, created_at = ?, modified_at = ? WHERE id = ?
 `
 
 type UpdateNostrKeyParams struct {
 	Nsec       string
 	Npub       string
 	Active     bool
-	LoggedIn   bool
 	CreatedAt  string
 	ModifiedAt string
 	ID         int64
@@ -136,7 +129,6 @@ func (q *Queries) UpdateNostrKey(ctx context.Context, arg UpdateNostrKeyParams) 
 		arg.Nsec,
 		arg.Npub,
 		arg.Active,
-		arg.LoggedIn,
 		arg.CreatedAt,
 		arg.ModifiedAt,
 		arg.ID,

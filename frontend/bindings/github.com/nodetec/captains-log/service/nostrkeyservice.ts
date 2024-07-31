@@ -9,8 +9,8 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
-export function CreateNostrKey(nsec: string, npub: string, active: boolean, loggedIn: boolean): Promise<$models.NostrKey> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1139917670, nsec, npub, active, loggedIn) as any;
+export function CreateNostrKey(nsec: string, npub: string, active: boolean): Promise<$models.NostrKey> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1139917670, nsec, npub, active) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType0($result);
     }) as any;
@@ -41,8 +41,8 @@ export function ListNostrKeys(): Promise<$models.NostrKey[]> & { cancel(): void 
     return $typingPromise;
 }
 
-export function UpdateNostrKey(id: number, nsec: string, npub: string, active: boolean, loggedIn: boolean): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3672862547, id, nsec, npub, active, loggedIn) as any;
+export function UpdateNostrKey(id: number, nsec: string, npub: string, active: boolean): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3672862547, id, nsec, npub, active) as any;
     return $resultPromise;
 }
 

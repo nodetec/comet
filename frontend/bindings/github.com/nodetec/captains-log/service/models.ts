@@ -14,7 +14,6 @@ export class NostrKey {
     "Nsec": string;
     "Npub": string;
     "Active": boolean;
-    "LoggedIn": boolean;
 
     /** Creates a new NostrKey instance. */
     constructor($$source: Partial<NostrKey> = {}) {
@@ -29,9 +28,6 @@ export class NostrKey {
         }
         if (!("Active" in $$source)) {
             this["Active"] = false;
-        }
-        if (!("LoggedIn" in $$source)) {
-            this["LoggedIn"] = false;
         }
 
         Object.assign(this, $$source);

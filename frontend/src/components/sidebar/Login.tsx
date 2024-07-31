@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateNostrKey } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
+import {
+  CreateNostrKey,
+  ListNostrKeys,
+} from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -22,7 +25,11 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import { ArrowRightIcon, Check, Copy } from "lucide-react";
+import {
+  Check,
+  CloudOffIcon,
+  Copy,
+} from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import CopyToClipboard from "react-copy-to-clipboard";
@@ -76,18 +83,29 @@ export default function Login() {
     });
   };
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!form.formState.isValid) {
       return;
     }
 
     const { nsec, npub } = values;
 
-    CreateNostrKey(nsec, npub, true, true);
+    const keys = await ListNostrKeys();
+
+    if (keys.length === 1) {
+      setOpen(false);
+      setLoading(false);
+      setIsNsecCopied(false);
+      setIsNpubCopied(false);
+      return;
+    }
+
+    CreateNostrKey(nsec, npub, true);
+
     setOpen(false);
-    // setLoading(false);
-    // setIsNsecCopied(false);
-    // setIsNpubCopied(false);
+    setLoading(false);
+    setIsNsecCopied(false);
+    setIsNpubCopied(false);
   };
 
   const handleNsecOnCopy = (_: string, result: boolean) => {
@@ -111,6 +129,7 @@ export default function Login() {
     }
     setLoading(false);
   };
+
   useEffect(() => {
     if (isValidNsec(nsecValue)) {
       const secretKey = nip19.decode(nsecValue).data as Uint8Array;
@@ -123,19 +142,10 @@ export default function Login() {
   }, [nsecValue, setValue]);
 
   return (
-    <div className="flex items-center gap-4 border-t py-2">
+    <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button
-            id="sidebar-login-btn"
-            name="sidebar-login-btn"
-            type="button"
-            variant="ghost"
-            className="flex items-center gap-x-1 text-muted-foreground hover:bg-background"
-          >
-            <p className="text-sm">Login</p>
-            <ArrowRightIcon className="h-3 w-3" />
-          </Button>
+          <CloudOffIcon className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
         </DialogTrigger>
         <DialogContent className="pt-12 sm:max-w-[425px]">
           <DialogHeader className="items-start">
