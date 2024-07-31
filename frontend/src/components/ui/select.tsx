@@ -1,6 +1,5 @@
 import * as React from "react"
 import {
-  CaretSortIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -28,9 +27,9 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <SelectPrimitive.Icon asChild>
-      <CaretSortIcon className="h-4 w-4 opacity-50" />
-    </SelectPrimitive.Icon>
+    {/* <SelectPrimitive.Icon asChild> */}
+    {/*   <ChevronDownIcon className="h-4 w-4 opacity-50 ml-1 shrink-0" /> */}
+    {/* </SelectPrimitive.Icon> */}
   </SelectPrimitive.Trigger>
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName

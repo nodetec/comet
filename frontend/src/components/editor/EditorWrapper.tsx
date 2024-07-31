@@ -7,6 +7,7 @@ import { useAppState } from "~/store";
 import { Eye } from "lucide-react";
 
 import Editor from "./Editor";
+import { EditorHeader } from "./EditorHeader";
 import { PostButton } from "./PostButton";
 import Preview from "./Preview";
 import ReadOnlyTagList from "./ReadOnlyTagList";
@@ -46,7 +47,8 @@ export const EditorWrapper = () => {
   }
 
   return (
-    <div className="flex h-full flex-col pt-12">
+    <div className="flex h-full flex-col">
+      <EditorHeader />
       {!showPreview && <Editor />}
       {showPreview && <Preview />}
       <div className="fixed bottom-[3.75rem] right-2.5 p-2">
@@ -61,9 +63,6 @@ export const EditorWrapper = () => {
         >
           <Eye className="h-[1.2rem] w-[1.2rem]" />
         </Button>
-      </div>
-      <div className="fixed bottom-[6.25rem] right-2.5 p-2">
-        <PostButton note={activeNote} />
       </div>
       <div className="flex items-center justify-between">
         {feedType === "trash"

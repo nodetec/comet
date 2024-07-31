@@ -24,8 +24,17 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { useAppState } from "~/store";
+import { NewspaperIcon, StickyNote } from "lucide-react";
 
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import NoteTag from "./NoteTag";
 
 type Props = {
@@ -134,15 +143,18 @@ export default function TagInput({ note, tags }: Props) {
   }, [data]);
 
   return (
-    <div className="w-full flex border-t pl-4 min-h-12 pr-2">
-      <div className="flex items-center gap-x-2 w-full">
+    <div className="flex min-h-12 w-full items-center border-t pr-4 pl-2">
+      <div className="flex w-full items-center gap-x-2">
         <ScrollArea className="max-w-[65%] shrink-0 whitespace-nowrap">
-          <div className="flex w-full gap-1.5 my-2">
+          <div className="my-2 flex w-full gap-1.5">
             {data?.map((tag, tagIndex) => (
               <NoteTag key={tagIndex} note={note} tag={tag} />
             ))}
           </div>
-          <ScrollBar className="-mb-0.5 cursor-pointer" orientation="horizontal" />
+          <ScrollBar
+            className="-mb-0.5 cursor-pointer"
+            orientation="horizontal"
+          />
         </ScrollArea>
 
         <Popover
@@ -157,7 +169,7 @@ export default function TagInput({ note, tags }: Props) {
               role="combobox"
               aria-expanded={openTagInputCombobox}
               placeholder="Add Tags"
-              className="min-w-[30%] border-none px-1 py-3 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
+              className="border border-none px-1 py-3 text-xs focus-visible:ring-0 disabled:cursor-pointer disabled:opacity-100"
               disabled={loading}
               minLength={1}
               maxLength={32}
@@ -176,7 +188,7 @@ export default function TagInput({ note, tags }: Props) {
                 <CommandInput value={tagName} />
               </div>
               <CommandList>
-                <CommandEmpty className="px-2 py-1.5 text-sm">
+                <CommandEmpty className="px-2 pt-1.5 text-sm">
                   No tags...
                 </CommandEmpty>
                 <CommandGroup>
@@ -196,6 +208,32 @@ export default function TagInput({ note, tags }: Props) {
             </Command>
           </PopoverContent>
         </Popover>
+        <Select>
+          <SelectTrigger className="max-w-fit border-none p-0 focus:ring-0 focus-visible:ring-0">
+            <div className="font-semibold text-muted-foreground hover:text-foreground">
+              <SelectValue
+                className="placeholder:text-muted-foreground"
+                placeholder={"Article"}
+              />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="note">
+                <div className="flex items-center gap-x-1">
+                  <StickyNote className="h-[0.9rem] w-[0.9rem]" />
+                  <div>Note</div>
+                </div>
+              </SelectItem>
+              <SelectItem value="article">
+                <div className="flex items-center gap-x-1">
+                  <NewspaperIcon className="h-[0.9rem] w-[0.9rem]" />
+                  <div>Article</div>
+                </div>
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

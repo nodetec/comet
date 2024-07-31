@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -60,6 +61,8 @@ func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int
 
 	var notes []db.Note
 	var err error
+
+	fmt.Println("fetching notes")
 
 	if notebookId != 0 && tagId != 0 {
 		notes, err = s.queries.ListNotesByNotebookAndTag(ctx,

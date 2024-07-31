@@ -46,7 +46,7 @@ export default function Sidebar() {
   });
 
   return (
-    <div className="flex h-full flex-col justify-between pt-4">
+    <div className="flex h-full flex-col justify-between pt-5">
       <div className="flex justify-end gap-x-4 pb-4 pr-4">
         <div className="flex justify-end gap-4">
           {keys?.length === 1 ? (

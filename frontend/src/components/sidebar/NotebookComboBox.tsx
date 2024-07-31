@@ -135,22 +135,22 @@ export function NotebookComboBox() {
             className="hover:bg-muted-hover flex w-full cursor-pointer items-center justify-between rounded-md text-sm font-medium text-muted-foreground transition-colors"
           >
             {activeNotebook === undefined ? (
-              <span className="flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-sm font-medium text-muted-foreground">
-                <span className="flex">
-                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem] shrink-0" />
+              <div className="flex w-full cursor-pointer items-center justify-between rounded-md py-1.5 px-2 text-sm font-medium text-muted-foreground">
+                <div className="flex items-center">
+                  <NotebookIcon className="mr-1.5 h-[1.1rem] w-[1.1rem] shrink-0" />
                   Notebooks
-                </span>
-                <ChevronsUpDown className="h-4 w-4 shrink-0" />
-              </span>
+                </div>
+                <ChevronsUpDown className="h-[1.1rem] w-[1.1rem] shrink-0" />
+              </div>
             ) : (
-              <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted p-2 text-sm font-medium text-secondary-foreground">
-                <span className="flex">
-                  <NotebookIcon className="mr-1.5 h-[1.2rem] w-[1.2rem] shrink-0" />
-                  <span className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
+              <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted py-1.5 px-2 text-sm font-medium text-secondary-foreground">
+                <div className="flex items-center">
+                  <NotebookIcon className="mr-1.5 h-[1.1rem] w-[1.1rem] shrink-0" />
+                  <div className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
                     {activeNotebook.Name}
-                  </span>
-                </span>
-                <ChevronsUpDown className="h-4 w-4 shrink-0" />
+                  </div>
+                </div>
+                <ChevronsUpDown className="h-3 w-3 shrink-0" />
               </span>
             )}
           </span>

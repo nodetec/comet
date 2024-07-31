@@ -49,10 +49,10 @@ export function PostButton({ note }: Props) {
       type="button"
       variant="ghost"
       size="icon"
-      className="rounded-full text-muted-foreground"
+      className="text-muted-foreground hover:bg-background"
       onClick={postNote}
     >
-      <ShareIcon className="h-[1.2rem] w-[1.2rem]" />
+      <ShareIcon className="h-5 w-5" />
     </Button>
   );
 }
