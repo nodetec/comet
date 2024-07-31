@@ -50,7 +50,9 @@ func (q *Queries) SearchNotes(ctx context.Context, searchTerm string, notebookID
 			&note.ModifiedAt,
 			&note.PublishedAt,
 			&note.EventID,
-      &note.Pinned,
+			&note.Pinned,
+			&note.Notetype,
+			&note.Filetype,
 		); err != nil {
 			return nil, err
 		}
@@ -61,4 +63,3 @@ func (q *Queries) SearchNotes(ctx context.Context, searchTerm string, notebookID
 	}
 	return notes, nil
 }
-

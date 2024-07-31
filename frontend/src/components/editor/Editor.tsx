@@ -1,8 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
-import {
-  NoteService,
-} from "&/github.com/nodetec/captains-log/service";
+import { NoteService } from "&/github.com/nodetec/captains-log/service";
 import { useEditor } from "~/hooks/useEditor";
 import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
@@ -40,6 +38,10 @@ const Editor = () => {
       // TODO: rethink published indicator
       false,
       activeNote.EventID,
+
+      activeNote.Pinned,
+      activeNote.Notetype,
+      activeNote.Filetype,
     );
 
     void queryClient.invalidateQueries({

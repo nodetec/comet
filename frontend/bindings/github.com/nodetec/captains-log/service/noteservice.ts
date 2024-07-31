@@ -17,8 +17,8 @@ export function AddNoteToTrash(note: db$0.Note, tags: db$0.Tag[]): Promise<void>
     return $resultPromise;
 }
 
-export function CreateNote(title: string, content: string, notebookID: number, statusID: sql$0.NullInt64, publishedAt: sql$0.NullString, eventId: sql$0.NullString): Promise<db$0.Note> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(718095870, title, content, notebookID, statusID, publishedAt, eventId) as any;
+export function CreateNote(title: string, content: string, notebookID: number, statusID: sql$0.NullInt64, publishedAt: sql$0.NullString, eventId: sql$0.NullString, notetype: string, filetype: string): Promise<db$0.Note> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(718095870, title, content, notebookID, statusID, publishedAt, eventId, notetype, filetype) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType0($result);
     }) as any;
@@ -90,8 +90,8 @@ export function SearchTrash(searchTerm: string, limit: number, pageParam: number
     return $typingPromise;
 }
 
-export function UpdateNote(id: number, title: string, content: string, notebookID: number, statusID: sql$0.NullInt64, published: boolean, eventId: sql$0.NullString): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3047331695, id, title, content, notebookID, statusID, published, eventId) as any;
+export function UpdateNote(id: number, title: string, content: string, notebookID: number, statusID: sql$0.NullInt64, published: boolean, eventId: sql$0.NullString, pinned: boolean, notetype: string, filetype: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(3047331695, id, title, content, notebookID, statusID, published, eventId, pinned, notetype, filetype) as any;
     return $resultPromise;
 }
 

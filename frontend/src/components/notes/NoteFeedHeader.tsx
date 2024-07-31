@@ -36,6 +36,8 @@ export default function NoteFeedHeader({ feedType }: Props) {
         String: undefined,
         Valid: false,
       }),
+      "note",
+      "text",
     );
 
     if (activeTag) {
@@ -62,7 +64,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
           <h1 className="line-clamp-1 truncate text-ellipsis whitespace-break-spaces break-all text-lg font-bold">
             {title(feedType)}
           </h1>
-          <ChevronDown className="mt-1 mr-4 h-[1rem] w-[1rem] text-muted-foreground shrink-0" />
+          <ChevronDown className="mr-4 mt-1 h-[1rem] w-[1rem] shrink-0 text-muted-foreground" />
         </div>
       </SortDropdown>
       <Button

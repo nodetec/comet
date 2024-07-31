@@ -22,7 +22,7 @@ func NewNoteService(queries *db.Queries, logger *log.Logger) *NoteService {
 	}
 }
 
-func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID int64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString) (db.Note, error) {
+func (s *NoteService) CreateNote(ctx context.Context, title string, content string, notebookID int64, statusID sql.NullInt64, publishedAt sql.NullString, eventId sql.NullString, notetype string, filetype string) (db.Note, error) {
 
 	params := db.CreateNoteParams{
 		Title:       title,
@@ -33,6 +33,9 @@ func (s *NoteService) CreateNote(ctx context.Context, title string, content stri
 		ModifiedAt:  time.Now().Format(time.RFC3339),
 		PublishedAt: publishedAt,
 		EventID:     eventId,
+		Pinned:      false,
+		Notetype:    notetype,
+		Filetype:    filetype,
 	}
 
 	note, err := s.queries.CreateNote(ctx, params)
@@ -106,7 +109,7 @@ func (s *NoteService) ListNotes(ctx context.Context, notebookId int64, tagId int
 	return notes, nil
 }
 
-func (s *NoteService) UpdateNote(ctx context.Context, id int64, title string, content string, notebookID int64, statusID sql.NullInt64, published bool, eventId sql.NullString) error {
+func (s *NoteService) UpdateNote(ctx context.Context, id int64, title string, content string, notebookID int64, statusID sql.NullInt64, published bool, eventId sql.NullString, pinned bool, notetype string, filetype string) error {
 
 	var publishedAt sql.NullString
 
@@ -125,6 +128,9 @@ func (s *NoteService) UpdateNote(ctx context.Context, id int64, title string, co
 		ModifiedAt:  time.Now().Format(time.RFC3339),
 		PublishedAt: publishedAt,
 		EventID:     eventId,
+		Pinned:      pinned,
+		Notetype:    notetype,
+		Filetype:    filetype,
 	}
 
 	err := s.queries.UpdateNote(ctx, params)

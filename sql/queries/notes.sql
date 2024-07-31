@@ -10,10 +10,12 @@ INSERT INTO
     modified_at,
     published_at,
     event_id,
-    pinned
+    pinned,
+    notetype,
+    filetype
   )
 VALUES
-  (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
   status_id,
   notebook_id,
   content,
@@ -22,7 +24,9 @@ VALUES
   modified_at,
   published_at,
   event_id,
-  pinned;
+  pinned,
+  notetype,
+  filetype;
 
 -- name: GetNote :one
 SELECT
@@ -35,7 +39,9 @@ SELECT
   modified_at,
   published_at,
   event_id,
-  pinned
+  pinned,
+  notetype,
+  filetype
 FROM
   notes
 WHERE
@@ -51,7 +57,9 @@ SET
   modified_at = ?,
   published_at = ?,
   event_id = ?,
-  pinned = ?
+  pinned = ?,
+  notetype = ?,
+  filetype = ?
 WHERE
   id = ?;
 

@@ -29,7 +29,9 @@ func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, notebookID, tag
 		modified_at,
 		published_at,
 		event_id,
-    pinned
+    pinned,
+		notetype,
+		filetype
 	FROM
 		notes
 	WHERE
@@ -69,6 +71,8 @@ func (q *Queries) ListNotesByNotebookAndTag(ctx context.Context, notebookID, tag
 			&note.PublishedAt,
 			&note.EventID,
       &note.Pinned,
+			&note.Notetype,
+			&note.Filetype,
 		); err != nil {
 			return nil, err
 		}

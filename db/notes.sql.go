@@ -21,10 +21,12 @@ INSERT INTO
     modified_at,
     published_at,
     event_id,
-    pinned
+    pinned,
+    notetype,
+    filetype
   )
 VALUES
-  (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
   status_id,
   notebook_id,
   content,
@@ -33,7 +35,9 @@ VALUES
   modified_at,
   published_at,
   event_id,
-  pinned
+  pinned,
+  notetype,
+  filetype
 `
 
 type CreateNoteParams struct {
@@ -45,7 +49,9 @@ type CreateNoteParams struct {
 	ModifiedAt  string
 	PublishedAt sql.NullString
 	EventID     sql.NullString
-	Pinned      sql.NullBool
+	Pinned      bool
+	Notetype    string
+	Filetype    string
 }
 
 // Note Queries
@@ -60,6 +66,8 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		arg.PublishedAt,
 		arg.EventID,
 		arg.Pinned,
+		arg.Notetype,
+		arg.Filetype,
 	)
 	var i Note
 	err := row.Scan(
@@ -73,6 +81,8 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.PublishedAt,
 		&i.EventID,
 		&i.Pinned,
+		&i.Notetype,
+		&i.Filetype,
 	)
 	return i, err
 }
@@ -99,7 +109,9 @@ SELECT
   modified_at,
   published_at,
   event_id,
-  pinned
+  pinned,
+  notetype,
+  filetype
 FROM
   notes
 WHERE
@@ -120,6 +132,8 @@ func (q *Queries) GetNote(ctx context.Context, id int64) (Note, error) {
 		&i.PublishedAt,
 		&i.EventID,
 		&i.Pinned,
+		&i.Notetype,
+		&i.Filetype,
 	)
 	return i, err
 }
@@ -134,7 +148,9 @@ SET
   modified_at = ?,
   published_at = ?,
   event_id = ?,
-  pinned = ?
+  pinned = ?,
+  notetype = ?,
+  filetype = ?
 WHERE
   id = ?
 `
@@ -147,7 +163,9 @@ type UpdateNoteParams struct {
 	ModifiedAt  string
 	PublishedAt sql.NullString
 	EventID     sql.NullString
-	Pinned      sql.NullBool
+	Pinned      bool
+	Notetype    string
+	Filetype    string
 	ID          int64
 }
 
@@ -161,6 +179,8 @@ func (q *Queries) UpdateNote(ctx context.Context, arg UpdateNoteParams) error {
 		arg.PublishedAt,
 		arg.EventID,
 		arg.Pinned,
+		arg.Notetype,
+		arg.Filetype,
 		arg.ID,
 	)
 	return err

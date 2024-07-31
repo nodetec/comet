@@ -88,6 +88,9 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
         // TODO: rethink published indicator
         false,
         activeNote.EventID,
+        activeNote.Pinned,
+        activeNote.Notetype,
+        activeNote.Filetype,
       );
       console.log("SAVING TO DB");
     }

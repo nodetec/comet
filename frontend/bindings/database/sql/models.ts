@@ -6,40 +6,6 @@
 import {Create as $Create} from "@wailsio/runtime";
 
 /**
- * NullBool represents a bool that may be null.
- * NullBool implements the [Scanner] interface so
- * it can be used as a scan destination, similar to [NullString].
- */
-export class NullBool {
-    "Bool": boolean;
-
-    /**
-     * Valid is true if Bool is not NULL
-     */
-    "Valid": boolean;
-
-    /** Creates a new NullBool instance. */
-    constructor($$source: Partial<NullBool> = {}) {
-        if (!("Bool" in $$source)) {
-            this["Bool"] = false;
-        }
-        if (!("Valid" in $$source)) {
-            this["Valid"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new NullBool instance from a string or object.
-     */
-    static createFrom($$source: any = {}): NullBool {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new NullBool($$parsedSource as Partial<NullBool>);
-    }
-}
-
-/**
  * NullInt64 represents an int64 that may be null.
  * NullInt64 implements the [Scanner] interface so
  * it can be used as a scan destination, similar to [NullString].
