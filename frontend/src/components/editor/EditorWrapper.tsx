@@ -8,7 +8,6 @@ import { Eye } from "lucide-react";
 
 import Editor from "./Editor";
 import { EditorHeader } from "./EditorHeader";
-import { PostButton } from "./PostButton";
 import Preview from "./Preview";
 import ReadOnlyTagList from "./ReadOnlyTagList";
 import TagInput from "./TagInput";

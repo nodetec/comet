@@ -1,9 +1,6 @@
-import { useState } from "react";
-
 import { useAppState } from "~/store";
 import {
   EllipsisVertical,
-  Eye,
   PinIcon,
 } from "lucide-react";
 
