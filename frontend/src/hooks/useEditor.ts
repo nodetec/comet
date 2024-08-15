@@ -56,7 +56,9 @@ export const useEditor = ({ initialDoc, onChange }: Props) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorView, setEditorView] = useState<EditorView>();
 
-  const { activeNote, activeTrashNote, feedType } = useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
+  const feedType = useAppState((state) => state.feedType);
   const queryClient = useQueryClient();
 
   async function fetchSettings() {

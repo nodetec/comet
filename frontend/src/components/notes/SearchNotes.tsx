@@ -3,8 +3,9 @@ import { useAppState } from "~/store";
 import { Input } from "../ui/input";
 
 export default function SearchNotes() {
-  const { noteSearch, setNoteSearch, setSearchActive } =
-    useAppState();
+  const noteSearch = useAppState((state) => state.noteSearch);
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
+  const setSearchActive = useAppState((state) => state.setSearchActive);
 
   function handleSetSearchNote(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.value === "") {

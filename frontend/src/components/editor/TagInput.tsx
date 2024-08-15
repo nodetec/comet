@@ -34,7 +34,7 @@ type Props = {
 };
 
 export default function TagInput({ note, tags }: Props) {
-  const { activeNote } = useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
 
   const [loading, setLoading] = useState(false);
   const [tagName, setTagName] = useState<string>("");

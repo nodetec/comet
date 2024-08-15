@@ -7,8 +7,10 @@ import { useAppState } from "~/store";
 import { type InfiniteQueryData } from "~/types";
 
 const Editor = () => {
-  const { activeNote, setActiveNote, activeTrashNote, feedType } =
-    useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
+  const feedType = useAppState((state) => state.feedType);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
 
   const queryClient = useQueryClient();
 

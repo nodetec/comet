@@ -32,15 +32,14 @@ import { useAppState } from "~/store";
 import { Check, ChevronsUpDown, NotebookIcon, PlusIcon } from "lucide-react";
 
 export function NotebookComboBox() {
-  const {
-    activeNotebook,
-    setActiveNotebook,
-    setFeedType,
-    activeNote,
-    setActiveNote,
-    activeTag,
-    setActiveTag,
-  } = useAppState();
+  const activeNotebook = useAppState((state) => state.activeNotebook);
+  const setActiveNotebook = useAppState((state) => state.setActiveNotebook);
+  const setFeedType = useAppState((state) => state.setFeedType);
+  const activeNote = useAppState((state) => state.activeNote);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
+  const activeTag = useAppState((state) => state.activeTag);
+  const setActiveTag = useAppState((state) => state.setActiveTag);
+
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
 
@@ -135,7 +134,7 @@ export function NotebookComboBox() {
             className="hover:bg-muted-hover flex w-full cursor-pointer items-center justify-between rounded-md text-sm font-medium text-muted-foreground transition-colors"
           >
             {activeNotebook === undefined ? (
-              <div className="flex w-full cursor-pointer items-center justify-between rounded-md py-1.5 px-2 text-sm font-medium text-muted-foreground">
+              <div className="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground">
                 <div className="flex items-center">
                   <NotebookIcon className="mr-1.5 h-[1.1rem] w-[1.1rem] shrink-0" />
                   Notebooks
@@ -143,7 +142,7 @@ export function NotebookComboBox() {
                 <ChevronsUpDown className="h-[1.1rem] w-[1.1rem] shrink-0" />
               </div>
             ) : (
-              <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted py-1.5 px-2 text-sm font-medium text-secondary-foreground">
+              <span className="flex w-full cursor-pointer items-center justify-between rounded-md bg-muted px-2 py-1.5 text-sm font-medium text-secondary-foreground">
                 <div className="flex items-center">
                   <NotebookIcon className="mr-1.5 h-[1.1rem] w-[1.1rem] shrink-0" />
                   <div className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">

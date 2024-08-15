@@ -7,7 +7,10 @@ import { useAppState } from "~/store";
 
 const useNoteTagMenu = () => {
   const queryClient = useQueryClient();
-  const { activeTag, setActiveTag, setFeedType } = useAppState();
+
+  const activeTag = useAppState((state) => state.activeTag);
+  const setActiveTag = useAppState((state) => state.setActiveTag);
+  const setFeedType = useAppState((state) => state.setFeedType);
 
   useEffect(() => {
     const handleNoteTagRemoved = (event: WailsEvent) => {

@@ -13,8 +13,11 @@ import ReadOnlyTagList from "./ReadOnlyTagList";
 import TagInput from "./TagInput";
 
 export const EditorWrapper = () => {
-  const { activeNote, activeTrashNote, feedType } = useAppState();
   const [showPreview, setShowPreview] = useState(false);
+
+  const feedType = useAppState((state) => state.feedType);
+  const activeNote = useAppState((state) => state.activeNote);
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
 
   // TODO
   // Where should the errors and loading be taken care of?

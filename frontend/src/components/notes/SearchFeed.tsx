@@ -8,15 +8,13 @@ import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
 
 export default function SearchFeed() {
-  const {
-    setActiveNote,
-    noteSearch,
-    activeNotebook,
-    activeTag,
-    orderBy,
-    timeSortDirection,
-    titleSortDirection,
-  } = useAppState();
+  const noteSearch = useAppState((state) => state.noteSearch);
+  const activeNotebook = useAppState((state) => state.activeNotebook);
+  const activeTag = useAppState((state) => state.activeTag);
+  const titleSortDirection = useAppState((state) => state.titleSortDirection);
+  const timeSortDirection = useAppState((state) => state.timeSortDirection);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
+  const orderBy = useAppState((state) => state.orderBy);
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -36,8 +34,6 @@ export default function SearchFeed() {
       orderBy,
       sortDirection,
     );
-
-    console.log("NOTES", notes);
 
     if (notes.length === 0) {
       setActiveNote(undefined);

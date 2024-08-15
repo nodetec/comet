@@ -7,14 +7,12 @@ type Props = {
 };
 
 export default function TagItem({ tag }: Props) {
-  const {
-    activeTag,
-    setActiveTag,
-    activeNote,
-    setActiveNote,
-    feedType,
-    setFeedType,
-  } = useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
+  const activeTag = useAppState((state) => state.activeTag);
+  const setActiveTag = useAppState((state) => state.setActiveTag);
+  const feedType = useAppState((state) => state.feedType);
+  const setFeedType = useAppState((state) => state.setFeedType);
 
   const handleTagClick = async () => {
     if (feedType === "trash") {

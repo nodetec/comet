@@ -16,15 +16,14 @@ import {
 import { useAppState } from "~/store";
 
 export function SortDropdown({ children }: { children: React.ReactNode }) {
-  const {
-    orderBy,
-    setOrderBy,
-    timeSortDirection,
-    setTimeSortDirection,
-    titleSortDirection,
-    setTitleSortDirection,
-  } = useAppState();
   const queryClient = useQueryClient();
+
+  const orderBy = useAppState((state) => state.orderBy);
+  const setOrderBy = useAppState((state) => state.setOrderBy);
+  const titleSortDirection = useAppState((state) => state.titleSortDirection);
+  const timeSortDirection = useAppState((state) => state.timeSortDirection);
+  const setTitleSortDirection = useAppState((state) => state.setTitleSortDirection);
+  const setTimeSortDirection = useAppState((state) => state.setTimeSortDirection);
 
   const handleSortChange = (e: string) => {
     const value = e as "modified_at" | "created_at" | "title";

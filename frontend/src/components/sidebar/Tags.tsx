@@ -16,7 +16,7 @@ import {
 import TagItem from "./TagItem";
 
 export default function Tags() {
-  const { activeNotebook } = useAppState();
+  const activeNotebook = useAppState((state) => state.activeNotebook);
 
   const { isPending, data } = useQuery({
     queryKey: ["tags", activeNotebook?.ID],

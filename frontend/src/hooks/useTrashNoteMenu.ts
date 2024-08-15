@@ -7,7 +7,10 @@ import { useAppState } from "~/store";
 
 const useTrashNoteMenu = () => {
   const queryClient = useQueryClient();
-  const { activeTrashNote, setActiveTrashNote } = useAppState();
+
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
+  const setActiveTrashNote = useAppState((state) => state.setActiveTrashNote);
+
 
   useEffect(() => {
     const handleNoteDeleted = (event: WailsEvent) => {

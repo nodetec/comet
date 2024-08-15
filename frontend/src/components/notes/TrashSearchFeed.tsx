@@ -8,12 +8,10 @@ import { ScrollArea } from "../ui/scroll-area";
 import TrashNoteCard from "./TrashNoteCard";
 
 export default function TrashSearchFeed() {
-  const {
-    noteSearch,
-    orderBy,
-    timeSortDirection,
-    titleSortDirection,
-  } = useAppState();
+  const noteSearch = useAppState((state) => state.noteSearch);
+  const orderBy = useAppState((state) => state.orderBy);
+  const timeSortDirection = useAppState((state) => state.timeSortDirection);
+  const titleSortDirection = useAppState((state) => state.titleSortDirection);
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;

@@ -10,7 +10,8 @@ type Props = {
 };
 
 export default function TrashNoteCard({ trashNote }: Props) {
-  const { activeTrashNote, setActiveTrashNote } = useAppState();
+  const setActiveTrashNote = useAppState((state) => state.setActiveTrashNote);
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
 
   function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();

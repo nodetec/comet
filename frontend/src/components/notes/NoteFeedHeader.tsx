@@ -17,7 +17,10 @@ type Props = {
 
 export default function NoteFeedHeader({ feedType }: Props) {
   const queryClient = useQueryClient();
-  const { setActiveNote, activeTag, activeNotebook } = useAppState();
+
+  const setActiveNote = useAppState((state) => state.setActiveNote);
+  const activeTag = useAppState((state) => state.activeTag);
+  const activeNotebook = useAppState((state) => state.activeNotebook);
 
   async function handleCreateNote() {
     const note = await NoteService.CreateNote(

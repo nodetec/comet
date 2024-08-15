@@ -28,11 +28,11 @@ export default function App() {
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         {!editorFullScreen && (
           <>
-            <ResizablePanel defaultSize={18} minSize={18}>
+            <ResizablePanel className="min-w-40" defaultSize={18} minSize={18}>
               <Sidebar />
             </ResizablePanel>
             <ResizableHandle />
-            <ResizablePanel defaultSize={26} minSize={26}>
+            <ResizablePanel className="min-w-60" defaultSize={26} minSize={26}>
               <Notes />
             </ResizablePanel>
             <ResizableHandle />

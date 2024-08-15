@@ -8,7 +8,8 @@ import SearchFeed from "./SearchFeed";
 import TrashSearchFeed from "./TrashSearchFeed";
 
 export default function Notes() {
-  const { feedType, searchActive } = useAppState();
+  const feedType = useAppState((state) => state.feedType);
+  const searchActive = useAppState((state) => state.searchActive);
 
   return (
       <div className="h-full flex flex-col">

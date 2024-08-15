@@ -5,7 +5,8 @@ import rehypeSanitize from "rehype-sanitize";
 const rehypePlugins = [rehypeSanitize];
 
 export const Preview = () => {
-  const { activeNote, activeTrashNote } = useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
+  const activeTrashNote = useAppState((state) => state.activeTrashNote);
 
   return (
     <div className="h-full w-full overflow-auto py-1">

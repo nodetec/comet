@@ -10,7 +10,8 @@ type Props = {
 };
 
 export default function NoteCard({ note }: Props) {
-  const { activeNote, setActiveNote } = useAppState();
+  const activeNote = useAppState((state) => state.activeNote);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
 
   function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
