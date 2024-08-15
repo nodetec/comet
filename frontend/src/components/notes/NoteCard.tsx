@@ -25,8 +25,8 @@ export default function NoteCard({ note }: Props) {
     <div className="mx-3 flex w-full flex-col items-center">
       <button
         className={cn(
-          "flex w-full flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm transition-all",
-          activeNote?.ID === note.ID && "bg-muted/80",
+          "flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm transition-all",
+          activeNote?.ID === note.ID && "bg-muted/70",
         )}
       >
         <div

@@ -37,6 +37,9 @@ interface State {
 
   titleSortDirection: "ASC" | "DESC";
   setTitleSortDirection: (sortDirection: "ASC" | "DESC") => void;
+
+  editorFullScreen: boolean;
+  setEditorFullScreen: (editorFullScreen: boolean) => void;
 }
 
 export const useAppState = create<State>()(
@@ -68,6 +71,9 @@ export const useAppState = create<State>()(
 
       timeSortDirection: "DESC",
       setTimeSortDirection: (timeSortDirection) => set({ timeSortDirection }),
+
+      editorFullScreen: false,
+      setEditorFullScreen: (editorFullScreen) => set({ editorFullScreen }),
 
       titleSortDirection: "ASC",
       setTitleSortDirection: (titleSortDirection) =>

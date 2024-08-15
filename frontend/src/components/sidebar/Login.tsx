@@ -27,7 +27,7 @@ import {
 import { Input } from "~/components/ui/input";
 import {
   Check,
-  CloudOffIcon,
+  CircleUserRound,
   Copy,
 } from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
@@ -145,7 +145,7 @@ export default function Login() {
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <CloudOffIcon className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
+          <CircleUserRound className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
         </DialogTrigger>
         <DialogContent className="pt-12 sm:max-w-[425px]">
           <DialogHeader className="items-start">

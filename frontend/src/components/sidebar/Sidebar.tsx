@@ -6,7 +6,7 @@ import { Events } from "@wailsio/runtime";
 import { WailsEvent } from "@wailsio/runtime/types/events";
 import { ListNostrKeys } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { CloudIcon, Settings2 } from "lucide-react";
+import { CircleUserRound, Settings2 } from "lucide-react";
 
 import AllNotes from "./AllNotes";
 import Login from "./Login";
@@ -46,11 +46,11 @@ export default function Sidebar() {
   });
 
   return (
-    <div className="flex h-full flex-col justify-between pt-5">
+    <div className="flex h-full bg-secondary flex-col justify-between pt-[1.125rem]">
       <div className="flex justify-end gap-x-4 pb-4 pr-4">
         <div className="flex justify-end gap-4">
           {keys?.length === 1 ? (
-            <CloudIcon className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
+            <CircleUserRound className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
           ) : (
             <Login />
           )}

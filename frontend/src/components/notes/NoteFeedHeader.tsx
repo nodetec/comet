@@ -58,7 +58,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
   }
 
   return (
-    <div className="flex justify-between px-3 pt-3">
+    <div className="flex justify-between px-3 pt-2.5">
       <SortDropdown>
         <div className="flex cursor-pointer items-center justify-center gap-x-1 pl-2">
           <h1 className="line-clamp-1 truncate text-ellipsis whitespace-break-spaces break-all text-lg font-bold">

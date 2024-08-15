@@ -24,17 +24,8 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { useAppState } from "~/store";
-import { NewspaperIcon, StickyNote } from "lucide-react";
 
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 import NoteTag from "./NoteTag";
 
 type Props = {
@@ -143,7 +134,7 @@ export default function TagInput({ note, tags }: Props) {
   }, [data]);
 
   return (
-    <div className="flex min-h-12 w-full items-center border-t pr-4 pl-2">
+    <div className="flex min-h-12 w-full items-center border-t pl-2 pr-4">
       <div className="flex w-full items-center gap-x-2">
         <ScrollArea className="max-w-[65%] shrink-0 whitespace-nowrap">
           <div className="my-2 flex w-full gap-1.5">
@@ -208,32 +199,6 @@ export default function TagInput({ note, tags }: Props) {
             </Command>
           </PopoverContent>
         </Popover>
-        <Select>
-          <SelectTrigger className="max-w-fit border-none p-0 focus:ring-0 focus-visible:ring-0">
-            <div className="font-semibold text-muted-foreground hover:text-foreground">
-              <SelectValue
-                className="placeholder:text-muted-foreground"
-                placeholder={"Article"}
-              />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="note">
-                <div className="flex items-center gap-x-1">
-                  <StickyNote className="h-[0.9rem] w-[0.9rem]" />
-                  <div>Note</div>
-                </div>
-              </SelectItem>
-              <SelectItem value="article">
-                <div className="flex items-center gap-x-1">
-                  <NewspaperIcon className="h-[0.9rem] w-[0.9rem]" />
-                  <div>Article</div>
-                </div>
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
       </div>
     </div>
   );
