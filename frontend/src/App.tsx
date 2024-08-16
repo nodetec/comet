@@ -26,18 +26,24 @@ export default function App() {
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-        {!editorFullScreen && (
-          <>
-            <ResizablePanel className="min-w-40" defaultSize={18} minSize={18}>
-              <Sidebar />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel className="min-w-60" defaultSize={26} minSize={26}>
-              <Notes />
-            </ResizablePanel>
-            <ResizableHandle />
-          </>
-        )}
+        <ResizablePanel
+          hidden={editorFullScreen}
+          className="min-w-44"
+          defaultSize={18}
+          minSize={18}
+        >
+          <Sidebar />
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel
+          hidden={editorFullScreen}
+          className="min-w-60"
+          defaultSize={26}
+          minSize={26}
+        >
+          <Notes />
+        </ResizablePanel>
+        <ResizableHandle />
         <ResizablePanel minSize={40}>
           <EditorWrapper />
         </ResizablePanel>
