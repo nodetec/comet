@@ -8,6 +8,7 @@ import { ListNostrKeys } from "&/github.com/nodetec/captains-log/service/nostrke
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { CircleUserRound, Settings2 } from "lucide-react";
 
+import { Button } from "../ui/button";
 import AllNotes from "./AllNotes";
 import Login from "./Login";
 // import Login from "./Login";
@@ -46,19 +47,33 @@ export default function Sidebar() {
   });
 
   return (
-    <div className="flex h-full bg-secondary flex-col justify-between pt-[1.125rem]">
+    <div className="flex h-full flex-col justify-between bg-secondary pt-3">
       <div className="flex justify-end gap-x-4 pb-4 pr-4">
-        <div className="flex justify-end gap-4">
+        <div className="flex justify-end gap-1">
           {keys?.length === 1 ? (
-            <CircleUserRound className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="ml-20 text-muted-foreground"
+            >
+              <CircleUserRound className="h-6 w-6" />
+            </Button>
           ) : (
             <Login />
           )}
 
-          <Settings2
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
             onClick={handleOpenSettings}
-            className={`h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground ${settingsWindowClosed ? "" : "pointer-events-none opacity-50"}`}
-          />
+          >
+            <Settings2
+              className={`h-5 w-5 text-muted-foreground ${settingsWindowClosed ? "" : "pointer-events-none opacity-50"}`}
+            />
+          </Button>
         </div>
       </div>
       <ScrollArea className="flex h-full flex-col gap-y-2 [&>div>div[style]]:!block">

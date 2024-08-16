@@ -61,7 +61,7 @@ export default function NoteFeedHeader({ feedType }: Props) {
   }
 
   return (
-    <div className="flex justify-between px-3 pt-2.5">
+    <div className="flex justify-between px-3 pt-3">
       <SortDropdown>
         <div className="flex cursor-pointer items-center justify-center gap-x-1 pl-2">
           <h1 className="line-clamp-1 truncate text-ellipsis whitespace-break-spaces break-all text-lg font-bold">
@@ -71,12 +71,13 @@ export default function NoteFeedHeader({ feedType }: Props) {
         </div>
       </SortDropdown>
       <Button
-        disabled={feedType === "trash"}
+        type="button"
         variant="ghost"
-        className="cursor-pointer text-muted-foreground hover:bg-background hover:text-foreground"
         size="icon"
+        className="text-muted-foreground"
+        onClick={handleCreateNote}
       >
-        <PenBoxIcon onClick={handleCreateNote} className="h-5 w-5" />
+        <PenBoxIcon className="h-5 w-5" />
       </Button>
     </div>
   );

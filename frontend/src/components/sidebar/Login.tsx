@@ -25,11 +25,7 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import {
-  Check,
-  CircleUserRound,
-  Copy,
-} from "lucide-react";
+import { Check, CircleUserRound, Copy } from "lucide-react";
 import * as nip19 from "nostr-tools/nip19";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import CopyToClipboard from "react-copy-to-clipboard";
@@ -145,7 +141,14 @@ export default function Login() {
     <div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <CircleUserRound className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-foreground" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="ml-20 text-muted-foreground"
+          >
+            <CircleUserRound className="h-5 w-5" />
+          </Button>
         </DialogTrigger>
         <DialogContent className="pt-12 sm:max-w-[425px]">
           <DialogHeader className="items-start">
