@@ -1,5 +1,5 @@
 import { useAppState } from "~/store";
-import { ChevronLeft, EllipsisVertical, Menu, PinIcon } from "lucide-react";
+import { EllipsisVertical, PinIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
 import { PostButton } from "./PostButton";
@@ -10,7 +10,9 @@ export function EditorHeader() {
   const setEditorFullScreen = useAppState((state) => state.setEditorFullScreen);
 
   return (
-    <div className="flex flex-col px-2 pt-3">
+    <div
+      className={`flex flex-col px-2 pt-3 ${editorFullScreen && "border-b pb-3"}`}
+    >
       <div className="flex items-center justify-between gap-x-3">
         {editorFullScreen ? (
           <Button
@@ -61,7 +63,6 @@ export function EditorHeader() {
                 />
               </g>
             </svg>
-
           </Button>
         )}
 
