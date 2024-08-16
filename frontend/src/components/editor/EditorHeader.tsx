@@ -11,7 +11,7 @@ export function EditorHeader() {
 
   return (
     <div
-      className={`flex flex-col px-2 pt-3 ${editorFullScreen && "border-b mb-3 pb-3"}`}
+      className={`mb-3 flex flex-col px-2 pt-3 ${editorFullScreen && "border-b pb-3"}`}
     >
       <div className="flex items-center justify-between gap-x-3">
         {editorFullScreen ? (
