@@ -1,7 +1,9 @@
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
 import { ListNostrKeys } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
+import { useAppState } from "~/store";
 import { ShareIcon } from "lucide-react";
 import { finalizeEvent, nip19, SimplePool } from "nostr-tools";
+import { toast } from "sonner";
 
 import { Button } from "../ui/button";
 import {
@@ -50,13 +52,22 @@ function replaceSpacesWithDashes(str: string) {
 // should probably save d value in the db, can look up by d value
 
 export function PostButton({ note }: Props) {
+  const openPostBtnDialog = useAppState((state) => state.openPostBtnDialog);
+  const setOpenPostBtnDialog = useAppState(
+    (state) => state.setOpenPostBtnDialog,
+  );
+
   const postNote = async (
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) => {
     e.preventDefault();
 
+    setOpenPostBtnDialog(false);
+
     if (!note) {
-      // TODO: show toast error
+      toast("Note failed to post", {
+        description: "There was an error posting your note.",
+      });
       return;
     }
 
@@ -83,22 +94,29 @@ export function PostButton({ note }: Props) {
 
     console.log("event", event);
 
-    await Promise.any(pool.publish(relays, event));
-
-    console.log("pk", keys[0].Npub);
+    try {
+      await Promise.any(pool.publish(relays, event));
+      console.log("pk", keys[0].Npub);
+      toast("Note posted", {
+        description: "Your note was posted successfully.",
+      });
+    } catch (error) {
+      toast("Note failed to post", {
+        description: "There was an error posting your note.",
+      });
+    }
   };
 
   return (
-    <Dialog>
+    <Dialog open={openPostBtnDialog} onOpenChange={setOpenPostBtnDialog}>
       <DialogTrigger asChild>
         <Button
-          id="editor-preview-btn"
-          name="editor-preview-btn"
+          id="editor-header-share-btn"
+          name="editor-header-share-btn"
           type="button"
           variant="ghost"
           size="icon"
           className="text-muted-foreground"
-          // onClick={postNote}
         >
           <ShareIcon className="h-5 w-5" />
         </Button>

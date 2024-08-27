@@ -8,6 +8,9 @@ export function EditorHeader() {
   const activeNote = useAppState((state) => state.activeNote);
   const editorFullScreen = useAppState((state) => state.editorFullScreen);
   const setEditorFullScreen = useAppState((state) => state.setEditorFullScreen);
+  const setOpenPostBtnDialog = useAppState(
+    (state) => state.setOpenPostBtnDialog,
+  );
 
   return (
     <div
@@ -16,8 +19,8 @@ export function EditorHeader() {
       <div className="flex items-center justify-between gap-x-3">
         {editorFullScreen ? (
           <Button
-            id="editor-preview-btn"
-            name="editor-preview-btn"
+            id="editor-header-full-screen-false-btn"
+            name="editor-header-full-screen-false-btn"
             type="button"
             variant="ghost"
             size="icon"
@@ -42,8 +45,8 @@ export function EditorHeader() {
           </Button>
         ) : (
           <Button
-            id="editor-preview-btn"
-            name="editor-preview-btn"
+            id="editor-header-full-screen-true-btn"
+            name="editor-header-full-screen-true-btn"
             type="button"
             variant="ghost"
             size="icon"
@@ -68,19 +71,20 @@ export function EditorHeader() {
 
         <div className="flex gap-x-2">
           <Button
-            id="editor-preview-btn"
-            name="editor-preview-btn"
+            id="editor-header-pin-btn"
+            name="editor-header-pin-btn"
             type="button"
             variant="ghost"
             size="icon"
             className="text-muted-foreground"
+            onClick={() => setOpenPostBtnDialog(true)}
           >
             <PinIcon className="h-5 w-5" />
           </Button>
           <PostButton note={activeNote} />
           <Button
-            id="editor-preview-btn"
-            name="editor-preview-btn"
+            id="editor-header-ellipsis-vertical-btn"
+            name="editor-header-ellipsis-vertical-btn"
             type="button"
             variant="ghost"
             size="icon"

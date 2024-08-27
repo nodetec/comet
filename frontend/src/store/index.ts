@@ -40,6 +40,9 @@ interface State {
 
   editorFullScreen: boolean;
   setEditorFullScreen: (editorFullScreen: boolean) => void;
+
+  openPostBtnDialog: boolean;
+  setOpenPostBtnDialog: (openPostBtnDialog: boolean) => void;
 }
 
 export const useAppState = create<State>()(
@@ -74,6 +77,9 @@ export const useAppState = create<State>()(
 
       editorFullScreen: false,
       setEditorFullScreen: (editorFullScreen) => set({ editorFullScreen }),
+
+      openPostBtnDialog: false,
+      setOpenPostBtnDialog: (openPostBtnDialog) => set({ openPostBtnDialog }),
 
       titleSortDirection: "ASC",
       setTitleSortDirection: (titleSortDirection) =>
