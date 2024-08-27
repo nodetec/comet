@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
+import { Toaster } from "~/components/ui/sonner";
 
 import EditorWrapper from "./components/editor/EditorWrapper";
 import Notes from "./components/notes/Notes";
@@ -48,6 +49,7 @@ export default function App() {
           <EditorWrapper />
         </ResizablePanel>
       </ResizablePanelGroup>
+      <Toaster />
     </div>
   );
 }
