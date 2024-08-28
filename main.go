@@ -103,7 +103,6 @@ func main() {
 			Title:            "Settings",
 			Width:            800,
 			Height:           600,
-			AlwaysOnTop:      true,
 			URL:              "/src/windows/settings/index.html",
 			MinWidth:         500,
 			MinHeight:        375,

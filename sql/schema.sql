@@ -176,4 +176,4 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		('npub', ''),
 		('nsec', ''),
 		-- relays
-		('relays', '["relay.damus.io", "nos.lol"]');
+		('relays', 'relay.notestack.com, relay.damus.io');
