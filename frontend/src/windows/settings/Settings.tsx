@@ -68,7 +68,7 @@ export default function Settings() {
               {currentTab === "General" && <GeneralSettings />}
               {currentTab === "Editor" && <EditorSettings settings={data} />}
               {/* {currentTab === "Profile" && <ProfileSettings />} */}
-              {currentTab === "Nostr" && <NostrSettings />}
+              {currentTab === "Nostr" && <NostrSettings settings={data} />}
             </div>
           )}
         </div>
