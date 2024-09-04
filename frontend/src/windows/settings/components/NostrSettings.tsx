@@ -1,11 +1,10 @@
 import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as wails from "@wailsio/runtime";
+// import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+// import * as wails from "@wailsio/runtime";
 import {
-  Settings,
-  SettingService,
+  Relay /* RelayService */,
 } from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import {
@@ -23,65 +22,51 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import {
-  settingArrayToString,
-  settingStringToArray,
-} from "~/lib/settings/utils";
 import { X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
 type Props = {
-  settings: Settings;
+  relayData: Relay[];
 };
 
 const nostrFormSchema = z.object({
-  relays: z.array(
-    z.object({
-      value: z
-        .string()
-        .max(100, { message: "Must be 100 or fewer characters long" })
-        .trim()
-        .toLowerCase(),
-    }),
-  ),
+  relays: z
+    .array(
+      z.object({
+        Url: z
+          .string()
+          .max(100, { message: "Must be 100 or fewer characters long" })
+          .trim()
+          .toLowerCase()
+          .url({ message: "Please enter a valid URL." })
+          .refine((url) => url.startsWith("wss://"), {
+            message: "URL must begin with wss://",
+          }),
+        Read: z.boolean(),
+        Write: z.boolean(),
+        Sync: z.boolean(),
+      }),
+    )
+    .default([{ Url: "", Read: false, Write: true, Sync: false }]),
 });
 
 type NostrFormValues = z.infer<typeof nostrFormSchema>;
 
-export function NostrSettings({ settings }: Props) {
+export function NostrSettings({ relayData }: Props) {
   const [loading, setLoading] = useState(false);
 
-  function formatSettings() {
-    const relayArr = settingStringToArray(settings.Relays);
+  function formatRelayData() {
     const relayObj: NostrFormValues = { relays: [] };
-    relayArr.forEach(
-      (relay, index) => (relayObj.relays[index] = { value: relay }),
-    );
+    if (relayData !== undefined && relayData.length > 0) {
+      relayObj.relays = relayData;
+    }
     return relayObj;
   }
 
-  const queryClient = useQueryClient();
-
-  // TODO
-  // Where should the errors and loading be taken of?
-  async function updateSetting(key, value) {
-    await SettingService.UpdateSetting(key, value);
-  }
-
-  const mutation = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: string }) =>
-      updateSetting(key, value),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
-      wails.Events.Emit({ name: "settingsChanged", data: "" });
-    },
-    onError: () => {},
-  });
-
   const form = useForm<NostrFormValues>({
     resolver: zodResolver(nostrFormSchema),
-    defaultValues: formatSettings(),
+    defaultValues: formatRelayData(),
     mode: "onChange",
   });
 
@@ -90,25 +75,94 @@ export function NostrSettings({ settings }: Props) {
     control: form.control,
   });
 
+  // const queryClient = useQueryClient();
+
+  // TODO
+  // Where should the errors and loading be taken of?
+  // async function createRelay(url, read, write, sync) {
+  //   await RelayService.CreateRelay(url, read, write, sync);
+  // }
+  //
+  // const mutation = useMutation({
+  //   mutationFn: ({
+  //     url,
+  //     read,
+  //     write,
+  //     sync,
+  //   }: {
+  //     url: string;
+  //     read: boolean;
+  //     write: boolean;
+  //     sync: boolean;
+  //   }) => createRelay(url, read, write, sync),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ["relays"] });
+  //     wails.Events.Emit({ name: "relaysFormSave", data: "" });
+  //   },
+  //   onError: () => {},
+  // });
+
+  // async function deleteRelay(id) {
+  //   await RelayService.DeleteRelay(id);
+  // }
+
+  // const deleteMutation = useMutation({
+  //   mutationFn: ({ id }: { id: number }) => deleteRelay(id),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ["relays"] });
+  //     wails.Events.Emit({ name: "relaysFormSave", data: "" });
+  //   },
+  //   onError: () => {},
+  // });
+
+  // async function fetchRelays() {
+  //   const relays = await RelayService.ListRelays();
+  //   return relays;
+  // }
+
+  // const { data } = useQuery({
+  //   queryKey: ["relays"],
+  //   queryFn: () => fetchRelays(),
+  // });
+
+  // TODO
+  // Handle if there are zero relays
+  // zod might be able to check if a value is unique
+
+  // Look at notestack component - RelayForm and RelaySettings to massage the data for the form
+  // Form handles validation, adding, and removing
+  // On save, first delete all relays in the db - Create a delete all service
+  // Then add all relays instead of one relay at a time to the db - Create an add all service
   function onSubmit(data: NostrFormValues) {
     setLoading(true);
-    const relays: string[] = [];
-    const prefix = "wss://";
-    for (const obj of data.relays) {
-      if (obj.value.startsWith(prefix)) {
-        obj.value = obj.value.slice(prefix.length);
-      }
-      relays.push(...Object.values(obj));
+    console.log("data ", data);
+    console.log("relayData ", relayData);
+    if (data.relays.length > 0) {
+      console.log("data.relays", data.relays);
+      data.relays.forEach((relay) => {
+        console.log("relay", relay);
+        // if (relayData.some((obj) => obj.Url === relay.Url)) {
+        //   console.log("Already in the array");
+        // } else {
+        //   console.log("Object does not exist in the array");
+        //   try {
+        //     mutation.mutate({
+        //       url: relay.Url,
+        //       read: relay.Read,
+        //       write: relay.Write,
+        //       sync: relay.Sync,
+        //     });
+        //   } catch (error) {
+        //     console.error("Nostr settings error: ", error);
+        //   }
+        // }
+      });
     }
-    const relaysString = settingArrayToString(relays);
 
-    try {
-      mutation.mutate({ key: "relays", value: relaysString });
-    } catch (error) {
-      console.error("Nostr settings error: ", error);
-    } finally {
-      setLoading(false);
-    }
+    // TODO
+    // Once Save is successful get list of relays or get each relay that was added
+
+    setLoading(false);
   }
 
   return (
@@ -125,7 +179,7 @@ export function NostrSettings({ settings }: Props) {
                 <FormField
                   control={form.control}
                   key={field.id}
-                  name={`relays.${index}.value`}
+                  name={`relays.${index}.Url`}
                   render={({ field }) => (
                     <FormItem className="pb-4">
                       <FormControl>
@@ -159,7 +213,14 @@ export function NostrSettings({ settings }: Props) {
                 size="sm"
                 className="mt-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
-                onClick={() => append({ value: "" })}
+                onClick={() =>
+                  append({
+                    Url: "",
+                    Read: false,
+                    Write: true,
+                    Sync: false,
+                  })
+                }
               >
                 Add Relay
               </Button>

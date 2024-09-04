@@ -175,5 +175,3 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		-- profile
 		('npub', ''),
 		('nsec', ''),
-		-- relays
-		('relays', 'relay.notestack.com, relay.damus.io');

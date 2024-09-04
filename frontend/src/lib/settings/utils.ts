@@ -12,11 +12,3 @@ export function prioritizeUserFontFamilies(value: string) {
   userPrioritizedFontFamilies.unshift(value);
   return userPrioritizedFontFamilies.join(", ");
 }
-
-export function settingStringToArray(value: string) {
-  return value.split(", ");
-}
-
-export function settingArrayToString(value: string[]) {
-  return value.join(", ");
-}

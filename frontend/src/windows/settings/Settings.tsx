@@ -1,7 +1,10 @@
 import { useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { SettingService } from "&/github.com/nodetec/captains-log/service";
+import {
+  RelayService,
+  SettingService,
+} from "&/github.com/nodetec/captains-log/service";
 
 import EditorSettings from "./components/EditorSettings";
 import GeneralSettings from "./components/GeneralSettings";
@@ -24,9 +27,19 @@ export default function Settings() {
     return settings;
   }
 
-  const { data } = useQuery({
+  const { data: settingsData } = useQuery({
     queryKey: ["settings"],
     queryFn: () => fetchSettings(),
+  });
+
+  async function fetchRelays() {
+    const relays = await RelayService.ListRelays();
+    return relays;
+  }
+
+  const { data: relayData } = useQuery({
+    queryKey: ["relays"],
+    queryFn: () => fetchRelays(),
   });
 
   return (
@@ -63,12 +76,16 @@ export default function Settings() {
             {/* <span>Donate</span> */}
           </nav>
 
-          {data && (
+          {settingsData && relayData && (
             <div className="w-full overflow-auto pb-8 pr-8">
               {currentTab === "General" && <GeneralSettings />}
-              {currentTab === "Editor" && <EditorSettings settings={data} />}
+              {currentTab === "Editor" && (
+                <EditorSettings settings={settingsData} />
+              )}
               {/* {currentTab === "Profile" && <ProfileSettings />} */}
-              {currentTab === "Nostr" && <NostrSettings settings={data} />}
+              {currentTab === "Nostr" && (
+                <NostrSettings relayData={relayData} />
+              )}
             </div>
           )}
         </div>
