@@ -38,7 +38,7 @@ export default function Settings() {
   }
 
   const { data: relayData } = useQuery({
-    queryKey: ["relays"],
+    queryKey: ["relay"],
     queryFn: () => fetchRelays(),
   });
 

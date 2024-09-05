@@ -129,17 +129,17 @@ export function NostrSettings({ relayData }: Props) {
     remove(index);
   }
 
-  function appendRelay(e: React.MouseEvent<HTMLButtonElement>) {
-    e.preventDefault();
-
-    // check if the last relay has a URL
-    // if it doesn't, don't append a new relay
-    const lastRelay = fields[fields.length - 1];
-    console.log("lastRelay ", lastRelay);
-    if (!lastRelay?.Url) return;
-
-    append({ Url: "", Read: false, Write: true, Sync: false });
-  }
+  // function appendRelay(e: React.MouseEvent<HTMLButtonElement>) {
+  //   e.preventDefault();
+  //
+  //   // check if the last relay has a URL
+  //   // if it doesn't, don't append a new relay
+  //   const lastRelay = fields[fields.length - 1];
+  //   console.log("lastRelay ", lastRelay);
+  //   if (!lastRelay?.Url) return;
+  //
+  //   append({ Url: "", Read: false, Write: true, Sync: false });
+  // }
 
   // TODO
   // Handle if there are zero relays
@@ -222,7 +222,10 @@ export function NostrSettings({ relayData }: Props) {
                 size="sm"
                 className="mt-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
-                onClick={(e) => appendRelay(e)}
+                // onClick={(e) => appendRelay(e)}
+                onClick={() =>
+                  append({ Url: "", Read: false, Write: true, Sync: false })
+                }
               >
                 Add Relay
               </Button>
