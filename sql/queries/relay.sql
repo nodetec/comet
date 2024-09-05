@@ -20,5 +20,5 @@ SELECT id, url, read, write, sync, created_at, modified_at FROM relay;
 -- name: UpdateRelay :exec
 UPDATE relay SET url = ?, read = ?, write = ?, sync = ?, created_at = ?, modified_at = ? WHERE id = ?;
 
--- name: DeleteRelay :exec
-DELETE FROM relay WHERE id = ?;
+-- name: DeleteRelays :exec
+DELETE FROM relay;

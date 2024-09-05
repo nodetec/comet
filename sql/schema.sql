@@ -174,4 +174,4 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		('lineHeight',          '2'),
 		-- profile
 		('npub', ''),
-		('nsec', ''),
+		('nsec', '');

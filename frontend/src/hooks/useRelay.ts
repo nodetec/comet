@@ -8,16 +8,16 @@ const useRelay = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const handleRelaysFormSave = (_: WailsEvent) => {
+    const handleRelayFormSave = (_: WailsEvent) => {
       void queryClient.invalidateQueries({
-        queryKey: ["relays"],
+        queryKey: ["relay"],
       });
     };
 
-    Events.On("relaysFormSave", handleRelaysFormSave);
+    Events.On("relayFormSave", handleRelayFormSave);
 
     return () => {
-      Events.Off("relaysFormSave");
+      Events.Off("relayFormSave");
     };
   }, []);
 };

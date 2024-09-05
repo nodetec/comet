@@ -54,12 +54,12 @@ func (q *Queries) CreateRelay(ctx context.Context, arg CreateRelayParams) (Relay
 	return i, err
 }
 
-const deleteRelay = `-- name: DeleteRelay :exec
-DELETE FROM relay WHERE id = ?
+const deleteRelays = `-- name: DeleteRelays :exec
+DELETE FROM relay
 `
 
-func (q *Queries) DeleteRelay(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteRelay, id)
+func (q *Queries) DeleteRelays(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteRelays)
 	return err
 }
 
