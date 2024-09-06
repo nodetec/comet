@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Relay, RelayService } from "&/github.com/nodetec/captains-log/service";
+import { RelayService } from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -23,10 +23,6 @@ import { X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
-type Props = {
-  relayData: Relay[];
-};
-
 // TODO
 // Where should the errors and loading be taken of?
 async function createRelay(
@@ -35,7 +31,6 @@ async function createRelay(
   write: boolean,
   sync: boolean,
 ) {
-  await RelayService.DeleteRelays();
   await RelayService.CreateRelay(url, read, write, sync);
 }
 
@@ -62,25 +57,18 @@ const nostrFormSchema = z.object({
 
 type NostrFormValues = z.infer<typeof nostrFormSchema>;
 
+type Props = {
+  relayData: NostrFormValues;
+};
+
 export function NostrSettings({ relayData }: Props) {
   const [loading, setLoading] = useState(false);
 
-  function formatRelayData() {
-    // TODO
-    // On Save fetch the relays again in the parent component or here
-    const relayObj: NostrFormValues = { relays: [] };
-    if (relayData !== undefined) {
-      relayObj.relays = relayData;
-    }
-
-    console.log("formatRelayData ", relayObj);
-
-    return relayObj;
-  }
-
   const form = useForm<NostrFormValues>({
     resolver: zodResolver(nostrFormSchema),
-    defaultValues: formatRelayData(),
+    defaultValues: {
+      relays: relayData.relays,
+    },
     mode: "onChange",
   });
 
@@ -137,6 +125,7 @@ export function NostrSettings({ relayData }: Props) {
     console.log("relayData ", relayData);
 
     try {
+      await RelayService.DeleteRelays();
       data.relays.forEach((relay) => {
         try {
           createMutation.mutate({
@@ -145,6 +134,7 @@ export function NostrSettings({ relayData }: Props) {
             write: relay.Write,
             sync: relay.Sync,
           });
+          queryClient.invalidateQueries({ queryKey: ["relays"] });
         } catch (error) {
           console.error("Nostr settings create relay error: ", error);
         }

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  Relay,
   RelayService,
   SettingService,
 } from "&/github.com/nodetec/captains-log/service";
@@ -11,6 +12,36 @@ import GeneralSettings from "./GeneralSettings";
 import { NostrSettings } from "./NostrSettings";
 
 type Tab = "General" | "Editor" | "Profile" | "Nostr";
+
+type NostrFormValues = {
+  relays: {
+    Url: string;
+    Read: boolean;
+    Write: boolean;
+    Sync: boolean;
+  }[];
+};
+
+function formatRelayData(relayData: Relay[]) {
+  const relayObj: NostrFormValues = {
+    relays: [{ Url: "", Read: false, Write: false, Sync: false }],
+  };
+
+  const formattedRelayData = relayData.map((relay) => {
+    return {
+      Url: relay.Url,
+      Read: relay.Read,
+      Write: relay.Write,
+      Sync: relay.Sync,
+    };
+  });
+
+  relayObj.relays = formattedRelayData;
+
+  console.log("formattedRelayData !!!!!! ", relayObj);
+
+  return relayObj;
+}
 
 export default function Settings() {
   const [currentTab, setCurrentTab] = useState<Tab>("General");
@@ -30,23 +61,23 @@ export default function Settings() {
     queryKey: ["settings"],
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    gcTime: Infinity,
-    staleTime: Infinity,
+    // gcTime: Infinity,
+    // staleTime: Infinity,
     queryFn: () => fetchSettings(),
   });
 
   async function fetchRelays() {
     const relays = await RelayService.ListRelays();
     console.log("fetchRelays ", relays);
-    return relays;
+    return formatRelayData(relays);
   }
 
   const { data: relayData } = useQuery({
     queryKey: ["relays"],
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     refetchOnMount: true,
-    gcTime: Infinity,
-    staleTime: Infinity,
+    // gcTime: Infinity,
+    // staleTime: Infinity,
     queryFn: () => fetchRelays(),
   });
 
