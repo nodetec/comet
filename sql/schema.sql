@@ -177,7 +177,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		('nsec', '');
 
 -- Insert initial relays only if they do not already exist
-INSERT OR IGNORE INTO relay (url, read, write, sync) VALUES
-		-- relays
-    ('wss://relay.notestack.com', 0, 1, 0);
-
+INSERT INTO relay (url, read, write, sync)
+-- relays
+SELECT 'wss://relay.notestack.com', 0, 1, 0
+WHERE NOT EXISTS (SELECT * FROM relay)
