@@ -109,18 +109,6 @@ export function NostrSettings({ relayData }: Props) {
     onError: () => {},
   });
 
-  async function deleteRelays() {
-    await RelayService.DeleteRelays();
-  }
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteRelays(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["relays"] });
-    },
-    onError: () => {},
-  });
-
   function removeRelay(e: React.MouseEvent<HTMLButtonElement>, index: number) {
     e.preventDefault();
     if (fields.length === 1) return;
