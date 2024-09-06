@@ -116,6 +116,7 @@ export function PostButton({ note }: Props) {
       const relayUrls = relays.map((relay) => relay.Url);
 
       await Promise.any(pool.publish(relayUrls, event));
+      pool.close(relayUrls);
       console.log("pk", keys[0].Npub);
       toast("Note posted", {
         description: "Your note was posted successfully.",
