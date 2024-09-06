@@ -28,6 +28,18 @@ type Props = {
   relayData: Relay[];
 };
 
+// TODO
+// Where should the errors and loading be taken of?
+async function createRelay(
+  url: string,
+  read: boolean,
+  write: boolean,
+  sync: boolean,
+) {
+  await RelayService.DeleteRelays();
+  await RelayService.CreateRelay(url, read, write, sync);
+}
+
 const nostrFormSchema = z.object({
   relays: z
     .array(
@@ -80,17 +92,6 @@ export function NostrSettings({ relayData }: Props) {
 
   const queryClient = useQueryClient();
 
-  // TODO
-  // Where should the errors and loading be taken of?
-  async function createRelay(
-    url: string,
-    read: boolean,
-    write: boolean,
-    sync: boolean,
-  ) {
-    await RelayService.CreateRelay(url, read, write, sync);
-  }
-
   const createMutation = useMutation({
     mutationFn: ({
       url,
@@ -105,7 +106,6 @@ export function NostrSettings({ relayData }: Props) {
     }) => createRelay(url, read, write, sync),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["relays"] });
-      wails.Events.Emit({ name: "relayFormSave", data: "" });
     },
     onError: () => {},
   });
@@ -150,7 +150,6 @@ export function NostrSettings({ relayData }: Props) {
     console.log("relayData ", relayData);
 
     try {
-      deleteMutation.mutate();
       data.relays.forEach((relay) => {
         try {
           createMutation.mutate({
