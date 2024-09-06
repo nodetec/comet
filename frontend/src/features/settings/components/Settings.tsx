@@ -28,6 +28,10 @@ export default function Settings() {
 
   const { data: settingsData } = useQuery({
     queryKey: ["settings"],
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    gcTime: Infinity,
+    staleTime: Infinity,
     queryFn: () => fetchSettings(),
   });
 
