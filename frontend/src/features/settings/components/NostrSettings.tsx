@@ -150,7 +150,7 @@ export function NostrSettings({ relayData }: Props) {
   }
 
   return (
-    <Card className="border-none">
+    <Card className="border-none shadow-none">
       <CardHeader>
         <CardTitle>Relays</CardTitle>
         <CardDescription>Configure your relays</CardDescription>

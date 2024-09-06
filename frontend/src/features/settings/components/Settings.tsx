@@ -107,7 +107,7 @@ export default function Settings() {
       </div>
 
       {settingsData && relayData && isSuccess && (
-        <div className="w-full overflow-auto">
+        <div className="w-full overflow-auto px-12">
           {currentTab === "General" && <GeneralSettings />}
           {currentTab === "Editor" && (
             <EditorSettings settings={settingsData} />
