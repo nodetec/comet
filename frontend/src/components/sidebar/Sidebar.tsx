@@ -33,7 +33,7 @@ export default function Sidebar() {
               size="icon"
               className="ml-20 text-muted-foreground"
             >
-              <CircleUserRound className="h-6 w-6" />
+              <CircleUserRound className="h-5 w-5" />
             </Button>
           ) : (
             <Login />
