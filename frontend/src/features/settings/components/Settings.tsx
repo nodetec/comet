@@ -43,6 +43,10 @@ export default function Settings() {
 
   const { data: relayData } = useQuery({
     queryKey: ["relays"],
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    gcTime: Infinity,
+    staleTime: Infinity,
     queryFn: () => fetchRelays(),
   });
 
