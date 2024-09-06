@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as wails from "@wailsio/runtime";
 import { Relay, RelayService } from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import {
