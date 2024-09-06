@@ -72,7 +72,7 @@ export default function Settings() {
     return formatRelayData(relays);
   }
 
-  const { data: relayData } = useQuery({
+  const { data: relayData, isSuccess } = useQuery({
     queryKey: ["relays"],
     refetchOnWindowFocus: true,
     refetchOnMount: true,
@@ -106,7 +106,7 @@ export default function Settings() {
         {/* <span>Donate</span> */}
       </nav>
 
-      {settingsData && relayData && (
+      {settingsData && relayData && isSuccess && (
         <div className="w-full overflow-auto">
           {currentTab === "General" && <GeneralSettings />}
           {currentTab === "Editor" && (

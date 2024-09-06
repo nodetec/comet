@@ -35,24 +35,22 @@ async function createRelay(
 }
 
 const nostrFormSchema = z.object({
-  relays: z
-    .array(
-      z.object({
-        Url: z
-          .string()
-          .max(100, { message: "Must be 100 or fewer characters long" })
-          .trim()
-          .toLowerCase()
-          .url({ message: "Please enter a valid URL." })
-          .refine((url) => url.startsWith("wss://"), {
-            message: "URL must begin with wss://",
-          }),
-        Read: z.boolean(),
-        Write: z.boolean(),
-        Sync: z.boolean(),
-      }),
-    )
-    .default([{ Url: "", Read: false, Write: true, Sync: false }]),
+  relays: z.array(
+    z.object({
+      Url: z
+        .string()
+        .max(100, { message: "Must be 100 or fewer characters long" })
+        .trim()
+        .toLowerCase()
+        .url({ message: "Please enter a valid URL." })
+        .refine((url) => url.startsWith("wss://"), {
+          message: "URL must begin with wss://",
+        }),
+      Read: z.boolean(),
+      Write: z.boolean(),
+      Sync: z.boolean(),
+    }),
+  ),
 });
 
 type NostrFormValues = z.infer<typeof nostrFormSchema>;
@@ -63,6 +61,8 @@ type Props = {
 
 export function NostrSettings({ relayData }: Props) {
   const [loading, setLoading] = useState(false);
+
+  console.log("relayData !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", relayData);
 
   const form = useForm<NostrFormValues>({
     resolver: zodResolver(nostrFormSchema),
