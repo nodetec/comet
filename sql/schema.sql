@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS relay (
     read BOOLEAN NOT NULL DEFAULT FALSE,
     write BOOLEAN NOT NULL DEFAULT TRUE,
     sync BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TEXT NOT NULL,
-    modified_at TEXT NOT NULL
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS nostr_keys (
@@ -174,6 +174,10 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 		('lineHeight',          '2'),
 		-- profile
 		('npub', ''),
-		('nsec', ''),
-		-- relays
-		('relays', 'relay.notestack.com, relay.damus.io');
+		('nsec', '');
+
+-- Insert initial relays only if they do not already exist
+INSERT INTO relay (url, read, write, sync)
+-- relays
+SELECT 'wss://relay.notestack.com', 0, 1, 0
+WHERE NOT EXISTS (SELECT * FROM relay)

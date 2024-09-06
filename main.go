@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/adrg/xdg"
 	"github.com/nodetec/captains-log/contextmenu"
@@ -96,34 +95,9 @@ func main() {
 		},
 	})
 
-	// Custom event handling
-	app.Events.On("openSettingsWindow", func(e *application.WailsEvent) {
-		app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
-			Name:             "settings",
-			Title:            "Settings",
-			Width:            800,
-			Height:           600,
-			URL:              "/src/windows/settings/index.html",
-			MinWidth:         500,
-			MinHeight:        375,
-			Centered:         true,
-			BackgroundColour: application.NewRGB(27, 38, 54),
-			Mac: application.MacWindow{
-				InvisibleTitleBarHeight: 50,
-				Backdrop:                application.MacBackdropTranslucent,
-				TitleBar:                application.MacTitleBarHiddenInset,
-			},
-		}).RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
-			app.Events.Emit(&application.WailsEvent{
-				Name: "settingsWindowClosed",
-				Data: "",
-			})
-		})
-	})
-
 	mainWindow := app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
 		Name:             "main",
-		Title:            "Captain's Log",
+		Title:            "Comet",
 		Width:            1200,
 		Height:           600,
 		URL:              "/",

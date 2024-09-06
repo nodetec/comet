@@ -51,10 +51,10 @@ func (s *RelayService) CreateRelay(ctx context.Context, url string, read bool, w
 	}, nil
 }
 
-func (s *RelayService) DeleteRelay(ctx context.Context, id int64) error {
-	err := s.queries.DeleteRelay(ctx, id)
+func (s *RelayService) DeleteRelays(ctx context.Context) error {
+	err := s.queries.DeleteRelays(ctx)
 	if err != nil {
-		s.logger.Printf("Error deleting tag with ID %d: %v", id, err)
+		s.logger.Printf("Error deleting relays: %v", err)
 		return err
 	}
 	return nil

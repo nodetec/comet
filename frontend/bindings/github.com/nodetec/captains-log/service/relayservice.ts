@@ -18,8 +18,8 @@ export function CreateRelay(url: string, read: boolean, write: boolean, sync: bo
     return $typingPromise;
 }
 
-export function DeleteRelay(id: number): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3155236123, id) as any;
+export function DeleteRelays(): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1994699448) as any;
     return $resultPromise;
 }
 

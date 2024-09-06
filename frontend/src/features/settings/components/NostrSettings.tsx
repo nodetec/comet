@@ -2,11 +2,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as wails from "@wailsio/runtime";
-import {
-  Settings,
-  SettingService,
-} from "&/github.com/nodetec/captains-log/service";
+import { RelayService } from "&/github.com/nodetec/captains-log/service";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -23,65 +19,56 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import {
-  settingArrayToString,
-  settingStringToArray,
-} from "~/lib/settings/utils";
 import { X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 
-type Props = {
-  settings: Settings;
-};
+// TODO
+// Where should the errors and loading be taken of?
+async function createRelay(
+  url: string,
+  read: boolean,
+  write: boolean,
+  sync: boolean,
+) {
+  await RelayService.CreateRelay(url, read, write, sync);
+}
 
 const nostrFormSchema = z.object({
   relays: z.array(
     z.object({
-      value: z
+      Url: z
         .string()
         .max(100, { message: "Must be 100 or fewer characters long" })
         .trim()
-        .toLowerCase(),
+        .toLowerCase()
+        .url({ message: "Please enter a valid URL." })
+        .refine((url) => url.startsWith("wss://"), {
+          message: "URL must begin with wss://",
+        }),
+      Read: z.boolean(),
+      Write: z.boolean(),
+      Sync: z.boolean(),
     }),
   ),
 });
 
 type NostrFormValues = z.infer<typeof nostrFormSchema>;
 
-export function NostrSettings({ settings }: Props) {
+type Props = {
+  relayData: NostrFormValues;
+};
+
+export function NostrSettings({ relayData }: Props) {
   const [loading, setLoading] = useState(false);
 
-  function formatSettings() {
-    const relayArr = settingStringToArray(settings.Relays);
-    const relayObj: NostrFormValues = { relays: [] };
-    relayArr.forEach(
-      (relay, index) => (relayObj.relays[index] = { value: relay }),
-    );
-    return relayObj;
-  }
-
-  const queryClient = useQueryClient();
-
-  // TODO
-  // Where should the errors and loading be taken of?
-  async function updateSetting(key, value) {
-    await SettingService.UpdateSetting(key, value);
-  }
-
-  const mutation = useMutation({
-    mutationFn: ({ key, value }: { key: string; value: string }) =>
-      updateSetting(key, value),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
-      wails.Events.Emit({ name: "settingsChanged", data: "" });
-    },
-    onError: () => {},
-  });
+  console.log("relayData !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", relayData);
 
   const form = useForm<NostrFormValues>({
     resolver: zodResolver(nostrFormSchema),
-    defaultValues: formatSettings(),
+    defaultValues: {
+      relays: relayData.relays,
+    },
     mode: "onChange",
   });
 
@@ -90,29 +77,80 @@ export function NostrSettings({ settings }: Props) {
     control: form.control,
   });
 
-  function onSubmit(data: NostrFormValues) {
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: ({
+      url,
+      read,
+      write,
+      sync,
+    }: {
+      url: string;
+      read: boolean;
+      write: boolean;
+      sync: boolean;
+    }) => createRelay(url, read, write, sync),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["relays"] });
+    },
+    onError: () => {},
+  });
+
+  function removeRelay(e: React.MouseEvent<HTMLButtonElement>, index: number) {
+    e.preventDefault();
+    if (fields.length === 1) return;
+    remove(index);
+  }
+
+  // function appendRelay(e: React.MouseEvent<HTMLButtonElement>) {
+  //   e.preventDefault();
+  //
+  //   // check if the last relay has a URL
+  //   // if it doesn't, don't append a new relay
+  //   const lastRelay = fields[fields.length - 1];
+  //   console.log("lastRelay ", lastRelay);
+  //   if (!lastRelay?.Url) return;
+  //
+  //   append({ Url: "", Read: false, Write: true, Sync: false });
+  // }
+
+  // TODO
+  // Handle if there are zero relays
+  // zod might be able to check if a value is unique
+  // Then add all relays instead of one relay at a time to the db - Create an add all service
+  async function onSubmit(data: NostrFormValues) {
     setLoading(true);
-    const relays: string[] = [];
-    const prefix = "wss://";
-    for (const obj of data.relays) {
-      if (obj.value.startsWith(prefix)) {
-        obj.value = obj.value.slice(prefix.length);
-      }
-      relays.push(...Object.values(obj));
-    }
-    const relaysString = settingArrayToString(relays);
+    console.log("data ", data);
+    console.log("relayData ", relayData);
 
     try {
-      mutation.mutate({ key: "relays", value: relaysString });
+      await RelayService.DeleteRelays();
+      data.relays.forEach((relay) => {
+        try {
+          createMutation.mutate({
+            url: relay.Url,
+            read: relay.Read,
+            write: relay.Write,
+            sync: relay.Sync,
+          });
+          queryClient.invalidateQueries({ queryKey: ["relays"] });
+        } catch (error) {
+          console.error("Nostr settings create relay error: ", error);
+        }
+      });
     } catch (error) {
-      console.error("Nostr settings error: ", error);
+      console.error("Nostr settings delete relays error: ", error);
     } finally {
+      // refetch();
       setLoading(false);
     }
+
+    console.log("data after ", data);
   }
 
   return (
-    <Card className="bg-card/20">
+    <Card className="border-none shadow-none">
       <CardHeader>
         <CardTitle>Relays</CardTitle>
         <CardDescription>Configure your relays</CardDescription>
@@ -125,7 +163,7 @@ export function NostrSettings({ settings }: Props) {
                 <FormField
                   control={form.control}
                   key={field.id}
-                  name={`relays.${index}.value`}
+                  name={`relays.${index}.Url`}
                   render={({ field }) => (
                     <FormItem className="pb-4">
                       <FormControl>
@@ -140,7 +178,7 @@ export function NostrSettings({ settings }: Props) {
                             variant="outline"
                             className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:cursor-pointer disabled:opacity-100"
                             disabled={loading}
-                            onClick={() => remove(index)}
+                            onClick={(e) => removeRelay(e, index)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -159,7 +197,10 @@ export function NostrSettings({ settings }: Props) {
                 size="sm"
                 className="mt-2 disabled:cursor-pointer disabled:opacity-100"
                 disabled={loading}
-                onClick={() => append({ value: "" })}
+                // onClick={(e) => appendRelay(e)}
+                onClick={() =>
+                  append({ Url: "", Read: false, Write: true, Sync: false })
+                }
               >
                 Add Relay
               </Button>
