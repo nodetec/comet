@@ -166,7 +166,7 @@ export default function EditorSettings({ settings }: Props) {
   }
 
   return (
-    <Card className="bg-card/20">
+    <Card className="border-none">
       <CardHeader>
         <CardTitle>Editor</CardTitle>
         <CardDescription>Configure your note editor</CardDescription>

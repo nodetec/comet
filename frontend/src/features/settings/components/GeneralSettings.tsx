@@ -37,7 +37,7 @@ export default function GeneralSettings() {
   }
 
   return (
-    <Card className="bg-card/20">
+    <Card className="border-none">
       <CardHeader>
         <CardTitle>General</CardTitle>
         <CardDescription>Configure your general settings</CardDescription>

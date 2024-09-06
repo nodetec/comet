@@ -104,7 +104,7 @@ export function NostrSettings({ relayData }: Props) {
       sync: boolean;
     }) => createRelay(url, read, write, sync),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["relay"] });
+      queryClient.invalidateQueries({ queryKey: ["relays"] });
       wails.Events.Emit({ name: "relayFormSave", data: "" });
     },
     onError: () => {},
@@ -117,8 +117,7 @@ export function NostrSettings({ relayData }: Props) {
   const deleteMutation = useMutation({
     mutationFn: () => deleteRelays(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["relay"] });
-      wails.Events.Emit({ name: "relayFormSave", data: "" });
+      queryClient.invalidateQueries({ queryKey: ["relays"] });
     },
     onError: () => {},
   });
@@ -175,7 +174,7 @@ export function NostrSettings({ relayData }: Props) {
   }
 
   return (
-    <Card className="bg-card/20">
+    <Card className="border-none">
       <CardHeader>
         <CardTitle>Relays</CardTitle>
         <CardDescription>Configure your relays</CardDescription>

@@ -1,4 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/captains-log/db/models";
+import { RelayService } from "&/github.com/nodetec/captains-log/service";
 import { ListNostrKeys } from "&/github.com/nodetec/captains-log/service/nostrkeyservice";
 import { useAppState } from "~/store";
 import { ShareIcon } from "lucide-react";
@@ -57,6 +59,17 @@ export function PostButton({ note }: Props) {
     (state) => state.setOpenPostBtnDialog,
   );
 
+  async function fetchRelays() {
+    const relays = await RelayService.ListRelays();
+    console.log("fetchRelays ", relays);
+    return relays;
+  }
+
+  const { data: relays } = useQuery({
+    queryKey: ["relays"],
+    queryFn: () => fetchRelays(),
+  });
+
   const postNote = async (
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) => {
@@ -76,8 +89,6 @@ export function PostButton({ note }: Props) {
 
     let secretKey = nip19.decode(keys[0].Nsec).data as Uint8Array;
 
-    let relays = ["wss://relay.notestack.com"];
-
     let event = finalizeEvent(
       {
         kind: 30023,
@@ -95,7 +106,16 @@ export function PostButton({ note }: Props) {
     console.log("event", event);
 
     try {
-      await Promise.any(pool.publish(relays, event));
+      // create list of relay ursl
+      if (!relays) {
+        toast("Note failed to post", {
+          description: "There was an error posting your note.",
+        });
+        return;
+      }
+      const relayUrls = relays.map((relay) => relay.Url);
+
+      await Promise.any(pool.publish(relayUrls, event));
       console.log("pk", keys[0].Npub);
       toast("Note posted", {
         description: "Your note was posted successfully.",
