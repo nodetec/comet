@@ -61,7 +61,6 @@ export function PostButton({ note }: Props) {
 
   async function fetchRelays() {
     const relays = await RelayService.ListRelays();
-    console.log("fetchRelays ", relays);
     return relays;
   }
 

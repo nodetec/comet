@@ -38,8 +38,6 @@ function formatRelayData(relayData: Relay[]) {
 
   relayObj.relays = formattedRelayData;
 
-  console.log("formattedRelayData !!!!!! ", relayObj);
-
   return relayObj;
 }
 
@@ -68,7 +66,6 @@ export default function Settings() {
 
   async function fetchRelays() {
     const relays = await RelayService.ListRelays();
-    console.log("fetchRelays ", relays);
     return formatRelayData(relays);
   }
 
@@ -83,7 +80,7 @@ export default function Settings() {
 
   return (
     <>
-      <div className="flex min-h-full min-w-52 max-w-52 flex-col gap-y-2 overflow-hidden border-r bg-secondary pr-4 pl-4 pt-6 text-sm text-muted-foreground">
+      <div className="flex min-h-full min-w-52 max-w-52 flex-col gap-y-2 overflow-hidden border-r bg-secondary pl-4 pr-4 pt-6 text-sm text-muted-foreground">
         <span
           className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${currentTab === "General" && "bg-muted text-secondary-foreground"}`}
           onClick={() => handleCurrentTabOnClick("General")}

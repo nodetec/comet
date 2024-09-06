@@ -62,8 +62,6 @@ type Props = {
 export function NostrSettings({ relayData }: Props) {
   const [loading, setLoading] = useState(false);
 
-  console.log("relayData !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", relayData);
-
   const form = useForm<NostrFormValues>({
     resolver: zodResolver(nostrFormSchema),
     defaultValues: {
@@ -121,9 +119,6 @@ export function NostrSettings({ relayData }: Props) {
   // Then add all relays instead of one relay at a time to the db - Create an add all service
   async function onSubmit(data: NostrFormValues) {
     setLoading(true);
-    console.log("data ", data);
-    console.log("relayData ", relayData);
-
     try {
       await RelayService.DeleteRelays();
       data.relays.forEach((relay) => {
@@ -136,17 +131,14 @@ export function NostrSettings({ relayData }: Props) {
           });
           queryClient.invalidateQueries({ queryKey: ["relays"] });
         } catch (error) {
-          console.error("Nostr settings create relay error: ", error);
+          console.error("Nostr settings error: ", error);
         }
       });
     } catch (error) {
-      console.error("Nostr settings delete relays error: ", error);
+      console.error("Nostr settings error: ", error);
     } finally {
-      // refetch();
       setLoading(false);
     }
-
-    console.log("data after ", data);
   }
 
   return (
