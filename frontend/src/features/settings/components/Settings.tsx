@@ -44,7 +44,7 @@ export default function Settings() {
 
   return (
     <>
-      <nav className="flex flex-col pl-8 pr-32 gap-y-4 text-sm text-muted-foreground pt-6 min-w-48 max-w-48 min-h-full border-r overflow-hidden bg-secondary">
+      <nav className="flex min-h-full min-w-48 max-w-48 flex-col gap-y-4 overflow-hidden border-r bg-secondary pl-8 pr-32 pt-6 text-sm text-muted-foreground">
         <span
           className={`cursor-pointer ${currentTab === "General" ? "font-semibold text-primary" : ""}`}
           onClick={() => handleCurrentTabOnClick("General")}
