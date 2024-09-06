@@ -83,28 +83,28 @@ export default function Settings() {
 
   return (
     <>
-      <nav className="flex min-h-full min-w-48 max-w-48 flex-col gap-y-4 overflow-hidden border-r bg-secondary pl-8 pr-32 pt-6 text-sm text-muted-foreground">
-        <span
-          className={`cursor-pointer ${currentTab === "General" ? "font-semibold text-primary" : ""}`}
+      <div className="flex min-h-full min-w-52 max-w-52 flex-col gap-y-2 overflow-hidden border-r bg-secondary pr-4 pl-4 pt-6 text-sm text-muted-foreground">
+        <button
+          className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${currentTab === "General" && "bg-muted text-secondary-foreground"}`}
           onClick={() => handleCurrentTabOnClick("General")}
         >
           General
-        </span>
+        </button>
         <span
-          className={`cursor-pointer ${currentTab === "Editor" ? "font-semibold text-primary" : ""}`}
+          className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${currentTab === "Editor" && "bg-muted text-secondary-foreground"}`}
           onClick={() => handleCurrentTabOnClick("Editor")}
         >
           Editor
         </span>
         <span
-          className={`cursor-pointer ${currentTab === "Nostr" ? "font-semibold text-primary" : ""}`}
+          className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${currentTab === "Nostr" && "bg-muted text-secondary-foreground"}`}
           onClick={() => handleCurrentTabOnClick("Nostr")}
         >
           Nostr
         </span>
         {/* <span>Support</span> */}
         {/* <span>Donate</span> */}
-      </nav>
+      </div>
 
       {settingsData && relayData && isSuccess && (
         <div className="w-full overflow-auto">
