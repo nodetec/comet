@@ -45,6 +45,15 @@ export function GetTagByName(name: string): Promise<$models.Tag> & { cancel(): v
     return $typingPromise;
 }
 
+export function GetTagsByNames(names: string[]): Promise<$models.Tag[]> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1187259212, names) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType1($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
 export function ListTags(): Promise<$models.Tag[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3082273913) as any;
     let $typingPromise = $resultPromise.then(($result) => {

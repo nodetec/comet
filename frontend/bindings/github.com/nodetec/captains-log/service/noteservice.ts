@@ -45,7 +45,7 @@ export function GetNote(id: number): Promise<db$0.Note> & { cancel(): void } {
     return $typingPromise;
 }
 
-export function GetNoteFromTrash(id: number): Promise<db$0.Trash> & { cancel(): void } {
+export function GetNoteFromTrash(id: number): Promise<db$0.GetNoteFromTrashRow> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2404583840, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
@@ -66,7 +66,16 @@ export function ListNotes(notebookId: number, tagId: number, limit: number, page
 export function ListNotesFromTrash(limit: number, pageParam: number, orderBy: string, sortDirection: string): Promise<db$0.Trash[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3687280279, limit, pageParam, orderBy, sortDirection) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
+    }) as any;
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+export function RestoreNoteFromTrash(noteId: number, title: string, content: string, notebookID: number, statusID: sql$0.NullInt64, createdAt: string, modifiedAt: string, publishedAt: sql$0.NullString, eventId: sql$0.NullString, notetype: string, filetype: string, tagIds: number[]): Promise<db$0.CreateNoteFromTrashRow> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1566556202, noteId, title, content, notebookID, statusID, createdAt, modifiedAt, publishedAt, eventId, notetype, filetype, tagIds) as any;
+    let $typingPromise = $resultPromise.then(($result) => {
+        return $$createType5($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -84,7 +93,7 @@ export function SearchNotes(searchTerm: string, notebookID: number, tagID: numbe
 export function SearchTrash(searchTerm: string, limit: number, pageParam: number, orderBy: string, sortDirection: string): Promise<db$0.Trash[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1243198908, searchTerm, limit, pageParam, orderBy, sortDirection) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType3($result);
+        return $$createType4($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -97,6 +106,8 @@ export function UpdateNote(id: number, title: string, content: string, notebookI
 
 // Private type creation functions
 const $$createType0 = db$0.Note.createFrom;
-const $$createType1 = db$0.Trash.createFrom;
+const $$createType1 = db$0.GetNoteFromTrashRow.createFrom;
 const $$createType2 = $Create.Array($$createType0);
-const $$createType3 = $Create.Array($$createType1);
+const $$createType3 = db$0.Trash.createFrom;
+const $$createType4 = $Create.Array($$createType3);
+const $$createType5 = db$0.CreateNoteFromTrashRow.createFrom;

@@ -7,16 +7,26 @@ INSERT INTO
     title,
     created_at,
     modified_at,
-    tags
+    tags,
+    notebook_id,
+    published_at,
+    event_id,
+    notetype,
+    filetype
   )
 VALUES
-  (?, ?, ?, ?, ?, ?) RETURNING id,
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
   note_id,
   content,
   title,
   created_at,
   modified_at,
-  tags;
+  tags,
+  notebook_id,
+  published_at,
+  event_id,
+  notetype,
+  filetype;
 
 -- name: GetNoteFromTrash :one
 SELECT
@@ -26,7 +36,12 @@ SELECT
   title,
   created_at,
   modified_at,
-  tags
+  tags,
+  notebook_id,
+  published_at,
+  event_id,
+  notetype,
+  filetype
 FROM
   trash
 WHERE

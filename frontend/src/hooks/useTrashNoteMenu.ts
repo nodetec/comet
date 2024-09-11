@@ -22,9 +22,11 @@ const useTrashNoteMenu = () => {
     };
 
     Events.On("trashNoteDeleted", handleNoteDeleted);
+    Events.On("noteRestored", handleNoteDeleted);
 
     return () => {
       Events.Off("trashNoteDeleted");
+      Events.Off("noteRestored");
     };
   }, [activeTrashNote, setActiveTrashNote, queryClient]);
 };

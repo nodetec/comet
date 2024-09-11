@@ -49,11 +49,16 @@ CREATE TABLE IF NOT EXISTS notebook_tags (
 CREATE TABLE IF NOT EXISTS trash (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   note_id INTEGER NOT NULL,
+  notebook_id INTEGER NOT NULL,
   content TEXT NOT NULL,
   title TEXT NOT NULL,
   created_at TEXT NOT NULL,
   modified_at TEXT NOT NULL,
-  tags TEXT -- Field to store tags
+  tags TEXT, -- Field to store tags
+  published_at TEXT,
+  event_id TEXT,
+  notetype TEXT NOT NULL,
+  filetype TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS relay (
