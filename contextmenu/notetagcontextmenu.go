@@ -50,10 +50,7 @@ func CreateNoteTagMenu(app *application.App, mainWindow application.Window, ctx 
 		}
 
 		// Emit an event to notify about tag deletion
-		app.Events.Emit(&application.WailsEvent{
-			Name: "noteTagRemoved",
-			Data: tagID,
-		})
+		app.EmitEvent("noteTagRemoved", tagID)
 	})
 
 	mainWindow.RegisterContextMenu("noteTagMenu", noteTagMenu)

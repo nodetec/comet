@@ -87,6 +87,103 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 	return i, err
 }
 
+const createNoteFromTrash = `-- name: CreateNoteFromTrash :one
+INSERT INTO
+  notes (
+    id,
+    status_id,
+    notebook_id,
+    content,
+    title,
+    created_at,
+    modified_at,
+    published_at,
+    event_id,
+    pinned,
+    notetype,
+    filetype
+  )
+VALUES
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id,
+  pinned,
+  notetype,
+  filetype
+`
+
+type CreateNoteFromTrashParams struct {
+	ID          int64
+	StatusID    sql.NullInt64
+	NotebookID  int64
+	Content     string
+	Title       string
+	CreatedAt   string
+	ModifiedAt  string
+	PublishedAt sql.NullString
+	EventID     sql.NullString
+	Pinned      bool
+	Notetype    string
+	Filetype    string
+}
+
+type CreateNoteFromTrashRow struct {
+	ID          int64
+	ID_2        int64
+	StatusID    sql.NullInt64
+	NotebookID  int64
+	Content     string
+	Title       string
+	CreatedAt   string
+	ModifiedAt  string
+	PublishedAt sql.NullString
+	EventID     sql.NullString
+	Pinned      bool
+	Notetype    string
+	Filetype    string
+}
+
+func (q *Queries) CreateNoteFromTrash(ctx context.Context, arg CreateNoteFromTrashParams) (CreateNoteFromTrashRow, error) {
+	row := q.db.QueryRowContext(ctx, createNoteFromTrash,
+		arg.ID,
+		arg.StatusID,
+		arg.NotebookID,
+		arg.Content,
+		arg.Title,
+		arg.CreatedAt,
+		arg.ModifiedAt,
+		arg.PublishedAt,
+		arg.EventID,
+		arg.Pinned,
+		arg.Notetype,
+		arg.Filetype,
+	)
+	var i CreateNoteFromTrashRow
+	err := row.Scan(
+		&i.ID,
+		&i.ID_2,
+		&i.StatusID,
+		&i.NotebookID,
+		&i.Content,
+		&i.Title,
+		&i.CreatedAt,
+		&i.ModifiedAt,
+		&i.PublishedAt,
+		&i.EventID,
+		&i.Pinned,
+		&i.Notetype,
+		&i.Filetype,
+	)
+	return i, err
+}
+
 const deleteNote = `-- name: DeleteNote :exec
 DELETE FROM notes
 WHERE

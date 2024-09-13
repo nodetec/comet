@@ -28,6 +28,37 @@ VALUES
   notetype,
   filetype;
 
+-- name: CreateNoteFromTrash :one
+INSERT INTO
+  notes (
+    id,
+    status_id,
+    notebook_id,
+    content,
+    title,
+    created_at,
+    modified_at,
+    published_at,
+    event_id,
+    pinned,
+    notetype,
+    filetype
+  )
+VALUES
+  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id,
+  id,
+  status_id,
+  notebook_id,
+  content,
+  title,
+  created_at,
+  modified_at,
+  published_at,
+  event_id,
+  pinned,
+  notetype,
+  filetype;
+
 -- name: GetNote :one
 SELECT
   id,

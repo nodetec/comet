@@ -44,11 +44,7 @@ func CreateNoteMenu(app *application.App, mainWindow application.Window, ctx con
 			return
 		}
 
-		// Emit an event to notify about note deletion
-		app.Events.Emit(&application.WailsEvent{
-			Name: "noteDeleted",
-			Data: noteID,
-		})
+		app.EmitEvent("noteDeleted", noteID)
 	})
 
 	mainWindow.RegisterContextMenu("noteMenu", noteMenu)

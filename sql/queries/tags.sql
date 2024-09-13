@@ -33,6 +33,17 @@ FROM
 WHERE
   name = ?;
 
+-- name: GetTagsByNames :many
+SELECT
+  id,
+  name,
+  color,
+  icon,
+  created_at
+FROM
+  tags
+WHERE name IN (sqlc.slice(names));
+
 -- name: ListTags :many
 SELECT
   id,
