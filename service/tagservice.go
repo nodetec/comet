@@ -88,6 +88,25 @@ func (s *TagService) GetTagByName(ctx context.Context, name string) (Tag, error)
 	}, nil
 }
 
+func (s *TagService) GetTagsByNames(ctx context.Context, names []string) ([]Tag, error) {
+	tags, err := s.queries.GetTagsByNames(ctx, names)
+	if err != nil {
+		s.logger.Printf("Error getting tags with names %s: %v", names, err)
+		return nil, err
+	}
+	var result []Tag
+	for _, t := range tags {
+		result = append(result, Tag{
+			ID:        t.ID,
+			Name:      t.Name,
+			Color:     t.Color,
+			Icon:      t.Icon,
+			CreatedAt: t.CreatedAt,
+		})
+	}
+	return result, nil
+}
+
 func (s *TagService) ListTags(ctx context.Context) ([]Tag, error) {
 	tags, err := s.queries.ListTags(ctx)
 	if err != nil {
@@ -122,4 +141,3 @@ func (s *TagService) UpdateTag(ctx context.Context, id int64, name string, color
 	}
 	return nil
 }
-

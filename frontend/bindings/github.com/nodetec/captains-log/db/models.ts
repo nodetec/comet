@@ -9,6 +9,164 @@ import {Create as $Create} from "@wailsio/runtime";
 // @ts-ignore: Unused imports
 import * as sql$0 from "../../../../database/sql/models.js";
 
+export class CreateNoteFromTrashRow {
+    "ID": number;
+    "ID_2": number;
+    "StatusID": sql$0.NullInt64;
+    "NotebookID": number;
+    "Content": string;
+    "Title": string;
+    "CreatedAt": string;
+    "ModifiedAt": string;
+    "PublishedAt": sql$0.NullString;
+    "EventID": sql$0.NullString;
+    "Pinned": boolean;
+    "Notetype": string;
+    "Filetype": string;
+
+    /** Creates a new CreateNoteFromTrashRow instance. */
+    constructor($$source: Partial<CreateNoteFromTrashRow> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("ID_2" in $$source)) {
+            this["ID_2"] = 0;
+        }
+        if (!("StatusID" in $$source)) {
+            this["StatusID"] = (new sql$0.NullInt64());
+        }
+        if (!("NotebookID" in $$source)) {
+            this["NotebookID"] = 0;
+        }
+        if (!("Content" in $$source)) {
+            this["Content"] = "";
+        }
+        if (!("Title" in $$source)) {
+            this["Title"] = "";
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+        if (!("ModifiedAt" in $$source)) {
+            this["ModifiedAt"] = "";
+        }
+        if (!("PublishedAt" in $$source)) {
+            this["PublishedAt"] = (new sql$0.NullString());
+        }
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
+        }
+        if (!("Pinned" in $$source)) {
+            this["Pinned"] = false;
+        }
+        if (!("Notetype" in $$source)) {
+            this["Notetype"] = "";
+        }
+        if (!("Filetype" in $$source)) {
+            this["Filetype"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CreateNoteFromTrashRow instance from a string or object.
+     */
+    static createFrom($$source: any = {}): CreateNoteFromTrashRow {
+        const $$createField2_0 = $$createType0;
+        const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("StatusID" in $$parsedSource) {
+            $$parsedSource["StatusID"] = $$createField2_0($$parsedSource["StatusID"]);
+        }
+        if ("PublishedAt" in $$parsedSource) {
+            $$parsedSource["PublishedAt"] = $$createField8_0($$parsedSource["PublishedAt"]);
+        }
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField9_0($$parsedSource["EventID"]);
+        }
+        return new CreateNoteFromTrashRow($$parsedSource as Partial<CreateNoteFromTrashRow>);
+    }
+}
+
+export class GetNoteFromTrashRow {
+    "ID": number;
+    "NoteID": number;
+    "Content": string;
+    "Title": string;
+    "CreatedAt": string;
+    "ModifiedAt": string;
+    "Tags": sql$0.NullString;
+    "NotebookID": number;
+    "PublishedAt": sql$0.NullString;
+    "EventID": sql$0.NullString;
+    "Notetype": string;
+    "Filetype": string;
+
+    /** Creates a new GetNoteFromTrashRow instance. */
+    constructor($$source: Partial<GetNoteFromTrashRow> = {}) {
+        if (!("ID" in $$source)) {
+            this["ID"] = 0;
+        }
+        if (!("NoteID" in $$source)) {
+            this["NoteID"] = 0;
+        }
+        if (!("Content" in $$source)) {
+            this["Content"] = "";
+        }
+        if (!("Title" in $$source)) {
+            this["Title"] = "";
+        }
+        if (!("CreatedAt" in $$source)) {
+            this["CreatedAt"] = "";
+        }
+        if (!("ModifiedAt" in $$source)) {
+            this["ModifiedAt"] = "";
+        }
+        if (!("Tags" in $$source)) {
+            this["Tags"] = (new sql$0.NullString());
+        }
+        if (!("NotebookID" in $$source)) {
+            this["NotebookID"] = 0;
+        }
+        if (!("PublishedAt" in $$source)) {
+            this["PublishedAt"] = (new sql$0.NullString());
+        }
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
+        }
+        if (!("Notetype" in $$source)) {
+            this["Notetype"] = "";
+        }
+        if (!("Filetype" in $$source)) {
+            this["Filetype"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GetNoteFromTrashRow instance from a string or object.
+     */
+    static createFrom($$source: any = {}): GetNoteFromTrashRow {
+        const $$createField6_0 = $$createType1;
+        const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("Tags" in $$parsedSource) {
+            $$parsedSource["Tags"] = $$createField6_0($$parsedSource["Tags"]);
+        }
+        if ("PublishedAt" in $$parsedSource) {
+            $$parsedSource["PublishedAt"] = $$createField8_0($$parsedSource["PublishedAt"]);
+        }
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField9_0($$parsedSource["EventID"]);
+        }
+        return new GetNoteFromTrashRow($$parsedSource as Partial<GetNoteFromTrashRow>);
+    }
+}
+
 export class Note {
     "ID": number;
     "StatusID": sql$0.NullInt64;
@@ -163,11 +321,16 @@ export class Tag {
 export class Trash {
     "ID": number;
     "NoteID": number;
+    "NotebookID": number;
     "Content": string;
     "Title": string;
     "CreatedAt": string;
     "ModifiedAt": string;
     "Tags": sql$0.NullString;
+    "PublishedAt": sql$0.NullString;
+    "EventID": sql$0.NullString;
+    "Notetype": string;
+    "Filetype": string;
 
     /** Creates a new Trash instance. */
     constructor($$source: Partial<Trash> = {}) {
@@ -176,6 +339,9 @@ export class Trash {
         }
         if (!("NoteID" in $$source)) {
             this["NoteID"] = 0;
+        }
+        if (!("NotebookID" in $$source)) {
+            this["NotebookID"] = 0;
         }
         if (!("Content" in $$source)) {
             this["Content"] = "";
@@ -192,6 +358,18 @@ export class Trash {
         if (!("Tags" in $$source)) {
             this["Tags"] = (new sql$0.NullString());
         }
+        if (!("PublishedAt" in $$source)) {
+            this["PublishedAt"] = (new sql$0.NullString());
+        }
+        if (!("EventID" in $$source)) {
+            this["EventID"] = (new sql$0.NullString());
+        }
+        if (!("Notetype" in $$source)) {
+            this["Notetype"] = "";
+        }
+        if (!("Filetype" in $$source)) {
+            this["Filetype"] = "";
+        }
 
         Object.assign(this, $$source);
     }
@@ -200,10 +378,18 @@ export class Trash {
      * Creates a new Trash instance from a string or object.
      */
     static createFrom($$source: any = {}): Trash {
-        const $$createField6_0 = $$createType1;
+        const $$createField7_0 = $$createType1;
+        const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("Tags" in $$parsedSource) {
-            $$parsedSource["Tags"] = $$createField6_0($$parsedSource["Tags"]);
+            $$parsedSource["Tags"] = $$createField7_0($$parsedSource["Tags"]);
+        }
+        if ("PublishedAt" in $$parsedSource) {
+            $$parsedSource["PublishedAt"] = $$createField8_0($$parsedSource["PublishedAt"]);
+        }
+        if ("EventID" in $$parsedSource) {
+            $$parsedSource["EventID"] = $$createField9_0($$parsedSource["EventID"]);
         }
         return new Trash($$parsedSource as Partial<Trash>);
     }

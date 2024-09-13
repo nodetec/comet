@@ -76,13 +76,18 @@ type Tag struct {
 }
 
 type Trash struct {
-	ID         int64
-	NoteID     int64
-	Content    string
-	Title      string
-	CreatedAt  string
-	ModifiedAt string
-	Tags       sql.NullString
+	ID          int64
+	NoteID      int64
+	NotebookID  int64
+	Content     string
+	Title       string
+	CreatedAt   string
+	ModifiedAt  string
+	Tags        sql.NullString
+	PublishedAt sql.NullString
+	EventID     sql.NullString
+	Notetype    string
+	Filetype    string
 }
 
 type TrashFt struct {

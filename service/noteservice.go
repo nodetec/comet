@@ -183,11 +183,11 @@ func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []d
 	return nil
 }
 
-func (s *NoteService) GetNoteFromTrash(ctx context.Context, id int64) (db.Trash, error) {
+func (s *NoteService) GetNoteFromTrash(ctx context.Context, id int64) (db.GetNoteFromTrashRow, error) {
 	trash, err := s.queries.GetNoteFromTrash(ctx, id)
 	if err != nil {
 		s.logger.Printf("Error getting note from trash with ID %d: %v", id, err)
-		return db.Trash{}, err
+		return db.GetNoteFromTrashRow{}, err
 	}
 	return trash, nil
 }
@@ -232,4 +232,39 @@ func (s *NoteService) SearchTrash(ctx context.Context, searchTerm string, limit,
 		return nil, err
 	}
 	return notes, nil
+}
+
+func (s *NoteService) RestoreNoteFromTrash(ctx context.Context, noteId int64, title string, content string, notebookID int64, statusID sql.NullInt64, createdAt string, modifiedAt string, publishedAt sql.NullString, eventId sql.NullString, notetype string, filetype string, tagIds []int64) (db.CreateNoteFromTrashRow, error) {
+
+	params := db.CreateNoteFromTrashParams{
+		ID:          noteId,
+		Title:       title,
+		Content:     content,
+		NotebookID:  notebookID,
+		StatusID:    statusID,
+		CreatedAt:   createdAt,
+		ModifiedAt:  modifiedAt,
+		PublishedAt: publishedAt,
+		EventID:     eventId,
+		Pinned:      false,
+		Notetype:    notetype,
+		Filetype:    filetype,
+	}
+
+	note, err := s.queries.CreateNoteFromTrash(ctx, params)
+	if err != nil {
+		s.logger.Println("Error restoring note from trash:", err)
+		return db.CreateNoteFromTrashRow{}, err
+	}
+	for _, tagId := range tagIds {
+		ntsErr := s.queries.AddTagToNote(ctx, db.AddTagToNoteParams{
+			NoteID: sql.NullInt64{Int64: noteId, Valid: true},
+			TagID:  sql.NullInt64{Int64: tagId, Valid: true},
+		})
+		if ntsErr != nil {
+			s.logger.Println("Error adding tag to note:", err)
+			return db.CreateNoteFromTrashRow{}, ntsErr
+		}
+	}
+	return note, nil
 }
