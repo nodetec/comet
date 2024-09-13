@@ -21,7 +21,7 @@ export default function SearchNotes() {
     <div className="flex items-center px-3 pb-4 pt-2">
       <Input
         placeholder="Search..."
-        className="text-muted-foreground/80 h-8 placeholder:text-muted-foreground/60 focus-visible:ring-primary"
+        className="h-8 text-muted-foreground/80 placeholder:text-muted-foreground/60 focus-visible:ring-primary"
         onChange={handleSetSearchNote}
         value={noteSearch}
       />

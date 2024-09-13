@@ -27,8 +27,6 @@ export default function TrashSearchFeed() {
       sortDirection,
     );
 
-    console.log("search trash",notes);
-
     return {
       data: notes || [],
       nextPage: pageParam + 1,
