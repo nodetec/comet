@@ -1,10 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
-ALTER TABLE trash ADD COLUMN notebook_id INTEGER NOT NULL;
+ALTER TABLE trash ADD COLUMN notebook_id INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE trash ADD COLUMN published_at TEXT;
 ALTER TABLE trash ADD COLUMN event_id TEXT;
-ALTER TABLE trash ADD COLUMN notetype TEXT NOT NULL;
-ALTER TABLE trash ADD COLUMN filetype TEXT NOT NULL;
+ALTER TABLE trash ADD COLUMN notetype TEXT NOT NULL DEFAULT "";
+ALTER TABLE trash ADD COLUMN filetype TEXT NOT NULL DEFAULT "";
 -- +goose StatementEnd
 
 -- +goose Down
