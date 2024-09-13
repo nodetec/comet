@@ -2,7 +2,6 @@ package contextmenu
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/nodetec/captains-log/service"
@@ -18,7 +17,6 @@ func CreateTagMenu(app *application.App, mainWindow application.Window, ctx cont
 			app.Logger.Error("Invalid context menu data type")
 			return
 		}
-    fmt.Println("Context data:", contextData)
 
 		tagID, err := strconv.ParseInt(contextData, 10, 64)
 		if err != nil {
@@ -34,10 +32,7 @@ func CreateTagMenu(app *application.App, mainWindow application.Window, ctx cont
 		}
 
 		// Emit an event to notify about tag deletion
-		app.Events.Emit(&application.WailsEvent{
-			Name: "tagDeleted",
-			Data: tagID,
-		})
+		app.EmitEvent("tagDeleted", tagID)
 	})
 
 	mainWindow.RegisterContextMenu("tagMenu", tagMenu)

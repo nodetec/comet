@@ -64,10 +64,7 @@ func CreateTrashNoteMenu(app *application.App, mainWindow application.Window, ct
 		}
 
 		// Emit an event to notify about note restoration
-		app.Events.Emit(&application.WailsEvent{
-			Name: "noteRestored",
-			Data: trashNoteID,
-		})
+		app.EmitEvent("noteRestored", trashNoteID)
 	})
 
 	trashNoteMenu.Add("Delete").OnClick(func(data *application.Context) {
@@ -91,10 +88,12 @@ func CreateTrashNoteMenu(app *application.App, mainWindow application.Window, ct
 		}
 
 		// Emit an event to notify about note deletion
-		app.Events.Emit(&application.WailsEvent{
-			Name: "trashNoteDeleted",
-			Data: trashNoteID,
-		})
+		// app.Events.Emit(&application.WailsEvent{
+		// 	Name: "trashNoteDeleted",
+		// 	Data: trashNoteID,
+		// })
+		app.EmitEvent("trashNoteDeleted", trashNoteID)
+
 	})
 
 	mainWindow.RegisterContextMenu("trashNoteMenu", trashNoteMenu)
