@@ -268,12 +268,3 @@ func (s *NoteService) RestoreNoteFromTrash(ctx context.Context, noteId int64, ti
 	}
 	return note, nil
 }
-
-// func (s *NoteService) RestoreNoteFromTrash(ctx context.Context, noteId int64, []tagIds int64) error {
-// 	err := s.queries.DeleteNoteFromTrash(ctx, id)
-// 	if err != nil {
-// 		s.logger.Printf("Error deleting note from trash with ID %d: %v", id, err)
-// 		return err
-// 	}
-// 	return nil
-// }
