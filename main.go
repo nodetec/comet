@@ -26,7 +26,7 @@ var assets embed.FS
 //go:embed sql/schema.sql
 var ddl string
 
-//go:embed sql/migrations/*.sql
+//go:embed sql/migrations/*.sql sql/migrations/*.go
 var embedMigrations embed.FS
 
 func main() {
