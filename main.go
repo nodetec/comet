@@ -13,6 +13,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/nodetec/captains-log/contextmenu"
 	"github.com/nodetec/captains-log/db"
+	_ "github.com/nodetec/captains-log/migrations"
 	"github.com/nodetec/captains-log/service"
 
 	"github.com/pressly/goose/v3"
@@ -26,7 +27,7 @@ var assets embed.FS
 //go:embed sql/schema.sql
 var ddl string
 
-//go:embed sql/migrations/*.sql sql/migrations/*.go
+//go:embed migrations/*.sql migrations/*.go
 var embedMigrations embed.FS
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 		panic(err)
 	}
 
-	if err := goose.Up(dbConn, "sql/migrations"); err != nil {
+	if err := goose.Up(dbConn, "migrations"); err != nil {
 		panic(err)
 	}
 

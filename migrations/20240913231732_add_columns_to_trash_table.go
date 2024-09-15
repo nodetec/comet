@@ -10,7 +10,6 @@ import (
 )
 
 func init() {
-	// goose.AddNamedMigrationContext("20240913_add_column_if_not_exists", upAddColumnsToTrashTable, downAddColumnsToTrashTable)
 	goose.AddMigrationContext(upAddColumnsToTrashTable, downAddColumnsToTrashTable)
 }
 
@@ -21,7 +20,6 @@ var columnsToAdd = map[string]string{
 	"event_id":     "TEXT",
 	"notetype":     "TEXT NOT NULL DEFAULT ''",
 	"filetype":     "TEXT NOT NULL DEFAULT ''",
-	"donut":        "TEXT NOT NULL DEFAULT ''",
 }
 
 func upAddColumnsToTrashTable(ctx context.Context, tx *sql.Tx) error {
@@ -56,6 +54,6 @@ func upAddColumnsToTrashTable(ctx context.Context, tx *sql.Tx) error {
 }
 
 func downAddColumnsToTrashTable(ctx context.Context, tx *sql.Tx) error {
-	log.Println("Nothing for now")
+	log.Println("Nothing for now. SQLite doesn’t support removing columns directly")
 	return nil
 }
