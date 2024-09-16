@@ -10,7 +10,10 @@ const useNoteMenu = () => {
 
   const activeNote = useAppState((state) => state.activeNote);
   const setActiveNote = useAppState((state) => state.setActiveNote);
-
+  const setIsSelectNotebookDialogOpen = useAppState(
+    (state) => state.setIsSelectNotebookDialogOpen,
+  );
+  const setSelectedNote = useAppState((state) => state.setSelectedNote);
   useEffect(() => {
     const handleNoteDeleted = (event: WailsEvent) => {
       if (activeNote?.ID === event.data) {
@@ -23,10 +26,17 @@ const useNoteMenu = () => {
       });
     };
 
+    const handleMoveToNotebook = (event: WailsEvent) => {
+      setSelectedNote(event.data[0]);
+      setIsSelectNotebookDialogOpen(true);
+    };
+
     Events.On("noteDeleted", handleNoteDeleted);
+    Events.On("noteBookModal", handleMoveToNotebook);
 
     return () => {
       Events.Off("noteDeleted");
+      Events.Off("noteBookModal");
     };
   }, [activeNote, setActiveNote, queryClient]);
 };

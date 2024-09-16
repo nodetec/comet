@@ -47,5 +47,26 @@ func CreateNoteMenu(app *application.App, mainWindow application.Window, ctx con
 		app.EmitEvent("noteDeleted", noteID)
 	})
 
+	noteMenu.Add("Move to Notebook").OnClick(func(data *application.Context) {
+		contextData, ok := data.ContextMenuData().(string)
+		if !ok {
+			app.Logger.Error("Invalid context menu data type")
+			return
+		}
+
+		noteID, err := strconv.ParseInt(contextData, 10, 64)
+		if err != nil {
+			app.Logger.Error("Error converting context data to int64", "error", err)
+			return
+		}
+
+		note, err := noteService.GetNote(ctx, noteID)
+		if err != nil {
+			app.Logger.Error("Error getting note", "error", err)
+		}
+
+		app.EmitEvent("noteBookModal", note)
+	})
+
 	mainWindow.RegisterContextMenu("noteMenu", noteMenu)
 }
