@@ -1,6 +1,6 @@
 import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
-import { EllipsisVertical, PinIcon } from "lucide-react";
+import { PinIcon } from "lucide-react";
 
 import { PostButton } from "./PostButton";
 
