@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { RelayService } from "&/github.com/nodetec/captains-log/service";
+import { RelayService } from "&/github.com/nodetec/comet/service";
 import { Button } from "~/components/ui/button";
 import {
   Card,

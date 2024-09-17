@@ -1,4 +1,4 @@
-module github.com/nodetec/captains-log
+module github.com/nodetec/comet
 
 go 1.22.4
 

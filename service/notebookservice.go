@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/nodetec/captains-log/db"
+	"github.com/nodetec/comet/db"
 )
 
 type NotebookService struct {

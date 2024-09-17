@@ -2,8 +2,8 @@ import {
   Note,
   Notebook,
   Trash,
-} from "&/github.com/nodetec/captains-log/db/models";
-import { Tag } from "&/github.com/nodetec/captains-log/service";
+} from "&/github.com/nodetec/comet/db/models";
+import { Tag } from "&/github.com/nodetec/comet/service";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -99,7 +99,7 @@ export const useAppState = create<State>()(
         set({ titleSortDirection }),
     }),
     {
-      name: "captains-log-storage",
+      name: "comet-storage",
       storage: createJSONStorage(() => localStorage),
     },
   ),

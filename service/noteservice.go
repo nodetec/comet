@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodetec/captains-log/db"
+	"github.com/nodetec/comet/db"
 )
 
 type NoteService struct {

@@ -7,7 +7,7 @@ import * as wails from "@wailsio/runtime";
 import {
   Settings,
   SettingService,
-} from "&/github.com/nodetec/captains-log/service";
+} from "&/github.com/nodetec/comet/service";
 import { Button } from "~/components/ui/button";
 import {
   Card,

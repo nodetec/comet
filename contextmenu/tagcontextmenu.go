@@ -4,7 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/nodetec/captains-log/service"
+	"github.com/nodetec/comet/service"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

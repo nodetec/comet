@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/nodetec/captains-log/db"
+	"github.com/nodetec/comet/db"
 )
 
 type Setting struct {

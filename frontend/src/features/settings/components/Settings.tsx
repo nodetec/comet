@@ -5,7 +5,7 @@ import {
   Relay,
   RelayService,
   SettingService,
-} from "&/github.com/nodetec/captains-log/service";
+} from "&/github.com/nodetec/comet/service";
 
 import EditorSettings from "./EditorSettings";
 import GeneralSettings from "./GeneralSettings";

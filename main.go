@@ -11,10 +11,10 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/adrg/xdg"
-	"github.com/nodetec/captains-log/contextmenu"
-	"github.com/nodetec/captains-log/db"
-	_ "github.com/nodetec/captains-log/migrations"
-	"github.com/nodetec/captains-log/service"
+	"github.com/nodetec/comet/contextmenu"
+	"github.com/nodetec/comet/db"
+	_ "github.com/nodetec/comet/migrations"
+	"github.com/nodetec/comet/service"
 
 	"github.com/pressly/goose/v3"
 
@@ -34,8 +34,8 @@ func main() {
 	ctx := context.Background()
 
 	// Define the directory path for the SQLite database file
-	dbDir := fmt.Sprintf("%s/captains-log", xdg.DataHome)
-	dbPath := fmt.Sprintf("%s/captains-log.db", dbDir)
+	dbDir := fmt.Sprintf("%s/comet", xdg.DataHome)
+	dbPath := fmt.Sprintf("%s/comet.db", dbDir)
 
 	// Ensure the directory exists
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
@@ -77,7 +77,7 @@ func main() {
 	nostrKeyService := service.NewNostrKeyService(queries, logger)
 
 	app := application.New(application.Options{
-		Name:        "captains-log",
+		Name:        "comet",
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
 			application.NewService(noteService),

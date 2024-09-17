@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  APP_NAME: "captains-log"
+  APP_NAME: "comet"
   BIN_DIR: "bin"
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
 
@@ -35,7 +35,7 @@ tasks:
         vars:
           ARCH: '{{.ARCH}}'
     cmds:
-      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/captains-log.exe
+      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/comet.exe
     vars:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,fts5 -trimpath -ldflags="-w -s -H windowsgui"{{else}}-tags fts5 -gcflags=all="-N -l"{{end}}'
     env:
@@ -141,7 +141,7 @@ tasks:
         vars:
           ARCH: '{{.ARCH}}'
     cmds:
-      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/captains-log
+      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/comet
     vars:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,fts5 -trimpath -ldflags="-w -s"{{else}}-tags fts5 -gcflags=all="-N -l"{{end}}'
     env:

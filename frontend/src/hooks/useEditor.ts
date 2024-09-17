@@ -31,7 +31,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   NoteService,
   SettingService,
-} from "&/github.com/nodetec/captains-log/service";
+} from "&/github.com/nodetec/comet/service";
 import neovimHighlightStyle from "~/lib/codemirror/highlight/neovim";
 import {
   fontFamily,

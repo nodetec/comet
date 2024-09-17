@@ -1,13 +1,12 @@
-import Sidebar from "~/components/sidebar/Sidebar";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
-import { Toaster } from "~/components/ui/sonner";
 
-import EditorWrapper from "./components/editor/EditorWrapper";
-import Notes from "./components/notes/Notes";
+import { Editor } from "./features/editor";
+import { Notes } from "./features/notes";
+import { Sidebar } from "./features/sidebar";
 import useNoteMenu from "./hooks/useNoteMenu";
 import useNoteTagMenu from "./hooks/useNoteTagMenu";
 import useSettingsRefresh from "./hooks/useSettingsRefresh";
@@ -46,10 +45,9 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          <EditorWrapper />
+          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
-      <Toaster />
     </div>
   );
 }

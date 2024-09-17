@@ -9,6 +9,7 @@ import "~/styles/globals.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "~/components/theme/theme-provider";
+import { Toaster } from "~/components/ui/sonner";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       {/* <ReactQueryDevtools buttonPosition="top-right" /> */}
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <App />
+        <Toaster />
       </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>,
