@@ -155,7 +155,7 @@ export function Login() {
             <DialogTitle>Nostr Login</DialogTitle>
             <DialogDescription>
               Don't have a Nostr account?{" "}
-              <button onClick={generateKepair} className="text-purple-500">
+              <button onClick={generateKepair} className="text-purple-500 focus-visible:ring-0 focus-visible:outline-none">
                 Create keypair
               </button>
             </DialogDescription>
