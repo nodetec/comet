@@ -1,1 +1,1 @@
-export { SettingsDialog } from "./components/SettingsDialog";
+export { SettingsBtn } from "./components/SettingsBtn";

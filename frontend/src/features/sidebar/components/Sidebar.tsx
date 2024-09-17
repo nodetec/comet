@@ -2,15 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { ListNostrKeys } from "&/github.com/nodetec/comet/service/nostrkeyservice";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { SettingsDialog } from "~/features/settings";
 import { CircleUserRound } from "lucide-react";
-import { Login } from "./Login";
-import { AllNotes } from "./AllNotes";
-import { NotebookComboBox } from "./NotebookComboBox";
-import { Trash } from "./Trash";
-import { Tags } from "./Tags";
 
-export function Sidebar() {
+import { AllNotes } from "./AllNotes";
+import { Login } from "./Login";
+import { NotebookComboBox } from "./NotebookComboBox";
+import { Tags } from "./Tags";
+import { Trash } from "./Trash";
+
+type Props = {
+  Settings: React.FC;
+};
+
+export function Sidebar({ Settings }: Props) {
   const getKeys = async () => {
     const keys = await ListNostrKeys();
     return keys;
@@ -37,7 +41,7 @@ export function Sidebar() {
           ) : (
             <Login />
           )}
-          <SettingsDialog />
+          <Settings />
         </div>
       </div>
       <ScrollArea className="flex h-full flex-col gap-y-2 [&>div>div[style]]:!block">

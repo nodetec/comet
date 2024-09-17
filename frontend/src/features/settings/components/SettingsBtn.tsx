@@ -7,10 +7,9 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Settings2 } from "lucide-react";
+import { Settings } from "./Settings";
 
-import Settings from "./Settings";
-
-export function SettingsDialog() {
+export function SettingsBtn() {
   return (
     <Dialog>
       <DialogTrigger asChild>

@@ -41,7 +41,7 @@ function formatRelayData(relayData: Relay[]) {
   return relayObj;
 }
 
-export default function Settings() {
+export function Settings() {
   const [currentTab, setCurrentTab] = useState<Tab>("General");
 
   const handleCurrentTabOnClick = (tab: Tab) => {

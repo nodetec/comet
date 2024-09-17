@@ -6,6 +6,7 @@ import {
 
 import { Editor } from "./features/editor";
 import { Notes } from "./features/notes";
+import { SettingsBtn } from "./features/settings";
 import { Sidebar } from "./features/sidebar";
 import useNoteMenu from "./hooks/useNoteMenu";
 import useNoteTagMenu from "./hooks/useNoteTagMenu";
@@ -32,7 +33,7 @@ export default function App() {
           defaultSize={18}
           minSize={18}
         >
-          <Sidebar />
+          <Sidebar Settings={SettingsBtn} />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel
