@@ -4,7 +4,11 @@ import { EllipsisVertical, PinIcon } from "lucide-react";
 
 import { PostButton } from "./PostButton";
 
-export function EditorHeader() {
+type Props = {
+  EditorDropdown: React.FC;
+};
+
+export function EditorHeader({ EditorDropdown }: Props) {
   const activeNote = useAppState((state) => state.activeNote);
   const editorFullScreen = useAppState((state) => state.editorFullScreen);
   const setEditorFullScreen = useAppState((state) => state.setEditorFullScreen);
@@ -82,16 +86,7 @@ export function EditorHeader() {
             <PinIcon className="h-5 w-5" />
           </Button>
           <PostButton note={activeNote} />
-          <Button
-            id="editor-header-ellipsis-vertical-btn"
-            name="editor-header-ellipsis-vertical-btn"
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground"
-          >
-            <EllipsisVertical className="h-5 w-5" />
-          </Button>
+          <EditorDropdown />
         </div>
       </div>
 

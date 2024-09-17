@@ -6,13 +6,17 @@ import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
 import { Eye } from "lucide-react";
 
+import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { EditorHeader } from "./EditorHeader";
 import Preview from "./Preview";
 import ReadOnlyTagList from "./ReadOnlyTagList";
 import TagInput from "./TagInput";
-import { CodeMirrorEditor } from "./CodeMirrorEditor";
 
-export const Editor = () => {
+type Props = {
+  EditorDropdown: React.FC;
+};
+
+export const Editor = ({ EditorDropdown }: Props) => {
   const [showPreview, setShowPreview] = useState(false);
 
   const feedType = useAppState((state) => state.feedType);
@@ -50,7 +54,7 @@ export const Editor = () => {
 
   return (
     <div className="flex h-full flex-col">
-      <EditorHeader />
+      <EditorHeader EditorDropdown={EditorDropdown} />
       {!showPreview && <CodeMirrorEditor />}
       {showPreview && <Preview />}
       <div className="fixed bottom-[3.75rem] right-2.5 p-2">

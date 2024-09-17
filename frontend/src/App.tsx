@@ -5,6 +5,7 @@ import {
 } from "~/components/ui/resizable";
 
 import { Editor } from "./features/editor";
+import { EditorDropdown } from "./features/editor-dropdown";
 import { Notes } from "./features/notes";
 import { SettingsBtn } from "./features/settings";
 import { Sidebar } from "./features/sidebar";
@@ -46,7 +47,7 @@ export default function App() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          <Editor />
+          <Editor EditorDropdown={EditorDropdown} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
