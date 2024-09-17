@@ -42,7 +42,7 @@ export default function NoteCard({ note }: Props) {
           }
         >
           <div className="flex w-full flex-col gap-1.5">
-            <h2 className="select-none truncate line-clamp-1 break-all whitespace-break-spaces text-ellipsis font-semibold text-primary">
+            <h2 className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
               {note.Title}
             </h2>
             <div className="mt-0 line-clamp-2 text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground">

@@ -6,6 +6,7 @@ import { useInView } from "react-intersection-observer";
 
 import { ScrollArea } from "../ui/scroll-area";
 import NoteCard from "./NoteCard";
+import SearchNotebookDialog from "./SearchNotebookDialog";
 
 export default function NoteFeed() {
   const setActiveNote = useAppState((state) => state.setActiveNote);
@@ -14,6 +15,10 @@ export default function NoteFeed() {
   const orderBy = useAppState((state) => state.orderBy);
   const timeSortDirection = useAppState((state) => state.timeSortDirection);
   const titleSortDirection = useAppState((state) => state.titleSortDirection);
+  const isSelectNotebookDialogOpen = useAppState(
+    (state) => state.isSelectNotebookDialogOpen,
+  );
+  const selectedNote = useAppState((state) => state.selectedNote);
 
   async function fetchNotes({ pageParam = 1 }) {
     const pageSize = 50;
@@ -77,6 +82,7 @@ export default function NoteFeed() {
   }
   return (
     <ScrollArea className="h-screen">
+      {isSelectNotebookDialogOpen && selectedNote && <SearchNotebookDialog />}
       {data.pages.map((page, pageIndex) => (
         <div className="flex flex-col items-center px-3" key={pageIndex}>
           {page.data.map((project, noteIndex) => (

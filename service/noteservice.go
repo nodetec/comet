@@ -174,6 +174,7 @@ func (s *NoteService) AddNoteToTrash(ctx context.Context, note db.Note, tags []d
 		CreatedAt:  note.CreatedAt,
 		ModifiedAt: time.Now().Format(time.RFC3339),
 		Tags:       sql.NullString{String: stringifiedTags, Valid: true},
+		NotebookID: note.NotebookID,
 	}
 	_, err := s.queries.AddNoteToTrash(ctx, params)
 	if err != nil {

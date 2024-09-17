@@ -41,8 +41,14 @@ interface State {
   editorFullScreen: boolean;
   setEditorFullScreen: (editorFullScreen: boolean) => void;
 
+  isSelectNotebookDialogOpen: boolean;
+  setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen: boolean) => void;
+
   openPostBtnDialog: boolean;
   setOpenPostBtnDialog: (openPostBtnDialog: boolean) => void;
+
+  selectedNote: Note | undefined;
+  setSelectedNote: (selectedNote: Note | undefined) => void;
 }
 
 export const useAppState = create<State>()(
@@ -80,6 +86,13 @@ export const useAppState = create<State>()(
 
       openPostBtnDialog: false,
       setOpenPostBtnDialog: (openPostBtnDialog) => set({ openPostBtnDialog }),
+
+      isSelectNotebookDialogOpen: false,
+      setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen) =>
+        set({ isSelectNotebookDialogOpen }),
+
+      selectedNote: undefined,
+      setSelectedNote: (selectedNote) => set({ selectedNote }),
 
       titleSortDirection: "ASC",
       setTitleSortDirection: (titleSortDirection) =>
