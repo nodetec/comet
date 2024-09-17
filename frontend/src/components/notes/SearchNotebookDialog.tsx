@@ -82,23 +82,25 @@ const SearchNotebookDialog = () => {
         }
       }}
     >
-      <DialogContent className="w-full max-w-md p-6">
-        <DialogHeader>
+      <DialogContent className="mx-auto my-auto flex max-h-[70%] min-h-[70%] min-w-[50%] max-w-[50%] flex-col items-start justify-start border border-accent p-4">
+        <DialogHeader className="w-full">
           <DialogTitle className="text-primary">Move to Notebook</DialogTitle>
         </DialogHeader>
-        <div className="mt-2">
+        <div className="sticky top-0 w-full">
           <Input
             placeholder="Search Notebooks..."
             value={searchTerm}
             onChange={handleSearch}
-            className="mb-2"
+            className="w-full"
           />
-          <ul className="space-y-2">
+        </div>
+        <div className="min-h-full w-full overflow-y-auto">
+          <ul className="w-full space-y-2">
             {filteredNotebooks?.length ? (
               filteredNotebooks.map((notebook) => (
                 <li
                   key={notebook.ID}
-                  className="m-0 cursor-pointer rounded-md p-1 text-primary hover:bg-muted/70"
+                  className="cursor-pointer rounded-md p-1 text-primary hover:bg-muted/70"
                   onClick={() => moveToNotebook(notebook.ID)}
                 >
                   {notebook.Name}
