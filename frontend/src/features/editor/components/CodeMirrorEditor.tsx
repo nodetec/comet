@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/comet/db/models";
 import { NoteService } from "&/github.com/nodetec/comet/service";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import { useEditor } from "~/hooks/useEditor";
 import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
@@ -60,11 +61,11 @@ export const CodeMirrorEditor = () => {
   });
 
   return (
-    <div className="flex h-full w-full overflow-auto">
+    <ScrollArea className="flex h-full w-full">
       <div
-        className="prose max-w-none prose-zinc h-full w-full break-words dark:prose-invert"
+        className="prose prose-zinc h-full w-full max-w-none break-words dark:prose-invert"
         ref={editorRef}
       ></div>
-    </div>
+    </ScrollArea>
   );
 };
