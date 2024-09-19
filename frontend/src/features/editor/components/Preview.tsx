@@ -1,8 +1,5 @@
-import MarkdownPreview from "@uiw/react-markdown-preview";
+import { processArticle } from "~/lib/markdown";
 import { useAppState } from "~/store";
-import rehypeSanitize from "rehype-sanitize";
-
-const rehypePlugins = [rehypeSanitize];
 
 export const Preview = () => {
   const activeNote = useAppState((state) => state.activeNote);
@@ -10,10 +7,13 @@ export const Preview = () => {
 
   return (
     <div className="h-full w-full overflow-auto py-1">
-      <MarkdownPreview
-        source={activeNote?.Content || activeTrashNote?.Content || ""}
-        className="px-8"
-        rehypePlugins={rehypePlugins}
+      <article
+        className="break-anywhere max-w-4xl prose prose-zinc mx-auto w-full dark:prose-invert"
+        dangerouslySetInnerHTML={{
+          __html: processArticle(
+            activeNote?.Content || activeTrashNote?.Content || "",
+          ),
+        }}
       />
     </div>
   );

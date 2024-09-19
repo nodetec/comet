@@ -115,7 +115,12 @@ export function PostButton({ note }: Props) {
 
       await Promise.any(pool.publish(relayUrls, event));
       pool.close(relayUrls);
-      console.log("pk", keys[0].Npub);
+
+      // TODO: update note to published
+      // TODO: add event id to note
+      // TODO: add identifier to note
+
+
       toast("Note posted", {
         description: "Your note was posted successfully.",
       });

@@ -59,5 +59,12 @@ export const CodeMirrorEditor = () => {
     onChange,
   });
 
-  return <div className="h-full w-full overflow-auto" ref={editorRef}></div>;
+  return (
+    <div className="flex h-full w-full items-center overflow-auto justify-center">
+      <div
+        className="break-anywhere max-w-none prose prose-zinc h-full w-full dark:prose-invert"
+        ref={editorRef}
+      ></div>
+    </div>
+  );
 };

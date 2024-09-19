@@ -71,6 +71,28 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            // Target all images within Prose
+            img: {
+              // Change the display property to inline
+              display: "inline",
+              // Optionally adjust vertical alignment
+              "vertical-align": "middle",
+              "margin-top": "0.5em",
+              "margin-bottom": "0.5em",
+              "margin-left": "0.25em",
+              "margin-right": "0.25em",
+            },
+            h2: {
+              "margin-top": "1.5em", // Adjust the top margin
+              "margin-bottom": "1em", // Adjust the bottom margin
+              padding: "0", // Remove any padding if necessary
+            },
+          },
+        },
+      },
     },
   },
   plugins: [require("@tailwindcss/typography"), require("tailwindcss-animate")],
