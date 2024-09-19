@@ -108,7 +108,7 @@
 
 /* Scrollbar thumb (foreground) */
 ::-webkit-scrollbar-thumb {
-  @apply bg-secondary;
+  @apply bg-muted-foreground;
   @apply rounded-full;
 }
 
@@ -119,11 +119,11 @@
 
 /* Optional: Scrollbar width */
 ::-webkit-scrollbar {
-  @apply w-2.5;
+  @apply w-[0.45rem];
 }
 
 ::-webkit-scrollbar:horizontal {
-  @apply h-2.5;
+  @apply h-[0.45rem];
 }
 
 ::-webkit-scrollbar-corner {
