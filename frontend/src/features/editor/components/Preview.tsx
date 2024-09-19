@@ -6,10 +6,12 @@ export const Preview = () => {
   const activeNote = useAppState((state) => state.activeNote);
   const activeTrashNote = useAppState((state) => state.activeTrashNote);
 
+  const editorFullScreen = useAppState((state) => state.editorFullScreen);
+
   return (
-    <ScrollArea className="flex h-full w-full py-1">
+    <ScrollArea className="flex h-full w-full">
       <article
-        className="break-anywhere prose prose-zinc mx-auto w-full dark:prose-invert"
+        className={`break-anywhere prose prose-zinc mx-auto w-full dark:prose-invert ${editorFullScreen && "py-4"}`}
         dangerouslySetInnerHTML={{
           __html: processArticle(
             activeNote?.Content || activeTrashNote?.Content || "",

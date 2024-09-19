@@ -13,6 +13,8 @@ export const CodeMirrorEditor = () => {
   const feedType = useAppState((state) => state.feedType);
   const setActiveNote = useAppState((state) => state.setActiveNote);
 
+  const editorFullScreen = useAppState((state) => state.editorFullScreen);
+
   const queryClient = useQueryClient();
 
   const onChange = async (doc: string) => {
@@ -63,7 +65,7 @@ export const CodeMirrorEditor = () => {
   return (
     <ScrollArea className="flex h-full w-full">
       <div
-        className="prose prose-zinc h-full w-full max-w-none break-words dark:prose-invert"
+        className={`prose prose-zinc h-full w-full max-w-none break-words dark:prose-invert ${editorFullScreen && "py-4"}`}
         ref={editorRef}
       ></div>
     </ScrollArea>
