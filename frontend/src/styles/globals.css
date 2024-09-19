@@ -135,6 +135,19 @@ input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
 }
 
+.cm-scroller {
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+}
+
+.cm-content {
+  @apply items-center;
+  @apply bg-background;
+  @apply text-foreground;
+  @apply max-w-3xl;
+}
+
 @layer utilities {
   .popover-content-width-full {
     width: var(--radix-popover-trigger-width);

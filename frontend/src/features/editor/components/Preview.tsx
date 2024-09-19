@@ -8,7 +8,7 @@ export const Preview = () => {
   return (
     <div className="h-full w-full overflow-auto py-1">
       <article
-        className="break-anywhere max-w-4xl prose prose-zinc mx-auto w-full dark:prose-invert"
+        className="break-anywhere prose prose-zinc mx-auto w-full dark:prose-invert"
         dangerouslySetInnerHTML={{
           __html: processArticle(
             activeNote?.Content || activeTrashNote?.Content || "",
