@@ -18,7 +18,7 @@ export function EditorHeader({ EditorDropdown }: Props) {
 
   return (
     <div
-      className={`pb-3 flex flex-col px-2 pt-3 ${editorFullScreen && "border-b pb-3"}`}
+      className={`flex flex-col px-2 pb-3 pt-3 ${editorFullScreen && "border-b pb-3"}`}
     >
       <div className="flex items-center justify-between gap-x-3">
         {editorFullScreen ? (

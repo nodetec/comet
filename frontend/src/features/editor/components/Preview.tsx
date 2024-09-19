@@ -11,7 +11,7 @@ export const Preview = () => {
   return (
     <ScrollArea className="flex h-full w-full">
       <article
-        className={`break-anywhere prose prose-zinc mx-auto w-full dark:prose-invert ${editorFullScreen && "py-4"}`}
+        className={`break-anywhere prose prose-zinc mx-auto w-full pb-4 dark:prose-invert ${editorFullScreen && "py-4"}`}
         dangerouslySetInnerHTML={{
           __html: processArticle(
             activeNote?.Content || activeTrashNote?.Content || "",
