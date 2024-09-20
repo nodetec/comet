@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/github.com/nodetec/comet/db/models";
 import { NoteService } from "&/github.com/nodetec/comet/service";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import { useEditor } from "~/hooks/useEditor";
 import { parseTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
