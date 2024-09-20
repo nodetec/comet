@@ -63,11 +63,11 @@ export const CodeMirrorEditor = () => {
   });
 
   return (
-    <ScrollArea className="flex h-full w-full">
+    <div className="flex h-full w-full overflow-y-auto">
       <div
-        className={`prose prose-zinc h-full w-full max-w-none break-words pb-4 dark:prose-invert ${editorFullScreen && "py-4"}`}
+        className={`prose prose-zinc h-full w-full max-w-none break-words border border-red-500 pb-4 dark:prose-invert ${editorFullScreen && "py-4"}`}
         ref={editorRef}
       ></div>
-    </ScrollArea>
+    </div>
   );
 };
