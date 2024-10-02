@@ -5,10 +5,10 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "My Product Description",
-			"LegalCopyright": "© now, My Company",
-			"ProductName": "My Product",
+			"CompanyName": "NODE-TEC",
+			"FileDescription": "Comet Description",
+			"LegalCopyright": "© now, NODE-TEC",
+			"ProductName": "Comet",
 			"Comments": "This is a comment"
 		}
 	}

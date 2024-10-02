@@ -4,7 +4,7 @@
         <key>CFBundlePackageType</key>
         <string>APPL</string>
         <key>CFBundleName</key>
-        <string>My Product</string>
+        <string>Comet</string>
         <key>CFBundleExecutable</key>
         <string>comet</string>
         <key>CFBundleIdentifier</key>
