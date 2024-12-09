@@ -1,5 +1,9 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-require-imports */
+
+import { Config } from "tailwindcss";
+
+const config: Config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -74,11 +78,8 @@ module.exports = {
       typography: {
         DEFAULT: {
           css: {
-            // Target all images within Prose
             img: {
-              // Change the display property to inline
               display: "inline",
-              // Optionally adjust vertical alignment
               "vertical-align": "middle",
               "margin-top": "0.5em",
               "margin-bottom": "0.5em",
@@ -86,9 +87,9 @@ module.exports = {
               "margin-right": "0.25em",
             },
             h2: {
-              "margin-top": "1.5em", // Adjust the top margin
-              "margin-bottom": "1em", // Adjust the bottom margin
-              padding: "0", // Remove any padding if necessary
+              "margin-top": "1.5em",
+              "margin-bottom": "1em",
+              padding: "0",
             },
           },
         },
@@ -97,3 +98,5 @@ module.exports = {
   },
   plugins: [require("@tailwindcss/typography"), require("tailwindcss-animate")],
 };
+
+export default config;

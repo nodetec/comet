@@ -104,7 +104,7 @@ func main() {
 		URL:              "/",
 		MinWidth:         500,
 		MinHeight:        250,
-		Centered:         true,
+		// Centered:         true,
 		BackgroundColour: application.NewRGB(27, 38, 54),
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
