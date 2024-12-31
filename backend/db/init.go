@@ -11,7 +11,6 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
 )
 
 // Database instance
@@ -31,16 +30,16 @@ func Init(embedMigrations embed.FS) {
 	}
 	DB = dbConn
 
-	goose.SetBaseFS(embedMigrations)
+	// goose.SetBaseFS(embedMigrations)
 
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		panic(err)
-	}
+	// if err := goose.SetDialect("sqlite3"); err != nil {
+	// 	panic(err)
+	// }
 
-	// Perform migrations
-	if err := goose.Up(DB.DB, "migrations"); err != nil {
-		log.Fatalf("Failed to apply migrations: %v", err)
-	}
+	// // Perform migrations
+	// if err := goose.Up(DB.DB, "migrations"); err != nil {
+	// 	log.Fatalf("Failed to apply migrations: %v", err)
+	// }
 
 	// List of table schemas
 	tableSchemas := []string{
