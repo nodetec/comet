@@ -41,7 +41,7 @@ const DefaultTheme: EditorThemeClasses = {
     base: "border rounded-md p-2",
     focus: "border-blue-500 shadow",
   },
-  hashtag: "text-sky-500/90",
+  hashtag: "text-sky-500/90 font-bold",
   heading: {
     h1: "text-3xl font-bold mb-2 mt-3",
     h2: "text-2xl font-bold mb-2 mt-3",

@@ -64,7 +64,7 @@ export function Editor() {
         activeNote?.Content ?? "",
         UPDATED_TRANSFORMERS,
         undefined,
-        true,
+        false,
       ),
     nodes: [
       HorizontalRuleNode,
