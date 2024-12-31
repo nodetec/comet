@@ -9,7 +9,7 @@ import dayjs from "dayjs";
 // import { unified } from "unified";
 
 export function parseTitle(markdownContent: string) {
-//   console.log("markdownContent", markdownContent);
+  //   console.log("markdownContent", markdownContent);
   // Split the content into lines
   const lines = markdownContent.split("\n");
 
@@ -19,7 +19,7 @@ export function parseTitle(markdownContent: string) {
   // Check if the first line is a header
   const headerMatch = /^#+\s+(.*)$/.exec(firstLine);
 
-//   console.log("headerMatch", headerMatch);
+  //   console.log("headerMatch", headerMatch);
 
   if (headerMatch) {
     // Extract and return the title without the header markdown and remove ** on either side
@@ -49,7 +49,17 @@ export function parseContent(markdownContent: string) {
   // Join the lines back together with newlines
   const content = filteredLines.join("\n");
 
-  return content;
+  // Remove all markdown elements
+  const cleanedContent = content
+    .replace(/!\[.*?\]\(.*?\)/g, "") // Remove images
+    .replace(/\[.*?\]\(.*?\)/g, "") // Remove links
+    .replace(/`{1,3}.*?`{1,3}/g, "") // Remove inline and block code
+    .replace(/[*_~]{1,3}/g, "") // Remove emphasis (bold, italic, strikethrough)
+    .replace(/^#+\s+/gm, "") // Remove headers
+    .replace(/^\s*[-*+]\s+/gm, "") // Remove list items
+    .replace(/^\s*\d+\.\s+/gm, ""); // Remove numbered list items
+
+  return cleanedContent;
 }
 
 export const getTag = (name: string, tags: string[][]) => {
