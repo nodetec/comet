@@ -1,9 +1,4 @@
-import {
-  Note,
-  Notebook,
-  Trash,
-} from "&/github.com/nodetec/comet/db/models";
-import { Tag } from "&/github.com/nodetec/comet/service";
+import { type Note, type Notebook, type Tag } from "&/comet/backend/db/schemas";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -11,23 +6,20 @@ interface State {
   feedType: "all" | "notebook" | "trash";
   setFeedType: (feedType: "all" | "notebook" | "trash") => void;
 
-  activeNote: Note | undefined;
-  setActiveNote: (activeNote: Note | undefined) => void;
-
   activeNotebook: Notebook | undefined;
   setActiveNotebook: (activeNotebook: Notebook | undefined) => void;
 
   activeTag: Tag | undefined;
   setActiveTag: (activeNote: Tag | undefined) => void;
 
-  activeTrashNote: Trash | undefined;
-  setActiveTrashNote: (activeTrashNote: Trash | undefined) => void;
-
   searchActive: boolean;
   setSearchActive: (searchActive: boolean) => void;
 
   noteSearch: string;
   setNoteSearch: (noteSearch: string) => void;
+
+  lastTagVisible: boolean;
+  setLastTagVisible: (lastTagVisible: boolean) => void;
 
   orderBy: "modified_at" | "created_at" | "title";
   setOrderBy: (orderBy: "modified_at" | "created_at" | "title") => void;
@@ -40,6 +32,11 @@ interface State {
 
   editorFullScreen: boolean;
   setEditorFullScreen: (editorFullScreen: boolean) => void;
+
+  settingsTab: "profile" | "appearance" | "relays" | "editor";
+  setSettingsTab: (
+    settingsTab: "profile" | "appearance" | "relays" | "editor",
+  ) => void;
 
   isSelectNotebookDialogOpen: boolean;
   setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen: boolean) => void;
@@ -57,23 +54,20 @@ export const useAppState = create<State>()(
       feedType: "all",
       setFeedType: (feedType) => set({ feedType }),
 
-      activeNote: undefined,
-      setActiveNote: (activeNote) => set({ activeNote }),
-
       activeNotebook: undefined,
       setActiveNotebook: (activeNotebook) => set({ activeNotebook }),
 
       activeTag: undefined,
       setActiveTag: (activeTag) => set({ activeTag }),
 
-      activeTrashNote: undefined,
-      setActiveTrashNote: (activeTrashNote) => set({ activeTrashNote }),
-
       searchActive: false,
       setSearchActive: (searchActive) => set({ searchActive }),
 
       noteSearch: "",
       setNoteSearch: (noteSearch) => set({ noteSearch }),
+
+      lastTagVisible: false,
+      setLastTagVisible: (lastTagVisible) => set({ lastTagVisible }),
 
       orderBy: "modified_at",
       setOrderBy: (orderBy) => set({ orderBy }),
@@ -83,6 +77,9 @@ export const useAppState = create<State>()(
 
       editorFullScreen: false,
       setEditorFullScreen: (editorFullScreen) => set({ editorFullScreen }),
+
+      settingsTab: "profile",
+      setSettingsTab: (settingsTab) => set({ settingsTab }),
 
       openPostBtnDialog: false,
       setOpenPostBtnDialog: (openPostBtnDialog) => set({ openPostBtnDialog }),

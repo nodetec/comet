@@ -1,4 +1,10 @@
+import { useState } from "react";
+
+// import { type CheckedState } from "@radix-ui/react-checkbox";
+import { useQueryClient } from "@tanstack/react-query";
+import { AppService } from "&/comet/backend/service";
 import { Button } from "~/components/ui/button";
+// import { Checkbox } from "~/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -9,50 +15,75 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { PlusCircleIcon } from "lucide-react";
+import { toast } from "sonner";
 
-export function NewNotebookDialog({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function NewNotebookDialog() {
+  const [name, setName] = useState("");
+  //   const [pinned, setPinned] = useState<CheckedState>(true);
+  const pinned = true;
+  const [isOpen, setIsOpen] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  const handleCreate = async () => {
+    console.log({ name, pinned });
+
+    if (name.trim() === "") {
+      return;
+    }
+
+    const trimmedName = name.trim();
+
+    const notebookExists = await AppService.CheckNotebookExists(trimmedName);
+
+    if (notebookExists) {
+      toast.error("Notebook already exists");
+      return;
+    }
+
+    if (typeof pinned === "boolean") {
+      await AppService.CreateNotebook(trimmedName, pinned);
+      await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
+      toast.success("Notebook created successfully");
+      setIsOpen(false);
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        {/* <Button variant="outline">Edit Profile</Button> */}
-        {children}
+        <Button
+          className="flex justify-start gap-2 text-sm hover:bg-transparent [&_svg]:size-[1rem]"
+          variant="ghost"
+        >
+          <PlusCircleIcon />
+          Notebook
+        </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit profile</DialogTitle>
+          <DialogTitle>New Notebook</DialogTitle>
           <DialogDescription>
-            Make changes to your profile here. Click save when you're done.
+            Create a new notebook to organize your notes
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
-            </Label>
-            <Input
-              id="name"
-              defaultValue="Pedro Duarte"
-              className="col-span-3"
+        <div className="space-y-4">
+          <Input
+            placeholder="Notebook Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          {/* <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={pinned}
+              onCheckedChange={(checked) => setPinned(checked)}
             />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="username" className="text-right">
-              Username
-            </Label>
-            <Input
-              id="username"
-              defaultValue="@peduarte"
-              className="col-span-3"
-            />
-          </div>
+            <label>Pin this notebook</label>
+          </div> */}
         </div>
         <DialogFooter>
-          <Button type="submit">Save changes</Button>
+          <Button onClick={handleCreate}>Create</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

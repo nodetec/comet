@@ -1,37 +1,67 @@
-<div align="center">
-    <h1>Comet Notes ☄️</h1>
-    <a href="https://github.com/nodetec/comet/releases/latest">
-      <img alt="Latest release" src="https://img.shields.io/github/v/release/nodetec/comet?style=for-the-badge&logo=starship&color=C9CBFF&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/comet/pulse">
-      <img alt="Last commit" src="https://img.shields.io/github/last-commit/nodetec/comet?style=for-the-badge&logo=starship&color=8bd5ca&logoColor=D9E0EE&labelColor=302D41"/>
-    </a>
-    <a href="https://github.com/nodetec/comet/stargazers">
-      <img alt="Stars" src="https://img.shields.io/github/stars/nodetec/comet?style=for-the-badge&logo=starship&color=c69ff5&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/comet/issues">
-      <img alt="Issues" src="https://img.shields.io/github/issues/nodetec/comet?style=for-the-badge&logo=bilibili&color=F5E0DC&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
-    <a href="https://github.com/nodetec/comet">
-      <img alt="Repo size" src="https://img.shields.io/github/repo-size/nodetec/comet?color=%23DDB6F2&label=SIZE&logo=codesandbox&style=for-the-badge&logoColor=D9E0EE&labelColor=302D41" />
-    </a>
+# Comet
 
-</div>
+Comet is a desktop app for taking and publishing notes for nostr.
 
-![demo](https://private-user-images.githubusercontent.com/29136904/342766691-5ccfc513-665d-4231-9962-52443a00639c.gif?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MjA0OTczOTMsIm5iZiI6MTcyMDQ5NzA5MywicGF0aCI6Ii8yOTEzNjkwNC8zNDI3NjY2OTEtNWNjZmM1MTMtNjY1ZC00MjMxLTk5NjItNTI0NDNhMDA2MzljLmdpZj9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA3MDklMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNzA5VDAzNTEzM1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTU0ZDA4NmE4ZmMwYTY0M2M0OTJjODRiZTBhODZlZTkwYzFiNWJiM2NiNjZiNjlmMDQ5YzBiYjU3ZmM4ODE4ZjgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.sQvPZ7pIRBhQodFBgUwnjrfjaRxYu77MJZNuXJtHjCo)
+## Development
 
-[Comet Notes](https://comet.md/ "Comet Notes") is a note-taking app with [Nostr](https://nostr.com/ "Nostr") integration.
+### Keep go modules up to date
 
-## Download
-
-You can download the app from the [Comet Notes](https://comet.md/ "Comet Notes") website.
-
-You can also download Comet Notes by navigating to the [Releases](https://github.com/nodetec/comet/releases "Releases") page and clicking on the release you want to download.
-
-## Contribute
-
-To install the dependencies and start the app in development mode, run the following command:
-
-```bash
-wails3 dev
+```sh
+go mod tidy
 ```
+
+## Getting Started
+
+1. Navigate to your project directory in the terminal.
+
+2. To run your application in development mode, use the following command:
+
+   ```
+   wails3 dev
+   ```
+
+   This will start your application and enable hot-reloading for both frontend and backend changes.
+
+3. To build your application for production, use:
+
+   ```
+   wails3 build
+   ```
+
+   This will create a production-ready executable in the `build` directory.
+
+## Exploring Wails3 Features
+
+Now that you have your project set up, it's time to explore the features that Wails3 offers:
+
+1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+
+2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+
+   ```
+   go run .
+   ```
+
+   Note: Some examples may be under development during the alpha phase.
+
+3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3alpha.wails.io/) for in-depth guides and API references.
+
+4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+
+## Project Structure
+
+Take a moment to familiarize yourself with your project structure:
+
+- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
+- `main.go`: The entry point of your Go backend
+- `app.go`: Define your application structure and methods here
+- `wails.json`: Configuration file for your Wails project
+
+## Next Steps
+
+1. Modify the frontend in the `frontend/` directory to create your desired UI.
+2. Add backend functionality in `main.go`.
+3. Use `wails3 dev` to see your changes in real-time.
+4. When ready, build your application with `wails3 build`.
+
+Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.

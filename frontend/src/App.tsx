@@ -3,51 +3,49 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
+import { EllipsisVerticalIcon } from "lucide-react";
 
-import { Editor } from "./features/editor";
-import { EditorDropdown } from "./features/editor-dropdown";
-import { Notes } from "./features/notes";
-import { SettingsBtn } from "./features/settings";
+import { Button } from "./components/ui/button";
+import { Editor, PublishDialog } from "./features/editor";
+import { NoteList, NotesHeader, SearchBox } from "./features/notes";
 import { Sidebar } from "./features/sidebar";
-import useNoteMenu from "./hooks/useNoteMenu";
-import useNoteTagMenu from "./hooks/useNoteTagMenu";
-import useSettingsRefresh from "./hooks/useSettingsRefresh";
-import useTagMenu from "./hooks/useTagMenu";
-import useTrashNoteMenu from "./hooks/useTrashNoteMenu";
-import { useAppState } from "./store";
+import useNotebookEvents from "./hooks/useNotebookEvents";
+import useNoteEvents from "./hooks/useNoteEvents";
 
-export default function App() {
-  useNoteMenu();
-  useTagMenu();
-  useNoteTagMenu();
-  useTrashNoteMenu();
-  useSettingsRefresh();
-
-  const editorFullScreen = useAppState((state) => state.editorFullScreen);
+export default function ResizableLayout() {
+  useNoteEvents();
+  useNotebookEvents();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
       <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         <ResizablePanel
-          hidden={editorFullScreen}
-          className="min-w-44"
-          defaultSize={18}
-          minSize={18}
+          className="min-w-44 select-none"
+          defaultSize={18.5}
+          minSize={18.5}
+          maxSize={20}
         >
-          <Sidebar Settings={SettingsBtn} />
+          <Sidebar />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel
-          hidden={editorFullScreen}
-          className="min-w-60"
+          className="flex h-full min-w-60 select-none flex-col"
           defaultSize={26}
           minSize={26}
         >
-          <Notes />
+          <NotesHeader />
+          <SearchBox />
+          <NoteList />
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          <Editor EditorDropdown={EditorDropdown} />
+          <div className="flex justify-end p-2">
+            <PublishDialog />
+            <Button type="button" variant="ghost" size="icon">
+              <EllipsisVerticalIcon />
+            </Button>
+          </div>
+          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

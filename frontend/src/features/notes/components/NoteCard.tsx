@@ -1,4 +1,8 @@
-import { Note } from "&/github.com/nodetec/comet/db/models";
+import { useState } from "react";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { type Note } from "&/comet/backend/db/schemas";
+import { AppService } from "&/comet/backend/service";
 import { Separator } from "~/components/ui/separator";
 import { parseContent } from "~/lib/markdown";
 import { cn, fromNow } from "~/lib/utils";
@@ -6,15 +10,21 @@ import { useAppState } from "~/store";
 
 type Props = {
   note: Note;
+  index: number;
+  length: number;
 };
 
-export default function NoteCard({ note }: Props) {
-  const activeNote = useAppState((state) => state.activeNote);
-  const setActiveNote = useAppState((state) => state.setActiveNote);
+export function NoteCard({ note, index, length }: Props) {
+  const queryClient = useQueryClient();
 
-  function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
+  const feedType = useAppState((state) => state.feedType);
+
+  async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
-    setActiveNote(note);
+    if (note.Active) return;
+    await AppService.SetActiveNote(note.ID);
+    await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
+    await queryClient.invalidateQueries({ queryKey: ["notes"] });
   }
 
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -26,7 +36,7 @@ export default function NoteCard({ note }: Props) {
       <button
         className={cn(
           "flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm transition-all",
-          activeNote?.ID === note.ID && "bg-muted/70",
+          note.Active && "bg-muted/70",
         )}
       >
         <div
@@ -34,17 +44,22 @@ export default function NoteCard({ note }: Props) {
           onContextMenu={handleContextMenu}
           onClick={handleSetActiveNote}
           style={
-            {
-              "--custom-contextmenu": "noteMenu",
-              "--custom-contextmenu-data": `${note.ID}`,
-            } as React.CSSProperties
+            feedType === "trash"
+              ? ({
+                  "--custom-contextmenu": "trash_note_card",
+                  "--custom-contextmenu-data": `${JSON.stringify(note)}`,
+                } as React.CSSProperties)
+              : ({
+                  "--custom-contextmenu": "note_card",
+                  "--custom-contextmenu-data": `${JSON.stringify(note)}`,
+                } as React.CSSProperties)
           }
         >
           <div className="flex w-full flex-col gap-1.5">
             <h2 className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
               {note.Title}
             </h2>
-            <div className="mt-0 line-clamp-2 text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground">
+            <div className="mt-0 line-clamp-2 min-h-[3em] text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground">
               {parseContent(note.Content) || "No content \n "}
             </div>
             <span className="select-none text-xs text-muted-foreground/80">
@@ -54,7 +69,7 @@ export default function NoteCard({ note }: Props) {
         </div>
       </button>
       <div className="flex w-full flex-col items-center px-[0.30rem]">
-        <Separator decorative className="bg-border/30" />
+        {index < length - 1 && <Separator decorative className="bg-muted/30" />}
       </div>
     </div>
   );
