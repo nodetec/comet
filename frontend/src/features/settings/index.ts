@@ -1,1 +1,1 @@
-export { SettingsBtn } from "./components/SettingsBtn";
+export { Settings } from "./components/Settings";

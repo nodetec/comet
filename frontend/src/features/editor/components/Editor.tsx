@@ -1,80 +1,111 @@
-import { useState } from "react";
-
-import { useQuery } from "@tanstack/react-query";
-import { TagService } from "&/github.com/nodetec/comet/service";
-import { Button } from "~/components/ui/button";
+import { CodeNode } from "@lexical/code";
+import { HashtagNode } from "@lexical/hashtag";
+import { AutoLinkNode, LinkNode } from "@lexical/link";
+import { ListItemNode, ListNode } from "@lexical/list";
+import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
+import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
+import {
+  LexicalComposer,
+  type InitialConfigType,
+} from "@lexical/react/LexicalComposer";
+import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
+import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { useActiveNote } from "~/hooks/useActiveNote";
 import { useAppState } from "~/store";
-import { Eye } from "lucide-react";
+import { type EditorState, type LexicalEditor } from "lexical";
 
-import { CodeMirrorEditor } from "./CodeMirrorEditor";
-import { EditorHeader } from "./EditorHeader";
-import Preview from "./Preview";
-import ReadOnlyTagList from "./ReadOnlyTagList";
-import TagInput from "./TagInput";
+import { useSaveNote } from "../hooks/useSaveNote";
+import { CustomHashtagPlugin } from "../plugins/CustomHashtagPlugin";
+import { OnBlurPlugin } from "../plugins/OnBlurPlugin";
+import { OnChangeDebouncePlugin } from "../plugins/OnChangeDebouncePlugin";
+import DefaultTheme from "../themes/DefaultTheme";
 
-type Props = {
-  EditorDropdown: React.FC;
-};
+function onError(error: Error) {
+  console.error(error);
+}
 
-export const Editor = ({ EditorDropdown }: Props) => {
-  const [showPreview, setShowPreview] = useState(false);
-
+export function Editor() {
+  const saveNote = useSaveNote();
+  const { data: activeNote } = useActiveNote();
   const feedType = useAppState((state) => state.feedType);
-  const activeNote = useAppState((state) => state.activeNote);
-  const activeTrashNote = useAppState((state) => state.activeTrashNote);
 
-  // TODO
-  // Where should the errors and loading be taken care of?
-  async function fetchTags() {
-    const tags = await TagService.ListTags();
-    return tags;
-  }
+  const UPDATED_TRANSFORMERS = [...TRANSFORMERS];
 
-  const { data } = useQuery({
-    queryKey: ["tags"],
-    queryFn: () => fetchTags(),
-  });
-
-  if (
-    activeNote === undefined &&
-    (feedType === "all" || feedType === "notebook")
-  ) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-lg text-muted-foreground">
-          Something about notes...
-        </p>
-      </div>
-    );
-  }
-
-  if (activeTrashNote === undefined && feedType === "trash") {
+  if (!activeNote) {
     return null;
   }
 
+  function onBlur(event: FocusEvent, editor: LexicalEditor) {
+    saveNote.mutate({
+      note: activeNote,
+      editor,
+      transformers: UPDATED_TRANSFORMERS,
+    });
+  }
+
+  function onChange(editorState: EditorState) {
+    saveNote.mutate({
+      note: activeNote,
+      editor: editorState,
+      transformers: UPDATED_TRANSFORMERS,
+      shouldInvalidate: true,
+    });
+  }
+
+  const initialConfig: InitialConfigType = {
+    namespace: "CometEditor",
+    editorState: () =>
+      $convertFromMarkdownString(
+        activeNote?.Content ?? "",
+        UPDATED_TRANSFORMERS,
+        undefined,
+        true,
+      ),
+    nodes: [
+      HorizontalRuleNode,
+      QuoteNode,
+      HeadingNode,
+      CodeNode,
+      ListNode,
+      ListItemNode,
+      LinkNode,
+      AutoLinkNode,
+      HashtagNode,
+      // ImageNode,
+      // BannerNode,
+    ],
+
+    onError,
+    theme: DefaultTheme,
+    editable: feedType === "trash" ? false : true,
+  };
+
   return (
-    <div className="flex h-full flex-col">
-      <EditorHeader EditorDropdown={EditorDropdown} />
-      {!showPreview && <CodeMirrorEditor />}
-      {showPreview && <Preview />}
-      <div className="fixed bottom-[3.75rem] right-2.5 p-2">
-        <Button
-          id="editor-preview-btn"
-          name="editor-preview-btn"
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowPreview((prevShowPreview) => !prevShowPreview)}
-          className="rounded-full text-muted-foreground"
-        >
-          <Eye className="h-[1.2rem] w-[1.2rem]" />
-        </Button>
-      </div>
-      <div className="flex items-center justify-between">
-        {feedType === "trash"
-          ? activeTrashNote && <ReadOnlyTagList trashNote={activeTrashNote} />
-          : data && activeNote && <TagInput note={activeNote} tags={data} />}
-      </div>
+    <div className="h-full">
+      <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
+        <RichTextPlugin
+          contentEditable={
+            <ContentEditable className="h-full flex-grow select-text flex-col overflow-y-auto px-16 pb-80 caret-sky-500/90 focus-visible:outline-none" />
+          }
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+
+        {!activeNote.TrashedAt && (
+          <>
+            <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
+            <OnBlurPlugin onBlur={onBlur} />
+          </>
+        )}
+        <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
+        <HistoryPlugin />
+        <CustomHashtagPlugin />
+        <AutoFocusPlugin />
+      </LexicalComposer>
     </div>
   );
-};
+}

@@ -1,52 +1,58 @@
-import { useQuery } from "@tanstack/react-query";
-import {
-  NotebookService,
-  Tag,
-  TagService,
-} from "&/github.com/nodetec/comet/service";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { useTags } from "~/hooks/useTags";
 import { useAppState } from "~/store";
-import { TagsIcon } from "lucide-react";
+import { useInView } from "react-intersection-observer";
+
 import { TagItem } from "./TagItem";
 
 export function Tags() {
-  const activeNotebook = useAppState((state) => state.activeNotebook);
+  const { data: tags, status } = useTags();
 
-  const { isPending, data } = useQuery({
-    queryKey: ["tags", activeNotebook?.ID],
-    queryFn: () => fetchTags(),
+  const setLastTagVisible = useAppState((state) => state.setLastTagVisible);
+
+  const { ref: lastTagRef } = useInView({
+    threshold: 1,
+    onChange: (inView) => {
+      if (inView) {
+        setLastTagVisible(true);
+      } else {
+        setLastTagVisible(false);
+      }
+    },
   });
 
-  async function fetchTags() {
-    let tags: Tag[] = [];
-
-    if (!activeNotebook) {
-      tags = await TagService.ListTags();
-    } else {
-      tags = await NotebookService.GetTagsForNotebook(activeNotebook.ID);
-    }
-
-    return tags;
+  if (status === "pending") {
+    return undefined;
   }
 
-  if (isPending) return <div>Loading...</div>;
+  if (status === "error") {
+    return <div>Error fetching tags</div>;
+  }
 
   return (
     <Accordion type="single" collapsible defaultValue="item-1">
-      <AccordionItem className="border-none px-2" value="item-1">
-        <AccordionTrigger className="py-1.5">
-          <div className="flex items-center text-muted-foreground">
-            <TagsIcon className="h-[1.1rem] w-[1.1rem]" />
-            <span className="ml-1.5">Tags</span>
+      <AccordionItem className="border-none" value="item-1">
+        <AccordionTrigger className="pb-1.5 pt-3 hover:no-underline">
+          <div className="flex items-center text-secondary-foreground">
+            <div className="ml-1 text-xs text-muted-foreground">Tags</div>
           </div>
         </AccordionTrigger>
-        <AccordionContent>
-          {data?.map((tag) => <TagItem key={tag.ID} tag={tag} />)}
+        <AccordionContent className="pl-3">
+          <div className="flex flex-wrap gap-2 pt-2">
+            {tags?.map((tag, index) => {
+              const isLastTag = index === tags.length - 1;
+              return (
+                <div key={tag.ID} ref={isLastTag ? lastTagRef : null}>
+                  <TagItem tag={tag} />
+                </div>
+              );
+            })}
+          </div>
         </AccordionContent>
       </AccordionItem>
     </Accordion>
