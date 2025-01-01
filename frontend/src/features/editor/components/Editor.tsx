@@ -3,7 +3,6 @@ import { HashtagNode } from "@lexical/hashtag";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
-import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import {
   LexicalComposer,
   type InitialConfigType,
@@ -17,7 +16,7 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { useActiveNote } from "~/hooks/useActiveNote";
 import { useAppState } from "~/store";
-import { type EditorState, type LexicalEditor } from "lexical";
+import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
 
 import { useSaveNote } from "../hooks/useSaveNote";
 import { CustomHashtagPlugin } from "../plugins/CustomHashtagPlugin";
@@ -57,15 +56,19 @@ export function Editor() {
     });
   }
 
+  function getInitalContent() {
+    $convertFromMarkdownString(
+      activeNote?.Content ?? "",
+      UPDATED_TRANSFORMERS,
+      undefined,
+      false,
+    );
+    $setSelection(null);
+  }
+
   const initialConfig: InitialConfigType = {
     namespace: "CometEditor",
-    editorState: () =>
-      $convertFromMarkdownString(
-        activeNote?.Content ?? "",
-        UPDATED_TRANSFORMERS,
-        undefined,
-        false,
-      ),
+    editorState: () => getInitalContent(),
     nodes: [
       HorizontalRuleNode,
       QuoteNode,
@@ -90,7 +93,7 @@ export function Editor() {
       <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
         <RichTextPlugin
           contentEditable={
-            <ContentEditable className="h-full flex-grow select-text flex-col overflow-y-auto px-16 pb-80 caret-sky-500/90 focus-visible:outline-none" />
+            <ContentEditable className="h-full cursor-text select-text flex-col overflow-y-auto px-16 pb-80 caret-sky-500/90 focus-visible:outline-none" />
           }
           ErrorBoundary={LexicalErrorBoundary}
         />
@@ -104,7 +107,6 @@ export function Editor() {
         <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
         <HistoryPlugin />
         <CustomHashtagPlugin />
-        <AutoFocusPlugin />
       </LexicalComposer>
     </div>
   );
