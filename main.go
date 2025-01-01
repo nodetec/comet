@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"comet/backend/db"
+	"comet/backend/events" // Import the events package
 	"comet/backend/menus"
 	"comet/backend/service"
 )
@@ -36,6 +37,9 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	// Initialize the event system
+	events.Init(app)
 
 	app.NewWebviewWindowWithOptions(application.WebviewWindowOptions{
 		Title:     "Comet",
