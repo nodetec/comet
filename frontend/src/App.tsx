@@ -39,13 +39,15 @@ export default function ResizableLayout() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          <div className="flex justify-end p-2">
-            <PublishDialog />
-            <Button type="button" variant="ghost" size="icon">
-              <EllipsisVerticalIcon />
-            </Button>
+          <div className="flex h-screen flex-col">
+            <div className="flex justify-end p-2">
+              <PublishDialog />
+              <Button type="button" variant="ghost" size="icon">
+                <EllipsisVerticalIcon />
+              </Button>
+            </div>
+            <Editor />
           </div>
-          <Editor />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

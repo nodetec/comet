@@ -14,6 +14,7 @@ import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import { useActiveNote } from "~/hooks/useActiveNote";
 import { useAppState } from "~/store";
 import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
@@ -89,25 +90,25 @@ export function Editor() {
   };
 
   return (
-    <div className="h-full">
-      <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
-        <RichTextPlugin
-          contentEditable={
-            <ContentEditable className="h-full cursor-text select-text flex-col overflow-y-auto px-16 pb-80 caret-sky-500/90 focus-visible:outline-none" />
-          }
-          ErrorBoundary={LexicalErrorBoundary}
-        />
+    <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
+      <RichTextPlugin
+        contentEditable={
+          <ScrollArea>
+            <ContentEditable className="min-h-[95svh] cursor-text select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
+          </ScrollArea>
+        }
+        ErrorBoundary={LexicalErrorBoundary}
+      />
 
-        {!activeNote.TrashedAt && (
-          <>
-            <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
-            <OnBlurPlugin onBlur={onBlur} />
-          </>
-        )}
-        <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
-        <HistoryPlugin />
-        <CustomHashtagPlugin />
-      </LexicalComposer>
-    </div>
+      {!activeNote.TrashedAt && (
+        <>
+          <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
+          <OnBlurPlugin onBlur={onBlur} />
+        </>
+      )}
+      <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
+      <HistoryPlugin />
+      <CustomHashtagPlugin />
+    </LexicalComposer>
   );
 }
