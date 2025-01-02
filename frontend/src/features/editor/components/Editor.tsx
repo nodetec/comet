@@ -23,6 +23,7 @@ import { useSaveNote } from "../hooks/useSaveNote";
 import { CustomHashtagPlugin } from "../plugins/CustomHashtagPlugin";
 import { OnBlurPlugin } from "../plugins/OnBlurPlugin";
 import { OnChangeDebouncePlugin } from "../plugins/OnChangeDebouncePlugin";
+import { ScrollCenterCurrentLinePlugin } from "../plugins/ScrollCenterCurrentLinePlugin";
 import DefaultTheme from "../themes/DefaultTheme";
 
 function onError(error: Error) {
@@ -94,7 +95,7 @@ export function Editor() {
       <RichTextPlugin
         contentEditable={
           <ScrollArea>
-            <ContentEditable className="min-h-[95svh] cursor-text select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
+            <ContentEditable className="min-h-svh flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}
@@ -109,6 +110,7 @@ export function Editor() {
       <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
       <HistoryPlugin />
       <CustomHashtagPlugin />
+      <ScrollCenterCurrentLinePlugin />
     </LexicalComposer>
   );
 }
