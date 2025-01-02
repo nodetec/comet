@@ -76,40 +76,31 @@ async function saveNote(
   queryClient: QueryClient,
   shouldInvalidate: boolean,
 ) {
-  console.log("Saving note");
   if (!note) {
     console.error("No active note found");
     return;
   }
-  console.log("Note ID", note.ID);
 
   await editor.read(async () => {
     const markdownText = $convertToMarkdownString(transformers);
 
-    console.log("Markdown text", markdownText);
 
     // TODO: only do this on blur
     const noteToUpdate = await AppService.GetNoteByID(note.ID);
-    console.log("here 1");
 
     if (noteToUpdate?.Content === markdownText) {
-      console.log("Note content has not changed");
+      // console.log("Note content has not changed");
       return;
     }
-    console.log("here 2");
 
     note.Content = markdownText;
     note.Title = parseTitle(markdownText);
     await AppService.UpdateNote(note);
-    console.log("here 3");
 
     const tags = extractTags(markdownText);
-    console.log("here 4");
 
     await AppService.CreateTags(note.ID, tags);
-    console.log("here 5");
 
-    console.log("Note saved successfully");
     if (shouldInvalidate) {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       void queryClient.invalidateQueries({ queryKey: ["tags"] });

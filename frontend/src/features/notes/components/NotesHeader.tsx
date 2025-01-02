@@ -1,6 +1,6 @@
 import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
-import { ChevronDown, PenBoxIcon } from "lucide-react";
+import { PenBoxIcon } from "lucide-react";
 
 import { useCreateNote } from "../hooks/useCreateNote";
 
