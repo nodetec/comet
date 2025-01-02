@@ -51,7 +51,13 @@ export function OnChangeDebouncePlugin({
         },
       );
     }
-  }, [editor, ignoreHistoryMergeTagChange, ignoreSelectionChange, onChange, debounceTime]);
+  }, [
+    editor,
+    ignoreHistoryMergeTagChange,
+    ignoreSelectionChange,
+    onChange,
+    debounceTime,
+  ]);
 
   return null;
 }
