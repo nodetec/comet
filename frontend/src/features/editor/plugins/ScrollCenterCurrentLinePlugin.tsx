@@ -48,9 +48,9 @@ export const ScrollCenterCurrentLinePlugin = ({
                 const threshold = viewportHeight * (viewportPercentage / 100);
 
                 if (cursorPosition > viewportHeight - threshold) {
-                  console.log(
-                    `Cursor is in the bottom ${viewportPercentage}% of the viewport`,
-                  );
+                  // console.log(
+                  //   `Cursor is in the bottom ${viewportPercentage}% of the viewport`,
+                  // );
                   requestAnimationFrame(() => {
                     currentLineRef.current = blockElement as HTMLDivElement;
                     currentLineRef.current.scrollIntoView({
