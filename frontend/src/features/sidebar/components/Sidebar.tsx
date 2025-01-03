@@ -7,6 +7,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Settings } from "~/features/settings";
+import { useTags } from "~/hooks/useTags";
 import { cn } from "~/lib/utils";
 import { useAppState } from "~/store";
 import { Settings2Icon, UserCircleIcon } from "lucide-react";
@@ -20,6 +21,8 @@ import { TrashBtn } from "./TrashBtn";
 export function Sidebar() {
   const setSettingsTab = useAppState((state) => state.setSettingsTab);
   const lastTagVisible = useAppState((state) => state.lastTagVisible);
+  const tags = useTags();
+  const tagsCount = tags.data?.length ?? 0;
 
   return (
     <div className="flex h-full flex-col justify-between bg-secondary pt-2">
@@ -46,7 +49,7 @@ export function Sidebar() {
       <ScrollArea
         className={cn(
           "flex h-full flex-col gap-y-2",
-          !lastTagVisible && "border-b",
+          !lastTagVisible && tagsCount > 0 && "border-b",
         )}
       >
         <div className="flex flex-col gap-y-1 px-3">
