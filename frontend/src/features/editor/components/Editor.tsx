@@ -94,8 +94,8 @@ export function Editor() {
     <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
       <RichTextPlugin
         contentEditable={
-          <ScrollArea>
-            <ContentEditable className="min-h-svh flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
+          <ScrollArea type="scroll">
+            <ContentEditable className="min-h-[calc(100vh-4rem)] flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}

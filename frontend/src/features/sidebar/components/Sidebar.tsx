@@ -47,6 +47,7 @@ export function Sidebar() {
       </div>
 
       <ScrollArea
+        type="scroll"
         className={cn(
           "flex h-full flex-col gap-y-2",
           !lastTagVisible && tagsCount > 0 && "border-b",

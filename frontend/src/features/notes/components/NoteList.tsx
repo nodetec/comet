@@ -26,7 +26,7 @@ export const NoteList = () => {
   }
 
   return (
-    <ScrollArea className="h-screen">
+    <ScrollArea type="scroll" className="h-screen">
       {data.pages.map((page, pageIndex) => (
         <div className="flex flex-col items-center px-3" key={pageIndex}>
           {page.data.map((note, noteIndex) => (

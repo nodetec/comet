@@ -4,6 +4,7 @@ import { AppService } from "&/comet/backend/service";
 type QueryKey = [string, number | undefined];
 
 async function fetchNoteTags({ queryKey }: QueryFunctionContext<QueryKey>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_, noteId] = queryKey;
   if (!noteId) {
     return null;

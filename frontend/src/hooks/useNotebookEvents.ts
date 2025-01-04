@@ -24,11 +24,11 @@ const useNotebookEvents = () => {
       });
     };
 
-    const onNotebookDeleted = (event: WailsEvent) => {
+    const onNotebookDeleted = (_: WailsEvent) => {
       refresh();
     };
 
-    const onActiveNotebookDeleted = (event: WailsEvent) => {
+    const onActiveNotebookDeleted = (_: WailsEvent) => {
       setFeedType("all");
       setActiveNotebook(undefined);
       refresh();

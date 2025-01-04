@@ -8,7 +8,7 @@ const useNoteEvents = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const refresh = (event: WailsEvent) => {
+    const refresh = (_: WailsEvent) => {
       console.log("refreshing notes");
       void queryClient.invalidateQueries({
         queryKey: ["notes"],
