@@ -75,6 +75,7 @@ export function NewNotebookDialog() {
                 handleCreate();
               }
             }}
+            autoFocus
           />
           {/* <div className="flex items-center space-x-2">
             <Checkbox
