@@ -65,7 +65,7 @@ export function Editor() {
       undefined,
       false,
     );
-    if (activeNote?.Content !== "# ") {
+    if (activeNote?.Content !== "# " && activeNote?.Content !== "") {
       $setSelection(null);
     }
   }
