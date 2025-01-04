@@ -20,14 +20,12 @@ import { toast } from "sonner";
 
 export function NewNotebookDialog() {
   const [name, setName] = useState("");
-  //   const [pinned, setPinned] = useState<CheckedState>(true);
-  const pinned = true;
   const [isOpen, setIsOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
   const handleCreate = async () => {
-    console.log({ name, pinned });
+    console.log({ name });
 
     if (name.trim() === "") {
       return;
@@ -42,12 +40,11 @@ export function NewNotebookDialog() {
       return;
     }
 
-    if (typeof pinned === "boolean") {
-      await AppService.CreateNotebook(trimmedName, pinned);
-      await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
-      toast.success("Notebook created successfully");
-      setIsOpen(false);
-    }
+    await AppService.CreateNotebook(trimmedName);
+    await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
+    toast.success("Notebook created successfully");
+    setIsOpen(false);
+    setName(""); // Clear the input field
   };
 
   return (
@@ -73,6 +70,11 @@ export function NewNotebookDialog() {
             placeholder="Notebook Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleCreate();
+              }
+            }}
           />
           {/* <div className="flex items-center space-x-2">
             <Checkbox

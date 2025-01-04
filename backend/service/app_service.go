@@ -132,8 +132,8 @@ func (s *AppService) GetTagsByNoteID(noteID int) ([]models.Tag, error) {
 }
 
 // CreateNotebook inserts a new notebook into the database
-func (s *AppService) CreateNotebook(name string, pinned bool) error {
-	return notebooks.CreateNotebook(name, pinned) // Use notebooks package
+func (s *AppService) CreateNotebook(name string) error {
+	return notebooks.CreateNotebook(name) // Use notebooks package
 }
 
 // GetNotebooks retrieves all notebooks from the database

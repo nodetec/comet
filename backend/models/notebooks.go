@@ -6,7 +6,7 @@ type Notebook struct {
 	Name         string `db:"name"`
 	CreatedAt    string `db:"created_at"`
 	ModifiedAt   string `db:"modified_at"`
-	PinnedAt     bool   `db:"pinned_at"`
+	PinnedAt     string `db:"pinned_at"`
 	DisplayOrder int    `db:"display_order"`
 	Active       bool   `db:"active"`
 }

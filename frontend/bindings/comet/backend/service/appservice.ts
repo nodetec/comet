@@ -59,8 +59,8 @@ export function CreateNote(title: string, content: string): Promise<models$0.Not
 /**
  * CreateNotebook inserts a new notebook into the database
  */
-export function CreateNotebook(name: string, pinned: boolean): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(882431131, name, pinned) as any;
+export function CreateNotebook(name: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(882431131, name) as any;
     return $resultPromise;
 }
 
