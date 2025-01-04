@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
 import { useRelays } from "~/hooks/useRelays";
 import { useAppState } from "~/store";
 
+import { NotebookSettings } from "./NotebookSettings";
 // import { EditorSettings } from "./EditorSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { RelaySettings } from "./RelaySettings";
@@ -33,6 +34,12 @@ export function Settings({ children }: Props) {
           >
             Relays
           </span>
+          <span
+            className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${settingsTab === "notebooks" && "bg-muted text-secondary-foreground"}`}
+            onClick={() => setSettingsTab("notebooks")}
+          >
+            Notebooks
+          </span>
           {/* <span
           className={`flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${settingsTab === "editor" && "bg-muted text-secondary-foreground"}`}
           onClick={() => setSettingsTab("editor")}
@@ -42,6 +49,7 @@ export function Settings({ children }: Props) {
         </div>
         <div className="flex w-full flex-col overflow-auto px-12 pt-4">
           {settingsTab === "profile" && <ProfileSettings />}
+          {settingsTab === "notebooks" && <NotebookSettings />}
           {settingsTab === "relays" && relays.data && (
             <RelaySettings relays={relays.data} />
           )}

@@ -33,9 +33,9 @@ interface State {
   editorFullScreen: boolean;
   setEditorFullScreen: (editorFullScreen: boolean) => void;
 
-  settingsTab: "profile" | "appearance" | "relays" | "editor";
+  settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks";
   setSettingsTab: (
-    settingsTab: "profile" | "appearance" | "relays" | "editor",
+    settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks",
   ) => void;
 
   isSelectNotebookDialogOpen: boolean;

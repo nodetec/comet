@@ -72,7 +72,7 @@ export function NewNotebookDialog() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                handleCreate();
+                void handleCreate();
               }
             }}
             autoFocus

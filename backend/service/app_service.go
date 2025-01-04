@@ -176,6 +176,16 @@ func (s *AppService) GetActiveNotebook() (*models.Notebook, error) {
 	return notebooks.GetActiveNotebook() // Use notebooks package
 }
 
+// ShowNotebook sets the pinned_at to the current timestamp to show the notebook
+func (s *AppService) ShowNotebook(id int) error {
+	return notebooks.ShowNotebook(id) // Use notebooks package
+}
+
+// HideNotebook sets the pinned_at to NULL to hide the notebook
+func (s *AppService) HideNotebook(id int) error {
+	return notebooks.HideNotebook(id) // Use notebooks package
+}
+
 // CreateUser inserts a new user into the database
 func (s *AppService) CreateUser(nsec, npub string, active bool) (*models.User, error) {
 	return users.CreateUser(nsec, npub, active) // Use users package

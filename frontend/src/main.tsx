@@ -10,7 +10,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "~/components/ui/sonner";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  // defaultOptions: {
+  //   queries: {
+  //     placeholderData: (prev) => prev,
+  //   },
+  // },
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -301,6 +301,14 @@ export function GetUserByID(id: number): Promise<models$0.User | null> & { cance
 }
 
 /**
+ * HideNotebook sets the pinned_at to NULL to hide the notebook
+ */
+export function HideNotebook(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1490066047, id) as any;
+    return $resultPromise;
+}
+
+/**
  * PinNote pins a note by its ID
  */
 export function PinNote(id: number): Promise<void> & { cancel(): void } {
@@ -373,6 +381,14 @@ export function SetTagActive(tagID: number, active: boolean): Promise<void> & { 
  */
 export function SetTagInactive(tagID: number): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2142607883, tagID) as any;
+    return $resultPromise;
+}
+
+/**
+ * ShowNotebook sets the pinned_at to the current timestamp to show the notebook
+ */
+export function ShowNotebook(id: number): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(472606830, id) as any;
     return $resultPromise;
 }
 

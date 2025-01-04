@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Relay } from "&/comet/backend/models/models";
+import { type Relay } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { Button } from "~/components/ui/button";
 import {

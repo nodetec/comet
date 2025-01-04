@@ -93,7 +93,7 @@ export class Notebook {
     "Name": string;
     "CreatedAt": string;
     "ModifiedAt": string;
-    "PinnedAt": string;
+    "PinnedAt": string | null;
     "DisplayOrder": number;
     "Active": boolean;
 
@@ -112,7 +112,7 @@ export class Notebook {
             this["ModifiedAt"] = "";
         }
         if (!("PinnedAt" in $$source)) {
-            this["PinnedAt"] = "";
+            this["PinnedAt"] = null;
         }
         if (!("DisplayOrder" in $$source)) {
             this["DisplayOrder"] = 0;
