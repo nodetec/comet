@@ -2,12 +2,12 @@ package users
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 )
 
-func CreateUser(nsec, npub string, active bool) (*schemas.User, error) {
-	user := &schemas.User{
+func CreateUser(nsec, npub string, active bool) (*models.User, error) {
+	user := &models.User{
 		Nsec:   nsec,
 		Npub:   npub,
 		Active: active,

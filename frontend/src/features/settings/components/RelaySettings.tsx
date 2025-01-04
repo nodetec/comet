@@ -1,17 +1,10 @@
 import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type Relay } from "&/comet/backend/db/schemas";
+import { useQueryClient } from "@tanstack/react-query";
+import { Relay } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
 import {
   Form,
   FormControl,
@@ -24,17 +17,6 @@ import { PlusIcon, X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-
-// TODO
-// Where should the errors and loading be taken of?
-async function createRelay(
-  URL: string,
-  read: boolean,
-  write: boolean,
-  sync: boolean,
-) {
-  // await RelayService.CreateRelay(url, read, write, sync);
-}
 
 const nostrFormSchema = z.object({
   relays: z.array(

@@ -2,7 +2,7 @@ package notes
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 	"regexp"
 )
@@ -24,7 +24,7 @@ func RestoreNote(id int) error {
 	}
 
 	// Get the note content and notebook ID
-	var note schemas.Note
+	var note models.Note
 	err = tx.QueryRow("SELECT content, notebook_id FROM notes WHERE id = ?", id).Scan(&note.Content, &note.NotebookID)
 	if err != nil {
 		tx.Rollback()

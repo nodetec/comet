@@ -15,10 +15,11 @@ export class Note {
     "Title": string;
     "CreatedAt": string;
     "ModifiedAt": string;
+    "ContentModifiedAt": string;
     "PublishedAt": string | null;
     "EventAddress": string | null;
     "Identifier": string | null;
-    "Pinned": boolean;
+    "PinnedAt": string | null;
     "TrashedAt": string | null;
     "ArchivedAt": string | null;
     "Active": boolean;
@@ -44,6 +45,9 @@ export class Note {
         if (!("ModifiedAt" in $$source)) {
             this["ModifiedAt"] = "";
         }
+        if (!("ContentModifiedAt" in $$source)) {
+            this["ContentModifiedAt"] = "";
+        }
         if (!("PublishedAt" in $$source)) {
             this["PublishedAt"] = null;
         }
@@ -53,8 +57,8 @@ export class Note {
         if (!("Identifier" in $$source)) {
             this["Identifier"] = null;
         }
-        if (!("Pinned" in $$source)) {
-            this["Pinned"] = false;
+        if (!("PinnedAt" in $$source)) {
+            this["PinnedAt"] = null;
         }
         if (!("TrashedAt" in $$source)) {
             this["TrashedAt"] = null;
@@ -89,7 +93,8 @@ export class Notebook {
     "Name": string;
     "CreatedAt": string;
     "ModifiedAt": string;
-    "Pinned": boolean;
+    "PinnedAt": boolean;
+    "DisplayOrder": number;
     "Active": boolean;
 
     /** Creates a new Notebook instance. */
@@ -106,8 +111,11 @@ export class Notebook {
         if (!("ModifiedAt" in $$source)) {
             this["ModifiedAt"] = "";
         }
-        if (!("Pinned" in $$source)) {
-            this["Pinned"] = false;
+        if (!("PinnedAt" in $$source)) {
+            this["PinnedAt"] = false;
+        }
+        if (!("DisplayOrder" in $$source)) {
+            this["DisplayOrder"] = 0;
         }
         if (!("Active" in $$source)) {
             this["Active"] = false;

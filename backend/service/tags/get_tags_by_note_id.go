@@ -2,13 +2,13 @@ package tags
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 )
 
 // GetTagsByNoteID retrieves all tags associated with a specific note ID
-func GetTagsByNoteID(noteID int) ([]schemas.Tag, error) {
-	var tags []schemas.Tag
+func GetTagsByNoteID(noteID int) ([]models.Tag, error) {
+	var tags []models.Tag
 	query := `
 		SELECT tags.* FROM tags
 		JOIN notes_tags ON tags.id = notes_tags.tag_id

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { type Tag } from "&/comet/backend/db/schemas";
+import { Tag } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
 

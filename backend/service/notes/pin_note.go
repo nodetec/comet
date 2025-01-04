@@ -7,7 +7,7 @@ import (
 
 // PinNote pins a note by its ID
 func PinNote(id int) error {
-	_, err := db.DB.Exec("UPDATE notes SET pinned = 1 WHERE id = ?", id)
+	_, err := db.DB.Exec("UPDATE notes SET pinned_at = CURRENT_TIMESTAMP WHERE id = ?", id)
 	if err != nil {
 		log.Printf("Failed to pin note: %v", err)
 		return err

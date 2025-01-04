@@ -7,18 +7,10 @@ import {Call as $Call, Create as $Create} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as schemas$0 from "../db/schemas/models.js";
+import * as models$0 from "../models/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as relays$0 from "./relays/models.js";
-
-/**
- * ArchiveNote archives a note by its ID
- */
-export function ArchiveNote(id: number): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(902761560, id) as any;
-    return $resultPromise;
-}
 
 /**
  * CheckNotebookExists checks if a notebook with the given name already exists in the database
@@ -55,7 +47,7 @@ export function ClearActiveTags(): Promise<void> & { cancel(): void } {
 /**
  * CreateNote inserts a new note into the database and returns the created note
  */
-export function CreateNote(title: string, content: string): Promise<schemas$0.Note | null> & { cancel(): void } {
+export function CreateNote(title: string, content: string): Promise<models$0.Note | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3783994422, title, content) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
@@ -75,7 +67,7 @@ export function CreateNotebook(name: string, pinned: boolean): Promise<void> & {
 /**
  * CreateRelay inserts a new relay into the database and returns the created relay
  */
-export function CreateRelay(url: string, read: boolean, write: boolean, sync: boolean): Promise<schemas$0.Relay | null> & { cancel(): void } {
+export function CreateRelay(url: string, read: boolean, write: boolean, sync: boolean): Promise<models$0.Relay | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2667641403, url, read, write, sync) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType3($result);
@@ -103,7 +95,7 @@ export function CreateTags(noteId: number, tagList: string[]): Promise<void> & {
 /**
  * CreateUser inserts a new user into the database
  */
-export function CreateUser(nsec: string, npub: string, active: boolean): Promise<schemas$0.User | null> & { cancel(): void } {
+export function CreateUser(nsec: string, npub: string, active: boolean): Promise<models$0.User | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2530128525, nsec, npub, active) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType5($result);
@@ -155,7 +147,7 @@ export function DeleteUser(id: number): Promise<void> & { cancel(): void } {
 /**
  * GetActiveNote retrieves the active note from the database
  */
-export function GetActiveNote(): Promise<schemas$0.Note | null> & { cancel(): void } {
+export function GetActiveNote(): Promise<models$0.Note | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2175076152) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
@@ -167,7 +159,7 @@ export function GetActiveNote(): Promise<schemas$0.Note | null> & { cancel(): vo
 /**
  * GetActiveNotebook retrieves the active notebook from the database
  */
-export function GetActiveNotebook(): Promise<schemas$0.Notebook | null> & { cancel(): void } {
+export function GetActiveNotebook(): Promise<models$0.Notebook | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2283957325) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType7($result);
@@ -179,7 +171,7 @@ export function GetActiveNotebook(): Promise<schemas$0.Notebook | null> & { canc
 /**
  * GetActiveUser retrieves the active user from the database
  */
-export function GetActiveUser(): Promise<schemas$0.User | null> & { cancel(): void } {
+export function GetActiveUser(): Promise<models$0.User | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2477491471) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType5($result);
@@ -191,7 +183,7 @@ export function GetActiveUser(): Promise<schemas$0.User | null> & { cancel(): vo
 /**
  * GetAllRelays retrieves all relays from the database
  */
-export function GetAllRelays(): Promise<(schemas$0.Relay | null)[]> & { cancel(): void } {
+export function GetAllRelays(): Promise<(models$0.Relay | null)[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2242042095) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType8($result);
@@ -201,21 +193,9 @@ export function GetAllRelays(): Promise<(schemas$0.Relay | null)[]> & { cancel()
 }
 
 /**
- * GetArchivedNotes retrieves all archived notes from the database
- */
-export function GetArchivedNotes(): Promise<schemas$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3503187217) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
-/**
  * GetNoteByID retrieves a single note by its ID
  */
-export function GetNoteByID(id: number): Promise<schemas$0.Note | null> & { cancel(): void } {
+export function GetNoteByID(id: number): Promise<models$0.Note | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2859106818, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType1($result);
@@ -227,7 +207,7 @@ export function GetNoteByID(id: number): Promise<schemas$0.Note | null> & { canc
 /**
  * GetNotebookByID retrieves a single notebook by its ID
  */
-export function GetNotebookByID(id: number): Promise<schemas$0.Notebook | null> & { cancel(): void } {
+export function GetNotebookByID(id: number): Promise<models$0.Notebook | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1987921963, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType7($result);
@@ -239,10 +219,10 @@ export function GetNotebookByID(id: number): Promise<schemas$0.Notebook | null> 
 /**
  * GetNotebooks retrieves all notebooks from the database
  */
-export function GetNotebooks(pinned: boolean): Promise<schemas$0.Notebook[]> & { cancel(): void } {
+export function GetNotebooks(pinned: boolean): Promise<models$0.Notebook[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(763701224, pinned) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType10($result);
+        return $$createType9($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -251,34 +231,10 @@ export function GetNotebooks(pinned: boolean): Promise<schemas$0.Notebook[]> & {
 /**
  * GetNotes retrieves all notes from the database with specified ordering, limit, offset, search, and trashed filter
  */
-export function GetNotes(orderBy: string, orderDirection: string, limit: number, offset: number, search: string, showTrashed: boolean): Promise<schemas$0.Note[]> & { cancel(): void } {
+export function GetNotes(orderBy: string, orderDirection: string, limit: number, offset: number, search: string, showTrashed: boolean): Promise<models$0.Note[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(961141263, orderBy, orderDirection, limit, offset, search, showTrashed) as any;
     let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
-/**
- * GetNotesByNotebookID retrieves all notes by a specific notebook ID
- */
-export function GetNotesByNotebookID(notebookID: number): Promise<schemas$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(10554070, notebookID) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
-/**
- * GetPinnedNotes retrieves all pinned notes from the database
- */
-export function GetPinnedNotes(): Promise<schemas$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3277905433) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
+        return $$createType10($result);
     }) as any;
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -287,7 +243,7 @@ export function GetPinnedNotes(): Promise<schemas$0.Note[]> & { cancel(): void }
 /**
  * GetRelayByID retrieves a relay by its ID
  */
-export function GetRelayByID(id: number): Promise<schemas$0.Relay | null> & { cancel(): void } {
+export function GetRelayByID(id: number): Promise<models$0.Relay | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1106514443, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType3($result);
@@ -299,7 +255,7 @@ export function GetRelayByID(id: number): Promise<schemas$0.Relay | null> & { ca
 /**
  * GetTagByID retrieves a single tag by its ID
  */
-export function GetTagByID(id: number): Promise<schemas$0.Tag | null> & { cancel(): void } {
+export function GetTagByID(id: number): Promise<models$0.Tag | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2723008278, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType12($result);
@@ -311,7 +267,7 @@ export function GetTagByID(id: number): Promise<schemas$0.Tag | null> & { cancel
 /**
  * GetTags retrieves all tags from the database
  */
-export function GetTags(): Promise<schemas$0.Tag[]> & { cancel(): void } {
+export function GetTags(): Promise<models$0.Tag[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3835819395) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType13($result);
@@ -323,7 +279,7 @@ export function GetTags(): Promise<schemas$0.Tag[]> & { cancel(): void } {
 /**
  * GetTagsByNoteID retrieves all tags associated with a specific note ID
  */
-export function GetTagsByNoteID(noteID: number): Promise<schemas$0.Tag[]> & { cancel(): void } {
+export function GetTagsByNoteID(noteID: number): Promise<models$0.Tag[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3922355959, noteID) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType13($result);
@@ -333,21 +289,9 @@ export function GetTagsByNoteID(noteID: number): Promise<schemas$0.Tag[]> & { ca
 }
 
 /**
- * GetTrashedNotes retrieves all trashed notes from the database
- */
-export function GetTrashedNotes(): Promise<schemas$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(2170508510) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
-}
-
-/**
  * GetUserByID retrieves a single user by its ID
  */
-export function GetUserByID(id: number): Promise<schemas$0.User | null> & { cancel(): void } {
+export function GetUserByID(id: number): Promise<models$0.User | null> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2716774129, id) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType5($result);
@@ -375,7 +319,7 @@ export function RemoveNoteTags(noteID: number): Promise<void> & { cancel(): void
 /**
  * ReplaceRelays removes all existing relays and inserts the new list of relays into the database
  */
-export function ReplaceRelays(relayData: relays$0.RelayData[]): Promise<(schemas$0.Relay | null)[]> & { cancel(): void } {
+export function ReplaceRelays(relayData: relays$0.RelayData[]): Promise<(models$0.Relay | null)[]> & { cancel(): void } {
     let $resultPromise = $Call.ByID(2472126696, relayData) as any;
     let $typingPromise = $resultPromise.then(($result) => {
         return $$createType8($result);
@@ -390,18 +334,6 @@ export function ReplaceRelays(relayData: relays$0.RelayData[]): Promise<(schemas
 export function RestoreNote(id: number): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(543428744, id) as any;
     return $resultPromise;
-}
-
-/**
- * SearchNotes searches for notes by content
- */
-export function SearchNotes(query: string): Promise<schemas$0.Note[]> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(2567554219, query) as any;
-    let $typingPromise = $resultPromise.then(($result) => {
-        return $$createType9($result);
-    }) as any;
-    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
-    return $typingPromise;
 }
 
 /**
@@ -453,14 +385,6 @@ export function TrashNote(id: number): Promise<void> & { cancel(): void } {
 }
 
 /**
- * UnarchiveNote unarchives a note by its ID
- */
-export function UnarchiveNote(id: number): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(3018250821, id) as any;
-    return $resultPromise;
-}
-
-/**
  * UnpinNote unpins a note by its ID
  */
 export function UnpinNote(id: number): Promise<void> & { cancel(): void } {
@@ -471,7 +395,7 @@ export function UnpinNote(id: number): Promise<void> & { cancel(): void } {
 /**
  * UpdateNote updates the content and title of an existing note
  */
-export function UpdateNote(note: schemas$0.Note): Promise<void> & { cancel(): void } {
+export function UpdateNote(note: models$0.Note): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1594419559, note) as any;
     return $resultPromise;
 }
@@ -487,7 +411,7 @@ export function UpdateNotebook(id: number, name: string): Promise<void> & { canc
 /**
  * UpdateRelay updates an existing relay in the database
  */
-export function UpdateRelay(relay: schemas$0.Relay): Promise<void> & { cancel(): void } {
+export function UpdateRelay(relay: models$0.Relay): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(3000693652, relay) as any;
     return $resultPromise;
 }
@@ -503,23 +427,23 @@ export function UpdateTag(id: number, name: string, color: string, icon: string)
 /**
  * UpdateUser updates the details of an existing user
  */
-export function UpdateUser(user: schemas$0.User): Promise<void> & { cancel(): void } {
+export function UpdateUser(user: models$0.User): Promise<void> & { cancel(): void } {
     let $resultPromise = $Call.ByID(1224790596, user) as any;
     return $resultPromise;
 }
 
 // Private type creation functions
-const $$createType0 = schemas$0.Note.createFrom;
+const $$createType0 = models$0.Note.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = schemas$0.Relay.createFrom;
+const $$createType2 = models$0.Relay.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = schemas$0.User.createFrom;
+const $$createType4 = models$0.User.createFrom;
 const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = schemas$0.Notebook.createFrom;
+const $$createType6 = models$0.Notebook.createFrom;
 const $$createType7 = $Create.Nullable($$createType6);
 const $$createType8 = $Create.Array($$createType3);
-const $$createType9 = $Create.Array($$createType0);
-const $$createType10 = $Create.Array($$createType6);
-const $$createType11 = schemas$0.Tag.createFrom;
+const $$createType9 = $Create.Array($$createType6);
+const $$createType10 = $Create.Array($$createType0);
+const $$createType11 = models$0.Tag.createFrom;
 const $$createType12 = $Create.Nullable($$createType11);
 const $$createType13 = $Create.Array($$createType11);

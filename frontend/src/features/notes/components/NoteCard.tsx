@@ -1,7 +1,5 @@
-import { useState } from "react";
-
 import { useQueryClient } from "@tanstack/react-query";
-import { type Note } from "&/comet/backend/db/schemas";
+import { Note } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { Separator } from "~/components/ui/separator";
 import { parseContent } from "~/lib/markdown";

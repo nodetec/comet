@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { type Notebook } from "&/comet/backend/db/schemas";
+import { Notebook } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
 import { NotebookIcon } from "lucide-react";

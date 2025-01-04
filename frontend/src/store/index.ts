@@ -1,4 +1,4 @@
-import { type Note, type Notebook, type Tag } from "&/comet/backend/db/schemas";
+import { Notebook, Tag } from "&/comet/backend/models/models";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -21,8 +21,8 @@ interface State {
   lastTagVisible: boolean;
   setLastTagVisible: (lastTagVisible: boolean) => void;
 
-  orderBy: "modified_at" | "created_at" | "title";
-  setOrderBy: (orderBy: "modified_at" | "created_at" | "title") => void;
+  orderBy: "content_modified_at" | "created_at" | "title";
+  setOrderBy: (orderBy: "content_modified_at" | "created_at" | "title") => void;
 
   timeSortDirection: "ASC" | "DESC";
   setTimeSortDirection: (sortDirection: "ASC" | "DESC") => void;
@@ -43,9 +43,6 @@ interface State {
 
   openPostBtnDialog: boolean;
   setOpenPostBtnDialog: (openPostBtnDialog: boolean) => void;
-
-  selectedNote: Note | undefined;
-  setSelectedNote: (selectedNote: Note | undefined) => void;
 }
 
 export const useAppState = create<State>()(
@@ -69,7 +66,7 @@ export const useAppState = create<State>()(
       lastTagVisible: false,
       setLastTagVisible: (lastTagVisible) => set({ lastTagVisible }),
 
-      orderBy: "modified_at",
+      orderBy: "content_modified_at",
       setOrderBy: (orderBy) => set({ orderBy }),
 
       timeSortDirection: "DESC",
@@ -87,9 +84,6 @@ export const useAppState = create<State>()(
       isSelectNotebookDialogOpen: false,
       setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen) =>
         set({ isSelectNotebookDialogOpen }),
-
-      selectedNote: undefined,
-      setSelectedNote: (selectedNote) => set({ selectedNote }),
 
       titleSortDirection: "ASC",
       setTitleSortDirection: (titleSortDirection) =>

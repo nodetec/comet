@@ -15,7 +15,7 @@ export function useCreateNote() {
 
   return useMutation({
     mutationFn: createNote,
-    onSuccess: (note) => {
+    onSuccess: (_) => {
       void queryClient.invalidateQueries({
         queryKey: ["notes"],
       });

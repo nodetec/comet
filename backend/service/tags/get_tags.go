@@ -2,14 +2,14 @@ package tags
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"database/sql"
 	"log"
 )
 
 // GetTags retrieves all tags from the database
-func GetTags() ([]schemas.Tag, error) {
-	var tags []schemas.Tag
+func GetTags() ([]models.Tag, error) {
+	var tags []models.Tag
 	var activeNotebookID *int
 
 	// Check if there is an active notebook
@@ -41,7 +41,7 @@ func GetTags() ([]schemas.Tag, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var tag schemas.Tag
+		var tag models.Tag
 		if err := rows.Scan(&tag.ID, &tag.Name, &tag.Color, &tag.Icon, &tag.Active, &tag.Inactive, &tag.CreatedAt, &tag.ModifiedAt); err != nil {
 			log.Printf("Failed to scan tag: %v", err)
 			return nil, err

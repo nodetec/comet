@@ -2,14 +2,14 @@ package notes
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"database/sql"
 	"log"
 	"strings"
 )
 
 // CreateNote inserts a new note into the database and returns the created note
-func CreateNote(title, content string) (*schemas.Note, error) {
+func CreateNote(title, content string) (*models.Note, error) {
 	// Directly clear all active notes
 	_, err := db.DB.Exec("UPDATE notes SET active = FALSE WHERE active = TRUE")
 	if err != nil {
@@ -25,7 +25,7 @@ func CreateNote(title, content string) (*schemas.Note, error) {
 	}
 
 	// Check if there are any active tags
-	var activeTags []schemas.Tag
+	var activeTags []models.Tag
 	err = db.DB.Select(&activeTags, "SELECT * FROM tags WHERE active = 1")
 	if err != nil {
 		log.Printf("Failed to retrieve active tags: %v", err)
@@ -59,7 +59,7 @@ func CreateNote(title, content string) (*schemas.Note, error) {
 		return nil, err
 	}
 
-	var note schemas.Note
+	var note models.Note
 	err = db.DB.Get(&note, "SELECT * FROM notes WHERE id = ?", id)
 	if err != nil {
 		log.Printf("Failed to retrieve created note: %v", err)

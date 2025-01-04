@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { type Note } from "&/comet/backend/db/schemas";
+import { type Note } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { parseTitle } from "~/lib/markdown";
 import { type EditorState, type LexicalEditor } from "lexical";
@@ -83,7 +83,6 @@ async function saveNote(
 
   await editor.read(async () => {
     const markdownText = $convertToMarkdownString(transformers);
-
 
     // TODO: only do this on blur
     const noteToUpdate = await AppService.GetNoteByID(note.ID);

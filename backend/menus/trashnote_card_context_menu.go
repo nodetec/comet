@@ -1,7 +1,7 @@
 package menus
 
 import (
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"comet/backend/service/notes"
 	"encoding/json"
 
@@ -24,7 +24,7 @@ func CreateTrashNoteCardContextMenu(app *application.App) *application.Menu {
 			return
 		}
 		contextMenuDataBytes := []byte(contextMenuDataStr)
-		var note schemas.Note
+		var note models.Note
 		err := json.Unmarshal(contextMenuDataBytes, &note)
 		if err != nil {
 			app.Logger.Error("Failed to unmarshal context menu data", "error", err)
@@ -52,7 +52,7 @@ func CreateTrashNoteCardContextMenu(app *application.App) *application.Menu {
 			return
 		}
 		contextMenuDataBytes := []byte(contextMenuDataStr)
-		var note schemas.Note
+		var note models.Note
 		err := json.Unmarshal(contextMenuDataBytes, &note)
 		if err != nil {
 			app.Logger.Error("Failed to unmarshal context menu data", "error", err)

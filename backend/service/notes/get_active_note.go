@@ -2,13 +2,13 @@ package notes
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 )
 
 // GetActiveNote retrieves the active note from the database
-func GetActiveNote() (*schemas.Note, error) {
-	var note schemas.Note
+func GetActiveNote() (*models.Note, error) {
+	var note models.Note
 	err := db.DB.Get(&note, "SELECT * FROM notes WHERE active = TRUE LIMIT 1")
 	if err != nil {
 		log.Printf("Failed to retrieve active note: %v", err)

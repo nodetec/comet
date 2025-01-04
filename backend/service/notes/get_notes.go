@@ -2,16 +2,16 @@ package notes
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"database/sql"
 	"fmt"
 	"log"
 )
 
 // GetNotes retrieves all notes from the database with specified ordering, limit, offset, search, and trashed filter
-func GetNotes(orderBy string, orderDirection string, limit int, offset int, search string, showTrashed bool) ([]schemas.Note, error) {
-	var notes []schemas.Note
-	var activeTags []schemas.Tag
+func GetNotes(orderBy string, orderDirection string, limit int, offset int, search string, showTrashed bool) ([]models.Note, error) {
+	var notes []models.Note
+	var activeTags []models.Tag
 	var activeNotebookID *int
 
 	// Check if there are any active tags
@@ -33,7 +33,7 @@ func GetNotes(orderBy string, orderDirection string, limit int, offset int, sear
 	if len(activeTags) > 0 {
 		log.Printf("Active tags found, filtering notes by active tags")
 		query := fmt.Sprintf(`
-			SELECT DISTINCT notes.*, notes.active FROM notes
+			SELECT DISTINCT notes.*, notes.active, notes.content_modified_at, notes.pinned_at FROM notes
 			JOIN notes_tags ON notes.id = notes_tags.note_id
 			JOIN tags ON notes_tags.tag_id = tags.id
 			WHERE tags.active = 1 AND notes.content LIKE '%%%s%%'`, search)
@@ -53,7 +53,7 @@ func GetNotes(orderBy string, orderDirection string, limit int, offset int, sear
 		}
 	} else {
 		// If there are no active tags, retrieve all notes
-		query := fmt.Sprintf("SELECT *, active FROM notes WHERE content LIKE '%%%s%%'", search)
+		query := fmt.Sprintf("SELECT *, active, content_modified_at, pinned_at FROM notes WHERE content LIKE '%%%s%%'", search)
 		if activeNotebookID != nil {
 			query += fmt.Sprintf(" AND notebook_id = %d", *activeNotebookID)
 		}

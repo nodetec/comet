@@ -29,14 +29,14 @@ export const NoteList = () => {
     <ScrollArea className="h-screen">
       {data.pages.map((page, pageIndex) => (
         <div className="flex flex-col items-center px-3" key={pageIndex}>
-          {page.data.map((project, noteIndex) => (
+          {page.data.map((note, noteIndex) => (
             <div
               className="mx-3 flex w-full flex-col items-center"
               key={noteIndex}
               ref={assignRef(lastNoteRef, pageIndex, noteIndex, data)}
             >
               <NoteCard
-                note={project}
+                note={note}
                 index={noteIndex}
                 length={page.data.length}
               />

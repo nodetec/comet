@@ -2,7 +2,7 @@ package relays
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 )
 
@@ -15,7 +15,7 @@ type RelayData struct {
 }
 
 // ReplaceRelays removes all existing relays and inserts the new list of relays into the database
-func ReplaceRelays(relayData []RelayData) ([]*schemas.Relay, error) {
+func ReplaceRelays(relayData []RelayData) ([]*models.Relay, error) {
 	tx, err := db.DB.Begin()
 	if err != nil {
 		log.Printf("Failed to begin transaction: %v", err)
@@ -29,7 +29,7 @@ func ReplaceRelays(relayData []RelayData) ([]*schemas.Relay, error) {
 		return nil, err
 	}
 
-	createdRelays := []*schemas.Relay{}
+	createdRelays := []*models.Relay{}
 	for _, data := range relayData {
 		result, err := tx.Exec("INSERT INTO relays (url, read, write, sync) VALUES (?, ?, ?, ?)", data.URL, data.Read, data.Write, data.Sync)
 		if err != nil {
@@ -45,7 +45,7 @@ func ReplaceRelays(relayData []RelayData) ([]*schemas.Relay, error) {
 			return nil, err
 		}
 
-		createdRelay := &schemas.Relay{
+		createdRelay := &models.Relay{
 			ID:    int(id),
 			URL:   data.URL,
 			Read:  data.Read,

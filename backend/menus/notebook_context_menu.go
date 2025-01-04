@@ -1,7 +1,7 @@
 package menus
 
 import (
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"comet/backend/service/notebooks"
 	"encoding/json"
 
@@ -23,7 +23,7 @@ func CreateNotebookContextMenu(app *application.App) *application.Menu {
 			return
 		}
 		contextMenuDataBytes := []byte(contextMenuDataStr)
-		var notebook schemas.Notebook
+		var notebook models.Notebook
 		err := json.Unmarshal(contextMenuDataBytes, &notebook)
 		if err != nil {
 			app.Logger.Error("Failed to unmarshal context menu data", "error", err)

@@ -6,8 +6,8 @@ import { useCreateNote } from "../hooks/useCreateNote";
 
 export function NotesHeader() {
   const feedType = useAppState((state) => state.feedType);
-  const createNote = useCreateNote();
   const activeNotebook = useAppState((state) => state.activeNotebook);
+  const createNote = useCreateNote();
 
   function title(feedType: string) {
     if (feedType === "all") return "All Notes";
@@ -29,6 +29,7 @@ export function NotesHeader() {
         type="button"
         variant="ghost"
         size="icon"
+        disabled={createNote.isPending}
         onClick={() => createNote.mutate()}
       >
         <PenBoxIcon />

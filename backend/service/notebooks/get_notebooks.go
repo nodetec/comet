@@ -2,15 +2,15 @@ package notebooks
 
 import (
 	"comet/backend/db"
-	"comet/backend/db/schemas"
+	"comet/backend/models"
 	"log"
 )
 
 // GetNotebooks retrieves all notebooks from the database
-func GetNotebooks(pinned bool) ([]schemas.Notebook, error) {
-	query := "SELECT id, name, created_at, modified_at, pinned, active FROM notebooks"
+func GetNotebooks(pinned bool) ([]models.Notebook, error) {
+	query := "SELECT id, name, created_at, modified_at, pinned_at, display_order, active FROM notebooks"
 	if pinned {
-		query += " WHERE pinned = true"
+		query += " WHERE pinned_at IS NOT NULL ORDER BY display_order"
 	}
 
 	rows, err := db.DB.Query(query)
@@ -20,10 +20,10 @@ func GetNotebooks(pinned bool) ([]schemas.Notebook, error) {
 	}
 	defer rows.Close()
 
-	var notebooks []schemas.Notebook
+	var notebooks []models.Notebook
 	for rows.Next() {
-		var notebook schemas.Notebook
-		if err := rows.Scan(&notebook.ID, &notebook.Name, &notebook.CreatedAt, &notebook.ModifiedAt, &notebook.Pinned, &notebook.Active); err != nil {
+		var notebook models.Notebook
+		if err := rows.Scan(&notebook.ID, &notebook.Name, &notebook.CreatedAt, &notebook.ModifiedAt, &notebook.PinnedAt, &notebook.DisplayOrder, &notebook.Active); err != nil {
 			log.Printf("Failed to scan notebook: %v", err)
 			return nil, err
 		}
