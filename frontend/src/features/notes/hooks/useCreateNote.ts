@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 async function createNote() {
   const title = dayjs().format("YYYY-MM-DD");
 
-  const note = await AppService.CreateNote(title, "");
+  const note = await AppService.CreateNote(title, "# ");
 
   return note;
 }

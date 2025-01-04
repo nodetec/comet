@@ -65,7 +65,9 @@ export function Editor() {
       undefined,
       false,
     );
-    $setSelection(null);
+    if (activeNote?.Content !== "# ") {
+      $setSelection(null);
+    }
   }
 
   const initialConfig: InitialConfigType = {
