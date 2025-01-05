@@ -13,6 +13,7 @@ export function NotebookBtn({ notebook }: Props) {
   const setFeedType = useAppState((state) => state.setFeedType);
   const setActiveNotebook = useAppState((state) => state.setActiveNotebook);
   const setActiveTag = useAppState((state) => state.setActiveTag);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
 
   const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
@@ -25,6 +26,7 @@ export function NotebookBtn({ notebook }: Props) {
       return;
     }
     if (feedType === "trash" || feedType === "notebook") {
+      setActiveNote(undefined);
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       await AppService.ClearActiveNote();
     }
