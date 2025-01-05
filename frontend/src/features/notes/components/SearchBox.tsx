@@ -20,7 +20,7 @@ export function SearchBox() {
     <div className="flex items-center px-3 pb-4 pt-2 select-none">
       <Input
         placeholder="Search..."
-        className="h-8 text-muted-foreground/80 bg-transparent placeholder:text-muted-foreground/60 select-none focus-visible:ring-sky-500/90"
+        className="h-8 text-muted-foreground/80 bg-transparent placeholder:text-muted-foreground/60 select-none focus-visible:ring-blue-400/80"
         onChange={handleSetSearchNote}
         value={noteSearch}
       />

@@ -67,7 +67,7 @@ export function NewNotebookDialog() {
         </DialogHeader>
         <div className="space-y-4">
           <Input
-            className="focus-visible:ring-sky-500/90"
+            className="focus-visible:ring-blue-400/80"
             placeholder="Notebook Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
