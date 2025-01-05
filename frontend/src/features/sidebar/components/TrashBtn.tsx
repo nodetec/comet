@@ -46,7 +46,7 @@ export function TrashBtn() {
         data-active={isDataActive}
         className="h-4 w-4 text-blue-400/90 data-[active=true]:text-secondary-foreground"
       />
-      <span className="ml-1.5">Trash</span>
+      <span className="ml-2.5">Trash</span>
     </span>
   );
 }
