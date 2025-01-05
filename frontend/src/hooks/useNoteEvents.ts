@@ -23,11 +23,13 @@ const useNoteEvents = () => {
     Events.On("note_trashed", refresh);
     Events.On("note_restored", refresh);
     Events.On("note_deleted", refresh);
+    Events.On("note_moved", refresh);
 
     return () => {
       Events.Off("note_trashed");
       Events.Off("note_restored");
       Events.Off("note_deleted");
+      Events.Off("note_moved");
     };
   }, [queryClient]);
 };
