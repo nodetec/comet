@@ -4,7 +4,6 @@ import (
 	"comet/backend/db"
 	"comet/backend/models"
 	"log"
-	// "regexp"
 )
 
 // MoveNoteToNotebook updates the notebook ID of a note and manages tag associations
