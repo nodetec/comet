@@ -63,6 +63,11 @@ export function NotebookSettings() {
               <span className="text-sm text-muted-foreground">{`created ${fromNow(notebook.CreatedAt)}`}</span>
             </div>
           ))}
+          {notebooks.data?.length === 0 && (
+            <div className="text-sm text-muted-foreground">
+              No notebooks found
+            </div>
+          )}
         </div>
       </div>
     </div>
