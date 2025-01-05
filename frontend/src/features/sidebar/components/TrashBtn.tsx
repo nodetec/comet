@@ -9,9 +9,13 @@ export function TrashBtn() {
   const setActiveNotebook = useAppState((state) => state.setActiveNotebook);
   const setActiveTag = useAppState((state) => state.setActiveTag);
 
+  const appFocus = useAppState((state) => state.appFocus);
+  const setAppFocus = useAppState((state) => state.setAppFocus);
+
   const queryClient = useQueryClient();
 
   async function handleClick() {
+    setAppFocus({ panel: "sidebar", isFocused: true });
     if (feedType === "trash") {
       return;
     }
@@ -29,12 +33,19 @@ export function TrashBtn() {
     await queryClient.invalidateQueries({ queryKey: ["tags"] });
   }
 
+  const isDataActive =
+    appFocus?.panel === "sidebar" && appFocus.isFocused && feedType === "trash";
+
   return (
     <span
       onClick={handleClick}
-      className={`ml-1 flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${feedType === "trash" && "bg-muted text-secondary-foreground"}`}
+      data-active={isDataActive}
+      className={`ml-1 flex cursor-default items-center rounded-md px-2 py-1 text-sm font-medium text-secondary-foreground ${feedType === "trash" && "bg-muted text-secondary-foreground"} data-[active=true]:bg-blue-500/50`}
     >
-      <Trash2Icon className="h-4 w-4 text-sky-500/90" />
+      <Trash2Icon
+        data-active={isDataActive}
+        className="h-4 w-4 text-blue-400/90 data-[active=true]:text-secondary-foreground"
+      />
       <span className="ml-1.5">Trash</span>
     </span>
   );

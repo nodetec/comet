@@ -32,7 +32,7 @@ export function Notebooks() {
             <div className="ml-1 text-xs text-muted-foreground">Notebooks</div>
           </div>
         </AccordionTrigger>
-        <AccordionContent className="flex flex-col pb-0 pl-1">
+        <AccordionContent className="flex flex-col pb-0 pl-1 gap-0.5">
           {data?.map((notebook) => (
             <NotebookBtn notebook={notebook} key={notebook.ID} />
           ))}

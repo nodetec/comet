@@ -9,12 +9,14 @@ import { Button } from "./components/ui/button";
 import { Editor, PublishDialog } from "./features/editor";
 import { NoteList, NotesHeader, SearchBox } from "./features/notes";
 import { Sidebar } from "./features/sidebar";
+import useAppFocus from "./hooks/useAppFocus";
 import useNotebookEvents from "./hooks/useNotebookEvents";
 import useNoteEvents from "./hooks/useNoteEvents";
 
 export default function ResizableLayout() {
   useNoteEvents();
   useNotebookEvents();
+  useAppFocus();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">

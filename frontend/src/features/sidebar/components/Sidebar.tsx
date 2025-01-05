@@ -68,7 +68,7 @@ export function Sidebar() {
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="flex flex-col pb-0 pl-1">
+              <AccordionContent className="flex flex-col pb-0 pl-1 gap-0.5">
                 <AllNotesBtn />
                 <TrashBtn />
               </AccordionContent>

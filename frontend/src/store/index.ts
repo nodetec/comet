@@ -1,4 +1,4 @@
-import { Notebook, Tag } from "&/comet/backend/models/models";
+import { type Notebook, type Tag } from "&/comet/backend/models/models";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -8,6 +8,15 @@ interface State {
 
   activeNotebook: Notebook | undefined;
   setActiveNotebook: (activeNotebook: Notebook | undefined) => void;
+
+  appFocus:
+    | { panel: "sidebar" | "feed" | "editor" | undefined; isFocused: boolean }
+    | undefined;
+  setAppFocus: (
+    appFocus:
+      | { panel: "sidebar" | "feed" | "editor" | undefined; isFocused: boolean }
+      | undefined,
+  ) => void;
 
   activeTag: Tag | undefined;
   setActiveTag: (activeNote: Tag | undefined) => void;
@@ -53,6 +62,9 @@ export const useAppState = create<State>()(
 
       activeNotebook: undefined,
       setActiveNotebook: (activeNotebook) => set({ activeNotebook }),
+
+      appFocus: undefined,
+      setAppFocus: (appFocus) => set({ appFocus }),
 
       activeTag: undefined,
       setActiveTag: (activeTag) => set({ activeTag }),

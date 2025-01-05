@@ -17,13 +17,21 @@ export function NoteCard({ note, index, length }: Props) {
 
   const feedType = useAppState((state) => state.feedType);
 
+  const appFocus = useAppState((state) => state.appFocus);
+  const setAppFocus = useAppState((state) => state.setAppFocus);
+
   async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
+    setAppFocus({ panel: "feed", isFocused: true });
+
     if (note.Active) return;
     await AppService.SetActiveNote(note.ID);
     await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
   }
+
+  const isDataActive =
+    appFocus?.panel === "feed" && appFocus.isFocused && note.Active;
 
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -32,9 +40,10 @@ export function NoteCard({ note, index, length }: Props) {
   return (
     <div className="mx-3 flex w-full flex-col items-center">
       <button
+        data-active={isDataActive}
         className={cn(
-          "flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm transition-all",
-          note.Active && "bg-muted/70",
+          "relative flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm",
+          note.Active && "bg-muted/70 data-[active=true]:bg-blue-500/50",
         )}
       >
         <div
@@ -54,17 +63,26 @@ export function NoteCard({ note, index, length }: Props) {
           }
         >
           <div className="flex w-full flex-col gap-1.5">
-            <h2 className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-primary">
+            <h2 className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold text-secondary-foreground">
               {note.Title}
             </h2>
-            <div className="mt-0 line-clamp-2 min-h-[3em] text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground">
+            <div
+              data-active={isDataActive}
+              className="mt-0 line-clamp-2 min-h-[3em] text-ellipsis whitespace-break-spaces break-all pt-0 text-muted-foreground data-[active=true]:text-secondary-foreground"
+            >
               {parseContent(note.Content) || "No content \n "}
             </div>
-            <span className="select-none text-xs text-muted-foreground/80">
+            <span
+              data-active={isDataActive}
+              className="select-none text-xs text-muted-foreground/80 data-[active=true]:text-secondary-foreground"
+            >
               {note.ModifiedAt && fromNow(note.ModifiedAt)}
             </span>
           </div>
         </div>
+        {/* {note.Active && isDataActive && (
+          <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-500"></div>
+        )} */}
       </button>
       <div className="flex w-full flex-col items-center px-[0.30rem]">
         {index < length - 1 && <Separator decorative className="bg-muted/30" />}

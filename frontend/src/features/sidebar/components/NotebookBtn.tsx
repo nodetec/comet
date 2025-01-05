@@ -13,9 +13,13 @@ export function NotebookBtn({ notebook }: Props) {
   const setFeedType = useAppState((state) => state.setFeedType);
   const setActiveNotebook = useAppState((state) => state.setActiveNotebook);
   const setActiveTag = useAppState((state) => state.setActiveTag);
+
+  const appFocus = useAppState((state) => state.appFocus);
+  const setAppFocus = useAppState((state) => state.setAppFocus);
   const queryClient = useQueryClient();
 
   async function handleClick() {
+    setAppFocus({ panel: "sidebar", isFocused: true });
     console.log("Clicked");
     if (feedType === "notebook" && notebook.Active) {
       return;
@@ -42,11 +46,18 @@ export function NotebookBtn({ notebook }: Props) {
     console.log("Right Clicked");
   };
 
+  const isDataActive =
+    appFocus?.panel === "sidebar" &&
+    appFocus.isFocused &&
+    feedType === "notebook" &&
+    notebook.Active;
+
   return (
     <button
       onClick={handleClick}
+      data-active={isDataActive}
       onContextMenu={handleContextMenu}
-      className={`flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${notebook.Active && "bg-muted text-secondary-foreground"}`}
+      className={`flex cursor-default items-center rounded-md px-2 py-1 text-sm font-medium text-secondary-foreground ${notebook.Active && "bg-muted"} data-[active=true]:bg-blue-500/50`}
       style={
         {
           "--custom-contextmenu": "notebook",
@@ -54,7 +65,10 @@ export function NotebookBtn({ notebook }: Props) {
         } as React.CSSProperties
       }
     >
-      <NotebookIcon className="h-4 w-4 text-sky-500/90" />
+      <NotebookIcon
+        data-active={isDataActive}
+        className="h-4 w-4 text-blue-400/90 data-[active=true]:text-secondary-foreground"
+      />
       <span className="ml-1.5">{notebook.Name}</span>
     </button>
   );

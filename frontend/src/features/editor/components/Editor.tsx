@@ -1,3 +1,5 @@
+import { FocusEventHandler } from "react";
+
 import { CodeNode } from "@lexical/code";
 import { HashtagNode } from "@lexical/hashtag";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
@@ -23,6 +25,7 @@ import { useSaveNote } from "../hooks/useSaveNote";
 import { CustomHashtagPlugin } from "../plugins/CustomHashtagPlugin";
 import { OnBlurPlugin } from "../plugins/OnBlurPlugin";
 import { OnChangeDebouncePlugin } from "../plugins/OnChangeDebouncePlugin";
+import { OnFocusPlugin } from "../plugins/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../plugins/ScrollCenterCurrentLinePlugin";
 import DefaultTheme from "../themes/DefaultTheme";
 
@@ -35,6 +38,9 @@ export function Editor() {
   const { data: activeNote } = useActiveNote();
   const feedType = useAppState((state) => state.feedType);
 
+  const appFocus = useAppState((state) => state.appFocus);
+  const setAppFocus = useAppState((state) => state.setAppFocus);
+
   const UPDATED_TRANSFORMERS = [...TRANSFORMERS];
 
   if (!activeNote) {
@@ -42,6 +48,7 @@ export function Editor() {
   }
 
   function onBlur(event: FocusEvent, editor: LexicalEditor) {
+    $setSelection(null);
     saveNote.mutate({
       note: activeNote,
       editor,
@@ -58,6 +65,11 @@ export function Editor() {
     });
   }
 
+  function onFocus(event: FocusEvent, editor: LexicalEditor) {
+    console.log("ContentEditable focused");
+    setAppFocus({ panel: "editor", isFocused: true });
+  }
+
   function getInitalContent() {
     $convertFromMarkdownString(
       activeNote?.Content ?? "",
@@ -65,9 +77,7 @@ export function Editor() {
       undefined,
       false,
     );
-    if (activeNote?.Content !== "# " && activeNote?.Content !== "") {
-      $setSelection(null);
-    }
+    $setSelection(null);
   }
 
   const initialConfig: InitialConfigType = {
@@ -86,7 +96,6 @@ export function Editor() {
       // ImageNode,
       // BannerNode,
     ],
-
     onError,
     theme: DefaultTheme,
     editable: feedType === "trash" ? false : true,
@@ -97,7 +106,15 @@ export function Editor() {
       <RichTextPlugin
         contentEditable={
           <ScrollArea type="scroll">
-            <ContentEditable className="min-h-[calc(100vh-4rem)] flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none" />
+            <ContentEditable
+              onClick={(event: React.MouseEvent<HTMLDivElement>) => {
+                event.preventDefault();
+                if (feedType === "trash") {
+                  setAppFocus({ panel: "editor", isFocused: true });
+                }
+              }}
+              className="min-h-[calc(100vh-4rem)] flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none"
+            />
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}
@@ -107,6 +124,7 @@ export function Editor() {
         <>
           <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
           <OnBlurPlugin onBlur={onBlur} />
+          <OnFocusPlugin onFocus={onFocus} />
         </>
       )}
       <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
