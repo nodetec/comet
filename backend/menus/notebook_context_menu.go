@@ -10,6 +10,35 @@ import (
 
 func CreateNotebookContextMenu(app *application.App) *application.Menu {
 	contextMenu := app.NewMenu()
+
+	contextMenu.Add("Hide").OnClick(func(data *application.Context) {
+		contextMenuData := data.ContextMenuData()
+		app.Logger.Info("Context menu data", "data", contextMenuData)
+		if contextMenuData == nil {
+			app.Logger.Error("Context menu data is nil")
+			return
+		}
+		contextMenuDataStr, ok := contextMenuData.(string)
+		if !ok {
+			app.Logger.Error("Failed to assert context menu data to string")
+			return
+		}
+		contextMenuDataBytes := []byte(contextMenuDataStr)
+		var notebook models.Notebook
+		err := json.Unmarshal(contextMenuDataBytes, &notebook)
+		if err != nil {
+			app.Logger.Error("Failed to unmarshal context menu data", "error", err)
+			return
+		}
+		err = notebooks.HideNotebook(notebook.ID)
+		if err != nil {
+			app.Logger.Error("Failed to hide notebook", "error", err)
+			return
+		}
+		app.EmitEvent("notebook_hidden", notebook.ID)
+		app.Logger.Info("Notebook hidden", "notebook", notebook)
+	})
+
 	contextMenu.Add("Delete").OnClick(func(data *application.Context) {
 		contextMenuData := data.ContextMenuData()
 		app.Logger.Info("Context menu data", "data", contextMenuData)
@@ -41,5 +70,6 @@ func CreateNotebookContextMenu(app *application.App) *application.Menu {
 		}
 		app.Logger.Info("Notebook deleted", "notebook", notebook)
 	})
+
 	return contextMenu
 }

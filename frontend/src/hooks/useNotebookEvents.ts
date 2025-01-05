@@ -36,6 +36,7 @@ const useNotebookEvents = () => {
 
     Events.On("notebook_deleted", onNotebookDeleted);
     Events.On("active_notebook_deleted", onActiveNotebookDeleted);
+    Events.On("notebook_hidden", refresh);
 
     return () => {
       Events.Off("notebook_deleted");
