@@ -41,7 +41,7 @@ export default function ResizableLayout() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel minSize={40}>
-          <div className="flex h-screen flex-col">
+          <div className="flex h-screen flex-col select-none">
             <div className="flex justify-end p-2">
               <PublishDialog />
               <Button type="button" variant="ghost" size="icon">
