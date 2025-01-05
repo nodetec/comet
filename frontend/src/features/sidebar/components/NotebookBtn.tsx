@@ -24,7 +24,7 @@ export function NotebookBtn({ notebook }: Props) {
     if (feedType === "notebook" && notebook.Active) {
       return;
     }
-    if (feedType === "trash") {
+    if (feedType === "trash" || feedType === "notebook") {
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       await AppService.ClearActiveNote();
     }
@@ -32,7 +32,6 @@ export function NotebookBtn({ notebook }: Props) {
     setFeedType("notebook");
     setActiveNotebook(notebook);
     setActiveTag(undefined);
-    await AppService.ClearActiveNote();
     void queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     await AppService.SetNotebookActive(notebook.ID);
     void queryClient.invalidateQueries({ queryKey: ["notebooks"] });

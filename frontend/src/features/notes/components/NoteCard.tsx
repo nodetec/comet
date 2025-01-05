@@ -22,6 +22,8 @@ export function NoteCard({ note, index, length }: Props) {
   const queryClient = useQueryClient();
 
   const feedType = useAppState((state) => state.feedType);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
+  const activeNote = useAppState((state) => state.activeNote);
 
   const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
@@ -32,6 +34,7 @@ export function NoteCard({ note, index, length }: Props) {
       setAppFocus({ panel: "feed", isFocused: true });
       return;
     }
+    setActiveNote(note);
     await AppService.SetActiveNote(note.ID);
     await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -51,7 +54,9 @@ export function NoteCard({ note, index, length }: Props) {
         data-active={isDataActive}
         className={cn(
           "relative flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm",
-          note.Active && "bg-muted/70 data-[active=true]:bg-blue-500/50",
+          note.Active &&
+            activeNote?.ID === note.ID &&
+            "bg-muted/70 data-[active=true]:bg-blue-500/50",
         )}
       >
         <div

@@ -20,14 +20,14 @@ export function AllNotesBtn() {
       return;
     }
     if (feedType === "trash") {
-      await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       await AppService.ClearActiveNote();
+      await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     }
-    setFeedType("all");
     setActiveNotebook(undefined);
     setActiveTag(undefined);
     await AppService.ClearActiveNotebooks();
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
+    setFeedType("all");
     await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
     await queryClient.invalidateQueries({ queryKey: ["tags"] });
   }

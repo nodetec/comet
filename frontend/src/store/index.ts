@@ -1,10 +1,17 @@
-import { type Notebook, type Tag } from "&/comet/backend/models/models";
+import {
+  type Note,
+  type Notebook,
+  type Tag,
+} from "&/comet/backend/models/models";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
   feedType: "all" | "notebook" | "trash";
   setFeedType: (feedType: "all" | "notebook" | "trash") => void;
+
+  activeNote: Note | undefined;
+  setActiveNote: (activeNote: Note | undefined) => void;
 
   activeNotebook: Notebook | undefined;
   setActiveNotebook: (activeNotebook: Notebook | undefined) => void;
@@ -59,6 +66,9 @@ export const useAppState = create<State>()(
     (set) => ({
       feedType: "all",
       setFeedType: (feedType) => set({ feedType }),
+
+      activeNote: undefined,
+      setActiveNote: (activeNote) => set({ activeNote }),
 
       activeNotebook: undefined,
       setActiveNotebook: (activeNotebook) => set({ activeNotebook }),

@@ -8,6 +8,7 @@ export function TrashBtn() {
   const setFeedType = useAppState((state) => state.setFeedType);
   const setActiveNotebook = useAppState((state) => state.setActiveNotebook);
   const setActiveTag = useAppState((state) => state.setActiveTag);
+  const setActiveNote = useAppState((state) => state.setActiveNote);
 
   const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
@@ -23,6 +24,7 @@ export function TrashBtn() {
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       await AppService.ClearActiveNote();
     }
+    setActiveNote(undefined);
     setFeedType("trash");
     setActiveNotebook(undefined);
     setActiveTag(undefined);
