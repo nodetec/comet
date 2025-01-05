@@ -72,8 +72,8 @@ func (s *AppService) GetActiveNote() (*models.Note, error) {
 }
 
 // SetPublishDetails updates the author, identifier, and published_at fields of a note
-func (s *AppService) SetPublishDetails(noteID int, author, identifier, publishedAt string) error {
-	return notes.SetPublishDetails(noteID, author, identifier, publishedAt) // Use notes package
+func (s *AppService) SetPublishDetails(noteID int, author, identifier string) error {
+	return notes.SetPublishDetails(noteID, author, identifier) // Use notes package
 }
 
 // RemoveNoteTags removes all tag associations for a given note ID

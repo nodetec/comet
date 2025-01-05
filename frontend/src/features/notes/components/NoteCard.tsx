@@ -2,9 +2,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Note } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { Separator } from "~/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { parseContent } from "~/lib/markdown";
 import { cn, fromNow } from "~/lib/utils";
 import { useAppState } from "~/store";
+import { SendIcon } from "lucide-react";
 
 type Props = {
   note: Note;
@@ -74,12 +80,29 @@ export function NoteCard({ note, index, length }: Props) {
             >
               {parseContent(note.Content) || "No content \n "}
             </div>
-            <span
-              data-active={isDataActive}
-              className="select-none text-xs text-muted-foreground/80 data-[active=true]:text-secondary-foreground"
-            >
-              {note.ModifiedAt && fromNow(note.ModifiedAt)}
-            </span>
+            <div className="flex w-full items-center justify-between">
+              <span
+                data-active={isDataActive}
+                className="select-none text-xs text-muted-foreground/80 data-[active=true]:text-secondary-foreground"
+              >
+                {note.ModifiedAt && fromNow(note.ModifiedAt)}
+              </span>
+              {note.PublishedAt && (
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger className="cursor-default">
+                    <span
+                      data-active={isDataActive}
+                      className="cursor-default select-none text-xs text-blue-500/60 data-[active=true]:text-secondary-foreground"
+                    >
+                      <SendIcon className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <span>{`published ${fromNow(note.PublishedAt)}`}</span>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
         </div>
         {/* {note.Active && isDataActive && (

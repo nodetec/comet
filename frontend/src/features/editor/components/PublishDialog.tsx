@@ -17,7 +17,7 @@ import { useActiveNote } from "~/hooks/useActiveNote";
 import { useActiveUser } from "~/hooks/useActiveUser";
 import { useNoteTags } from "~/hooks/useNoteTags";
 import { useRelays } from "~/hooks/useRelays";
-import { SendHorizonalIcon } from "lucide-react";
+import { SendIcon } from "lucide-react";
 import { finalizeEvent, nip19 } from "nostr-tools";
 import { SimplePool } from "nostr-tools/pool";
 import { toast } from "sonner";
@@ -107,13 +107,13 @@ export function PublishDialog() {
       console.log(relayUrls);
 
       await Promise.any(pool.publish(relayUrls, event));
-        pool.close(relayUrls);
+      pool.close(relayUrls);
 
       // TODO: update note to published
       // TODO: add event id to note
       // TODO: add identifier to note
 
-      await AppService.SetPublishDetails(note.ID, npub, identifier, "");
+      await AppService.SetPublishDetails(note.ID, npub, identifier);
       await queryClient.invalidateQueries({ queryKey: ["notes"] });
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       setIsOpen(false);
@@ -132,7 +132,7 @@ export function PublishDialog() {
       <DialogTrigger asChild>
         {user && (
           <Button type="button" variant="ghost" size="icon">
-            <SendHorizonalIcon />
+            <SendIcon />
           </Button>
         )}
       </DialogTrigger>

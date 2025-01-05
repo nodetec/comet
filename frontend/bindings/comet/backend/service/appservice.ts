@@ -363,8 +363,8 @@ export function SetNotebookActive(id: number): Promise<void> & { cancel(): void 
 /**
  * SetPublishDetails updates the author, identifier, and published_at fields of a note
  */
-export function SetPublishDetails(noteID: number, author: string, identifier: string, publishedAt: string): Promise<void> & { cancel(): void } {
-    let $resultPromise = $Call.ByID(1835734245, noteID, author, identifier, publishedAt) as any;
+export function SetPublishDetails(noteID: number, author: string, identifier: string): Promise<void> & { cancel(): void } {
+    let $resultPromise = $Call.ByID(1835734245, noteID, author, identifier) as any;
     return $resultPromise;
 }
 
