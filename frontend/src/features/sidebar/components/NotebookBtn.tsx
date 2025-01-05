@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Notebook } from "&/comet/backend/models/models";
+import { type Notebook } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
 import { NotebookIcon } from "lucide-react";
@@ -16,6 +16,7 @@ export function NotebookBtn({ notebook }: Props) {
   const queryClient = useQueryClient();
 
   async function handleClick() {
+    console.log("Clicked");
     if (feedType === "notebook" && notebook.Active) {
       return;
     }
@@ -23,14 +24,17 @@ export function NotebookBtn({ notebook }: Props) {
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       await AppService.ClearActiveNote();
     }
+    console.log("Setting Feed Type to notebook");
     setFeedType("notebook");
     setActiveNotebook(notebook);
     setActiveTag(undefined);
+    await AppService.ClearActiveNote();
+    void queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     await AppService.SetNotebookActive(notebook.ID);
+    void queryClient.invalidateQueries({ queryKey: ["notebooks"] });
     await AppService.ClearActiveTags();
-    await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
-    await queryClient.invalidateQueries({ queryKey: ["tags"] });
+    void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    void queryClient.invalidateQueries({ queryKey: ["tags"] });
   }
 
   const handleContextMenu = (event: React.MouseEvent<HTMLButtonElement>) => {

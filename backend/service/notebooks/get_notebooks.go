@@ -10,8 +10,9 @@ import (
 func GetNotebooks(pinned bool) ([]models.Notebook, error) {
 	query := "SELECT id, name, created_at, modified_at, pinned_at, display_order, active FROM notebooks"
 	if pinned {
-		query += " WHERE pinned_at IS NOT NULL ORDER BY display_order"
+		query += " WHERE pinned_at IS NOT NULL"
 	}
+	query += " ORDER BY name ASC"
 
 	rows, err := db.DB.Query(query)
 	if err != nil {

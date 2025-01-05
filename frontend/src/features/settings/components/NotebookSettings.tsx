@@ -7,7 +7,6 @@ import { Button } from "~/components/ui/button";
 import { useNotebooks } from "~/hooks/useNotebooks";
 import { fromNow } from "~/lib/utils";
 import { EyeClosedIcon, EyeIcon } from "lucide-react";
-import { toast } from "sonner";
 
 export function NotebookSettings() {
   const [loading, setLoading] = useState(false);
@@ -27,9 +26,6 @@ export function NotebookSettings() {
         await AppService.ShowNotebook(notebook.ID);
       }
       await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
-      //   toast("Success", {
-      //     description: "Notebook visibility updated",
-      //   });
     } catch (error) {
       console.error("Error updating notebook visibility: ", error);
     } finally {
@@ -43,7 +39,7 @@ export function NotebookSettings() {
         Notebooks
       </h1>
       <div className="mb-4 border-b border-muted py-4">
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           {notebooks.data?.map((notebook) => (
             <div
               className="flex items-center justify-between"
