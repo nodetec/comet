@@ -33,6 +33,7 @@ const isValidNsec = (nsec: string) => {
   try {
     return nip19.decode(nsec).type === "nsec";
   } catch (e) {
+    console.error("Error decoding nsec:", e);
     return false;
   }
 };

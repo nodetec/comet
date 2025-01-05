@@ -121,6 +121,7 @@ export function PublishDialog() {
         description: "Your note was posted successfully.",
       });
     } catch (error) {
+      console.error("Error posting note", error);
       toast("Note failed to post", {
         description: "There was an error posting your note.",
       });

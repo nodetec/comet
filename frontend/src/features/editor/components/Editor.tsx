@@ -1,5 +1,3 @@
-import { FocusEventHandler } from "react";
-
 import { CodeNode } from "@lexical/code";
 import { HashtagNode } from "@lexical/hashtag";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
@@ -38,7 +36,6 @@ export function Editor() {
   const { data: activeNote } = useActiveNote();
   const feedType = useAppState((state) => state.feedType);
 
-  const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
 
   const UPDATED_TRANSFORMERS = [...TRANSFORMERS];
@@ -47,7 +44,7 @@ export function Editor() {
     return null;
   }
 
-  function onBlur(event: FocusEvent, editor: LexicalEditor) {
+  function onBlur(_event: FocusEvent, editor: LexicalEditor) {
     $setSelection(null);
     saveNote.mutate({
       note: activeNote,
@@ -65,9 +62,16 @@ export function Editor() {
     });
   }
 
-  function onFocus(event: FocusEvent, editor: LexicalEditor) {
+  function onFocus(_event: FocusEvent, _editor: LexicalEditor) {
     console.log("ContentEditable focused");
     setAppFocus({ panel: "editor", isFocused: true });
+  }
+
+  function handleClick(event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (feedType === "trash") {
+      setAppFocus({ panel: "editor", isFocused: true });
+    }
   }
 
   function getInitalContent() {
@@ -107,12 +111,7 @@ export function Editor() {
         contentEditable={
           <ScrollArea type="scroll">
             <ContentEditable
-              onClick={(event: React.MouseEvent<HTMLDivElement>) => {
-                event.preventDefault();
-                if (feedType === "trash") {
-                  setAppFocus({ panel: "editor", isFocused: true });
-                }
-              }}
+              onClick={handleClick}
               className="min-h-[calc(100vh-4rem)] flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none"
             />
           </ScrollArea>

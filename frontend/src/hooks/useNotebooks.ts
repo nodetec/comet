@@ -4,6 +4,7 @@ import { AppService } from "&/comet/backend/service";
 type QueryKey = [string, boolean];
 
 async function fetchNotebooks({ queryKey }: QueryFunctionContext<QueryKey>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_, pinned] = queryKey;
   try {
     const tags = await AppService.GetNotebooks(pinned);
