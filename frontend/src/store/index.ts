@@ -4,7 +4,7 @@ import {
   type Tag,
 } from "&/comet/backend/models/models";
 import { create } from "zustand";
-// import { createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 interface State {
   feedType: "all" | "notebook" | "trash";
@@ -62,57 +62,67 @@ interface State {
 }
 
 export const useAppState = create<State>()(
-  // persist(
-  (set) => ({
-    feedType: "all",
-    setFeedType: (feedType) => set({ feedType }),
+  persist(
+    (set) => ({
+      feedType: "all",
+      setFeedType: (feedType) => set({ feedType }),
 
-    activeNote: undefined,
-    setActiveNote: (activeNote) => set({ activeNote }),
+      activeNote: undefined,
+      setActiveNote: (activeNote) => set({ activeNote }),
 
-    activeNotebook: undefined,
-    setActiveNotebook: (activeNotebook) => set({ activeNotebook }),
+      activeNotebook: undefined,
+      setActiveNotebook: (activeNotebook) => set({ activeNotebook }),
 
-    appFocus: undefined,
-    setAppFocus: (appFocus) => set({ appFocus }),
+      appFocus: undefined,
+      setAppFocus: (appFocus) => set({ appFocus }),
 
-    activeTag: undefined,
-    setActiveTag: (activeTag) => set({ activeTag }),
+      activeTag: undefined,
+      setActiveTag: (activeTag) => set({ activeTag }),
 
-    searchActive: false,
-    setSearchActive: (searchActive) => set({ searchActive }),
+      searchActive: false,
+      setSearchActive: (searchActive) => set({ searchActive }),
 
-    noteSearch: "",
-    setNoteSearch: (noteSearch) => set({ noteSearch }),
+      noteSearch: "",
+      setNoteSearch: (noteSearch) => set({ noteSearch }),
 
-    lastTagVisible: false,
-    setLastTagVisible: (lastTagVisible) => set({ lastTagVisible }),
+      lastTagVisible: false,
+      setLastTagVisible: (lastTagVisible) => set({ lastTagVisible }),
 
-    orderBy: "content_modified_at",
-    setOrderBy: (orderBy) => set({ orderBy }),
+      orderBy: "content_modified_at",
+      setOrderBy: (orderBy) => set({ orderBy }),
 
-    timeSortDirection: "DESC",
-    setTimeSortDirection: (timeSortDirection) => set({ timeSortDirection }),
+      timeSortDirection: "DESC",
+      setTimeSortDirection: (timeSortDirection) => set({ timeSortDirection }),
 
-    editorFullScreen: false,
-    setEditorFullScreen: (editorFullScreen) => set({ editorFullScreen }),
+      editorFullScreen: false,
+      setEditorFullScreen: (editorFullScreen) => set({ editorFullScreen }),
 
-    settingsTab: "profile",
-    setSettingsTab: (settingsTab) => set({ settingsTab }),
+      settingsTab: "profile",
+      setSettingsTab: (settingsTab) => set({ settingsTab }),
 
-    openPostBtnDialog: false,
-    setOpenPostBtnDialog: (openPostBtnDialog) => set({ openPostBtnDialog }),
+      openPostBtnDialog: false,
+      setOpenPostBtnDialog: (openPostBtnDialog) => set({ openPostBtnDialog }),
 
-    isSelectNotebookDialogOpen: false,
-    setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen) =>
-      set({ isSelectNotebookDialogOpen }),
+      isSelectNotebookDialogOpen: false,
+      setIsSelectNotebookDialogOpen: (isSelectNotebookDialogOpen) =>
+        set({ isSelectNotebookDialogOpen }),
 
-    titleSortDirection: "ASC",
-    setTitleSortDirection: (titleSortDirection) => set({ titleSortDirection }),
-  }),
-  //   {
-  //     name: "comet-storage",
-  //     storage: createJSONStorage(() => localStorage),
-  //   },
-  // ),
+      titleSortDirection: "ASC",
+      setTitleSortDirection: (titleSortDirection) =>
+        set({ titleSortDirection }),
+    }),
+    {
+      name: "comet-storage",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        feedType: state.feedType,
+        activeNotebook: state.activeNotebook,
+        orderBy: state.orderBy,
+        timeSortDirection: state.timeSortDirection,
+        titleSortDirection: state.titleSortDirection,
+        editorFullScreen: state.editorFullScreen,
+        settingsTab: state.settingsTab,
+      }),
+    },
+  ),
 );

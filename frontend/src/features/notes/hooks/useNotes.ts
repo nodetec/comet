@@ -11,15 +11,12 @@ const useNotes = () => {
   const feedType = useAppState((state) => state.feedType);
 
   async function fetchNotes({ pageParam = 1 }) {
+    console.log("fetchNotes", pageParam);
     const limit = 10;
     const offset = (pageParam - 1) * limit;
 
-    console.log("offset", offset);
-
     const orderDirection =
       orderBy === "title" ? titleSortDirection : timeSortDirection;
-
-    console.log("orderBy", orderBy);
 
     const showTrashed = feedType === "trash";
 
@@ -31,10 +28,6 @@ const useNotes = () => {
       search,
       showTrashed,
     );
-
-    for (const note of notes) {
-      console.log("note", note.Title);
-    }
 
     return {
       data: notes || [],
@@ -54,7 +47,8 @@ const useNotes = () => {
       titleSortDirection,
     ],
     queryFn: fetchNotes,
-    gcTime: 10000,
+    gcTime: 0,
+    staleTime: 0,
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages, lastPageParam) => {
       if (lastPage.data.length === 0) {

@@ -15,6 +15,7 @@ export function AllNotesBtn() {
   const queryClient = useQueryClient();
 
   async function handleAllNotesClick() {
+    setFeedType("all");
     setAppFocus({ panel: "sidebar", isFocused: true });
     if (feedType === "all") {
       return;
@@ -27,7 +28,6 @@ export function AllNotesBtn() {
     setActiveTag(undefined);
     await AppService.ClearActiveNotebooks();
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
-    setFeedType("all");
     await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
     await queryClient.invalidateQueries({ queryKey: ["tags"] });
   }

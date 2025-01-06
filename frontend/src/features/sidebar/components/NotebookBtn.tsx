@@ -20,18 +20,16 @@ export function NotebookBtn({ notebook }: Props) {
   const queryClient = useQueryClient();
 
   async function handleClick() {
+    setFeedType("notebook");
     setAppFocus({ panel: "sidebar", isFocused: true });
     console.log("Clicked");
     if (feedType === "notebook" && notebook.Active) {
       return;
     }
-    if (feedType === "trash" || feedType === "notebook") {
-      setActiveNote(undefined);
-      await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
-      await AppService.ClearActiveNote();
-    }
+    setActiveNote(undefined);
+    await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
+    await AppService.ClearActiveNote();
     console.log("Setting Feed Type to notebook");
-    setFeedType("notebook");
     setActiveNotebook(notebook);
     setActiveTag(undefined);
     void queryClient.invalidateQueries({ queryKey: ["activeNote"] });

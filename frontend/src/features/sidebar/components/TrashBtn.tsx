@@ -16,6 +16,7 @@ export function TrashBtn() {
   const queryClient = useQueryClient();
 
   async function handleClick() {
+    setFeedType("trash");
     setAppFocus({ panel: "sidebar", isFocused: true });
     if (feedType === "trash") {
       return;
@@ -25,7 +26,6 @@ export function TrashBtn() {
       await AppService.ClearActiveNote();
     }
     setActiveNote(undefined);
-    setFeedType("trash");
     setActiveNotebook(undefined);
     setActiveTag(undefined);
     await AppService.ClearActiveNotebooks();
