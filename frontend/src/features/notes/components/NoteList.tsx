@@ -25,25 +25,30 @@ export const NoteList = () => {
     return <div>Error fetching notes</div>;
   }
 
+  const flattenedNotes = data.pages.flatMap((page) => page.data);
+
   return (
     <ScrollArea type="scroll" className="h-screen">
-      {data.pages.map((page, pageIndex) => (
-        <div className="flex flex-col items-center px-3" key={pageIndex}>
-          {page.data.map((note, noteIndex) => (
-            <div
-              className="mx-3 flex w-full flex-col items-center"
-              key={noteIndex}
-              ref={assignRef(lastNoteRef, pageIndex, noteIndex, data)}
-            >
-              <NoteCard
-                note={note}
-                index={noteIndex}
-                length={page.data.length}
-              />
-            </div>
-          ))}
-        </div>
-      ))}
+      <div className="flex flex-col items-center px-3">
+        {flattenedNotes.map((note, index) => (
+          <div
+            className="mx-3 flex w-full flex-col items-center"
+            key={index}
+            ref={assignRef(
+              lastNoteRef,
+              Math.floor(index / data.pages[0].data.length),
+              index % data.pages[0].data.length,
+              data,
+            )}
+          >
+            <NoteCard
+              note={note}
+              index={index}
+              length={flattenedNotes.length}
+            />
+          </div>
+        ))}
+      </div>
     </ScrollArea>
   );
 };

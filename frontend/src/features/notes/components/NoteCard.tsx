@@ -31,6 +31,7 @@ export function NoteCard({ note, index, length }: Props) {
   async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     if (note.Active) {
+      setActiveNote(note);
       setAppFocus({ panel: "feed", isFocused: true });
       return;
     }
@@ -54,9 +55,7 @@ export function NoteCard({ note, index, length }: Props) {
         data-active={isDataActive}
         className={cn(
           "relative flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm",
-          note.Active &&
-            activeNote?.ID === note.ID &&
-            "bg-muted/70 data-[active=true]:bg-blue-500/50",
+          note.Active && "bg-muted/70 data-[active=true]:bg-blue-500/50",
         )}
       >
         <div
@@ -94,7 +93,7 @@ export function NoteCard({ note, index, length }: Props) {
               </span>
               {note.PublishedAt && (
                 <Tooltip delayDuration={200}>
-                  <TooltipTrigger className="cursor-default">
+                  <TooltipTrigger asChild className="cursor-default">
                     <span
                       data-active={isDataActive}
                       className="cursor-default select-none text-xs text-blue-500/60 data-[active=true]:text-secondary-foreground"

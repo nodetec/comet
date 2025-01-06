@@ -3,7 +3,7 @@ import { AppService } from "&/comet/backend/service/";
 import { useAppState } from "~/store";
 
 const useNotes = () => {
-  const noteSearch = useAppState((state) => state.noteSearch);
+  const search = useAppState((state) => state.noteSearch);
   const activeNotebook = useAppState((state) => state.activeNotebook);
   const orderBy = useAppState((state) => state.orderBy);
   const timeSortDirection = useAppState((state) => state.timeSortDirection);
@@ -11,25 +11,35 @@ const useNotes = () => {
   const feedType = useAppState((state) => state.feedType);
 
   async function fetchNotes({ pageParam = 1 }) {
-    const limit = 20;
-    const offset = pageParam;
+    const limit = 10;
+    const offset = (pageParam - 1) * limit;
 
-    const sortDirection =
+    console.log("offset", offset);
+
+    const orderDirection =
       orderBy === "title" ? titleSortDirection : timeSortDirection;
+
+    console.log("orderBy", orderBy);
+
+    const showTrashed = feedType === "trash";
 
     const notes = await AppService.GetNotes(
       orderBy,
-      sortDirection,
+      orderDirection,
       limit,
       offset,
-      noteSearch,
-      feedType === "trash" ? true : false,
+      search,
+      showTrashed,
     );
+
+    for (const note of notes) {
+      console.log("note", note.Title);
+    }
 
     return {
       data: notes || [],
-      nextPage: offset + 1,
-      nextCursor: notes.length === limit ? offset + 1 : undefined,
+      nextPage: pageParam + 1,
+      nextCursor: notes.length === limit ? pageParam + 1 : undefined,
     };
   }
 
@@ -38,15 +48,21 @@ const useNotes = () => {
       "notes",
       feedType,
       activeNotebook?.ID,
-      noteSearch,
+      search,
       orderBy,
       timeSortDirection,
       titleSortDirection,
     ],
     queryFn: fetchNotes,
     gcTime: 10000,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages, lastPageParam) => {
+      if (lastPage.data.length === 0) {
+        return undefined;
+      }
+
+      return lastPageParam + 1;
+    },
   });
 };
 

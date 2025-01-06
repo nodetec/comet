@@ -63,6 +63,7 @@ func GetNotes(orderBy string, orderDirection string, limit int, offset int, sear
 			query += " AND trashed_at IS NULL"
 		}
 		query += fmt.Sprintf(" ORDER BY %s %s LIMIT %d OFFSET %d", orderBy, orderDirection, limit, offset)
+		log.Printf("Query !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: %s", query)
 		err = db.DB.Select(&notes, query)
 		if err != nil {
 			log.Printf("Failed to retrieve notes: %v", err)
