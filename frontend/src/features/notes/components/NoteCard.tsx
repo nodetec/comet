@@ -95,7 +95,7 @@ export function NoteCard({ note, index, length }: Props) {
                   <TooltipTrigger asChild className="cursor-default">
                     <span
                       data-active={isDataActive}
-                      className="cursor-default select-none text-xs text-blue-500/60 data-[active=true]:text-secondary-foreground"
+                      className="cursor-default select-none text-xs text-blue-400/80 data-[active=true]:text-secondary-foreground"
                     >
                       <SendIcon className="h-4 w-4" />
                     </span>
