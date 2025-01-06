@@ -23,7 +23,6 @@ export function NoteCard({ note, index, length }: Props) {
 
   const feedType = useAppState((state) => state.feedType);
   const setActiveNote = useAppState((state) => state.setActiveNote);
-  const activeNote = useAppState((state) => state.activeNote);
 
   const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
