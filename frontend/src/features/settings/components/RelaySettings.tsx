@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import { PlusIcon, X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -109,76 +110,79 @@ export function RelaySettings({ relays }: Props) {
 
   return (
     <div className="flex flex-col space-y-4">
-      <h1 className="border-b border-muted pb-4 text-lg font-bold text-primary">
-        Relays
-      </h1>
-      <div className="mb-4 border-b border-muted py-4">
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="max-w-md space-y-8"
-          >
-            <div>
-              {fields.map((field, index) => (
-                <FormField
-                  control={form.control}
-                  key={field.id}
-                  name={`relays.${index}.URL`}
-                  render={({ field }) => (
-                    <FormItem className="pb-4">
-                      <FormControl>
-                        <div className="flex gap-4">
-                          <Input
-                            {...field}
-                            className="disabled:cursor-text disabled:opacity-100"
-                            disabled={loading}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:cursor-pointer disabled:opacity-100"
-                            disabled={loading}
-                            onClick={(e) => removeRelay(e, index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              ))}
-              <div className="mt-2 flex items-center gap-4">
-                <Button
-                  id="nostr-settings-add-relay-btn"
-                  name="nostr-settings-add-relay-btn"
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="disabled:cursor-pointer disabled:opacity-100"
-                  disabled={loading}
-                  onClick={(e) => appendRelay(e)}
-                >
-                  <PlusIcon />
-                  Relay
-                </Button>
-                <Button
-                  id="nostr-settings-submit-relay-btn"
-                  name="nostr-settings-submit-relay-btn"
-                  type="submit"
-                  variant="muted"
-                  size="sm"
-                  className="disabled:cursor-pointer disabled:opacity-100"
-                  disabled={loading}
-                >
-                  Save
-                </Button>
+      <ScrollArea type="scroll">
+        <h1 className="mx-12 border-b border-muted py-4 text-lg font-bold text-primary">
+          Relays
+        </h1>
+
+        <div className="mx-12 my-4 h-full py-4">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="max-w-md space-y-8"
+            >
+              <div>
+                {fields.map((field, index) => (
+                  <FormField
+                    control={form.control}
+                    key={field.id}
+                    name={`relays.${index}.URL`}
+                    render={({ field }) => (
+                      <FormItem className="pb-4">
+                        <FormControl>
+                          <div className="flex gap-4">
+                            <Input
+                              {...field}
+                              className="disabled:cursor-text disabled:opacity-100"
+                              disabled={loading}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 self-end rounded-md bg-transparent px-3 text-xs disabled:cursor-pointer disabled:opacity-100"
+                              disabled={loading}
+                              onClick={(e) => removeRelay(e, index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+                <div className="mt-2 flex items-center gap-4">
+                  <Button
+                    id="nostr-settings-add-relay-btn"
+                    name="nostr-settings-add-relay-btn"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="disabled:cursor-pointer disabled:opacity-100"
+                    disabled={loading}
+                    onClick={(e) => appendRelay(e)}
+                  >
+                    <PlusIcon />
+                    Relay
+                  </Button>
+                  <Button
+                    id="nostr-settings-submit-relay-btn"
+                    name="nostr-settings-submit-relay-btn"
+                    type="submit"
+                    variant="muted"
+                    size="sm"
+                    className="disabled:cursor-pointer disabled:opacity-100"
+                    disabled={loading}
+                  >
+                    Save
+                  </Button>
+                </div>
               </div>
-            </div>
-          </form>
-        </Form>
-      </div>
+            </form>
+          </Form>
+        </div>
+      </ScrollArea>
     </div>
   );
 }
