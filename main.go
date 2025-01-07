@@ -59,10 +59,12 @@ func main() {
 	createNoteMenu := menus.CreateNoteCardContextMenu(app)
 	createTrashNoteMenu := menus.CreateTrashNoteCardContextMenu(app)
 	createNotebookMenu := menus.CreateNotebookContextMenu(app)
+	createNoteFeedMenu := menus.CreateNoteFeedContextMenu(app)
 
 	app.RegisterContextMenu("note_card", createNoteMenu)
 	app.RegisterContextMenu("trash_note_card", createTrashNoteMenu)
 	app.RegisterContextMenu("notebook", createNotebookMenu)
+	app.RegisterContextMenu("note_feed", createNoteFeedMenu)
 
 	err := app.Run()
 

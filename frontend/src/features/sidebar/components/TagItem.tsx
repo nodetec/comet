@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { type Tag } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
+import { cn } from "~/lib/utils";
 import { useAppState } from "~/store";
 
 type Props = {
@@ -43,7 +44,10 @@ export function TagItem({ tag }: Props) {
         } as React.CSSProperties
       }
       onClick={handleTagClick}
-      className={`rouned-md flex cursor-default select-none items-center gap-2 truncate rounded-md bg-muted px-2 py-1 text-sm font-medium text-secondary-foreground ${tag.Active && "bg-blue-500/50 text-secondary-foreground"}`}
+      className={cn(
+        "rouned-md flex cursor-default select-none items-center gap-2 truncate rounded-md bg-muted px-2 py-1 text-sm font-medium text-secondary-foreground",
+        tag.Active && "bg-blue-500/50",
+      )}
     >
       #{truncateText(tag.Name, 20)}
     </div>

@@ -180,10 +180,24 @@ CREATE TABLE IF NOT EXISTS notebook_tags (
 CREATE INDEX IF NOT EXISTS idx_notebook_id ON notebook_tags(notebook_id);
 CREATE INDEX IF NOT EXISTS idx_tag_id ON notebook_tags(tag_id);
 
+-- Create sort_preferences table
+CREATE TABLE IF NOT EXISTS sort_preferences (
+    id INTEGER PRIMARY KEY,
+    notebook_id INTEGER,
+    sort_by TEXT NOT NULL DEFAULT 'date_edited',
+    sort_order TEXT NOT NULL DEFAULT 'desc',
+    FOREIGN KEY (notebook_id) REFERENCES notebooks(id) ON DELETE CASCADE
+);
+
+-- Create indexes for sort_preferences table
+CREATE INDEX IF NOT EXISTS idx_sort_order ON sort_preferences(sort_order);
+CREATE INDEX IF NOT EXISTS idx_notebook_id ON sort_preferences(notebook_id);
+
 -- +goose Down
 
 -- Drop all tables and triggers
-DROP TABLE IF EXISTS notebook_tags;
+DROP TABLE IF EXISTS sort_preferences;
+DROP TABLE IF NOT EXISTS notebook_tags;
 DROP TABLE IF NOT EXISTS notebooks;
 DROP TABLE IF NOT EXISTS notes_tags;
 DROP TABLE IF NOT EXISTS notes;

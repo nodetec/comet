@@ -37,6 +37,7 @@ export function usePublish() {
 
   const handlePublish = async (
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
+    onClose: () => void,
   ) => {
     e.preventDefault();
 
@@ -60,17 +61,31 @@ export function usePublish() {
 
     const secretKey = nip19.decode(nsec).data as Uint8Array;
 
-    const identifier = `${replaceSpacesWithDashes(note.Title)}-${randomId()}`;
+    let identifier;
+
+    if (note.Identifier && note.Author === npub) {
+      identifier = note.Identifier;
+    } else {
+      identifier = `${replaceSpacesWithDashes(note.Title)}-${randomId()}`;
+    }
+
+    const eventTags = [
+      ["d", identifier],
+      ["title", note.Title],
+      ["image", `${getFirstImage(note.Content)}`], // TODO: parse first image from content
+    ];
+
+    if (tags) {
+      tags.forEach((tag) => {
+        eventTags.push(["t", tag.Name]);
+      });
+    }
 
     const event = finalizeEvent(
       {
         kind: 30023,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ["d", identifier],
-          ["title", note.Title],
-          ["image", `${getFirstImage(note.Content)}`], // TODO: parse first image from content
-        ],
+        tags: eventTags,
         content: note.Content,
       },
       secretKey,
@@ -104,6 +119,7 @@ export function usePublish() {
       toast("Note posted", {
         description: "Your note was posted successfully.",
       });
+      onClose();
     } catch (error) {
       console.error("Error posting note", error);
       toast("Note failed to post", {

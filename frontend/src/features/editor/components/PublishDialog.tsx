@@ -35,7 +35,11 @@ export function PublishDialog() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publish Note</DialogTitle>
+          {note?.Identifier && note?.Author === user?.Npub ? (
+            <DialogTitle>Update Published Note</DialogTitle>
+          ) : (
+            <DialogTitle>Publish Note</DialogTitle>
+          )}
           <DialogDescription>Publish to the nostr network.</DialogDescription>
         </DialogHeader>
 
@@ -87,7 +91,9 @@ export function PublishDialog() {
           <Button variant="outline" onClick={() => setIsOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handlePublish}>Publish</Button>
+          <Button onClick={(e) => handlePublish(e, () => setIsOpen(false))}>
+            Publish
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

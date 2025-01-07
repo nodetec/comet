@@ -12,7 +12,7 @@ import (
 func CreateNoteCardContextMenu(app *application.App) *application.Menu {
 	contextMenu := app.NewMenu()
 
-	var moveToSubmenu = contextMenu.AddSubmenu("Move to")
+	var moveToSubmenu = contextMenu.AddSubmenu("Move To")
 
 	moveToSubmenu.AddSeparator()
 
