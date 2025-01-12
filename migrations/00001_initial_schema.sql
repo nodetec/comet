@@ -183,8 +183,8 @@ CREATE INDEX IF NOT EXISTS idx_tag_id ON notebook_tags(tag_id);
 -- Create sort_preferences table
 CREATE TABLE IF NOT EXISTS sort_preferences (
     id INTEGER PRIMARY KEY,
-    notebook_id INTEGER,
-    sort_by TEXT NOT NULL DEFAULT 'date_edited',
+    notebook_id INTEGER UNIQUE,
+    sort_by TEXT NOT NULL DEFAULT 'content_modified_at',
     sort_order TEXT NOT NULL DEFAULT 'desc',
     FOREIGN KEY (notebook_id) REFERENCES notebooks(id) ON DELETE CASCADE
 );
@@ -192,6 +192,11 @@ CREATE TABLE IF NOT EXISTS sort_preferences (
 -- Create indexes for sort_preferences table
 CREATE INDEX IF NOT EXISTS idx_sort_order ON sort_preferences(sort_order);
 CREATE INDEX IF NOT EXISTS idx_notebook_id ON sort_preferences(notebook_id);
+
+-- Insert default sort preference
+INSERT INTO sort_preferences (notebook_id, sort_by, sort_order)
+SELECT NULL, 'content_modified_at', 'desc'
+WHERE NOT EXISTS (SELECT 1 FROM sort_preferences WHERE notebook_id IS NULL);
 
 -- +goose Down
 

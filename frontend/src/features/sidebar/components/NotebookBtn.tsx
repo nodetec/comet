@@ -1,4 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { Events } from "@wailsio/runtime";
+import { WailsEvent } from "@wailsio/runtime/types/events";
 import { type Notebook } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
@@ -34,6 +36,10 @@ export function NotebookBtn({ notebook }: Props) {
     setActiveTag(undefined);
     void queryClient.invalidateQueries({ queryKey: ["activeNote"] });
     await AppService.SetNotebookActive(notebook.ID);
+    await Events.Emit({
+      name: "notebook_changed",
+      data: notebook.ID,
+    });
     void queryClient.invalidateQueries({ queryKey: ["notebooks"] });
     await AppService.ClearActiveTags();
     void queryClient.invalidateQueries({ queryKey: ["notes"] });
