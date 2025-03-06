@@ -14,7 +14,7 @@ export function OnChangeDebouncePlugin({
   onChange: (
     editorState: EditorState,
     editor: LexicalEditor,
-    tags: Set<string>,
+    tags: Set<string>
   ) => void;
   debounceTime?: number;
 }): null {
@@ -48,7 +48,7 @@ export function OnChangeDebouncePlugin({
           debounceTimeout.current = setTimeout(() => {
             onChange(editorState, editor, tags);
           }, debounceTime);
-        },
+        }
       );
     }
   }, [

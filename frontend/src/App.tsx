@@ -1,12 +1,12 @@
+import { Bar, Container, Section } from "@column-resizer/react";
+import { Separator } from "@radix-ui/react-separator";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "~/components/ui/resizable";
-import { EllipsisVerticalIcon } from "lucide-react";
 
-import { Button } from "./components/ui/button";
-import { Editor, PublishDialog } from "./features/editor";
+import { Editor } from "./features/editor";
 import { NoteList, NotesHeader, SearchBox } from "./features/notes";
 import { Sidebar } from "./features/sidebar";
 import useAppFocus from "./hooks/useAppFocus";
@@ -20,38 +20,40 @@ export default function ResizableLayout() {
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
-      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-        <ResizablePanel
-          className="min-w-44 select-none"
-          defaultSize={18.5}
-          minSize={18.5}
-          maxSize={20}
+      <Container className="flex h-full w-full">
+        <Section
+          className="select-none"
+          disableResponsive
+          defaultSize={200}
+          minSize={200}
+          maxSize={400}
         >
           <Sidebar />
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel
-          className="flex h-full min-w-60 select-none flex-col"
-          defaultSize={26}
-          minSize={26}
+        </Section>
+        <Bar className="flex cursor-col-resize items-center" size={10}>
+          <div className="h-full w-[5px] bg-secondary" />
+          <div className="h-full w-[1px] bg-border" />
+          <div className="h-full w-[5px] bg-background" />
+        </Bar>
+        <Section
+          className="select-none"
+          disableResponsive
+          defaultSize={400}
+          minSize={250}
         >
           <NotesHeader />
           <SearchBox />
           <NoteList />
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel minSize={40}>
-          <div className="flex h-screen flex-col select-none">
-            <div className="flex justify-end p-2">
-              <PublishDialog />
-              <Button type="button" variant="ghost" size="icon">
-                <EllipsisVerticalIcon />
-              </Button>
-            </div>
-            <Editor />
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </Section>
+        <Bar className="flex cursor-col-resize items-center" size={10}>
+          <div className="h-full w-[5px] bg-background" />
+          <div className="h-full w-[1px] bg-border" />
+          <div className="h-full w-[5px] bg-background" />
+        </Bar>
+        <Section minSize={400}>
+          <Editor />
+        </Section>
+      </Container>
     </div>
   );
 }

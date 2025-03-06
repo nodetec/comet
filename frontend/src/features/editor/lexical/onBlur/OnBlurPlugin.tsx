@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { BLUR_COMMAND, COMMAND_PRIORITY_EDITOR, type LexicalEditor } from "lexical";
+import {
+  BLUR_COMMAND,
+  COMMAND_PRIORITY_EDITOR,
+  type LexicalEditor,
+} from "lexical";
 
 export function OnBlurPlugin({
   onBlur,
@@ -16,7 +20,7 @@ export function OnBlurPlugin({
         onBlur(event, editor);
         return true;
       },
-      COMMAND_PRIORITY_EDITOR,
+      COMMAND_PRIORITY_EDITOR
     );
   }, [editor, onBlur]);
 

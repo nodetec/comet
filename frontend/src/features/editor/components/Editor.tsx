@@ -1,8 +1,9 @@
-import { CodeNode } from "@lexical/code";
+import { CodeHighlightNode, CodeNode } from "@lexical/code";
 import { HashtagNode } from "@lexical/hashtag";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
+import { ClickableLinkPlugin } from "@lexical/react/LexicalClickableLinkPlugin";
 import {
   LexicalComposer,
   type InitialConfigType,
@@ -11,6 +12,8 @@ import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
+import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
+import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
@@ -20,11 +23,27 @@ import { useAppState } from "~/store";
 import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
 
 import { useSaveNote } from "../hooks/useSaveNote";
-import { CustomHashtagPlugin } from "../plugins/CustomHashtagPlugin";
-import { OnBlurPlugin } from "../plugins/OnBlurPlugin";
-import { OnChangeDebouncePlugin } from "../plugins/OnChangeDebouncePlugin";
-import { OnFocusPlugin } from "../plugins/OnFocus";
-import { ScrollCenterCurrentLinePlugin } from "../plugins/ScrollCenterCurrentLinePlugin";
+import AutoLinkPlugin from "../lexical/autolink/AutoLinkPlugin";
+import { MarkdownCodeBlockShortcutPlugin } from "../lexical/codeblock/MarkdownCodeBlockShortcutPlugin";
+import { CustomHashtagPlugin } from "../lexical/customHashtag/CustomHashtagPlugin";
+import { ImageNode } from "../lexical/markdownImage/ImageNode";
+import ImagePastePlugin from "../lexical/markdownImage/ImagePastePlugin";
+import IMAGE_TRANSFORMER from "../lexical/markdownImage/ImageTransformer";
+import { ProfileNode } from "../lexical/nostrProfile/NostrProfileNode";
+import { ProfilePastePlugin } from "../lexical/nostrProfile/ProfilePastePlugin";
+import ProfilePlugin, {
+  ProfileMarkdownPlugin,
+} from "../lexical/nostrProfile/ProfilePlugin";
+import { PROFILE_TRANSFORMER } from "../lexical/nostrProfile/ProfileTransformer";
+import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebouncePlugin";
+import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
+import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
+import TabKeyPlugin from "../lexical/tabKey/TabKeyPlugin";
+import { ToolbarPlugin } from "../lexical/toolbar/ToolbarPlugin";
+import { TweetNode } from "../lexical/tweet/TwitterNode";
+import { TWITTER_TRANSFORMER } from "../lexical/tweet/TwitterTransformer";
+import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
+import { YOUTUBE_TRANSFORMER } from "../lexical/youtube/YouTubeTransformer";
 import DefaultTheme from "../themes/DefaultTheme";
 
 function onError(error: Error) {
@@ -38,26 +57,32 @@ export function Editor() {
 
   const setAppFocus = useAppState((state) => state.setAppFocus);
 
-  const UPDATED_TRANSFORMERS = [...TRANSFORMERS];
+  const COMBINED_TRANSFORMERS = [
+    IMAGE_TRANSFORMER,
+    TWITTER_TRANSFORMER,
+    YOUTUBE_TRANSFORMER,
+    PROFILE_TRANSFORMER,
+    ...TRANSFORMERS,
+  ];
 
   if (!activeNote) {
     return null;
   }
 
-  function onBlur(_event: FocusEvent, editor: LexicalEditor) {
-    $setSelection(null);
-    saveNote.mutate({
-      note: activeNote,
-      editor,
-      transformers: UPDATED_TRANSFORMERS,
-    });
-  }
+  // function onBlur(_event: FocusEvent, editor: LexicalEditor) {
+  //   $setSelection(null);
+  //   saveNote.mutate({
+  //     note: activeNote,
+  //     editor,
+  //     transformers: COMBINED_TRANSFORMERS,
+  //   });
+  // }
 
   function onChange(editorState: EditorState) {
     saveNote.mutate({
       note: activeNote,
       editor: editorState,
-      transformers: UPDATED_TRANSFORMERS,
+      transformers: COMBINED_TRANSFORMERS,
       shouldInvalidate: true,
     });
   }
@@ -67,19 +92,19 @@ export function Editor() {
     setAppFocus({ panel: "editor", isFocused: true });
   }
 
-  function handleClick(event: React.MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
-    if (feedType === "trash") {
-      setAppFocus({ panel: "editor", isFocused: true });
-    }
-  }
+  // function handleClick(event: React.MouseEvent<HTMLDivElement>) {
+  //   event.preventDefault();
+  //   if (feedType === "trash") {
+  //     setAppFocus({ panel: "editor", isFocused: true });
+  //   }
+  // }
 
   function getInitalContent() {
     $convertFromMarkdownString(
       activeNote?.Content ?? "",
-      UPDATED_TRANSFORMERS,
+      COMBINED_TRANSFORMERS,
       undefined,
-      false,
+      true,
     );
     $setSelection(null);
   }
@@ -88,18 +113,24 @@ export function Editor() {
     namespace: "CometEditor",
     editorState: () => getInitalContent(),
     nodes: [
-      HorizontalRuleNode,
-      QuoteNode,
       HeadingNode,
-      CodeNode,
       ListNode,
       ListItemNode,
+      CodeHighlightNode,
+      CodeNode,
+      HorizontalRuleNode,
+      QuoteNode,
+      ImageNode,
       LinkNode,
       AutoLinkNode,
       HashtagNode,
-      // ImageNode,
-      // BannerNode,
+      CodeNode,
+      CodeHighlightNode,
+      TweetNode,
+      YouTubeNode,
+      ProfileNode,
     ],
+
     onError,
     theme: DefaultTheme,
     editable: feedType === "trash" ? false : true,
@@ -107,29 +138,42 @@ export function Editor() {
 
   return (
     <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
-      <RichTextPlugin
-        contentEditable={
-          <ScrollArea type="scroll">
-            <ContentEditable
-              onClick={handleClick}
-              className="min-h-[calc(100vh-4rem)] flex-auto select-text flex-col px-16 pb-[50%] caret-sky-500/90 focus-visible:outline-none"
-            />
-          </ScrollArea>
-        }
-        ErrorBoundary={LexicalErrorBoundary}
-      />
+      <ToolbarPlugin />
+      <div className="relative flex h-full flex-1 cursor-text justify-center">
+        <RichTextPlugin
+          contentEditable={
+            <ScrollArea className="flex h-full flex-1 flex-col" type="scroll">
+              <ContentEditable className="z- mx-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
+            </ScrollArea>
+          }
+          placeholder={
+            <div className="pointer-events-none absolute inset-0 py-8 text-muted-foreground"></div>
+          }
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+      </div>
 
       {!activeNote.TrashedAt && (
         <>
           <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
-          <OnBlurPlugin onBlur={onBlur} />
+          {/* <OnBlurPlugin onBlur={onBlur} /> */}
           <OnFocusPlugin onFocus={onFocus} />
         </>
       )}
-      <MarkdownShortcutPlugin transformers={UPDATED_TRANSFORMERS} />
+      <MarkdownShortcutPlugin transformers={COMBINED_TRANSFORMERS} />
+      <ImagePastePlugin />
+      <TabKeyPlugin tabSize={2} useSpaces={true} />
+      <ListPlugin />
       <HistoryPlugin />
       <CustomHashtagPlugin />
       <ScrollCenterCurrentLinePlugin />
+      <LinkPlugin />
+      <ClickableLinkPlugin />
+      <AutoLinkPlugin />
+      <ProfilePlugin />
+      <ProfilePastePlugin />
+      <ProfileMarkdownPlugin />
+      <MarkdownCodeBlockShortcutPlugin />
     </LexicalComposer>
   );
 }

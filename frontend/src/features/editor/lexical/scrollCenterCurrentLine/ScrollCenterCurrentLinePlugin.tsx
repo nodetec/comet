@@ -14,7 +14,7 @@ interface ScrollCenterCurrentLinePluginProps {
 }
 
 export const ScrollCenterCurrentLinePlugin = ({
-  viewportPercentage = 10,
+  viewportPercentage = 30,
 }: ScrollCenterCurrentLinePluginProps) => {
   const [editor] = useLexicalComposerContext();
   const currentLineRef = useRef<HTMLDivElement | null>(null);
@@ -22,7 +22,7 @@ export const ScrollCenterCurrentLinePlugin = ({
   useEffect(() => {
     return editor.registerCommand<string>(
       KEY_ENTER_COMMAND,
-      (_) => {
+      () => {
         editor.getEditorState().read(() => {
           const root = $getRoot();
           const children = root.getChildren();
@@ -65,7 +65,7 @@ export const ScrollCenterCurrentLinePlugin = ({
         });
         return true;
       },
-      COMMAND_PRIORITY_CRITICAL,
+      COMMAND_PRIORITY_CRITICAL
     );
   }, [editor, viewportPercentage]);
 
