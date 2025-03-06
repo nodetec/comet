@@ -6,9 +6,9 @@
         <key>CFBundleName</key>
         <string>My Product</string>
         <key>CFBundleExecutable</key>
-        <string>comet</string>
+        <string>Comet-Alpha</string>
         <key>CFBundleIdentifier</key>
-        <string>com.wails.comet</string>
+        <string>com.nodetec.comet-alpha</string>
         <key>CFBundleVersion</key>
         <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
