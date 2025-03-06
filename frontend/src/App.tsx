@@ -1,10 +1,4 @@
 import { Bar, Container, Section } from "@column-resizer/react";
-import { Separator } from "@radix-ui/react-separator";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "~/components/ui/resizable";
 
 import { Editor } from "./features/editor";
 import { NoteList, NotesHeader, SearchBox } from "./features/notes";
@@ -20,7 +14,7 @@ export default function ResizableLayout() {
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
-      <Container className="flex h-full w-full">
+      <Container className="h-full w-full">
         <Section
           className="select-none"
           disableResponsive
@@ -36,7 +30,7 @@ export default function ResizableLayout() {
           <div className="h-full w-[5px] bg-background" />
         </Bar>
         <Section
-          className="select-none"
+          className="flex h-full select-none flex-col"
           disableResponsive
           defaultSize={400}
           minSize={250}
@@ -51,7 +45,9 @@ export default function ResizableLayout() {
           <div className="h-full w-[5px] bg-background" />
         </Bar>
         <Section minSize={400}>
-          <Editor />
+          <div className="flex h-screen select-none flex-col">
+            <Editor />
+          </div>
         </Section>
       </Container>
     </div>

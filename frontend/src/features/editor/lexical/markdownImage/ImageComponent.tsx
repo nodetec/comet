@@ -1,15 +1,17 @@
-/* eslint-disable @next/next/no-img-element */
-
-import type { JSX } from "react";
-// import "./ImageNode.css";
-
-import * as React from "react";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type JSX,
+} from "react";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import { mergeRegister } from "@lexical/utils";
+import { cn } from "~/lib/utils";
 import {
   $getSelection,
   $isNodeSelection,
@@ -45,7 +47,7 @@ export const RIGHT_CLICK_IMAGE_COMMAND: LexicalCommand<MouseEvent> =
 // }
 function useSuspenseImage(src: string) {
   if (!imageCache.has(src)) {
-    // TODO: figure out what is going on here 
+    // TODO: figure out what is going on here
     // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw new Promise((resolve) => {
       const img = new Image();
@@ -83,15 +85,15 @@ function LazyImage({
   useSuspenseImage(src);
   return (
     <img
-      className={className ?? undefined}
+      // use tailwindcss classnames
+      // make sure image has a max size
+      className={cn(
+        className,
+        "h-auto lg:max-w-[400px] object-contain",
+      )}
       src={src}
       alt={altText}
       ref={imageRef}
-      style={{
-        height,
-        maxWidth,
-        width,
-      }}
       onError={onError}
       draggable="false"
     />

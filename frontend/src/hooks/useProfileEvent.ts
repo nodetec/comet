@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { getProfileEvent } from "~/lib/nostr/getProfileEvent";
 import { type Event } from "nostr-tools";
+import { type Relay } from "&/comet/backend/models/models";
 
 export const useProfileEvent = (
-  relays: string[] | undefined,
+  relays: Relay[] | null | undefined,
   publicKey: string | undefined,
 ) => {
   return useQuery<Event | null>({

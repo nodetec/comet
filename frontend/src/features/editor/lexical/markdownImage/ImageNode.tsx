@@ -6,21 +6,22 @@
  *
  */
 
-import type {
-  DOMConversionMap,
-  DOMConversionOutput,
-  DOMExportOutput,
-  EditorConfig,
-  LexicalNode,
-  LexicalUpdateJSON,
-  NodeKey,
-  SerializedLexicalNode,
-  Spread,
-} from "lexical";
 import type { JSX } from "react";
 
-import { $applyNodeReplacement, DecoratorNode } from "lexical";
-import * as React from "react";
+import {
+  $applyNodeReplacement,
+  DecoratorNode,
+  type DOMConversionMap,
+  type DOMConversionOutput,
+  type DOMExportOutput,
+  type EditorConfig,
+  type LexicalNode,
+  type LexicalUpdateJSON,
+  type NodeKey,
+  type SerializedLexicalNode,
+  type Spread,
+} from "lexical";
+
 import ImageComponent from "./ImageComponent";
 
 export interface ImagePayload {
@@ -80,7 +81,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
       node.__maxWidth,
       node.__width,
       node.__height,
-      node.__key
+      node.__key,
     );
   }
 
@@ -124,7 +125,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     maxWidth: number,
     width?: "inherit" | number,
     height?: "inherit" | number,
-    key?: NodeKey
+    key?: NodeKey,
   ) {
     super(key);
     this.__src = src;
@@ -147,7 +148,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
 
   setWidthAndHeight(
     width: "inherit" | number,
-    height: "inherit" | number
+    height: "inherit" | number,
   ): void {
     const writable = this.getWritable();
     writable.__width = width;
@@ -201,12 +202,12 @@ export function $createImageNode({
   key,
 }: ImagePayload): ImageNode {
   return $applyNodeReplacement(
-    new ImageNode(src, altText, maxWidth, width, height, key)
+    new ImageNode(src, altText, maxWidth, width, height, key),
   );
 }
 
 export function $isImageNode(
-  node: LexicalNode | null | undefined
+  node: LexicalNode | null | undefined,
 ): node is ImageNode {
   return node instanceof ImageNode;
 }

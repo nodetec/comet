@@ -1,0 +1,4 @@
+.textCode {
+  border-radius: var(--radius);
+  font-family: monospace;
+}

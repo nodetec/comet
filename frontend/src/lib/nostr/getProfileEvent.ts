@@ -1,7 +1,8 @@
+import { type Relay } from "&/comet/backend/models/models";
 import { SimplePool } from "nostr-tools";
 
 export async function getProfileEvent(
-  relays: string[] | undefined,
+  relays: Relay[] | null | undefined,
   publicKey: string | undefined,
 ) {
   if (!publicKey) return null;
@@ -9,12 +10,14 @@ export async function getProfileEvent(
 
   const pool = new SimplePool();
 
-  const profileEvent = await pool.get(relays, {
+  const relayUrls = relays.map((relay) => relay.URL);
+
+  const profileEvent = await pool.get(relayUrls, {
     kinds: [0],
     authors: [publicKey],
   });
 
-  pool.close(relays);
+  pool.close(relayUrls);
 
   return profileEvent;
 }

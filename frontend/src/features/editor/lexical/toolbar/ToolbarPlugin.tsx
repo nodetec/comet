@@ -181,7 +181,7 @@ export function ToolbarPlugin() {
   };
 
   return (
-    <div className="flex w-full items-center p-2 px-2 border-b">
+    <div className="flex w-full items-center px-2">
       <div className="flex w-full items-center gap-2">
         <div className="flex items-center gap-2">
           {RICH_TEXT_OPTIONS.map(({ id, icon }, index) =>

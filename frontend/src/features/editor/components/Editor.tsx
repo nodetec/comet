@@ -29,12 +29,6 @@ import { CustomHashtagPlugin } from "../lexical/customHashtag/CustomHashtagPlugi
 import { ImageNode } from "../lexical/markdownImage/ImageNode";
 import ImagePastePlugin from "../lexical/markdownImage/ImagePastePlugin";
 import IMAGE_TRANSFORMER from "../lexical/markdownImage/ImageTransformer";
-import { ProfileNode } from "../lexical/nostrProfile/NostrProfileNode";
-import { ProfilePastePlugin } from "../lexical/nostrProfile/ProfilePastePlugin";
-import ProfilePlugin, {
-  ProfileMarkdownPlugin,
-} from "../lexical/nostrProfile/ProfilePlugin";
-import { PROFILE_TRANSFORMER } from "../lexical/nostrProfile/ProfileTransformer";
 import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebouncePlugin";
 import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
@@ -61,7 +55,6 @@ export function Editor() {
     IMAGE_TRANSFORMER,
     TWITTER_TRANSFORMER,
     YOUTUBE_TRANSFORMER,
-    PROFILE_TRANSFORMER,
     ...TRANSFORMERS,
   ];
 
@@ -128,7 +121,6 @@ export function Editor() {
       CodeHighlightNode,
       TweetNode,
       YouTubeNode,
-      ProfileNode,
     ],
 
     onError,
@@ -138,20 +130,17 @@ export function Editor() {
 
   return (
     <LexicalComposer key={activeNote?.ID} initialConfig={initialConfig}>
-      <ToolbarPlugin />
-      <div className="relative flex h-full flex-1 cursor-text justify-center">
-        <RichTextPlugin
-          contentEditable={
-            <ScrollArea className="flex h-full flex-1 flex-col" type="scroll">
-              <ContentEditable className="z- mx-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
-            </ScrollArea>
-          }
-          placeholder={
-            <div className="pointer-events-none absolute inset-0 py-8 text-muted-foreground"></div>
-          }
-          ErrorBoundary={LexicalErrorBoundary}
-        />
+      <div className="flex w-full justify-center border-b bg-background py-2">
+        <ToolbarPlugin />
       </div>
+      <RichTextPlugin
+        contentEditable={
+          <ScrollArea className="flex flex-1 flex-col" type="scroll">
+            <ContentEditable className="mx-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
+          </ScrollArea>
+        }
+        ErrorBoundary={LexicalErrorBoundary}
+      />
 
       {!activeNote.TrashedAt && (
         <>
@@ -170,9 +159,6 @@ export function Editor() {
       <LinkPlugin />
       <ClickableLinkPlugin />
       <AutoLinkPlugin />
-      <ProfilePlugin />
-      <ProfilePastePlugin />
-      <ProfileMarkdownPlugin />
       <MarkdownCodeBlockShortcutPlugin />
     </LexicalComposer>
   );
