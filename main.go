@@ -25,7 +25,7 @@ func main() {
 	db.Init(embedMigrations)
 
 	app := application.New(application.Options{
-		Name:        "Comet",
+		Name:        "Comet-Alpha",
 		Description: "Desktop note taking app for nostr",
 		Services: []application.Service{
 			application.NewService(&service.AppService{}), // Add the AppService here
@@ -46,7 +46,7 @@ func main() {
 		Width:     1200,
 		Height:    600,
 		URL:       "/",
-		MinWidth:  500,
+		MinWidth:  900,
 		MinHeight: 250,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
