@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 
 	"embed"
@@ -21,6 +22,13 @@ func Init(embedMigrations embed.FS) {
 
 	// Get the data home directory
 	dbPath := filepath.Join(xdg.DataHome, "comet", "comet-alpha.db")
+
+	// Create the directory for the database if it doesn't exist
+	dir := filepath.Dir(dbPath)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		log.Fatalf("Failed to create directory for database: %v", err)
+	}
 
 	// Set PRAGMAs in the connection string
 	dbConn, err := sqlx.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL&_synchronous=NORMAL&_temp_store=MEMORY&_cache_size=-2000")
