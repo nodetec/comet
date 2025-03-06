@@ -20,7 +20,7 @@ func Init(embedMigrations embed.FS) {
 	var err error
 
 	// Get the data home directory
-	dbPath := filepath.Join(xdg.DataHome, "comet", "comet-beta.db")
+	dbPath := filepath.Join(xdg.DataHome, "comet", "comet-alpha.db")
 
 	// Set PRAGMAs in the connection string
 	dbConn, err := sqlx.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL&_synchronous=NORMAL&_temp_store=MEMORY&_cache_size=-2000")
