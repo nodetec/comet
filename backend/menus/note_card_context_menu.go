@@ -52,9 +52,6 @@ func CreateNoteCardContextMenu(app *application.App) *application.Menu {
 		}
 	}
 
-	moveToSubmenu.Add("Test").OnClick(func(data *application.Context) {
-	})
-
 	contextMenu.Add("Trash").OnClick(func(data *application.Context) {
 		contextMenuData := data.ContextMenuData()
 		app.Logger.Info("Context menu data", "data", contextMenuData)
