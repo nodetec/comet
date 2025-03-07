@@ -40,15 +40,9 @@ type YouTubeComponentProps = Readonly<{
   videoID: string;
 }>;
 
-function YouTubeComponent({
-  className,
-  format,
-  nodeKey,
-  videoID,
-}: YouTubeComponentProps) {
+function YouTubeComponent({ format, nodeKey, videoID }: YouTubeComponentProps) {
   const [editor] = useLexicalComposerContext();
-  const [isSelected, setSelected, clearSelection] =
-    useLexicalNodeSelection(nodeKey);
+  const [isSelected, , clearSelection] = useLexicalNodeSelection(nodeKey);
   const isEditable = useLexicalEditable();
 
   const deleteNode = useCallback(() => {
@@ -276,7 +270,7 @@ export class YouTubeNode extends DecoratorBlockNode {
   }
 
   decorate(_editor: LexicalEditor, config: EditorConfig): JSX.Element {
-    const embedBlockTheme = config.theme.embedBlock || {};
+    const embedBlockTheme = config.theme.embedBlock ?? {};
     const className = {
       base: embedBlockTheme.base ?? "",
       focus: embedBlockTheme.focus ?? "",

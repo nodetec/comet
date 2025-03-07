@@ -2,18 +2,12 @@ import React, { useEffect, useState } from "react";
 
 import { $isListNode, ListNode } from "@lexical/list";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  $createHeadingNode,
-  $isHeadingNode,
-  type HeadingTagType,
-} from "@lexical/rich-text";
-import { $setBlocksType } from "@lexical/selection";
+import { $isHeadingNode } from "@lexical/rich-text";
 import { $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
 import {
-  $createParagraphNode,
   $getSelection,
   $isRangeSelection,
   CAN_REDO_COMMAND,
@@ -27,11 +21,10 @@ import { EllipsisVerticalIcon } from "lucide-react";
 
 import { PublishDialog } from "../../components/PublishDialog";
 import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
-import TwitterAction from "../tweet/TwitterActions";
+import { MarkdownImagePlugin } from "../markdownImage/MarkdownImagePlugin";
 import YoutubeAction from "../youtube/YouTubeActions";
 import { LOW_PRIORIRTY, RICH_TEXT_OPTIONS, RichTextAction } from "./constants";
 import { useKeyBinds } from "./hooks/useKeybinds";
-import { MarkdownImagePlugin } from "../markdownImage/MarkdownImagePlugin";
 
 export function ToolbarPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -41,6 +34,7 @@ export function ToolbarPlugin() {
   });
   const [selectionMap, setSelectionMap] = useState<Record<string, boolean>>({});
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const blockTypeToName: Record<string, string> = {
     paragraph: "Paragraph",
     h1: "Heading 1",
@@ -165,20 +159,6 @@ export function ToolbarPlugin() {
   };
 
   useKeyBinds({ onAction });
-
-  const updateFormat = (heading: HeadingTagType | "paragraph") => {
-    editor.update(() => {
-      const selection = $getSelection();
-
-      if ($isRangeSelection(selection)) {
-        if (heading === "paragraph") {
-          $setBlocksType(selection, () => $createParagraphNode());
-        } else {
-          $setBlocksType(selection, () => $createHeadingNode(heading));
-        }
-      }
-    });
-  };
 
   return (
     <div className="flex w-full items-center px-2">

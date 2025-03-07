@@ -27,7 +27,7 @@
   },
   "esModuleInterop": true,
   "allowSyntheticDefaultImports": true,
-  "include": ["src", ".eslintrc.cjs", "tailwind.config.js"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", ".eslintrc.cjs"],
   "references": [
     {
       "path": "./tsconfig.node.json"

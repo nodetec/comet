@@ -26,18 +26,16 @@ import { useSaveNote } from "../hooks/useSaveNote";
 import AutoLinkPlugin from "../lexical/autolink/AutoLinkPlugin";
 import { MarkdownCodeBlockShortcutPlugin } from "../lexical/codeblock/MarkdownCodeBlockShortcutPlugin";
 import { CustomHashtagPlugin } from "../lexical/customHashtag/CustomHashtagPlugin";
+import { MarkdownImageNode } from "../lexical/markdownImage/nodes/MarkdownImageNode";
+import { MARKDOWN_IMAGE_TRANSFORMER } from "../lexical/markdownImage/transformers/MarkdownImageTransformer";
 import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebouncePlugin";
 import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
 import TabKeyPlugin from "../lexical/tabKey/TabKeyPlugin";
 import { ToolbarPlugin } from "../lexical/toolbar/ToolbarPlugin";
-import { TweetNode } from "../lexical/tweet/TwitterNode";
-import { TWITTER_TRANSFORMER } from "../lexical/tweet/TwitterTransformer";
 import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
 import { YOUTUBE_TRANSFORMER } from "../lexical/youtube/YouTubeTransformer";
 import DefaultTheme from "../themes/DefaultTheme";
-import { MARKDOWN_IMAGE_TRANSFORMER } from "../lexical/markdownImage/transformers/MarkdownImageTransformer";
-import { MarkdownImageNode } from "../lexical/markdownImage/nodes/MarkdownImageNode";
 
 function onError(error: Error) {
   console.error(error);
@@ -52,7 +50,6 @@ export function Editor() {
 
   const COMBINED_TRANSFORMERS = [
     MARKDOWN_IMAGE_TRANSFORMER,
-    TWITTER_TRANSFORMER,
     YOUTUBE_TRANSFORMER,
     ...TRANSFORMERS,
   ];
@@ -60,15 +57,6 @@ export function Editor() {
   if (!activeNote) {
     return null;
   }
-
-  // function onBlur(_event: FocusEvent, editor: LexicalEditor) {
-  //   $setSelection(null);
-  //   saveNote.mutate({
-  //     note: activeNote,
-  //     editor,
-  //     transformers: COMBINED_TRANSFORMERS,
-  //   });
-  // }
 
   function onChange(editorState: EditorState) {
     saveNote.mutate({
@@ -118,7 +106,6 @@ export function Editor() {
       HashtagNode,
       CodeNode,
       CodeHighlightNode,
-      TweetNode,
       YouTubeNode,
     ],
 
@@ -135,7 +122,7 @@ export function Editor() {
       <RichTextPlugin
         contentEditable={
           <ScrollArea className="flex flex-1 flex-col" type="scroll">
-            <ContentEditable className="px-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
+            <ContentEditable className="min-h-screen flex-auto select-text flex-col px-16 pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}
@@ -144,7 +131,6 @@ export function Editor() {
       {!activeNote.TrashedAt && (
         <>
           <OnChangeDebouncePlugin onChange={onChange} debounceTime={500} />
-          {/* <OnBlurPlugin onBlur={onBlur} /> */}
           <OnFocusPlugin onFocus={onFocus} />
         </>
       )}

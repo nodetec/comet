@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "comet"
+name: "comet-alpha"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/comet"
-    dst: "/usr/local/bin/comet"
+  - src: "./bin/comet-alpha"
+    dst: "/usr/local/bin/comet-alpha"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/comet.png"
-  - src: "./build/comet.desktop"
-    dst: "/usr/share/applications/comet.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/comet-alpha.png"
+  - src: "./build/linux/comet-alpha.desktop"
+    dst: "/usr/share/applications/comet-alpha.desktop"
 
 depends:
   - gtk3
@@ -44,7 +44,7 @@ depends:
 #   - not-bar
 # changelog: "changelog.yaml"
 # scripts:
-#   preinstall: ./build/nfpm/scripts/preinstall.sh
-#   postinstall: ./build/nfpm/scripts/postinstall.sh
-#   preremove: ./build/nfpm/scripts/preremove.sh
-#   postremove: ./build/nfpm/scripts/postremove.sh
+#   preinstall: ./build/linux/nfpm/scripts/preinstall.sh
+#   postinstall: ./build/linux/nfpm/scripts/postinstall.sh
+#   preremove: ./build/linux/nfpm/scripts/preremove.sh
+#   postremove: ./build/linux/nfpm/scripts/postremove.sh

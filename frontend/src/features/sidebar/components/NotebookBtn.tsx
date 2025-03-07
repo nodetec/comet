@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Events } from "@wailsio/runtime";
-import { WailsEvent } from "@wailsio/runtime/types/events";
 import { type Notebook } from "&/comet/backend/models/models";
 import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
