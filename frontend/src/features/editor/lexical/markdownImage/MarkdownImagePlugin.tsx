@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $insertNodeToNearestRoot } from "@lexical/utils";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -13,54 +12,23 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  $createParagraphNode,
-  $insertNodes,
-  COMMAND_PRIORITY_EDITOR,
-  createCommand,
-  type LexicalCommand,
-} from "lexical";
+import { $createParagraphNode, $insertNodes } from "lexical";
 import { ImageIcon } from "lucide-react";
 
-import { $createImageNode, ImageNode } from "./ImageNode";
+import { useImageInsertCommand } from "./hooks/useImageInsertCommand";
+import { useMarkdownImagePaste } from "./hooks/useMarkdownImagePaste";
+import { $createMarkdownImageNode } from "./nodes/MarkdownImageNode";
 
-export const INSERT_IMAGE_COMMAND: LexicalCommand<{
-  src: string;
-  altText: string;
-}> = createCommand("INSERT_IMAGE_COMMAND");
+export { INSERT_IMAGE_COMMAND } from "./hooks/useImageInsertCommand";
 
-export default function ImageAction() {
+export function MarkdownImagePlugin() {
   const [editor] = useLexicalComposerContext();
+  useImageInsertCommand(editor);
+  useMarkdownImagePaste(editor);
   const [src, setSrc] = useState("");
   const [altText, setAltText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!editor.hasNodes([ImageNode])) {
-      throw new Error("ImagePlugin: ImageNode not registered on editor");
-    }
-
-    return editor.registerCommand<{
-      src: string;
-      altText: string;
-    }>(
-      INSERT_IMAGE_COMMAND,
-      (payload) => {
-        const imageNode = $createImageNode(payload);
-
-        // Create a paragraph node after for better editing
-        const paragraphAfter = $createParagraphNode();
-
-        // Insert nodes at current selection
-        $insertNodeToNearestRoot(imageNode);
-        imageNode.insertAfter(paragraphAfter);
-
-        return true;
-      },
-      COMMAND_PRIORITY_EDITOR,
-    );
-  }, [editor]);
 
   const handleInsertImage = useCallback(() => {
     if (imageFile) {
@@ -70,7 +38,7 @@ export default function ImageAction() {
         const dataUrl = e.target?.result as string;
 
         editor.update(() => {
-          const imageNode = $createImageNode({
+          const imageNode = $createMarkdownImageNode({
             src: dataUrl,
             altText,
           });
@@ -92,7 +60,7 @@ export default function ImageAction() {
     } else if (src) {
       // For URLs
       editor.update(() => {
-        const imageNode = $createImageNode({
+        const imageNode = $createMarkdownImageNode({
           src,
           altText,
         });
@@ -114,8 +82,8 @@ export default function ImageAction() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="icon" variant="ghost">
-          <ImageIcon />
+        <Button size="icon-sm" variant="ghost">
+          <ImageIcon className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent>

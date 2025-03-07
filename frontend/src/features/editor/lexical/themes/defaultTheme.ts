@@ -36,10 +36,10 @@ export const defaultTheme: EditorThemeClasses = {
     ol: "list-decimal ml-4 list-inside",
   },
   embedBlock: {
-    base: "p-4",
+    base: "p-8 cursor-default w-full bg-background/30 flex justify-center border border-border/50 items-center rounded-md",
     focus: "ring-2 ring-blue-500 rounded-md",
   },
-  image: "editor-image",
+  image: "cursor-default relative select-none",
   inlineImage: "inline-editor-image",
   link: "text-blue-500 underline cursor-pointer",
 };

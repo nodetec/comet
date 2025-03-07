@@ -1,20 +1,10 @@
 import { useEffect } from "react";
-
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  $getSelection,
-  $isRangeSelection,
-  COMMAND_PRIORITY_HIGH,
-  PASTE_COMMAND,
-} from "lexical";
-
-import { $createImageNode } from "./ImageNode";
+import { type LexicalEditor, $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, PASTE_COMMAND } from "lexical";
+import { $createMarkdownImageNode } from "../nodes/MarkdownImageNode";
 
 const IMAGE_MARKDOWN_REGEX = /!\[(.*?)\]\((.*?)\)/;
 
-export default function ImagePastePlugin() {
-  const [editor] = useLexicalComposerContext();
-
+export function useMarkdownImagePaste(editor: LexicalEditor) {
   useEffect(() => {
     const removePasteOverride = editor.registerCommand(
       PASTE_COMMAND,
@@ -35,7 +25,10 @@ export default function ImagePastePlugin() {
               selection.removeText();
             }
             // TODO: fix url ""
-            const imageNode = $createImageNode({ src: url ?? "", altText });
+            const imageNode = $createMarkdownImageNode({
+              src: url ?? "",
+              altText,
+            });
             selection.insertNodes([imageNode]);
           });
           return true;
@@ -50,6 +43,4 @@ export default function ImagePastePlugin() {
       removePasteOverride();
     };
   }, [editor]);
-
-  return null;
 }

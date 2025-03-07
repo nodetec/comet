@@ -26,9 +26,6 @@ import { useSaveNote } from "../hooks/useSaveNote";
 import AutoLinkPlugin from "../lexical/autolink/AutoLinkPlugin";
 import { MarkdownCodeBlockShortcutPlugin } from "../lexical/codeblock/MarkdownCodeBlockShortcutPlugin";
 import { CustomHashtagPlugin } from "../lexical/customHashtag/CustomHashtagPlugin";
-import { ImageNode } from "../lexical/markdownImage/ImageNode";
-import ImagePastePlugin from "../lexical/markdownImage/ImagePastePlugin";
-import IMAGE_TRANSFORMER from "../lexical/markdownImage/ImageTransformer";
 import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebouncePlugin";
 import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
@@ -39,6 +36,8 @@ import { TWITTER_TRANSFORMER } from "../lexical/tweet/TwitterTransformer";
 import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
 import { YOUTUBE_TRANSFORMER } from "../lexical/youtube/YouTubeTransformer";
 import DefaultTheme from "../themes/DefaultTheme";
+import { MARKDOWN_IMAGE_TRANSFORMER } from "../lexical/markdownImage/transformers/MarkdownImageTransformer";
+import { MarkdownImageNode } from "../lexical/markdownImage/nodes/MarkdownImageNode";
 
 function onError(error: Error) {
   console.error(error);
@@ -52,7 +51,7 @@ export function Editor() {
   const setAppFocus = useAppState((state) => state.setAppFocus);
 
   const COMBINED_TRANSFORMERS = [
-    IMAGE_TRANSFORMER,
+    MARKDOWN_IMAGE_TRANSFORMER,
     TWITTER_TRANSFORMER,
     YOUTUBE_TRANSFORMER,
     ...TRANSFORMERS,
@@ -113,7 +112,7 @@ export function Editor() {
       CodeNode,
       HorizontalRuleNode,
       QuoteNode,
-      ImageNode,
+      MarkdownImageNode,
       LinkNode,
       AutoLinkNode,
       HashtagNode,
@@ -136,7 +135,7 @@ export function Editor() {
       <RichTextPlugin
         contentEditable={
           <ScrollArea className="flex flex-1 flex-col" type="scroll">
-            <ContentEditable className="mx-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
+            <ContentEditable className="px-16 min-h-screen flex-auto select-text flex-col pb-[50%] pt-8 caret-sky-500/90 focus-visible:outline-none" />
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}
@@ -150,7 +149,6 @@ export function Editor() {
         </>
       )}
       <MarkdownShortcutPlugin transformers={COMBINED_TRANSFORMERS} />
-      <ImagePastePlugin />
       <TabKeyPlugin tabSize={2} useSpaces={true} />
       <ListPlugin />
       <HistoryPlugin />

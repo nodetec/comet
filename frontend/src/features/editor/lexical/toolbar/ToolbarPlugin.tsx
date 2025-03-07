@@ -27,11 +27,11 @@ import { EllipsisVerticalIcon } from "lucide-react";
 
 import { PublishDialog } from "../../components/PublishDialog";
 import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
-import MarkdownImagePlugin from "../markdownImage/ImageActions";
 import TwitterAction from "../tweet/TwitterActions";
 import YoutubeAction from "../youtube/YouTubeActions";
 import { LOW_PRIORIRTY, RICH_TEXT_OPTIONS, RichTextAction } from "./constants";
 import { useKeyBinds } from "./hooks/useKeybinds";
+import { MarkdownImagePlugin } from "../markdownImage/MarkdownImagePlugin";
 
 export function ToolbarPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -209,7 +209,7 @@ export function ToolbarPlugin() {
         <div className="hidden items-center gap-2 xl:flex">
           <CodeBlockPlugin blockType={blockType} />
           <MarkdownImagePlugin />
-          <TwitterAction />
+          {/* <TwitterAction /> */}
           <YoutubeAction />
         </div>
 

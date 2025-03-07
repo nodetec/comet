@@ -21,7 +21,7 @@ const DefaultTheme: EditorThemeClasses = {
     h6: "text-lg font-bold mb-2 mt-3",
   },
   hr: "border-t my-4",
-  image: "rounded shadow",
+  image: "cursor-default inline-block relative select-none",
   // indent: "ml-4",
   // inlineImage: "inline-block rounded shadow",
   // layoutContainer: "grid gap-4",

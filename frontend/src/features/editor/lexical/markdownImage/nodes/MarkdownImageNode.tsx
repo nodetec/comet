@@ -1,12 +1,5 @@
-/**
- * Copyright (c) Meta Platforms, Inc. and affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- *
- */
-
 import type { JSX } from "react";
+import * as React from "react";
 
 import {
   $applyNodeReplacement,
@@ -22,7 +15,7 @@ import {
   type Spread,
 } from "lexical";
 
-import ImageComponent from "./ImageComponent";
+import { MarkdownImageComponent } from "../components/MarkdownImageComponent";
 
 export interface ImagePayload {
   altText: string;
@@ -33,26 +26,17 @@ export interface ImagePayload {
   width?: number;
 }
 
-function isGoogleDocCheckboxImg(img: HTMLImageElement): boolean {
-  return (
-    img.parentElement != null &&
-    img.parentElement.tagName === "LI" &&
-    img.previousSibling === null &&
-    img.getAttribute("aria-roledescription") === "checkbox"
-  );
-}
-
 function $convertImageElement(domNode: Node): null | DOMConversionOutput {
   const img = domNode as HTMLImageElement;
-  if (img.src.startsWith("file:///") || isGoogleDocCheckboxImg(img)) {
+  if (img.src.startsWith("file:///")) {
     return null;
   }
   const { alt: altText, src, width, height } = img;
-  const node = $createImageNode({ altText, height, src, width });
+  const node = $createMarkdownImageNode({ altText, height, src, width });
   return { node };
 }
 
-export type SerializedImageNode = Spread<
+export type SerializedMarkdownImageNode = Spread<
   {
     altText: string;
     height?: number;
@@ -63,7 +47,7 @@ export type SerializedImageNode = Spread<
   SerializedLexicalNode
 >;
 
-export class ImageNode extends DecoratorNode<JSX.Element> {
+export class MarkdownImageNode extends DecoratorNode<JSX.Element> {
   __src: string;
   __altText: string;
   __width: "inherit" | number;
@@ -74,8 +58,8 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     return "image";
   }
 
-  static clone(node: ImageNode): ImageNode {
-    return new ImageNode(
+  static clone(node: MarkdownImageNode) {
+    return new MarkdownImageNode(
       node.__src,
       node.__altText,
       node.__maxWidth,
@@ -85,9 +69,9 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     );
   }
 
-  static importJSON(serializedNode: SerializedImageNode): ImageNode {
+  static importJSON(serializedNode: SerializedMarkdownImageNode) {
     const { altText, height, width, maxWidth, src } = serializedNode;
-    return $createImageNode({
+    return $createMarkdownImageNode({
       altText,
       height,
       maxWidth,
@@ -96,7 +80,9 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     }).updateFromJSON(serializedNode);
   }
 
-  updateFromJSON(serializedNode: LexicalUpdateJSON<SerializedImageNode>): this {
+  updateFromJSON(
+    serializedNode: LexicalUpdateJSON<SerializedMarkdownImageNode>,
+  ) {
     const node = super.updateFromJSON(serializedNode);
     return node;
   }
@@ -131,11 +117,11 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     this.__src = src;
     this.__altText = altText;
     this.__maxWidth = maxWidth;
-    this.__width = width || "inherit";
-    this.__height = height || "inherit";
+    this.__width = width ?? "inherit";
+    this.__height = height ?? "inherit";
   }
 
-  exportJSON(): SerializedImageNode {
+  exportJSON(): SerializedMarkdownImageNode {
     return {
       ...super.exportJSON(),
       altText: this.getAltText(),
@@ -154,8 +140,6 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     writable.__width = width;
     writable.__height = height;
   }
-
-  // View
 
   createDOM(config: EditorConfig): HTMLElement {
     const span = document.createElement("span");
@@ -181,7 +165,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
 
   decorate(): JSX.Element {
     return (
-      <ImageComponent
+      <MarkdownImageComponent
         src={this.__src}
         altText={this.__altText}
         width={this.__width}
@@ -193,21 +177,22 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
   }
 }
 
-export function $createImageNode({
+export function $createMarkdownImageNode({
   altText,
   height,
+  // TODO: decide if we want to use maxWidth at all
   maxWidth = 500,
   src,
   width,
   key,
-}: ImagePayload): ImageNode {
+}: ImagePayload) {
   return $applyNodeReplacement(
-    new ImageNode(src, altText, maxWidth, width, height, key),
+    new MarkdownImageNode(src, altText, maxWidth, width, height, key),
   );
 }
 
-export function $isImageNode(
+export function $isMarkdownImageNode(
   node: LexicalNode | null | undefined,
-): node is ImageNode {
-  return node instanceof ImageNode;
+): node is MarkdownImageNode {
+  return node instanceof MarkdownImageNode;
 }
