@@ -1,6 +1,4 @@
 import { useQuery, type QueryFunctionContext } from "@tanstack/react-query";
-import { type Tag } from "&/comet/backend/models/models";
-import { AppService } from "&/comet/backend/service";
 
 type QueryKey = [string, number | undefined];
 
@@ -11,8 +9,8 @@ async function fetchNoteTags({ queryKey }: QueryFunctionContext<QueryKey>) {
     return null;
   }
   try {
-    const tags = (await AppService.GetTagsByNoteID(noteId)) as Tag[];
-    return tags;
+    // const tags = (await AppService.GetTagsByNoteID(noteId)) as Tag[];
+    // return tags;
   } catch (e) {
     console.error("Error fetching tags for note:", e);
     return null;

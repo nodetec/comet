@@ -1,5 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { AppService } from "&/comet/backend/service";
 import { useActiveNote } from "~/hooks/useActiveNote";
 import { useActiveUser } from "~/hooks/useActiveUser";
 import { useNoteTags } from "~/hooks/useNoteTags";
@@ -113,7 +112,7 @@ export function usePublish() {
       // TODO: add event id to note
       // TODO: add identifier to note
 
-      await AppService.SetPublishDetails(note.ID, npub, identifier);
+      // await AppService.SetPublishDetails(note.ID, npub, identifier);
       await queryClient.invalidateQueries({ queryKey: ["notes"] });
       await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
       toast("Note posted", {

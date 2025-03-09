@@ -1,8 +1,8 @@
 import { Bar, Container, Section } from "@column-resizer/react";
 
-import { Editor } from "./features/editor";
-import { NoteList, NotesHeader, SearchBox } from "./features/notes";
-import { Sidebar } from "./features/sidebar";
+// import { Editor } from "./features/editor";
+import { NotesHeader } from "./features/notes";
+// import { Sidebar } from "./features/sidebar";
 import useAppFocus from "./hooks/useAppFocus";
 import useNotebookEvents from "./hooks/useNotebookEvents";
 import useNoteEvents from "./hooks/useNoteEvents";
@@ -22,7 +22,7 @@ export default function ResizableLayout() {
           minSize={200}
           maxSize={400}
         >
-          <Sidebar />
+          {/* <Sidebar /> */}
         </Section>
         <Bar className="flex cursor-col-resize items-center" size={10}>
           <div className="h-full w-[5px] bg-secondary" />
@@ -36,8 +36,8 @@ export default function ResizableLayout() {
           minSize={250}
         >
           <NotesHeader />
-          <SearchBox />
-          <NoteList />
+          {/* <SearchBox /> */}
+          {/* <NoteList /> */}
         </Section>
         <Bar className="flex cursor-col-resize items-center" size={10}>
           <div className="h-full w-[5px] bg-background" />
@@ -46,7 +46,7 @@ export default function ResizableLayout() {
         </Bar>
         <Section minSize={400}>
           <div className="flex h-screen select-none flex-col">
-            <Editor />
+            {/* <Editor /> */}
           </div>
         </Section>
       </Container>

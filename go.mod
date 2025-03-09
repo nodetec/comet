@@ -5,16 +5,13 @@ go 1.22.4
 toolchain go1.23.4
 
 require (
-	github.com/adrg/xdg v0.5.0
-	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.8.3
 )
 
 require (
-	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/sethvargo/go-retry v0.3.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
+	github.com/adrg/xdg v0.5.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 )
 
 require (
@@ -43,7 +40,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
-	github.com/pressly/goose/v3 v3.24.0
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.38.1 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect

@@ -1,5 +1,4 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { AppService } from "&/comet/backend/service/";
 import { useAppState } from "~/store";
 
 const useNotes = () => {
@@ -20,19 +19,19 @@ const useNotes = () => {
 
     const showTrashed = feedType === "trash";
 
-    const notes = await AppService.GetNotes(
-      orderBy,
-      orderDirection,
-      limit,
-      offset,
-      search,
-      showTrashed,
-    );
+    // const notes = await AppService.GetNotes(
+    //   orderBy,
+    //   orderDirection,
+    //   limit,
+    //   offset,
+    //   search,
+    //   showTrashed,
+    // );
 
     return {
-      data: notes || [],
-      nextPage: pageParam + 1,
-      nextCursor: notes.length === limit ? pageParam + 1 : undefined,
+      // data: notes || [],
+      // nextPage: pageParam + 1,
+      // nextCursor: notes.length === limit ? pageParam + 1 : undefined,
     };
   }
 
@@ -51,9 +50,9 @@ const useNotes = () => {
     staleTime: 0,
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages, lastPageParam) => {
-      if (lastPage.data.length === 0) {
-        return undefined;
-      }
+      // if (lastPage.data.length === 0) {
+      //   return undefined;
+      // }
 
       return lastPageParam + 1;
     },

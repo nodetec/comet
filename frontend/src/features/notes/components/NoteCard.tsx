@@ -1,6 +1,4 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { type Note } from "&/comet/backend/models/models";
-import { AppService } from "&/comet/backend/service";
 import { Separator } from "~/components/ui/separator";
 import {
   Tooltip,
@@ -13,7 +11,7 @@ import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";
 
 type Props = {
-  note: Note;
+  note: any;
   index: number;
   length: number;
 };

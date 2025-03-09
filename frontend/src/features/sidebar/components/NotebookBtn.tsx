@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Events } from "@wailsio/runtime";
 import { type Notebook } from "&/comet/backend/models/models";
-import { AppService } from "&/comet/backend/service";
 import { useAppState } from "~/store";
 import { NotebookIcon } from "lucide-react";
 
@@ -29,18 +28,18 @@ export function NotebookBtn({ notebook }: Props) {
     }
     setActiveNote(undefined);
     await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
-    await AppService.ClearActiveNote();
+    // await AppService.ClearActiveNote();
     console.log("Setting Feed Type to notebook");
     setActiveNotebook(notebook);
     setActiveTag(undefined);
     void queryClient.invalidateQueries({ queryKey: ["activeNote"] });
-    await AppService.SetNotebookActive(notebook.ID);
+    // await AppService.SetNotebookActive(notebook.ID);
     await Events.Emit({
       name: "notebook_changed",
       data: notebook.ID,
     });
     void queryClient.invalidateQueries({ queryKey: ["notebooks"] });
-    await AppService.ClearActiveTags();
+    // await AppService.ClearActiveTags();
     void queryClient.invalidateQueries({ queryKey: ["notes"] });
     void queryClient.invalidateQueries({ queryKey: ["tags"] });
   }

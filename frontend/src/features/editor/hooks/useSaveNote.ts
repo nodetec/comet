@@ -5,7 +5,6 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { type Note } from "&/comet/backend/models/models";
-import { AppService } from "&/comet/backend/service";
 import { parseTitle } from "~/lib/markdown";
 import { type EditorState, type LexicalEditor } from "lexical";
 
@@ -85,20 +84,20 @@ async function saveNote(
     const markdownText = $convertToMarkdownString(transformers);
 
     // TODO: only do this on blur
-    const noteToUpdate = await AppService.GetNoteByID(note.ID);
+    // const noteToUpdate = (await AppService.GetNoteByID(note.ID)) as Note;
 
-    if (noteToUpdate?.Content === markdownText) {
-      // console.log("Note content has not changed");
-      return;
-    }
+    // if (noteToUpdate?.Content === markdownText) {
+    //   // console.log("Note content has not changed");
+    //   return;
+    // }
 
     note.Content = markdownText;
     note.Title = parseTitle(markdownText);
-    await AppService.UpdateNote(note);
+    // await AppService.UpdateNote(note);
 
     const tags = extractTags(markdownText);
 
-    await AppService.CreateTags(note.ID, tags);
+    // await AppService.CreateTags(note.ID, tags);
 
     if (shouldInvalidate) {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
