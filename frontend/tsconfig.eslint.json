@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", ".eslintrc.cjs"],
-  "compilerOptions": {
-    "noEmit": true
-  },
-  "references": []
-}
