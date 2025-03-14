@@ -53,7 +53,6 @@ export function LoginDialog({ children }: Props) {
   const [isNsecCopied, setIsNsecCopied] = useState(false);
   const [isNpubCopied, setIsNpubCopied] = useState(false);
 
-  const keys = useAppState((state) => state.keys);
   const setKeys = useAppState((state) => state.setKeys);
 
   const form = useForm<z.infer<typeof formSchema>>({
