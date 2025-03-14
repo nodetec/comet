@@ -1,0 +1,1 @@
+export { shortNpub } from "./shortNpub";
