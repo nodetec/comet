@@ -122,6 +122,26 @@ export async function restoreNote(_: IpcMainEvent, id: string) {
   return response.id;
 }
 
+export async function addPublishDetailsToNote(
+  _: IpcMainInvokeEvent,
+  update: Note,
+) {
+  const db = getDb();
+  const id = update._id;
+  if (!id) return;
+  const note = await db.get<Note>(id);
+  note.title = update.title ?? dayjs().format("YYYY-MM-DD");
+  note.content = update.content ?? "";
+  note.updatedAt = new Date();
+  note.contentUpdatedAt = new Date();
+  note.author = update.author;
+  note.publishedAt = update.publishedAt;
+  note.eventAddress = update.eventAddress;
+  note.identifier = update.identifier;
+  const response = await db.put(note);
+  return response.id;
+}
+
 export async function moveNoteToNotebook(
   _: IpcMainInvokeEvent,
   noteId: string,

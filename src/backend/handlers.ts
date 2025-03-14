@@ -16,4 +16,5 @@ export function setupHandlers(): void {
   ipcMain.handle("hideNotebook", api.hideNotebook);
   ipcMain.handle("unhideNotebook", api.unhideNotebook);
   ipcMain.handle("deleteNotebook", api.deleteNotebook);
+  ipcMain.handle("addPublishDetailsToNote", api.addPublishDetailsToNote);
 }

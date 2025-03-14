@@ -1,3 +1,4 @@
+import { type Keys } from "$/types/Keys";
 import { type Relay } from "$/types/Relay";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -6,8 +7,8 @@ interface State {
   activeNoteId: string | undefined;
   setActiveNoteId: (activeNoteId: string | undefined) => void;
 
-  keys: { nsec: string; npub: string } | undefined;
-  setKeys: (keys: { nsec: string; npub: string } | undefined) => void;
+  keys: Keys | undefined;
+  setKeys: (keys: Keys | undefined) => void;
 
   relays: Relay[];
   setRelays: (relays: Relay[]) => void;

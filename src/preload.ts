@@ -9,7 +9,6 @@ import { type Notebook } from "./types/Notebook";
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld("api", {
-
   // notes
   createNote: (note: InsertNote) =>
     ipcRenderer.invoke("createNote", note) as Promise<string>,
@@ -33,6 +32,8 @@ contextBridge.exposeInMainWorld("api", {
   getNote: (id: string) => ipcRenderer.invoke("getNote", id) as Promise<Note>,
   saveNote: (update: Partial<Note>) =>
     ipcRenderer.invoke("saveNote", update) as Promise<string>,
+  addPublishDetailsToNote: (update: Note) =>
+    ipcRenderer.invoke("addPublishDetailsToNote", update) as Promise<void>,
 
   // notebooks
   createNotebook: (name: string) =>

@@ -19,7 +19,7 @@ import {
 } from "lexical";
 import { EllipsisVerticalIcon } from "lucide-react";
 
-// import { PublishDialog } from "../../components/PublishDialog";
+import { PublishDialog } from "../../components/PublishDialog";
 import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
 import { MarkdownImagePlugin } from "../markdownImage/MarkdownImagePlugin";
 import YoutubeAction from "../youtube/YouTubeActions";
@@ -191,7 +191,7 @@ export function ToolbarPlugin() {
         {/* <InsertProfileButton /> */}
       </div>
       <div className="flex items-center gap-2">
-        {/* <PublishDialog /> */}
+        <PublishDialog />
         <Button type="button" variant="ghost" size="icon">
           <EllipsisVerticalIcon />
         </Button>
