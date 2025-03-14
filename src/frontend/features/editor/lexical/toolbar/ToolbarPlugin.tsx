@@ -55,7 +55,6 @@ export function ToolbarPlugin() {
       const newSelectionMap = {
         [RichTextAction.Bold]: selection.hasFormat("bold"),
         [RichTextAction.Italics]: selection.hasFormat("italic"),
-        // [RichTextAction.Underline]: selection.hasFormat("underline"),
         [RichTextAction.Strikethrough]: selection.hasFormat("strikethrough"),
         [RichTextAction.Code]: selection.hasFormat("code"),
       };
@@ -135,10 +134,6 @@ export function ToolbarPlugin() {
         editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic");
         break;
       }
-      // case RichTextAction.Underline: {
-      //   editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline");
-      //   break;
-      // }
       case RichTextAction.Strikethrough: {
         editor.dispatchCommand(FORMAT_TEXT_COMMAND, "strikethrough");
         break;
