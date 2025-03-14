@@ -1,3 +1,4 @@
+import { type Relay } from "$/types/Relay";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -7,6 +8,9 @@ interface State {
 
   keys: { nsec: string; npub: string } | undefined;
   setKeys: (keys: { nsec: string; npub: string } | undefined) => void;
+
+  relays: Relay[];
+  setRelays: (relays: Relay[]) => void;
 
   activeNotebookId: string;
   setActiveNotebookId: (notebookId: string) => void;
@@ -41,6 +45,9 @@ export const useAppState = create<State>()(
       keys: undefined,
       setKeys: (keys) => set({ keys }),
 
+      relays: [{ url: "wss://relay.damus.io", read: true, write: true }],
+      setRelays: (relays) => set({ relays }),
+
       activeNotebookId: "all",
       setActiveNotebookId: (activeNotebookId) => set({ activeNotebookId }),
 
@@ -66,6 +73,7 @@ export const useAppState = create<State>()(
         activeNotebookId: state.activeNotebookId,
         activeNotebookName: state.activeNotebookName,
         settingsTab: state.settingsTab,
+        keys: state.keys,
       }),
     },
   ),

@@ -1,9 +1,6 @@
 import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
-import { type Relay } from "&/comet/backend/models/models";
-import { AppService } from "&/comet/backend/service";
 import { Button } from "~/components/ui/button";
 import {
   Form,
@@ -14,6 +11,8 @@ import {
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { useAppState } from "~/store";
+import { type Relay } from "$/types/Relay";
 import { PlusIcon, X } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ import { z } from "zod";
 const nostrFormSchema = z.object({
   relays: z.array(
     z.object({
-      URL: z
+      url: z
         .string()
         .max(100, { message: "Must be 100 or fewer characters long" })
         .trim()
@@ -31,9 +30,8 @@ const nostrFormSchema = z.object({
         .refine((url) => url.startsWith("wss://"), {
           message: "URL must begin with wss://",
         }),
-      Read: z.boolean(),
-      Write: z.boolean(),
-      Sync: z.boolean(),
+      read: z.boolean(),
+      write: z.boolean(),
     }),
   ),
 });
@@ -46,13 +44,14 @@ type Props = {
 
 export function RelaySettings({ relays }: Props) {
   const [loading, setLoading] = useState(false);
+  const setRelays = useAppState((state) => state.setRelays);
+
   const defaultRelay = {
     relays: [
       {
-        URL: "wss://relay.damus.io",
-        Read: false,
-        Write: true,
-        Sync: false,
+        url: "wss://relay.damus.io",
+        read: false,
+        write: true,
       },
     ],
   };
@@ -70,8 +69,6 @@ export function RelaySettings({ relays }: Props) {
     control: form.control,
   });
 
-  const queryClient = useQueryClient();
-
   function removeRelay(e: React.MouseEvent<HTMLButtonElement>, index: number) {
     e.preventDefault();
     if (fields.length === 1) return;
@@ -84,9 +81,9 @@ export function RelaySettings({ relays }: Props) {
     // check if the last relay has a URL using form's getValues method
     const values = form.getValues();
     const lastRelay = values.relays[values.relays.length - 1];
-    if (!lastRelay?.URL) return;
+    if (!lastRelay?.url) return;
 
-    append({ URL: "", Read: false, Write: true, Sync: false });
+    append({ url: "", read: false, write: true });
   }
 
   // TODO
@@ -96,8 +93,7 @@ export function RelaySettings({ relays }: Props) {
   async function onSubmit(data: NostrFormValues) {
     setLoading(true);
     try {
-      await AppService.ReplaceRelays(data.relays);
-      await queryClient.invalidateQueries({ queryKey: ["relays"] });
+      setRelays(data.relays);
       toast("Success", {
         description: "Relays updated",
       });
@@ -111,7 +107,7 @@ export function RelaySettings({ relays }: Props) {
   return (
     <div className="flex flex-col space-y-4">
       <ScrollArea type="scroll">
-        <h1 className="mx-12 border-b border-muted py-4 text-lg font-bold text-primary">
+        <h1 className="border-muted text-primary mx-12 border-b py-4 text-lg font-bold">
           Relays
         </h1>
 
@@ -126,7 +122,7 @@ export function RelaySettings({ relays }: Props) {
                   <FormField
                     control={form.control}
                     key={field.id}
-                    name={`relays.${index}.URL`}
+                    name={`relays.${index}.url`}
                     render={({ field }) => (
                       <FormItem className="pb-4">
                         <FormControl>
@@ -170,7 +166,7 @@ export function RelaySettings({ relays }: Props) {
                     id="nostr-settings-submit-relay-btn"
                     name="nostr-settings-submit-relay-btn"
                     type="submit"
-                    variant="muted"
+                    variant="default"
                     size="sm"
                     className="disabled:cursor-pointer disabled:opacity-100"
                     disabled={loading}

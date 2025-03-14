@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
-import { AppService } from "&/comet/backend/service";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -22,9 +20,9 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { useAppState } from "~/store";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import * as nip19 from "nostr-tools/nip19";
-import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 import CopyToClipboard from "react-copy-to-clipboard";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -55,7 +53,8 @@ export function LoginDialog({ children }: Props) {
   const [isNsecCopied, setIsNsecCopied] = useState(false);
   const [isNpubCopied, setIsNpubCopied] = useState(false);
 
-  const queryClient = useQueryClient();
+  const keys = useAppState((state) => state.keys);
+  const setKeys = useAppState((state) => state.setKeys);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -81,18 +80,26 @@ export function LoginDialog({ children }: Props) {
       nsec,
       npub,
     });
+    void form.trigger(["nsec", "npub"]);
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!form.formState.isValid) {
+    // TODO: not sure why this doesn't work
+    // if (!form.formState.isValid) {
+    //   return;
+    // }
+
+    if (!isValidNsec(values.nsec)) {
+      alert("Invalid nsec");
       return;
     }
 
     const { nsec, npub } = values;
 
-    await AppService.CreateUser(nsec, npub, true);
+    console.log("nsec", nsec);
+    console.log("npub", npub);
 
-    await queryClient.invalidateQueries({ queryKey: ["activeUser"] });
+    setKeys({ nsec, npub });
 
     setIsDialogOpen(false);
     setLoading(false);
@@ -127,6 +134,7 @@ export function LoginDialog({ children }: Props) {
       const secretKey = nip19.decode(nsecValue).data as Uint8Array;
       const publicKey = getPublicKey(secretKey);
       const npub = nip19.npubEncode(publicKey);
+      setValue("nsec", nsecValue, { shouldValidate: true });
       setValue("npub", npub, { shouldValidate: true });
     } else {
       setValue("npub", "", { shouldValidate: true });
@@ -145,7 +153,7 @@ export function LoginDialog({ children }: Props) {
             Don't have a Nostr account?{" "}
             <button
               onClick={generateKepair}
-              className="text-sky-500/90 focus-visible:outline-none focus-visible:ring-0"
+              className="text-sky-500/90 focus-visible:ring-0 focus-visible:outline-none"
             >
               Create keypair
             </button>
@@ -181,8 +189,8 @@ export function LoginDialog({ children }: Props) {
                             size="icon"
                             disabled={loading}
                           >
-                            {!isNsecCopied && <CopyIcon className="h-4 w-4" />}
-                            {isNsecCopied && <CheckIcon className="h-4 w-4" />}
+                            {!isNsecCopied && <CopyIcon className="h-3 w-3" />}
+                            {isNsecCopied && <CheckIcon className="h-3 w-3" />}
                           </Button>
                         </CopyToClipboard>
                       </div>
@@ -223,8 +231,8 @@ export function LoginDialog({ children }: Props) {
                             size="icon"
                             disabled={loading}
                           >
-                            {!isNpubCopied && <CopyIcon className="h-4 w-4" />}
-                            {isNpubCopied && <CheckIcon className="h-4 w-4" />}
+                            {!isNpubCopied && <CopyIcon className="h-3 w-3" />}
+                            {isNpubCopied && <CheckIcon className="h-3 w-3" />}
                           </Button>
                         </CopyToClipboard>
                       </div>
@@ -244,7 +252,7 @@ export function LoginDialog({ children }: Props) {
                 name="create-dialog-create-btn"
                 type="submit"
                 className="max-w-[18%]"
-                variant="muted"
+                variant="default"
               >
                 Login
               </Button>
