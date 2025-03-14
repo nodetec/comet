@@ -14,7 +14,7 @@ import { rendererConfig } from "./webpack.renderer.config";
 const config: ForgeConfig = {
   packagerConfig: {
     name: "Comet",
-    // icon: "./assets/icon",
+    icon: "./assets/icon",
     appBundleId: "org.nodetec.comet",
     executableName: "comet",
     asar: true,
