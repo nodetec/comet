@@ -36,7 +36,7 @@ export function NotebookSettings() {
   return (
     <div className="flex h-full flex-col space-y-4">
       <ScrollArea type="scroll">
-        <h1 className="border-accent text-primary mx-12 border-b py-4 text-lg font-bold">
+        <h1 className="border-accent mx-12 border-b py-4 text-lg font-bold">
           Notebooks
         </h1>
         <div className="mx-12 my-4 h-full py-4">

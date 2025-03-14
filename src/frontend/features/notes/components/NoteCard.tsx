@@ -52,7 +52,7 @@ export function NoteCard({ note, index, length }: Props) {
         data-focused={isFocused}
         className={cn(
           "relative flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm",
-          active && "bg-accent/50 data-[focused=true]:bg-blue-500/50",
+          active && "bg-accent/50 data-[focused=true]:bg-primary/50",
         )}
       >
         <div
@@ -82,7 +82,7 @@ export function NoteCard({ note, index, length }: Props) {
                   <TooltipTrigger asChild className="cursor-default">
                     <span
                       data-focused={isFocused}
-                      className="data-[focused=true]:text-secondary-foreground cursor-default text-xs text-blue-400/80 select-none"
+                      className="data-[focused=true]:text-secondary-foreground cursor-default text-xs text-primary/80 select-none"
                     >
                       <SendIcon className="h-4 w-4" />
                     </span>
@@ -100,7 +100,7 @@ export function NoteCard({ note, index, length }: Props) {
         )} */}
       </button>
       <div className="flex w-full flex-col items-center px-[0.30rem]">
-        {index < length - 1 && <Separator decorative className="bg-muted/30" />}
+        {index < length - 1 && <Separator decorative className="bg-accent/30" />}
       </div>
     </div>
   );

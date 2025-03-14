@@ -17,7 +17,7 @@ export function ProfileSettings() {
   return (
     <div className="flex flex-col space-y-4">
       <ScrollArea type="scroll">
-        <h1 className="border-muted text-primary mx-12 border-b py-4 text-lg font-bold">
+        <h1 className="border-accent mx-12 border-b py-4 text-lg font-bold">
           Profile
         </h1>
 

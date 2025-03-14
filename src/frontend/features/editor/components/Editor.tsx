@@ -18,13 +18,11 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ScrollArea } from "~/components/ui/scroll-area";
-// import { useActiveNote } from "~/hooks/useActiveNote";
 import { useAppState } from "~/store";
 import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
 
 import { useNote } from "../hooks/useNote";
 import { useSaveNote } from "../hooks/useSaveNote";
-// import { useSaveNote } from "../hooks/useSaveNote";
 import AutoLinkPlugin from "../lexical/autolink/AutoLinkPlugin";
 import { MarkdownCodeBlockShortcutPlugin } from "../lexical/codeblock/MarkdownCodeBlockShortcutPlugin";
 import { CustomHashtagPlugin } from "../lexical/customHashtag/CustomHashtagPlugin";
@@ -135,7 +133,7 @@ export function Editor() {
           <ScrollArea className="flex flex-1 flex-col" type="scroll">
             <ContentEditable
               onClick={handleClick}
-              className="min-h-full flex-auto flex-col px-16 pt-8 pb-[50%] caret-sky-500/90 select-text focus-visible:outline-none"
+              className="min-h-full flex-auto flex-col px-16 pt-8 pb-[50%] caret-primary select-text focus-visible:outline-none"
             />
           </ScrollArea>
         }
