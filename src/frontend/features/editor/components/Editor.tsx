@@ -133,7 +133,7 @@ export function Editor() {
           <ScrollArea className="flex flex-1 flex-col" type="scroll">
             <ContentEditable
               onClick={handleClick}
-              className="min-h-full flex-auto flex-col px-16 pt-8 pb-[50%] caret-primary select-text focus-visible:outline-none"
+              className="caret-primary min-h-full flex-auto flex-col px-16 pt-8 pb-[50%] select-text focus-visible:outline-none"
             />
           </ScrollArea>
         }
