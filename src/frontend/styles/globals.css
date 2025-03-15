@@ -11,7 +11,7 @@
   --card-foreground: oklch(89.14% 0 0);
   --popover: oklch(23.48% 0.004 264.49);
   --popover-foreground: oklch(89.14% 0 0);
-  --primary: oklch(0.623 0.214 259.815);
+  --primary: oklch(0.685 0.169 237.323);
   --primary-foreground: oklch(89.14% 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(86.22% 0.007 286.26);
@@ -94,4 +94,11 @@
 
 .non-draggable {
   -webkit-app-region: no-drag;
+}
+
+
+.list-marker {
+  li::marker {
+    @apply text-sky-500;
+  }
 }

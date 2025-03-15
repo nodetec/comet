@@ -108,9 +108,8 @@ export function usePublish() {
       pool.close(relayUrls);
 
       // TODO: update note to published
-      // TODO: add event id to note
       // TODO: add identifier to note
-      // await AppService.SetPublishDetails(note.ID, npub, identifier);
+      // TODO: add event address to note
       note.publishedAt = new Date();
       note.identifier = identifier;
 

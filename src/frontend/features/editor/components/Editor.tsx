@@ -16,6 +16,7 @@ import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { useAppState } from "~/store";
@@ -32,6 +33,7 @@ import { MARKDOWN_IMAGE_TRANSFORMER } from "../lexical/markdownImage/transformer
 import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebouncePlugin";
 import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
+import TabFocusPlugin from "../lexical/tabFocus";
 import TabKeyPlugin from "../lexical/tabKey/TabKeyPlugin";
 import { ToolbarPlugin } from "../lexical/toolbar/ToolbarPlugin";
 import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
@@ -148,8 +150,9 @@ export function Editor() {
       )}
       <MarkdownImageShortcutPlugin />
       <MarkdownShortcutPlugin transformers={COMBINED_TRANSFORMERS} />
-      <TabKeyPlugin tabSize={2} useSpaces={true} />
       <ListPlugin />
+      <TabIndentationPlugin maxIndent={5} />
+      <TabFocusPlugin />
       <HistoryPlugin />
       <CustomHashtagPlugin />
       <ScrollCenterCurrentLinePlugin />
