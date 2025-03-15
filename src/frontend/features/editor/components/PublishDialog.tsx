@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import { usePublish } from "~/features/editor/hooks/usePublish";
 import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";
@@ -23,6 +25,8 @@ export function PublishDialog() {
   const activeNoteId = useAppState((state) => state.activeNoteId);
   const note = useNote(activeNoteId);
 
+  const previewImage = note.data?.content.match(/!\[.*\]\((.*)\)/);
+
   const { handlePublish } = usePublish();
 
   return (
@@ -34,73 +38,70 @@ export function PublishDialog() {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          {note.data?.identifier && note.data?.author === keys?.npub ? (
-            <DialogTitle>Update Published Note</DialogTitle>
-          ) : (
-            <DialogTitle>Publish Note</DialogTitle>
-          )}
-          <DialogDescription>Publish to the nostr network.</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="border-accent h-[85%] max-h-[50rem] w-[90%] max-w-[40rem] overflow-hidden border select-none">
+        <ScrollArea className="m-2">
+          <DialogHeader>
+            {note.data?.identifier ? (
+              <DialogTitle>Update Note</DialogTitle>
+            ) : (
+              <DialogTitle>Publish Note</DialogTitle>
+            )}
+            <DialogDescription>Publish to the nostr network.</DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-4 py-4 md:grid-cols-2">
-          <div className="space-y-4">
-            <div>
-              <h3 className="mb-2 font-semibold">Title:</h3>
-              <p className="no-scrollbar bg-secondary cursor-default overflow-x-auto rounded-md px-2 py-1">
-                {note.data?.title}
-              </p>
+          <div className="flex flex-col gap-4 my-4">
+            <div className="border-accent max-w-md rounded-md border">
+              <img
+                src={previewImage ? previewImage[1] : ""}
+                alt="preview"
+                className="h-full w-full rounded-md object-contain"
+              />
             </div>
-            <div>
-              <h3 className="mb-2 font-semibold">Author:</h3>
-              <p className="no-scrollbar bg-secondary cursor-default overflow-x-auto rounded-md px-2 py-1">
-                {keys?.npub}
-              </p>
-            </div>
-            {/* <div>
-              <h3 className="mb-2 font-semibold">Tags:</h3>
-              <div className="flex flex-wrap gap-2">
-                {tags?.map((tag, index) => (
-                  <Badge
-                    className="cursor-default"
-                    key={index}
-                    variant="secondary"
-                  >
-                    {tag.Name}
-                  </Badge>
-                ))}
-              </div>
-            </div> */}
-          </div>
-          {/* {previewContent && (
-            <Card className="h-[300px] overflow-auto">
-              <CardContent className="p-4">
-                <h3 className="mb-2 font-semibold">Preview</h3>
-                <p className="text-sm text-muted-foreground">
-                  {previewContent}
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="mb-2 font-semibold">Title:</h3>
+                <p className="no-scrollbar bg-accent cursor-default overflow-x-auto rounded-md px-2 py-1">
+                  {note.data?.title}
                 </p>
-              </CardContent>
-            </Card>
-          )} */}
-        </div>
-        {/* <div className="flex justify-end space-x-2">
-          <Button>Publish</Button>
-        </div> */}
+              </div>
+              <div>
+                <h3 className="mb-2 font-semibold">Author:</h3>
+                <p className="no-scrollbar bg-accent cursor-default overflow-x-auto rounded-md px-2 py-1">
+                  {keys?.npub}
+                </p>
+              </div>
+              <div>
+                <h3 className="mb-2 font-semibold">Tags:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {note.data?.tags.map((tag, index) => (
+                    <Badge
+                      className="cursor-default"
+                      key={index}
+                      variant="accent"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Cancel
-          </Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
 
-          <Button
-            onClick={(e) =>
-              handlePublish(e, note.data, keys, () => setIsOpen(false))
-            }
-          >
-            Publish
-          </Button>
-        </DialogFooter>
+            <Button
+              onClick={(e) =>
+                handlePublish(e, note.data, keys, () => setIsOpen(false))
+              }
+            >
+              Publish
+            </Button>
+          </DialogFooter>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

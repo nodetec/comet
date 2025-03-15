@@ -4,10 +4,7 @@ import { type Keys } from "$/types/Keys";
 import { type Note } from "$/types/Note";
 import { finalizeEvent, nip19, SimplePool } from "nostr-tools";
 import { toast } from "sonner";
-
-function replaceSpacesWithDashes(str: string) {
-  return str.replace(/\s/g, "-");
-}
+import { v4 as uuidv4 } from "uuid";
 
 function getFirstImage(markdown: string) {
   const regex = /!\[.*\]\((.*)\)/;
@@ -21,7 +18,7 @@ function getFirstImage(markdown: string) {
 }
 
 function randomId() {
-  return Math.floor(Math.random() * 0xffffffff).toString(16);
+  return uuidv4().replace(/-/g, "").substring(0, 10);
 }
 
 export function usePublish() {
@@ -62,7 +59,7 @@ export function usePublish() {
     if (note.identifier && note.author === npub) {
       identifier = note.identifier;
     } else {
-      identifier = `${replaceSpacesWithDashes(note.title)}-${randomId()}`;
+      identifier = randomId();
     }
 
     const eventTags = [
@@ -71,12 +68,11 @@ export function usePublish() {
       ["image", `${getFirstImage(note.content)}`], // TODO: parse first image from content
     ];
 
-    // TODO: add tags
-    // if (tags) {
-    //   tags.forEach((tag) => {
-    //     eventTags.push(["t", tag.Name]);
-    //   });
-    // }
+    if (note.tags) {
+      note.tags.forEach((tag) => {
+        eventTags.push(["t", tag]);
+      });
+    }
 
     const event = finalizeEvent(
       {
@@ -100,15 +96,13 @@ export function usePublish() {
       }
       const relayUrls = relays.map((relay) => relay.url);
 
-      console.log(event);
-      console.log(relayUrls);
+      console.log("relay urls", relayUrls);
 
       await Promise.all(pool.publish(relayUrls, event));
 
       pool.close(relayUrls);
 
       // TODO: update note to published
-      // TODO: add identifier to note
       // TODO: add event address to note
       note.publishedAt = new Date();
       note.identifier = identifier;
@@ -116,7 +110,7 @@ export function usePublish() {
       await window.api.addPublishDetailsToNote(note);
 
       await queryClient.invalidateQueries({ queryKey: ["notes"] });
-      await queryClient.invalidateQueries({ queryKey: ["activeNote"] });
+      await queryClient.invalidateQueries({ queryKey: ["note", note._id] });
       toast("Note posted", {
         description: "Your note was posted successfully.",
       });
