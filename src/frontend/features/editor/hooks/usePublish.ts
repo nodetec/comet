@@ -6,17 +6,6 @@ import { finalizeEvent, nip19, SimplePool } from "nostr-tools";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 
-function getFirstImage(markdown: string) {
-  const regex = /!\[.*\]\((.*)\)/;
-  const match = regex.exec(markdown);
-
-  if (match) {
-    return match[1];
-  }
-
-  return "";
-}
-
 function randomId() {
   return uuidv4().replace(/-/g, "").substring(0, 10);
 }
@@ -62,11 +51,19 @@ export function usePublish() {
       identifier = randomId();
     }
 
+    const image = /!\[.*\]\((.*)\)/.exec(note.content);
+
+    console.log(note.content);
+
     const eventTags = [
       ["d", identifier],
       ["title", note.title],
-      ["image", `${getFirstImage(note.content)}`], // TODO: parse first image from content
+      // ["image", image], // TODO: parse first image from content
     ];
+
+    if (image) {
+      eventTags.push(["image", image[1]]);
+    }
 
     if (note.tags) {
       note.tags.forEach((tag) => {
