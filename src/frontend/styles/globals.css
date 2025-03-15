@@ -96,9 +96,18 @@
   -webkit-app-region: no-drag;
 }
 
+::selection {
+  @apply bg-accent/60;
+}
 
 .list-marker {
   li::marker {
     @apply text-sky-500;
+  }
+}
+
+.list-padding {
+  li {
+    padding-left: 8px;
   }
 }

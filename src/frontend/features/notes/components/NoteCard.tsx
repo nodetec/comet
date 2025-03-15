@@ -52,7 +52,7 @@ export function NoteCard({ note, index, length }: Props) {
         data-focused={isFocused}
         className={cn(
           "relative flex w-full cursor-default flex-col items-start gap-2 rounded-md p-2.5 text-left text-sm",
-          active && "bg-accent/50 data-[focused=true]:bg-primary/50",
+          active && "bg-accent/50 data-[focused=true]:bg-primary/30",
         )}
       >
         <div

@@ -35,7 +35,7 @@ const DefaultTheme: EditorThemeClasses = {
       "list-[upper-roman] list-outside p-0 m-0 list-marker",
       "list-[lower-roman] list-outside p-0 m-0 list-marker",
     ],
-    ul: "list-disc list-outside p-0 m-0 list-marker",
+    ul: "list-disc list-outside p-0 m-0 list-marker list-padding",
   },
   ltr: "text-left",
   paragraph: "leading-relaxed",
