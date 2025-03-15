@@ -10,10 +10,10 @@ import { useInView } from "react-intersection-observer";
 
 import { Tag } from "./Tag";
 
-// import { TagItem } from "./TagItem";
-
 export function Tags() {
-  const tags = useTags();
+  const activeNotebookId = useAppState((state) => state.activeNotebookId);
+
+  const tags = useTags(activeNotebookId);
 
   const setLastTagVisible = useAppState((state) => state.setLastTagVisible);
 
@@ -37,8 +37,8 @@ export function Tags() {
   }
 
   return (
-    <Accordion type="single" collapsible defaultValue="item-1">
-      <AccordionItem value="item-1">
+    <Accordion type="single" collapsible defaultValue="tags">
+      <AccordionItem value="tags">
         <AccordionTrigger className="pt-3 pb-1.5">
           <div className="flex items-center">
             <div className="ml-1 text-xs">Tags</div>

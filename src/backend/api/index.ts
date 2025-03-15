@@ -64,6 +64,8 @@ export async function getNoteFeed(
 ): Promise<Note[]> {
   const db = getDb();
 
+  console.log("getNoteFeed", offset, limit, sortField, sortOrder, notebookId);
+
   const selector: PouchDB.Find.Selector = {
     contentUpdatedAt: { $exists: true },
     type: "note",
@@ -72,8 +74,6 @@ export async function getNoteFeed(
 
   if (notebookId) {
     selector.notebookId = notebookId;
-  } else {
-    selector.notebookId = { $exists: false };
   }
 
   if (tags && tags.length > 0) {
@@ -280,4 +280,18 @@ export async function getAllTags() {
     console.error("Error getting all tags:", err);
     throw err; // Re-throw the error for the caller to handle
   }
+}
+
+export async function getTagsByNotebookId(
+  _: IpcMainInvokeEvent,
+  notebookId: string,
+) {
+  const db = getDb();
+  const result = await db.query("tags/tagsByNotebook", {
+    startkey: [notebookId],
+    endkey: [notebookId, {}],
+    group: true,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+  return result.rows.map((row) => row.key[1]);
 }

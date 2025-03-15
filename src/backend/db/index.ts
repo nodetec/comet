@@ -2,20 +2,46 @@ import PouchDB from "pouchdb";
 import PouchDBFind from "pouchdb-find";
 
 import { createIndexes } from "./utils/createIndexes";
+
 // import { trackChanges } from "./utils/trackChanges";
 
 PouchDB.plugin(PouchDBFind);
 
 let db: PouchDB.Database;
 
+// const designDoc = {
+//   _id: "_design/tags",
+//   views: {
+//     allTags: {
+//       map: `function(doc) {
+//         if (doc.tags && Array.isArray(doc.tags)) {
+//           doc.tags.forEach(function(tag) {
+//             emit(tag, null);
+//           });
+//         }
+//       }`,
+//       reduce: "_count",
+//     },
+//   },
+// };
 const designDoc = {
   _id: "_design/tags",
   views: {
     allTags: {
       map: `function(doc) {
-        if (doc.tags && Array.isArray(doc.tags)) {
+        if (doc.type === "note" && doc.tags && Array.isArray(doc.tags)) {
           doc.tags.forEach(function(tag) {
             emit(tag, null);
+          });
+        }
+      }`,
+      reduce: "_count",
+    },
+    tagsByNotebook: {
+      map: `function(doc) {
+        if (doc.type === "note" && doc.notebookId && doc.tags && Array.isArray(doc.tags)) {
+          doc.tags.forEach(function(tag) {
+            emit([doc.notebookId, tag], null);
           });
         }
       }`,
@@ -52,7 +78,7 @@ export async function initDb(dbPath: string) {
   //   live: true,
   // } );
 
-//   trackChanges(db);
+  //   trackChanges(db);
   await createIndexes(db);
   await setupDesignDoc(db);
 

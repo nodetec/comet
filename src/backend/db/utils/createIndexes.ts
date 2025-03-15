@@ -11,6 +11,12 @@ export function createIndexes(db: PouchDB.Database) {
     }),
     db.createIndex({
       index: {
+        fields: ["contentUpdatedAt", "type", "trashedAt", "tags"],
+        name: "note-index-contentUpdatedAt-all",
+      },
+    }),
+    db.createIndex({
+      index: {
         fields: ["tags"],
         name: "note-tags-index",
       },

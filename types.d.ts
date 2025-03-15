@@ -30,6 +30,7 @@ declare global {
 
       // tags
       getAllTags: () => Promise<string[]>;
+      getTagsByNotebookId: (notebookId: string) => Promise<string[]>;
 
       // context menus
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;

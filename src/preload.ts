@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("api", {
 
   // tags
   getAllTags: () => ipcRenderer.invoke("getAllTags") as Promise<string[]>,
+  getTagsByNotebookId: (notebookId: string) =>
+    ipcRenderer.invoke("getTagsByNotebookId", notebookId) as Promise<string[]>,
 
   // context menus
   noteCardContextMenu: (note: Note, notebooks: Notebook[]) =>

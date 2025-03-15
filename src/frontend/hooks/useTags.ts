@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-async function fetchTags() {
+async function fetchTags(notebookId?: string) {
   try {
+    if (notebookId) {
+      return (await window.api.getTagsByNotebookId(notebookId)) ?? [];
+    }
+
     return (await window.api.getAllTags()) ?? [];
   } catch (e) {
     console.error("Error fetching tags:", e);
@@ -9,10 +13,10 @@ async function fetchTags() {
   }
 }
 
-export const useTags = () => {
+export const useTags = (notebookId?: string) => {
   return useQuery({
-    queryKey: ["tags"],
+    queryKey: ["tags", notebookId],
     refetchOnWindowFocus: false,
-    queryFn: fetchTags,
+    queryFn: () => fetchTags(notebookId),
   });
 };

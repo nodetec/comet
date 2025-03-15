@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-
 import { SidebarButton } from "~/components/ui/SidebarButton";
 import { useAppState } from "~/store";
 import { type Notebook } from "$/types/Notebook";
@@ -22,7 +20,10 @@ export function NotebookBtn({ notebook }: NotebookBtnProps) {
     (state) => state.setActiveNotebookName,
   );
 
+  const setActiveTags = useAppState((state) => state.setActiveTags);
+
   async function handleClick() {
+    setActiveTags([]);
     setFeedType("notebook");
     setActiveNotebookName(notebook.name);
     setActiveNotebookId(notebook._id);
