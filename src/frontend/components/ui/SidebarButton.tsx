@@ -29,7 +29,7 @@ export function SidebarButton({
       className={cn(
         "text-secondary-foreground flex w-full items-center rounded-md px-3 py-1 text-sm select-none",
         isActive && "bg-accent/80",
-        "cursor-default data-[focused=true]:bg-primary/50",
+        "cursor-default data-[focused=true]:bg-primary/30",
       )}
     >
       {React.cloneElement(icon, {
