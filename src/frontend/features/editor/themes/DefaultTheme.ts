@@ -10,7 +10,7 @@ const DefaultTheme: EditorThemeClasses = {
     base: "border rounded-md p-2",
     focus: "border-blue-500 shadow",
   },
-  hashtag: "text-sky-primary font-bold",
+  hashtag: "text-primary font-semibold",
   heading: {
     h1: "text-3xl font-bold mb-2 mt-3",
     h2: "text-2xl font-bold mb-2 mt-3",
