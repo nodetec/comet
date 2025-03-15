@@ -16,7 +16,10 @@ export function TrashNotesBtn() {
     (state) => state.setActiveNotebookName,
   );
 
+  const setActiveTags = useAppState((state) => state.setActiveTags);
+
   async function handleClick() {
+    setActiveTags([]);
     setFeedType("trash");
     setAppFocus({ panel: "sidebar", isFocused: true });
     setActiveNotebookId(undefined);
