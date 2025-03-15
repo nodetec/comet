@@ -20,7 +20,7 @@ export default function ResizableLayout() {
           className="bg-sidebar flex flex-col justify-between select-none"
           disableResponsive
           defaultSize={200}
-          minSize={200}
+          minSize={180}
           maxSize={300}
         >
           <SidebarHeader />
