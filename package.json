@@ -2,7 +2,7 @@
   "name": "comet",
   "productName": "comet",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Capture locally transmit globally",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
