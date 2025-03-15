@@ -97,12 +97,12 @@
 }
 
 ::selection {
-  @apply bg-accent/60;
+  @apply bg-primary/30;
 }
 
 .list-marker {
   li::marker {
-    @apply text-sky-500;
+    @apply text-primary
   }
 }
 
