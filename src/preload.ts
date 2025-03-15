@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("api", {
     sortOrder: "asc" | "desc" = "desc",
     notebookId,
     trashFeed = false,
+    tags?: string[],
   ) =>
     ipcRenderer.invoke(
       "getNoteFeed",
@@ -28,6 +29,7 @@ contextBridge.exposeInMainWorld("api", {
       sortOrder,
       notebookId,
       trashFeed,
+      tags,
     ) as Promise<Note[]>,
   getNote: (id: string) => ipcRenderer.invoke("getNote", id) as Promise<Note>,
   saveNote: (update: Partial<Note>) =>
@@ -48,6 +50,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("unhideNotebook", notebookId) as Promise<void>,
   deleteNotebook: (notebookId: string) =>
     ipcRenderer.invoke("deleteNotebook", notebookId) as Promise<void>,
+
+  // tags
+  getAllTags: () => ipcRenderer.invoke("getAllTags") as Promise<string[]>,
 
   // context menus
   noteCardContextMenu: (note: Note, notebooks: Notebook[]) =>

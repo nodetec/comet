@@ -13,11 +13,17 @@ interface State {
   relays: Relay[];
   setRelays: (relays: Relay[]) => void;
 
-  activeNotebookId: string;
-  setActiveNotebookId: (notebookId: string) => void;
+  activeNotebookId: string | undefined;
+  setActiveNotebookId: (notebookId: string | undefined) => void;
 
   activeNotebookName: string | undefined;
   setActiveNotebookName: (notebookName: string | undefined) => void;
+
+  activeTags: string[];
+  setActiveTags: (tags: string[]) => void;
+
+  lastTagVisible: boolean;
+  setLastTagVisible: (lastTagVisible: boolean) => void;
 
   feedType: "all" | "notebook" | "trash";
   setFeedType: (feedType: "all" | "notebook" | "trash") => void;
@@ -49,12 +55,18 @@ export const useAppState = create<State>()(
       relays: [{ url: "wss://relay.damus.io", read: true, write: true }],
       setRelays: (relays) => set({ relays }),
 
-      activeNotebookId: "all",
+      activeNotebookId: undefined,
       setActiveNotebookId: (activeNotebookId) => set({ activeNotebookId }),
 
       activeNotebookName: undefined,
       setActiveNotebookName: (activeNotebookName) =>
         set({ activeNotebookName }),
+
+      activeTags: [],
+      setActiveTags: (activeTags) => set({ activeTags }),
+
+      lastTagVisible: false,
+      setLastTagVisible: (lastTagVisible) => set({ lastTagVisible }),
 
       feedType: "all",
       setFeedType: (feedType) => set({ feedType }),
@@ -73,6 +85,7 @@ export const useAppState = create<State>()(
         activeNoteId: state.activeNoteId,
         activeNotebookId: state.activeNotebookId,
         activeNotebookName: state.activeNotebookName,
+        activeTags: state.activeTags,
         settingsTab: state.settingsTab,
         keys: state.keys,
       }),

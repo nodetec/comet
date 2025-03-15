@@ -1,5 +1,6 @@
 export type InsertNote = {
   notebookId?: string;
+  tags: string[];
 };
 
 export type Note = {
@@ -8,6 +9,7 @@ export type Note = {
   type: "note";
   title: string;
   content: string;
+  tags: string[];
   notebookId: string | undefined;
   createdAt: Date;
   updatedAt: Date;

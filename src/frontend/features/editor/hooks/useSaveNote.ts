@@ -81,10 +81,6 @@ async function saveNote(
     note.title = parseTitle(markdownText);
     await window.api.saveNote(note);
 
-    // TODO
-    // const tags = extractTags(markdownText);
-    // await AppService.CreateTags(note.ID, tags);
-
     if (shouldInvalidate) {
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       void queryClient.invalidateQueries({ queryKey: ["tags"] });

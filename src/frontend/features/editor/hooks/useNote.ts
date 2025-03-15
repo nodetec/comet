@@ -10,6 +10,8 @@ export const useNote = (id: string | undefined) => {
   return useQuery<Note | null>({
     queryKey: ["note", id],
     refetchOnWindowFocus: false,
+    gcTime: 0,
+    staleTime: 0,
     queryFn: () => getNote(id),
   });
 };

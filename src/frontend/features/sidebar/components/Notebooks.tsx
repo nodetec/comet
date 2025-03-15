@@ -22,7 +22,7 @@ export function Notebooks() {
   return (
     <Accordion type="single" collapsible defaultValue="notebooks">
       <AccordionItem value="notebooks">
-        <AccordionTrigger className="ml-1 flex items-center pt-0 pb-1.5 text-xs">
+        <AccordionTrigger className="ml-1 flex items-center pt-3 pb-1.5 text-xs">
           Notebooks
         </AccordionTrigger>
         <AccordionContent className="flex flex-col gap-0.5 pb-0">

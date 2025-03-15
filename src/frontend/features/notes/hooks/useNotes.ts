@@ -8,6 +8,7 @@ const useNotes = () => {
   //   const timeSortDirection = useAppState((state) => state.timeSortDirection);
   //   const titleSortDirection = useAppState((state) => state.titleSortDirection);
   const feedType = useAppState((state) => state.feedType);
+  const activeTags = useAppState((state) => state.activeTags);
 
   async function fetchNotes({ pageParam = 1 }) {
     const limit = 10;
@@ -33,6 +34,7 @@ const useNotes = () => {
       "desc",
       notebookId,
       trashFeed,
+      activeTags,
     );
 
     return {
@@ -47,6 +49,7 @@ const useNotes = () => {
       "notes",
       feedType,
       activeNotebookId,
+      activeTags,
       //   search,
       //   orderBy,
       //   timeSortDirection,

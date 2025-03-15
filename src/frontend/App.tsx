@@ -23,10 +23,8 @@ export default function ResizableLayout() {
           minSize={200}
           maxSize={300}
         >
-          <div>
-            <SidebarHeader />
-            <SidebarNav />
-          </div>
+          <SidebarHeader />
+          <SidebarNav />
           <NewNotebookBtn />
         </Section>
         <Bar className="flex cursor-col-resize items-center" size={10}>

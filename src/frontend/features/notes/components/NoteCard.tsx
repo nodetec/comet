@@ -82,7 +82,7 @@ export function NoteCard({ note, index, length }: Props) {
                   <TooltipTrigger asChild className="cursor-default">
                     <span
                       data-focused={isFocused}
-                      className="data-[focused=true]:text-secondary-foreground cursor-default text-xs text-primary/80 select-none"
+                      className="data-[focused=true]:text-secondary-foreground text-primary/80 cursor-default text-xs select-none"
                     >
                       <SendIcon className="h-4 w-4" />
                     </span>
@@ -100,7 +100,9 @@ export function NoteCard({ note, index, length }: Props) {
         )} */}
       </button>
       <div className="flex w-full flex-col items-center px-[0.30rem]">
-        {index < length - 1 && <Separator decorative className="bg-accent/30" />}
+        {index < length - 1 && (
+          <Separator decorative className="bg-accent/30" />
+        )}
       </div>
     </div>
   );

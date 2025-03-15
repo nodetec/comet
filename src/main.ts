@@ -1,6 +1,6 @@
 import path from "path";
 
-import { initDb, logDbInfo } from "&/db";
+import { initDb } from "&/db";
 import { setupHandlers } from "&/handlers";
 import { setupContextMenus } from "&/menus";
 import { app, BrowserWindow } from "electron";
@@ -69,9 +69,6 @@ void app
     setupHandlers();
     setupContextMenus();
     createWindow();
-    // This overrides the default context menu which is annoying
-
-    void logDbInfo();
   })
   .catch(console.error);
 

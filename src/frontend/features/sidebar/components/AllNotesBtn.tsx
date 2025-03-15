@@ -17,8 +17,8 @@ export function AllNotesBtn() {
 
   async function handleAllNotesClick() {
     setFeedType("all");
-    setActiveNotebookId("all");
-    setActiveNotebookName("all");
+    setActiveNotebookId(undefined);
+    setActiveNotebookName(undefined);
     setAppFocus({ panel: "sidebar", isFocused: true });
   }
 

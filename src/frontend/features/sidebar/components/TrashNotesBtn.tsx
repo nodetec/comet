@@ -11,9 +11,17 @@ export function TrashNotesBtn() {
 
   const setActiveNoteId = useAppState((state) => state.setActiveNoteId);
 
+  const setActiveNotebookId = useAppState((state) => state.setActiveNotebookId);
+  const setActiveNotebookName = useAppState(
+    (state) => state.setActiveNotebookName,
+  );
+
   async function handleClick() {
     setFeedType("trash");
     setAppFocus({ panel: "sidebar", isFocused: true });
+    setActiveNotebookId(undefined);
+    setActiveNotebookName(undefined);
+
     if (feedType === "trash") return;
     setActiveNoteId(undefined);
   }

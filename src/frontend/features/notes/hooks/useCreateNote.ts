@@ -7,8 +7,11 @@ export function useCreateNote() {
   const setActiveNoteId = useAppState((state) => state.setActiveNoteId);
 
   async function createNote(notebookId?: string) {
+    console.log("Creating note in notebook:", notebookId);
+
     const id = await window.api.createNote({
       notebookId,
+      tags: [],
     });
 
     void queryClient.invalidateQueries({

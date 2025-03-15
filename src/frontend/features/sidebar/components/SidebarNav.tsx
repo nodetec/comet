@@ -5,6 +5,9 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { useTags } from "~/hooks/useTags";
+import { cn } from "~/lib/utils";
+import { useAppState } from "~/store";
 
 import { AllNotesBtn } from "./AllNotesBtn";
 import { Notebooks } from "./Notebooks";
@@ -12,13 +15,16 @@ import { Tags } from "./Tags";
 import { TrashNotesBtn } from "./TrashNotesBtn";
 
 export function SidebarNav() {
+  const lastTagVisible = useAppState((state) => state.lastTagVisible);
+  const tags = useTags();
+
   return (
     <ScrollArea
-    //   type="scroll"
-    //   className={cn(
-    //     "flex h-full flex-col gap-y-2",
-    //     !lastTagVisible && tagsCount > 0 && "border-b",
-    //   )}
+      type="scroll"
+      className={cn(
+        "flex h-full flex-col gap-y-2",
+        !lastTagVisible && (tags.data?.length ?? 0) > 0 && "border-b",
+      )}
     >
       <div className="flex flex-col gap-y-1 px-3">
         <Accordion type="single" collapsible defaultValue="notes">

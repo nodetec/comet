@@ -5,13 +5,13 @@
 // https://pouchdb.com/2015/02/28/efficiently-managing-ui-state-in-pouchdb.html
 // https://pouchdb.com/2014/05/01/secondary-indexes-have-landed-in-pouchdb.html
 
+import { getDb } from "&/db";
+import { extractHashtags } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
 import dayjs from "dayjs";
 import { type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import { v4 as uuidv4 } from "uuid";
-
-import { getDb } from "../db";
 
 // Notes
 export async function createNote(
@@ -19,12 +19,16 @@ export async function createNote(
   insertNote: InsertNote,
 ): Promise<string> {
   const db = getDb();
+
+  // if there are active tags then add \n and put the tags separated by spaces with #
+
   const note: Note = {
     _id: `note_${uuidv4()}`,
     _rev: undefined,
     type: "note",
     title: dayjs().format("YYYY-MM-DD"),
     content: "",
+    tags: insertNote.tags,
     notebookId: insertNote?.notebookId,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -56,7 +60,8 @@ export async function getNoteFeed(
   sortOrder: "asc" | "desc" = "desc",
   notebookId?: string,
   trashFeed = false,
-) {
+  tags?: string[],
+): Promise<Note[]> {
   const db = getDb();
 
   const selector: PouchDB.Find.Selector = {
@@ -67,6 +72,12 @@ export async function getNoteFeed(
 
   if (notebookId) {
     selector.notebookId = notebookId;
+  } else {
+    selector.notebookId = { $exists: false };
+  }
+
+  if (tags && tags.length > 0) {
+    selector.tags = { $all: tags };
   }
 
   const response = await db.find({
@@ -76,9 +87,7 @@ export async function getNoteFeed(
     limit,
   });
 
-  const notes = response.docs as Note[];
-
-  return notes;
+  return response.docs as Note[];
 }
 
 export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
@@ -86,6 +95,8 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   const id = update._id;
   if (!id) return;
   const note = await db.get<Note>(id);
+  const tags = extractHashtags(update.content ?? "");
+  note.tags = tags;
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
   note.updatedAt = new Date();
@@ -249,4 +260,24 @@ export async function deleteNotebook(event: IpcMainInvokeEvent, id: string) {
   await db.remove(notebook);
   event.sender.send("notebookDeleted", id);
   return id;
+}
+
+export async function getAllTags() {
+  const db = getDb();
+  try {
+    // Query the 'allTags' view with grouping to get unique tags
+    const result = await db.query("tags/allTags", {
+      group: true,
+    });
+
+    // Extract the unique tags from the result rows
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    const uniqueTags = result.rows.map((row) => row.key) as string[];
+
+    // TODO: we can probably return the count too with row.value
+    return uniqueTags;
+  } catch (err) {
+    console.error("Error getting all tags:", err);
+    throw err; // Re-throw the error for the caller to handle
+  }
 }

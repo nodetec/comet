@@ -4,35 +4,37 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-// import { useTags } from "~/hooks/useTags";
+import { useTags } from "~/hooks/useTags";
 import { useAppState } from "~/store";
 import { useInView } from "react-intersection-observer";
+
+import { Tag } from "./Tag";
 
 // import { TagItem } from "./TagItem";
 
 export function Tags() {
-  //   const { data: tags, status } = useTags();
+  const tags = useTags();
 
-  //   const setLastTagVisible = useAppState((state) => state.setLastTagVisible);
+  const setLastTagVisible = useAppState((state) => state.setLastTagVisible);
 
-  //   const { ref: lastTagRef } = useInView({
-  //     threshold: 1,
-  //     onChange: (inView) => {
-  //       if (inView) {
-  //         setLastTagVisible(true);
-  //       } else {
-  //         setLastTagVisible(false);
-  //       }
-  //     },
-  //   });
+  const { ref: lastTagRef } = useInView({
+    threshold: 1,
+    onChange: (inView) => {
+      if (inView) {
+        setLastTagVisible(true);
+      } else {
+        setLastTagVisible(false);
+      }
+    },
+  });
 
-  //   if (status === "pending") {
-  //     return undefined;
-  //   }
+  if (tags.status === "pending") {
+    return undefined;
+  }
 
-  //   if (status === "error") {
-  //     return <div>Error fetching tags</div>;
-  //   }
+  if (tags.status === "error") {
+    return <div>Error fetching tags</div>;
+  }
 
   return (
     <Accordion type="single" collapsible defaultValue="item-1">
@@ -44,14 +46,14 @@ export function Tags() {
         </AccordionTrigger>
         <AccordionContent className="pl-3">
           <div className="flex flex-wrap gap-2 pt-2">
-            {/* {tags?.map((tag, index) => {
-              const isLastTag = index === tags.length - 1;
+            {tags.data?.map((tag, index) => {
+              const isLastTag = index === tags.data.length - 1;
               return (
-                <div key={tag.ID} ref={isLastTag ? lastTagRef : null}>
-                  <TagItem tag={tag} />
+                <div key={tag} ref={isLastTag ? lastTagRef : null}>
+                  <Tag tag={tag} />
                 </div>
               );
-            })} */}
+            })}
           </div>
         </AccordionContent>
       </AccordionItem>

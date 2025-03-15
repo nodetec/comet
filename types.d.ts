@@ -14,6 +14,7 @@ declare global {
         sortOrder: "asc" | "desc",
         notebookId?: string,
         trashFeed?: boolean,
+        tags?: string[],
       ) => Promise<Note[]>;
       getNote: (id: string) => Promise<Note>;
       saveNote: (update: Partial<Note>) => Promise<string>;
@@ -26,6 +27,9 @@ declare global {
       hideNotebook: (notebookId: string) => Promise<void>;
       unhideNotebook: (notebookId: string) => Promise<void>;
       deleteNotebook: (notebookId: string) => Promise<void>;
+
+      // tags
+      getAllTags: () => Promise<string[]>;
 
       // context menus
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;
