@@ -9,6 +9,7 @@ export function setupHandlers(): void {
   ipcMain.handle("getNote", api.getNote);
   ipcMain.handle("saveNote", api.saveNote);
   ipcMain.handle("addPublishDetailsToNote", api.addPublishDetailsToNote);
+  ipcMain.handle("searchDocuments", api.searchDocuments);
 
   // notebooks
   ipcMain.handle("createNotebook", api.createNotebook);

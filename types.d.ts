@@ -19,6 +19,11 @@ declare global {
       getNote: (id: string) => Promise<Note>;
       saveNote: (update: Partial<Note>) => Promise<string>;
       addPublishDetailsToNote: (update: Note) => Promise<void>;
+      searchDocuments: (
+        query: string,
+        notebookId?: string,
+        tags?: string[],
+      ) => Promise<Note[]>;
 
       // notebooks
       createNotebook: (name: string) => Promise<string>;

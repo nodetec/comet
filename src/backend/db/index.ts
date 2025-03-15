@@ -1,11 +1,15 @@
 import PouchDB from "pouchdb";
 import PouchDBFind from "pouchdb-find";
+// import {  } from "pouchdb-quicker-search";
+import PouchDBSearch from 'pouchdb-quicker-search';
+
 
 import { createIndexes } from "./utils/createIndexes";
 
 // import { trackChanges } from "./utils/trackChanges";
 
 PouchDB.plugin(PouchDBFind);
+PouchDB.plugin(PouchDBSearch);
 
 let db: PouchDB.Database;
 

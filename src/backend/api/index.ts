@@ -95,6 +95,59 @@ export async function getNoteFeed(
   return response.docs as Note[];
 }
 
+export async function searchDocuments(
+  _: IpcMainInvokeEvent,
+  query: string,
+  notebookId?: string,
+  tags?: string[],
+) {
+  const db = getDb();
+  try {
+    const result = await db.search({
+      query,
+      fields: ["content"],
+      highlighting: true,
+      filter: function (doc: Note) {
+        const isNote = doc.type === "note";
+        const isNotTrashed = doc.trashedAt === undefined;
+        const isNotebookMatch = notebookId
+          ? doc.notebookId === notebookId
+          : false;
+
+        console.log("notebookId", notebookId);
+        console.log("doc.notebookId", doc.notebookId);
+
+        console.log("isNote", isNote);
+        console.log("isNotTrashed", isNotTrashed);
+        console.log("isNotebookMatch", isNotebookMatch);
+
+        return isNote && isNotTrashed && isNotebookMatch;
+      },
+      include_docs: true,
+    });
+
+    console.log("Search result:", result);
+
+    // console.log(`Found ${result.total_rows} results for query "${query}":`);
+
+    // result.rows.forEach((row) => {
+    //   console.log(`Document: ${row.id}, Score: ${row.score}`);
+    //   console.log(`Title: ${row.doc.title}`);
+
+    //   // Show highlighted matches
+    //   if (row.highlighting) {
+    //     Object.keys(row.highlighting).forEach((field) => {
+    //       console.log(`Highlighted ${field}: ${row.highlighting[field]}`);
+    // });
+    // }
+
+    // console.log("---");
+    // });
+  } catch (error) {
+    console.error("Search error:", error);
+  }
+}
+
 export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   const db = getDb();
   const id = update._id;

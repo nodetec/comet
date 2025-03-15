@@ -88,6 +88,7 @@
     "postcss": "^8.5.3",
     "pouchdb": "^9.0.0",
     "pouchdb-find": "^9.0.0",
+    "pouchdb-quick-search": "^1.3.0",
     "react": "^19.0.0",
     "react-copy-to-clipboard": "^5.1.0",
     "react-dom": "^19.0.0",
