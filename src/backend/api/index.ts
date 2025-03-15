@@ -21,13 +21,20 @@ export async function createNote(
   const db = getDb();
 
   // if there are active tags then add \n and put the tags separated by spaces with #
+  const tags = insertNote.tags.map((tag) => `#${tag}`).join(" ");
+
+  let content = "";
+
+  if (tags && tags.length > 0) {
+    content = `\n${tags}\n`;
+  }
 
   const note: Note = {
     _id: `note_${uuidv4()}`,
     _rev: undefined,
     type: "note",
     title: dayjs().format("YYYY-MM-DD"),
-    content: "",
+    content: content,
     tags: insertNote.tags,
     notebookId: insertNote?.notebookId,
     createdAt: new Date(),
@@ -63,8 +70,6 @@ export async function getNoteFeed(
   tags?: string[],
 ): Promise<Note[]> {
   const db = getDb();
-
-  console.log("getNoteFeed", offset, limit, sortField, sortOrder, notebookId);
 
   const selector: PouchDB.Find.Selector = {
     contentUpdatedAt: { $exists: true },

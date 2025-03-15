@@ -10,6 +10,7 @@ export function NotesHeader() {
   const feedType = useAppState((state) => state.feedType);
   const activeNotebookId = useAppState((state) => state.activeNotebookId);
   const activeNotebookName = useAppState((state) => state.activeNotebookName);
+  const activeTags = useAppState((state) => state.activeTags);
   const createNote = useCreateNote();
 
   const title = useMemo(() => {
@@ -34,7 +35,9 @@ export function NotesHeader() {
         variant="ghost"
         size="icon"
         disabled={createNote.isPending}
-        onClick={() => createNote.mutate(activeNotebookId)}
+        onClick={() =>
+          createNote.mutate({ notebookId: activeNotebookId, tags: activeTags })
+        }
       >
         <PenBoxIcon />
       </Button>
