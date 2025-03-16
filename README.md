@@ -4,7 +4,14 @@ Comet is a desktop app for taking and publishing notes for nostr.
 
 ## Development
 
+Will currently only work with nodejs 20
+
 ### Install Dependencies
+
+```sh
+# needed for pouchdb-adapter-node-websql
+ln -s /opt/homebrew/bin/python3 /opt/homebrew/bin/python
+```
 
 ```sh
 npm i --force

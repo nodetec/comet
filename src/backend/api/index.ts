@@ -5,7 +5,7 @@
 // https://pouchdb.com/2015/02/28/efficiently-managing-ui-state-in-pouchdb.html
 // https://pouchdb.com/2014/05/01/secondary-indexes-have-landed-in-pouchdb.html
 
-import { getDb } from "&/db";
+import { getDb, getDbFts } from "&/db";
 import { extractHashtags } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
@@ -300,3 +300,106 @@ export async function getTagsByNotebookId(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
   return result.rows.map((row) => row.key[1]);
 }
+
+// TODO: add notebook id to fts as well
+export async function searchNotes(
+  _: IpcMainInvokeEvent,
+  searchTerm: string,
+  limit = 100,
+  offset = 0,
+): Promise<Note[]> {
+  const db = getDb();
+  const dbFts = getDbFts();
+
+  // Return empty array if search term is empty or just whitespace
+  if (!searchTerm.trim()) {
+    return [];
+  }
+
+  try {
+    const rows = await new Promise<unknown[]>((resolve, reject) => {
+      dbFts.all(
+        "SELECT doc_id FROM notes_fts WHERE content MATCH ? ORDER BY rank ASC LIMIT ? OFFSET ?",
+        [searchTerm, limit, offset],
+        (err, rows) => {
+          if (err) {
+            console.error("Error searching FTS index:", err);
+            reject(err);
+            return;
+          }
+          resolve(rows);
+        },
+      );
+    });
+
+    // Extract doc_ids from the FTS query results
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    const docIds = rows.map((row) => row.doc_id);
+
+    // Fetch full documents from PouchDB using the doc_ids
+    const result = await db.allDocs({
+      keys: docIds,
+      include_docs: true,
+    });
+
+    // Filter out any missing documents and map to Note type
+    const notes = result.rows
+      .filter((row) => row.doc) // Ensure doc exists
+      .map((row) => row.doc as Note);
+
+    return notes;
+  } catch (err) {
+    console.error("Error fetching documents from PouchDB:", err);
+    throw err;
+  }
+}
+
+// export async function searchNotes(
+//   searchTerm: string,
+//   limit = 100,
+// ): Promise<Note[]> {
+//   const db = getDb();
+//   const dbFts = getDbFts();
+
+//   // Return empty array if search term is empty or just whitespace
+//   if (!searchTerm.trim()) {
+//     return [];
+//   }
+
+//   try {
+//     const rows = await new Promise<unknown[]>((resolve, reject) => {
+//       dbFts.all(
+//         "SELECT doc_id FROM notes_fts WHERE content MATCH ? ORDER BY rank LIMIT ?",
+//         [searchTerm, limit],
+//         (err, rows) => {
+//           if (err) {
+//             console.error("Error searching FTS index:", err);
+//             reject(err);
+//             return;
+//           }
+//           resolve(rows);
+//         },
+//       );
+//     });
+
+//     // Extract doc_ids from the FTS query results
+//     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+//     const docIds = rows.map((row) => row.doc_id);
+
+//     // Fetch full documents from PouchDB using the doc_ids
+//     const result = await db.allDocs({
+//       keys: docIds,
+//       include_docs: true,
+//     });
+
+//     // Filter out any missing documents and map to Note type
+//     const notes = result.rows
+//       .filter((row) => row.doc) // Ensure doc exists
+//       .map((row) => row.doc as Note);
+
+//     return notes;
+//   } catch (err) {
+//     console.error("Error fetching documents from PouchDB:", err);
+//     throw err;
+//   }
+// }
