@@ -35,6 +35,7 @@ const useNotes = () => {
         noteSearch,
         limit,
         offset,
+        trashFeed,
         activeNotebookId,
       );
     } else {

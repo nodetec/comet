@@ -97,6 +97,7 @@ export async function getNoteFeed(
 }
 
 export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
+  console.log("saving note", update);
   const db = getDb();
   const id = update._id;
   if (!id) return;
@@ -109,6 +110,7 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.updatedAt = new Date().toISOString();
   note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
+  console.log("saved note", response);
   return response.id;
 }
 
@@ -323,6 +325,7 @@ export async function searchNotes(
   searchTerm: string,
   limit: number,
   offset: number,
+  trashed: boolean, // Add parameter with default value false
   notebookId?: string,
 ): Promise<Note[]> {
   const db = getDb();
@@ -342,13 +345,16 @@ export async function searchNotes(
   let selectQuery;
   let selectParams;
 
+  // Add trashedAt condition based on the trashed parameter
+  const trashedCondition = trashed
+    ? "trashedAt IS NOT NULL"
+    : "trashedAt IS NULL";
+
   if (notebookId) {
-    selectQuery =
-      "SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
+    selectQuery = `SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, notebookId, limit, offset];
   } else {
-    selectQuery =
-      "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
+    selectQuery = `SELECT doc_id FROM notes_fts WHERE content LIKE ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, limit, offset];
   }
 
@@ -364,6 +370,8 @@ export async function searchNotes(
         resolve(rows);
       });
     });
+
+    console.log("rows", rows);
 
     // Extract doc_ids from the FTS query results
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return

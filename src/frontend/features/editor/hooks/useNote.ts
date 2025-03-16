@@ -2,8 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { type Note } from "$/types/Note";
 
 async function getNote(id: string | undefined): Promise<Note | null> {
+  console.log("getNote", id);
   if (!id) return null;
-  return await window.api.getNote(id);
+  const note = await window.api.getNote(id);
+  console.log("getNote", note);
+  return note;
 }
 
 export const useNote = (id: string | undefined) => {

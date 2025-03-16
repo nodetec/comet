@@ -69,6 +69,7 @@ async function saveNote(
   }
 
   await editor.read(async () => {
+    console.log("saving note", note);
     const markdownText = $convertToMarkdownString(transformers);
 
     const noteToUpdate = await window.api.getNote(note._id);

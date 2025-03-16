@@ -42,7 +42,7 @@ function NoteCardBase({ note, index, length }: Props) {
 
   // Memoize parsed content with search highlighting
   const parsedContentWithSearch = useMemo(
-    () => searchContent(note.previewContent, noteSearch) || "No content \n ",
+    () => searchContent(note.previewContent, noteSearch) || "",
     [note.previewContent, noteSearch],
   );
 
