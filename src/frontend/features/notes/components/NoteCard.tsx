@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { Separator } from "~/components/ui/separator";
 import {
   Tooltip,
@@ -30,7 +32,29 @@ export function NoteCard({ note, index, length }: Props) {
 
   const noteSearch = useAppState((state) => state.noteSearch);
 
-  // const queryClient = useQueryClient();
+  // Memoize parsed content
+  const parsedContent = useMemo(
+    () => parseContent(note.content) || "No content \n ",
+    [note.content],
+  );
+
+  // Memoize parsed content with search highlighting
+  const parsedContentWithSearch = useMemo(
+    () => parseContent(note.content, noteSearch) || "No content \n ",
+    [note.content, noteSearch],
+  );
+  
+  // Memoize date formatting
+  const formattedUpdatedTime = useMemo(
+    () => note.contentUpdatedAt ? fromNow(note.contentUpdatedAt) : "",
+    [note.contentUpdatedAt]
+  );
+  
+  // Memoize published date formatting
+  const formattedPublishedTime = useMemo(
+    () => note.publishedAt ? `published ${fromNow(note.publishedAt)}` : "",
+    [note.publishedAt]
+  );
 
   async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -54,7 +78,6 @@ export function NoteCard({ note, index, length }: Props) {
 
   return (
     <div className="mx-3 flex w-full flex-col items-center">
-      <div>{note.notebookId}</div>
       <button
         data-focused={isFocused}
         className={cn(
@@ -88,14 +111,15 @@ export function NoteCard({ note, index, length }: Props) {
                 highlightClassName="bg-yellow-300 text-background"
                 searchWords={[noteSearch]}
                 autoEscape={true}
-                textToHighlight={parseContent(note.content) || "No content \n "}
+                // caseSensitive={true}
+                textToHighlight={parsedContentWithSearch}
               />
             ) : (
               <div
                 data-focused={isFocused}
                 className="text-muted-foreground data-[focused=true]:text-secondary-foreground mt-0 line-clamp-2 min-h-[3em] pt-0 break-all text-ellipsis whitespace-break-spaces"
               >
-                {parseContent(note.content) || "No content \n "}
+                {parsedContent}
               </div>
             )}
 
@@ -104,7 +128,7 @@ export function NoteCard({ note, index, length }: Props) {
                 data-focused={isFocused}
                 className="text-muted-foreground/80 data-[focused=true]:text-secondary-foreground text-xs select-none"
               >
-                {note.contentUpdatedAt && fromNow(note.contentUpdatedAt)}
+                {formattedUpdatedTime}
               </span>
               {note.publishedAt && (
                 <Tooltip delayDuration={200}>
@@ -117,7 +141,7 @@ export function NoteCard({ note, index, length }: Props) {
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    <span>{`published ${fromNow(note.publishedAt)}`}</span>
+                    <span>{formattedPublishedTime}</span>
                   </TooltipContent>
                 </Tooltip>
               )}

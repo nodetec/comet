@@ -1,4 +1,4 @@
-export function parseContent(markdownContent: string) {
+export function parseContent(markdownContent: string, searchTerm?: string) {
   // Split the content into lines
   const lines = markdownContent.split("\n");
 
@@ -23,9 +23,19 @@ export function parseContent(markdownContent: string) {
     .replace(/\[.*?\]\(.*?\)/g, "") // Remove links
     .replace(/`{1,3}.*?`{1,3}/g, "") // Remove inline and block code
     .replace(/[*_~]{1,3}/g, "") // Remove emphasis (bold, italic, strikethrough)
-    .replace(/^#+\s+/gm, "") // Remove headers
+    .replace(/^#+\s+/gm, "") // Strip hashtags from headers but keep the text
     .replace(/^\s*[-*+]\s+/gm, "") // Remove list items
     .replace(/^\s*\d+\.\s+/gm, ""); // Remove numbered list items
+
+    console.log("cleanedContent", cleanedContent);
+
+  if (searchTerm) {
+    const linesAfterClean = cleanedContent.split("\n");
+    const matchedLines = linesAfterClean.filter((line) =>
+      line.includes(searchTerm),
+    );
+    return matchedLines.join("\n");
+  }
 
   return cleanedContent.trim();
 }
