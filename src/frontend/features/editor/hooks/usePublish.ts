@@ -101,7 +101,7 @@ export function usePublish() {
 
       // TODO: update note to published
       // TODO: add event address to note
-      note.publishedAt = new Date();
+      note.publishedAt = new Date().toISOString();
       note.identifier = identifier;
 
       await window.api.addPublishDetailsToNote(note);

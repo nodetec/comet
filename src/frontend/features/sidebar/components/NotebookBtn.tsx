@@ -20,9 +20,12 @@ export function NotebookBtn({ notebook }: NotebookBtnProps) {
     (state) => state.setActiveNotebookName,
   );
 
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
+
   const setActiveTags = useAppState((state) => state.setActiveTags);
 
   async function handleClick() {
+    setNoteSearch("");
     setActiveTags([]);
     setFeedType("notebook");
     setActiveNotebookName(notebook.name);

@@ -1,8 +1,9 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useAppState } from "~/store";
+import { Note } from "$/types/Note";
 
 const useNotes = () => {
-  //   const search = useAppState((state) => state.noteSearch);
+  const noteSearch = useAppState((state) => state.noteSearch);
   const activeNotebookId = useAppState((state) => state.activeNotebookId);
   //   const orderBy = useAppState((state) => state.orderBy);
   //   const timeSortDirection = useAppState((state) => state.timeSortDirection);
@@ -27,15 +28,26 @@ const useNotes = () => {
       notebookId = undefined;
     }
 
-    const notes = await window.api.getNoteFeed(
-      offset,
-      limit,
-      "contentUpdatedAt",
-      "desc",
-      notebookId,
-      trashFeed,
-      activeTags,
-    );
+    let notes: Note[] = [];
+
+    if (noteSearch !== "") {
+      notes = await window.api.searchNotes(
+        noteSearch,
+        limit,
+        offset,
+        activeNotebookId,
+      );
+    } else {
+      notes = await window.api.getNoteFeed(
+        offset,
+        limit,
+        "contentUpdatedAt",
+        "desc",
+        notebookId,
+        trashFeed,
+        activeTags,
+      );
+    }
 
     return {
       data: notes || [],
@@ -50,13 +62,14 @@ const useNotes = () => {
       feedType,
       activeNotebookId,
       activeTags,
-      //   search,
+      noteSearch,
       //   orderBy,
       //   timeSortDirection,
       //   titleSortDirection,
     ],
     queryFn: fetchNotes,
     initialPageParam: 1,
+    placeholderData: keepPreviousData,
     getNextPageParam: (lastPage, allPages, lastPageParam) => {
       if (lastPage.data.length === 0) {
         return undefined;

@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("saveNote", update) as Promise<string>,
   addPublishDetailsToNote: (update: Note) =>
     ipcRenderer.invoke("addPublishDetailsToNote", update) as Promise<void>,
+  searchNotes: (searchTerm: string, limit: number, offset: number, notebookId?: string) =>
+    ipcRenderer.invoke("searchNotes", searchTerm, limit, offset, notebookId) as Promise<Note[]>,
 
   // notebooks
   createNotebook: (name: string) =>

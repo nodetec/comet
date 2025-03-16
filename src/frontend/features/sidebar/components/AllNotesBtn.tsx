@@ -9,6 +9,8 @@ export function AllNotesBtn() {
   const appFocus = useAppState((state) => state.appFocus);
   const setAppFocus = useAppState((state) => state.setAppFocus);
 
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
+
   // const notebookId = useAppState((state) => state.activeNotebookId);
   const setActiveNotebookId = useAppState((state) => state.setActiveNotebookId);
   const setActiveNotebookName = useAppState(
@@ -16,6 +18,7 @@ export function AllNotesBtn() {
   );
 
   async function handleAllNotesClick() {
+    setNoteSearch("");
     setFeedType("all");
     setActiveNotebookId(undefined);
     setActiveNotebookName(undefined);

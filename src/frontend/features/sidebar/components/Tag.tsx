@@ -14,7 +14,13 @@ export function Tag({ tag }: Props) {
   const feedType = useAppState((state) => state.feedType);
   const setFeedType = useAppState((state) => state.setFeedType);
 
+  const noteSearch = useAppState((state) => state.noteSearch);
+
   const handleTagClick = async () => {
+    if (noteSearch !== "") {
+      return;
+    }
+
     if (feedType === "trash") {
       setFeedType("all");
     }
@@ -34,7 +40,9 @@ export function Tag({ tag }: Props) {
       onClick={handleTagClick}
       className={cn(
         "rouned-md bg-accent text-secondary-foreground line-clamp-1 cursor-pointer truncate rounded-md px-2 py-1 text-sm font-medium break-all overflow-ellipsis whitespace-break-spaces select-none",
-        activeTags.includes(tag) && "text-secondary-foreground bg-primary/30",
+        activeTags.includes(tag) &&
+          noteSearch === "" &&
+          "text-secondary-foreground bg-primary/30",
       )}
     >
       #{tag}

@@ -5,7 +5,7 @@
 // https://pouchdb.com/2015/02/28/efficiently-managing-ui-state-in-pouchdb.html
 // https://pouchdb.com/2014/05/01/secondary-indexes-have-landed-in-pouchdb.html
 
-import { getDb } from "&/db";
+import { getDb, getDbFts } from "&/db";
 import { extractHashtags } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
@@ -37,9 +37,9 @@ export async function createNote(
     content: content,
     tags: insertNote.tags,
     notebookId: insertNote?.notebookId,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    contentUpdatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    contentUpdatedAt: new Date().toISOString(),
     author: undefined,
     publishedAt: undefined,
     eventAddress: undefined,
@@ -104,8 +104,8 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.tags = tags;
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -113,8 +113,8 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
 export async function moveNoteToTrash(_: IpcMainEvent, id: string) {
   const db = getDb();
   const note = await db.get<Note>(id);
-  note.trashedAt = new Date();
-  note.updatedAt = new Date();
+  note.trashedAt = new Date().toISOString();
+  note.updatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -132,8 +132,8 @@ export async function restoreNote(_: IpcMainEvent, id: string) {
   const db = getDb();
   const note = await db.get<Note>(id);
   note.trashedAt = undefined;
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -148,8 +148,8 @@ export async function addPublishDetailsToNote(
   const note = await db.get<Note>(id);
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   note.author = update.author;
   note.publishedAt = update.publishedAt;
   note.eventAddress = update.eventAddress;
@@ -166,8 +166,8 @@ export async function moveNoteToNotebook(
   const db = getDb();
   const note = await db.get<Note>(noteId);
   note.notebookId = notebookId;
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -193,8 +193,8 @@ export async function createNotebook(_: IpcMainInvokeEvent, name: string) {
     type: "notebook",
     name,
     hidden: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const response = await db.put(notebook);
@@ -234,7 +234,7 @@ export async function updateNotebookName(
   if (!id) return;
   const notebook = await db.get<Notebook>(id);
   notebook.name = update.name ?? "";
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   return response.id;
 }
@@ -243,7 +243,7 @@ export async function hideNotebook(event: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
   notebook.hidden = true;
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   event.sender.send("notebookHidden", id);
   return response.id;
@@ -253,7 +253,7 @@ export async function unhideNotebook(_: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
   notebook.hidden = false;
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   return response.id;
 }
@@ -261,6 +261,18 @@ export async function unhideNotebook(_: IpcMainInvokeEvent, id: string) {
 export async function deleteNotebook(event: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
+  const notesResponse = await db.find({
+    selector: {
+      type: "note",
+      notebookId: id,
+    },
+  });
+
+  for (const note of notesResponse.docs) {
+    (note as Note).notebookId = undefined;
+    await db.put(note as Note);
+  }
+
   notebook.name = "";
   await db.remove(notebook);
   event.sender.send("notebookDeleted", id);
@@ -299,4 +311,76 @@ export async function getTagsByNotebookId(
   });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
   return result.rows.map((row) => row.key[1]);
+}
+
+// TODO: add notebook id to fts as well
+export async function searchNotes(
+  _: IpcMainInvokeEvent,
+  searchTerm: string,
+  limit: number,
+  offset: number,
+  notebookId?: string,
+): Promise<Note[]> {
+  const db = getDb();
+  const dbFts = getDbFts();
+
+  console.log("searching for", searchTerm);
+
+  // Return empty array if search term is empty or just whitespace
+  if (!searchTerm.trim()) {
+    return [];
+  }
+
+  const literalQuery = "%" + searchTerm.trim() + "%";
+
+  console.log("query", literalQuery);
+
+  let selectQuery;
+  let selectParams;
+
+  if (notebookId) {
+    selectQuery =
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
+    selectParams = [literalQuery, notebookId, limit, offset];
+  } else {
+    selectQuery =
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
+    selectParams = [literalQuery, limit, offset];
+  }
+
+  // maybe we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
+  try {
+    const rows = await new Promise<unknown[]>((resolve, reject) => {
+      dbFts.all(selectQuery, selectParams, (err, rows) => {
+        if (err) {
+          console.error("Error searching FTS index:", err);
+          reject(err);
+          return;
+        }
+        resolve(rows);
+      });
+    });
+
+    // Extract doc_ids from the FTS query results
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    const docIds = rows.map((row) => row.doc_id);
+
+    // Fetch full documents from PouchDB using the doc_ids
+    const result = await db.allDocs({
+      keys: docIds,
+      include_docs: true,
+    });
+
+    // Filter out any missing documents and map to Note type
+    const notes = result.rows
+      .filter((row) => row.doc) // Ensure doc exists
+      .map((row) => row.doc as Note);
+
+    console.log("notes", notes);
+
+    return notes;
+  } catch (err) {
+    console.error("Error fetching documents from PouchDB:", err);
+    throw err;
+  }
 }

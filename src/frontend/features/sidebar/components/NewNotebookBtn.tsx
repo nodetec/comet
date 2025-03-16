@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import { useAppState } from "~/store";
 import { PlusCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +23,8 @@ export function NewNotebookBtn() {
   const [isOpen, setIsOpen] = useState(false);
 
   const queryClient = useQueryClient();
+
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
 
   const handleCreate = async () => {
     console.log({ name });
@@ -37,6 +40,7 @@ export function NewNotebookBtn() {
       await queryClient.invalidateQueries({ queryKey: ["notebooks"] });
       setIsOpen(false);
       setName("");
+      setNoteSearch("");
     } catch (error) {
       console.error(error);
       toast.error("Notebook already exists");

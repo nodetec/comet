@@ -12,15 +12,15 @@ npm i --force
 
 ### Run the app
 
- ```
- npm run start
- ```
+```
+npm run dev
+```
 
 ### Package the app
 
- ```
- npm run package
- ```
+```
+npm run package
+```
 
 The output for you platform will be in the `out/` directory
 

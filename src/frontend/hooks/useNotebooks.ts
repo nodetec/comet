@@ -1,4 +1,8 @@
-import { useQuery, type QueryFunctionContext } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  type QueryFunctionContext,
+} from "@tanstack/react-query";
 
 type QueryKey = [string, boolean];
 
@@ -18,6 +22,7 @@ export const useNotebooks = (showHidden: boolean) => {
   return useQuery({
     queryKey: ["notebooks", showHidden],
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
     queryFn: fetchNotebooks,
   });
 };

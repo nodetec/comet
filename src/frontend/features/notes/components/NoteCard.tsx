@@ -9,6 +9,7 @@ import { cn, fromNow } from "~/lib/utils";
 import { useAppState } from "~/store";
 import { type Note } from "$/types/Note";
 import { SendIcon } from "lucide-react";
+import Highlighter from "react-highlight-words";
 
 type Props = {
   note: Note;
@@ -27,10 +28,15 @@ export function NoteCard({ note, index, length }: Props) {
 
   const active = activeNoteId === note._id;
 
+  const noteSearch = useAppState((state) => state.noteSearch);
+
+  // const queryClient = useQueryClient();
+
   async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     setActiveNoteId(note._id);
     setAppFocus({ panel: "feed", isFocused: true });
+    // void queryClient.invalidateQueries({ queryKey: ["note"] });
   }
 
   const isFocused = appFocus?.panel === "feed" && appFocus.isFocused && active;
@@ -48,6 +54,7 @@ export function NoteCard({ note, index, length }: Props) {
 
   return (
     <div className="mx-3 flex w-full flex-col items-center">
+      <div>{note.notebookId}</div>
       <button
         data-focused={isFocused}
         className={cn(
@@ -61,15 +68,35 @@ export function NoteCard({ note, index, length }: Props) {
           onClick={handleSetActiveNote}
         >
           <div className="flex w-full flex-col gap-1.5">
-            <h2 className="text-secondary-foreground line-clamp-1 truncate font-semibold break-all text-ellipsis whitespace-break-spaces select-none">
-              {note.title}
-            </h2>
-            <div
-              data-focused={isFocused}
-              className="text-muted-foreground data-[focused=true]:text-secondary-foreground mt-0 line-clamp-2 min-h-[3em] pt-0 break-all text-ellipsis whitespace-break-spaces"
-            >
-              {parseContent(note.content) || "No content \n "}
-            </div>
+            {noteSearch ? (
+              <Highlighter
+                highlightClassName="bg-yellow-300 text-background"
+                searchWords={[noteSearch]}
+                autoEscape={true}
+                textToHighlight={note.title}
+              />
+            ) : (
+              <h2 className="text-secondary-foreground line-clamp-1 truncate font-semibold break-all text-ellipsis whitespace-break-spaces select-none">
+                {note.title}
+              </h2>
+            )}
+
+            {noteSearch ? (
+              <Highlighter
+                highlightClassName="bg-yellow-300 text-background"
+                searchWords={[noteSearch]}
+                autoEscape={true}
+                textToHighlight={parseContent(note.content) || "No content \n "}
+              />
+            ) : (
+              <div
+                data-focused={isFocused}
+                className="text-muted-foreground data-[focused=true]:text-secondary-foreground mt-0 line-clamp-2 min-h-[3em] pt-0 break-all text-ellipsis whitespace-break-spaces"
+              >
+                {parseContent(note.content) || "No content \n "}
+              </div>
+            )}
+
             <div className="flex w-full items-center justify-between">
               <span
                 data-focused={isFocused}

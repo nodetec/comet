@@ -2,27 +2,32 @@ import { Input } from "~/components/ui/input";
 import { useAppState } from "~/store";
 
 export function NotesSearch() {
-//   const noteSearch = useAppState((state) => state.noteSearch);
-//   const setNoteSearch = useAppState((state) => state.setNoteSearch);
-//   const setSearchActive = useAppState((state) => state.setSearchActive);
+  const noteSearch = useAppState((state) => state.noteSearch);
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
 
-//   function handleSetSearchNote(e: React.ChangeEvent<HTMLInputElement>) {
-//     if (e.target.value === "") {
-//       setNoteSearch("");
-//       setSearchActive(false);
-//       return;
-//     }
-//     setSearchActive(true);
-//     setNoteSearch(e.target.value);
-//   }
+  const setAppFocus = useAppState((state) => state.setAppFocus);
+
+  async function handleSetSearchNote(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.value === "") {
+      setNoteSearch("");
+      return;
+    }
+    setNoteSearch(e.target.value);
+  }
+
+  const handleFocus = () => {
+    console.log("focus");
+    setAppFocus({ panel: undefined, isFocused: true });
+  };
 
   return (
-    <div className="flex items-center px-3 pb-4 pt-2 select-none">
+    <div className="flex items-center px-3 pt-2 pb-4 select-none">
       <Input
         placeholder="Search..."
-        className="h-8 text-muted-foreground/80 bg-transparent placeholder:text-muted-foreground/60 select-none focus-visible:ring-blue-400/80"
-        // onChange={handleSetSearchNote}
-        // value={noteSearch}
+        className="text-muted-accent/80 placeholder:text-accent-foreground/60 focus-visible:ring-primary h-8 shrink-0 bg-transparent select-none"
+        onChange={handleSetSearchNote}
+        value={noteSearch}
+        onFocus={handleFocus}
       />
     </div>
   );

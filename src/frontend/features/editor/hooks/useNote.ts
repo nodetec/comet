@@ -10,8 +10,8 @@ export const useNote = (id: string | undefined) => {
   return useQuery<Note | null>({
     queryKey: ["note", id],
     refetchOnWindowFocus: false,
-    gcTime: 0,
-    staleTime: 0,
+    // TODO: why doesn't this work for individual notes?
+    // placeholderData: keepPreviousData,
     queryFn: () => getNote(id),
   });
 };

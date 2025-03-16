@@ -31,7 +31,7 @@ export const assignRef = (
   return undefined;
 };
 
-export function fromNow(createdAt: Date | undefined) {
+export function fromNow(createdAt: Date | string | undefined) {
   if (!createdAt) {
     return undefined;
   }
