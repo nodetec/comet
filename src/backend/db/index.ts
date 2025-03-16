@@ -18,26 +18,43 @@ async function syncFtsIndex(dbFts: Database) {
     fields: ["_id", "content"],
   });
   for (const note of notes.docs as Note[]) {
+    let updateQuery: string;
+    let insertQuery: string;
+    let updateParams: string[];
+    let insertParams: string[];
+
+    if (note.notebookId) {
+      updateQuery =
+        "UPDATE notes_fts SET content = ?, notebookId = ? WHERE doc_id = ?";
+      updateParams = [note.content, note.notebookId, note._id];
+      insertQuery =
+        "INSERT INTO notes_fts (doc_id, content, notebookId) VALUES (?, ?, ?)";
+      updateParams = [note._id, note.content, note.notebookId];
+    } else {
+      updateQuery = "UPDATE notes_fts SET content = ? WHERE doc_id = ?";
+      updateParams = [note.content, note._id];
+      insertQuery = "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)";
+      insertParams = [note._id, note.content];
+    }
+
     dbFts.run(
-      "UPDATE notes_fts SET content = ? WHERE doc_id = ?",
-      [note.content, note._id],
+      updateQuery,
+
+      updateParams,
+
       function (err) {
         if (err) {
           console.error("Error updating FTS index during initial sync:", err);
         } else if (this.changes === 0) {
           // No rows updated, so insert a new row
-          dbFts.run(
-            "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)",
-            [note._id, note.content],
-            (err) => {
-              if (err) {
-                console.error(
-                  "Error inserting into FTS index during initial sync:",
-                  err,
-                );
-              }
-            },
-          );
+          dbFts.run(insertQuery, insertParams, (err) => {
+            if (err) {
+              console.error(
+                "Error inserting into FTS index during initial sync:",
+                err,
+              );
+            }
+          });
         }
       },
     );
@@ -65,26 +82,51 @@ async function syncFtsIndex(dbFts: Database) {
         );
       } else if (change.doc) {
         console.log("processing", change.doc._id);
-        dbFts.run(
-          "UPDATE notes_fts SET content = ? WHERE doc_id = ?",
-          [(change.doc as Note).content, change.doc._id],
-          function (err) {
-            if (err) {
-              console.error("Error updating FTS index:", err);
-            } else if (this.changes === 0) {
-              // No rows updated, so insert a new row
-              dbFts.run(
-                "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)",
-                [change.doc?._id, (change.doc as Note)?.content],
-                (err) => {
-                  if (err) {
-                    console.error("Error inserting into FTS index:", err);
-                  }
-                },
-              );
-            }
-          },
-        );
+
+        let updateQuery: string;
+        let insertQuery: string;
+        let updateParams: string[];
+        let insertParams: string[];
+
+        console.log("change.doc", change.doc);
+
+        if ((change.doc as Note).notebookId) {
+          updateQuery =
+            "UPDATE notes_fts SET content = ?, notebookId = ? WHERE doc_id = ?";
+          updateParams = [
+            (change.doc as Note).content,
+            (change.doc as Note).notebookId ?? "",
+            change.doc._id,
+          ];
+          insertQuery =
+            "INSERT INTO notes_fts (doc_id, content, notebookId) VALUES (?, ?, ?)";
+          insertParams = [
+            change.doc?._id,
+            (change.doc as Note)?.content,
+            (change.doc as Note)?.notebookId ?? "",
+          ];
+        } else {
+          updateQuery = "UPDATE notes_fts SET content = ? WHERE doc_id = ?";
+          insertQuery = "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)";
+          updateParams = [(change.doc as Note).content, change.doc._id];
+          insertParams = [change.doc?._id, (change.doc as Note)?.content];
+        }
+
+        console.log("updateQuery", updateQuery);
+        console.log("insertQuery", insertQuery);
+
+        dbFts.run(updateQuery, updateParams, function (err) {
+          if (err) {
+            console.error("Error updating FTS index:", err);
+          } else if (this.changes === 0) {
+            // No rows updated, so insert a new row
+            dbFts.run(insertQuery, insertParams, (err) => {
+              if (err) {
+                console.error("Error inserting into FTS index:", err);
+              }
+            });
+          }
+        });
       }
     });
 }
@@ -97,7 +139,7 @@ export async function initDb(dbPath: string) {
   dbFts = new sqlite3.Database(`${dbPath}_fts`);
 
   dbFts.run(
-    "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content)",
+    "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content, notebookId)",
   );
   await syncFtsIndex(dbFts);
 

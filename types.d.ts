@@ -23,6 +23,7 @@ declare global {
         searchTerm: string,
         limit: number,
         offset: number,
+        notebookId?: string,
       ) => Promise<Note[]>;
 
       // notebooks

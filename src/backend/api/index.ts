@@ -306,8 +306,9 @@ export async function getTagsByNotebookId(
 export async function searchNotes(
   _: IpcMainInvokeEvent,
   searchTerm: string,
-  limit = 10,
-  offset = 0,
+  limit: number,
+  offset: number,
+  notebookId?: string,
 ): Promise<Note[]> {
   const db = getDb();
   const dbFts = getDbFts();
@@ -323,21 +324,30 @@ export async function searchNotes(
 
   console.log("query", literalQuery);
 
+  let selectQuery;
+  let selectParams;
+
+  if (notebookId) {
+    selectQuery =
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? ORDER BY rank ASC LIMIT ? OFFSET ?";
+    selectParams = [literalQuery, notebookId, limit, offset];
+  } else {
+    selectQuery =
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY rank ASC LIMIT ? OFFSET ?";
+    selectParams = [literalQuery, limit, offset];
+  }
+
   // maybe we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
   try {
     const rows = await new Promise<unknown[]>((resolve, reject) => {
-      dbFts.all(
-        "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY rank ASC LIMIT ? OFFSET ?",
-        [literalQuery, limit, offset],
-        (err, rows) => {
-          if (err) {
-            console.error("Error searching FTS index:", err);
-            reject(err);
-            return;
-          }
-          resolve(rows);
-        },
-      );
+      dbFts.all(selectQuery, selectParams, (err, rows) => {
+        if (err) {
+          console.error("Error searching FTS index:", err);
+          reject(err);
+          return;
+        }
+        resolve(rows);
+      });
     });
 
     // Extract doc_ids from the FTS query results
@@ -363,53 +373,3 @@ export async function searchNotes(
     throw err;
   }
 }
-
-// export async function searchNotes(
-//   searchTerm: string,
-//   limit = 100,
-// ): Promise<Note[]> {
-//   const db = getDb();
-//   const dbFts = getDbFts();
-
-//   // Return empty array if search term is empty or just whitespace
-//   if (!searchTerm.trim()) {
-//     return [];
-//   }
-
-//   try {
-//     const rows = await new Promise<unknown[]>((resolve, reject) => {
-//       dbFts.all(
-//         "SELECT doc_id FROM notes_fts WHERE content MATCH ? ORDER BY rank LIMIT ?",
-//         [searchTerm, limit],
-//         (err, rows) => {
-//           if (err) {
-//             console.error("Error searching FTS index:", err);
-//             reject(err);
-//             return;
-//           }
-//           resolve(rows);
-//         },
-//       );
-//     });
-
-//     // Extract doc_ids from the FTS query results
-//     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-//     const docIds = rows.map((row) => row.doc_id);
-
-//     // Fetch full documents from PouchDB using the doc_ids
-//     const result = await db.allDocs({
-//       keys: docIds,
-//       include_docs: true,
-//     });
-
-//     // Filter out any missing documents and map to Note type
-//     const notes = result.rows
-//       .filter((row) => row.doc) // Ensure doc exists
-//       .map((row) => row.doc as Note);
-
-//     return notes;
-//   } catch (err) {
-//     console.error("Error fetching documents from PouchDB:", err);
-//     throw err;
-//   }
-// }

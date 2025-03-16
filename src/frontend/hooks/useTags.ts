@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 async function fetchTags(notebookId?: string) {
   try {
@@ -17,6 +17,7 @@ export const useTags = (notebookId?: string) => {
   return useQuery({
     queryKey: ["tags", notebookId],
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
     queryFn: () => fetchTags(notebookId),
   });
 };

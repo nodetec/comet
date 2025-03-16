@@ -18,7 +18,10 @@ export function TrashNotesBtn() {
 
   const setActiveTags = useAppState((state) => state.setActiveTags);
 
+  const setNoteSearch = useAppState((state) => state.setNoteSearch);
+
   async function handleClick() {
+    setNoteSearch("");
     setActiveTags([]);
     setFeedType("trash");
     setAppFocus({ panel: "sidebar", isFocused: true });

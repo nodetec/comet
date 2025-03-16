@@ -20,6 +20,9 @@ export function useCreateNote() {
     void queryClient.invalidateQueries({
       queryKey: ["notes"],
     });
+    void queryClient.invalidateQueries({
+      queryKey: ["note"],
+    });
 
     setActiveNoteId(id);
   }

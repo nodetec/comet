@@ -37,6 +37,9 @@ interface State {
       | undefined,
   ) => void;
 
+  noteSearch: string;
+  setNoteSearch: (noteSearch: string) => void;
+
   settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks";
   setSettingsTab: (
     settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks",
@@ -76,6 +79,9 @@ export const useAppState = create<State>()(
 
       settingsTab: "profile",
       setSettingsTab: (settingsTab) => set({ settingsTab }),
+
+      noteSearch: "",
+      setNoteSearch: (noteSearch) => set({ noteSearch }),
     }),
     {
       name: "comet-storage",

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Separator } from "~/components/ui/separator";
 import {
   Tooltip,
@@ -27,10 +28,13 @@ export function NoteCard({ note, index, length }: Props) {
 
   const active = activeNoteId === note._id;
 
+  // const queryClient = useQueryClient();
+
   async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
     setActiveNoteId(note._id);
     setAppFocus({ panel: "feed", isFocused: true });
+    // void queryClient.invalidateQueries({ queryKey: ["note"] });
   }
 
   const isFocused = appFocus?.panel === "feed" && appFocus.isFocused && active;
