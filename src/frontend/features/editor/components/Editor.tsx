@@ -69,7 +69,6 @@ export function Editor() {
   }
 
   function onChange(editorState: EditorState) {
-    console.log(editorState.toJSON());
     saveNote.mutate({
       note: note.data,
       editor: editorState,
@@ -79,7 +78,6 @@ export function Editor() {
   }
 
   function onFocus(_event: FocusEvent, _editor: LexicalEditor) {
-    console.log("ContentEditable focused");
     setAppFocus({ panel: "editor", isFocused: true });
   }
 

@@ -27,8 +27,6 @@ export function parseContent(markdownContent: string, searchTerm?: string) {
     .replace(/^\s*[-*+]\s+/gm, "") // Remove list items
     .replace(/^\s*\d+\.\s+/gm, ""); // Remove numbered list items
 
-    console.log("cleanedContent", cleanedContent);
-
   if (searchTerm) {
     const linesAfterClean = cleanedContent.split("\n");
     const matchedLines = linesAfterClean.filter((line) =>
