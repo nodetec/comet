@@ -24,7 +24,4 @@ export const mainConfig: Configuration = {
       $: path.resolve(__dirname, "src"),
     },
   },
-  externals: {
-    sqlite3: "commonjs2 sqlite3",
-  },
 };

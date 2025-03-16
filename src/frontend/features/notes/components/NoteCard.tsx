@@ -54,6 +54,7 @@ export function NoteCard({ note, index, length }: Props) {
 
   return (
     <div className="mx-3 flex w-full flex-col items-center">
+      <div>{note.notebookId}</div>
       <button
         data-focused={isFocused}
         className={cn(

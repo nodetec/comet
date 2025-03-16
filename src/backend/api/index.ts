@@ -258,10 +258,21 @@ export async function unhideNotebook(_: IpcMainInvokeEvent, id: string) {
   return response.id;
 }
 
-// TODO: also remove notebook from associated notes
 export async function deleteNotebook(event: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
+  const notesResponse = await db.find({
+    selector: {
+      type: "note",
+      notebookId: id,
+    },
+  });
+
+  for (const note of notesResponse.docs) {
+    (note as Note).notebookId = undefined;
+    await db.put(note as Note);
+  }
+
   notebook.name = "";
   await db.remove(notebook);
   event.sender.send("notebookDeleted", id);
