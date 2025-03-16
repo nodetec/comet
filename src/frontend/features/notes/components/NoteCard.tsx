@@ -70,6 +70,7 @@ export function NoteCard({ note, index, length }: Props) {
           <div className="flex w-full flex-col gap-1.5">
             {noteSearch ? (
               <Highlighter
+                className="line-clamp-1 truncate font-semibold break-all text-ellipsis whitespace-break-spaces select-none"
                 highlightClassName="bg-yellow-300 text-background"
                 searchWords={[noteSearch]}
                 autoEscape={true}
@@ -83,6 +84,7 @@ export function NoteCard({ note, index, length }: Props) {
 
             {noteSearch ? (
               <Highlighter
+                className="text-muted-foreground/80 line-clamp-4 min-h-[3em] pt-0 break-all whitespace-break-spaces select-none"
                 highlightClassName="bg-yellow-300 text-background"
                 searchWords={[noteSearch]}
                 autoEscape={true}

@@ -27,5 +27,5 @@ export function parseContent(markdownContent: string) {
     .replace(/^\s*[-*+]\s+/gm, "") // Remove list items
     .replace(/^\s*\d+\.\s+/gm, ""); // Remove numbered list items
 
-  return cleanedContent;
+  return cleanedContent.trim();
 }
