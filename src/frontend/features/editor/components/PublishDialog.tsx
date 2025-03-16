@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { usePublish } from "~/features/editor/hooks/usePublish";
 import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";

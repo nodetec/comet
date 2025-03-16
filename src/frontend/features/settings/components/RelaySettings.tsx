@@ -10,7 +10,7 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useAppState } from "~/store";
 import { type Relay } from "$/types/Relay";
 import { PlusIcon, X } from "lucide-react";

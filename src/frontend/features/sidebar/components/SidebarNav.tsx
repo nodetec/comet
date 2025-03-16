@@ -4,7 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useTags } from "~/hooks/useTags";
 import { cn } from "~/lib/utils";
 import { useAppState } from "~/store";

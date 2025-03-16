@@ -11,7 +11,7 @@ import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useAppState } from "~/store";
 
 import { MarkdownImageNode } from "../lexical/markdownImage/nodes/MarkdownImageNode";

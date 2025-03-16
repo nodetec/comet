@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "~/components/ui/button";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useNotebooks } from "~/hooks/useNotebooks";
 import { fromNow } from "~/lib/utils";
 import { type Notebook } from "$/types/Notebook";

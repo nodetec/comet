@@ -1,4 +1,4 @@
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { assignRef } from "~/lib/utils";
 import { useInView } from "react-intersection-observer";
 

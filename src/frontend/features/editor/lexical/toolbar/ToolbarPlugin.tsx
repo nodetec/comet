@@ -183,7 +183,7 @@ export function ToolbarPlugin() {
 
         <div className="hidden items-center gap-2 xl:flex">
           <CodeBlockPlugin blockType={blockType} />
-          <MarkdownImagePlugin />
+          {/* <MarkdownImagePlugin /> */}
           {/* <TwitterAction /> */}
           <YoutubeAction />
         </div>

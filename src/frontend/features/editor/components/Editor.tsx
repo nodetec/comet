@@ -18,7 +18,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useAppState } from "~/store";
 import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
 
@@ -39,6 +39,7 @@ import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
 import { YOUTUBE_TRANSFORMER } from "../lexical/youtube/YouTubeTransformer";
 import DefaultTheme from "../themes/DefaultTheme";
 import { DummyEditor } from "./DummyEditor";
+import { EditorClickWrapper } from "./EditorClickWrapper";
 
 function onError(error: Error) {
   console.error(error);
@@ -83,20 +84,22 @@ export function Editor() {
   }
 
   function handleClick(event: React.MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
     if (feedType === "trash") {
+      event.preventDefault();
       setAppFocus({ panel: "editor", isFocused: true });
     }
   }
 
   function getInitalContent() {
     $convertFromMarkdownString(
-      note.data?.content ?? "",
+      note.data?.content === "" ? "# " : (note.data?.content ?? ""),
       COMBINED_TRANSFORMERS,
       undefined,
       true,
     );
-    $setSelection(null);
+    if (note.data?.content !== "") {
+      $setSelection(null);
+    }
   }
 
   const initialConfig: InitialConfigType = {
@@ -131,11 +134,22 @@ export function Editor() {
       </div>
       <RichTextPlugin
         contentEditable={
-          <ScrollArea className="flex flex-1 flex-col" type="scroll">
-            <ContentEditable
-              onClick={handleClick}
-              className="caret-primary min-h-full flex-auto flex-col px-16 pt-8 pb-[50%] select-text focus-visible:outline-none"
-            />
+          <ScrollArea
+            className="w-full"
+            type="scroll"
+            // Add an id to make it easier to identify
+            id="editor-scroll-area"
+          >
+            <EditorClickWrapper>
+              <div className="cursor-text">
+                <ContentEditable
+                  onClick={handleClick}
+                  className="caret-primary mx-auto min-h-full max-w-[46rem] px-16 pt-8 pb-[50%] select-text focus-visible:outline-none xl:pb-[30%]"
+                  // Add an id to make it easier to identify
+                  id="editor-content-editable"
+                />
+              </div>
+            </EditorClickWrapper>
           </ScrollArea>
         }
         ErrorBoundary={LexicalErrorBoundary}
