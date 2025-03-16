@@ -258,6 +258,7 @@ export async function unhideNotebook(_: IpcMainInvokeEvent, id: string) {
   return response.id;
 }
 
+// TODO: also remove notebook from associated notes
 export async function deleteNotebook(event: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
@@ -305,22 +306,29 @@ export async function getTagsByNotebookId(
 export async function searchNotes(
   _: IpcMainInvokeEvent,
   searchTerm: string,
-  limit = 100,
+  limit = 10,
   offset = 0,
 ): Promise<Note[]> {
   const db = getDb();
   const dbFts = getDbFts();
+
+  console.log("searching for", searchTerm);
 
   // Return empty array if search term is empty or just whitespace
   if (!searchTerm.trim()) {
     return [];
   }
 
+  const literalQuery = "%" + searchTerm.trim() + "%";
+
+  console.log("query", literalQuery);
+
+  // maybe we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
   try {
     const rows = await new Promise<unknown[]>((resolve, reject) => {
       dbFts.all(
-        "SELECT doc_id FROM notes_fts WHERE content MATCH ? ORDER BY rank ASC LIMIT ? OFFSET ?",
-        [searchTerm, limit, offset],
+        "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY rank ASC LIMIT ? OFFSET ?",
+        [literalQuery, limit, offset],
         (err, rows) => {
           if (err) {
             console.error("Error searching FTS index:", err);
@@ -346,6 +354,8 @@ export async function searchNotes(
     const notes = result.rows
       .filter((row) => row.doc) // Ensure doc exists
       .map((row) => row.doc as Note);
+
+    console.log("notes", notes);
 
     return notes;
   } catch (err) {
