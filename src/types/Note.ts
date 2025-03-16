@@ -9,6 +9,7 @@ export type Note = {
   type: "note";
   title: string;
   content: string;
+  previewContent: string;
   tags: string[];
   notebookId: string | undefined;
   createdAt: string;

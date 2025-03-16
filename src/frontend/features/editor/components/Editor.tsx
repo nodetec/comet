@@ -18,7 +18,6 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { useAppState } from "~/store";
 import { $setSelection, type EditorState, type LexicalEditor } from "lexical";
 
@@ -69,6 +68,7 @@ export function Editor() {
   }
 
   function onChange(editorState: EditorState) {
+    console.log("onChange");
     saveNote.mutate({
       note: note.data,
       editor: editorState,
