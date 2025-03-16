@@ -12,6 +12,7 @@ import { useAppState } from "~/store";
 import { type Note } from "$/types/Note";
 import { SendIcon } from "lucide-react";
 import Highlighter from "react-highlight-words";
+import { searchContent } from "~/lib/markdown/searchContent";
 
 type Props = {
   note: Note;
@@ -34,14 +35,14 @@ function NoteCardBase({ note, index, length }: Props) {
   const noteSearch = useAppState((state) => state.noteSearch);
 
   // Memoize parsed content
-  const parsedContent = useMemo(
-    () => parseContent(note.content) || "No content \n ",
-    [note.content],
-  );
+  // const parsedContent = useMemo(
+  //   () => parseContent(note.content) || "No content \n ",
+  //   [note.content],
+  // );
 
   // Memoize parsed content with search highlighting
   const parsedContentWithSearch = useMemo(
-    () => parseContent(note.content, noteSearch) || "No content \n ",
+    () => searchContent(note.previewContent, noteSearch) || "No content \n ",
     [note.content, noteSearch],
   );
 
@@ -131,7 +132,7 @@ function NoteCardBase({ note, index, length }: Props) {
                 data-focused={isFocused}
                 className="text-muted-foreground data-[focused=true]:text-secondary-foreground mt-0 line-clamp-2 min-h-[3em] pt-0 break-all text-ellipsis whitespace-break-spaces"
               >
-                {parsedContent}
+                {note.previewContent}
               </div>
             )}
 

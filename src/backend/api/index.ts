@@ -6,7 +6,7 @@
 // https://pouchdb.com/2014/05/01/secondary-indexes-have-landed-in-pouchdb.html
 
 import { getDb, getDbFts } from "&/db";
-import { extractHashtags } from "~/lib/markdown";
+import { extractHashtags, parseContent } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
 import dayjs from "dayjs";
@@ -35,6 +35,7 @@ export async function createNote(
     type: "note",
     title: dayjs().format("YYYY-MM-DD"),
     content: content,
+    previewContent: "",
     tags: insertNote.tags,
     notebookId: insertNote?.notebookId,
     createdAt: new Date().toISOString(),
@@ -104,6 +105,7 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.tags = tags;
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
+  note.previewContent = parseContent(update.content ?? "") ?? "";
   note.updatedAt = new Date().toISOString();
   note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
@@ -124,6 +126,7 @@ export async function deleteNote(_: IpcMainEvent, id: string) {
   const note = await db.get<Note>(id);
   note.title = "";
   note.content = "";
+  note.previewContent = "";
   note.author = "";
   return await db.remove(note);
 }
@@ -148,6 +151,7 @@ export async function addPublishDetailsToNote(
   const note = await db.get<Note>(id);
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
+  note.previewContent = parseContent(update.content ?? "") ?? "";
   note.updatedAt = new Date().toISOString();
   note.contentUpdatedAt = new Date().toISOString();
   note.author = update.author;
@@ -363,7 +367,7 @@ export async function searchNotes(
 
     // Extract doc_ids from the FTS query results
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    const docIds = rows.map((row) => row.doc_id);
+    const docIds = rows.map((row: unknown) => row.doc_id);
 
     // Fetch full documents from PouchDB using the doc_ids
     const result = await db.allDocs({
