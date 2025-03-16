@@ -97,7 +97,6 @@ export async function getNoteFeed(
 }
 
 export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
-  console.log("saving note", update);
   const db = getDb();
   const id = update._id;
   if (!id) return;
@@ -110,7 +109,6 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.updatedAt = new Date().toISOString();
   note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
-  console.log("saved note", response);
   return response.id;
 }
 
@@ -331,16 +329,12 @@ export async function searchNotes(
   const db = getDb();
   const dbFts = getDbFts();
 
-  console.log("searching for", searchTerm);
-
   // Return empty array if search term is empty or just whitespace
   if (!searchTerm.trim()) {
     return [];
   }
 
   const literalQuery = "%" + searchTerm.trim() + "%";
-
-  console.log("query", literalQuery);
 
   let selectQuery;
   let selectParams;
@@ -358,9 +352,15 @@ export async function searchNotes(
     selectParams = [literalQuery, limit, offset];
   }
 
-  // maybe we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
+  console.log("selectQuery", selectQuery);
+
+  type Row = {
+    doc_id: string;
+  };
+
   try {
-    const rows = await new Promise<unknown[]>((resolve, reject) => {
+    // we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
+    const rows = (await new Promise<unknown[]>((resolve, reject) => {
       dbFts.all(selectQuery, selectParams, (err, rows) => {
         if (err) {
           console.error("Error searching FTS index:", err);
@@ -369,26 +369,28 @@ export async function searchNotes(
         }
         resolve(rows);
       });
-    });
+    })) as Row[];
 
-    console.log("rows", rows);
-
-    // Extract doc_ids from the FTS query results
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    const docIds = rows.map((row: unknown) => row.doc_id);
+    const docIds = rows.map((row: Row) => row.doc_id);
 
     // Fetch full documents from PouchDB using the doc_ids
-    const result = await db.allDocs({
+    const pouchDbResult = await db.allDocs({
       keys: docIds,
       include_docs: true,
     });
 
-    // Filter out any missing documents and map to Note type
-    const notes = result.rows
-      .filter((row) => row.doc) // Ensure doc exists
-      .map((row) => row.doc as Note);
+    const pouchDbRows = pouchDbResult.rows;
 
-    console.log("notes", notes);
+    // Filter out any missing documents and map to Note type
+    const notes = pouchDbRows
+      .filter((row) => "doc" in row && row.doc) // Ensure doc exists
+      .map((row) => {
+        if ("doc" in row && row.doc) {
+          return row.doc as Note;
+        }
+        return null;
+      })
+      .filter((note): note is Note => note !== null);
 
     return notes;
   } catch (err) {

@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useAppState } from "~/store";
-import { Note } from "$/types/Note";
+import { type Note } from "$/types/Note";
 
 const useNotes = () => {
   const noteSearch = useAppState((state) => state.noteSearch);
@@ -69,6 +69,8 @@ const useNotes = () => {
       //   titleSortDirection,
     ],
     queryFn: fetchNotes,
+    gcTime: 0,
+    staleTime: 0,
     initialPageParam: 1,
     placeholderData: keepPreviousData,
     getNextPageParam: (lastPage, allPages, lastPageParam) => {
