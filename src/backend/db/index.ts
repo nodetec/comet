@@ -1,4 +1,5 @@
 import { type Note } from "$/types/Note";
+import { type Notebook } from "$/types/Notebook";
 import PouchDB from "pouchdb";
 import PouchDBFind from "pouchdb-find";
 import sqlite3, { type Database } from "sqlite3";
@@ -13,54 +14,65 @@ let dbFts: Database;
 
 async function syncFtsIndex(dbFts: Database) {
   // Initial sync: Populate the FTS table with existing notes
-  const notes = await db.find({
-    selector: { type: "note" },
-    fields: ["_id", "content"],
-  });
-  for (const note of notes.docs as Note[]) {
-    const updateQuery =
-      "UPDATE notes_fts SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ?, trashedAt = ? WHERE doc_id = ?";
-    const updateParams = [
-      note.content,
-      note.notebookId,
-      note.createdAt,
-      note.contentUpdatedAt,
-      note.trashedAt,
-      note._id,
-    ];
-    const insertQuery =
-      "INSERT INTO notes_fts (doc_id, content, notebookId, createdAt, contentUpdatedAt, trashedAt) VALUES (?, ?, ?, ?, ?, ?)";
-    const insertParams = [
-      note._id,
-      note.content,
-      note.notebookId,
-      note.createdAt,
-      note.contentUpdatedAt,
-      note.trashedAt,
-    ];
+  // TODO: this runs on every app start, which is inefficient
+  // const notes = await db.find({
+  //   selector: {
+  //     type: "note",
+  //   },
+  //   fields: [
+  //     "_id",
+  //     "content",
+  //     "notebookId",
+  //     "createdAt",
+  //     "contentUpdatedAt",
+  //     "trashedAt",
+  //   ],
+  // });
 
-    dbFts.run(
-      updateQuery,
+  // for (const note of notes.docs as Note[]) {
+  //   const updateQuery =
+  //     "UPDATE notes_fts SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ?, trashedAt = ? WHERE doc_id = ?";
+  //   const updateParams = [
+  //     note.content,
+  //     note.notebookId,
+  //     note.createdAt,
+  //     note.contentUpdatedAt,
+  //     note.trashedAt,
+  //     note._id,
+  //   ];
+  //   const insertQuery =
+  //     "INSERT INTO notes_fts (doc_id, content, notebookId, createdAt, contentUpdatedAt, trashedAt) VALUES (?, ?, ?, ?, ?, ?)";
+  //   const insertParams = [
+  //     note._id,
+  //     note.content,
+  //     note.notebookId,
+  //     note.createdAt,
+  //     note.contentUpdatedAt,
+  //     note.trashedAt,
+  //   ];
 
-      updateParams,
+  //   dbFts.run(
+  //     updateQuery,
 
-      function (err) {
-        if (err) {
-          console.error("Error updating FTS index during initial sync:", err);
-        } else if (this.changes === 0) {
-          // No rows updated, so insert a new row
-          dbFts.run(insertQuery, insertParams, (err) => {
-            if (err) {
-              console.error(
-                "Error inserting into FTS index during initial sync:",
-                err,
-              );
-            }
-          });
-        }
-      },
-    );
-  }
+  //     updateParams,
+
+  //     function (err) {
+  //       if (err) {
+  //         console.error("Error updating FTS index during initial sync:", err);
+  //       } else if (this.changes === 0) {
+  //         // No rows updated, so insert a new row
+  //         dbFts.run(insertQuery, insertParams, (err) => {
+  //           if (err) {
+  //             console.error(
+  //               "Error inserting into FTS index during initial sync:",
+  //               err,
+  //             );
+  //           }
+  //         });
+  //       }
+  //     },
+  //   );
+  // }
 
   // Live updates via changes feed
   void db
@@ -83,7 +95,15 @@ async function syncFtsIndex(dbFts: Database) {
           },
         );
       } else if (change.doc) {
-        const note = change.doc as Note;
+        const doc = change.doc;
+
+        if ((doc as Note | Notebook).type !== "note") {
+          return;
+        }
+
+        const note = doc as Note;
+
+        console.log("updating", note._id);
 
         const updateQuery =
           "UPDATE notes_fts SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ?, trashedAt = ? WHERE doc_id = ?";
@@ -132,6 +152,7 @@ export async function initDb(dbPath: string) {
   dbFts.run(
     "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content, notebookId, createdAt, contentUpdatedAt, trashedAt)",
   );
+  // TODO: think about how to handle this better
   await syncFtsIndex(dbFts);
 
   const info = await db.info();

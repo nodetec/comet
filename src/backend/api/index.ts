@@ -352,8 +352,6 @@ export async function searchNotes(
     selectParams = [literalQuery, limit, offset];
   }
 
-  console.log("selectQuery", selectQuery);
-
   type Row = {
     doc_id: string;
   };
