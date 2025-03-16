@@ -49,7 +49,7 @@
     "eslint-plugin-react-compiler": "^19.0.0-beta-40c6c23-20250301",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
-    "fork-ts-checker-webpack-plugin": "^7.3.0",
+    "fork-ts-checker-webpack-plugin": "^9.0.2",
     "node-loader": "^2.1.0",
     "postcss-loader": "^8.1.1",
     "prettier": "^3.5.3",
