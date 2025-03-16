@@ -34,7 +34,6 @@ import { OnChangeDebouncePlugin } from "../lexical/onChangeDebounce/OnChangeDebo
 import { OnFocusPlugin } from "../lexical/onFocus/OnFocus";
 import { ScrollCenterCurrentLinePlugin } from "../lexical/scrollCenterCurrentLine/ScrollCenterCurrentLinePlugin";
 import TabFocusPlugin from "../lexical/tabFocus";
-import TabKeyPlugin from "../lexical/tabKey/TabKeyPlugin";
 import { ToolbarPlugin } from "../lexical/toolbar/ToolbarPlugin";
 import { YouTubeNode } from "../lexical/youtube/YouTubeNode";
 import { YOUTUBE_TRANSFORMER } from "../lexical/youtube/YouTubeTransformer";

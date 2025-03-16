@@ -25,16 +25,40 @@ async function syncFtsIndex(dbFts: Database) {
 
     if (note.notebookId) {
       updateQuery =
-        "UPDATE notes_fts SET content = ?, notebookId = ? WHERE doc_id = ?";
-      updateParams = [note.content, note.notebookId, note._id];
+        "UPDATE notes_fts SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ? WHERE doc_id = ?";
+      updateParams = [
+        note.content,
+        note.notebookId,
+        note.createdAt,
+        note.contentUpdatedAt,
+        note._id,
+      ];
       insertQuery =
-        "INSERT INTO notes_fts (doc_id, content, notebookId) VALUES (?, ?, ?)";
-      updateParams = [note._id, note.content, note.notebookId];
+        "INSERT INTO notes_fts (doc_id, content, notebookId, createdAt, contentUpdatedAt) VALUES (?, ?, ?, ?, ?)";
+      insertParams = [
+        note._id,
+        note.content,
+        note.notebookId,
+        note.createdAt,
+        note.contentUpdatedAt,
+      ];
     } else {
-      updateQuery = "UPDATE notes_fts SET content = ? WHERE doc_id = ?";
-      updateParams = [note.content, note._id];
-      insertQuery = "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)";
-      insertParams = [note._id, note.content];
+      updateQuery =
+        "UPDATE notes_fts SET content = ?, createdAt = ?, contentUpdatedAt = ? WHERE doc_id = ?";
+      updateParams = [
+        note.content,
+        note.createdAt,
+        note.contentUpdatedAt,
+        note._id,
+      ];
+      insertQuery =
+        "INSERT INTO notes_fts (doc_id, content, createdAt, contentUpdatedAt) VALUES (?, ?, ?, ?)";
+      insertParams = [
+        note._id,
+        note.content,
+        note.createdAt,
+        note.contentUpdatedAt,
+      ];
     }
 
     dbFts.run(
@@ -81,39 +105,50 @@ async function syncFtsIndex(dbFts: Database) {
           },
         );
       } else if (change.doc) {
-        console.log("processing", change.doc._id);
-
         let updateQuery: string;
         let insertQuery: string;
         let updateParams: string[];
         let insertParams: string[];
 
-        console.log("change.doc", change.doc);
+        const note = change.doc as Note;
 
-        if ((change.doc as Note).notebookId) {
+        if (note.notebookId) {
           updateQuery =
-            "UPDATE notes_fts SET content = ?, notebookId = ? WHERE doc_id = ?";
+            "UPDATE notes_fts SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ? WHERE doc_id = ?";
           updateParams = [
-            (change.doc as Note).content,
-            (change.doc as Note).notebookId ?? "",
-            change.doc._id,
+            note.content,
+            note.notebookId ?? "",
+            note.createdAt,
+            note.contentUpdatedAt,
+            note._id,
           ];
           insertQuery =
-            "INSERT INTO notes_fts (doc_id, content, notebookId) VALUES (?, ?, ?)";
+            "INSERT INTO notes_fts (doc_id, content, notebookId, createdAt, contentUpdatedAt) VALUES (?, ?, ?, ?, ?)";
           insertParams = [
-            change.doc?._id,
-            (change.doc as Note)?.content,
-            (change.doc as Note)?.notebookId ?? "",
+            note?._id,
+            note?.content,
+            note?.notebookId ?? "",
+            note.createdAt,
+            note.contentUpdatedAt,
           ];
         } else {
-          updateQuery = "UPDATE notes_fts SET content = ? WHERE doc_id = ?";
-          insertQuery = "INSERT INTO notes_fts (doc_id, content) VALUES (?, ?)";
-          updateParams = [(change.doc as Note).content, change.doc._id];
-          insertParams = [change.doc?._id, (change.doc as Note)?.content];
+          updateQuery =
+            "UPDATE notes_fts SET content = ?, createdAt = ?, contentUpdatedAt = ? WHERE doc_id = ?";
+          updateParams = [
+            note.content,
+            note.createdAt,
+            note.contentUpdatedAt,
+            note._id,
+          ];
+          insertQuery =
+            "INSERT INTO notes_fts (doc_id, content, createdAt, contentUpdatedAt) VALUES (?, ?, ?, ?)";
+          insertParams = [
+            note?._id,
+            note?.content,
+            note.createdAt,
+            note.contentUpdatedAt,
+          ];
         }
-
-        console.log("updateQuery", updateQuery);
-        console.log("insertQuery", insertQuery);
 
         dbFts.run(updateQuery, updateParams, function (err) {
           if (err) {
@@ -139,7 +174,7 @@ export async function initDb(dbPath: string) {
   dbFts = new sqlite3.Database(`${dbPath}_fts`);
 
   dbFts.run(
-    "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content, notebookId)",
+    "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content, notebookId, createdAt, contentUpdatedAt)",
   );
   await syncFtsIndex(dbFts);
 

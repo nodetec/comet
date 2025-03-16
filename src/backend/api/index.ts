@@ -37,9 +37,9 @@ export async function createNote(
     content: content,
     tags: insertNote.tags,
     notebookId: insertNote?.notebookId,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    contentUpdatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    contentUpdatedAt: new Date().toISOString(),
     author: undefined,
     publishedAt: undefined,
     eventAddress: undefined,
@@ -104,8 +104,8 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.tags = tags;
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -113,8 +113,8 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
 export async function moveNoteToTrash(_: IpcMainEvent, id: string) {
   const db = getDb();
   const note = await db.get<Note>(id);
-  note.trashedAt = new Date();
-  note.updatedAt = new Date();
+  note.trashedAt = new Date().toISOString();
+  note.updatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -132,8 +132,8 @@ export async function restoreNote(_: IpcMainEvent, id: string) {
   const db = getDb();
   const note = await db.get<Note>(id);
   note.trashedAt = undefined;
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -148,8 +148,8 @@ export async function addPublishDetailsToNote(
   const note = await db.get<Note>(id);
   note.title = update.title ?? dayjs().format("YYYY-MM-DD");
   note.content = update.content ?? "";
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   note.author = update.author;
   note.publishedAt = update.publishedAt;
   note.eventAddress = update.eventAddress;
@@ -166,8 +166,8 @@ export async function moveNoteToNotebook(
   const db = getDb();
   const note = await db.get<Note>(noteId);
   note.notebookId = notebookId;
-  note.updatedAt = new Date();
-  note.contentUpdatedAt = new Date();
+  note.updatedAt = new Date().toISOString();
+  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -193,8 +193,8 @@ export async function createNotebook(_: IpcMainInvokeEvent, name: string) {
     type: "notebook",
     name,
     hidden: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   const response = await db.put(notebook);
@@ -234,7 +234,7 @@ export async function updateNotebookName(
   if (!id) return;
   const notebook = await db.get<Notebook>(id);
   notebook.name = update.name ?? "";
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   return response.id;
 }
@@ -243,7 +243,7 @@ export async function hideNotebook(event: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
   notebook.hidden = true;
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   event.sender.send("notebookHidden", id);
   return response.id;
@@ -253,7 +253,7 @@ export async function unhideNotebook(_: IpcMainInvokeEvent, id: string) {
   const db = getDb();
   const notebook = await db.get<Notebook>(id);
   notebook.hidden = false;
-  notebook.updatedAt = new Date();
+  notebook.updatedAt = new Date().toISOString();
   const response = await db.put(notebook);
   return response.id;
 }
@@ -329,11 +329,11 @@ export async function searchNotes(
 
   if (notebookId) {
     selectQuery =
-      "SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? ORDER BY rank ASC LIMIT ? OFFSET ?";
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
     selectParams = [literalQuery, notebookId, limit, offset];
   } else {
     selectQuery =
-      "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY rank ASC LIMIT ? OFFSET ?";
+      "SELECT doc_id FROM notes_fts WHERE content LIKE ? ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?";
     selectParams = [literalQuery, limit, offset];
   }
 
