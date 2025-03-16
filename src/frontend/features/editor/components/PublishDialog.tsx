@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import { ScrollArea } from "~/components/ui/scroll-area-old";
 import { usePublish } from "~/features/editor/hooks/usePublish";
 import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";
@@ -48,13 +47,13 @@ export function PublishDialog() {
           <DialogDescription>Publish to the nostr network.</DialogDescription>
         </DialogHeader>
 
-        <div className="my-4 flex flex-col gap-4">
+        <div className="mb-4 flex flex-col gap-4">
           {previewImage && (
-            <div className="border-accent max-w-md rounded-md border">
+            <div className="max-w-md rounded-md">
               <img
                 src={previewImage ? previewImage[1] : ""}
                 alt="preview"
-                className="h-full w-full rounded-md object-contain"
+                className="border-accent h-auto w-auto rounded-md border object-contain"
               />
             </div>
           )}
