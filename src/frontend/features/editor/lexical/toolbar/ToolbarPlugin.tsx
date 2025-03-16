@@ -169,7 +169,7 @@ export function ToolbarPlugin() {
             ) : (
               <Button
                 key={`${id}-${index}`}
-                className={cn(selectionMap[id] && "bg-primary/5")}
+                className={cn(selectionMap[id] && "bg-accent/50")}
                 size="icon"
                 variant="ghost"
                 onClick={() => onAction(id)}

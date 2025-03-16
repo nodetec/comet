@@ -34,7 +34,7 @@ export default function CodeBlockPlugin({ blockType }: CodeBlockPluginProps) {
       <Button
         size="icon"
         variant="ghost"
-        className={blockType === "code" ? "bg-primary/5" : ""}
+        className={blockType === "code" ? "bg-accent/50" : ""}
         onClick={onAddCodeBlock}
       >
         <SquareCodeIcon />
