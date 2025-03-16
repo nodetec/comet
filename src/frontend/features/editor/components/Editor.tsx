@@ -134,23 +134,14 @@ export function Editor() {
       </div>
       <RichTextPlugin
         contentEditable={
-          <ScrollArea
-            className="w-full"
-            type="scroll"
-            // Add an id to make it easier to identify
-            id="editor-scroll-area"
-          >
-            <EditorClickWrapper>
-              <div className="cursor-text">
-                <ContentEditable
-                  onClick={handleClick}
-                  className="caret-primary mx-auto min-h-full max-w-[46rem] px-16 pt-8 pb-[50%] select-text focus-visible:outline-none xl:pb-[30%]"
-                  // Add an id to make it easier to identify
-                  id="editor-content-editable"
-                />
-              </div>
-            </EditorClickWrapper>
-          </ScrollArea>
+          <EditorClickWrapper>
+            <ContentEditable
+              onClick={handleClick}
+              className="caret-primary mx-auto min-h-[calc(100vh-3.5rem)] max-w-[46rem] flex-1 flex-col px-16 pt-8 pb-[50%] select-text focus-visible:outline-none lg:pb-[40%] xl:pb-[30%]"
+              // Add an id to make it easier to identify
+              id="editor-content-editable"
+            />
+          </EditorClickWrapper>
         }
         ErrorBoundary={LexicalErrorBoundary}
       />

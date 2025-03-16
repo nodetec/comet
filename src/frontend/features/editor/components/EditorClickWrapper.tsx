@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, type ReactNode } from "react";
 
+import { ScrollArea } from "~/components/ui/scroll-area-old";
+
 interface EditorClickWrapperProps {
   children: ReactNode;
 }
@@ -204,8 +206,12 @@ export const EditorClickWrapper: React.FC<EditorClickWrapperProps> = ({
   const containerRef = useEditorClick();
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <ScrollArea
+      className="flex w-full flex-1 cursor-text flex-col"
+      type="scroll"
+      ref={containerRef}
+    >
       {children}
-    </div>
+    </ScrollArea>
   );
 };
