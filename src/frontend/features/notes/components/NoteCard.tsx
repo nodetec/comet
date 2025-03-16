@@ -43,7 +43,7 @@ function NoteCardBase({ note, index, length }: Props) {
   // Memoize parsed content with search highlighting
   const parsedContentWithSearch = useMemo(
     () => searchContent(note.previewContent, noteSearch) || "No content \n ",
-    [note.content, noteSearch],
+    [note.previewContent, noteSearch],
   );
 
   // Memoize date formatting
