@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 
 import { Separator } from "~/components/ui/separator";
 import {
@@ -19,7 +19,8 @@ type Props = {
   length: number;
 };
 
-export function NoteCard({ note, index, length }: Props) {
+// Wrap the component with React.memo to prevent unnecessary re-renders
+function NoteCardBase({ note, index, length }: Props) {
   const activeNoteId = useAppState((state) => state.activeNoteId);
   const setActiveNoteId = useAppState((state) => state.setActiveNoteId);
 
@@ -43,38 +44,49 @@ export function NoteCard({ note, index, length }: Props) {
     () => parseContent(note.content, noteSearch) || "No content \n ",
     [note.content, noteSearch],
   );
-  
+
   // Memoize date formatting
   const formattedUpdatedTime = useMemo(
-    () => note.contentUpdatedAt ? fromNow(note.contentUpdatedAt) : "",
-    [note.contentUpdatedAt]
+    () => (note.contentUpdatedAt ? fromNow(note.contentUpdatedAt) : ""),
+    [note.contentUpdatedAt],
   );
-  
+
   // Memoize published date formatting
   const formattedPublishedTime = useMemo(
-    () => note.publishedAt ? `published ${fromNow(note.publishedAt)}` : "",
-    [note.publishedAt]
+    () => (note.publishedAt ? `published ${fromNow(note.publishedAt)}` : ""),
+    [note.publishedAt],
   );
 
-  async function handleSetActiveNote(event: React.MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setActiveNoteId(note._id);
-    setAppFocus({ panel: "feed", isFocused: true });
-    // void queryClient.invalidateQueries({ queryKey: ["note"] });
-  }
+  // Memoize isFocused calculation
+  const isFocused = useMemo(
+    () => appFocus?.panel === "feed" && appFocus.isFocused && active,
+    [appFocus, active],
+  );
 
-  const isFocused = appFocus?.panel === "feed" && appFocus.isFocused && active;
+  // Memoize event handlers with useCallback
+  const handleSetActiveNote = useCallback(
+    async (event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setActiveNoteId(note._id);
+      setAppFocus({ panel: "feed", isFocused: true });
+      // void queryClient.invalidateQueries({ queryKey: ["note"] });
+    },
+    [note._id, setActiveNoteId, setAppFocus],
+  );
 
-  const handleContextMenu = async (_: React.MouseEvent<HTMLDivElement>) => {
-    if (feedType === "all" || feedType === "notebook") {
-      const notebooks = await window.api.getNotebooks(true);
-      console.log("notebooks test", notebooks);
-      window.api.noteCardContextMenu(note, notebooks);
-    }
-    if (feedType === "trash") {
-      window.api.trashNoteCardContextMenu(note._id);
-    }
-  };
+  const handleContextMenu = useCallback(
+    async (_: React.MouseEvent<HTMLDivElement>) => {
+      if (feedType === "all" || feedType === "notebook") {
+        const notebooks = await window.api.getNotebooks(true);
+        console.log("notebooks test", notebooks);
+        window.api.noteCardContextMenu(note, notebooks);
+      }
+      if (feedType === "trash") {
+        window.api.trashNoteCardContextMenu(note._id);
+      }
+    },
+    [feedType, note],
+  );
 
   return (
     <div className="mx-3 flex w-full flex-col items-center">
@@ -160,3 +172,6 @@ export function NoteCard({ note, index, length }: Props) {
     </div>
   );
 }
+
+// Export memoized component
+export const NoteCard = React.memo(NoteCardBase);
