@@ -8,7 +8,11 @@ export function setupContextMenus() {
   setupNoteCardContextMenu();
   setupTrashNoteCardContextMenu();
   setupNotebookContextMenu();
-  contextMenu({
-    showInspectElement: false,
-  });
+
+  // Only setup default context menu if not on Linux
+  if (process.platform !== "linux") {
+    contextMenu({
+      showInspectElement: false,
+    });
+  }
 }

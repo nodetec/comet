@@ -111,7 +111,7 @@ export async function initDb(dbPath: string) {
     auto_compaction: true,
   });
 
-  dbFts = new sqlite3.Database(`${dbPath}_fts`);
+  dbFts = new sqlite3.Database(`${dbPath}_notes.sqlite`);
   
   try {
     // Create the table

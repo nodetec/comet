@@ -21,6 +21,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.7.0",
     "@electron-forge/maker-deb": "^7.7.0",
+    "@electron-forge/maker-dmg": "^7.7.0",
     "@electron-forge/maker-rpm": "^7.7.0",
     "@electron-forge/maker-squirrel": "^7.7.0",
     "@electron-forge/maker-zip": "^7.7.0",
@@ -29,6 +30,7 @@
     "@electron-forge/plugin-webpack": "^7.7.0",
     "@electron/fuses": "^1.8.0",
     "@ianvs/prettier-plugin-sort-imports": "^4.4.1",
+    "@reforged/maker-appimage": "^5.0.0",
     "@tanstack/eslint-plugin-query": "^5.68.0",
     "@types/crypto-pouch": "^4.0.4",
     "@types/pouchdb": "^6.4.2",
@@ -41,6 +43,7 @@
     "@vercel/webpack-asset-relocator-loader": "1.7.3",
     "babel-plugin-react-compiler": "^19.0.0-beta-40c6c23-20250301",
     "css-loader": "^7.1.2",
+    "dotenv": "^16.4.7",
     "electron": "35.0.2",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.31.0",

@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import path from "path";
 
 import { initDb } from "&/db";
@@ -21,11 +22,17 @@ const createWindow = (): void => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1200,
-    height: 0,
-    trafficLightPosition: { x: 18, y: 18 },
-    titleBarStyle: "hidden",
+    height: 600,
+    minHeight: 350,
+    minWidth: 980,
+    autoHideMenuBar: true,
     backgroundColor: "#1D1E20",
-    ...(process.platform !== "darwin" ? { titleBarOverlay: true } : {}),
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hidden",
+          trafficLightPosition: { x: 18, y: 18 },
+        }
+      : {}),
 
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -45,12 +52,12 @@ const createWindow = (): void => {
   mainWindow.once("ready-to-show", () => {
     // center the main window
     mainWindow.center();
-    mainWindow.setSize(1200, 600);
-    mainWindow.setMinimumSize(980, 350);
+    // mainWindow.setSize(1200, 600);
+    // mainWindow.setMinimumSize(980, 350);
   });
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
@@ -65,7 +72,15 @@ const createWindow = (): void => {
 void app
   .whenReady()
   .then(async () => {
-    await initDb(path.join(app.getPath("appData"), "comet", "comet-alpha"));
+    await fsPromises.mkdir(
+      path.join(app.getPath("appData"), "comet", "db-alpha"),
+      {
+        recursive: true,
+      },
+    );
+    await initDb(
+      path.join(app.getPath("appData"), "comet", "db-alpha", "comet-alpha"),
+    );
     setupHandlers();
     setupContextMenus();
     createWindow();
