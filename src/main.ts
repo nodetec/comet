@@ -22,7 +22,9 @@ const createWindow = (): void => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1200,
-    height: 0,
+    height: 600,
+    minHeight: 350,
+    minWidth: 980,
     backgroundColor: "#1D1E20",
     ...(process.platform === "darwin"
       ? {
@@ -49,8 +51,8 @@ const createWindow = (): void => {
   mainWindow.once("ready-to-show", () => {
     // center the main window
     mainWindow.center();
-    mainWindow.setSize(1200, 600);
-    mainWindow.setMinimumSize(980, 350);
+    // mainWindow.setSize(1200, 600);
+    // mainWindow.setMinimumSize(980, 350);
   });
 
   // Open the DevTools.
