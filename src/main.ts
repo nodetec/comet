@@ -23,10 +23,13 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 0,
-    trafficLightPosition: { x: 18, y: 18 },
-    titleBarStyle: "hidden",
     backgroundColor: "#1D1E20",
-    ...(process.platform !== "darwin" ? { titleBarOverlay: true } : {}),
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hidden",
+          trafficLightPosition: { x: 18, y: 18 },
+        }
+      : {}),
 
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -66,10 +69,15 @@ const createWindow = (): void => {
 void app
   .whenReady()
   .then(async () => {
-    await fsPromises.mkdir(path.join(app.getPath("appData"), "comet", "db-alpha"), {
-      recursive: true,
-    });
-    await initDb(path.join(app.getPath("appData"), "comet", "db-alpha", "comet-alpha"));
+    await fsPromises.mkdir(
+      path.join(app.getPath("appData"), "comet", "db-alpha"),
+      {
+        recursive: true,
+      },
+    );
+    await initDb(
+      path.join(app.getPath("appData"), "comet", "db-alpha", "comet-alpha"),
+    );
     setupHandlers();
     setupContextMenus();
     createWindow();
