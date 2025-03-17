@@ -152,6 +152,17 @@ export async function initDb(dbPath: string) {
   dbFts.run(
     "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(doc_id, content, notebookId, createdAt, contentUpdatedAt, trashedAt)",
   );
+
+  dbFts.run(`CREATE INDEX IF NOT EXISTS idx_content ON notes_fts(content)`);
+  dbFts.run(
+    `CREATE INDEX IF NOT EXISTS idx_notebookId ON notes_fts(notebookId)`,
+  );
+  dbFts.run(`CREATE INDEX IF NOT EXISTS idx_createdAt ON notes_fts(createdAt)`);
+  dbFts.run(
+    `CREATE INDEX IF NOT EXISTS idx_contentUpdatedAt ON notes_fts(contentUpdatedAt)`,
+  );
+  dbFts.run(`CREATE INDEX IF NOT EXISTS idx_trashedAt ON notes_fts(trashedAt)`);
+
   // TODO: think about how to handle this better
   await syncFtsIndex(dbFts);
 
