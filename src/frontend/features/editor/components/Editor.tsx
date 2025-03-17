@@ -64,7 +64,7 @@ export function Editor() {
 
   if (!note.data || !activeNoteId) {
     // TODO: show some nice art or something here
-    return null;
+    return <div className="draggable h-full w-full" />;
   }
 
   function onChange(editorState: EditorState) {
