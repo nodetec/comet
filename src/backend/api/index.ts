@@ -345,10 +345,10 @@ export async function searchNotes(
     : "trashedAt IS NULL";
 
   if (notebookId) {
-    selectQuery = `SELECT doc_id FROM notes_fts WHERE content LIKE ? AND notebookId = ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
+    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND notebookId = ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, notebookId, limit, offset];
   } else {
-    selectQuery = `SELECT doc_id FROM notes_fts WHERE content LIKE ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
+    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, limit, offset];
   }
 
@@ -357,11 +357,10 @@ export async function searchNotes(
   };
 
   try {
-    // we can use the FTS5 MATCH query instead of LIKE later on to take advantage of the FTS index
     const rows = (await new Promise<unknown[]>((resolve, reject) => {
       dbFts.all(selectQuery, selectParams, (err, rows) => {
         if (err) {
-          console.error("Error searching FTS index:", err);
+          console.error("Error searching notes table:", err);
           reject(err);
           return;
         }
