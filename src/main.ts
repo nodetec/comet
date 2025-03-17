@@ -25,6 +25,7 @@ const createWindow = (): void => {
     height: 600,
     minHeight: 350,
     minWidth: 980,
+    autoHideMenuBar: true,
     backgroundColor: "#1D1E20",
     ...(process.platform === "darwin"
       ? {
