@@ -40,6 +40,19 @@ const config: ForgeConfig = {
         format: "ULFO",
       },
     },
+    {
+      name: "@reforged/maker-appimage",
+      config: {
+        options: {
+          categories: ["Publishing"],
+          icon: "./assets/icon.png",
+          bin: "comet",
+          genericName: "Comet",
+          name: "Comet",
+          productName: "Comet",
+        },
+      },
+    },
     new MakerSquirrel({}),
     new MakerRpm({}),
     new MakerDeb({}),
