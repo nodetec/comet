@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import path from "path";
 
 import { initDb } from "&/db";
@@ -50,7 +51,7 @@ const createWindow = (): void => {
   });
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
@@ -65,7 +66,10 @@ const createWindow = (): void => {
 void app
   .whenReady()
   .then(async () => {
-    await initDb(path.join(app.getPath("appData"), "comet", "comet-alpha"));
+    await fsPromises.mkdir(path.join(app.getPath("appData"), "comet", "db-alpha"), {
+      recursive: true,
+    });
+    await initDb(path.join(app.getPath("appData"), "comet", "db-alpha", "comet-alpha"));
     setupHandlers();
     setupContextMenus();
     createWindow();
