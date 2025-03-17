@@ -14,15 +14,37 @@ npm i --force
 
 ### Run the app
 
-```
+```sh
 npm run dev
 ```
 
 ### Package the app
 
-```
+```sh
 npm run package
 ```
+
+## Make the app for your platform
+
+### Linux Dependencies
+
+For RPM
+
+```sh
+sudo apt install rpm
+```
+
+For AppImage
+
+```sh
+sudo apt install squashfs-tools
+```
+
+```sh
+npm run make
+```
+
+
 
 The output for you platform will be in the `out/` directory
 
