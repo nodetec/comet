@@ -1,15 +1,17 @@
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
-import { MakerZIP } from "@electron-forge/maker-zip";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { WebpackPlugin } from "@electron-forge/plugin-webpack";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import dotenv from "dotenv";
 
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
+
+dotenv.config({ path: "./.env" });
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -18,11 +20,27 @@ const config: ForgeConfig = {
     appBundleId: "org.nodetec.comet",
     executableName: "comet",
     asar: true,
+    osxSign: {
+      identity: process.env.APPLE_IDENTITY!,
+    },
+    osxNotarize: {
+      appleId: process.env.APPLE_ID!,
+      appleIdPassword: process.env.APPLE_PASSWORD!,
+      teamId: process.env.APPLE_TEAM_ID!,
+    },
   },
   rebuildConfig: {},
   makers: [
+    {
+      name: "@electron-forge/maker-dmg",
+      config: {
+        name: "Comet",
+        icon: "./assets/icon.icns",
+        overwrite: true,
+        format: "ULFO",
+      },
+    },
     new MakerSquirrel({}),
-    new MakerZIP({}, ["darwin"]),
     new MakerRpm({}),
     new MakerDeb({}),
   ],
