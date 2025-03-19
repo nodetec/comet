@@ -5,7 +5,6 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
 import { Button } from "~/components/ui/button";
-import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
 import {
   $getSelection,
@@ -32,8 +31,13 @@ import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
 import YoutubeAction from "../youtube/YouTubeActions";
 import { LOW_PRIORIRTY, RichTextAction } from "./constants";
 import { useKeyBinds } from "./hooks/useKeybinds";
+import { useAppState } from "~/store";
 
 export function ToolbarPlugin() {
+
+  const feedType = useAppState((state) => state.feedType);
+
+
   const [editor] = useLexicalComposerContext();
   const [disableMap, setDisableMap] = useState<Record<string, boolean>>({
     [RichTextAction.Undo]: true,
@@ -170,7 +174,7 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Bold)}
-            disabled={disableMap[RichTextAction.Bold]}
+            disabled={disableMap[RichTextAction.Bold] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <BoldIcon />
@@ -182,7 +186,7 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Italics)}
-            disabled={disableMap[RichTextAction.Italics]}
+            disabled={disableMap[RichTextAction.Italics] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <ItalicIcon />
@@ -194,7 +198,7 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Strikethrough)}
-            disabled={disableMap[RichTextAction.Strikethrough]}
+            disabled={disableMap[RichTextAction.Strikethrough] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <StrikethroughIcon />
@@ -204,12 +208,12 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Code)}
-            disabled={disableMap[RichTextAction.Code]}
+            disabled={disableMap[RichTextAction.Code] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <CodeIcon />
           </Button>
-          <div className="bg-accent h-4 w-[1px] hidden md:block" />
+          <div className="bg-accent hidden h-4 w-[1px] md:block" />
           <Button
             className={cn(
               "hidden md:flex",
@@ -218,7 +222,7 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Undo)}
-            disabled={disableMap[RichTextAction.Undo]}
+            disabled={disableMap[RichTextAction.Undo] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <UndoIcon />
@@ -231,12 +235,12 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Redo)}
-            disabled={disableMap[RichTextAction.Redo]}
+            disabled={disableMap[RichTextAction.Redo] || feedType === "trash"}
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <RedoIcon />
           </Button>
-          <div className="bg-accent h-4 w-[1px] hidden lg:block" />
+          <div className="bg-accent hidden h-4 w-[1px] lg:block" />
           <CodeBlockPlugin blockType={blockType} />
           <YoutubeAction />
         </div>

@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import { useAppState } from "~/store";
 import {
   $createParagraphNode,
   $insertNodes,
@@ -32,6 +33,8 @@ export default function YoutubeAction() {
   const [isOpen, setIsOpen] = useState(false); // Add state to control dialog open state
 
   const [editor] = useLexicalComposerContext();
+
+  const feedType = useAppState((state) => state.feedType);
 
   useEffect(() => {
     if (!editor.hasNodes([YouTubeNode])) {
@@ -86,6 +89,7 @@ export default function YoutubeAction() {
         className="hidden lg:flex"
         size="icon"
         variant="ghost"
+        disabled={feedType === "trash"}
       >
         <YoutubeIcon />
       </Button>
