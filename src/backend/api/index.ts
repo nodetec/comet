@@ -5,7 +5,9 @@
 // https://pouchdb.com/2015/02/28/efficiently-managing-ui-state-in-pouchdb.html
 // https://pouchdb.com/2014/05/01/secondary-indexes-have-landed-in-pouchdb.html
 
-import { getDb, getDbFts } from "&/db";
+import { getDb, getDbFts, getSync } from "&/db";
+import { sync } from "&/db/utils/syncDb";
+import { getStore } from "&/store";
 import { extractHashtags, parseContent } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
@@ -394,4 +396,55 @@ export async function searchNotes(
     console.error("Error fetching documents from PouchDB:", err);
     throw err;
   }
+}
+
+export function syncDb(
+  _: IpcMainInvokeEvent,
+  remoteUrl: string,
+  // syncMethod: "comet_sync" | "custom_sync",
+) {
+  sync(remoteUrl);
+  const store = getStore();
+  // @ts-expect-error - electron store is module only and electron forge is not
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  store.set({
+    sync: {
+      remote: {
+        url: remoteUrl,
+      },
+      method: "custom_sync",
+    },
+  });
+}
+
+export function cancelSync() {
+  const sync = getSync();
+  const store = getStore();
+  if (sync) {
+    sync.cancel();
+    // @ts-expect-error - electron store is module only and electron forge is not
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    store.set({
+      sync: {
+        remote: {
+          url: undefined,
+        },
+        method: "no_sync",
+      },
+    });
+  }
+}
+
+export function getSyncConfig() {
+  const store = getStore();
+  // @ts-expect-error - electron store is module only and electron forge is not
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  return store.get("sync") as
+    | {
+        remote: {
+          url: string | undefined;
+        };
+        method: "no_sync" | "custom_sync";
+      }
+    | undefined;
 }

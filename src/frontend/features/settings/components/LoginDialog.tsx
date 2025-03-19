@@ -145,7 +145,7 @@ export function LoginDialog({ children }: Props) {
       <DialogTrigger asChild>
         <div onClick={() => setIsDialogOpen(true)}>{children}</div>
       </DialogTrigger>
-      <DialogContent className="max-w-md p-6">
+      <DialogContent aria-describedby="login" className="max-w-md p-6">
         <DialogHeader>
           <DialogTitle>Register</DialogTitle>
           <DialogDescription>

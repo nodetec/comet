@@ -39,10 +39,25 @@ declare global {
       getAllTags: () => Promise<string[]>;
       getTagsByNotebookId: (notebookId: string) => Promise<string[]>;
 
+      // sync
+      syncDb: (remoteUrl: string) => Promise<void>;
+      cancelSync: () => Promise<void>;
+      getSyncConfig: () => Promise<
+        | {
+            remote: {
+              url: string | undefined;
+            };
+            method: "no_sync" | "custom_sync";
+          }
+        | undefined
+      >;
+
       // context menus
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;
       notebookContextMenu: (notebookId: string) => void;
       trashNoteCardContextMenu: (noteId: string) => void;
+
+      onSync: (handler: (event: IpcRendererEvent) => void) => () => void;
 
       // listeners
       onNoteMovedToTrash: (

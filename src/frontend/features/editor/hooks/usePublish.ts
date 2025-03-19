@@ -62,7 +62,9 @@ export function usePublish() {
     ];
 
     if (image) {
-      eventTags.push(["image", image[1]]);
+      if (image[1]) {
+        eventTags.push(["image", image[1]]);
+      }
     }
 
     if (note.tags) {

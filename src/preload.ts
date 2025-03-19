@@ -79,6 +79,25 @@ contextBridge.exposeInMainWorld("api", {
   notebookContextMenu: (notebookId: string) =>
     ipcRenderer.send("notebookContextMenu", notebookId),
 
+  // sync
+  syncDb: (remoteUrl: string) =>
+    ipcRenderer.invoke("syncDb", remoteUrl) as Promise<void>,
+  cancelSync: () => ipcRenderer.invoke("cancelSync") as Promise<void>,
+  getSyncConfig: () =>
+    ipcRenderer.invoke("getSyncConfig") as Promise<
+      | {
+          remote: {
+            url: string | undefined;
+          };
+          method: "no_sync" | "custom_sync";
+        }
+      | undefined
+    >,
+  onSync: (handler: (event: IpcRendererEvent) => void) => {
+    ipcRenderer.on("sync", handler);
+    return () => ipcRenderer.removeListener("sync", handler);
+  },
+
   // listeners
   onNoteMovedToTrash: (
     handler: (event: IpcRendererEvent, noteId: string) => void,

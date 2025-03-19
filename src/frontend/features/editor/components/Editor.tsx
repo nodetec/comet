@@ -48,7 +48,7 @@ export function Editor() {
   const feedType = useAppState((state) => state.feedType);
   const setAppFocus = useAppState((state) => state.setAppFocus);
   const activeNoteId = useAppState((state) => state.activeNoteId);
-  const note = useNote(activeNoteId);
+  const note = useNote();
 
   const saveNote = useSaveNote();
 

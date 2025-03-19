@@ -11,6 +11,7 @@ import dotenv from "dotenv";
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 dotenv.config({ path: "./.env" });
 
 const config: ForgeConfig = {
