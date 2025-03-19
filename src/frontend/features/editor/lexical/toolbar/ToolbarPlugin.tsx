@@ -17,13 +17,20 @@ import {
   SELECTION_CHANGE_COMMAND,
   UNDO_COMMAND,
 } from "lexical";
-import { EllipsisVerticalIcon } from "lucide-react";
+import {
+  BoldIcon,
+  CodeIcon,
+  EllipsisVerticalIcon,
+  ItalicIcon,
+  RedoIcon,
+  StrikethroughIcon,
+  UndoIcon,
+} from "lucide-react";
 
 import { PublishDialog } from "../../components/PublishDialog";
 import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
-import { MarkdownImagePlugin } from "../markdownImage/MarkdownImagePlugin";
 import YoutubeAction from "../youtube/YouTubeActions";
-import { LOW_PRIORIRTY, RICH_TEXT_OPTIONS, RichTextAction } from "./constants";
+import { LOW_PRIORIRTY, RichTextAction } from "./constants";
 import { useKeyBinds } from "./hooks/useKeybinds";
 
 export function ToolbarPlugin() {
@@ -159,29 +166,75 @@ export function ToolbarPlugin() {
     <div className="flex w-full items-center px-2">
       <div className="flex w-full items-center gap-2">
         <div className="flex items-center gap-2">
-          {RICH_TEXT_OPTIONS.map(({ id, icon }, index) =>
-            id === RichTextAction.Divider ? (
-              <Separator
-                orientation="vertical"
-                className="h-4"
-                key={`${id}-${index}`}
-              />
-            ) : (
-              <Button
-                key={`${id}-${index}`}
-                className={cn(selectionMap[id] && "bg-accent/50")}
-                size="icon"
-                variant="ghost"
-                onClick={() => onAction(id)}
-                disabled={disableMap[id]}
-              >
-                {icon}
-              </Button>
-            ),
-          )}
+          <Button
+            className={cn(selectionMap[RichTextAction.Bold] && "bg-accent/50")}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Bold)}
+            disabled={disableMap[RichTextAction.Bold]}
+          >
+            <BoldIcon />
+          </Button>
+          <Button
+            className={cn(
+              selectionMap[RichTextAction.Italics] && "bg-accent/50",
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Italics)}
+            disabled={disableMap[RichTextAction.Italics]}
+          >
+            <ItalicIcon />
+          </Button>
+          <Button
+            className={cn(
+              selectionMap[RichTextAction.Strikethrough] && "bg-accent/50",
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Strikethrough)}
+            disabled={disableMap[RichTextAction.Strikethrough]}
+          >
+            <StrikethroughIcon />
+          </Button>
+          <Button
+            className={cn(selectionMap[RichTextAction.Code] && "bg-accent/50")}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Code)}
+            disabled={disableMap[RichTextAction.Code]}
+          >
+            <CodeIcon />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
+          <Button
+            className={cn(
+              "hidden md:block",
+              selectionMap[RichTextAction.Undo] && "bg-accent/50",
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Undo)}
+            disabled={disableMap[RichTextAction.Undo]}
+          >
+            <UndoIcon />
+          </Button>
+          <Button
+            className={cn(
+              "hidden md:block",
+              selectionMap[RichTextAction.Redo] && "bg-accent/50",
+            )}
+            size="icon"
+            variant="ghost"
+            onClick={() => onAction(RichTextAction.Redo)}
+            disabled={disableMap[RichTextAction.Redo]}
+          >
+            <RedoIcon />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
         </div>
 
-        <div className="hidden items-center gap-2 xl:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <CodeBlockPlugin blockType={blockType} />
           {/* <MarkdownImagePlugin /> */}
           {/* <TwitterAction /> */}
