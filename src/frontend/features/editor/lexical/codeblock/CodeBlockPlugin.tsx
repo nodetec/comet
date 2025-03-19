@@ -2,6 +2,7 @@ import { $createCodeNode } from "@lexical/code";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $setBlocksType } from "@lexical/selection";
 import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 import { $getSelection, $isRangeSelection } from "lexical";
 import { SquareCodeIcon } from "lucide-react";
 
@@ -30,15 +31,16 @@ export default function CodeBlockPlugin({ blockType }: CodeBlockPluginProps) {
   };
 
   return (
-    <div className="flex gap-1">
-      <Button
-        size="icon"
-        variant="ghost"
-        className={blockType === "code" ? "bg-accent/50" : ""}
-        onClick={onAddCodeBlock}
-      >
-        <SquareCodeIcon />
-      </Button>
-    </div>
+    <Button
+      size="icon"
+      variant="ghost"
+      className={cn(
+        "hidden lg:flex",
+        blockType === "code" ? "bg-accent/50" : "",
+      )}
+      onClick={onAddCodeBlock}
+    >
+      <SquareCodeIcon />
+    </Button>
   );
 }

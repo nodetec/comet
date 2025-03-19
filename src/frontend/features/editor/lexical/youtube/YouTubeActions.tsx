@@ -81,7 +81,7 @@ export default function YoutubeAction() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="icon" variant="ghost">
+        <Button className="hidden lg:flex" size="icon" variant="ghost">
           <YoutubeIcon />
         </Button>
       </DialogTrigger>

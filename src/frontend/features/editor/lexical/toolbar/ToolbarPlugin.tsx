@@ -165,7 +165,7 @@ export function ToolbarPlugin() {
   return (
     <div className="flex w-full items-center px-2">
       <div className="flex w-full items-center gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex h-full items-center gap-2">
           <Button
             className={cn(selectionMap[RichTextAction.Bold] && "bg-accent/50")}
             size="icon"
@@ -206,10 +206,10 @@ export function ToolbarPlugin() {
           >
             <CodeIcon />
           </Button>
-          <Separator orientation="vertical" className="h-4" />
+          <div className="bg-accent h-4 w-[1px]" />
           <Button
             className={cn(
-              "hidden md:block",
+              "hidden md:flex",
               selectionMap[RichTextAction.Undo] && "bg-accent/50",
             )}
             size="icon"
@@ -221,7 +221,7 @@ export function ToolbarPlugin() {
           </Button>
           <Button
             className={cn(
-              "hidden md:block",
+              "hidden md:flex",
               selectionMap[RichTextAction.Redo] && "bg-accent/50",
             )}
             size="icon"
@@ -231,13 +231,8 @@ export function ToolbarPlugin() {
           >
             <RedoIcon />
           </Button>
-          <Separator orientation="vertical" className="h-4" />
-        </div>
-
-        <div className="hidden items-center gap-2 lg:flex">
+          <div className="bg-accent h-4 w-[1px]" />
           <CodeBlockPlugin blockType={blockType} />
-          {/* <MarkdownImagePlugin /> */}
-          {/* <TwitterAction /> */}
           <YoutubeAction />
         </div>
 
