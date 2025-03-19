@@ -26,12 +26,12 @@ export function sync(remoteUrl: string) {
     },
   });
 
-  console.log("remoteDB", remoteDB);
-  console.log("db", db);
-  console.log("mainWindow", mainWindow);
-  console.log("dbUrl", dbUrl);
-  console.log("dbUsername", dbUsername);
-  console.log("dbPassword", dbPassword);
+//   console.log("remoteDB", remoteDB);
+//   console.log("db", db);
+//   console.log("mainWindow", mainWindow);
+//   console.log("dbUrl", dbUrl);
+//   console.log("dbUsername", dbUsername);
+//   console.log("dbPassword", dbPassword);
 
   const sync = db
     .sync(remoteDB, {
