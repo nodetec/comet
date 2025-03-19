@@ -21,7 +21,7 @@ export function NotesSearch() {
   };
 
   return (
-    <div className="mr-1 flex items-center px-1 pt-2 pb-4 select-none">
+    <div className="mr-[5px] flex items-center px-1 pt-2 pb-4 select-none">
       <Input
         placeholder="Search..."
         className="text-muted-accent/80 placeholder:text-accent-foreground/60 focus-visible:ring-primary h-8 bg-transparent text-sm select-none"
