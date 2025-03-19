@@ -48,7 +48,7 @@ export default function ResizableLayout() {
         <Bar className="flex cursor-col-resize items-center" size={5}>
           <div className="bg-accent/40 h-full w-[1px]" />
         </Bar>
-        <Section minSize={300}>
+        <Section minSize={size.width! > 800 ? 300 : 210}>
           <div className="flex h-screen w-full flex-1 flex-col items-center select-none">
             <Editor />
           </div>

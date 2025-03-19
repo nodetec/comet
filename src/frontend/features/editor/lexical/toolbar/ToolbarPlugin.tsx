@@ -209,7 +209,7 @@ export function ToolbarPlugin() {
           >
             <CodeIcon />
           </Button>
-          <div className="bg-accent h-4 w-[1px]" />
+          <div className="bg-accent h-4 w-[1px] hidden md:block" />
           <Button
             className={cn(
               "hidden md:flex",
@@ -236,7 +236,7 @@ export function ToolbarPlugin() {
           >
             <RedoIcon />
           </Button>
-          <div className="bg-accent h-4 w-[1px]" />
+          <div className="bg-accent h-4 w-[1px] hidden lg:block" />
           <CodeBlockPlugin blockType={blockType} />
           <YoutubeAction />
         </div>
