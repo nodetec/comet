@@ -39,7 +39,7 @@ export default function ResizableLayout() {
           disableResponsive
           defaultSize={280}
           minSize={210}
-          maxSize={size.width! > 800 ? undefined : 210}
+          maxSize={size.width! > 800 ? 300 : 210}
         >
           <NotesHeader />
           <NotesSearch />
