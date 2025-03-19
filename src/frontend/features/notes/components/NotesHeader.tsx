@@ -20,7 +20,7 @@ export function NotesHeader() {
   }, [activeNotebookName, feedType]);
 
   return (
-    <div className="draggable flex justify-between px-3 pt-2">
+    <div className="draggable flex justify-between px-1 pt-2 mr-1">
       <div
         id="notes-header"
         className="flex cursor-default items-center justify-center gap-x-1 pl-2"

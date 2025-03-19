@@ -26,7 +26,7 @@ export function SidebarNav() {
         !lastTagVisible && (tags.data?.length ?? 0) > 0 && "border-b",
       )}
     >
-      <div className="flex flex-col gap-y-1 px-3">
+      <div className="flex flex-col gap-y-1 pl-2 pr-1">
         <Accordion type="single" collapsible defaultValue="notes">
           <AccordionItem value="notes">
             <AccordionTrigger className="ml-1 flex items-center pt-0 pb-1.5 text-xs">

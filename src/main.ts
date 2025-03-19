@@ -30,8 +30,8 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 600,
-    minHeight: 350,
-    minWidth: 980,
+    minHeight: 370,
+    minWidth: 710,
     autoHideMenuBar: true,
     backgroundColor: "#1D1E20",
     ...(process.platform === "darwin"

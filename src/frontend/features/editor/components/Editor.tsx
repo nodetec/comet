@@ -127,15 +127,16 @@ export function Editor() {
 
   return (
     <LexicalComposer key={activeNoteId} initialConfig={initialConfig}>
-      <div className="bg-background draggable flex w-full justify-center border-b py-2">
+      <div className="bg-background draggable flex w-full justify-center py-2">
         <ToolbarPlugin />
       </div>
+      <div className="w-full h-[1px] bg-border mr-[5px]" />
       <RichTextPlugin
         contentEditable={
           <EditorClickWrapper>
             <ContentEditable
               onClick={handleClick}
-              className="caret-primary mx-auto min-h-[calc(100vh-3.5rem)] max-w-[46rem] flex-1 flex-col px-16 pt-8 pb-[50%] select-text focus-visible:outline-none lg:pb-[40%] xl:pb-[30%]"
+              className="caret-primary mx-auto min-h-[calc(100vh-3.5rem)] max-w-[46rem] flex-1 flex-col px-12 pt-8 pb-[50%] select-text focus-visible:outline-none lg:pb-[40%] xl:pb-[30%]"
               // Add an id to make it easier to identify
               id="editor-content-editable"
             />

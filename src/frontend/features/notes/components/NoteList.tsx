@@ -30,7 +30,7 @@ export const NoteList = () => {
 
   return (
     <ScrollArea type="scroll" className="h-screen">
-      <div className="flex flex-col items-center px-3">
+      <div className="flex flex-col items-center px-1 mr-1">
         {flattenedNotes.map((note, index) => (
           <div
             className="mx-3 flex w-full flex-col items-center"
