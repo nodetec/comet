@@ -4,7 +4,10 @@ import Store from "electron-store";
 let store: Store;
 
 export const initStore = () => {
-  store = new Store();
+  store = new Store({
+    encryptionKey: "12345",
+    clearInvalidConfig: true,
+  });
 };
 
 export const getStore = () => {
