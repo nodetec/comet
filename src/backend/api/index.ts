@@ -419,6 +419,7 @@ export function syncDb(
 
 export function cancelSync() {
   const sync = getSync();
+  const store = getStore();
   if (sync) {
     sync.cancel();
     // @ts-expect-error - electron store is module only and electron forge is not
@@ -438,5 +439,12 @@ export function getSyncConfig() {
   const store = getStore();
   // @ts-expect-error - electron store is module only and electron forge is not
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-  return store.get("sync") as string | undefined;
+  return store.get("sync") as
+    | {
+        remote: {
+          url: string | undefined;
+        };
+        method: "no_sync" | "custom_sync";
+      }
+    | undefined;
 }

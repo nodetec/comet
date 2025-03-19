@@ -25,6 +25,6 @@ export function setupHandlers(): void {
 
   // sync
   ipcMain.handle("syncDb", api.syncDb);
-  ipcMain.handle("cacnelSync", api.cancelSync);
+  ipcMain.handle("cancelSync", api.cancelSync);
   ipcMain.handle("getSyncConfig", api.getSyncConfig);
 }
