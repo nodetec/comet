@@ -29,7 +29,7 @@ export function Settings({ children }: Props) {
       <DialogTitle className="hidden">Settings</DialogTitle>
       <DialogContent
         aria-describedby="settings"
-        className="border-accent flex h-[85%] max-h-[60rem] w-[90%] max-w-[70rem] overflow-hidden border p-0 select-none"
+        className="non-draggable border-red-500 flex h-[85%] max-h-[60rem] w-[90%] max-w-[70rem] overflow-hidden border p-0 select-none"
       >
         <div className="bg-sidebar text-muted-foreground flex min-h-full max-w-64 min-w-64 flex-col gap-y-2 overflow-hidden border-r pt-6 pr-4 pl-4 text-sm">
           <span
