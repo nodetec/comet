@@ -8,6 +8,7 @@
 import { getDb, getDbFts, getSync } from "&/db";
 import { sync } from "&/db/utils/syncDb";
 import { getStore } from "&/store";
+import { getWindow } from "&/window";
 import { extractHashtags, parseContent } from "~/lib/markdown";
 import { type InsertNote, type Note } from "$/types/Note";
 import { type Notebook } from "$/types/Notebook";
@@ -447,4 +448,15 @@ export function getSyncConfig() {
         method: "no_sync" | "custom_sync";
       }
     | undefined;
+}
+
+export function toggleMaximize(_: IpcMainInvokeEvent) {
+  const mainWindow = getWindow();
+  console.log("mainWindow", mainWindow);
+  console.log("isMaximized", mainWindow.isMaximized());
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow.maximize();
+  }
 }

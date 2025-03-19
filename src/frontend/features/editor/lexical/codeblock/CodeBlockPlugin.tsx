@@ -39,6 +39,7 @@ export default function CodeBlockPlugin({ blockType }: CodeBlockPluginProps) {
         blockType === "code" ? "bg-accent/50" : "",
       )}
       onClick={onAddCodeBlock}
+      onDoubleClick={(e) => e.stopPropagation()}
     >
       <SquareCodeIcon />
     </Button>

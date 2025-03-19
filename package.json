@@ -86,6 +86,7 @@
     "crypto-pouch": "^4.0.2",
     "dayjs": "^1.11.13",
     "electron-context-menu": "^4.0.5",
+    "electron-drag-click": "^1.0.6",
     "electron-is-dev": "^3.0.1",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.1",

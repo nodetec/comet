@@ -80,11 +80,15 @@ export default function YoutubeAction() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="hidden lg:flex" size="icon" variant="ghost">
-          <YoutubeIcon />
-        </Button>
-      </DialogTrigger>
+      <Button
+        onClick={() => setIsOpen(true)}
+        onDoubleClick={(e) => e.stopPropagation()}
+        className="hidden lg:flex"
+        size="icon"
+        variant="ghost"
+      >
+        <YoutubeIcon />
+      </Button>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Embed YouTube Video</DialogTitle>

@@ -10,10 +10,26 @@ export function SidebarHeader() {
     setSettingsTab("profile");
   }
 
+  function handleDoubleClick(e: React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("double click");
+    void window.api.toggleMaximize();
+  }
+
   return (
-    <header className="draggable flex justify-end gap-1 px-4 pt-2 pb-4">
+    <header
+      className="draggable flex justify-end gap-1 px-4 pt-2 pb-4"
+      onDoubleClick={handleDoubleClick}
+    >
       <Settings>
-        <Button onClick={handleClick} type="button" variant="ghost" size="icon">
+        <Button
+          onClick={handleClick}
+          onDoubleClick={(e) => e.stopPropagation()}
+          type="button"
+          variant="ghost"
+          size="icon"
+        >
           <UserCircleIcon />
         </Button>
       </Settings>

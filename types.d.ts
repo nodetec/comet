@@ -78,6 +78,9 @@ declare global {
       onNotebookDeleted: (
         handler: (event: IpcRendererEvent, notebookId: string) => void,
       ) => () => void;
+
+      // window
+      toggleMaximize: () => Promise<void>;
     };
   }
 }

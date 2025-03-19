@@ -131,4 +131,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("notebookDeleted", handler);
     return () => ipcRenderer.removeListener("notebookDeleted", handler);
   },
+
+  // window
+  toggleMaximize: () => ipcRenderer.invoke("toggleMaximize"),
 } satisfies Window["api"]);

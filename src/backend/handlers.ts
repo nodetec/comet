@@ -27,4 +27,7 @@ export function setupHandlers(): void {
   ipcMain.handle("syncDb", api.syncDb);
   ipcMain.handle("cancelSync", api.cancelSync);
   ipcMain.handle("getSyncConfig", api.getSyncConfig);
+
+  // window
+  ipcMain.handle("toggleMaximize", api.toggleMaximize);
 }

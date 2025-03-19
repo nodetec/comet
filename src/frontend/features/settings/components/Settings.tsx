@@ -25,7 +25,9 @@ export function Settings({ children }: Props) {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger onDoubleClick={(e) => e.stopPropagation()} asChild>
+        {children}
+      </DialogTrigger>
       <DialogTitle className="hidden">Settings</DialogTitle>
       <DialogContent
         aria-describedby="settings"
@@ -63,7 +65,9 @@ export function Settings({ children }: Props) {
           {settingsTab === "relays" && relays && (
             <RelaySettings relays={relays} />
           )}
-          {settingsTab === "sync" && <SyncSettings syncConfig={syncConfig.data} />}
+          {settingsTab === "sync" && (
+            <SyncSettings syncConfig={syncConfig.data} />
+          )}
         </div>
       </DialogContent>
     </Dialog>
