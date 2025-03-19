@@ -39,7 +39,7 @@ export function Tag({ tag }: Props) {
       key={tag}
       onClick={handleTagClick}
       className={cn(
-        "rouned-md bg-accent text-secondary-foreground line-clamp-1 cursor-pointer truncate rounded-md px-2 py-1 text-sm font-medium break-all overflow-ellipsis whitespace-break-spaces select-none",
+        "rouned-md bg-accent text-secondary-foreground line-clamp-1 truncate rounded-md px-2 py-1 text-sm font-medium break-all overflow-ellipsis whitespace-break-spaces select-none",
         activeTags.includes(tag) &&
           noteSearch === "" &&
           "text-secondary-foreground bg-primary/30",
