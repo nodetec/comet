@@ -85,7 +85,7 @@ const createWindow = (): void => {
   });
 
   if (isDev) {
-    mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     console.log("Running in production");
   }
