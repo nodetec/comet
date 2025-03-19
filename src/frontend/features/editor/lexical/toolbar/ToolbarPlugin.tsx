@@ -6,6 +6,7 @@ import { $isHeadingNode } from "@lexical/rich-text";
 import { $getNearestNodeOfType, mergeRegister } from "@lexical/utils";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
+import { useAppState } from "~/store";
 import {
   $getSelection,
   $isRangeSelection,
@@ -31,12 +32,9 @@ import CodeBlockPlugin from "../codeblock/CodeBlockPlugin";
 import YoutubeAction from "../youtube/YouTubeActions";
 import { LOW_PRIORIRTY, RichTextAction } from "./constants";
 import { useKeyBinds } from "./hooks/useKeybinds";
-import { useAppState } from "~/store";
 
 export function ToolbarPlugin() {
-
   const feedType = useAppState((state) => state.feedType);
-
 
   const [editor] = useLexicalComposerContext();
   const [disableMap, setDisableMap] = useState<Record<string, boolean>>({
@@ -186,7 +184,9 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Italics)}
-            disabled={disableMap[RichTextAction.Italics] || feedType === "trash"}
+            disabled={
+              disableMap[RichTextAction.Italics] || feedType === "trash"
+            }
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <ItalicIcon />
@@ -198,13 +198,18 @@ export function ToolbarPlugin() {
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Strikethrough)}
-            disabled={disableMap[RichTextAction.Strikethrough] || feedType === "trash"}
+            disabled={
+              disableMap[RichTextAction.Strikethrough] || feedType === "trash"
+            }
             onDoubleClick={(e) => e.stopPropagation()}
           >
             <StrikethroughIcon />
           </Button>
           <Button
-            className={cn(selectionMap[RichTextAction.Code] && "bg-accent/50")}
+            className={cn(
+              "hidden md:flex",
+              selectionMap[RichTextAction.Code] && "bg-accent/50",
+            )}
             size="icon"
             variant="ghost"
             onClick={() => onAction(RichTextAction.Code)}
