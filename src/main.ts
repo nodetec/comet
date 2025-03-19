@@ -9,6 +9,7 @@ import { setupContextMenus } from "&/menus";
 import { getStore, initStore } from "&/store";
 import { setWindow } from "&/window";
 import { app, BrowserWindow } from "electron";
+import isDev from "electron-is-dev";
 
 EventEmitter.defaultMaxListeners = 20;
 
@@ -83,8 +84,11 @@ const createWindow = (): void => {
     mainWindow.center();
   });
 
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools();
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  } else {
+    console.log("Running in production");
+  }
 };
 
 // This method will be called when Electron has finished
