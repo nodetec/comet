@@ -1,5 +1,3 @@
-import React from "react";
-
 import { Bar, Container, Section } from "@column-resizer/react";
 
 import { Editor } from "./features/editor";
@@ -8,10 +6,12 @@ import { NoteList } from "./features/notes/components/NoteList";
 import { NewNotebookBtn, SidebarHeader, SidebarNav } from "./features/sidebar";
 import useAppFocus from "./hooks/useAppFocus";
 import { useEvents } from "./hooks/useEvents";
+import { useSync } from "./hooks/useSync";
 
 export default function ResizableLayout() {
   useAppFocus();
   useEvents();
+  useSync();
 
   return (
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
@@ -48,7 +48,7 @@ export default function ResizableLayout() {
           <div className="bg-background h-full w-[5px]" />
         </Bar>
         <Section minSize={500}>
-          <div className="flex h-screen flex-col select-none flex-1 w-full items-center">
+          <div className="flex h-screen w-full flex-1 flex-col items-center select-none">
             <Editor />
           </div>
         </Section>

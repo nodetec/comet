@@ -40,10 +40,25 @@ interface State {
   noteSearch: string;
   setNoteSearch: (noteSearch: string) => void;
 
-  settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks";
+  settingsTab:
+    | "profile"
+    | "appearance"
+    | "relays"
+    | "editor"
+    | "notebooks"
+    | "sync";
   setSettingsTab: (
-    settingsTab: "profile" | "appearance" | "relays" | "editor" | "notebooks",
+    settingsTab:
+      | "profile"
+      | "appearance"
+      | "relays"
+      | "editor"
+      | "notebooks"
+      | "sync",
   ) => void;
+
+  syncRadio: "nosync" | "customsync";
+  setSyncRadio: (syncRadio: "nosync" | "customsync") => void;
 }
 
 export const useAppState = create<State>()(
@@ -80,6 +95,9 @@ export const useAppState = create<State>()(
       settingsTab: "profile",
       setSettingsTab: (settingsTab) => set({ settingsTab }),
 
+      syncRadio: "nosync",
+      setSyncRadio: (syncRadio) => set({ syncRadio }),
+
       noteSearch: "",
       setNoteSearch: (noteSearch) => set({ noteSearch }),
     }),
@@ -93,6 +111,7 @@ export const useAppState = create<State>()(
         activeNotebookName: state.activeNotebookName,
         activeTags: state.activeTags,
         settingsTab: state.settingsTab,
+        syncRadio: state.syncRadio,
         keys: state.keys,
       }),
     },

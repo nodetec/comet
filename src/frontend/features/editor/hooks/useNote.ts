@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAppState } from "~/store";
 import { type Note } from "$/types/Note";
 
 async function getNote(id: string | undefined): Promise<Note | null> {
@@ -9,12 +10,15 @@ async function getNote(id: string | undefined): Promise<Note | null> {
   return note;
 }
 
-export const useNote = (id: string | undefined) => {
+export const useNote = () => {
+  const activeNoteId = useAppState((state) => state.activeNoteId);
   return useQuery<Note | null>({
-    queryKey: ["note", id],
+    queryKey: ["note", activeNoteId],
     refetchOnWindowFocus: false,
+    gcTime: 0,
+    staleTime: 0,
     // TODO: why doesn't this work for individual notes?
     // placeholderData: keepPreviousData,
-    queryFn: () => getNote(id),
+    queryFn: () => getNote(activeNoteId),
   });
 };

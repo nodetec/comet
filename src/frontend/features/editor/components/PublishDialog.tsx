@@ -21,8 +21,7 @@ export function PublishDialog() {
   const [isOpen, setIsOpen] = useState(false);
 
   const keys = useAppState((state) => state.keys);
-  const activeNoteId = useAppState((state) => state.activeNoteId);
-  const note = useNote(activeNoteId);
+  const note = useNote();
 
   const previewImage = note.data?.content.match(/!\[.*\]\((.*)\)/);
 

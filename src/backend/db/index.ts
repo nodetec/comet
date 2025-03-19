@@ -10,13 +10,18 @@ import { setupDesignDoc } from "./utils/tagsDesignDoc";
 PouchDB.plugin(PouchDBFind);
 
 let db: PouchDB.Database;
+let sync: PouchDB.Replication.Sync<{}> | undefined;
 let dbFts: Database;
 let dbReady = false;
 
 // Function to run SQLite queries as promises
-function runQuery(db: Database, query: string, params: unknown[] = []): Promise<void> {
+function runQuery(
+  db: Database,
+  query: string,
+  params: unknown[] = [],
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    db.run(query, params, function(err) {
+    db.run(query, params, function (err) {
       if (err) {
         console.error(`Error executing query: ${query}`, err);
         reject(err);
@@ -30,14 +35,18 @@ function runQuery(db: Database, query: string, params: unknown[] = []): Promise<
 // Check if the notes table exists
 async function ensureTableExists(db: Database): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='notes'", [], (err, row) => {
-      if (err) {
-        console.error("Error checking if table exists:", err);
-        reject(err);
-      } else {
-        resolve(!!row);
-      }
-    });
+    db.get(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='notes'",
+      [],
+      (err, row) => {
+        if (err) {
+          console.error("Error checking if table exists:", err);
+          reject(err);
+        } else {
+          resolve(!!row);
+        }
+      },
+    );
   });
 }
 
@@ -112,30 +121,47 @@ export async function initDb(dbPath: string) {
   });
 
   dbFts = new sqlite3.Database(`${dbPath}_notes.sqlite`);
-  
+
   try {
     // Create the table
     await runQuery(
       dbFts,
-      "CREATE TABLE IF NOT EXISTS notes (doc_id TEXT PRIMARY KEY, content TEXT, notebookId TEXT, createdAt TEXT, contentUpdatedAt TEXT, trashedAt TEXT)"
+      "CREATE TABLE IF NOT EXISTS notes (doc_id TEXT PRIMARY KEY, content TEXT, notebookId TEXT, createdAt TEXT, contentUpdatedAt TEXT, trashedAt TEXT)",
     );
-    
+
     // Verify the table exists
     const tableExists = await ensureTableExists(dbFts);
     if (!tableExists) {
-      console.error("Failed to create notes table - table does not exist after creation");
+      console.error(
+        "Failed to create notes table - table does not exist after creation",
+      );
       throw new Error("Failed to create notes table");
     }
-    
+
     console.log("Notes table created successfully");
-    
+
     // Create indexes
-    await runQuery(dbFts, "CREATE INDEX IF NOT EXISTS idx_content ON notes(content)");
-    await runQuery(dbFts, "CREATE INDEX IF NOT EXISTS idx_notebookId ON notes(notebookId)");
-    await runQuery(dbFts, "CREATE INDEX IF NOT EXISTS idx_createdAt ON notes(createdAt)");
-    await runQuery(dbFts, "CREATE INDEX IF NOT EXISTS idx_contentUpdatedAt ON notes(contentUpdatedAt)");
-    await runQuery(dbFts, "CREATE INDEX IF NOT EXISTS idx_trashedAt ON notes(trashedAt)");
-    
+    await runQuery(
+      dbFts,
+      "CREATE INDEX IF NOT EXISTS idx_content ON notes(content)",
+    );
+    await runQuery(
+      dbFts,
+      "CREATE INDEX IF NOT EXISTS idx_notebookId ON notes(notebookId)",
+    );
+    await runQuery(
+      dbFts,
+      "CREATE INDEX IF NOT EXISTS idx_createdAt ON notes(createdAt)",
+    );
+    await runQuery(
+      dbFts,
+      "CREATE INDEX IF NOT EXISTS idx_contentUpdatedAt ON notes(contentUpdatedAt)",
+    );
+    await runQuery(
+      dbFts,
+      "CREATE INDEX IF NOT EXISTS idx_trashedAt ON notes(trashedAt)",
+    );
+
     // TODO: think about how to handle this better
     await syncFtsIndex(dbFts);
 
@@ -144,7 +170,7 @@ export async function initDb(dbPath: string) {
 
     await createIndexes(db);
     await setupDesignDoc(db);
-    
+
     dbReady = true;
     return db;
   } catch (error) {
@@ -154,5 +180,9 @@ export async function initDb(dbPath: string) {
 }
 
 export const getDb = () => db;
+export const getSync = () => sync;
+export const setSync = (newSync: PouchDB.Replication.Sync<{}>) => {
+  sync = newSync;
+};
 export const getDbFts = () => dbFts;
 export const isDbReady = () => dbReady;

@@ -120,7 +120,7 @@ function NoteCardBase({ note, index, length }: Props) {
 
             {noteSearch ? (
               <Highlighter
-                className="text-muted-foreground/80 line-clamp-4 min-h-[3em] pt-0 break-all whitespace-break-spaces select-none"
+                className="text-muted-foreground/80 line-clamp-2 min-h-[3em] pt-0 break-all whitespace-break-spaces select-none"
                 highlightClassName="bg-yellow-300 text-background"
                 searchWords={[noteSearch]}
                 autoEscape={true}

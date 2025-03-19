@@ -22,4 +22,9 @@ export function setupHandlers(): void {
   // tags
   ipcMain.handle("getAllTags", api.getAllTags);
   ipcMain.handle("getTagsByNotebookId", api.getTagsByNotebookId);
+
+  // sync
+  ipcMain.handle("syncDb", api.syncDb);
+  ipcMain.handle("cacnelSync", api.cancelSync);
+  ipcMain.handle("getSyncConfig", api.getSyncConfig);
 }

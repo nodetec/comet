@@ -4,15 +4,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-// import { useRelays } from "~/hooks/useRelays";
+import { useSyncConfig } from "~/hooks/useSyncConfig";
 import { useAppState } from "~/store";
 
 import { NotebookSettings } from "./NotebookSettings";
-// import { EditorSettings } from "./EditorSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { RelaySettings } from "./RelaySettings";
-
-// import { RelaySettings } from "./RelaySettings";
+import { SyncSettings } from "./SyncSettings";
 
 type Props = {
   children: React.ReactNode;
@@ -23,6 +21,7 @@ export function Settings({ children }: Props) {
   const setSettingsTab = useAppState((state) => state.setSettingsTab);
 
   const relays = useAppState((state) => state.relays);
+  const syncConfig = useSyncConfig();
 
   return (
     <Dialog>
@@ -51,12 +50,12 @@ export function Settings({ children }: Props) {
           >
             Notebooks
           </span>
-          {/* <span
-          className={`flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-secondary-foreground ${settingsTab === "editor" && "bg-muted text-secondary-foreground"}`}
-          onClick={() => setSettingsTab("editor")}
-        >
-          Editor
-        </span> */}
+          <span
+            className={`text-secondary-foreground flex items-center rounded-md px-2 py-1.5 text-sm font-medium ${settingsTab === "sync" && "bg-accent/80 text-secondary-foreground"}`}
+            onClick={() => setSettingsTab("sync")}
+          >
+            Sync
+          </span>
         </div>
         <div className="flex w-full flex-col">
           {settingsTab === "profile" && <ProfileSettings />}
@@ -64,7 +63,7 @@ export function Settings({ children }: Props) {
           {settingsTab === "relays" && relays && (
             <RelaySettings relays={relays} />
           )}
-          {/* {settingsTab === "editor" && <EditorSettings />} */}
+          {settingsTab === "sync" && <SyncSettings syncConfig={syncConfig.data} />}
         </div>
       </DialogContent>
     </Dialog>

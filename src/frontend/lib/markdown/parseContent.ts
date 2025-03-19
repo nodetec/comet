@@ -3,7 +3,7 @@ export function parseContent(markdownContent: string, searchTerm?: string) {
   const lines = markdownContent.split("\n");
 
   // Check if the first line is a header
-  const firstLine = lines[0].trim();
+  const firstLine = lines[0]?.trim() || "";
   const isHeader = /^#+\s+(.*)$/.test(firstLine);
 
   // Determine the starting index for processing lines
