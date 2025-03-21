@@ -55,7 +55,18 @@ const config: ForgeConfig = {
       },
     },
     new MakerSquirrel({}),
-    new MakerRpm({}),
+    new MakerRpm({
+      options: {
+        name: "comet",
+        productName: "Comet",
+        icon: "./assets/icon.png",
+        categories: ["Utility"],
+        genericName: "Comet",
+        bin: "comet",
+        productDescription: "Comet - A note-taking application",
+        homepage: "https://comet.md"
+      }
+    }),
     new MakerDeb({}),
   ],
   plugins: [
