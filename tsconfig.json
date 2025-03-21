@@ -22,6 +22,7 @@
     }
   },
   "include": [
+    "postcss.config.mjs",
     "src/**/*",
     "typings.d.ts",
     ".eslintrc.cjs",

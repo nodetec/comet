@@ -145,14 +145,14 @@ export function LoginDialog({ children }: Props) {
       <DialogTrigger asChild>
         <div onClick={() => setIsDialogOpen(true)}>{children}</div>
       </DialogTrigger>
-      <DialogContent aria-describedby="login" className="max-w-md p-6">
+      <DialogContent aria-describedby="login" className="max-w-sm p-6">
         <DialogHeader>
-          <DialogTitle>Register</DialogTitle>
+          <DialogTitle>Login</DialogTitle>
           <DialogDescription>
             Don't have a Nostr account?{" "}
             <button
               onClick={generateKepair}
-              className="text-sky-500/90 focus-visible:ring-0 focus-visible:outline-none"
+              className="text-primary focus-visible:ring-0 focus-visible:outline-none"
             >
               Create keypair
             </button>
@@ -246,15 +246,21 @@ export function LoginDialog({ children }: Props) {
               />
             </div>
             <DialogFooter>
-              <Button
-                id="create-dialog-create-btn"
-                name="create-dialog-create-btn"
-                type="submit"
-                className="max-w-[18%]"
-                variant="default"
-              >
-                Login
-              </Button>
+              <div className="flex w-full flex-col items-center justify-start gap-y-6 py-2">
+                <Button
+                  id="create-dialog-create-btn"
+                  name="create-dialog-create-btn"
+                  type="submit"
+                  className="w-full"
+                  variant="secondary"
+                >
+                  Login
+                </Button>
+
+                <Button className="w-full" variant="default">
+                  Login with Keystash
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>
