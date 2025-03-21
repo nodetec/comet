@@ -64,10 +64,21 @@ const config: ForgeConfig = {
         genericName: "Comet",
         bin: "comet",
         productDescription: "Comet - A note-taking application",
-        homepage: "https://comet.md"
-      }
+        homepage: "https://comet.md",
+      },
     }),
-    new MakerDeb({}),
+    new MakerDeb({
+      options: {
+        name: "comet",
+        productName: "Comet",
+        icon: "./assets/icon.png",
+        categories: ["Utility"],
+        genericName: "Comet",
+        bin: "comet",
+        productDescription: "Comet - A note-taking application",
+        homepage: "https://comet.md",
+      },
+    }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
