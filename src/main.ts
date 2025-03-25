@@ -12,6 +12,14 @@ import { app, BrowserWindow } from "electron";
 import electronDragClick from "electron-drag-click";
 import isDev from "electron-is-dev";
 
+let dbDir: string;
+
+if (isDev) {
+  dbDir = "db-test";
+} else {
+  dbDir = "db-alpha";
+}
+
 EventEmitter.defaultMaxListeners = 20;
 
 electronDragClick();
@@ -59,8 +67,6 @@ const createWindow = (): void => {
   const store = getStore();
 
   try {
-    // @ts-expect-error - electron store is module only and electron forge is not
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const syncConfig = store.get("sync") as
       | {
           remote: {
@@ -107,15 +113,13 @@ void app
   .whenReady()
   .then(async () => {
     await fsPromises.mkdir(
-      path.join(app.getPath("appData"), "comet", "db-alpha"),
+      path.join(app.getPath("appData"), "comet", dbDir, "db"),
       {
         recursive: true,
       },
     );
     initStore();
-    await initDb(
-      path.join(app.getPath("appData"), "comet", "db-alpha", "comet-alpha"),
-    );
+    await initDb(path.join(app.getPath("appData"), "comet", dbDir, "db"));
     setupHandlers();
     setupContextMenus();
     createWindow();

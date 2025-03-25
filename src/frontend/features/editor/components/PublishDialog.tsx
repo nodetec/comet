@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { usePublish } from "~/features/editor/hooks/usePublish";
 import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";
@@ -19,11 +20,10 @@ import { useNote } from "../hooks/useNote";
 
 export function PublishDialog() {
   const [isOpen, setIsOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>("");
 
   const keys = useAppState((state) => state.keys);
   const note = useNote();
-
-  const previewImage = note.data?.content.match(/!\[.*\]\((.*)\)/);
 
   const { handlePublish } = usePublish();
 
@@ -47,10 +47,10 @@ export function PublishDialog() {
         </DialogHeader>
 
         <div className="mb-4 flex flex-col gap-4">
-          {previewImage && (
+          {imageUrl && (
             <div className="max-w-md rounded-md">
               <img
-                src={previewImage ? previewImage[1] : ""}
+                src={imageUrl}
                 alt="preview"
                 className="border-accent h-auto w-auto rounded-md border object-contain"
               />
@@ -58,6 +58,17 @@ export function PublishDialog() {
           )}
 
           <div className="space-y-4">
+            <div>
+              <h3 className="mb-2 font-semibold">Image URL:</h3>
+              <Input
+                type="url"
+                placeholder="Enter image URL"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
             <div>
               <h3 className="mb-2 font-semibold">Title:</h3>
               <p className="no-scrollbar bg-accent cursor-default overflow-x-auto rounded-md px-2 py-1">
@@ -94,7 +105,9 @@ export function PublishDialog() {
 
           <Button
             onClick={(e) =>
-              handlePublish(e, note.data, keys, () => setIsOpen(false))
+              handlePublish(e, note.data, keys, imageUrl || undefined, () =>
+                setIsOpen(false),
+              )
             }
           >
             Publish

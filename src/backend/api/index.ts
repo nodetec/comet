@@ -406,8 +406,6 @@ export function syncDb(
 ) {
   sync(remoteUrl);
   const store = getStore();
-  // @ts-expect-error - electron store is module only and electron forge is not
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   store.set({
     sync: {
       remote: {
@@ -423,8 +421,6 @@ export function cancelSync() {
   const store = getStore();
   if (sync) {
     sync.cancel();
-    // @ts-expect-error - electron store is module only and electron forge is not
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     store.set({
       sync: {
         remote: {
@@ -438,8 +434,6 @@ export function cancelSync() {
 
 export function getSyncConfig() {
   const store = getStore();
-  // @ts-expect-error - electron store is module only and electron forge is not
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   return store.get("sync") as
     | {
         remote: {

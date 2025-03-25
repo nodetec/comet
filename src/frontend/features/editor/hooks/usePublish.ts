@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { removeTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
 import { type Keys } from "$/types/Keys";
 import { type Note } from "$/types/Note";
@@ -19,6 +20,7 @@ export function usePublish() {
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>,
     note: Note | undefined | null,
     keys: Keys | undefined | null,
+    image: string | undefined | null,
     onClose: () => void,
   ) => {
     e.preventDefault();
@@ -51,20 +53,13 @@ export function usePublish() {
       identifier = randomId();
     }
 
-    const image = /!\[.*\]\((.*)\)/.exec(note.content);
-
-    console.log(note.content);
-
     const eventTags = [
       ["d", identifier],
       ["title", note.title],
-      // ["image", image], // TODO: parse first image from content
     ];
 
     if (image) {
-      if (image[1]) {
-        eventTags.push(["image", image[1]]);
-      }
+      eventTags.push(["image", image]);
     }
 
     if (note.tags) {
@@ -78,15 +73,13 @@ export function usePublish() {
         kind: 30023,
         created_at: Math.floor(Date.now() / 1000),
         tags: eventTags,
-        content: note.content,
+        content: removeTitle(note.content),
       },
       secretKey,
     );
 
-    console.log("event", event);
-
     try {
-      // create list of relay ursl
+      // create list of relay urls
       if (!relays) {
         toast("Note failed to post", {
           description: "There was an error posting your note.",
@@ -94,8 +87,6 @@ export function usePublish() {
         return;
       }
       const relayUrls = relays.map((relay) => relay.url);
-
-      console.log("relay urls", relayUrls);
 
       await Promise.all(pool.publish(relayUrls, event));
 
