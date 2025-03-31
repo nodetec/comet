@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAppState } from "~/store";
-import { type Note } from "$/types/Note";
+import type { Note } from "$/types/Note";
 
 async function getNote(id: string | undefined): Promise<Note | null> {
-  console.log("getNote", id);
   if (!id) return null;
   const note = await window.api.getNote(id);
-  console.log("getNote", note);
   return note;
 }
 

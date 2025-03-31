@@ -12,7 +12,6 @@ export const NoteList = () => {
   const { ref: lastNoteRef } = useInView({
     onChange: (inView) => {
       if (inView && !isFetchingNextPage && hasNextPage) {
-        console.log("fetching next page");
         void fetchNextPage();
       }
     },
@@ -30,7 +29,7 @@ export const NoteList = () => {
 
   return (
     <ScrollArea type="scroll" className="h-screen">
-      <div className="flex flex-col items-center px-1 mr-[5px]">
+      <div className="mr-[5px] flex flex-col items-center px-1">
         {flattenedNotes.map((note, index) => (
           <div
             className="mx-3 flex w-full flex-col items-center"
