@@ -11,6 +11,9 @@
   "linter": {
     "enabled": true,
     "rules": {
+      "style": {
+        "noNonNullAssertion": "off"
+      },
       "suspicious": {
         "noArrayIndexKey": "off"
       },
