@@ -19,7 +19,7 @@ export default function ResizableLayout() {
     <div className="flex h-dvh w-dvw flex-col items-center justify-center">
       <Container className="relative h-full w-full">
         <Section
-          className="bg-sidebar flex flex-col justify-between select-none"
+          className="flex select-none flex-col justify-between bg-sidebar"
           disableResponsive
           defaultSize={size.width! > 800 ? 200 : 180}
           minSize={180}
@@ -29,13 +29,13 @@ export default function ResizableLayout() {
           <SidebarNav />
           <NewNotebookBtn />
         </Section>
-        <Bar className="flex cursor-col-resize items-center" size={8}>
-          <div className="bg-sidebar h-full w-1" />
-          <div className="bg-border h-full w-[1px]" />
-          <div className="bg-background h-full w-1" />
-        </Bar>
+        <Bar
+          className="z-30 cursor-col-resize bg-border"
+          expandInteractiveArea={{ left: 5, right: 5 }}
+          size={1}
+        />
         <Section
-          className="flex h-full flex-col select-none"
+          className="flex h-full select-none flex-col"
           disableResponsive
           defaultSize={280}
           minSize={210}
@@ -45,11 +45,13 @@ export default function ResizableLayout() {
           <NotesSearch />
           <NoteList />
         </Section>
-        <Bar className="flex cursor-col-resize items-center" size={5}>
-          <div className="bg-accent/40 h-full w-[1px]" />
-        </Bar>
+        <Bar
+          className="z-30 cursor-col-resize bg-border"
+          expandInteractiveArea={{ left: 5, right: 5 }}
+          size={1}
+        />
         <Section minSize={size.width! > 800 ? 300 : 210}>
-          <div className="flex h-screen w-full flex-1 flex-col items-center select-none">
+          <div className="flex h-screen w-full flex-1 select-none flex-col items-center">
             <Editor />
           </div>
         </Section>
