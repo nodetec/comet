@@ -28,7 +28,7 @@ export function NotesHeader() {
 
   return (
     <div
-      className="draggable mr-[5px] flex justify-between px-1 pt-2"
+      className="draggable flex justify-between pt-2"
       onDoubleClick={handleDoubleClick}
     >
       <div
@@ -36,10 +36,10 @@ export function NotesHeader() {
         onDoubleClick={(e) => e.stopPropagation()}
         className="flex cursor-default items-center justify-center gap-x-1 pl-2"
       >
-        <h1 className="line-clamp-1 truncate font-semibold break-all text-ellipsis whitespace-break-spaces select-none">
+        <h1 className="line-clamp-1 select-none truncate text-ellipsis whitespace-break-spaces break-all font-semibold">
           {title}
         </h1>
-        <ChevronDown className="text-muted-foreground mt-1 mr-4 h-[1rem] w-[1rem] shrink-0" />
+        <ChevronDown className="mt-1 mr-4 h-[1rem] w-[1rem] shrink-0 text-muted-foreground" />
       </div>
       <Button
         type="button"
