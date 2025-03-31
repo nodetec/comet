@@ -1,5 +1,5 @@
-import { type Note } from "$/types/Note";
-import { type Notebook } from "$/types/Notebook";
+import type { Note } from "$/types/Note";
+import type { Notebook } from "$/types/Notebook";
 import PouchDB from "pouchdb";
 import PouchDBFind from "pouchdb-find";
 import sqlite3, { type Database } from "sqlite3";
@@ -21,7 +21,7 @@ function runQuery(
   params: unknown[] = [],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    db.run(query, params, function (err) {
+    db.run(query, params, (err) => {
       if (err) {
         console.error(`Error executing query: ${query}`, err);
         reject(err);

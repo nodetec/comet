@@ -1,6 +1,6 @@
-import { EventEmitter } from "events";
-import { promises as fsPromises } from "fs";
-import path from "path";
+import { EventEmitter } from "node:events";
+import { promises as fsPromises } from "node:fs";
+import path from "node:path";
 
 import { initDb } from "&/db";
 import { sync } from "&/db/utils/syncDb";

@@ -10,10 +10,10 @@ import { sync } from "&/db/utils/syncDb";
 import { getStore } from "&/store";
 import { getWindow } from "&/window";
 import { extractHashtags, parseContent } from "~/lib/markdown";
-import { type InsertNote, type Note } from "$/types/Note";
-import { type Notebook } from "$/types/Notebook";
+import type { InsertNote, Note } from "$/types/Note";
+import type { Notebook } from "$/types/Notebook";
 import dayjs from "dayjs";
-import { type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { v4 as uuidv4 } from "uuid";
 
 // Notes
@@ -337,10 +337,10 @@ export async function searchNotes(
     return [];
   }
 
-  const literalQuery = "%" + searchTerm.trim() + "%";
+  const literalQuery = `%${searchTerm.trim()}%`;
 
-  let selectQuery;
-  let selectParams;
+  let selectQuery: string;
+  let selectParams: unknown[];
 
   // Add trashedAt condition based on the trashed parameter
   const trashedCondition = trashed
