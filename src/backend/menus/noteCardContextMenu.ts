@@ -13,6 +13,10 @@ export function setupNoteCardContextMenu() {
         (notebook) => notebook._id !== note.notebookId,
       );
 
+      const currentNotebook = note.notebookId
+        ? notebooks.find((n) => n._id === note.notebookId)
+        : undefined;
+
       const template = [
         {
           label: "Move To",
@@ -24,7 +28,6 @@ export function setupNoteCardContextMenu() {
             },
           })),
         },
-
         {
           label: "Trash",
           click: async () => {
@@ -32,6 +35,17 @@ export function setupNoteCardContextMenu() {
             event.sender.send("noteMovedToTrash", note._id);
           },
         },
+        ...(currentNotebook
+          ? [
+              {
+                label: `Remove from ${currentNotebook.name}`,
+                click: async () => {
+                  await moveNoteToNotebook(event, note._id, undefined);
+                  event.sender.send("noteMovedToNotebook", note._id, "");
+                },
+              },
+            ]
+          : []),
       ];
 
       const menu = Menu.buildFromTemplate(template);

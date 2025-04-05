@@ -197,13 +197,12 @@ export async function addPublishDetailsToNote(
 export async function moveNoteToNotebook(
   _: IpcMainInvokeEvent,
   noteId: string,
-  notebookId: string,
+  notebookId: string | undefined,
 ) {
   const db = getDb();
   const note = await db.get<Note>(noteId);
   note.notebookId = notebookId;
   note.updatedAt = new Date().toISOString();
-  note.contentUpdatedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
