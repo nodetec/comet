@@ -15,7 +15,7 @@ import isDev from "electron-is-dev";
 let dbDir: string;
 
 if (isDev) {
-  dbDir = "db-test";
+  dbDir = "db-test-v1";
 } else {
   dbDir = "db-alpha-v1";
 }
