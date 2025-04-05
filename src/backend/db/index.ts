@@ -79,23 +79,23 @@ async function syncFtsIndex(dbFts: Database) {
         console.log("updating", note._id);
 
         const updateQuery =
-          "UPDATE notes SET content = ?, notebookId = ?, createdAt = ?, contentUpdatedAt = ?, trashedAt = ? WHERE doc_id = ?";
+          "UPDATE notes SET content = ?, notebookId = ?, createdAt = ?, editedAt = ?, trashedAt = ? WHERE doc_id = ?";
         const updateParams = [
           note.content,
           note.notebookId,
           note.createdAt,
-          note.contentUpdatedAt,
+          note.editedAt,
           note.trashedAt,
           note._id,
         ];
         const insertQuery =
-          "INSERT INTO notes (doc_id, content, notebookId, createdAt, contentUpdatedAt, trashedAt) VALUES (?, ?, ?, ?, ?, ?)";
+          "INSERT INTO notes (doc_id, content, notebookId, createdAt, editedAt, trashedAt) VALUES (?, ?, ?, ?, ?, ?)";
         const insertParams = [
           note._id,
           note.content,
           note.notebookId,
           note.createdAt,
-          note.contentUpdatedAt,
+          note.editedAt,
           note.trashedAt,
         ];
 
@@ -126,7 +126,7 @@ export async function initDb(dbPath: string) {
     // Create the table
     await runQuery(
       dbFts,
-      "CREATE TABLE IF NOT EXISTS notes (doc_id TEXT PRIMARY KEY, content TEXT, notebookId TEXT, createdAt TEXT, contentUpdatedAt TEXT, trashedAt TEXT)",
+      "CREATE TABLE IF NOT EXISTS notes (doc_id TEXT PRIMARY KEY, content TEXT, notebookId TEXT, createdAt TEXT, editedAt TEXT, trashedAt TEXT)",
     );
 
     // Verify the table exists
@@ -155,7 +155,7 @@ export async function initDb(dbPath: string) {
     );
     await runQuery(
       dbFts,
-      "CREATE INDEX IF NOT EXISTS idx_contentUpdatedAt ON notes(contentUpdatedAt)",
+      "CREATE INDEX IF NOT EXISTS idx_editedAt ON notes(editedAt)",
     );
     await runQuery(
       dbFts,

@@ -84,11 +84,11 @@ contextBridge.exposeInMainWorld("api", {
   getSyncConfig: () => ipcRenderer.invoke("getSyncConfig"),
   getSortSettings: () =>
     ipcRenderer.invoke("getSortSettings") as Promise<{
-      sortBy: "createdAt" | "contentUpdatedAt" | "title";
+      sortBy: "createdAt" | "editedAt" | "title";
       sortOrder: "asc" | "desc";
     }>,
   updateSortSettings: (
-    sortBy: "createdAt" | "contentUpdatedAt" | "title",
+    sortBy: "createdAt" | "editedAt" | "title",
     sortOrder: "asc" | "desc",
   ) =>
     ipcRenderer.invoke(
@@ -137,7 +137,7 @@ contextBridge.exposeInMainWorld("api", {
   onSortSettingsUpdated: (
     handler: (
       event: IpcRendererEvent,
-      settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+      settings: { sortBy: "createdAt" | "editedAt" | "title"; sortOrder: "asc" | "desc" },
     ) => void,
   ) => {
     ipcRenderer.on("sortSettingsUpdated", handler);

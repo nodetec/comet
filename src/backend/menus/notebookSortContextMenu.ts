@@ -10,8 +10,8 @@ export function setupNotebookSortContextMenu() {
         switch (notebook.sortBy) {
           case "createdAt":
             return notebook.createdAtSortOrder;
-          case "contentUpdatedAt":
-            return notebook.contentUpdatedAtSortOrder;
+          case "editedAt":
+            return notebook.editedAtSortOrder;
           case "title":
             return notebook.titleSortOrder;
         }
@@ -24,11 +24,11 @@ export function setupNotebookSortContextMenu() {
             {
               label: "Date Edited",
               type: "checkbox",
-              checked: notebook.sortBy === "contentUpdatedAt",
+              checked: notebook.sortBy === "editedAt",
               click: () => {
                 void updateNotebook(event, {
                   _id: notebook._id,
-                  sortBy: "contentUpdatedAt",
+                  sortBy: "editedAt",
                 }).then((updatedNotebook) => {
                   if (updatedNotebook) {
                     event.sender.send(
@@ -91,8 +91,8 @@ export function setupNotebookSortContextMenu() {
                   case "createdAt":
                     update.createdAtSortOrder = "desc";
                     break;
-                  case "contentUpdatedAt":
-                    update.contentUpdatedAtSortOrder = "desc";
+                  case "editedAt":
+                    update.editedAtSortOrder = "desc";
                     break;
                   case "title":
                     update.titleSortOrder = "asc";
@@ -123,8 +123,8 @@ export function setupNotebookSortContextMenu() {
                   case "createdAt":
                     update.createdAtSortOrder = "asc";
                     break;
-                  case "contentUpdatedAt":
-                    update.contentUpdatedAtSortOrder = "asc";
+                  case "editedAt":
+                    update.editedAtSortOrder = "asc";
                     break;
                   case "title":
                     update.titleSortOrder = "desc";

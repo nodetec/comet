@@ -5,8 +5,8 @@ export function createIndexes(db: PouchDB.Database) {
   return Promise.all([
     db.createIndex({
       index: {
-        fields: ["contentUpdatedAt", "type", "trashedAt", "notebookId", "tags"],
-        name: "note-index-contentUpdatedAt",
+        fields: ["editedAt", "type", "trashedAt", "notebookId", "tags"],
+        name: "note-index-editedAt",
       },
     }),
     db.createIndex({
@@ -23,8 +23,8 @@ export function createIndexes(db: PouchDB.Database) {
     }),
     db.createIndex({
       index: {
-        fields: ["contentUpdatedAt", "type", "trashedAt", "tags"],
-        name: "note-index-contentUpdatedAt-all",
+        fields: ["editedAt", "type", "trashedAt", "tags"],
+        name: "note-index-editedAt-all",
       },
     }),
     db.createIndex({

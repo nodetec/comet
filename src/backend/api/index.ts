@@ -36,6 +36,9 @@ export async function createNote(
     _id: `note_${uuidv4()}`,
     _rev: undefined,
     type: "note",
+    kind: "30023",
+    filetype: "markdown",
+    extension: "md",
     title: dayjs().format("YYYY-MM-DD"),
     content: content,
     previewContent: "",
@@ -43,10 +46,12 @@ export async function createNote(
     notebookId: insertNote?.notebookId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    contentUpdatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
     author: undefined,
     publishedAt: undefined,
-    eventAddress: undefined,
+    eventId: undefined,
+    naddr: undefined,
+    nevent: undefined,
     identifier: undefined,
     pinnedAt: undefined,
     trashedAt: undefined,
@@ -83,8 +88,8 @@ export async function getNoteFeed(
       case "createdAt":
         sortOrder = notebook.createdAtSortOrder;
         break;
-      case "contentUpdatedAt":
-        sortOrder = notebook.contentUpdatedAtSortOrder;
+      case "editedAt":
+        sortOrder = notebook.editedAtSortOrder;
         break;
       case "title":
         sortOrder = notebook.titleSortOrder;
@@ -95,8 +100,8 @@ export async function getNoteFeed(
       case "createdAt":
         sortOrder = sortSettings.createdAtSortOrder;
         break;
-      case "contentUpdatedAt":
-        sortOrder = sortSettings.contentUpdatedAtSortOrder;
+      case "editedAt":
+        sortOrder = sortSettings.editedAtSortOrder;
         break;
       case "title":
         sortOrder = sortSettings.titleSortOrder;
@@ -139,7 +144,7 @@ export async function saveNote(_: IpcMainInvokeEvent, update: Partial<Note>) {
   note.content = update.content ?? "";
   note.previewContent = parseContent(update.content ?? "") ?? "";
   note.updatedAt = new Date().toISOString();
-  note.contentUpdatedAt = new Date().toISOString();
+  note.editedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -168,7 +173,7 @@ export async function restoreNote(_: IpcMainEvent, id: string) {
   const note = await db.get<Note>(id);
   note.trashedAt = undefined;
   note.updatedAt = new Date().toISOString();
-  note.contentUpdatedAt = new Date().toISOString();
+  note.editedAt = new Date().toISOString();
   const response = await db.put(note);
   return response.id;
 }
@@ -185,10 +190,10 @@ export async function addPublishDetailsToNote(
   note.content = update.content ?? "";
   note.previewContent = parseContent(update.content ?? "") ?? "";
   note.updatedAt = new Date().toISOString();
-  note.contentUpdatedAt = new Date().toISOString();
+  note.editedAt = new Date().toISOString();
   note.author = update.author;
   note.publishedAt = update.publishedAt;
-  note.eventAddress = update.eventAddress;
+  note.naddr = update.naddr;
   note.identifier = update.identifier;
   const response = await db.put(note);
   return response.id;
@@ -228,9 +233,9 @@ export async function createNotebook(_: IpcMainInvokeEvent, name: string) {
     type: "notebook",
     name,
     hidden: false,
-    sortBy: "contentUpdatedAt",
+    sortBy: "editedAt",
     createdAtSortOrder: "desc",
-    contentUpdatedAtSortOrder: "desc",
+    editedAtSortOrder: "desc",
     titleSortOrder: "asc",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -380,10 +385,10 @@ export async function searchNotes(
     : "trashedAt IS NULL";
 
   if (notebookId) {
-    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND notebookId = ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
+    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND notebookId = ? AND ${trashedCondition} ORDER BY editedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, notebookId, limit, offset];
   } else {
-    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND ${trashedCondition} ORDER BY contentUpdatedAt DESC LIMIT ? OFFSET ?`;
+    selectQuery = `SELECT doc_id FROM notes WHERE content LIKE ? AND ${trashedCondition} ORDER BY editedAt DESC LIMIT ? OFFSET ?`;
     selectParams = [literalQuery, limit, offset];
   }
 
@@ -481,14 +486,14 @@ export function getSortSettings() {
   return {
     sortBy: store.get("sortBy"),
     createdAtSortOrder: store.get("createdAtSortOrder"),
-    contentUpdatedAtSortOrder: store.get("contentUpdatedAtSortOrder"),
+    editedAtSortOrder: store.get("editedAtSortOrder"),
     titleSortOrder: store.get("titleSortOrder"),
   };
 }
 
 export function updateSortSettings(
   event: IpcMainInvokeEvent,
-  sortBy: "createdAt" | "contentUpdatedAt" | "title",
+  sortBy: "createdAt" | "editedAt" | "title",
   sortOrder: "asc" | "desc",
 ) {
   const store = getStore();
@@ -497,8 +502,8 @@ export function updateSortSettings(
     case "createdAt":
       store.set("createdAtSortOrder", sortOrder);
       break;
-    case "contentUpdatedAt":
-      store.set("contentUpdatedAtSortOrder", sortOrder);
+    case "editedAt":
+      store.set("editedAtSortOrder", sortOrder);
       break;
     case "title":
       store.set("titleSortOrder", sortOrder);

@@ -48,8 +48,8 @@ function NoteCardBase({ note, index, length }: Props) {
 
   // Memoize date formatting
   const formattedUpdatedTime = useMemo(
-    () => (note.contentUpdatedAt ? fromNow(note.contentUpdatedAt) : ""),
-    [note.contentUpdatedAt],
+    () => (note.editedAt ? fromNow(note.editedAt) : ""),
+    [note.editedAt],
   );
 
   // Memoize published date formatting

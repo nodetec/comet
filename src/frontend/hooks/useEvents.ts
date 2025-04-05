@@ -139,7 +139,7 @@ export const useEvents = () => {
     const sortSettingsUpdatedHandler = (
       event: Electron.IpcRendererEvent,
       settings: {
-        sortBy: "createdAt" | "contentUpdatedAt" | "title";
+        sortBy: "createdAt" | "editedAt" | "title";
         sortOrder: "asc" | "desc";
       },
     ) => {

@@ -3,9 +3,9 @@ export type Notebook = {
   _rev: string | undefined;
   type: "notebook";
   name: string;
-  sortBy: "createdAt" | "contentUpdatedAt" | "title";
+  sortBy: "createdAt" | "editedAt" | "title";
   createdAtSortOrder: "asc" | "desc";
-  contentUpdatedAtSortOrder: "asc" | "desc";
+  editedAtSortOrder: "asc" | "desc";
   titleSortOrder: "asc" | "desc";
   color: string;
   hidden: boolean;

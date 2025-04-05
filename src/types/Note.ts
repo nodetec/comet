@@ -7,6 +7,9 @@ export type Note = {
   _id: string;
   _rev: string | undefined;
   type: "note";
+  kind: "1" | "30023" | "1337";
+  filetype: string;
+  extension: string;
   title: string;
   content: string;
   previewContent: string;
@@ -14,9 +17,11 @@ export type Note = {
   notebookId: string | undefined;
   createdAt: string;
   updatedAt: string;
-  contentUpdatedAt: string;
+  editedAt: string;
   publishedAt: string | undefined;
-  eventAddress: string | undefined;
+  eventId: string | undefined;
+  naddr: string | undefined;
+  nevent: string | undefined;
   identifier: string | undefined;
   pinnedAt: string | undefined;
   trashedAt: string | undefined;

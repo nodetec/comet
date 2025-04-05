@@ -50,11 +50,11 @@ declare global {
         | undefined
       >;
       getSortSettings: () => Promise<{
-        sortBy: "createdAt" | "contentUpdatedAt" | "title";
+        sortBy: "createdAt" | "editedAt" | "title";
         sortOrder: "asc" | "desc";
       }>;
       updateSortSettings: (
-        sortBy: "createdAt" | "contentUpdatedAt" | "title",
+        sortBy: "createdAt" | "editedAt" | "title",
         sortOrder: "asc" | "desc",
       ) => Promise<void>;
 
@@ -89,7 +89,7 @@ declare global {
       onSortSettingsUpdated: (
         handler: (
           event: IpcRendererEvent,
-          settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+          settings: { sortBy: "createdAt" | "editedAt" | "title"; sortOrder: "asc" | "desc" },
         ) => void,
       ) => () => void;
       onNotebookSortSettingsUpdated: (

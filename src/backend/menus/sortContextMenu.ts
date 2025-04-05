@@ -9,8 +9,8 @@ export function setupSortContextMenu() {
       switch (sortSettings.sortBy) {
         case "createdAt":
           return sortSettings.createdAtSortOrder;
-        case "contentUpdatedAt":
-          return sortSettings.contentUpdatedAtSortOrder;
+        case "editedAt":
+          return sortSettings.editedAtSortOrder;
         case "title":
           return sortSettings.titleSortOrder;
       }
@@ -23,12 +23,12 @@ export function setupSortContextMenu() {
           {
             label: "Date Edited",
             type: "checkbox",
-            checked: sortSettings.sortBy === "contentUpdatedAt",
+            checked: sortSettings.sortBy === "editedAt",
             click: () => {
               void updateSortSettings(
                 event,
-                "contentUpdatedAt",
-                sortSettings.contentUpdatedAtSortOrder,
+                "editedAt",
+                sortSettings.editedAtSortOrder,
               );
             },
           },
