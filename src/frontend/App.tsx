@@ -35,7 +35,7 @@ export default function ResizableLayout() {
           size={1}
         />
         <Section
-          className="flex h-full select-none flex-col px-2"
+          className="flex h-full select-none flex-col"
           disableResponsive
           defaultSize={280}
           minSize={210}

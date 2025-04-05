@@ -29,7 +29,7 @@ export function NotesHeader() {
   }
 
   return (
-    <div className="draggable flex justify-between pt-2 pb-2">
+    <div className="draggable flex justify-between pt-2 pb-2 mx-2">
       <div
         id="notes-header"
         className="non-draggable flex cursor-default items-center justify-center gap-x-1 pl-2"

@@ -28,7 +28,7 @@ export const NoteList = () => {
   const flattenedNotes = data.pages.flatMap((page) => page.data);
 
   return (
-    <ScrollArea type="scroll" className="h-screen">
+    <ScrollArea type="scroll" className="h-screen px-2">
       <div className="flex flex-col items-center">
         {flattenedNotes.map((note, index) => (
           <div
