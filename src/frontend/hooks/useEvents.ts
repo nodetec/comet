@@ -133,4 +133,18 @@ export const useEvents = () => {
 
     return cleanup;
   }, [queryClient]);
+
+  useEffect(() => {
+    const sortSettingsUpdatedHandler = (
+      event: Electron.IpcRendererEvent,
+      settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+    ) => {
+      console.log("Sort settings updated:", settings);
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    };
+
+    const cleanup = window.api.onSortSettingsUpdated(sortSettingsUpdatedHandler);
+
+    return cleanup;
+  }, [queryClient]);
 };

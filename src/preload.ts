@@ -15,8 +15,6 @@ contextBridge.exposeInMainWorld("api", {
   getNoteFeed: (
     offset: number,
     limit: number,
-    sortField: "title" | "createdAt" | "contentUpdatedAt" = "contentUpdatedAt",
-    sortOrder: "asc" | "desc" = "desc",
     notebookId,
     trashFeed = false,
     tags?: string[],
@@ -25,8 +23,6 @@ contextBridge.exposeInMainWorld("api", {
       "getNoteFeed",
       offset,
       limit,
-      sortField,
-      sortOrder,
       notebookId,
       trashFeed,
       tags,
@@ -78,21 +74,26 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.send("trashNoteCardContextMenu", noteId),
   notebookContextMenu: (notebookId: string) =>
     ipcRenderer.send("notebookContextMenu", notebookId),
+  sortContextMenu: () => ipcRenderer.send("sortContextMenu"),
 
   // sync
-  syncDb: (remoteUrl: string) =>
-    ipcRenderer.invoke("syncDb", remoteUrl) as Promise<void>,
-  cancelSync: () => ipcRenderer.invoke("cancelSync") as Promise<void>,
-  getSyncConfig: () =>
-    ipcRenderer.invoke("getSyncConfig") as Promise<
-      | {
-          remote: {
-            url: string | undefined;
-          };
-          method: "no_sync" | "custom_sync";
-        }
-      | undefined
-    >,
+  syncDb: (remoteUrl: string) => ipcRenderer.invoke("syncDb", remoteUrl),
+  cancelSync: () => ipcRenderer.invoke("cancelSync"),
+  getSyncConfig: () => ipcRenderer.invoke("getSyncConfig"),
+  getSortSettings: () =>
+    ipcRenderer.invoke("getSortSettings") as Promise<{
+      sortBy: "createdAt" | "contentUpdatedAt" | "title";
+      sortOrder: "asc" | "desc";
+    }>,
+  updateSortSettings: (
+    sortBy: "createdAt" | "contentUpdatedAt" | "title",
+    sortOrder: "asc" | "desc",
+  ) =>
+    ipcRenderer.invoke(
+      "updateSortSettings",
+      sortBy,
+      sortOrder,
+    ) as Promise<void>,
   onSync: (handler: (event: IpcRendererEvent) => void) => {
     ipcRenderer.on("sync", handler);
     return () => ipcRenderer.removeListener("sync", handler);
@@ -130,6 +131,15 @@ contextBridge.exposeInMainWorld("api", {
   onNotebookDeleted: (handler: (e: IpcRendererEvent, id: string) => void) => {
     ipcRenderer.on("notebookDeleted", handler);
     return () => ipcRenderer.removeListener("notebookDeleted", handler);
+  },
+  onSortSettingsUpdated: (
+    handler: (
+      event: IpcRendererEvent,
+      settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+    ) => void,
+  ) => {
+    ipcRenderer.on("sortSettingsUpdated", handler);
+    return () => ipcRenderer.removeListener("sortSettingsUpdated", handler);
   },
 
   // window

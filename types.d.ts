@@ -10,8 +10,6 @@ declare global {
       getNoteFeed: (
         offset: number,
         limit: number,
-        sortField: "title" | "createdAt" | "contentUpdatedAt",
-        sortOrder: "asc" | "desc",
         notebookId?: string,
         trashFeed?: boolean,
         tags?: string[],
@@ -51,11 +49,20 @@ declare global {
           }
         | undefined
       >;
+      getSortSettings: () => Promise<{
+        sortBy: "createdAt" | "contentUpdatedAt" | "title";
+        sortOrder: "asc" | "desc";
+      }>;
+      updateSortSettings: (
+        sortBy: "createdAt" | "contentUpdatedAt" | "title",
+        sortOrder: "asc" | "desc",
+      ) => Promise<void>;
 
       // context menus
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;
       notebookContextMenu: (notebookId: string) => void;
       trashNoteCardContextMenu: (noteId: string) => void;
+      sortContextMenu: () => void;
 
       onSync: (handler: (event: IpcRendererEvent) => void) => () => void;
 
@@ -77,6 +84,12 @@ declare global {
       ) => () => void;
       onNotebookDeleted: (
         handler: (event: IpcRendererEvent, notebookId: string) => void,
+      ) => () => void;
+      onSortSettingsUpdated: (
+        handler: (
+          event: IpcRendererEvent,
+          settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+        ) => void,
       ) => () => void;
 
       // window

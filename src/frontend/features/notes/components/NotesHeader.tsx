@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
 import { ChevronDown, PenBoxIcon } from "lucide-react";
@@ -19,11 +20,16 @@ export function NotesHeader() {
     if (feedType === "trash") return "Trash";
   }, [activeNotebookName, feedType]);
 
+  async function sortContextMenu() {
+    window.api.sortContextMenu();
+  }
+
   return (
     <div className="draggable flex justify-between pt-2 pb-2">
       <div
         id="notes-header"
-        className="flex cursor-default items-center justify-center gap-x-1 pl-2"
+        className="non-draggable flex cursor-default items-center justify-center gap-x-1 pl-2"
+        onClick={sortContextMenu}
       >
         <h1 className="line-clamp-1 truncate font-semibold break-all text-ellipsis whitespace-break-spaces select-none">
           {title}

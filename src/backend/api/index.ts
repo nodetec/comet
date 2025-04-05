@@ -67,16 +67,23 @@ export async function getNoteFeed(
   _: IpcMainInvokeEvent,
   offset: number,
   limit: number,
-  sortField: "title" | "createdAt" | "contentUpdatedAt" = "contentUpdatedAt",
-  sortOrder: "asc" | "desc" = "desc",
   notebookId?: string,
   trashFeed = false,
   tags?: string[],
 ): Promise<Note[]> {
   const db = getDb();
+  const sortSettings = getSortSettings();
+  let sortField = sortSettings.sortBy;
+  let sortOrder = sortSettings.sortOrder;
+
+  if (notebookId) {
+    const notebook = await db.get<Notebook>(notebookId);
+    sortField = notebook.sortBy;
+    sortOrder = notebook.sortOrder;
+  }
 
   const selector: PouchDB.Find.Selector = {
-    contentUpdatedAt: { $exists: true },
+    [sortField]: { $exists: true },
     type: "note",
     trashedAt: { $exists: trashFeed },
   };
@@ -200,6 +207,8 @@ export async function createNotebook(_: IpcMainInvokeEvent, name: string) {
     type: "notebook",
     name,
     hidden: false,
+    sortBy: "contentUpdatedAt",
+    sortOrder: "desc",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -442,6 +451,25 @@ export function getSyncConfig() {
         method: "no_sync" | "custom_sync";
       }
     | undefined;
+}
+
+export function getSortSettings() {
+  const store = getStore();
+  return {
+    sortBy: store.get("sortBy") as "createdAt" | "contentUpdatedAt" | "title",
+    sortOrder: store.get("sortOrder"),
+  };
+}
+
+export function updateSortSettings(
+  event: IpcMainInvokeEvent,
+  sortBy: "createdAt" | "contentUpdatedAt" | "title",
+  sortOrder: "asc" | "desc",
+) {
+  const store = getStore();
+  store.set("sortBy", sortBy);
+  store.set("sortOrder", sortOrder);
+  event.sender.send("sortSettingsUpdated", { sortBy, sortOrder });
 }
 
 export function toggleMaximize(_: IpcMainInvokeEvent) {

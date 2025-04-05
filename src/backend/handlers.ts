@@ -28,6 +28,10 @@ export function setupHandlers(): void {
   ipcMain.handle("cancelSync", api.cancelSync);
   ipcMain.handle("getSyncConfig", api.getSyncConfig);
 
+  // sort settings
+  ipcMain.handle("getSortSettings", api.getSortSettings);
+  ipcMain.handle("updateSortSettings", api.updateSortSettings);
+
   // window
   ipcMain.handle("toggleMaximize", api.toggleMaximize);
 }

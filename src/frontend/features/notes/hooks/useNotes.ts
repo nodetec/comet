@@ -5,9 +5,6 @@ import { type Note } from "$/types/Note";
 const useNotes = () => {
   const noteSearch = useAppState((state) => state.noteSearch);
   const activeNotebookId = useAppState((state) => state.activeNotebookId);
-  //   const orderBy = useAppState((state) => state.orderBy);
-  //   const timeSortDirection = useAppState((state) => state.timeSortDirection);
-  //   const titleSortDirection = useAppState((state) => state.titleSortDirection);
   const feedType = useAppState((state) => state.feedType);
   const activeTags = useAppState((state) => state.activeTags);
 
@@ -15,10 +12,6 @@ const useNotes = () => {
     const limit = 10;
     const offset = (pageParam - 1) * limit;
 
-    // const orderDirection =
-    //   orderBy === "title" ? titleSortDirection : timeSortDirection;
-
-    // TODO: put search order on notebook
     const trashFeed = feedType === "trash";
 
     let notebookId: string | undefined;
@@ -42,8 +35,6 @@ const useNotes = () => {
       notes = await window.api.getNoteFeed(
         offset,
         limit,
-        "contentUpdatedAt",
-        "desc",
         notebookId,
         trashFeed,
         activeTags,
@@ -58,16 +49,7 @@ const useNotes = () => {
   }
 
   return useInfiniteQuery({
-    queryKey: [
-      "notes",
-      feedType,
-      activeNotebookId,
-      activeTags,
-      noteSearch,
-      //   orderBy,
-      //   timeSortDirection,
-      //   titleSortDirection,
-    ],
+    queryKey: ["notes", feedType, activeNotebookId, activeTags, noteSearch],
     queryFn: fetchNotes,
     gcTime: 0,
     staleTime: 0,

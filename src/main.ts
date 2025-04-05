@@ -49,11 +49,6 @@ const createWindow = (): void => {
       ? {
           titleBarStyle: "hidden",
           trafficLightPosition: { x: 18, y: 18 },
-          titleBarOverlay: {
-            height: 300,
-            color: "#1D1E20",
-            symbolColor: "#ffffff"
-          }
         }
       : {}),
 
