@@ -17,7 +17,7 @@ let dbDir: string;
 if (isDev) {
   dbDir = "db-test";
 } else {
-  dbDir = "db-alpha";
+  dbDir = "db-alpha-v1";
 }
 
 EventEmitter.defaultMaxListeners = 20;
