@@ -21,7 +21,11 @@ export function NotesHeader() {
   }, [activeNotebookName, feedType]);
 
   async function sortContextMenu() {
-    window.api.sortContextMenu();
+    const headerElement = document.getElementById("notes-header");
+    if (headerElement) {
+      const rect = headerElement.getBoundingClientRect();
+      window.api.sortContextMenu(rect.left, rect.bottom);
+    }
   }
 
   return (
