@@ -4,7 +4,9 @@ export type Notebook = {
   type: "notebook";
   name: string;
   sortBy: "createdAt" | "contentUpdatedAt" | "title";
-  sortOrder: "asc" | "desc";
+  createdAtSortOrder: "asc" | "desc";
+  contentUpdatedAtSortOrder: "asc" | "desc";
+  titleSortOrder: "asc" | "desc";
   color: string;
   hidden: boolean;
   createdAt: string;

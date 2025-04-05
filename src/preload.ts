@@ -74,8 +74,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.send("trashNoteCardContextMenu", noteId),
   notebookContextMenu: (notebookId: string) =>
     ipcRenderer.send("notebookContextMenu", notebookId),
-  sortContextMenu: (x?: number, y?: number) => 
-    ipcRenderer.send("sortContextMenu", x, y),
+  sortContextMenu: () => ipcRenderer.send("sortContextMenu"),
+  notebookSortContextMenu: (notebook: Notebook, x?: number, y?: number) =>
+    ipcRenderer.send("notebookSortContextMenu", notebook, x, y),
 
   // sync
   syncDb: (remoteUrl: string) => ipcRenderer.invoke("syncDb", remoteUrl),
@@ -141,6 +142,12 @@ contextBridge.exposeInMainWorld("api", {
   ) => {
     ipcRenderer.on("sortSettingsUpdated", handler);
     return () => ipcRenderer.removeListener("sortSettingsUpdated", handler);
+  },
+  onNotebookSortSettingsUpdated: (
+    handler: (event: IpcRendererEvent, notebook: Notebook) => void,
+  ) => {
+    ipcRenderer.on("notebookSortSettingsUpdated", handler);
+    return () => ipcRenderer.removeListener("notebookSortSettingsUpdated", handler);
   },
 
   // window

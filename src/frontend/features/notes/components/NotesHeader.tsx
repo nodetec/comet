@@ -1,6 +1,5 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "~/components/ui/button";
 import { useAppState } from "~/store";
 import { ChevronDown, PenBoxIcon } from "lucide-react";
@@ -24,12 +23,17 @@ export function NotesHeader() {
     const headerElement = document.getElementById("notes-header");
     if (headerElement) {
       const rect = headerElement.getBoundingClientRect();
-      window.api.sortContextMenu(rect.left, rect.bottom);
+      if (activeNotebookId) {
+        const notebook = await window.api.getNotebook(activeNotebookId);
+        window.api.notebookSortContextMenu(notebook, rect.left, rect.bottom);
+      } else {
+        window.api.sortContextMenu();
+      }
     }
   }
 
   return (
-    <div className="draggable flex justify-between pt-2 pb-2 mx-2">
+    <div className="draggable mx-2 flex justify-between pt-2 pb-2">
       <div
         id="notes-header"
         className="non-draggable flex cursor-default items-center justify-center gap-x-1 pl-2"

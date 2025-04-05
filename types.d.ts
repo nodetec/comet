@@ -62,7 +62,8 @@ declare global {
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;
       notebookContextMenu: (notebookId: string) => void;
       trashNoteCardContextMenu: (noteId: string) => void;
-      sortContextMenu: (x?: number, y?: number) => void;
+      sortContextMenu: () => void;
+      notebookSortContextMenu: (notebook: Notebook, x?: number, y?: number) => void;
 
       onSync: (handler: (event: IpcRendererEvent) => void) => () => void;
 
@@ -90,6 +91,9 @@ declare global {
           event: IpcRendererEvent,
           settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
         ) => void,
+      ) => () => void;
+      onNotebookSortSettingsUpdated: (
+        handler: (event: IpcRendererEvent, notebook: Notebook) => void,
       ) => () => void;
 
       // window

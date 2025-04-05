@@ -9,8 +9,10 @@ interface SyncConfig {
 
 interface StoreSchema {
   sync: SyncConfig;
-  sortBy: "createAt" | "contentUpdatedAt" | "title";
-  sortOrder: "asc" | "desc";
+  sortBy: "createdAt" | "contentUpdatedAt" | "title";
+  createdAtSortOrder: "asc" | "desc";
+  contentUpdatedAtSortOrder: "asc" | "desc";
+  titleSortOrder: "asc" | "desc";
 }
 
 let store: Store<StoreSchema>;
@@ -50,10 +52,20 @@ export const initStore = () => {
         enum: ["createdAt", "contentUpdatedAt", "title"],
         default: "contentUpdatedAt",
       },
-      sortOrder: {
+      createdAtSortOrder: {
         type: "string",
         enum: ["asc", "desc"],
         default: "desc",
+      },
+      contentUpdatedAtSortOrder: {
+        type: "string",
+        enum: ["asc", "desc"],
+        default: "desc",
+      },
+      titleSortOrder: {
+        type: "string",
+        enum: ["asc", "desc"],
+        default: "asc",
       },
     },
   });

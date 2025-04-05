@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppState } from "~/store";
+import type { Notebook } from "$/types/Notebook";
 
 export const useEvents = () => {
   const activeNoteId = useAppState((state) => state.activeNoteId);
@@ -137,13 +138,34 @@ export const useEvents = () => {
   useEffect(() => {
     const sortSettingsUpdatedHandler = (
       event: Electron.IpcRendererEvent,
-      settings: { sortBy: "createdAt" | "contentUpdatedAt" | "title"; sortOrder: "asc" | "desc" },
+      settings: {
+        sortBy: "createdAt" | "contentUpdatedAt" | "title";
+        sortOrder: "asc" | "desc";
+      },
     ) => {
       console.log("Sort settings updated:", settings);
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
     };
 
-    const cleanup = window.api.onSortSettingsUpdated(sortSettingsUpdatedHandler);
+    const cleanup = window.api.onSortSettingsUpdated(
+      sortSettingsUpdatedHandler,
+    );
+
+    return cleanup;
+  }, [queryClient]);
+
+  useEffect(() => {
+    const notebookSortSettingsUpdatedHandler = (
+      event: Electron.IpcRendererEvent,
+      notebook: Notebook,
+    ) => {
+      console.log("Notebook sort settings updated:", notebook);
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    };
+
+    const cleanup = window.api.onNotebookSortSettingsUpdated(
+      notebookSortSettingsUpdatedHandler,
+    );
 
     return cleanup;
   }, [queryClient]);

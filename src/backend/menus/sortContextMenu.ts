@@ -5,6 +5,17 @@ export function setupSortContextMenu() {
   ipcMain.on("sortContextMenu", (event, x?: number, y?: number) => {
     const sortSettings = getSortSettings();
 
+    const getCurrentSortOrder = () => {
+      switch (sortSettings.sortBy) {
+        case "createdAt":
+          return sortSettings.createdAtSortOrder;
+        case "contentUpdatedAt":
+          return sortSettings.contentUpdatedAtSortOrder;
+        case "title":
+          return sortSettings.titleSortOrder;
+      }
+    };
+
     const template: MenuItemConstructorOptions[] = [
       {
         label: "Sort By",
@@ -17,7 +28,7 @@ export function setupSortContextMenu() {
               void updateSortSettings(
                 event,
                 "contentUpdatedAt",
-                sortSettings.sortOrder,
+                sortSettings.contentUpdatedAtSortOrder,
               );
             },
           },
@@ -29,7 +40,7 @@ export function setupSortContextMenu() {
               void updateSortSettings(
                 event,
                 "createdAt",
-                sortSettings.sortOrder,
+                sortSettings.createdAtSortOrder,
               );
             },
           },
@@ -38,25 +49,40 @@ export function setupSortContextMenu() {
             type: "checkbox",
             checked: sortSettings.sortBy === "title",
             click: () => {
-              void updateSortSettings(event, "title", sortSettings.sortOrder);
+              void updateSortSettings(
+                event,
+                "title",
+                sortSettings.titleSortOrder,
+              );
             },
           },
           { type: "separator" },
           {
-            label: sortSettings.sortBy === "title" ? "A to Z" : "Oldest First",
+            label: sortSettings.sortBy === "title" ? "A to Z" : "Newest First",
             type: "checkbox",
-            checked: sortSettings.sortOrder === "asc",
+            checked:
+              getCurrentSortOrder() ===
+              (sortSettings.sortBy === "title" ? "asc" : "desc"),
             click: () => {
-              void updateSortSettings(event, sortSettings.sortBy, "asc");
+              void updateSortSettings(
+                event,
+                sortSettings.sortBy,
+                sortSettings.sortBy === "title" ? "asc" : "desc",
+              );
             },
           },
-
           {
-            label: sortSettings.sortBy === "title" ? "Z to A" : "Newest First",
+            label: sortSettings.sortBy === "title" ? "Z to A" : "Oldest First",
             type: "checkbox",
-            checked: sortSettings.sortOrder === "desc",
+            checked:
+              getCurrentSortOrder() ===
+              (sortSettings.sortBy === "title" ? "desc" : "asc"),
             click: () => {
-              void updateSortSettings(event, sortSettings.sortBy, "desc");
+              void updateSortSettings(
+                event,
+                sortSettings.sortBy,
+                sortSettings.sortBy === "title" ? "desc" : "asc",
+              );
             },
           },
         ],

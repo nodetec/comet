@@ -74,12 +74,34 @@ export async function getNoteFeed(
   const db = getDb();
   const sortSettings = getSortSettings();
   let sortField = sortSettings.sortBy;
-  let sortOrder = sortSettings.sortOrder;
+  let sortOrder: "asc" | "desc";
 
   if (notebookId) {
     const notebook = await db.get<Notebook>(notebookId);
     sortField = notebook.sortBy;
-    sortOrder = notebook.sortOrder;
+    switch (notebook.sortBy) {
+      case "createdAt":
+        sortOrder = notebook.createdAtSortOrder;
+        break;
+      case "contentUpdatedAt":
+        sortOrder = notebook.contentUpdatedAtSortOrder;
+        break;
+      case "title":
+        sortOrder = notebook.titleSortOrder;
+        break;
+    }
+  } else {
+    switch (sortSettings.sortBy) {
+      case "createdAt":
+        sortOrder = sortSettings.createdAtSortOrder;
+        break;
+      case "contentUpdatedAt":
+        sortOrder = sortSettings.contentUpdatedAtSortOrder;
+        break;
+      case "title":
+        sortOrder = sortSettings.titleSortOrder;
+        break;
+    }
   }
 
   const selector: PouchDB.Find.Selector = {
@@ -208,7 +230,9 @@ export async function createNotebook(_: IpcMainInvokeEvent, name: string) {
     name,
     hidden: false,
     sortBy: "contentUpdatedAt",
-    sortOrder: "desc",
+    createdAtSortOrder: "desc",
+    contentUpdatedAtSortOrder: "desc",
+    titleSortOrder: "asc",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -241,7 +265,7 @@ export async function getNotebooks(_: IpcMainInvokeEvent, showHidden = false) {
   return notebooks;
 }
 
-export async function updateNotebookName(
+export async function updateNotebook(
   _: IpcMainInvokeEvent,
   update: Partial<Notebook>,
 ) {
@@ -249,9 +273,9 @@ export async function updateNotebookName(
   const id = update._id;
   if (!id) return;
   const notebook = await db.get<Notebook>(id);
-  notebook.name = update.name ?? "";
-  notebook.updatedAt = new Date().toISOString();
-  const response = await db.put(notebook);
+  const updatedNotebook = { ...notebook, ...update };
+  updatedNotebook.updatedAt = new Date().toISOString();
+  const response = await db.put(updatedNotebook);
   return response.id;
 }
 
@@ -456,8 +480,10 @@ export function getSyncConfig() {
 export function getSortSettings() {
   const store = getStore();
   return {
-    sortBy: store.get("sortBy") as "createdAt" | "contentUpdatedAt" | "title",
-    sortOrder: store.get("sortOrder"),
+    sortBy: store.get("sortBy"),
+    createdAtSortOrder: store.get("createdAtSortOrder"),
+    contentUpdatedAtSortOrder: store.get("contentUpdatedAtSortOrder"),
+    titleSortOrder: store.get("titleSortOrder"),
   };
 }
 
@@ -468,7 +494,17 @@ export function updateSortSettings(
 ) {
   const store = getStore();
   store.set("sortBy", sortBy);
-  store.set("sortOrder", sortOrder);
+  switch (sortBy) {
+    case "createdAt":
+      store.set("createdAtSortOrder", sortOrder);
+      break;
+    case "contentUpdatedAt":
+      store.set("contentUpdatedAtSortOrder", sortOrder);
+      break;
+    case "title":
+      store.set("titleSortOrder", sortOrder);
+      break;
+  }
   event.sender.send("sortSettingsUpdated", { sortBy, sortOrder });
 }
 
