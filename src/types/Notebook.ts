@@ -12,5 +12,5 @@ export type Notebook = {
   createdAt: string;
   updatedAt: string;
   pinnedAt: string | undefined;
-  language: string | undefined;
+  defaultLanguage: string | undefined;
 };
