@@ -25,9 +25,7 @@ export function Settings({ children }: Props) {
 
   return (
     <Dialog>
-      <DialogTrigger onDoubleClick={(e) => e.stopPropagation()} asChild>
-        {children}
-      </DialogTrigger>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogTitle className="hidden">Settings</DialogTitle>
       <DialogContent
         aria-describedby="settings"

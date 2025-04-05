@@ -102,7 +102,7 @@
 
 .list-marker {
   li::marker {
-    @apply text-primary
+    @apply text-primary;
   }
 }
 

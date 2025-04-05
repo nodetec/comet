@@ -85,7 +85,6 @@ export default function YoutubeAction() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <Button
         onClick={() => setIsOpen(true)}
-        onDoubleClick={(e) => e.stopPropagation()}
         className="hidden lg:flex"
         size="icon"
         variant="ghost"

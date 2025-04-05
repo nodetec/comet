@@ -173,7 +173,6 @@ export function ToolbarPlugin() {
             variant="ghost"
             onClick={() => onAction(RichTextAction.Bold)}
             disabled={disableMap[RichTextAction.Bold] || feedType === "trash"}
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <BoldIcon />
           </Button>
@@ -187,7 +186,6 @@ export function ToolbarPlugin() {
             disabled={
               disableMap[RichTextAction.Italics] || feedType === "trash"
             }
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <ItalicIcon />
           </Button>
@@ -201,7 +199,6 @@ export function ToolbarPlugin() {
             disabled={
               disableMap[RichTextAction.Strikethrough] || feedType === "trash"
             }
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <StrikethroughIcon />
           </Button>
@@ -214,7 +211,6 @@ export function ToolbarPlugin() {
             variant="ghost"
             onClick={() => onAction(RichTextAction.Code)}
             disabled={disableMap[RichTextAction.Code] || feedType === "trash"}
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <CodeIcon />
           </Button>
@@ -228,7 +224,6 @@ export function ToolbarPlugin() {
             variant="ghost"
             onClick={() => onAction(RichTextAction.Undo)}
             disabled={disableMap[RichTextAction.Undo] || feedType === "trash"}
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <UndoIcon />
           </Button>
@@ -241,7 +236,6 @@ export function ToolbarPlugin() {
             variant="ghost"
             onClick={() => onAction(RichTextAction.Redo)}
             disabled={disableMap[RichTextAction.Redo] || feedType === "trash"}
-            onDoubleClick={(e) => e.stopPropagation()}
           >
             <RedoIcon />
           </Button>

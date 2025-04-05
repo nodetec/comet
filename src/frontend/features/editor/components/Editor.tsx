@@ -125,19 +125,9 @@ export function Editor() {
     editable: feedType === "trash" ? false : true,
   };
 
-  function handleDoubleClick(e: React.MouseEvent<HTMLDivElement>) {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("double click");
-    void window.api.toggleMaximize();
-  }
-
   return (
     <LexicalComposer key={activeNoteId} initialConfig={initialConfig}>
-      <div
-        className="bg-background draggable flex w-full justify-center py-2"
-        onDoubleClick={handleDoubleClick}
-      >
+      <div className="bg-background draggable flex w-full justify-center py-2">
         <ToolbarPlugin />
       </div>
       <div className="bg-border mr-[5px] h-[1px] w-full" />

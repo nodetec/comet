@@ -26,7 +26,7 @@ export function NotesSearch() {
   };
 
   return (
-    <div className="flex select-none items-center pt-2 pb-4">
+    <div className="flex select-none items-center pb-4">
       <div className="relative w-full">
         <Input
           placeholder="Search..."
