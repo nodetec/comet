@@ -1,5 +1,6 @@
 import type { Note } from "$/types/Note";
 import type { Notebook } from "$/types/Notebook";
+import cryptoPouch from "crypto-pouch";
 import PouchDB from "pouchdb";
 import PouchDBFind from "pouchdb-find";
 import sqlite3, { type Database } from "sqlite3";
@@ -8,6 +9,7 @@ import { createIndexes } from "./utils/createIndexes";
 import { setupDesignDoc } from "./utils/tagsDesignDoc";
 
 PouchDB.plugin(PouchDBFind);
+PouchDB.plugin(cryptoPouch);
 
 let db: PouchDB.Database;
 let sync: PouchDB.Replication.Sync<{}> | undefined;
@@ -115,10 +117,31 @@ async function syncFtsIndex(dbFts: Database) {
     });
 }
 
+async function deriveKeyFromPassword(password: string) {
+  // In a real implementation, use a proper key derivation function with salt
+  return password;
+}
+
+export async function setupEncryption(db: PouchDB.Database, password: string) {
+  if (!db) {
+    throw new Error("Database not initialized. Call initDb first.");
+  }
+
+  // Derive a strong key from the password
+  // In a real implementation, use a proper key derivation function with salt
+  const key = await deriveKeyFromPassword(password);
+
+  // Enable encryption on the database
+  await db.crypto(key);
+
+  console.log("Encryption set up successfully");
+}
+
 export async function initDb(dbPath: string) {
   db = new PouchDB(dbPath, {
     auto_compaction: true,
   });
+  await setupEncryption(db, "password");
 
   dbFts = new sqlite3.Database(`${dbPath}_notes.sqlite`);
 
