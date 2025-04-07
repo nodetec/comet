@@ -74,7 +74,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.send("trashNoteCardContextMenu", noteId),
   notebookContextMenu: (notebookId: string) =>
     ipcRenderer.send("notebookContextMenu", notebookId),
-  sortContextMenu: () => ipcRenderer.send("sortContextMenu"),
+  sortContextMenu: (x?: number, y?: number) =>
+    ipcRenderer.send("sortContextMenu", x, y),
   notebookSortContextMenu: (notebook: Notebook, x?: number, y?: number) =>
     ipcRenderer.send("notebookSortContextMenu", notebook, x, y),
 

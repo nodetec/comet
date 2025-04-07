@@ -62,7 +62,7 @@ declare global {
       noteCardContextMenu: (note: Note, notebooks: Notebook[]) => void;
       notebookContextMenu: (notebookId: string) => void;
       trashNoteCardContextMenu: (noteId: string) => void;
-      sortContextMenu: () => void;
+      sortContextMenu: (x?: number, y?: number) => void;
       notebookSortContextMenu: (notebook: Notebook, x?: number, y?: number) => void;
 
       onSync: (handler: (event: IpcRendererEvent) => void) => () => void;

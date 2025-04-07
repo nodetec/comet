@@ -27,7 +27,7 @@ export function NotesHeader() {
         const notebook = await window.api.getNotebook(activeNotebookId);
         window.api.notebookSortContextMenu(notebook, rect.left, rect.bottom);
       } else {
-        window.api.sortContextMenu();
+        window.api.sortContextMenu(rect.left, rect.bottom);
       }
     }
   }
