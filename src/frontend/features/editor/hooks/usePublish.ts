@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { removeTitle } from "~/lib/markdown";
 import { useAppState } from "~/store";
-import { type Keys } from "$/types/Keys";
-import { type Note } from "$/types/Note";
+import type { Keys } from "$/types/Keys";
+import type { Note } from "$/types/Note";
 import { finalizeEvent, nip19, SimplePool } from "nostr-tools";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
@@ -45,7 +45,7 @@ export function usePublish() {
 
     const secretKey = nip19.decode(nsec).data as Uint8Array;
 
-    let identifier;
+    let identifier: string;
 
     if (note.identifier && note.author === npub) {
       identifier = note.identifier;
@@ -63,9 +63,9 @@ export function usePublish() {
     }
 
     if (note.tags) {
-      note.tags.forEach((tag) => {
+      for (const tag of note.tags) {
         eventTags.push(["t", tag]);
-      });
+      }
     }
 
     const event = finalizeEvent(

@@ -17,6 +17,7 @@ import { useAppState } from "~/store";
 import { SendIcon } from "lucide-react";
 
 import { useNote } from "../hooks/useNote";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function PublishDialog() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,18 +26,26 @@ export function PublishDialog() {
   const keys = useAppState((state) => state.keys);
   const note = useNote();
 
+  const queryClient = useQueryClient();
+
   const { handlePublish } = usePublish();
+
+  const onClick = () => {
+    queryClient.invalidateQueries({
+      queryKey: ["note", note.data?._id],
+    });
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {keys?.npub && (
-          <Button type="button" variant="ghost" size="icon">
+          <Button onClick={onClick} type="button" variant="ghost" size="icon">
             <SendIcon />
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="border-accent h-[85%] max-h-[50rem] w-[90%] max-w-[40rem] overflow-hidden overflow-y-scroll border select-none">
+      <DialogContent className="h-[85%] max-h-[50rem] w-[90%] max-w-[40rem] select-none overflow-hidden overflow-y-scroll border border-accent">
         <DialogHeader>
           {note.data?.identifier ? (
             <DialogTitle>Update Note</DialogTitle>
@@ -52,7 +61,7 @@ export function PublishDialog() {
               <img
                 src={imageUrl}
                 alt="preview"
-                className="border-accent h-auto w-auto rounded-md border object-contain"
+                className="h-auto w-auto rounded-md border border-accent object-contain"
               />
             </div>
           )}
@@ -71,13 +80,13 @@ export function PublishDialog() {
 
             <div>
               <h3 className="mb-2 font-semibold">Title:</h3>
-              <p className="no-scrollbar bg-accent cursor-default overflow-x-auto rounded-md px-2 py-1">
+              <p className="no-scrollbar cursor-default overflow-x-auto rounded-md bg-accent px-2 py-1">
                 {note.data?.title}
               </p>
             </div>
             <div>
               <h3 className="mb-2 font-semibold">Author:</h3>
-              <p className="no-scrollbar bg-accent cursor-default overflow-x-auto rounded-md px-2 py-1">
+              <p className="no-scrollbar cursor-default overflow-x-auto rounded-md bg-accent px-2 py-1">
                 {keys?.npub}
               </p>
             </div>
