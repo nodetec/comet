@@ -23,11 +23,23 @@ export function NotesHeader() {
     const headerElement = document.getElementById("notes-header");
     if (headerElement) {
       const rect = headerElement.getBoundingClientRect();
+
+      const roundedRect = {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+      };
+
       if (activeNotebookId) {
         const notebook = await window.api.getNotebook(activeNotebookId);
-        window.api.notebookSortContextMenu(notebook, rect.left, rect.bottom);
+        window.api.notebookSortContextMenu(
+          notebook,
+          roundedRect.left + 24,
+          roundedRect.bottom,
+        );
       } else {
-        window.api.sortContextMenu(rect.left, rect.bottom);
+        window.api.sortContextMenu(roundedRect.left + 24, roundedRect.bottom);
       }
     }
   }

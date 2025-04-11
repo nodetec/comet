@@ -90,9 +90,14 @@ export function setupSortContextMenu() {
     ];
 
     const menu = Menu.buildFromTemplate(template);
-    menu.popup({
-      x,
-      y,
-    });
+
+    try {
+      menu.popup({
+        x,
+        y,
+      });
+    } catch (error) {
+      console.error("Error popping up sort context menu", error);
+    }
   });
 }
