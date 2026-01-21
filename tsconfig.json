@@ -2,31 +2,18 @@
   "compilerOptions": {
     "target": "ES6",
     "allowJs": true,
-    "jsx": "react-jsx",
-    "types": ["./types.d.ts"],
     "module": "commonjs",
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
     "sourceMap": true,
+    "baseUrl": ".",
     "outDir": "dist",
-    "strict": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/frontend/*"],
-      "&/*": ["./src/backend/*"],
-      "$/*": ["./src/*"]
+      "*": ["node_modules/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "typings.d.ts",
-    ".eslintrc.cjs",
-    "prettier.config.cjs",
-    "forge.config.ts",
-    "webpack.main.config.ts",
-    "webpack.renderer.config.ts"
-  ]
+  "include": ["src/**/*"]
 }
