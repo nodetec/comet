@@ -56,6 +56,7 @@
     "@types/node": "^25.4.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/react-highlight-words": "^0.20.1",
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
