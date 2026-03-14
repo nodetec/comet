@@ -35,6 +35,8 @@ DROP TABLE IF EXISTS note_tags;
 DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS relays;
+DROP TABLE IF EXISTS nostr_identity;
+DROP TABLE IF EXISTS _rusqlite_migration_version;
 
 CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
@@ -65,7 +67,15 @@ CREATE TABLE notes (
   archived_at INTEGER,
   pinned_at INTEGER,
   nostr_d_tag TEXT,
-  published_at INTEGER
+  published_at INTEGER,
+  sync_event_id TEXT
+);
+
+CREATE TABLE nostr_identity (
+  secret_key TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  npub       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
 );
 
 CREATE TABLE note_tags (
@@ -293,11 +303,22 @@ INSERT INTO note_tags (note_id, tag) VALUES
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
 
+-- Stable test identity
+INSERT INTO nostr_identity (secret_key, public_key, npub, created_at) VALUES (
+  '34ad98b1403b2e0cb48b6caf7591988c6bb8c2a1844c6e908b2e91b2c2f973b1',
+  '55e9e957162a1ec52a453f0a7112a2d3e55ee86d964365f5cbf4fd7054db5fa2',
+  'npub12h57j4ck9g0v22j98u98zy4z60j4a6rdjepktawt7n7hq4xmt73qgze79r',
+  $NOW_MS
+);
+
 INSERT INTO relays (url, kind, created_at) VALUES
   ('ws://localhost:3000', 'sync', $NOW_MS),
   ('ws://localhost:3000', 'publish', $NOW_MS);
 
 COMMIT;
+
+-- Tell rusqlite_migration that both migrations have been applied
+PRAGMA user_version = 2;
 
 PRAGMA foreign_keys = ON;
 SQL

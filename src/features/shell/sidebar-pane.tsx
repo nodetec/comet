@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
 import {
   Archive,
   BookText,
   CalendarDays,
   ChevronRight,
+  CloudAlert,
+  CloudOff,
+  CloudSync,
+  CloudCheck,
   FileTextIcon,
   PlusCircleIcon,
   Settings2,
-  UserCircle2Icon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -72,6 +77,24 @@ export function SidebarPane({
   renamingNotebookName,
 }: SidebarPaneProps) {
   const openSettings = useUIStore((s) => s.setSettingsOpen);
+  const [syncState, setSyncState] = useState<string>("disconnected");
+
+  useEffect(() => {
+    invoke<string | { error: { message: string } }>("get_sync_status").then((s) => {
+      setSyncState(typeof s === "string" ? s : "error");
+    });
+    const unlisten = listen<{ state: string | { error: { message: string } } }>(
+      "sync-status",
+      (event) => {
+        const s = event.payload.state;
+        setSyncState(typeof s === "string" ? s : "error");
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showFooterBorder, setShowFooterBorder] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
@@ -164,12 +187,26 @@ export function SidebarPane({
       >
         <div className="relative z-40 flex gap-1">
           <Button
-            aria-label="Profile"
+            aria-label={`Sync: ${syncState}`}
             className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             size="icon-sm"
             variant="ghost"
+            onClick={() => {
+              openSettings(true);
+            }}
           >
-            <UserCircle2Icon className="size-[1.2rem]" />
+            {syncState === "connected" && (
+              <CloudCheck className="size-[1.2rem] text-emerald-500" />
+            )}
+            {(syncState === "syncing" || syncState === "connecting" || syncState === "authenticating") && (
+              <CloudSync className="size-[1.2rem] animate-spin" />
+            )}
+            {syncState === "error" && (
+              <CloudAlert className="size-[1.2rem] text-destructive" />
+            )}
+            {syncState === "disconnected" && (
+              <CloudOff className="size-[1.2rem]" />
+            )}
           </Button>
           <Button
             aria-label="Settings"

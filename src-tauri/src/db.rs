@@ -19,7 +19,8 @@ pub fn database_connection(app: &AppHandle) -> Result<Connection, String> {
 }
 
 fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(
+    Migrations::new(vec![
+        M::up(
         "CREATE TABLE app_settings (
            key TEXT PRIMARY KEY,
            value TEXT NOT NULL
@@ -71,7 +72,11 @@ fn migrations() -> Migrations<'static> {
          CREATE INDEX idx_notes_archived_at ON notes(archived_at);
          CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
          CREATE INDEX idx_note_tags_tag ON note_tags(tag);",
-    )])
+        ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN sync_event_id TEXT;",
+        ),
+    ])
 }
 
 pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {

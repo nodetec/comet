@@ -74,3 +74,7 @@ React UI → useShellController (React Query + Tauri invoke()) → Rust commands
 - Prefer clean greenfield solutions over compatibility layers or migration hacks
 - Prefer small, product-aligned changes over broad refactors
 - Nostr SDK is included for future publishing — architecture should preserve that path
+
+## Commit Style
+
+- Do not include `Co-Authored-By` lines in commit messages
