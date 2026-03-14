@@ -46,6 +46,12 @@ fn migrations() -> Migrations<'static> {
            tag TEXT NOT NULL,
            PRIMARY KEY (note_id, tag)
          );
+         CREATE TABLE relays (
+           url TEXT NOT NULL,
+           kind TEXT NOT NULL CHECK (kind IN ('sync', 'publish')),
+           created_at INTEGER NOT NULL,
+           PRIMARY KEY (url, kind)
+         );
          CREATE TABLE nostr_identity (
            secret_key TEXT NOT NULL,
            public_key TEXT NOT NULL,
