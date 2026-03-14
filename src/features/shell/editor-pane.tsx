@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import { useUIStore } from "@/stores/use-ui-store";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, Submenu } from "@tauri-apps/api/menu";
@@ -15,6 +21,7 @@ import { type NotebookRef, type NotebookSummary } from "./types";
 type EditorPaneProps = {
   archivedAt: number | null;
   focusMode: "none" | "immediate" | "pointerup";
+  isDeletePublishedNotePending: boolean;
   isNewNote: boolean;
   markdown: string;
   modifiedAt: number;
@@ -25,7 +32,8 @@ type EditorPaneProps = {
   publishedAt: number | null;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
-  onPublish(): void;
+  onDeletePublishedNote(): void;
+  onOpenPublishDialog(): void;
   onSetPinned(pinned: boolean): void;
   onFocusHandled(): void;
   onChange(markdown: string): void;
@@ -40,6 +48,7 @@ function firstLineH1Title(markdown: string) {
 export function EditorPane({
   archivedAt,
   focusMode,
+  isDeletePublishedNotePending,
   isNewNote,
   markdown,
   modifiedAt,
@@ -50,7 +59,8 @@ export function EditorPane({
   publishedAt,
   searchQuery,
   onAssignNotebook,
-  onPublish,
+  onDeletePublishedNote,
+  onOpenPublishDialog,
   onSetPinned,
   onFocusHandled,
   onChange,
@@ -58,7 +68,8 @@ export function EditorPane({
   const isArchived = archivedAt !== null;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [toolbarContainer, setToolbarContainer] = useState<HTMLDivElement | null>(null);
+  const [toolbarContainer, setToolbarContainer] =
+    useState<HTMLDivElement | null>(null);
   const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
     setToolbarContainer(node);
   }, []);
@@ -84,9 +95,9 @@ export function EditorPane({
       return;
     }
 
-    const firstLine = scrollContainer.querySelector("[data-lexical-editor] > :first-child") as
-      | HTMLElement
-      | null;
+    const firstLine = scrollContainer.querySelector(
+      "[data-lexical-editor] > :first-child",
+    ) as HTMLElement | null;
 
     if (!firstLine) {
       setShowHeaderTitle(false);
@@ -141,6 +152,34 @@ export function EditorPane({
       items: [...currentNotebookItem, ...otherNotebookItems],
     });
 
+    const publishItems = publishedAt
+      ? [
+          {
+            id: "editor-menu-publish",
+            text: "Update on Nostr",
+            action: () => {
+              onOpenPublishDialog();
+            },
+          },
+          {
+            id: "editor-menu-delete-published",
+            text: "Delete from Nostr",
+            enabled: !isDeletePublishedNotePending,
+            action: () => {
+              onDeletePublishedNote();
+            },
+          },
+        ]
+      : [
+          {
+            id: "editor-menu-publish",
+            text: "Publish to Nostr",
+            action: () => {
+              onOpenPublishDialog();
+            },
+          },
+        ];
+
     const menu = await Menu.new({
       items: [
         {
@@ -151,13 +190,7 @@ export function EditorPane({
           },
         },
         moveToNotebookSubmenu,
-        {
-          id: "editor-menu-publish",
-          text: "Publish to Nostr",
-          action: () => {
-            onPublish();
-          },
-        },
+        ...publishItems,
       ],
     });
 
@@ -170,9 +203,7 @@ export function EditorPane({
     }
   };
 
-  const handleEditorSurfaceMouseDown = (
-    event: MouseEvent<HTMLDivElement>,
-  ) => {
+  const handleEditorSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (isArchived) {
       return;
     }
@@ -218,7 +249,7 @@ export function EditorPane({
               ) : (
                 <button
                   className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
-                  onClick={onPublish}
+                  onClick={onOpenPublishDialog}
                   type="button"
                 >
                   Update
@@ -234,7 +265,11 @@ export function EditorPane({
               variant="ghost"
               title={showToolbar ? "Hide toolbar" : "Show toolbar"}
             >
-              {showToolbar ? <PanelBottomClose className="size-[1.2rem]" /> : <PanelBottomOpen className="size-[1.2rem]" />}
+              {showToolbar ? (
+                <PanelBottomClose className="size-[1.2rem]" />
+              ) : (
+                <PanelBottomOpen className="size-[1.2rem]" />
+              )}
             </Button>
             <Button
               className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
@@ -249,14 +284,19 @@ export function EditorPane({
       </header>
 
       <div
-        className={cn("min-h-0 flex-1 overflow-y-scroll overscroll-y-contain", !isArchived && "cursor-text")}
+        className={cn(
+          "min-h-0 flex-1 overflow-y-scroll overscroll-y-contain",
+          !isArchived && "cursor-text",
+        )}
         data-editor-scroll-container
         onMouseDown={handleEditorSurfaceMouseDown}
         onScroll={(event) => {
           updateHeaderState(event.currentTarget);
         }}
         ref={scrollContainerRef}
-        style={{ "--editor-font-size": `${editorFontSize}px` } as React.CSSProperties}
+        style={
+          { "--editor-font-size": `${editorFontSize}px` } as React.CSSProperties
+        }
         spellCheck={editorSpellCheck}
       >
         {noteId ? (
@@ -287,10 +327,7 @@ export function EditorPane({
 
       {noteId && !isArchived && showToolbar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div
-            className="pointer-events-auto"
-            ref={toolbarContainerRef}
-          />
+          <div className="pointer-events-auto" ref={toolbarContainerRef} />
         </div>
       )}
     </section>

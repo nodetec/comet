@@ -175,8 +175,13 @@ fn remove_relay(app: AppHandle, url: String, kind: String) -> Result<Vec<nostr::
 }
 
 #[tauri::command]
-async fn publish_note(app: AppHandle, note_id: String) -> Result<nostr::PublishResult, String> {
-    nostr::publish_note(&app, &note_id).await
+async fn publish_note(app: AppHandle, input: nostr::PublishNoteInput) -> Result<nostr::PublishResult, String> {
+    nostr::publish_note(&app, input).await
+}
+
+#[tauri::command]
+async fn delete_published_note(app: AppHandle, note_id: String) -> Result<nostr::PublishResult, String> {
+    nostr::delete_published_note(&app, &note_id).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -210,7 +215,8 @@ pub fn run() {
             remove_sync_relay,
             add_publish_relay,
             remove_relay,
-            publish_note
+            publish_note,
+            delete_published_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

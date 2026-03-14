@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NotesPane } from "@/features/shell/notes-pane";
+import { PublishDialog } from "@/features/shell/publish-dialog";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
@@ -18,6 +19,7 @@ function App() {
     bootstrapError,
     editorPaneProps,
     notesPaneProps,
+    publishDialogProps,
     readyToRevealWindow,
     retryBootstrap,
     sidebarPaneProps,
@@ -103,6 +105,7 @@ function App() {
           </Section>
         </Container>
       </div>
+      <PublishDialog {...publishDialogProps} />
       <SettingsDialog />
       <Toaster closeButton position="bottom-right" richColors />
     </div>

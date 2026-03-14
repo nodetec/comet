@@ -25,6 +25,7 @@ import {
   type NoteQueryInput,
   type NoteSortDirection,
   type NoteSortField,
+  type PublishNoteInput,
   type RenameNotebookInput,
 } from "./types";
 
@@ -50,7 +51,10 @@ async function loadNote(noteId: string) {
   return invoke<LoadedNote>("load_note", { noteId });
 }
 
-async function createNote(input: { notebookId: string | null; tags: string[] }) {
+async function createNote(input: {
+  notebookId: string | null;
+  tags: string[];
+}) {
   return invoke<LoadedNote>("create_note", input);
 }
 
@@ -100,11 +104,17 @@ type PublishResult = {
   relayCount: number;
 };
 
-async function publishNote(noteId: string) {
-  return invoke<PublishResult>("publish_note", { noteId });
+async function publishNote(input: PublishNoteInput) {
+  return invoke<PublishResult>("publish_note", { input });
 }
 
-function flattenNotePages(data: InfiniteData<NotePagePayload, unknown> | undefined) {
+async function deletePublishedNote(noteId: string) {
+  return invoke<PublishResult>("delete_published_note", { noteId });
+}
+
+function flattenNotePages(
+  data: InfiniteData<NotePagePayload, unknown> | undefined,
+) {
   return data?.pages.flatMap((page) => page.notes) ?? [];
 }
 
@@ -123,7 +133,10 @@ function nextSelectedNoteIdAfterRemoval(
     return remainingNotes[0]?.id ?? null;
   }
 
-  return remainingNotes[Math.min(removedIndex, remainingNotes.length - 1)]?.id ?? null;
+  return (
+    remainingNotes[Math.min(removedIndex, remainingNotes.length - 1)]?.id ??
+    null
+  );
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -154,6 +167,7 @@ export function useShellController() {
     "none" | "immediate" | "pointerup"
   >("none");
   const [newNotebookName, setNewNotebookName] = useState("");
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [renamingNotebookName, setRenamingNotebookName] = useState("");
   const pendingSaveTimeoutRef = useRef<number | null>(null);
 
@@ -173,10 +187,11 @@ export function useShellController() {
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
   const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
 
-  const sortViewKey = noteFilter === "notebook" ? (activeNotebookId ?? "all") : noteFilter;
-  const sortPrefs = useUIStore(
-    (state) => state.noteSortPrefs[sortViewKey],
-  ) ?? defaultNoteSortPrefs;
+  const sortViewKey =
+    noteFilter === "notebook" ? (activeNotebookId ?? "all") : noteFilter;
+  const sortPrefs =
+    useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
+    defaultNoteSortPrefs;
   const setNoteSortPrefs = useUIStore((state) => state.setNoteSortPrefs);
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
@@ -214,19 +229,33 @@ export function useShellController() {
       sortField: noteSortField,
       sortDirection: noteSortDirection,
     }),
-    [activeNotebookId, normalizedActiveTags, normalizedQuery, noteFilter, noteSortField, noteSortDirection],
+    [
+      activeNotebookId,
+      normalizedActiveTags,
+      normalizedQuery,
+      noteFilter,
+      noteSortField,
+      noteSortDirection,
+    ],
   );
   const notesQueryKey = useMemo(
     () => [
       "notes",
       noteFilter,
-      noteFilter === "notebook" ? activeNotebookId ?? "" : "",
+      noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
       normalizedQuery,
       normalizedActiveTags.join("\u0000"),
       noteSortField,
       noteSortDirection,
     ],
-    [activeNotebookId, normalizedActiveTags, normalizedQuery, noteFilter, noteSortField, noteSortDirection],
+    [
+      activeNotebookId,
+      normalizedActiveTags,
+      normalizedQuery,
+      noteFilter,
+      noteSortField,
+      noteSortDirection,
+    ],
   );
   const notesQuery = useInfiniteQuery({
     enabled: bootstrapQuery.isSuccess,
@@ -267,7 +296,7 @@ export function useShellController() {
     queryKey: [
       "contextual-tags",
       noteFilter,
-      noteFilter === "notebook" ? activeNotebookId ?? "" : "",
+      noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
     ],
   });
   const availableTags = contextualTagsQuery.data?.tags ?? [];
@@ -277,7 +306,9 @@ export function useShellController() {
       return;
     }
 
-    const nextActiveTags = activeTags.filter((tag) => availableTags.includes(tag));
+    const nextActiveTags = activeTags.filter((tag) =>
+      availableTags.includes(tag),
+    );
     if (nextActiveTags.length !== activeTags.length) {
       setActiveTags(nextActiveTags);
     }
@@ -592,17 +623,35 @@ export function useShellController() {
 
   const publishNoteMutation = useMutation({
     mutationFn: publishNote,
-    onSuccess: (result, noteId) => {
+    onSuccess: (result, input) => {
+      setPublishDialogOpen(false);
       toast.success(
         `Published to ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
         { id: "publish-note-success" },
       );
-      void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+      void queryClient.invalidateQueries({ queryKey: ["note", input.noteId] });
     },
     onError: (error) => {
       toast.error("Couldn't publish note", {
         description: errorMessage(error, "Try again."),
         id: "publish-note-error",
+      });
+    },
+  });
+
+  const deletePublishedNoteMutation = useMutation({
+    mutationFn: deletePublishedNote,
+    onSuccess: (result, noteId) => {
+      toast.success(
+        `Deleted from ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
+        { id: "delete-published-note-success" },
+      );
+      void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+    },
+    onError: (error) => {
+      toast.error("Couldn't delete published note", {
+        description: errorMessage(error, "Try again."),
+        id: "delete-published-note-error",
       });
     },
   });
@@ -909,19 +958,31 @@ export function useShellController() {
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
       searchQuery,
+      isDeletePublishedNotePending: deletePublishedNoteMutation.isPending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           handleAssignNoteNotebook(currentNote.id, notebookId);
         }
       },
-      onPublish() {
+      onDeletePublishedNote() {
+        if (
+          !currentNote ||
+          deletePublishedNoteMutation.isPending ||
+          !currentNote.publishedAt
+        ) {
+          return;
+        }
+
+        deletePublishedNoteMutation.mutate(currentNote.id);
+      },
+      onOpenPublishDialog() {
         if (!currentNote || publishNoteMutation.isPending) {
           return;
         }
 
         void (async () => {
           await flushCurrentDraftAsync();
-          await publishNoteMutation.mutateAsync(currentNote.id);
+          setPublishDialogOpen(true);
         })().catch(() => {});
       },
       onSetPinned(pinned: boolean) {
@@ -938,6 +999,17 @@ export function useShellController() {
         setEditorFocusMode("none");
       },
     },
+    publishDialogProps: {
+      initialTitle: currentNote?.title ?? "",
+      initialTags: currentNote?.tags ?? [],
+      noteId: currentNote?.id ?? "",
+      open: publishDialogOpen,
+      pending: publishNoteMutation.isPending,
+      onOpenChange: setPublishDialogOpen,
+      onSubmit(input: PublishNoteInput) {
+        publishNoteMutation.mutate(input);
+      },
+    },
     notesPaneProps: {
       activeNotebook,
       filteredNotes: currentNotes,
@@ -946,8 +1018,10 @@ export function useShellController() {
       isLoadingMoreNotes: notesQuery.isFetchingNextPage,
       sortField: noteSortField,
       sortDirection: noteSortDirection,
-      onChangeSortField: (field: NoteSortField) => setNoteSortPrefs(sortViewKey, { field }),
-      onChangeSortDirection: (direction: NoteSortDirection) => setNoteSortPrefs(sortViewKey, { direction }),
+      onChangeSortField: (field: NoteSortField) =>
+        setNoteSortPrefs(sortViewKey, { field }),
+      onChangeSortDirection: (direction: NoteSortDirection) =>
+        setNoteSortPrefs(sortViewKey, { direction }),
       isMutatingNote:
         archiveNoteMutation.isPending ||
         restoreNoteMutation.isPending ||

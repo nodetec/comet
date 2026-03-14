@@ -1,6 +1,6 @@
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
@@ -136,16 +136,27 @@ pub struct PublishResult {
     pub relay_count: usize,
 }
 
-pub async fn publish_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, String> {
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishNoteInput {
+    pub note_id: String,
+    pub title: String,
+    pub image: Option<String>,
+    pub tags: Vec<String>,
+}
+
+pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<PublishResult, String> {
+    let note_id = &input.note_id;
+
     // Synchronous DB block — Connection is not Send, must drop before any .await
-    let (secret_hex, d_tag, title, content, tags, relay_urls) = {
+    let (secret_hex, d_tag, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
 
-        let (id, title, markdown, existing_d_tag): (String, String, String, Option<String>) = conn
+        let (id, markdown, existing_d_tag): (String, String, Option<String>) = conn
             .query_row(
-                "SELECT id, title, markdown, nostr_d_tag FROM notes WHERE id = ?1",
+                "SELECT id, markdown, nostr_d_tag FROM notes WHERE id = ?1",
                 params![note_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()
             .map_err(|e| e.to_string())?
@@ -186,10 +197,9 @@ pub async fn publish_note(app: &AppHandle, note_id: &str) -> Result<PublishResul
             }
         };
 
-        let tags = crate::db::extract_tags(&markdown);
         let content = strip_title_line(&markdown);
 
-        (secret_hex, d_tag, title, content, tags, relay_urls)
+        (secret_hex, d_tag, content, relay_urls)
     };
 
     // Async relay block
@@ -204,13 +214,16 @@ pub async fn publish_note(app: &AppHandle, note_id: &str) -> Result<PublishResul
 
     let mut event_tags: Vec<Tag> = vec![
         Tag::identifier(&d_tag),
-        Tag::title(&title),
+        Tag::title(&input.title),
         Tag::custom(
             TagKind::custom("published_at"),
             vec![now.to_string()],
         ),
     ];
-    for t in &tags {
+    if let Some(ref image) = input.image {
+        event_tags.push(Tag::custom(TagKind::custom("image"), vec![image.clone()]));
+    }
+    for t in &input.tags {
         event_tags.push(Tag::hashtag(t));
     }
 
@@ -248,6 +261,105 @@ pub async fn publish_note(app: &AppHandle, note_id: &str) -> Result<PublishResul
         conn.execute(
             "UPDATE notes SET published_at = ?1 WHERE id = ?2",
             params![published_at, note_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(PublishResult {
+        success_count,
+        fail_count,
+        relay_count,
+    })
+}
+
+pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, String> {
+    // Synchronous DB block
+    let (secret_hex, d_tag, relay_urls) = {
+        let conn = crate::db::database_connection(app)?;
+
+        let (id, existing_d_tag): (String, Option<String>) = conn
+            .query_row(
+                "SELECT id, nostr_d_tag FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Note not found.".to_string())?;
+
+        let d_tag = existing_d_tag
+            .ok_or_else(|| "This note has not been published to Nostr.".to_string())?;
+
+        let secret_hex: String = conn
+            .query_row(
+                "SELECT secret_key FROM nostr_identity LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "No Nostr identity configured.".to_string())?;
+
+        let mut stmt = conn
+            .prepare("SELECT url FROM relays WHERE kind = 'publish'")
+            .map_err(|e| e.to_string())?;
+        let relay_urls: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+
+        if relay_urls.is_empty() {
+            return Err("No publish relays configured. Add one in Settings → Relays.".to_string());
+        }
+
+        let _ = id;
+        (secret_hex, d_tag, relay_urls)
+    };
+
+    // Async relay block
+    let secret_key =
+        SecretKey::parse(&secret_hex).map_err(|e| format!("Invalid secret key: {e}"))?;
+    let keys = Keys::new(secret_key);
+
+    let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key())
+        .identifier(&d_tag);
+
+    let deletion = EventBuilder::delete(
+        EventDeletionRequest::new()
+            .coordinate(coordinate)
+    )
+    .sign_with_keys(&keys)
+    .map_err(|e| format!("Failed to sign deletion event: {e}"))?;
+
+    let client = Client::new(keys);
+    for url in &relay_urls {
+        client
+            .add_relay(url.as_str())
+            .await
+            .map_err(|e| format!("Failed to add relay {url}: {e}"))?;
+    }
+    client.connect().await;
+
+    let relay_count = relay_urls.len();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        client.send_event(&deletion),
+    )
+    .await
+    .map_err(|_| "Timed out sending deletion event to relays.".to_string())?
+    .map_err(|e| format!("Failed to send deletion event: {e}"))?;
+
+    client.disconnect().await;
+
+    let success_count = result.success.len();
+    let fail_count = result.failed.len();
+
+    if success_count > 0 {
+        let conn = crate::db::database_connection(app)?;
+        conn.execute(
+            "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL WHERE id = ?1",
+            params![note_id],
         )
         .map_err(|e| e.to_string())?;
     }

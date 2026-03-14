@@ -86,6 +86,13 @@ export type AssignNoteNotebookInput = {
   notebookId: string | null;
 };
 
+export type PublishNoteInput = {
+  noteId: string;
+  title: string;
+  image: string | null;
+  tags: string[];
+};
+
 export function notesHeading(
   noteFilter: NoteFilter,
   activeNotebook: NotebookSummary | null,
