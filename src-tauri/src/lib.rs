@@ -144,6 +144,41 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
     nostr::import_nsec(&conn, &nsec)
 }
 
+#[tauri::command]
+fn list_relays(app: AppHandle) -> Result<Vec<nostr::Relay>, String> {
+    let conn = database_connection(&app)?;
+    nostr::list_relays(&conn)
+}
+
+#[tauri::command]
+fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<nostr::Relay>, String> {
+    let conn = database_connection(&app)?;
+    nostr::set_sync_relay(&conn, &url)
+}
+
+#[tauri::command]
+fn remove_sync_relay(app: AppHandle) -> Result<Vec<nostr::Relay>, String> {
+    let conn = database_connection(&app)?;
+    nostr::remove_sync_relay(&conn)
+}
+
+#[tauri::command]
+fn add_publish_relay(app: AppHandle, url: String) -> Result<Vec<nostr::Relay>, String> {
+    let conn = database_connection(&app)?;
+    nostr::add_publish_relay(&conn, &url)
+}
+
+#[tauri::command]
+fn remove_relay(app: AppHandle, url: String, kind: String) -> Result<Vec<nostr::Relay>, String> {
+    let conn = database_connection(&app)?;
+    nostr::remove_relay(&conn, &url, &kind)
+}
+
+#[tauri::command]
+async fn publish_note(app: AppHandle, note_id: String) -> Result<nostr::PublishResult, String> {
+    nostr::publish_note(&app, &note_id).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -169,7 +204,13 @@ pub fn run() {
             assign_note_notebook,
             pin_note,
             unpin_note,
-            import_nsec
+            import_nsec,
+            list_relays,
+            set_sync_relay,
+            remove_sync_relay,
+            add_publish_relay,
+            remove_relay,
+            publish_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

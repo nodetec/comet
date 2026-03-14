@@ -3,7 +3,6 @@ import { useUIStore } from "@/stores/use-ui-store";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, Submenu } from "@tauri-apps/api/menu";
 import { Ellipsis, PanelBottomOpen, PanelBottomClose } from "lucide-react";
-import { toast } from "sonner";
 
 import {
   NoteEditor,
@@ -24,6 +23,7 @@ type EditorPaneProps = {
   pinnedAt: number | null;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
+  onPublish(): void;
   onSetPinned(pinned: boolean): void;
   onFocusHandled(): void;
   onChange(markdown: string): void;
@@ -46,6 +46,7 @@ export function EditorPane({
   pinnedAt,
   searchQuery,
   onAssignNotebook,
+  onPublish,
   onSetPinned,
   onFocusHandled,
   onChange,
@@ -150,7 +151,7 @@ export function EditorPane({
           id: "editor-menu-publish",
           text: "Publish to Nostr",
           action: () => {
-            toast.info("Publish flow coming later");
+            onPublish();
           },
         },
       ],

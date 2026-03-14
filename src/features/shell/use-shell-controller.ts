@@ -94,6 +94,16 @@ async function unpinNote(noteId: string) {
   return invoke<LoadedNote>("unpin_note", { noteId });
 }
 
+type PublishResult = {
+  successCount: number;
+  failCount: number;
+  relayCount: number;
+};
+
+async function publishNote(noteId: string) {
+  return invoke<PublishResult>("publish_note", { noteId });
+}
+
 function flattenNotePages(data: InfiniteData<NotePagePayload, unknown> | undefined) {
   return data?.pages.flatMap((page) => page.notes) ?? [];
 }
@@ -580,6 +590,23 @@ export function useShellController() {
     },
   });
 
+  const publishNoteMutation = useMutation({
+    mutationFn: publishNote,
+    onSuccess: (result, noteId) => {
+      toast.success(
+        `Published to ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
+        { id: "publish-note-success" },
+      );
+      void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+    },
+    onError: (error) => {
+      toast.error("Couldn't publish note", {
+        description: errorMessage(error, "Try again."),
+        id: "publish-note-error",
+      });
+    },
+  });
+
   useEffect(() => {
     if (
       hasHydratedInitialSelection ||
@@ -884,6 +911,16 @@ export function useShellController() {
         if (currentNote) {
           handleAssignNoteNotebook(currentNote.id, notebookId);
         }
+      },
+      onPublish() {
+        if (!currentNote || publishNoteMutation.isPending) {
+          return;
+        }
+
+        void (async () => {
+          await flushCurrentDraftAsync();
+          await publishNoteMutation.mutateAsync(currentNote.id);
+        })().catch(() => {});
       },
       onSetPinned(pinned: boolean) {
         if (currentNote) {

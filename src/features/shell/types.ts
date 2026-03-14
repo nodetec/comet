@@ -27,6 +27,7 @@ export type LoadedNote = {
   id: string;
   markdown: string;
   modifiedAt: number;
+  nostrDTag: string | null;
   notebook: NotebookRef | null;
   pinnedAt: number | null;
   tags: string[];
