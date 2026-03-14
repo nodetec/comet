@@ -80,9 +80,11 @@ export function SidebarPane({
   const [syncState, setSyncState] = useState<string>("disconnected");
 
   useEffect(() => {
-    invoke<string | { error: { message: string } }>("get_sync_status").then((s) => {
-      setSyncState(typeof s === "string" ? s : "error");
-    });
+    invoke<string | { error: { message: string } }>("get_sync_status").then(
+      (s) => {
+        setSyncState(typeof s === "string" ? s : "error");
+      },
+    );
     const unlisten = listen<{ state: string | { error: { message: string } } }>(
       "sync-status",
       (event) => {
@@ -198,11 +200,13 @@ export function SidebarPane({
             {syncState === "connected" && (
               <CloudCheck className="size-[1.2rem] text-emerald-500" />
             )}
-            {(syncState === "syncing" || syncState === "connecting" || syncState === "authenticating") && (
+            {(syncState === "syncing" ||
+              syncState === "connecting" ||
+              syncState === "authenticating") && (
               <CloudSync className="size-[1.2rem] animate-spin" />
             )}
             {syncState === "error" && (
-              <CloudAlert className="size-[1.2rem] text-destructive" />
+              <CloudAlert className="text-destructive size-[1.2rem]" />
             )}
             {syncState === "disconnected" && (
               <CloudOff className="size-[1.2rem]" />
