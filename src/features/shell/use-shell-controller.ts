@@ -902,10 +902,12 @@ export function useShellController() {
           : "none",
       isNewNote: currentNote?.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
+      modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,
       notebooks,
       noteId: currentNote?.id ?? null,
       pinnedAt: currentNote?.pinnedAt ?? null,
+      publishedAt: currentNote?.publishedAt ?? null,
       searchQuery,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {

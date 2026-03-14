@@ -30,6 +30,7 @@ export type LoadedNote = {
   nostrDTag: string | null;
   notebook: NotebookRef | null;
   pinnedAt: number | null;
+  publishedAt: number | null;
   tags: string[];
   title: string;
 };

@@ -17,10 +17,12 @@ type EditorPaneProps = {
   focusMode: "none" | "immediate" | "pointerup";
   isNewNote: boolean;
   markdown: string;
+  modifiedAt: number;
   notebook: NotebookRef | null;
   notebooks: NotebookSummary[];
   noteId: string | null;
   pinnedAt: number | null;
+  publishedAt: number | null;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
   onPublish(): void;
@@ -40,10 +42,12 @@ export function EditorPane({
   focusMode,
   isNewNote,
   markdown,
+  modifiedAt,
   notebook,
   notebooks,
   noteId,
   pinnedAt,
+  publishedAt,
   searchQuery,
   onAssignNotebook,
   onPublish,
@@ -206,6 +210,20 @@ export function EditorPane({
         </div>
         {noteId && !isArchived ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
+            {publishedAt != null &&
+              (modifiedAt <= publishedAt ? (
+                <span className="text-muted-foreground pointer-events-auto text-xs">
+                  Published
+                </span>
+              ) : (
+                <button
+                  className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
+                  onClick={onPublish}
+                  type="button"
+                >
+                  Update
+                </button>
+              ))}
             <Button
               className={cn(
                 "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",

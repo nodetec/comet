@@ -39,7 +39,8 @@ fn migrations() -> Migrations<'static> {
            modified_at INTEGER NOT NULL,
            archived_at INTEGER,
            pinned_at INTEGER,
-           nostr_d_tag TEXT
+           nostr_d_tag TEXT,
+           published_at INTEGER
          );
          CREATE TABLE note_tags (
            note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,

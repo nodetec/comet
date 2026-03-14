@@ -64,7 +64,8 @@ CREATE TABLE notes (
   modified_at INTEGER NOT NULL,
   archived_at INTEGER,
   pinned_at INTEGER,
-  nostr_d_tag TEXT
+  nostr_d_tag TEXT,
+  published_at INTEGER
 );
 
 CREATE TABLE note_tags (

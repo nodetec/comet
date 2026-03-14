@@ -242,6 +242,16 @@ pub async fn publish_note(app: &AppHandle, note_id: &str) -> Result<PublishResul
     let success_count = result.success.len();
     let fail_count = result.failed.len();
 
+    if success_count > 0 {
+        let conn = crate::db::database_connection(app)?;
+        let published_at = now_ms()?;
+        conn.execute(
+            "UPDATE notes SET published_at = ?1 WHERE id = ?2",
+            params![published_at, note_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
     Ok(PublishResult {
         success_count,
         fail_count,
