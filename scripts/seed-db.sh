@@ -34,6 +34,7 @@ DROP TABLE IF EXISTS notes;
 DROP TABLE IF EXISTS note_tags;
 DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
+DROP TABLE IF EXISTS relays;
 
 CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
@@ -45,6 +46,13 @@ CREATE TABLE notebooks (
   name TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE relays (
+  url TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('sync', 'publish')),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (url, kind)
 );
 
 CREATE TABLE notes (
@@ -283,6 +291,10 @@ INSERT INTO note_tags (note_id, tag) VALUES
 
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
+
+INSERT INTO relays (url, kind, created_at) VALUES
+  ('ws://localhost:3000', 'sync', $NOW_MS),
+  ('ws://localhost:3000', 'publish', $NOW_MS);
 
 COMMIT;
 
