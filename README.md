@@ -1,63 +1,26 @@
-# ☄️ Comet
+# comet
 
-![comet](https://private-user-images.githubusercontent.com/29136904/423198103-0b77558c-83db-46da-9567-6c4cdbcd0a62.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NDIxMTQ1MDgsIm5iZiI6MTc0MjExNDIwOCwicGF0aCI6Ii8yOTEzNjkwNC80MjMxOTgxMDMtMGI3NzU1OGMtODNkYi00NmRhLTk1NjctNmM0Y2RiY2QwYTYyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTAzMTYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwMzE2VDA4MzY0OFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWJjNWE0Mjk5ODIwM2U2MzM0MmM5NGI1MTQ2YjRiYjJkNDgwMjgwYTk1YzY1Y2IzYzU4MDExN2ExZmUxNTg1M2EmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.WQYJ3Ew45E1Vr9AH_PZi-0ukNiDJ7Uc9MzUEc8Q-tpk)
+`comet` is a desktop notetaking app for people who think in text and want a calm, fast place to capture, shape, and revisit ideas. The product direction is intentionally narrow: a single-user, desktop-first notes experience that favors speed, clarity, and trust over breadth, with note content stored locally as markdown inside the app’s database and edited through a markdown-first writing surface.
 
-Comet is a desktop app for taking and publishing notes for nostr.
+Current status: active desktop shell with local SQLite-backed notes, pinning, markdown-derived tags, notebooks, archive flow, search, and editor persistence. Core linking, publishing, and sync are still ahead.
 
-## Development
+Canonical docs:
 
-### Install Dependencies
+- [Vision](./docs/vision.md)
+- [Principles](./docs/principles.md)
+- [Roadmap](./docs/roadmap.md)
 
-```sh
-npm i --force
-```
+Development:
 
-### Run the app
+- Install dependencies: `npm install`
+- Start the desktop app: `npm run tauri dev`
+- Build the app bundle: `npm run tauri build -- --bundles app`
+- Seed demo notebooks and notes: `npm run seed:db`
 
-```sh
-npm run dev
-```
+The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
 
-### Package the app
+Recommended IDE setup:
 
-```sh
-npm run package
-```
-
-## Make the app for your platform
-
-### Linux Dependencies
-
-For RPM
-
-```sh
-sudo apt install rpm
-```
-
-For AppImage
-
-```sh
-sudo apt install squashfs-tools
-```
-
-```sh
-npm run make
-```
-
-
-
-The output for you platform will be in the `out/` directory
-
-## Tech Stack
-
-- electron (desktop app framework)
-- nostr (social media protocol)
-- shadcn (components)
-- nodejs (backend)
-- react (frontend)
-- pouchdb (database)
-- tailwind (styling)
-- typescript (language)
-- tanstack query (async state)
-- zustand (sync state)
-- lexical (editor)
+- [VS Code](https://code.visualstudio.com/)
+- [Tauri VS Code extension](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)

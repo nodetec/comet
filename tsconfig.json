@@ -1,32 +1,29 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "allowJs": true,
-    "jsx": "react-jsx",
-    "types": ["./types.d.ts"],
-    "module": "commonjs",
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "noImplicitAny": true,
-    "sourceMap": true,
-    "outDir": "dist",
-    "strict": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/frontend/*"],
-      "&/*": ["./src/backend/*"],
-      "$/*": ["./src/*"]
-    }
+      "@/*": ["./src/*"]
+    },
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src/**/*",
-    "typings.d.ts",
-    ".eslintrc.cjs",
-    "prettier.config.cjs",
-    "forge.config.ts",
-    "webpack.main.config.ts",
-    "webpack.renderer.config.ts"
-  ]
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

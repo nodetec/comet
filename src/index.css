@@ -1,0 +1,150 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/nunito-sans";
+@import "@fontsource-variable/figtree";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Figtree Variable", sans-serif;
+  --font-editor:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  background: oklch(23.48% 0.004 264.49);
+}
+
+:root {
+  --background: oklch(23.48% 0.004 264.49);
+  --foreground: oklch(89.14% 0 0);
+  --card: oklch(23.48% 0.004 264.49);
+  --card-foreground: oklch(89.14% 0 0);
+  --popover: oklch(23.48% 0.004 264.49);
+  --popover-foreground: oklch(89.14% 0 0);
+  --primary: oklch(64.71% 0.194 252.09);
+  --primary-foreground: oklch(89.14% 0 0);
+  --secondary: oklch(0.255 0.01 255);
+  --secondary-foreground: oklch(86.22% 0.007 286.26);
+  --muted: oklch(0.255 0.01 255);
+  --muted-foreground: oklch(64.83% 0.007 286.19);
+  --accent: oklch(38.83% 0.005 236.63);
+  --accent-foreground: oklch(83.12% 0.007 286.25);
+  --destructive: oklch(0.68 0.18 24);
+  --border: oklch(14.48% 0 0);
+  --input: oklch(38.83% 0.005 236.63);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+  --radius: 0.5rem;
+  --sidebar: oklch(27.7% 0.006 271.21);
+  --sidebar-foreground: oklch(75.2% 0.006 286.26);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --font-sans: "Figtree Variable", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+.comet-editor-shell {
+  background: transparent;
+}
+
+.comet-editor-content {
+  font-family: "Figtree Variable", sans-serif;
+  font-size: var(--editor-font-size, 16px);
+  /*line-height: normal;*/
+  letter-spacing: -0.01em;
+  color: rgba(244, 246, 247, 0.96);
+  caret-color: #6cb4ee;
+  outline: none;
+  min-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 35vh;
+  padding-left: max(3.5rem, calc((100% - 40rem) / 2));
+  padding-right: max(3.5rem, calc((100% - 40rem) / 2));
+  padding-top: 0.25rem;
+}
+
+.comet-editor-placeholder {
+  font-family: var(--font-editor);
+}
+
+[data-lexical-editor] ::selection {
+  background: rgba(108, 180, 238, 0.18);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 30%, transparent);
+}

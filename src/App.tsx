@@ -1,0 +1,112 @@
+import { type CSSProperties, useEffect, useState } from "react";
+import { Bar, Container, Section } from "@column-resizer/react";
+
+import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
+import { SettingsDialog } from "@/features/settings/settings-dialog";
+import { EditorPane } from "@/features/shell/editor-pane";
+import { NotesPane } from "@/features/shell/notes-pane";
+import { SidebarPane } from "@/features/shell/sidebar-pane";
+import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
+import { useShellController } from "@/features/shell/use-shell-controller";
+
+function App() {
+  const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
+  const [hasCompletedStartupReveal, setHasCompletedStartupReveal] =
+    useState(false);
+  const {
+    bootstrapError,
+    editorPaneProps,
+    notesPaneProps,
+    readyToRevealWindow,
+    retryBootstrap,
+    sidebarPaneProps,
+  } = useShellController();
+  useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
+
+  useEffect(() => {
+    if (readyToRevealWindow && !hasCompletedStartupReveal) {
+      setHasCompletedStartupReveal(true);
+    }
+  }, [hasCompletedStartupReveal, readyToRevealWindow]);
+
+  if (!hasCompletedStartupReveal && !readyToRevealWindow) {
+    // Keep React mounted but the window hidden until startup data is ready.
+    return null;
+  }
+
+  if (bootstrapError) {
+    return (
+      <div className="text-foreground flex min-h-screen items-center justify-center">
+        <div className="border-border bg-card flex max-w-lg min-w-96 flex-col gap-4 rounded-xl border px-5 py-5 shadow-sm">
+          <div className="space-y-1">
+            <p className="font-semibold">Couldn&apos;t load your notes</p>
+            <p className="text-muted-foreground text-sm">{bootstrapError}</p>
+          </div>
+          <div>
+            <Button onClick={retryBootstrap}>Try again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="text-foreground relative h-full min-h-0 overflow-hidden"
+      style={
+        {
+          "--titlebar-height": isMacos ? "3.25rem" : "0px",
+        } as CSSProperties
+      }
+    >
+      <div className="relative h-full min-h-0">
+        {isMacos ? (
+          <div
+            className="absolute inset-x-0 top-0 z-30 h-(--titlebar-height)"
+            data-tauri-drag-region
+          />
+        ) : null}
+        <Container className="h-full w-full" id="comet-shell">
+          <Section
+            defaultSize={200}
+            disableResponsive
+            minSize={180}
+            className="select-none"
+          >
+            <SidebarPane {...sidebarPaneProps} />
+          </Section>
+          <Bar
+            className="bg-border z-30 cursor-col-resize"
+            expandInteractiveArea={{ left: 5, right: 5 }}
+            size={1}
+          />
+
+          <Section
+            defaultSize={280}
+            disableResponsive
+            maxSize={340}
+            minSize={220}
+            className="select-none"
+          >
+            <NotesPane {...notesPaneProps} />
+          </Section>
+
+          <Bar
+            className="bg-border z-30 cursor-col-resize"
+            expandInteractiveArea={{ left: 5, right: 5 }}
+            size={1}
+          />
+
+          <Section minSize={300}>
+            <EditorPane {...editorPaneProps} />
+          </Section>
+        </Container>
+      </div>
+      <SettingsDialog />
+      <Toaster closeButton position="bottom-right" richColors />
+    </div>
+  );
+}
+
+export default App;
