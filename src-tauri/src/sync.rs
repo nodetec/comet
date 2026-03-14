@@ -26,7 +26,8 @@ pub enum SyncState {
 #[derive(Debug)]
 pub enum SyncCommand {
     PushNote(String),
-    PushDeletion(String),
+    /// note_id, sync_event_id (pre-fetched before local delete)
+    PushDeletion(String, String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -609,8 +610,8 @@ async fn run_sync_connection(
                             tokio::time::Instant::now() + debounce_duration,
                         );
                     }
-                    Some(SyncCommand::PushDeletion(note_id)) => {
-                        push_deletion(app, &keys, &mut ws_write, &note_id).await?;
+                    Some(SyncCommand::PushDeletion(note_id, sync_event_id)) => {
+                        push_deletion(app, &keys, &mut ws_write, &note_id, &sync_event_id).await?;
                     }
                     None => break, // channel closed
                 }
@@ -896,7 +897,7 @@ async fn push_note(
 }
 
 async fn push_deletion(
-    app: &AppHandle,
+    _app: &AppHandle,
     keys: &Keys,
     ws_write: &mut futures_util::stream::SplitSink<
         tokio_tungstenite::WebSocketStream<
@@ -905,26 +906,9 @@ async fn push_deletion(
         Message,
     >,
     note_id: &str,
+    sync_event_id: &str,
 ) -> Result<(), String> {
-    // Get sync_event_id for this note
-    let sync_event_id: Option<String> = {
-        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
-        conn.query_row(
-            "SELECT sync_event_id FROM notes WHERE id = ?1",
-            params![note_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?
-        .flatten()
-    };
-
-    let sync_event_id = match sync_event_id {
-        Some(id) => id,
-        None => return Ok(()), // never synced, nothing to delete remotely
-    };
-
-    let event_id = EventId::parse(&sync_event_id)
+    let event_id = EventId::parse(sync_event_id)
         .map_err(|e| format!("Invalid sync event ID: {e}"))?;
 
     let deletion = EventBuilder::delete(

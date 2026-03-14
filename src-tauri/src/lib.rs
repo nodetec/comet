@@ -109,8 +109,22 @@ fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
 
 #[tauri::command]
 fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), String> {
-    sync_push_deletion(&app, &note_id);
-    notes::delete_note_permanently(&app, &note_id)
+    // Pre-fetch sync_event_id before the row is deleted
+    let sync_event_id: Option<String> = {
+        let conn = database_connection(&app)?;
+        conn.query_row(
+            "SELECT sync_event_id FROM notes WHERE id = ?1",
+            rusqlite::params![note_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten()
+    };
+    notes::delete_note_permanently(&app, &note_id)?;
+    if let Some(event_id) = sync_event_id {
+        sync_push_deletion(&app, &note_id, &event_id);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -162,12 +176,15 @@ fn sync_push_note(app: &AppHandle, note_id: &str) {
     });
 }
 
-fn sync_push_deletion(app: &AppHandle, note_id: &str) {
+fn sync_push_deletion(app: &AppHandle, note_id: &str, sync_event_id: &str) {
     let manager = app.state::<sync::SyncManager>();
     let note_id = note_id.to_string();
+    let sync_event_id = sync_event_id.to_string();
     let manager = manager.inner().clone();
     tauri::async_runtime::spawn(async move {
-        manager.push(sync::SyncCommand::PushDeletion(note_id)).await;
+        manager
+            .push(sync::SyncCommand::PushDeletion(note_id, sync_event_id))
+            .await;
     });
 }
 
