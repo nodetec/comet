@@ -46,15 +46,9 @@ export function EditorSettings() {
         label="Editor Toolbar"
         description="Show the formatting toolbar below the editor"
       >
-        <Switch
-          checked={showToolbar}
-          onCheckedChange={setShowToolbar}
-        />
+        <Switch checked={showToolbar} onCheckedChange={setShowToolbar} />
       </SettingRow>
-      <SettingRow
-        label="Font Size"
-        description="Base font size for the editor"
-      >
+      <SettingRow label="Font Size" description="Base font size for the editor">
         <div className="flex items-center gap-1.5">
           <Button
             size="icon-xs"
@@ -82,10 +76,7 @@ export function EditorSettings() {
         description="Enable browser spell checking in the editor"
         border={false}
       >
-        <Switch
-          checked={spellCheck}
-          onCheckedChange={setSpellCheck}
-        />
+        <Switch checked={spellCheck} onCheckedChange={setSpellCheck} />
       </SettingRow>
     </div>
   );

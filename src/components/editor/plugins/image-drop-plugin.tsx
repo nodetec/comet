@@ -16,11 +16,7 @@ const IMAGE_EXTENSIONS_RE = new RegExp(
   "i",
 );
 
-function isInsideRect(
-  x: number,
-  y: number,
-  rect: DOMRect,
-): boolean {
+function isInsideRect(x: number, y: number, rect: DOMRect): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
@@ -64,7 +60,9 @@ export default function ImageDropPlugin() {
           rafId = requestAnimationFrame(() => {
             rafId = null;
             const scrollContainer = rootElement.closest(".comet-editor-shell");
-            const rect = (scrollContainer ?? rootElement).getBoundingClientRect();
+            const rect = (
+              scrollContainer ?? rootElement
+            ).getBoundingClientRect();
             if (!isInsideRect(x, y, rect)) return;
 
             rootElement.focus();
@@ -97,9 +95,7 @@ export default function ImageDropPlugin() {
           if (imagePaths.length === 0) return;
 
           const results = await Promise.all(
-            imagePaths.map((p) =>
-              importImage(p).catch(() => null),
-            ),
+            imagePaths.map((p) => importImage(p).catch(() => null)),
           );
 
           editor.update(() => {

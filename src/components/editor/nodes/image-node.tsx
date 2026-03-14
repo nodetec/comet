@@ -166,14 +166,14 @@ function ImageComponent({
 
   return (
     <span
-      className="inline-flex items-center align-middle mb-2"
+      className="mb-2 inline-flex items-center align-middle"
       style={{ maxWidth: "min(99%, 99%)" }}
     >
       <img
         ref={imageRef}
         src={src}
         alt={altText}
-        className={`max-w-full cursor-default rounded-lg my-2 border-2 ${
+        className={`my-2 max-w-full cursor-default rounded-lg border-2 ${
           isFocused ? "border-primary" : "border-transparent"
         }`}
         draggable="false"

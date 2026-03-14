@@ -3,9 +3,15 @@ import { persist } from "zustand/middleware";
 
 import type { NoteSortDirection, NoteSortField } from "@/features/shell/types";
 
-export type NoteSortPrefs = { field: NoteSortField; direction: NoteSortDirection };
+export type NoteSortPrefs = {
+  field: NoteSortField;
+  direction: NoteSortDirection;
+};
 
-export const defaultNoteSortPrefs: NoteSortPrefs = { field: "modified_at", direction: "newest" };
+export const defaultNoteSortPrefs: NoteSortPrefs = {
+  field: "modified_at",
+  direction: "newest",
+};
 
 type UIStore = {
   showEditorToolbar: boolean;
@@ -60,7 +66,10 @@ export const useUIStore = create<UIStore>()(
         set((state) => {
           const current = state.noteSortPrefs[viewKey] ?? defaultNoteSortPrefs;
           const next = { ...current, ...prefs };
-          if (next.field === current.field && next.direction === current.direction) {
+          if (
+            next.field === current.field &&
+            next.direction === current.direction
+          ) {
             return state;
           }
           return {

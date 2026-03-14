@@ -1,5 +1,9 @@
 import type { ElementTransformer } from "@lexical/markdown";
-import { $createParagraphNode, type ElementNode, type LexicalNode } from "lexical";
+import {
+  $createParagraphNode,
+  type ElementNode,
+  type LexicalNode,
+} from "lexical";
 import {
   $createYouTubeNode,
   $isYouTubeNode,
@@ -7,7 +11,8 @@ import {
 } from "../nodes/youtube-node";
 
 function extractYouTubeVideoId(text: string): string | null {
-  const match = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
+  const match =
+    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
   return match?.[2] && match[2].length === 11 ? match[2] : null;
 }
 

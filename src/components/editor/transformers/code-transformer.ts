@@ -46,10 +46,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     const singleLineEndRegex = new RegExp(`\`{${fenceLength},}$`);
     if (singleLineEndRegex.test(afterFence)) {
       const endMatch = afterFence.match(singleLineEndRegex)!;
-      const content = afterFence.slice(
-        0,
-        afterFence.lastIndexOf(endMatch[0]),
-      );
+      const content = afterFence.slice(0, afterFence.lastIndexOf(endMatch[0]));
       const fakeStartMatch = [...startMatch];
       fakeStartMatch[2] = "";
       CODE_BLOCK.replace!(
@@ -91,14 +88,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     if (afterFullMatch.length > 0) {
       linesInBetween.unshift(afterFullMatch);
     }
-    CODE_BLOCK.replace!(
-      rootNode,
-      null,
-      startMatch,
-      null,
-      linesInBetween,
-      true,
-    );
+    CODE_BLOCK.replace!(rootNode, null, startMatch, null, linesInBetween, true);
     return [true, lines.length - 1] as [boolean, number];
   },
   replace: (

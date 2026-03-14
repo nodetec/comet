@@ -18,14 +18,16 @@ export default function OnChangeMarkdownPlugin({
   }, [onChange]);
 
   useEffect(() => {
-    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
-      if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
+    return editor.registerUpdateListener(
+      ({ editorState, dirtyElements, dirtyLeaves }) => {
+        if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
-      editorState.read(() => {
-        const markdown = $exportMarkdown(TRANSFORMERS);
-        onChangeRef.current(markdown);
-      });
-    });
+        editorState.read(() => {
+          const markdown = $exportMarkdown(TRANSFORMERS);
+          onChangeRef.current(markdown);
+        });
+      },
+    );
   }, [editor]);
 
   return null;

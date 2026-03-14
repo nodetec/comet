@@ -154,7 +154,7 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
 
         {isEditable && (
           <button
-            className="bg-muted-foreground text-background hover:bg-foreground absolute right-3 top-3 z-20 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-colors"
+            className="bg-muted-foreground text-background hover:bg-foreground absolute top-3 right-3 z-20 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               deleteNode();

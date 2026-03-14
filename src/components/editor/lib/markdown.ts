@@ -115,7 +115,10 @@ function preprocessForImport(markdown: string): string {
     const line = lines[i];
 
     // Track code fence state
-    if (CODE_FENCE_RE.test(line.trimStart()) && !CODE_SINGLE_LINE_RE.test(line)) {
+    if (
+      CODE_FENCE_RE.test(line.trimStart()) &&
+      !CODE_SINGLE_LINE_RE.test(line)
+    ) {
       inCodeFence = !inCodeFence;
       hasContentBefore = true;
       result.push(line);
@@ -214,13 +217,19 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
   for (let i = 0; i < exportedLines.length; i++) {
     const line = exportedLines[i];
 
-    if (CODE_FENCE_RE.test(line.trimStart()) && !CODE_SINGLE_LINE_RE.test(line)) {
+    if (
+      CODE_FENCE_RE.test(line.trimStart()) &&
+      !CODE_SINGLE_LINE_RE.test(line)
+    ) {
       fenced = !fenced;
     }
 
     if (!fenced && line.trim() === "" && currentBlock.length > 0) {
       // Consume all consecutive blank lines (they form one separator)
-      while (i + 1 < exportedLines.length && exportedLines[i + 1].trim() === "") {
+      while (
+        i + 1 < exportedLines.length &&
+        exportedLines[i + 1].trim() === ""
+      ) {
         i++;
       }
       exportedBlocks.push(currentBlock.join("\n"));

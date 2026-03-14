@@ -209,7 +209,7 @@ export function SidebarPane({
             className={[
               "grid overflow-hidden transition-all duration-200 ease-out",
               notesOpen
-                ? "grid-rows-[1fr] opacity-100 pt-1"
+                ? "grid-rows-[1fr] pt-1 opacity-100"
                 : "grid-rows-[0fr] opacity-0",
             ].join(" ")}
           >
@@ -262,7 +262,7 @@ export function SidebarPane({
             className={[
               "grid overflow-hidden transition-all duration-200 ease-out",
               notebooksOpen
-                ? "grid-rows-[1fr] opacity-100 pt-1"
+                ? "grid-rows-[1fr] pt-1 opacity-100"
                 : "grid-rows-[0fr] opacity-0",
             ].join(" ")}
           >
@@ -339,10 +339,7 @@ export function SidebarPane({
                           key={notebook.id}
                           onClick={() => onSelectNotebook(notebook.id)}
                           onContextMenu={(event) =>
-                            void handleNotebookContextMenu(
-                              event,
-                              notebook.id,
-                            )
+                            void handleNotebookContextMenu(event, notebook.id)
                           }
                           type="button"
                         >
@@ -383,7 +380,7 @@ export function SidebarPane({
               className={[
                 "grid overflow-hidden transition-all duration-200 ease-out",
                 tagsOpen
-                  ? "grid-rows-[1fr] opacity-100 pt-2"
+                  ? "grid-rows-[1fr] pt-2 opacity-100"
                   : "grid-rows-[0fr] opacity-0",
               ].join(" ")}
             >

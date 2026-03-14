@@ -32,12 +32,12 @@ export function SettingsDialog() {
     <DialogRoot open={open} onOpenChange={setOpen} modal>
       <DialogPortal>
         <DialogBackdrop />
-        <DialogPopup className="flex h-[85%] max-h-[60rem] w-[90%] max-w-[70rem] select-none overflow-hidden p-0">
+        <DialogPopup className="flex h-[85%] max-h-[60rem] w-[90%] max-w-[70rem] overflow-hidden p-0 select-none">
           <DialogClose className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100">
             <X className="size-4" />
           </DialogClose>
-          <nav className="bg-sidebar flex min-w-64 max-w-64 shrink-0 flex-col border-r px-2 pt-6">
-            <DialogTitle className="text-muted-foreground mb-3 px-3 text-xs font-semibold uppercase tracking-wide">
+          <nav className="bg-sidebar flex max-w-64 min-w-64 shrink-0 flex-col border-r px-2 pt-6">
+            <DialogTitle className="text-muted-foreground mb-3 px-3 text-xs font-semibold tracking-wide uppercase">
               Settings
             </DialogTitle>
             {tabs.map((tab) => (

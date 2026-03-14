@@ -31,15 +31,9 @@ export default function BlockBreakoutPlugin(): null {
         const anchorNode = selection.anchor.getNode();
 
         // Check if we're inside a table cell
-        const tableCellNode = $findMatchingParent(
-          anchorNode,
-          $isTableCellNode,
-        );
+        const tableCellNode = $findMatchingParent(anchorNode, $isTableCellNode);
         if (tableCellNode) {
-          const tableNode = $findMatchingParent(
-            tableCellNode,
-            $isTableNode,
-          );
+          const tableNode = $findMatchingParent(tableCellNode, $isTableNode);
           if (tableNode) {
             event.preventDefault();
             const paragraph = $createParagraphNode();

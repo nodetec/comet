@@ -53,7 +53,9 @@ function createHeadlessEditor() {
   });
 }
 
-function $getMarkdownContent(editor: ReturnType<typeof useLexicalComposerContext>[0]): string {
+function $getMarkdownContent(
+  editor: ReturnType<typeof useLexicalComposerContext>[0],
+): string {
   const selection = $getSelection();
   if (!selection || ($isRangeSelection(selection) && selection.isCollapsed())) {
     return "";
@@ -90,7 +92,10 @@ export default function MarkdownCopyPlugin() {
       if (!clipboardData) return false;
 
       const selection = $getSelection();
-      if (!selection || ($isRangeSelection(selection) && selection.isCollapsed())) {
+      if (
+        !selection ||
+        ($isRangeSelection(selection) && selection.isCollapsed())
+      ) {
         return false;
       }
 
@@ -100,7 +105,8 @@ export default function MarkdownCopyPlugin() {
       const lexicalJson = $getLexicalContent(editor, selection);
 
       clipboardData.setData("text/plain", markdown);
-      if (lexicalJson) clipboardData.setData("application/x-lexical-editor", lexicalJson);
+      if (lexicalJson)
+        clipboardData.setData("application/x-lexical-editor", lexicalJson);
 
       return true;
     };

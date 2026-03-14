@@ -29,9 +29,7 @@ function isYouTubeUrl(text: string): boolean {
 
 function extractYouTubeVideoId(text: string): string | null {
   const match =
-    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(
-      text,
-    );
+    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
   return match?.[2] && match[2].length === 11 ? match[2] : null;
 }
 

@@ -30,9 +30,8 @@ export function ProfileSettings() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const truncated = npub.length > 20
-    ? `${npub.slice(0, 12)}...${npub.slice(-8)}`
-    : npub;
+  const truncated =
+    npub.length > 20 ? `${npub.slice(0, 12)}...${npub.slice(-8)}` : npub;
 
   return (
     <div>
@@ -106,7 +105,7 @@ export function ProfileSettings() {
                   setNsecInput("");
                   importMutation.reset();
                 }}
-                className="text-muted-foreground rounded px-3 py-1 text-xs hover:bg-accent"
+                className="text-muted-foreground hover:bg-accent rounded px-3 py-1 text-xs"
               >
                 Cancel
               </button>

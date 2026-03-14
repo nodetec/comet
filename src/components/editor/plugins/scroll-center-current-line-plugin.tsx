@@ -44,13 +44,11 @@ export default function ScrollCenterCurrentLinePlugin({
                 const rect = domNode.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
                 const cursorPosition = rect.top + focusOffset;
-                const threshold =
-                  viewportHeight * (viewportPercentage / 100);
+                const threshold = viewportHeight * (viewportPercentage / 100);
 
                 if (cursorPosition > viewportHeight - threshold) {
                   requestAnimationFrame(() => {
-                    currentLineRef.current =
-                      blockElement as HTMLDivElement;
+                    currentLineRef.current = blockElement as HTMLDivElement;
                     currentLineRef.current?.scrollIntoView({
                       behavior: "smooth",
                       block: "center",

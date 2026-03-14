@@ -22,14 +22,8 @@ export function RelaysSettings() {
 
   return (
     <div className="space-y-8">
-      <SyncRelaySection
-        relay={syncRelay}
-        queryClient={queryClient}
-      />
-      <PublishRelaysSection
-        relays={publishRelays}
-        queryClient={queryClient}
-      />
+      <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
+      <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
     </div>
   );
 }
@@ -109,7 +103,11 @@ function SyncRelaySection({
             setSyncMutation.reset();
           }}
           isPending={setSyncMutation.isPending}
-          error={setSyncMutation.isError ? (setSyncMutation.error as Error).message : undefined}
+          error={
+            setSyncMutation.isError
+              ? (setSyncMutation.error as Error).message
+              : undefined
+          }
           submitLabel="Save"
         />
       )}
@@ -161,7 +159,7 @@ function PublishRelaysSection({
               <button
                 type="button"
                 onClick={() => removeMutation.mutate(relay.url)}
-                className="text-muted-foreground hover:text-red-500 transition-colors"
+                className="text-muted-foreground transition-colors hover:text-red-500"
                 title="Remove relay"
               >
                 <X className="size-3.5" />
@@ -190,7 +188,11 @@ function PublishRelaysSection({
             addMutation.reset();
           }}
           isPending={addMutation.isPending}
-          error={addMutation.isError ? (addMutation.error as Error).message : undefined}
+          error={
+            addMutation.isError
+              ? (addMutation.error as Error).message
+              : undefined
+          }
           submitLabel="Add"
         />
       )}
@@ -242,7 +244,7 @@ function RelayUrlForm({
         <button
           type="button"
           onClick={onCancel}
-          className="text-muted-foreground rounded px-3 py-1 text-xs hover:bg-accent"
+          className="text-muted-foreground hover:bg-accent rounded px-3 py-1 text-xs"
         >
           Cancel
         </button>

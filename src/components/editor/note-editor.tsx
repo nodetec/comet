@@ -7,7 +7,10 @@ import { defineExtension } from "lexical";
 import { RichTextExtension } from "@lexical/rich-text";
 import { HistoryExtension } from "@lexical/history";
 import { ListExtension } from "@lexical/list";
-import { HorizontalRuleExtension, TabIndentationExtension } from "@lexical/extension";
+import {
+  HorizontalRuleExtension,
+  TabIndentationExtension,
+} from "@lexical/extension";
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "@lexical/hashtag";
 import { LinkNode } from "@lexical/link";

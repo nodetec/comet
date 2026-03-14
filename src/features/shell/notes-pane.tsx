@@ -1,13 +1,12 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { formatDistanceToNow } from "date-fns";
-import { CheckMenuItem, Menu, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
 import {
-  ChevronDown,
-  PenBoxIcon,
-  Pin,
-  Search,
-  X,
-} from "lucide-react";
+  CheckMenuItem,
+  Menu,
+  PredefinedMenuItem,
+  Submenu,
+} from "@tauri-apps/api/menu";
+import { ChevronDown, PenBoxIcon, Pin, Search, X } from "lucide-react";
 import Highlighter from "react-highlight-words";
 import {
   useEffect,
@@ -134,7 +133,10 @@ export function NotesPane({
   const { ref: loadMoreRef, inView } = useInView({
     rootMargin: "160px 0px",
   });
-  const searchWords = useMemo(() => searchWordsFromQuery(searchQuery), [searchQuery]);
+  const searchWords = useMemo(
+    () => searchWordsFromQuery(searchQuery),
+    [searchQuery],
+  );
   useEffect(() => {
     if (searchQuery) {
       setIsSearchOpen(true);
@@ -345,7 +347,9 @@ export function NotesPane({
 
                     const menu = await Menu.new({ items: [sortSubmenu] });
                     try {
-                      await menu.popup(new LogicalPosition(rect.left, rect.bottom));
+                      await menu.popup(
+                        new LogicalPosition(rect.left, rect.bottom),
+                      );
                     } finally {
                       await menu.close();
                     }
@@ -443,7 +447,9 @@ export function NotesPane({
                           {renderHighlightedText(note.title, searchWords)}
                         </h3>
                       ) : null}
-                      <div className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}>
+                      <div
+                        className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
+                      >
                         {renderHighlightedText(cardPreview, searchWords)}
                       </div>
                       <div className="flex w-full items-center gap-3">
