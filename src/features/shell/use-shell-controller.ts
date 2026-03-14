@@ -639,9 +639,12 @@ export function useShellController() {
     },
   });
 
+  const [deletePublishDialogOpen, setDeletePublishDialogOpen] = useState(false);
+
   const deletePublishedNoteMutation = useMutation({
     mutationFn: deletePublishedNote,
     onSuccess: (result, noteId) => {
+      setDeletePublishDialogOpen(false);
       toast.success(
         `Deleted from ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
         { id: "delete-published-note-success" },
@@ -973,7 +976,7 @@ export function useShellController() {
           return;
         }
 
-        deletePublishedNoteMutation.mutate(currentNote.id);
+        setDeletePublishDialogOpen(true);
       },
       onOpenPublishDialog() {
         if (!currentNote || publishNoteMutation.isPending) {
@@ -1008,6 +1011,16 @@ export function useShellController() {
       onOpenChange: setPublishDialogOpen,
       onSubmit(input: PublishNoteInput) {
         publishNoteMutation.mutate(input);
+      },
+    },
+    deletePublishDialogProps: {
+      open: deletePublishDialogOpen,
+      pending: deletePublishedNoteMutation.isPending,
+      onOpenChange: setDeletePublishDialogOpen,
+      onConfirm() {
+        if (currentNote) {
+          deletePublishedNoteMutation.mutate(currentNote.id);
+        }
       },
     },
     notesPaneProps: {
