@@ -122,7 +122,7 @@ body {
 
 .comet-editor-content {
   font-family: "Figtree Variable", sans-serif;
-  font-size: var(--editor-font-size, 16px);
+  font-size: var(--editor-font-size, 15px);
   /*line-height: normal;*/
   letter-spacing: -0.01em;
   color: rgba(244, 246, 247, 0.96);

@@ -1,4 +1,5 @@
 use crate::db::{database_connection, extract_tags};
+use crate::nostr;
 use rusqlite::{
     params, params_from_iter, types::Value, Connection, OptionalExtension, Transaction,
 };
@@ -74,6 +75,7 @@ pub struct ContextualTagsPayload {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BootstrapPayload {
+    pub npub: String,
     pub notebooks: Vec<NotebookSummary>,
     pub selected_note_id: Option<String>,
     pub initial_notes: NotePagePayload,
@@ -153,6 +155,7 @@ pub struct AssignNoteNotebookInput {
 
 pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, String> {
     let conn = database_connection(app)?;
+    let npub = nostr::ensure_identity(&conn)?;
     seed_welcome_note_if_empty(&conn)?;
 
     let notebooks = list_notebooks(&conn)?;
@@ -182,6 +185,7 @@ pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, String> {
     )?;
 
     Ok(BootstrapPayload {
+        npub,
         notebooks,
         selected_note_id,
         initial_notes,

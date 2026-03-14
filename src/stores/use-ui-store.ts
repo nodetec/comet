@@ -14,8 +14,8 @@ type UIStore = {
   settingsOpen: boolean;
   setSettingsOpen(open: boolean): void;
 
-  settingsTab: "general" | "editor";
-  setSettingsTab(tab: "general" | "editor"): void;
+  settingsTab: "general" | "editor" | "profile";
+  setSettingsTab(tab: "general" | "editor" | "profile"): void;
 
   editorFontSize: number;
   setEditorFontSize(size: number): void;

@@ -38,12 +38,19 @@ fn migrations() -> Migrations<'static> {
            created_at INTEGER NOT NULL,
            modified_at INTEGER NOT NULL,
            archived_at INTEGER,
-           pinned_at INTEGER
+           pinned_at INTEGER,
+           nostr_d_tag TEXT
          );
          CREATE TABLE note_tags (
            note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
            tag TEXT NOT NULL,
            PRIMARY KEY (note_id, tag)
+         );
+         CREATE TABLE nostr_identity (
+           secret_key TEXT NOT NULL,
+           public_key TEXT NOT NULL,
+           npub       TEXT NOT NULL,
+           created_at INTEGER NOT NULL
          );
          CREATE VIRTUAL TABLE notes_fts USING fts5(
            note_id UNINDEXED,

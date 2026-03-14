@@ -1,7 +1,9 @@
 mod attachments;
 mod db;
+mod nostr;
 mod notes;
 
+use db::database_connection;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, LoadedNote, NotePagePayload, NoteQueryInput, NotebookSummary,
@@ -136,6 +138,12 @@ fn unpin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     notes::unpin_note(&app, &note_id)
 }
 
+#[tauri::command]
+fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
+    let conn = database_connection(&app)?;
+    nostr::import_nsec(&conn, &nsec)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -160,7 +168,8 @@ pub fn run() {
             delete_notebook,
             assign_note_notebook,
             pin_note,
-            unpin_note
+            unpin_note,
+            import_nsec
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

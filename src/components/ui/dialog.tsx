@@ -15,7 +15,10 @@ function DialogBackdrop({
 }: ComponentPropsWithoutRef<typeof Dialog.Backdrop>) {
   return (
     <Dialog.Backdrop
-      className={cn("fixed inset-0 z-50 bg-black/60", className)}
+      className={cn(
+        "pointer-events-auto fixed inset-0 z-50 bg-black/30 transition-opacity duration-200 data-[closed]:opacity-0 data-[open]:opacity-100",
+        className,
+      )}
       {...props}
     />
   );
@@ -28,7 +31,7 @@ function DialogPopup({
   return (
     <Dialog.Popup
       className={cn(
-        "bg-card fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-xl border shadow-lg outline-none",
+        "bg-card fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-xl border shadow-lg outline-none transition-all duration-200 data-[closed]:scale-95 data-[closed]:opacity-0 data-[open]:scale-100 data-[open]:opacity-100",
         className,
       )}
       {...props}

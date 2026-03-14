@@ -34,6 +34,7 @@ export type LoadedNote = {
 };
 
 export type BootstrapPayload = {
+  npub: string;
   initialNotes: NotePagePayload;
   initialTags: ContextualTagsPayload;
   notebooks: NotebookSummary[];
