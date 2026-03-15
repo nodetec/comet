@@ -1,5 +1,6 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { formatDistanceToNow } from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckMenuItem,
   Menu,
@@ -412,6 +413,7 @@ export function NotesPane({
           </div>
         ) : (
           <div className="space-y-0 px-3">
+            <AnimatePresence initial={false}>
             {filteredNotes.map((note) => {
               const isActive = note.id === selectedNoteId;
               const cardPreview =
@@ -420,7 +422,9 @@ export function NotesPane({
                   : note.preview || "No content yet";
 
               return (
-                <div
+                <motion.div
+                  layout
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
                   className="flex w-full flex-col items-center"
                   key={note.id}
                 >
@@ -469,9 +473,10 @@ export function NotesPane({
                   <div className="w-full px-[0.30rem]">
                     <div className="bg-accent/30 h-px w-full" />
                   </div>
-                </div>
+                </motion.div>
               );
             })}
+            </AnimatePresence>
             {hasMoreNotes ? (
               <div className="px-[0.30rem] py-4" ref={loadMoreRef}>
                 <div className="text-muted-foreground text-center text-xs">
