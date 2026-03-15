@@ -198,12 +198,12 @@ export function SidebarPane({
             }}
           >
             {syncState === "connected" && (
-              <CloudCheck className="size-[1.2rem] text-emerald-500" />
+              <CloudCheck className="size-[1.2rem]" />
             )}
             {(syncState === "syncing" ||
               syncState === "connecting" ||
               syncState === "authenticating") && (
-              <CloudSync className="size-[1.2rem] animate-spin" />
+              <CloudSync className="size-[1.2rem] animate-pulse" />
             )}
             {syncState === "error" && (
               <CloudAlert className="text-destructive size-[1.2rem]" />
