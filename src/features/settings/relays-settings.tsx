@@ -1,9 +1,13 @@
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { errorMessage } from "@/lib/utils";
+
+import { SettingRow } from "./setting-row";
+import { useInlineEditor } from "./use-inline-editor";
 
 type Relay = {
   url: string;
@@ -52,18 +56,16 @@ function SyncToggle() {
   if (isLoading) return null;
 
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h3 className="text-sm font-medium">Sync</h3>
-        <p className="text-muted-foreground text-xs">
-          Sync notes across your devices.
-        </p>
-      </div>
+    <SettingRow
+      label="Sync"
+      description="Sync notes across your devices."
+      border={false}
+    >
       <Switch
         checked={enabled ?? true}
         onCheckedChange={(checked) => toggleMutation.mutate(checked)}
       />
-    </div>
+    </SettingRow>
   );
 }
 
@@ -74,15 +76,13 @@ function SyncRelaySection({
   relay: Relay | undefined;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
+  const editor = useInlineEditor();
 
   const setSyncMutation = useMutation({
     mutationFn: (url: string) => invoke<Relay[]>("set_sync_relay", { url }),
     onSuccess: (data) => {
       queryClient.setQueryData(["relays"], data);
-      setEditing(false);
-      setUrlInput("");
+      editor.close();
     },
   });
 
@@ -100,51 +100,44 @@ function SyncRelaySection({
         A single relay used to sync notes between your devices.
       </p>
 
-      {relay && !editing ? (
+      {relay && !editor.editing ? (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {relay.url}
           </code>
-          <button
-            type="button"
-            onClick={() => {
-              setUrlInput(relay.url);
-              setEditing(true);
-            }}
-            className="text-xs text-blue-500 hover:underline"
+          <Button
+            variant="link"
+            size="xs"
+            onClick={() => editor.open(relay.url)}
           >
             Change
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="link"
+            size="xs"
+            className="text-destructive"
             onClick={() => removeSyncMutation.mutate()}
-            className="text-xs text-red-500 hover:underline"
           >
             Remove
-          </button>
+          </Button>
         </div>
-      ) : !editing ? (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-sm text-blue-500 hover:underline"
-        >
+      ) : !editor.editing ? (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
           Set sync relay
-        </button>
+        </Button>
       ) : (
         <RelayUrlForm
-          value={urlInput}
-          onChange={setUrlInput}
-          onSubmit={() => setSyncMutation.mutate(urlInput.trim())}
+          value={editor.value}
+          onChange={editor.setValue}
+          onSubmit={() => setSyncMutation.mutate(editor.value.trim())}
           onCancel={() => {
-            setEditing(false);
-            setUrlInput("");
+            editor.close();
             setSyncMutation.reset();
           }}
           isPending={setSyncMutation.isPending}
           error={
             setSyncMutation.isError
-              ? (setSyncMutation.error as Error).message
+              ? errorMessage(setSyncMutation.error, "Failed to set relay")
               : undefined
           }
           submitLabel="Save"
@@ -159,8 +152,7 @@ function BlossomSection({
 }: {
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
+  const editor = useInlineEditor();
 
   const { data: blossomUrl } = useQuery({
     queryKey: ["blossom-url"],
@@ -171,8 +163,7 @@ function BlossomSection({
     mutationFn: (url: string) => invoke("set_blossom_url", { url }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
-      setEditing(false);
-      setUrlInput("");
+      editor.close();
     },
   });
 
@@ -190,51 +181,44 @@ function BlossomSection({
         A Blossom server used to sync image attachments between devices.
       </p>
 
-      {blossomUrl && !editing ? (
+      {blossomUrl && !editor.editing ? (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {blossomUrl}
           </code>
-          <button
-            type="button"
-            onClick={() => {
-              setUrlInput(blossomUrl);
-              setEditing(true);
-            }}
-            className="text-xs text-blue-500 hover:underline"
+          <Button
+            variant="link"
+            size="xs"
+            onClick={() => editor.open(blossomUrl)}
           >
             Change
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="link"
+            size="xs"
+            className="text-destructive"
             onClick={() => removeMutation.mutate()}
-            className="text-xs text-red-500 hover:underline"
           >
             Remove
-          </button>
+          </Button>
         </div>
-      ) : !editing ? (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-sm text-blue-500 hover:underline"
-        >
+      ) : !editor.editing ? (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
           Set Blossom server
-        </button>
+        </Button>
       ) : (
         <RelayUrlForm
-          value={urlInput}
-          onChange={setUrlInput}
-          onSubmit={() => setMutation.mutate(urlInput.trim())}
+          value={editor.value}
+          onChange={editor.setValue}
+          onSubmit={() => setMutation.mutate(editor.value.trim())}
           onCancel={() => {
-            setEditing(false);
-            setUrlInput("");
+            editor.close();
             setMutation.reset();
           }}
           isPending={setMutation.isPending}
           error={
             setMutation.isError
-              ? (setMutation.error as Error).message
+              ? errorMessage(setMutation.error, "Failed to set server")
               : undefined
           }
           submitLabel="Save"
@@ -252,15 +236,13 @@ function PublishRelaysSection({
   relays: Relay[];
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
-  const [adding, setAdding] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
+  const editor = useInlineEditor();
 
   const addMutation = useMutation({
     mutationFn: (url: string) => invoke<Relay[]>("add_publish_relay", { url }),
     onSuccess: (data) => {
       queryClient.setQueryData(["relays"], data);
-      setAdding(false);
-      setUrlInput("");
+      editor.close();
     },
   });
 
@@ -299,28 +281,23 @@ function PublishRelaysSection({
         </ul>
       )}
 
-      {!adding ? (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="text-sm text-blue-500 hover:underline"
-        >
+      {!editor.editing ? (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
           Add relay
-        </button>
+        </Button>
       ) : (
         <RelayUrlForm
-          value={urlInput}
-          onChange={setUrlInput}
-          onSubmit={() => addMutation.mutate(urlInput.trim())}
+          value={editor.value}
+          onChange={editor.setValue}
+          onSubmit={() => addMutation.mutate(editor.value.trim())}
           onCancel={() => {
-            setAdding(false);
-            setUrlInput("");
+            editor.close();
             addMutation.reset();
           }}
           isPending={addMutation.isPending}
           error={
             addMutation.isError
-              ? (addMutation.error as Error).message
+              ? errorMessage(addMutation.error, "Failed to add relay")
               : undefined
           }
           submitLabel="Add"
@@ -365,21 +342,16 @@ function RelayUrlForm({
       />
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex gap-2">
-        <button
-          type="button"
+        <Button
+          size="xs"
           onClick={onSubmit}
           disabled={!value.trim() || isPending}
-          className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {submitLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-muted-foreground hover:bg-accent rounded px-3 py-1 text-xs"
-        >
+        </Button>
+        <Button size="xs" variant="ghost" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

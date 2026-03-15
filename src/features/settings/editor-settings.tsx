@@ -4,32 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useUIStore } from "@/stores/use-ui-store";
 
-function SettingRow({
-  label,
-  description,
-  children,
-  border = true,
-}: {
-  label: string;
-  description: string;
-  children: React.ReactNode;
-  border?: boolean;
-}) {
-  return (
-    <div
-      className={[
-        "flex items-center justify-between gap-6 py-3",
-        border ? "border-b" : "",
-      ].join(" ")}
-    >
-      <div className="min-w-0">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-muted-foreground text-xs">{description}</p>
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  );
-}
+import { SettingRow } from "./setting-row";
 
 export function EditorSettings() {
   const showToolbar = useUIStore((s) => s.showEditorToolbar);

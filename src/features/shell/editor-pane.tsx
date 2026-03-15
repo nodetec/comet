@@ -7,7 +7,9 @@ import {
 } from "react";
 import { useUIStore } from "@/stores/use-ui-store";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu, Submenu } from "@tauri-apps/api/menu";
+import { Menu } from "@tauri-apps/api/menu";
+
+import { buildNotebookSubmenu } from "./notebook-submenu";
 import { Ellipsis, PanelBottomOpen, PanelBottomClose } from "lucide-react";
 
 import {
@@ -114,44 +116,11 @@ export function EditorPane({
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     const buttonRect = event.currentTarget.getBoundingClientRect();
-    const currentNotebookItem = notebook
-      ? [
-          {
-            id: `editor-menu-notebook-current-${notebook.id}`,
-            text: `Current: ${notebook.name}`,
-            enabled: false,
-          },
-          {
-            id: "editor-menu-notebook-none",
-            text: "Remove from Notebook",
-            action: () => {
-              onAssignNotebook(null);
-            },
-          },
-          { item: "Separator" as const },
-        ]
-      : [];
-    const otherNotebookItems =
-      notebooks.length > 0
-        ? notebooks
-            .filter((item) => item.id !== notebook?.id)
-            .map((item) => ({
-              id: `editor-menu-notebook-${item.id}`,
-              text: item.name,
-              action: () => {
-                onAssignNotebook(item.id);
-              },
-            }))
-        : [
-            {
-              id: "editor-menu-notebook-empty",
-              text: "No notebooks yet",
-              enabled: false,
-            },
-          ];
-    const moveToNotebookSubmenu = await Submenu.new({
-      text: "Move to Notebook",
-      items: [...currentNotebookItem, ...otherNotebookItems],
+    const moveToNotebookSubmenu = await buildNotebookSubmenu({
+      currentNotebook: notebook,
+      notebooks,
+      idPrefix: "editor-menu-notebook",
+      onAssign: (notebookId) => onAssignNotebook(notebookId),
     });
 
     const publishItems = publishedAt

@@ -1,168 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
-  type InfiniteData,
 } from "@tanstack/react-query";
-import { toast } from "sonner";
-
 import { listen } from "@tauri-apps/api/event";
-import { initAttachmentsBasePath } from "@/lib/attachments";
-
-const PENDING_DRAFT_KEY = "comet-pending-draft";
+import { toastErrorHandler } from "@/lib/mutation-utils";
+import { errorMessage } from "@/lib/utils";
 import { useShellStore } from "@/stores/use-shell-store";
 import { defaultNoteSortPrefs, useUIStore } from "@/stores/use-ui-store";
 
 import {
-  type AssignNoteNotebookInput,
-  type BootstrapPayload,
-  type ContextualTagsInput,
-  type ContextualTagsPayload,
-  type CreateNotebookInput,
+  archiveNote,
+  assignNoteNotebook,
+  createNote,
+  deleteNotePermanently,
+  getBootstrap,
+  getContextualTags,
+  loadNote,
+  NOTE_PAGE_SIZE,
+  PENDING_DRAFT_KEY,
+  pinNote,
+  queryNotes,
+  restoreNote,
+  saveNote,
+  unpinNote,
+} from "./api";
+import {
   type LoadedNote,
-  type NotePagePayload,
   type NoteQueryInput,
   type NoteSortDirection,
   type NoteSortField,
   type PublishNoteInput,
-  type RenameNotebookInput,
 } from "./types";
-
-const NOTE_PAGE_SIZE = 40;
-
-async function getBootstrap() {
-  const [bootstrap] = await Promise.all([
-    invoke<BootstrapPayload>("bootstrap"),
-    initAttachmentsBasePath(),
-  ]);
-  return bootstrap;
-}
-
-async function queryNotes(input: NoteQueryInput) {
-  return invoke<NotePagePayload>("query_notes", { input });
-}
-
-async function getContextualTags(input: ContextualTagsInput) {
-  return invoke<ContextualTagsPayload>("contextual_tags", { input });
-}
-
-async function loadNote(noteId: string) {
-  return invoke<LoadedNote>("load_note", { noteId });
-}
-
-async function createNote(input: {
-  notebookId: string | null;
-  tags: string[];
-}) {
-  return invoke<LoadedNote>("create_note", input);
-}
-
-async function saveNote(input: { id: string; markdown: string }) {
-  return invoke<LoadedNote>("save_note", { input });
-}
-
-async function archiveNote(noteId: string) {
-  return invoke<LoadedNote>("archive_note", { noteId });
-}
-
-async function restoreNote(noteId: string) {
-  return invoke<LoadedNote>("restore_note", { noteId });
-}
-
-async function deleteNotePermanently(noteId: string) {
-  return invoke("delete_note_permanently", { noteId });
-}
-
-async function createNotebook(input: CreateNotebookInput) {
-  return invoke("create_notebook", { input });
-}
-
-async function renameNotebook(input: RenameNotebookInput) {
-  return invoke("rename_notebook", { input });
-}
-
-async function deleteNotebook(notebookId: string) {
-  return invoke("delete_notebook", { notebookId });
-}
-
-async function assignNoteNotebook(input: AssignNoteNotebookInput) {
-  return invoke<LoadedNote>("assign_note_notebook", { input });
-}
-
-async function pinNote(noteId: string) {
-  return invoke<LoadedNote>("pin_note", { noteId });
-}
-
-async function unpinNote(noteId: string) {
-  return invoke<LoadedNote>("unpin_note", { noteId });
-}
-
-type PublishResult = {
-  successCount: number;
-  failCount: number;
-  relayCount: number;
-};
-
-async function publishNote(input: PublishNoteInput) {
-  return invoke<PublishResult>("publish_note", { input });
-}
-
-async function deletePublishedNote(noteId: string) {
-  return invoke<PublishResult>("delete_published_note", { noteId });
-}
-
-function flattenNotePages(
-  data: InfiniteData<NotePagePayload, unknown> | undefined,
-) {
-  return data?.pages.flatMap((page) => page.notes) ?? [];
-}
-
-function nextSelectedNoteIdAfterRemoval(
-  notes: NotePagePayload["notes"],
-  removedNoteId: string,
-) {
-  const removedIndex = notes.findIndex((note) => note.id === removedNoteId);
-  const remainingNotes = notes.filter((note) => note.id !== removedNoteId);
-
-  if (remainingNotes.length === 0) {
-    return null;
-  }
-
-  if (removedIndex < 0) {
-    return remainingNotes[0]?.id ?? null;
-  }
-
-  return (
-    remainingNotes[Math.min(removedIndex, remainingNotes.length - 1)]?.id ??
-    null
-  );
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error) {
-    return error;
-  }
-
-  return fallback;
-}
+import { useNotebookState } from "./use-notebook-state";
+import { usePublishState } from "./use-publish-state";
+import { flattenNotePages, nextSelectedNoteIdAfterRemoval } from "./utils";
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
     useState(false);
-  const [isCreatingNotebook, setIsCreatingNotebook] = useState(false);
   const [isCreatingNoteTransition, setIsCreatingNoteTransition] =
     useState(false);
-  const [editingNotebookId, setEditingNotebookId] = useState<string | null>(
-    null,
-  );
   const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
     string | null
   >(null);
@@ -170,9 +51,9 @@ export function useShellController() {
   const [editorFocusMode, setEditorFocusMode] = useState<
     "none" | "immediate" | "pointerup"
   >("none");
-  const [newNotebookName, setNewNotebookName] = useState("");
-  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
-  const [renamingNotebookName, setRenamingNotebookName] = useState("");
+
+  const notebook = useNotebookState();
+  const publish = usePublishState();
   const pendingSaveTimeoutRef = useRef<number | null>(null);
 
   const queryClient = useQueryClient();
@@ -425,10 +306,7 @@ export function useShellController() {
       setCreatingSelectedNoteId(null);
       setIsCreatingNoteTransition(false);
       setEditorFocusMode("none");
-      toast.error("Couldn't create note", {
-        description: errorMessage(error, "Try again."),
-        id: "create-note-error",
-      });
+      toastErrorHandler("Couldn't create note", "create-note-error")(error);
     },
   });
 
@@ -443,12 +321,11 @@ export function useShellController() {
         // Ignore
       }
     },
-    onError: (error) => {
-      toast.error("Couldn't save note", {
-        description: errorMessage(error, "Your latest changes were not saved."),
-        id: "save-note-error",
-      });
-    },
+    onError: toastErrorHandler(
+      "Couldn't save note",
+      "save-note-error",
+      "Your latest changes were not saved.",
+    ),
   });
 
   const archiveNoteMutation = useMutation({
@@ -464,12 +341,7 @@ export function useShellController() {
 
       void invalidateShellData();
     },
-    onError: (error) => {
-      toast.error("Couldn't archive note", {
-        description: errorMessage(error, "Try again."),
-        id: "archive-note-error",
-      });
-    },
+    onError: toastErrorHandler("Couldn't archive note", "archive-note-error"),
   });
 
   const restoreNoteMutation = useMutation({
@@ -485,12 +357,7 @@ export function useShellController() {
 
       void invalidateShellData();
     },
-    onError: (error) => {
-      toast.error("Couldn't restore note", {
-        description: errorMessage(error, "Try again."),
-        id: "restore-note-error",
-      });
-    },
+    onError: toastErrorHandler("Couldn't restore note", "restore-note-error"),
   });
 
   const deleteNotePermanentlyMutation = useMutation({
@@ -508,72 +375,7 @@ export function useShellController() {
 
       void invalidateShellData();
     },
-    onError: (error) => {
-      toast.error("Couldn't delete note", {
-        description: errorMessage(error, "Try again."),
-        id: "delete-note-error",
-      });
-    },
-  });
-
-  const createNotebookMutation = useMutation({
-    mutationFn: createNotebook,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-        queryClient.invalidateQueries({ queryKey: ["notes"] }),
-        queryClient.invalidateQueries({ queryKey: ["note"] }),
-      ]);
-      setIsCreatingNotebook(false);
-      setNewNotebookName("");
-    },
-    onError: (error) => {
-      toast.error("Couldn't create notebook", {
-        description: errorMessage(error, "Try again."),
-        id: "create-notebook-error",
-      });
-    },
-  });
-
-  const renameNotebookMutation = useMutation({
-    mutationFn: renameNotebook,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-        queryClient.invalidateQueries({ queryKey: ["notes"] }),
-        queryClient.invalidateQueries({ queryKey: ["note"] }),
-      ]);
-      setEditingNotebookId(null);
-      setRenamingNotebookName("");
-    },
-    onError: (error) => {
-      toast.error("Couldn't rename notebook", {
-        description: errorMessage(error, "Try again."),
-        id: "rename-notebook-error",
-      });
-    },
-  });
-
-  const deleteNotebookMutation = useMutation({
-    mutationFn: deleteNotebook,
-    onSuccess: async (_, notebookId) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-        queryClient.invalidateQueries({ queryKey: ["notes"] }),
-        queryClient.invalidateQueries({ queryKey: ["note"] }),
-      ]);
-
-      if (editingNotebookId === notebookId) {
-        setEditingNotebookId(null);
-        setRenamingNotebookName("");
-      }
-    },
-    onError: (error) => {
-      toast.error("Couldn't delete notebook", {
-        description: errorMessage(error, "Try again."),
-        id: "delete-notebook-error",
-      });
-    },
+    onError: toastErrorHandler("Couldn't delete note", "delete-note-error"),
   });
 
   const assignNoteNotebookMutation = useMutation({
@@ -594,12 +396,10 @@ export function useShellController() {
 
       void invalidateShellData();
     },
-    onError: (error) => {
-      toast.error("Couldn't move note", {
-        description: errorMessage(error, "Try again."),
-        id: "assign-note-notebook-error",
-      });
-    },
+    onError: toastErrorHandler(
+      "Couldn't move note",
+      "assign-note-notebook-error",
+    ),
   });
 
   const pinNoteMutation = useMutation({
@@ -608,12 +408,7 @@ export function useShellController() {
       queryClient.setQueryData(["note", updatedNote.id], updatedNote);
       void invalidateNotes();
     },
-    onError: (error) => {
-      toast.error("Couldn't pin note", {
-        description: errorMessage(error, "Try again."),
-        id: "pin-note-error",
-      });
-    },
+    onError: toastErrorHandler("Couldn't pin note", "pin-note-error"),
   });
 
   const unpinNoteMutation = useMutation({
@@ -622,50 +417,7 @@ export function useShellController() {
       queryClient.setQueryData(["note", updatedNote.id], updatedNote);
       void invalidateNotes();
     },
-    onError: (error) => {
-      toast.error("Couldn't unpin note", {
-        description: errorMessage(error, "Try again."),
-        id: "unpin-note-error",
-      });
-    },
-  });
-
-  const publishNoteMutation = useMutation({
-    mutationFn: publishNote,
-    onSuccess: (result, input) => {
-      setPublishDialogOpen(false);
-      toast.success(
-        `Published to ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
-        { id: "publish-note-success" },
-      );
-      void queryClient.invalidateQueries({ queryKey: ["note", input.noteId] });
-    },
-    onError: (error) => {
-      toast.error("Couldn't publish note", {
-        description: errorMessage(error, "Try again."),
-        id: "publish-note-error",
-      });
-    },
-  });
-
-  const [deletePublishDialogOpen, setDeletePublishDialogOpen] = useState(false);
-
-  const deletePublishedNoteMutation = useMutation({
-    mutationFn: deletePublishedNote,
-    onSuccess: (result, noteId) => {
-      setDeletePublishDialogOpen(false);
-      toast.success(
-        `Deleted from ${result.successCount} of ${result.relayCount} relay${result.relayCount === 1 ? "" : "s"}`,
-        { id: "delete-published-note-success" },
-      );
-      void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-    },
-    onError: (error) => {
-      toast.error("Couldn't delete published note", {
-        description: errorMessage(error, "Try again."),
-        id: "delete-published-note-error",
-      });
-    },
+    onError: toastErrorHandler("Couldn't unpin note", "unpin-note-error"),
   });
 
   useEffect(() => {
@@ -724,7 +476,7 @@ export function useShellController() {
         markdown: string;
       };
       if (noteId && markdown) {
-        invoke("save_note", { input: { id: noteId, markdown } }).then(() => {
+        saveNote({ id: noteId, markdown }).then(() => {
           localStorage.removeItem(PENDING_DRAFT_KEY);
           queryClient.invalidateQueries({ queryKey: ["note", noteId] });
           queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -959,56 +711,20 @@ export function useShellController() {
 
         await writeText(note.markdown);
       } catch (error) {
-        toast.error("Couldn't copy note", {
-          description: errorMessage(error, "Try again."),
-          id: "copy-note-error",
-        });
+        toastErrorHandler("Couldn't copy note", "copy-note-error")(error);
       }
     })();
   };
 
-  const submitNotebook = () => {
-    const name = newNotebookName.trim();
-    if (!name || createNotebookMutation.isPending) {
-      return;
-    }
-
-    createNotebookMutation.mutate({ name });
-  };
-
-  const submitRenameNotebook = () => {
-    const name = renamingNotebookName.trim();
-    if (!editingNotebookId || !name || renameNotebookMutation.isPending) {
-      return;
-    }
-
-    renameNotebookMutation.mutate({
-      name,
-      notebookId: editingNotebookId,
-    });
-  };
-
-  const handleDeleteNotebook = (notebookId: string) => {
-    if (
-      createNotebookMutation.isPending ||
-      renameNotebookMutation.isPending ||
-      deleteNotebookMutation.isPending
-    ) {
-      return;
-    }
-
-    deleteNotebookMutation.mutate(notebookId);
-  };
-
   // Keep latest handler references for stable memoized callbacks
-  const latestRef = useRef({
+  const currentHandlers = {
     fetchNextPage: notesQuery.fetchNextPage,
     flushCurrentDraftAsync,
     handleAssignNoteNotebook,
     handleArchiveNote,
     handleCopyNoteContent,
     handleCreateNote,
-    handleDeleteNotebook,
+    handleDeleteNotebook: notebook.handleDeleteNotebook,
     handleDeleteNotePermanently,
     handleRestoreNote,
     handleSelectAll,
@@ -1018,29 +734,11 @@ export function useShellController() {
     handleSelectToday,
     handleSetNotePinned,
     handleToggleTag,
-    submitNotebook,
-    submitRenameNotebook,
-  });
-  latestRef.current = {
-    fetchNextPage: notesQuery.fetchNextPage,
-    flushCurrentDraftAsync,
-    handleAssignNoteNotebook,
-    handleArchiveNote,
-    handleCopyNoteContent,
-    handleCreateNote,
-    handleDeleteNotebook,
-    handleDeleteNotePermanently,
-    handleRestoreNote,
-    handleSelectAll,
-    handleSelectArchive,
-    handleSelectNote,
-    handleSelectNotebook,
-    handleSelectToday,
-    handleSetNotePinned,
-    handleToggleTag,
-    submitNotebook,
-    submitRenameNotebook,
+    submitNotebook: notebook.submitNotebook,
+    submitRenameNotebook: notebook.submitRenameNotebook,
   };
+  const latestRef = useRef(currentHandlers);
+  latestRef.current = currentHandlers;
 
   const editorPaneProps = useMemo(
     () => ({
@@ -1059,7 +757,8 @@ export function useShellController() {
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
       searchQuery,
-      isDeletePublishedNotePending: deletePublishedNoteMutation.isPending,
+      isDeletePublishedNotePending:
+        publish.deletePublishedNoteMutation.isPending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           latestRef.current.handleAssignNoteNotebook(
@@ -1071,22 +770,22 @@ export function useShellController() {
       onDeletePublishedNote() {
         if (
           !currentNote ||
-          deletePublishedNoteMutation.isPending ||
+          publish.deletePublishedNoteMutation.isPending ||
           !currentNote.publishedAt
         ) {
           return;
         }
 
-        setDeletePublishDialogOpen(true);
+        publish.setDeletePublishDialogOpen(true);
       },
       onOpenPublishDialog() {
-        if (!currentNote || publishNoteMutation.isPending) {
+        if (!currentNote || publish.publishNoteMutation.isPending) {
           return;
         }
 
         void (async () => {
           await latestRef.current.flushCurrentDraftAsync();
-          setPublishDialogOpen(true);
+          publish.setPublishDialogOpen(true);
         })().catch(() => {});
       },
       onSetPinned(pinned: boolean) {
@@ -1107,10 +806,10 @@ export function useShellController() {
       creatingSelectedNoteId,
       currentEditorMarkdown,
       currentNote,
-      deletePublishedNoteMutation.isPending,
+      publish.deletePublishedNoteMutation.isPending,
       editorFocusMode,
       notebooks,
-      publishNoteMutation.isPending,
+      publish.publishNoteMutation.isPending,
       searchQuery,
       selectedNoteId,
       setDraft,
@@ -1124,39 +823,40 @@ export function useShellController() {
       initialTitle: currentNote?.title ?? "",
       initialTags: currentNote?.tags ?? [],
       noteId: currentNote?.id ?? "",
-      open: publishDialogOpen,
-      pending: publishNoteMutation.isPending,
-      onOpenChange: setPublishDialogOpen,
+      open: publish.publishDialogOpen,
+      pending: publish.publishNoteMutation.isPending,
+      onOpenChange: publish.setPublishDialogOpen,
       onSubmit(input: PublishNoteInput) {
-        publishNoteMutation.mutate(input);
+        publish.publishNoteMutation.mutate(input);
       },
     }),
     [
       currentNote?.id,
       currentNote?.tags,
       currentNote?.title,
-      publishDialogOpen,
-      publishNoteMutation.isPending,
-      publishNoteMutation.mutate,
+      publish.publishDialogOpen,
+      publish.publishNoteMutation.isPending,
+      publish.publishNoteMutation.mutate,
     ],
   );
 
+  const currentNoteId = currentNote?.id ?? null;
   const deletePublishDialogProps = useMemo(
     () => ({
-      open: deletePublishDialogOpen,
-      pending: deletePublishedNoteMutation.isPending,
-      onOpenChange: setDeletePublishDialogOpen,
+      open: publish.deletePublishDialogOpen,
+      pending: publish.deletePublishedNoteMutation.isPending,
+      onOpenChange: publish.setDeletePublishDialogOpen,
       onConfirm() {
-        if (currentNote) {
-          deletePublishedNoteMutation.mutate(currentNote.id);
+        if (currentNoteId) {
+          publish.deletePublishedNoteMutation.mutate(currentNoteId);
         }
       },
     }),
     [
-      currentNote,
-      deletePublishDialogOpen,
-      deletePublishedNoteMutation.isPending,
-      deletePublishedNoteMutation.mutate,
+      currentNoteId,
+      publish.deletePublishDialogOpen,
+      publish.deletePublishedNoteMutation.isPending,
+      publish.deletePublishedNoteMutation.mutate,
     ],
   );
 
@@ -1233,74 +933,53 @@ export function useShellController() {
       activeNotebookId,
       activeTags,
       availableTags,
-      editingNotebookId,
-      isCreatingNotebook,
-      newNotebookName,
+      editingNotebookId: notebook.editingNotebookId,
+      isCreatingNotebook: notebook.isCreatingNotebook,
+      newNotebookName: notebook.newNotebookName,
       noteFilter,
       notebooks,
-      onChangeNotebookName: setNewNotebookName,
-      onChangeRenamingNotebookName: setRenamingNotebookName,
+      onChangeNotebookName: notebook.setNewNotebookName,
+      onChangeRenamingNotebookName: notebook.setRenamingNotebookName,
       onCreateNotebook: () => latestRef.current.submitNotebook(),
       onDeleteNotebook: (notebookId: string) =>
         latestRef.current.handleDeleteNotebook(notebookId),
-      onHideCreateNotebook() {
-        setIsCreatingNotebook(false);
-        setNewNotebookName("");
-      },
-      onHideRenameNotebook() {
-        setEditingNotebookId(null);
-        setRenamingNotebookName("");
-      },
+      onHideCreateNotebook: notebook.hideCreateNotebook,
+      onHideRenameNotebook: notebook.hideRenameNotebook,
       onSelectAll: () => latestRef.current.handleSelectAll(),
       onSelectToday: () => latestRef.current.handleSelectToday(),
       onSelectArchive: () => latestRef.current.handleSelectArchive(),
       onSelectNotebook: (notebookId: string) =>
         latestRef.current.handleSelectNotebook(notebookId),
-      onShowCreateNotebook() {
-        setEditingNotebookId(null);
-        setRenamingNotebookName("");
-        setIsCreatingNotebook(true);
-      },
-      onShowRenameNotebook(notebookId: string) {
-        const notebook = notebooks.find((item) => item.id === notebookId);
-        if (!notebook) {
-          return;
-        }
-
-        setIsCreatingNotebook(false);
-        setNewNotebookName("");
-        setEditingNotebookId(notebookId);
-        setRenamingNotebookName(notebook.name);
-      },
+      onShowCreateNotebook: notebook.showCreateNotebook,
+      onShowRenameNotebook: (notebookId: string) =>
+        notebook.showRenameNotebook(notebookId, notebooks),
       onSubmitRenameNotebook: () => latestRef.current.submitRenameNotebook(),
       onToggleTag: (tag: string) => latestRef.current.handleToggleTag(tag),
       renameNotebookDisabled:
-        renameNotebookMutation.isPending || deleteNotebookMutation.isPending,
-      renamingNotebookName,
+        notebook.renameNotebookMutation.isPending ||
+        notebook.deleteNotebookMutation.isPending,
+      renamingNotebookName: notebook.renamingNotebookName,
     }),
     [
       activeNotebookId,
       activeTags,
       availableTags,
-      deleteNotebookMutation.isPending,
-      editingNotebookId,
-      isCreatingNotebook,
-      newNotebookName,
+      notebook.deleteNotebookMutation.isPending,
+      notebook.editingNotebookId,
+      notebook.isCreatingNotebook,
+      notebook.newNotebookName,
       noteFilter,
       notebooks,
-      renameNotebookMutation.isPending,
-      renamingNotebookName,
+      notebook.renameNotebookMutation.isPending,
+      notebook.renamingNotebookName,
     ],
   );
 
   return {
     activeNotebookId,
-    bootstrapError:
-      bootstrapQuery.isError && bootstrapQuery.error instanceof Error
-        ? bootstrapQuery.error.message
-        : bootstrapQuery.isError
-          ? "Failed to load the note library."
-          : null,
+    bootstrapError: bootstrapQuery.isError
+      ? errorMessage(bootstrapQuery.error, "Failed to load the note library.")
+      : null,
     bootstrapLoading: bootstrapQuery.isLoading,
     readyToRevealWindow,
     retryBootstrap() {

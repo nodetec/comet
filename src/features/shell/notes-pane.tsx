@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { searchWordsFromQuery } from "@/lib/search";
 import { type NoteFilter } from "@/stores/use-shell-store";
 
+import { buildNotebookSubmenu } from "./notebook-submenu";
+
 import {
   notesHeading,
   type NotebookSummary,
@@ -197,44 +199,11 @@ export function NotesPane({
     event.preventDefault();
     const moveToNotebookSubmenu =
       !isArchive &&
-      (await Submenu.new({
-        text: "Move to Notebook",
-        items: [
-          ...(note.notebook
-            ? [
-                {
-                  id: `note-menu-notebook-current-${note.id}-${note.notebook.id}`,
-                  text: `Current: ${note.notebook.name}`,
-                  enabled: false,
-                },
-                {
-                  id: `note-menu-notebook-none-${note.id}`,
-                  text: "Remove from Notebook",
-                  action: () => {
-                    onAssignNoteNotebook(note.id, null);
-                  },
-                },
-                { item: "Separator" as const },
-              ]
-            : []),
-          ...(notebooks.length > 0
-            ? notebooks
-                .filter((item) => item.id !== note.notebook?.id)
-                .map((item) => ({
-                  id: `note-menu-notebook-${note.id}-${item.id}`,
-                  text: item.name,
-                  action: () => {
-                    onAssignNoteNotebook(note.id, item.id);
-                  },
-                }))
-            : [
-                {
-                  id: `note-menu-notebook-empty-${note.id}`,
-                  text: "No notebooks yet",
-                  enabled: false,
-                },
-              ]),
-        ],
+      (await buildNotebookSubmenu({
+        currentNotebook: note.notebook,
+        notebooks,
+        idPrefix: `note-menu-notebook-${note.id}`,
+        onAssign: (notebookId) => onAssignNoteNotebook(note.id, notebookId),
       }));
 
     const menu = await Menu.new({

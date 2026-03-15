@@ -4,23 +4,25 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, Copy } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { errorMessage } from "@/lib/utils";
 import type { BootstrapPayload } from "@/features/shell/types";
+
+import { useInlineEditor } from "./use-inline-editor";
 
 export function ProfileSettings() {
   const queryClient = useQueryClient();
   const bootstrap = queryClient.getQueryData<BootstrapPayload>(["bootstrap"]);
   const npub = bootstrap?.npub ?? "";
 
-  const [editing, setEditing] = useState(false);
-  const [nsecInput, setNsecInput] = useState("");
+  const editor = useInlineEditor();
   const [copied, setCopied] = useState(false);
 
   const importMutation = useMutation({
     mutationFn: (nsec: string) => invoke<string>("import_nsec", { nsec }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
-      setEditing(false);
-      setNsecInput("");
+      editor.close();
     },
   });
 
@@ -61,14 +63,10 @@ export function ProfileSettings() {
           </div>
         </div>
 
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="text-sm text-blue-500 hover:underline"
-          >
+        {!editor.editing ? (
+          <Button variant="link" size="xs" onClick={() => editor.open()}>
             Change Key
-          </button>
+          </Button>
         ) : (
           <div className="space-y-3">
             <p className="text-xs text-yellow-600 dark:text-yellow-500">
@@ -76,9 +74,9 @@ export function ProfileSettings() {
             </p>
             <input
               type="password"
-              value={nsecInput}
+              value={editor.value}
               onChange={(e) => {
-                setNsecInput(e.target.value);
+                editor.setValue(e.target.value);
                 importMutation.reset();
               }}
               placeholder="nsec1..."
@@ -86,29 +84,27 @@ export function ProfileSettings() {
             />
             {importMutation.isError && (
               <p className="text-xs text-red-500">
-                {(importMutation.error as Error).message ?? "Import failed"}
+                {errorMessage(importMutation.error, "Import failed")}
               </p>
             )}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => importMutation.mutate(nsecInput.trim())}
-                disabled={!nsecInput.trim() || importMutation.isPending}
-                className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+              <Button
+                size="xs"
+                onClick={() => importMutation.mutate(editor.value.trim())}
+                disabled={!editor.value.trim() || importMutation.isPending}
               >
                 {importMutation.isPending ? "Importing..." : "Import"}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
                 onClick={() => {
-                  setEditing(false);
-                  setNsecInput("");
+                  editor.close();
                   importMutation.reset();
                 }}
-                className="text-muted-foreground hover:bg-accent rounded px-3 py-1 text-xs"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
