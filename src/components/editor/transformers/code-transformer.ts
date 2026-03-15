@@ -93,11 +93,17 @@ export const CODE_BLOCK: MultilineElementTransformer = {
   },
   replace: (
     rootNode: ElementNode,
-    _children: LexicalNode[] | null,
+    children: LexicalNode[] | null,
     startMatch: string[],
-    _endMatch: string[] | null,
+    endMatch: string[] | null,
     linesInBetween: string[] | null,
+    isImport?: boolean,
   ) => {
+    // Shortcut mode (user typed ``` + Enter): children is set, linesInBetween is null.
+    // Delegate to the default CODE transformer which handles node replacement.
+    if (children) {
+      return CODE.replace(rootNode, children, startMatch, endMatch, linesInBetween, isImport);
+    }
     if (!linesInBetween) return;
 
     const language = startMatch[2] || undefined;
