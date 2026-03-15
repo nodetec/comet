@@ -24,7 +24,7 @@ body,
 
 body {
   margin: 0;
-  background: oklch(23.48% 0.004 264.49);
+  background: var(--background);
 }
 
 :root {
@@ -60,6 +60,9 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --editor-text: rgba(244, 246, 247, 0.96);
+  --editor-caret: #6cb4ee;
+  --editor-selection: rgba(108, 180, 238, 0.18);
 }
 
 @theme inline {
@@ -125,8 +128,8 @@ body {
   font-size: var(--editor-font-size, 15px);
   /*line-height: normal;*/
   letter-spacing: -0.01em;
-  color: rgba(244, 246, 247, 0.96);
-  caret-color: #6cb4ee;
+  color: var(--editor-text);
+  caret-color: var(--editor-caret);
   outline: none;
   min-height: 100%;
   width: 100%;
@@ -142,7 +145,7 @@ body {
 }
 
 [data-lexical-editor] ::selection {
-  background: rgba(108, 180, 238, 0.18);
+  background: var(--editor-selection);
 }
 
 ::selection {

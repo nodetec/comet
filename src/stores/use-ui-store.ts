@@ -31,6 +31,9 @@ type UIStore = {
 
   noteSortPrefs: Record<string, NoteSortPrefs>;
   setNoteSortPrefs(viewKey: string, prefs: Partial<NoteSortPrefs>): void;
+
+  themeName: string;
+  setThemeName(name: string): void;
 };
 
 export const useUIStore = create<UIStore>()(
@@ -61,6 +64,11 @@ export const useUIStore = create<UIStore>()(
         set({ editorSpellCheck });
       },
 
+      themeName: "default",
+      setThemeName: (themeName) => {
+        set({ themeName });
+      },
+
       noteSortPrefs: {},
       setNoteSortPrefs: (viewKey, prefs) => {
         set((state) => {
@@ -84,6 +92,7 @@ export const useUIStore = create<UIStore>()(
         showEditorToolbar: state.showEditorToolbar,
         editorFontSize: state.editorFontSize,
         editorSpellCheck: state.editorSpellCheck,
+        themeName: state.themeName,
         noteSortPrefs: state.noteSortPrefs,
       }),
     },

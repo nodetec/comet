@@ -4,6 +4,7 @@ mod db;
 mod nostr;
 mod notes;
 mod sync;
+mod themes;
 
 use db::database_connection;
 use rusqlite::OptionalExtension;
@@ -21,6 +22,7 @@ struct AppStatus {
     version: String,
     database_path: String,
     attachments_path: String,
+    themes_path: String,
 }
 
 #[tauri::command]
@@ -28,12 +30,24 @@ fn app_status(app: AppHandle) -> Result<AppStatus, String> {
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let database_path = config_dir.join("comet.db");
     let attachments_path = config_dir.join("attachments");
+    let themes_path = config_dir.join("themes");
 
     Ok(AppStatus {
         version: app.config().version.clone().unwrap_or_else(|| "unknown".into()),
         database_path: database_path.to_string_lossy().into_owned(),
         attachments_path: attachments_path.to_string_lossy().into_owned(),
+        themes_path: themes_path.to_string_lossy().into_owned(),
     })
+}
+
+#[tauri::command]
+fn list_themes(app: AppHandle) -> Result<Vec<themes::ThemeSummary>, String> {
+    themes::list_themes(&app)
+}
+
+#[tauri::command]
+fn read_theme(app: AppHandle, theme_id: String) -> Result<themes::ThemeData, String> {
+    themes::read_theme(&app, &theme_id)
 }
 
 #[tauri::command]
@@ -577,7 +591,9 @@ pub fn run() {
             is_sync_enabled,
             set_sync_enabled,
             get_sync_status,
-            restart_sync
+            restart_sync,
+            list_themes,
+            read_theme
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

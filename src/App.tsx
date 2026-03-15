@@ -1,4 +1,6 @@
 import { type CSSProperties, useEffect, useState } from "react";
+
+import { useTheme } from "@/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 
 function App() {
+  useTheme();
   const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
   const [hasCompletedStartupReveal, setHasCompletedStartupReveal] =
     useState(false);
