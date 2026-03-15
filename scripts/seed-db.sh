@@ -287,7 +287,7 @@ This one exists to exercise archive and restore flows.
 
 INSERT INTO app_settings (key, value) VALUES
   ('last_open_note_id', 'note-writing-draft'),
-  ('blossom_url', 'https://comet-blossom.fly.dev');
+  ('blossom_url', 'https://blossom.comet.md');
 
 INSERT INTO note_tags (note_id, tag) VALUES
   ('note-pinned-trail', 'design'),
