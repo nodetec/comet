@@ -2,11 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 
 type AppStatus = {
-  appName: string;
-  editor: string;
-  storage: string;
-  publishing: string;
-  updatedAt: string;
+  version: string;
+  databasePath: string;
+  attachmentsPath: string;
 };
 
 export function GeneralSettings() {
@@ -24,11 +22,9 @@ export function GeneralSettings() {
   }
 
   const items = [
-    { label: "App", value: data.appName },
-    { label: "Editor", value: data.editor },
-    { label: "Storage", value: data.storage },
-    { label: "Publishing", value: data.publishing },
-    { label: "Updated", value: data.updatedAt },
+    { label: "Version", value: data.version },
+    { label: "Database", value: data.databasePath },
+    { label: "Attachments", value: data.attachmentsPath },
   ];
 
   return (
@@ -37,10 +33,10 @@ export function GeneralSettings() {
       <dl className="space-y-3">
         {items.map((item) => (
           <div key={item.label} className="flex gap-4 text-sm">
-            <dt className="text-muted-foreground w-24 shrink-0">
+            <dt className="text-muted-foreground w-28 shrink-0">
               {item.label}
             </dt>
-            <dd>{item.value}</dd>
+            <dd className="break-all">{item.value}</dd>
           </div>
         ))}
       </dl>

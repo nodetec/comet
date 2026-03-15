@@ -16,22 +16,22 @@ use tauri::{AppHandle, Manager};
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppStatus {
-    app_name: &'static str,
-    editor: &'static str,
-    storage: &'static str,
-    publishing: &'static str,
-    updated_at: &'static str,
+    version: String,
+    database_path: String,
+    attachments_path: String,
 }
 
 #[tauri::command]
-fn app_status() -> AppStatus {
-    AppStatus {
-        app_name: "comet",
-        editor: "CodeMirror",
-        storage: "Local SQLite note store with markdown as the content format",
-        publishing: "explicit Nostr publishing",
-        updated_at: "2026-03-12",
-    }
+fn app_status(app: AppHandle) -> Result<AppStatus, String> {
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let database_path = config_dir.join("comet.db");
+    let attachments_path = config_dir.join("attachments");
+
+    Ok(AppStatus {
+        version: app.config().version.clone().unwrap_or_else(|| "unknown".into()),
+        database_path: database_path.to_string_lossy().into_owned(),
+        attachments_path: attachments_path.to_string_lossy().into_owned(),
+    })
 }
 
 #[tauri::command]
