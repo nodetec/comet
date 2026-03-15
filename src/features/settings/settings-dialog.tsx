@@ -57,7 +57,7 @@ export function SettingsDialog() {
               </button>
             ))}
           </nav>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto px-14 py-6">
             {activeTab === "general" && <GeneralSettings />}
             {activeTab === "editor" && <EditorSettings />}
             {activeTab === "profile" && <ProfileSettings />}

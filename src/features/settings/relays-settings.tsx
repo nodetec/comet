@@ -28,8 +28,8 @@ export function RelaysSettings() {
 
   return (
     <div className="space-y-8">
-      <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
       <SyncToggle />
+      <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
       <BlossomSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
     </div>

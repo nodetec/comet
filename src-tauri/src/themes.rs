@@ -153,6 +153,108 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-selection": "rgba(108, 180, 238, 0.15)"
   }
 }"##),
+    ("light", r##"{
+  "name": "Light",
+  "colors": {
+    "background": "oklch(97% 0.004 265)",
+    "foreground": "oklch(22% 0.005 265)",
+    "card": "oklch(97% 0.004 265)",
+    "card-foreground": "oklch(22% 0.005 265)",
+    "popover": "oklch(97% 0.004 265)",
+    "popover-foreground": "oklch(22% 0.005 265)",
+    "primary": "oklch(50% 0.2 252)",
+    "primary-foreground": "oklch(97% 0 0)",
+    "secondary": "oklch(93% 0.008 265)",
+    "secondary-foreground": "oklch(30% 0.005 265)",
+    "muted": "oklch(93% 0.008 265)",
+    "muted-foreground": "oklch(38% 0.008 265)",
+    "accent": "oklch(90% 0.008 265)",
+    "accent-foreground": "oklch(30% 0.005 265)",
+    "destructive": "oklch(0.55 0.22 24)",
+    "border": "oklch(85% 0.008 265)",
+    "input": "oklch(88% 0.008 265)",
+    "ring": "oklch(0.7 0 0)",
+    "sidebar": "oklch(95% 0.006 265)",
+    "sidebar-foreground": "oklch(40% 0.005 265)",
+    "sidebar-primary": "oklch(50% 0.2 252)",
+    "sidebar-primary-foreground": "oklch(97% 0 0)",
+    "sidebar-accent": "oklch(91% 0.006 265)",
+    "sidebar-accent-foreground": "oklch(22% 0 0)",
+    "sidebar-border": "oklch(88% 0.006 265)",
+    "sidebar-ring": "oklch(0.7 0 0)",
+    "editor-text": "rgba(30, 30, 35, 0.92)",
+    "editor-caret": "oklch(50% 0.2 252)",
+    "editor-selection": "rgba(80, 140, 220, 0.18)"
+  }
+}"##),
+    ("paper", r##"{
+  "name": "Paper",
+  "colors": {
+    "background": "oklch(95.5% 0.01 80)",
+    "foreground": "oklch(25% 0.01 60)",
+    "card": "oklch(95.5% 0.01 80)",
+    "card-foreground": "oklch(25% 0.01 60)",
+    "popover": "oklch(95.5% 0.01 80)",
+    "popover-foreground": "oklch(25% 0.01 60)",
+    "primary": "oklch(48% 0.12 30)",
+    "primary-foreground": "oklch(96% 0 0)",
+    "secondary": "oklch(91% 0.012 80)",
+    "secondary-foreground": "oklch(32% 0.01 60)",
+    "muted": "oklch(91% 0.012 80)",
+    "muted-foreground": "oklch(38% 0.015 60)",
+    "accent": "oklch(88% 0.012 80)",
+    "accent-foreground": "oklch(32% 0.01 60)",
+    "destructive": "oklch(0.55 0.22 24)",
+    "border": "oklch(83% 0.01 80)",
+    "input": "oklch(86% 0.01 80)",
+    "ring": "oklch(0.68 0 0)",
+    "sidebar": "oklch(93% 0.012 80)",
+    "sidebar-foreground": "oklch(42% 0.01 60)",
+    "sidebar-primary": "oklch(48% 0.12 30)",
+    "sidebar-primary-foreground": "oklch(96% 0 0)",
+    "sidebar-accent": "oklch(89% 0.01 80)",
+    "sidebar-accent-foreground": "oklch(25% 0 0)",
+    "sidebar-border": "oklch(86% 0.01 80)",
+    "sidebar-ring": "oklch(0.68 0 0)",
+    "editor-text": "rgba(40, 35, 30, 0.9)",
+    "editor-caret": "oklch(48% 0.12 30)",
+    "editor-selection": "rgba(160, 100, 60, 0.15)"
+  }
+}"##),
+    ("sol-light", r##"{
+  "name": "Solarized Light",
+  "colors": {
+    "background": "oklch(96% 0.015 90)",
+    "foreground": "oklch(35% 0.04 200)",
+    "card": "oklch(96% 0.015 90)",
+    "card-foreground": "oklch(35% 0.04 200)",
+    "popover": "oklch(96% 0.015 90)",
+    "popover-foreground": "oklch(35% 0.04 200)",
+    "primary": "oklch(55% 0.12 235)",
+    "primary-foreground": "oklch(96% 0 0)",
+    "secondary": "oklch(91% 0.018 90)",
+    "secondary-foreground": "oklch(40% 0.04 200)",
+    "muted": "oklch(91% 0.018 90)",
+    "muted-foreground": "oklch(38% 0.04 200)",
+    "accent": "oklch(88% 0.018 90)",
+    "accent-foreground": "oklch(40% 0.04 200)",
+    "destructive": "oklch(0.55 0.2 25)",
+    "border": "oklch(83% 0.015 90)",
+    "input": "oklch(86% 0.015 90)",
+    "ring": "oklch(0.68 0 0)",
+    "sidebar": "oklch(93.5% 0.018 90)",
+    "sidebar-foreground": "oklch(45% 0.03 200)",
+    "sidebar-primary": "oklch(55% 0.12 235)",
+    "sidebar-primary-foreground": "oklch(96% 0 0)",
+    "sidebar-accent": "oklch(89% 0.015 90)",
+    "sidebar-accent-foreground": "oklch(35% 0 0)",
+    "sidebar-border": "oklch(86% 0.015 90)",
+    "sidebar-ring": "oklch(0.68 0 0)",
+    "editor-text": "rgba(50, 60, 70, 0.92)",
+    "editor-caret": "oklch(55% 0.12 235)",
+    "editor-selection": "rgba(70, 130, 180, 0.15)"
+  }
+}"##),
 ];
 
 fn themes_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -165,9 +267,8 @@ fn themes_dir(app: &AppHandle) -> Result<PathBuf, String> {
 fn seed_bundled_themes(dir: &PathBuf) {
     for (id, json) in BUNDLED_THEMES {
         let path = dir.join(format!("{}.json", id));
-        if !path.exists() {
-            let _ = fs::write(&path, json);
-        }
+        // Always overwrite bundled themes so users get updated colors
+        let _ = fs::write(&path, json);
     }
 }
 
