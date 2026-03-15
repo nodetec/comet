@@ -52,7 +52,6 @@ pub struct SyncedNote {
     pub title: String,
     pub markdown: String,
     pub notebook_id: Option<String>,
-    pub notebook_name: Option<String>,
     pub created_at: i64,
     pub modified_at: i64,
     pub edited_at: i64,
@@ -291,7 +290,6 @@ fn note_to_rumor(
     edited_at: i64,
     created_at: i64,
     notebook_id: Option<&str>,
-    notebook_name: Option<&str>,
     archived_at: Option<i64>,
     pinned_at: Option<i64>,
     tags: &[String],
@@ -308,10 +306,10 @@ fn note_to_rumor(
         Tag::custom(TagKind::custom("created_at"), vec![created_at.to_string()]),
     ];
 
-    if let (Some(nb_id), Some(nb_name)) = (notebook_id, notebook_name) {
+    if let Some(nb_id) = notebook_id {
         event_tags.push(Tag::custom(
             TagKind::custom("notebook"),
-            vec![nb_id.to_string(), nb_name.to_string()],
+            vec![nb_id.to_string()],
         ));
     }
 
@@ -375,18 +373,11 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, String> {
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or(modified_at);
 
-    let notebook_tag = rumor.tags.find(TagKind::custom("notebook"));
-    let (notebook_id, notebook_name) = match notebook_tag {
-        Some(tag) => {
-            let vals: Vec<&str> = tag.as_slice().iter().skip(1).map(|s| s.as_str()).collect();
-            if vals.len() >= 2 {
-                (Some(vals[0].to_string()), Some(vals[1].to_string()))
-            } else {
-                (None, None)
-            }
-        }
-        None => (None, None),
-    };
+    let notebook_id: Option<String> = rumor
+        .tags
+        .find(TagKind::custom("notebook"))
+        .and_then(|t| t.content())
+        .map(|s| s.to_string());
 
     let archived_at = rumor
         .tags
@@ -418,7 +409,6 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, String> {
         title,
         markdown,
         notebook_id,
-        notebook_name,
         created_at,
         modified_at,
         edited_at,
@@ -455,16 +445,6 @@ fn upsert_from_sync(
             .map_err(|e| e.to_string())?;
             return Ok(None);
         }
-    }
-
-    // Ensure notebook exists if referenced
-    if let (Some(nb_id), Some(nb_name)) = (&note.notebook_id, &note.notebook_name) {
-        let now = now_ms();
-        conn.execute(
-            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?3)",
-            params![nb_id, nb_name, now],
-        )
-        .map_err(|e| e.to_string())?;
     }
 
     if existing.is_some() {
@@ -1015,7 +995,7 @@ async fn push_note(
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), String> {
     // Read note from DB
-    let (title, markdown, notebook_id, notebook_name, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url) = {
+    let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url) = {
         let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
         let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>)> = conn
@@ -1031,15 +1011,6 @@ async fn push_note(
             note.ok_or_else(|| format!("Note not found: {note_id}"))?;
         let edited_at = edited_at.unwrap_or(modified_at);
 
-        // Get notebook name if applicable
-        let notebook_name: Option<String> = match &notebook_id {
-            Some(nb_id) => conn
-                .query_row("SELECT name FROM notebooks WHERE id = ?1", params![nb_id], |row| row.get(0))
-                .optional()
-                .map_err(|e| e.to_string())?,
-            None => None,
-        };
-
         // Get tags
         let mut tag_stmt = conn
             .prepare("SELECT tag FROM note_tags WHERE note_id = ?1")
@@ -1052,7 +1023,7 @@ async fn push_note(
 
         let blossom_url = get_blossom_url(&conn);
 
-        (title, markdown, notebook_id, notebook_name, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url)
+        (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url)
     };
 
     // Upload attachment blobs to Blossom if configured
@@ -1099,7 +1070,6 @@ async fn push_note(
         edited_at,
         created_at,
         notebook_id.as_deref(),
-        notebook_name.as_deref(),
         archived_at,
         pinned_at,
         &tags,
