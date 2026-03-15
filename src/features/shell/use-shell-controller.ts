@@ -746,6 +746,12 @@ export function useShellController() {
         if (action === "delete") {
           queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         }
+        // If the updated note is currently open, clear the draft so
+        // the editor picks up the new content from the query
+        const { draftNoteId: currentDraftId } = useShellStore.getState();
+        if (currentDraftId === noteId && action === "upsert") {
+          useShellStore.getState().setDraft("", "");
+        }
       },
     );
     return () => {
