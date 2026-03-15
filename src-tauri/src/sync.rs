@@ -901,7 +901,29 @@ async fn process_relay_message(
         "DELETED" => {
             let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
             let deleted_event_id = arr.get(4).and_then(|v| v.as_str()).unwrap_or("");
-            eprintln!("[sync] received DELETED seq={seq} event={}", &deleted_event_id[..8.min(deleted_event_id.len())]);
+            let reason = arr.get(5);
+            let is_supersede = reason
+                .and_then(|r| r.get("superseded_by"))
+                .is_some();
+            eprintln!("[sync] received DELETED seq={seq} event={} supersede={is_supersede}", &deleted_event_id[..8.min(deleted_event_id.len())]);
+
+            // Superseded events (replaceable gift wraps) are just version updates —
+            // don't delete the underlying note/notebook, just clear the sync_event_id
+            // so the next STORED event can update it
+            if is_supersede {
+                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                // Clear stale sync_event_id so the replacement can take over
+                conn.execute(
+                    "UPDATE notes SET sync_event_id = NULL WHERE sync_event_id = ?1",
+                    params![deleted_event_id],
+                ).map_err(|e| e.to_string())?;
+                conn.execute(
+                    "UPDATE notebooks SET sync_event_id = NULL WHERE sync_event_id = ?1",
+                    params![deleted_event_id],
+                ).map_err(|e| e.to_string())?;
+                save_checkpoint(&conn, seq);
+                return Ok(());
+            }
 
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
