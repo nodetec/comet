@@ -757,7 +757,7 @@ export function useShellController() {
         id: currentNote.id,
         markdown: draftMarkdown,
       });
-    }, 500);
+    }, 3000);
 
     return () => {
       if (pendingSaveTimeoutRef.current !== null) {
