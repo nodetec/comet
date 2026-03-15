@@ -29,8 +29,7 @@ pub enum SyncState {
 pub enum SyncCommand {
     PushNote(String),
     PushNotebook(String),
-    /// entity_id, sync_event_id (pre-fetched before local delete)
-    PushDeletion(String, String),
+    PushDeletion(String),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -602,7 +601,7 @@ async fn run_sync_loop(
         match run_sync_connection(&app, &state, &mut shutdown_rx, &mut push_rx).await {
             Ok(()) => break, // clean shutdown
             Err(e) => {
-                log::error!("[sync] connection error: {e}");
+                eprintln!("[sync] connection error: {e}");
                 set_state(
                     &state,
                     SyncState::Error { message: e.clone() },
@@ -795,9 +794,9 @@ async fn run_sync_connection(
                             eprintln!("[sync] push notebook error for {notebook_id}: {e}");
                         }
                     }
-                    Some(SyncCommand::PushDeletion(id, sync_event_id)) => {
+                    Some(SyncCommand::PushDeletion(id)) => {
                         eprintln!("[sync] pushing deletion for {id}");
-                        push_deletion(app, &keys, &mut ws_write, &id, &sync_event_id, &mut recent_pushes).await?;
+                        push_deletion(app, &keys, &mut ws_write, &id, &mut recent_pushes).await?;
                     }
                     None => break, // channel closed
                 }
@@ -1112,7 +1111,7 @@ async fn process_relay_message(
             // Process pending deletions (queued while offline)
             let pending_deletions: Vec<String> = {
                 let mut stmt = conn
-                    .prepare("SELECT sync_event_id FROM pending_deletions")
+                    .prepare("SELECT entity_id FROM pending_deletions")
                     .map_err(|e| e.to_string())?;
                 let ids: Vec<String> = stmt
                     .query_map([], |row| row.get(0))
@@ -1127,8 +1126,8 @@ async fn process_relay_message(
             }
 
             let manager = app.state::<SyncManager>();
-            for event_id in &pending_deletions {
-                manager.push(SyncCommand::PushDeletion(String::new(), event_id.clone())).await;
+            for entity_id in &pending_deletions {
+                manager.push(SyncCommand::PushDeletion(entity_id.clone())).await;
             }
             for nb_id in unsynced_notebooks {
                 manager.push(SyncCommand::PushNotebook(nb_id)).await;
@@ -1295,7 +1294,6 @@ async fn push_deletion(
         Message,
     >,
     entity_id: &str,
-    _sync_event_id: &str,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), String> {
     // Push a tombstone gift wrap — a deleted marker that replaces the current version
@@ -1337,8 +1335,8 @@ async fn push_deletion(
     // Remove from pending_deletions if it was queued for offline
     if let Ok(conn) = crate::db::database_connection(app) {
         let _ = conn.execute(
-            "DELETE FROM pending_deletions WHERE sync_event_id = ?1",
-            params![_sync_event_id],
+            "DELETE FROM pending_deletions WHERE entity_id = ?1",
+            params![entity_id],
         );
     }
 

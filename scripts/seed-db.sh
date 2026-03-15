@@ -80,7 +80,7 @@ CREATE TABLE blob_meta (
 );
 
 CREATE TABLE pending_deletions (
-  sync_event_id TEXT PRIMARY KEY,
+  entity_id TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL
 );
 
@@ -344,7 +344,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 6;
+PRAGMA user_version = 7;
 
 PRAGMA foreign_keys = ON;
 SQL

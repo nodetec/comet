@@ -97,6 +97,9 @@ fn migrations() -> Migrations<'static> {
                created_at INTEGER NOT NULL
              );",
         ),
+        M::up(
+            "ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;",
+        ),
     ])
 }
 

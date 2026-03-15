@@ -123,14 +123,14 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), String
         .flatten()
     };
     notes::delete_note_permanently(&app, &note_id)?;
-    if let Some(ref event_id) = sync_event_id {
+    if sync_event_id.is_some() {
         // Store pending deletion so it survives offline/restart
         let conn = database_connection(&app)?;
         let _ = conn.execute(
-            "INSERT OR IGNORE INTO pending_deletions (sync_event_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![event_id, sync::now_ms_pub()],
+            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![note_id, sync::now_ms_pub()],
         );
-        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone(), event_id.clone()));
+        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
     }
     Ok(())
 }
@@ -163,13 +163,13 @@ fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), String> {
         .flatten()
     };
     notes::delete_notebook(&app, &notebook_id)?;
-    if let Some(ref event_id) = sync_event_id {
+    if sync_event_id.is_some() {
         let conn = database_connection(&app)?;
         let _ = conn.execute(
-            "INSERT OR IGNORE INTO pending_deletions (sync_event_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![event_id, sync::now_ms_pub()],
+            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![notebook_id, sync::now_ms_pub()],
         );
-        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone(), event_id.clone()));
+        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
     }
     Ok(())
 }
