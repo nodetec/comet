@@ -916,13 +916,11 @@ async fn process_relay_message(
                     conn.execute("DELETE FROM notebooks WHERE id = ?1", params![d_tag])
                         .map_err(|e| e.to_string())?;
                 } else {
-                    // Archive the note (soft-delete)
-                    let now = now_ms();
-                    conn.execute(
-                        "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
-                        params![now, d_tag],
-                    )
-                    .map_err(|e| e.to_string())?;
+                    // Permanently delete the note
+                    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![d_tag])
+                        .map_err(|e| e.to_string())?;
+                    conn.execute("DELETE FROM notes WHERE id = ?1", params![d_tag])
+                        .map_err(|e| e.to_string())?;
                 }
                 save_checkpoint(&conn, seq);
 
