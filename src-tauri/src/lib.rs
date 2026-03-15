@@ -465,7 +465,7 @@ async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
         .map_err(|e| e.to_string())?;
 
     let synced_notes: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND archived_at IS NULL", [], |row| row.get(0))
         .map_err(|e| e.to_string())?;
 
     let total_notes: i64 = conn
