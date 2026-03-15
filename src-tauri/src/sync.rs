@@ -435,6 +435,7 @@ fn upsert_from_sync(
 
     if let Some((_, local_modified)) = &existing {
         if *local_modified >= note.modified_at {
+            eprintln!("[sync] skip upsert note={} local_modified={} remote_modified={}", note.id, local_modified, note.modified_at);
             // Local version is same or newer — just update sync_event_id
             conn.execute(
                 "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
@@ -877,7 +878,7 @@ async fn process_relay_message(
                     }
                 };
                 let note_id = synced_note.id.clone();
-                eprintln!("[sync] unwrapped note={note_id} modified_at={}", synced_note.modified_at);
+                eprintln!("[sync] unwrapped note={note_id} modified_at={} notebook={:?}", synced_note.modified_at, synced_note.notebook_id);
 
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                 let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
