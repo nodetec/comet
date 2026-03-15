@@ -166,6 +166,7 @@ export function useShellController() {
   const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
     string | null
   >(null);
+  const [syncEditorRevision, setSyncEditorRevision] = useState(0);
   const [editorFocusMode, setEditorFocusMode] = useState<
     "none" | "immediate" | "pointerup"
   >("none");
@@ -746,11 +747,16 @@ export function useShellController() {
         if (action === "delete") {
           queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         }
-        // If the updated note is currently open, clear the draft so
-        // the editor picks up the new content from the query
+        // If the updated note is currently open, refetch it then
+        // remount the editor with new content
         const { draftNoteId: currentDraftId } = useShellStore.getState();
         if (currentDraftId === noteId && action === "upsert") {
-          useShellStore.getState().setDraft("", "");
+          queryClient
+            .refetchQueries({ queryKey: ["note", noteId] })
+            .then(() => {
+              useShellStore.getState().setDraft("", "");
+              setSyncEditorRevision((r) => r + 1);
+            });
         }
       },
     );
@@ -1023,6 +1029,7 @@ export function useShellController() {
       notebook: currentNote?.notebook ?? null,
       notebooks,
       noteId: currentNote?.id ?? null,
+      editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
       searchQuery,
