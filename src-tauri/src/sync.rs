@@ -203,6 +203,27 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
     );
 }
 
+fn get_last_pushed_at(conn: &Connection) -> i64 {
+    conn.query_row(
+        "SELECT value FROM app_settings WHERE key = 'sync_last_pushed_at'",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .ok()
+    .flatten()
+    .and_then(|v| v.parse::<i64>().ok())
+    .unwrap_or(0)
+}
+
+fn save_last_pushed_at(conn: &Connection) {
+    let now = now_ms();
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_last_pushed_at', ?1)",
+        params![now.to_string()],
+    );
+}
+
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
 use crate::nostr::strip_title_line;
@@ -1003,23 +1024,24 @@ async fn process_relay_message(
             save_checkpoint(&conn, max_seq);
 
             // Push any local notes/notebooks that haven't been synced yet
-            // (created or modified while offline)
+            // or were modified while offline (since last push)
+            let last_pushed = get_last_pushed_at(&conn);
             let (unsynced_notebooks, unsynced_notes) = {
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notebooks WHERE sync_event_id IS NULL")
+                    .prepare("SELECT id FROM notebooks WHERE sync_event_id IS NULL OR updated_at > ?1")
                     .map_err(|e| e.to_string())?;
                 let nbs: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))
+                    .query_map(params![last_pushed], |row| row.get(0))
                     .map_err(|e| e.to_string())?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| e.to_string())?;
                 drop(stmt);
 
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notes WHERE sync_event_id IS NULL AND archived_at IS NULL")
+                    .prepare("SELECT id FROM notes WHERE archived_at IS NULL AND (sync_event_id IS NULL OR modified_at > ?1)")
                     .map_err(|e| e.to_string())?;
                 let notes: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))
+                    .query_map(params![last_pushed], |row| row.get(0))
                     .map_err(|e| e.to_string())?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| e.to_string())?;
@@ -1174,13 +1196,14 @@ async fn push_note(
         .await
         .map_err(|e| format!("Failed to send event: {e}"))?;
 
-    // Update sync_event_id in DB
+    // Update sync_event_id and last_pushed_at in DB
     let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
         params![event_id, note_id],
     )
     .map_err(|e| e.to_string())?;
+    save_last_pushed_at(&conn);
 
     eprintln!("[sync] pushed note={note_id} event={}", &event_id[..8]);
 
@@ -1277,6 +1300,7 @@ async fn push_notebook(
         params![event_id, notebook_id],
     )
     .map_err(|e| e.to_string())?;
+    save_last_pushed_at(&conn);
 
     eprintln!("[sync] pushed notebook={notebook_id} event={}", &event_id[..8]);
 
