@@ -64,7 +64,8 @@ export function CommandPalette({
     return notebooks.filter((nb) => nb.name.toLowerCase().includes(lower));
   }, [mode, searchTerm, notebooks]);
 
-  const displayedTags = mode === "tags" && !searchTerm ? availableTags : tagResults;
+  const displayedTags =
+    mode === "tags" && !searchTerm ? availableTags : tagResults;
 
   const hasResults =
     mode === "tags"
@@ -145,11 +146,7 @@ export function CommandPalette({
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup className="fixed top-[20%] left-1/2 w-full max-w-lg -translate-x-1/2 translate-y-0 overflow-hidden p-0">
-          <CommandPrimitive
-            className="flex flex-col"
-            shouldFilter={false}
-            loop
-          >
+          <CommandPrimitive className="flex flex-col" shouldFilter={false} loop>
             <div className="flex items-center px-3">
               <Search className="text-muted-foreground mr-2 size-4 shrink-0" />
               <CommandPrimitive.Input
