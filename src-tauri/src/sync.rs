@@ -608,13 +608,32 @@ async fn run_sync_connection(
 
     // Main select loop
     loop {
-        // Find the earliest debounce deadline
-        let next_debounce = pending_pushes
-            .values()
-            .min()
-            .copied();
+        // Fire any ready debounced pushes before waiting for new events
+        let now = tokio::time::Instant::now();
+        let ready: Vec<String> = pending_pushes
+            .iter()
+            .filter(|(_, deadline)| **deadline <= now)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for note_id in &ready {
+            pending_pushes.remove(note_id);
+            if let Err(e) = push_note(app, &keys, &mut ws_write, note_id, &mut recent_pushes).await {
+                eprintln!("[sync] push error for {note_id}: {e}");
+            }
+        }
+
+        // Compute sleep duration for the next pending push
+        let debounce_sleep = match pending_pushes.values().min().copied() {
+            Some(deadline) => tokio::time::sleep_until(deadline),
+            None => tokio::time::sleep(Duration::from_secs(86400)), // park if nothing pending
+        };
+        tokio::pin!(debounce_sleep);
 
         tokio::select! {
+            _ = &mut debounce_sleep => {
+                // Loop will fire ready pushes at the top
+            }
+
             msg = ws_read.next() => {
                 match msg {
                     Some(Ok(Message::Text(ref text))) => {
@@ -644,28 +663,6 @@ async fn run_sync_connection(
                         push_deletion(app, &keys, &mut ws_write, &note_id, &sync_event_id).await?;
                     }
                     None => break, // channel closed
-                }
-            }
-
-            _ = async {
-                match next_debounce {
-                    Some(deadline) => tokio::time::sleep_until(deadline).await,
-                    None => std::future::pending().await,
-                }
-            } => {
-                // Fire any debounced pushes that are ready
-                let now = tokio::time::Instant::now();
-                let ready: Vec<String> = pending_pushes
-                    .iter()
-                    .filter(|(_, deadline)| **deadline <= now)
-                    .map(|(id, _)| id.clone())
-                    .collect();
-
-                for note_id in ready {
-                    pending_pushes.remove(&note_id);
-                    if let Err(e) = push_note(app, &keys, &mut ws_write, &note_id, &mut recent_pushes).await {
-                        log::error!("[sync] push error for {note_id}: {e}");
-                    }
                 }
             }
 
