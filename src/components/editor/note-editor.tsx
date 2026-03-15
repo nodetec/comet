@@ -107,7 +107,11 @@ function EditorInner({
 
   return (
     <>
-      <ContentEditable className="comet-editor-content" />
+      <ContentEditable
+        className="comet-editor-content"
+        autoCapitalize="off"
+        autoCorrect="off"
+      />
       <InitialContentPlugin isNew={isNew} markdown={markdown} />
       <OnChangeMarkdownPlugin onChange={onChange} />
       <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
