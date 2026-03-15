@@ -453,10 +453,11 @@ pub fn assign_note_notebook(
         }
     }
 
+    let now = current_timestamp_millis();
     let updated = conn
         .execute(
-            "UPDATE notes SET notebook_id = ?1 WHERE id = ?2",
-            params![input.notebook_id, input.note_id],
+            "UPDATE notes SET notebook_id = ?1, modified_at = ?2 WHERE id = ?3",
+            params![input.notebook_id, now, input.note_id],
         )
         .map_err(|error| error.to_string())?;
 
@@ -475,7 +476,7 @@ pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
     let updated = conn
         .execute(
             "UPDATE notes
-             SET pinned_at = ?1
+             SET pinned_at = ?1, modified_at = ?1
              WHERE id = ?2 AND archived_at IS NULL",
             params![current_timestamp_millis(), note_id],
         )
@@ -493,8 +494,8 @@ pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> 
     let conn = database_connection(app)?;
     let updated = conn
         .execute(
-            "UPDATE notes SET pinned_at = NULL WHERE id = ?1",
-            params![note_id],
+            "UPDATE notes SET pinned_at = NULL, modified_at = ?1 WHERE id = ?2",
+            params![current_timestamp_millis(), note_id],
         )
         .map_err(|error| error.to_string())?;
 
