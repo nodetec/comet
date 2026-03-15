@@ -870,7 +870,9 @@ async fn process_relay_message(
                 eprintln!("[sync] unwrapped notebook={} name={}", notebook.id, notebook.name);
 
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
-                upsert_notebook_from_sync(&conn, &notebook, &event_id)?;
+                if let Err(e) = upsert_notebook_from_sync(&conn, &notebook, &event_id) {
+                    eprintln!("[sync] notebook upsert failed for {}: {e}", notebook.id);
+                }
                 save_checkpoint(&conn, seq);
 
                 let _ = app.emit(
