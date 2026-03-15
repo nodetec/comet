@@ -497,15 +497,20 @@ export function useShellController() {
         queryClient.invalidateQueries({ queryKey: ["note", noteId] });
         queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
         queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
-        // If the updated note is currently open, refetch it then
-        // remount the editor with new content
+        // If the updated note is currently open, refetch then remount editor
         const { draftNoteId: currentDraftId } = useShellStore.getState();
         if (currentDraftId === noteId && action === "upsert") {
           queryClient
-            .refetchQueries({ queryKey: ["note", noteId] })
-            .then(() => {
-              useShellStore.getState().setDraft("", "");
-              setSyncEditorRevision((r) => r + 1);
+            .fetchQuery({
+              queryKey: ["note", noteId],
+              queryFn: () => loadNote(noteId),
+            })
+            .then((freshNote) => {
+              if (freshNote) {
+                queryClient.setQueryData(["note", noteId], freshNote);
+                useShellStore.getState().setDraft("", "");
+                setSyncEditorRevision((r) => r + 1);
+              }
             });
         }
       },

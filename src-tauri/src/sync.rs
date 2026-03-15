@@ -713,9 +713,19 @@ async fn run_sync_connection(
     // Debounce timers for push commands
     let mut pending_pushes: HashMap<String, tokio::time::Instant> = HashMap::new();
     let debounce_duration = Duration::from_secs(2);
+    let mut last_ping = tokio::time::Instant::now();
+    let ping_interval = Duration::from_secs(30);
 
     // Main select loop
     loop {
+        // Send keepalive ping if no activity
+        if last_ping.elapsed() >= ping_interval {
+            ws_write
+                .send(Message::Ping(vec![].into()))
+                .await
+                .map_err(|e| format!("Ping failed: {e}"))?;
+            last_ping = tokio::time::Instant::now();
+        }
         // Fire any ready debounced pushes before waiting for new events
         let now = tokio::time::Instant::now();
         let ready: Vec<String> = pending_pushes
@@ -731,11 +741,15 @@ async fn run_sync_connection(
             }
         }
 
-        // Compute sleep duration for the next pending push
-        let debounce_sleep = match pending_pushes.values().min().copied() {
-            Some(deadline) => tokio::time::sleep_until(deadline),
-            None => tokio::time::sleep(Duration::from_secs(86400)), // park if nothing pending
-        };
+        // Compute sleep duration — wake for debounced pushes or keepalive ping
+        let next_ping = last_ping + ping_interval;
+        let next_wake = pending_pushes
+            .values()
+            .min()
+            .copied()
+            .map(|d| d.min(next_ping))
+            .unwrap_or(next_ping);
+        let debounce_sleep = tokio::time::sleep_until(next_wake);
         tokio::pin!(debounce_sleep);
 
         tokio::select! {
@@ -744,6 +758,7 @@ async fn run_sync_connection(
             }
 
             msg = ws_read.next() => {
+                last_ping = tokio::time::Instant::now();
                 match msg {
                     Some(Ok(Message::Text(ref text))) => {
                         process_relay_message(
