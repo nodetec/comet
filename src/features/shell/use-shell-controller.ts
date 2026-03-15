@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner";
 
 import { initAttachmentsBasePath } from "@/lib/attachments";
+
+const PENDING_DRAFT_KEY = "comet-pending-draft";
 import { useShellStore } from "@/stores/use-shell-store";
 import { defaultNoteSortPrefs, useUIStore } from "@/stores/use-ui-store";
 
@@ -433,6 +435,11 @@ export function useShellController() {
     onSuccess: (savedNote) => {
       queryClient.setQueryData(["note", savedNote.id], savedNote);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
+      try {
+        localStorage.removeItem(PENDING_DRAFT_KEY);
+      } catch {
+        // Ignore
+      }
     },
     onError: (error) => {
       toast.error("Couldn't save note", {
@@ -704,6 +711,28 @@ export function useShellController() {
       : currentNote.markdown
     : "";
 
+  // Recover any draft that was pending when the app quit
+  useEffect(() => {
+    if (!bootstrapQuery.isSuccess) return;
+    try {
+      const raw = localStorage.getItem(PENDING_DRAFT_KEY);
+      if (!raw) return;
+      const { noteId, markdown } = JSON.parse(raw) as {
+        noteId: string;
+        markdown: string;
+      };
+      if (noteId && markdown) {
+        invoke("save_note", { input: { id: noteId, markdown } }).then(() => {
+          localStorage.removeItem(PENDING_DRAFT_KEY);
+          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+          queryClient.invalidateQueries({ queryKey: ["notes"] });
+        });
+      }
+    } catch {
+      localStorage.removeItem(PENDING_DRAFT_KEY);
+    }
+  }, [bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!currentNote || draftNoteId !== currentNote.id) {
       return;
@@ -711,6 +740,16 @@ export function useShellController() {
 
     if (saveNoteMutation.isPending || draftMarkdown === currentNote.markdown) {
       return;
+    }
+
+    // Persist draft for crash recovery (survives app quit during debounce)
+    try {
+      localStorage.setItem(
+        PENDING_DRAFT_KEY,
+        JSON.stringify({ noteId: currentNote.id, markdown: draftMarkdown }),
+      );
+    } catch {
+      // Ignore storage errors
     }
 
     pendingSaveTimeoutRef.current = window.setTimeout(() => {
