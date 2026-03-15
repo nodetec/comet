@@ -744,9 +744,7 @@ export function useShellController() {
         queryClient.invalidateQueries({ queryKey: ["notes"] });
         queryClient.invalidateQueries({ queryKey: ["note", noteId] });
         queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
-        if (action === "delete") {
-          queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
-        }
+        queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         // If the updated note is currently open, refetch it then
         // remount the editor with new content
         const { draftNoteId: currentDraftId } = useShellStore.getState();
