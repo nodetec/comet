@@ -432,8 +432,9 @@ export function NotesPane({
         ) : (
           <div className="space-y-0 px-3">
             <LayoutGroup>
-            {filteredNotes.map((note) => {
+            {filteredNotes.map((note, index) => {
               const isActive = note.id === selectedNoteId;
+              const isNextActive = filteredNotes[index + 1]?.id === selectedNoteId;
               const isNew = newNoteIds.has(note.id);
               const fallback = note.title ? "" : "No content yet";
               const cardPreview =
@@ -496,7 +497,7 @@ export function NotesPane({
                     </div>
                   </button>
                   <div className="w-full px-[0.30rem]">
-                    <div className="bg-accent/35 h-px w-full" />
+                    <div className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`} />
                   </div>
                 </motion.div>
               );
