@@ -424,7 +424,9 @@ export function NotesPane({
               return (
                 <motion.div
                   layout
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="flex w-full flex-col items-center"
                   key={note.id}
                 >
