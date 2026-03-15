@@ -122,16 +122,27 @@ impl SyncManager {
 // ── Auto-start ─────────────────────────────────────────────────────────
 
 pub async fn auto_start(app: &AppHandle) {
-    // Check if a sync relay is configured
-    let has_relay = {
+    let should_start = {
         let conn = match crate::db::database_connection(app) {
             Ok(c) => c,
             Err(_) => return,
         };
-        get_sync_relay_url(&conn).is_some()
+        let has_relay = get_sync_relay_url(&conn).is_some();
+        let enabled = conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = 'sync_enabled'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .ok()
+            .flatten()
+            .as_deref()
+            != Some("false");
+        has_relay && enabled
     };
 
-    if has_relay {
+    if should_start {
         let manager = app.state::<SyncManager>();
         manager.start(app.clone()).await;
     }

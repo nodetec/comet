@@ -457,6 +457,40 @@ async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
 }
 
 #[tauri::command]
+fn is_sync_enabled(app: AppHandle) -> Result<bool, String> {
+    let conn = database_connection(&app)?;
+    let val: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'sync_enabled'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    // Default to true if not set
+    Ok(val.as_deref() != Some("false"))
+}
+
+#[tauri::command]
+async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let conn = database_connection(&app)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_enabled', ?1)",
+        rusqlite::params![if enabled { "true" } else { "false" }],
+    )
+    .map_err(|e| e.to_string())?;
+    drop(conn);
+
+    let manager = app.state::<sync::SyncManager>();
+    if enabled {
+        manager.start(app.clone()).await;
+    } else {
+        manager.stop().await;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_sync_status(app: AppHandle) -> Result<sync::SyncState, String> {
     let manager = app.state::<sync::SyncManager>();
     Ok(manager.state().await)
@@ -515,6 +549,8 @@ pub fn run() {
             remove_blossom_url,
             fetch_blob,
             get_sync_info,
+            is_sync_enabled,
+            set_sync_enabled,
             get_sync_status,
             restart_sync
         ])
