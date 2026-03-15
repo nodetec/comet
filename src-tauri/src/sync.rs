@@ -55,6 +55,7 @@ pub struct SyncedNote {
     pub notebook_name: Option<String>,
     pub created_at: i64,
     pub modified_at: i64,
+    pub edited_at: i64,
     pub archived_at: Option<i64>,
     pub pinned_at: Option<i64>,
     pub tags: Vec<String>,
@@ -287,6 +288,7 @@ fn note_to_rumor(
     title: &str,
     markdown: &str,
     modified_at: i64,
+    edited_at: i64,
     created_at: i64,
     notebook_id: Option<&str>,
     notebook_name: Option<&str>,
@@ -302,6 +304,7 @@ fn note_to_rumor(
         Tag::identifier(note_id),
         Tag::title(title),
         Tag::custom(TagKind::custom("published_at"), vec![modified_at.to_string()]),
+        Tag::custom(TagKind::custom("edited_at"), vec![edited_at.to_string()]),
         Tag::custom(TagKind::custom("created_at"), vec![created_at.to_string()]),
     ];
 
@@ -358,6 +361,13 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, String> {
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or_else(|| rumor.created_at.as_secs() as i64 * 1000);
 
+    let edited_at = rumor
+        .tags
+        .find(TagKind::custom("edited_at"))
+        .and_then(|t| t.content())
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(modified_at);
+
     let created_at = rumor
         .tags
         .find(TagKind::custom("created_at"))
@@ -411,6 +421,7 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, String> {
         notebook_name,
         created_at,
         modified_at,
+        edited_at,
         archived_at,
         pinned_at,
         tags,
@@ -459,13 +470,14 @@ fn upsert_from_sync(
     if existing.is_some() {
         // Update existing note
         conn.execute(
-            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?4, \
-             archived_at = ?5, pinned_at = ?6, sync_event_id = ?7 WHERE id = ?8",
+            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?5, \
+             archived_at = ?6, pinned_at = ?7, sync_event_id = ?8 WHERE id = ?9",
             params![
                 note.title,
                 note.markdown,
                 note.notebook_id,
                 note.modified_at,
+                note.edited_at,
                 note.archived_at,
                 note.pinned_at,
                 sync_event_id,
@@ -477,7 +489,7 @@ fn upsert_from_sync(
         // Insert new note
         conn.execute(
             "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
-             archived_at, pinned_at, sync_event_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7, ?8, ?9)",
+             archived_at, pinned_at, sync_event_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 note.id,
                 note.title,
@@ -485,6 +497,7 @@ fn upsert_from_sync(
                 note.notebook_id,
                 note.created_at,
                 note.modified_at,
+                note.edited_at,
                 note.archived_at,
                 note.pinned_at,
                 sync_event_id,
@@ -1000,20 +1013,21 @@ async fn push_note(
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), String> {
     // Read note from DB
-    let (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags, blossom_url) = {
+    let (title, markdown, notebook_id, notebook_name, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url) = {
         let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
-        let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>)> = conn
+        let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>)> = conn
             .query_row(
-                "SELECT title, markdown, notebook_id, created_at, modified_at, archived_at, pinned_at FROM notes WHERE id = ?1",
+                "SELECT title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at FROM notes WHERE id = ?1",
                 params![note_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
             )
             .optional()
             .map_err(|e| e.to_string())?;
 
-        let (title, markdown, notebook_id, created_at, modified_at, archived_at, pinned_at) =
+        let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at) =
             note.ok_or_else(|| format!("Note not found: {note_id}"))?;
+        let edited_at = edited_at.unwrap_or(modified_at);
 
         // Get notebook name if applicable
         let notebook_name: Option<String> = match &notebook_id {
@@ -1036,7 +1050,7 @@ async fn push_note(
 
         let blossom_url = get_blossom_url(&conn);
 
-        (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags, blossom_url)
+        (title, markdown, notebook_id, notebook_name, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url)
     };
 
     // Upload attachment blobs to Blossom if configured
@@ -1080,6 +1094,7 @@ async fn push_note(
         &title,
         &markdown,
         modified_at,
+        edited_at,
         created_at,
         notebook_id.as_deref(),
         notebook_name.as_deref(),
