@@ -130,7 +130,9 @@ export function NotesPane({
   );
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const knownNoteIdsRef = useRef<Set<string>>(new Set());
+  const hasMountedRef = useRef(false);
   const newNoteIds = useMemo(() => {
+    if (!hasMountedRef.current) return new Set<string>();
     const newIds = new Set<string>();
     for (const note of filteredNotes) {
       if (!knownNoteIdsRef.current.has(note.id)) {
@@ -143,6 +145,7 @@ export function NotesPane({
     for (const note of filteredNotes) {
       knownNoteIdsRef.current.add(note.id);
     }
+    hasMountedRef.current = true;
   }, [filteredNotes]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -432,10 +435,11 @@ export function NotesPane({
             {filteredNotes.map((note) => {
               const isActive = note.id === selectedNoteId;
               const isNew = newNoteIds.has(note.id);
+              const fallback = note.title ? "" : "No content yet";
               const cardPreview =
                 searchWords.length > 0
-                  ? note.searchSnippet || note.preview || "No content yet"
-                  : note.preview || "No content yet";
+                  ? note.searchSnippet || note.preview || fallback
+                  : note.preview || fallback;
 
               return (
                 <motion.div
