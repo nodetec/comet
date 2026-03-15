@@ -123,8 +123,14 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), String
         .flatten()
     };
     notes::delete_note_permanently(&app, &note_id)?;
-    if let Some(event_id) = sync_event_id {
-        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone(), event_id));
+    if let Some(ref event_id) = sync_event_id {
+        // Store pending deletion so it survives offline/restart
+        let conn = database_connection(&app)?;
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO pending_deletions (sync_event_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![event_id, sync::now_ms_pub()],
+        );
+        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone(), event_id.clone()));
     }
     Ok(())
 }
@@ -157,8 +163,13 @@ fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), String> {
         .flatten()
     };
     notes::delete_notebook(&app, &notebook_id)?;
-    if let Some(event_id) = sync_event_id {
-        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone(), event_id));
+    if let Some(ref event_id) = sync_event_id {
+        let conn = database_connection(&app)?;
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO pending_deletions (sync_event_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![event_id, sync::now_ms_pub()],
+        );
+        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone(), event_id.clone()));
     }
     Ok(())
 }
@@ -201,6 +212,10 @@ fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute("UPDATE notebooks SET sync_event_id = NULL", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM app_settings WHERE key = 'sync_last_pushed_at'", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM pending_deletions", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }

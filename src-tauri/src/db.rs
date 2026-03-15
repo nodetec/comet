@@ -91,6 +91,12 @@ fn migrations() -> Migrations<'static> {
              UPDATE notes SET edited_at = modified_at;
              CREATE INDEX IF NOT EXISTS idx_notes_edited_at ON notes(edited_at DESC);",
         ),
+        M::up(
+            "CREATE TABLE IF NOT EXISTS pending_deletions (
+               sync_event_id TEXT PRIMARY KEY,
+               created_at INTEGER NOT NULL
+             );",
+        ),
     ])
 }
 

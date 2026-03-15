@@ -544,6 +544,10 @@ fn upsert_from_sync(
     Ok(Some(note.id.clone()))
 }
 
+pub(crate) fn now_ms_pub() -> i64 {
+    now_ms()
+}
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -937,25 +941,14 @@ async fn process_relay_message(
             let is_supersede = reason
                 .and_then(|r| r.get("superseded_by"))
                 .is_some();
-            eprintln!("[sync] received DELETED seq={seq} event={} supersede={is_supersede}", &deleted_event_id[..8.min(deleted_event_id.len())]);
-
-            // Superseded events (replaceable gift wraps) are just version updates —
-            // don't delete the underlying note/notebook, just clear the sync_event_id
-            // so the next STORED event can update it
+            // Superseded events are just version replacements — skip entirely
             if is_supersede {
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
-                // Clear stale sync_event_id so the replacement can take over
-                conn.execute(
-                    "UPDATE notes SET sync_event_id = NULL WHERE sync_event_id = ?1",
-                    params![deleted_event_id],
-                ).map_err(|e| e.to_string())?;
-                conn.execute(
-                    "UPDATE notebooks SET sync_event_id = NULL WHERE sync_event_id = ?1",
-                    params![deleted_event_id],
-                ).map_err(|e| e.to_string())?;
                 save_checkpoint(&conn, seq);
                 return Ok(());
             }
+
+            eprintln!("[sync] received DELETED seq={seq} event={}", &deleted_event_id[..8.min(deleted_event_id.len())]);
 
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
@@ -1038,7 +1031,7 @@ async fn process_relay_message(
                 drop(stmt);
 
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notes WHERE archived_at IS NULL AND (sync_event_id IS NULL OR modified_at > ?1)")
+                    .prepare("SELECT id FROM notes WHERE sync_event_id IS NULL OR modified_at > ?1")
                     .map_err(|e| e.to_string())?;
                 let notes: Vec<String> = stmt
                     .query_map(params![last_pushed], |row| row.get(0))
@@ -1054,7 +1047,27 @@ async fn process_relay_message(
                     unsynced_notebooks.len(), unsynced_notes.len());
             }
 
+            // Process pending deletions (queued while offline)
+            let pending_deletions: Vec<String> = {
+                let mut stmt = conn
+                    .prepare("SELECT sync_event_id FROM pending_deletions")
+                    .map_err(|e| e.to_string())?;
+                let ids: Vec<String> = stmt
+                    .query_map([], |row| row.get(0))
+                    .map_err(|e| e.to_string())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| e.to_string())?;
+                ids
+            };
+
+            if !pending_deletions.is_empty() {
+                eprintln!("[sync] pushing {} pending deletions", pending_deletions.len());
+            }
+
             let manager = app.state::<SyncManager>();
+            for event_id in &pending_deletions {
+                manager.push(SyncCommand::PushDeletion(String::new(), event_id.clone())).await;
+            }
             for nb_id in unsynced_notebooks {
                 manager.push(SyncCommand::PushNotebook(nb_id)).await;
             }
@@ -1211,7 +1224,7 @@ async fn push_note(
 }
 
 async fn push_deletion(
-    _app: &AppHandle,
+    app: &AppHandle,
     keys: &Keys,
     ws_write: &mut futures_util::stream::SplitSink<
         tokio_tungstenite::WebSocketStream<
@@ -1239,7 +1252,15 @@ async fn push_deletion(
         .await
         .map_err(|e| format!("Failed to send deletion: {e}"))?;
 
-    eprintln!("[sync] pushed deletion for note={note_id}");
+    // Remove from pending_deletions if it was queued for offline
+    if let Ok(conn) = crate::db::database_connection(app) {
+        let _ = conn.execute(
+            "DELETE FROM pending_deletions WHERE sync_event_id = ?1",
+            params![sync_event_id],
+        );
+    }
+
+    eprintln!("[sync] pushed deletion event={}", &sync_event_id[..8]);
 
     Ok(())
 }

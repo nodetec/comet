@@ -79,6 +79,11 @@ CREATE TABLE blob_meta (
   encryption_key  TEXT NOT NULL
 );
 
+CREATE TABLE pending_deletions (
+  sync_event_id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE nostr_identity (
   secret_key TEXT NOT NULL,
   public_key TEXT NOT NULL,
@@ -339,7 +344,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 
 PRAGMA foreign_keys = ON;
 SQL
