@@ -213,8 +213,6 @@ fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
         .map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM app_settings WHERE key = 'sync_last_pushed_at'", [])
-        .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM pending_deletions", [])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -421,6 +419,8 @@ struct SyncInfo {
     npub: Option<String>,
     synced_notes: i64,
     synced_notebooks: i64,
+    pending_notes: i64,
+    pending_notebooks: i64,
     total_notes: i64,
     checkpoint: i64,
     blobs_stored: i64,
@@ -452,6 +452,14 @@ async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
         .query_row("SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
         .map_err(|e| e.to_string())?;
 
+    let pending_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE locally_modified = 1", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let pending_notebooks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notebooks WHERE locally_modified = 1", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
     let checkpoint: i64 = sync::get_checkpoint(&conn);
 
     let blobs_stored: i64 = conn
@@ -465,6 +473,8 @@ async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
         npub,
         synced_notes,
         synced_notebooks,
+        pending_notes,
+        pending_notebooks,
         total_notes,
         checkpoint,
         blobs_stored,

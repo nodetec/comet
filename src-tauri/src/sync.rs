@@ -202,26 +202,6 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
     );
 }
 
-fn get_last_pushed_at(conn: &Connection) -> i64 {
-    conn.query_row(
-        "SELECT value FROM app_settings WHERE key = 'sync_last_pushed_at'",
-        [],
-        |row| row.get::<_, String>(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
-    .and_then(|v| v.parse::<i64>().ok())
-    .unwrap_or(0)
-}
-
-fn save_last_pushed_at(conn: &Connection) {
-    let now = now_ms();
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_last_pushed_at', ?1)",
-        params![now.to_string()],
-    );
-}
 
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
@@ -286,9 +266,9 @@ fn upsert_notebook_from_sync(
 ) -> Result<(), String> {
     let now = now_ms();
     conn.execute(
-        "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id) \
-         VALUES (?1, ?2, ?3, ?3, ?4) \
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, sync_event_id = excluded.sync_event_id",
+        "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
+         VALUES (?1, ?2, ?3, ?3, ?4, 0) \
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, sync_event_id = excluded.sync_event_id, locally_modified = 0",
         params![notebook.id, notebook.name, now, sync_event_id],
     )
     .map_err(|e| e.to_string())?;
@@ -509,7 +489,7 @@ fn upsert_from_sync(
         // Update existing note
         conn.execute(
             "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?5, \
-             archived_at = ?6, pinned_at = ?7, sync_event_id = ?8 WHERE id = ?9",
+             archived_at = ?6, pinned_at = ?7, sync_event_id = ?8, locally_modified = 0 WHERE id = ?9",
             params![
                 note.title,
                 note.markdown,
@@ -527,7 +507,7 @@ fn upsert_from_sync(
         // Insert new note
         conn.execute(
             "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
-             archived_at, pinned_at, sync_event_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+             archived_at, pinned_at, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0)",
             params![
                 note.id,
                 note.title,
@@ -1077,25 +1057,23 @@ async fn process_relay_message(
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
             save_checkpoint(&conn, max_seq);
 
-            // Push any local notes/notebooks that haven't been synced yet
-            // or were modified while offline (since last push)
-            let last_pushed = get_last_pushed_at(&conn);
+            // Push any locally modified notes/notebooks (created or edited while offline)
             let (unsynced_notebooks, unsynced_notes) = {
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notebooks WHERE sync_event_id IS NULL OR updated_at > ?1")
+                    .prepare("SELECT id FROM notebooks WHERE locally_modified = 1")
                     .map_err(|e| e.to_string())?;
                 let nbs: Vec<String> = stmt
-                    .query_map(params![last_pushed], |row| row.get(0))
+                    .query_map([], |row| row.get(0))
                     .map_err(|e| e.to_string())?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| e.to_string())?;
                 drop(stmt);
 
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notes WHERE sync_event_id IS NULL OR modified_at > ?1")
+                    .prepare("SELECT id FROM notes WHERE locally_modified = 1")
                     .map_err(|e| e.to_string())?;
                 let notes: Vec<String> = stmt
-                    .query_map(params![last_pushed], |row| row.get(0))
+                    .query_map([], |row| row.get(0))
                     .map_err(|e| e.to_string())?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| e.to_string())?;
@@ -1273,11 +1251,10 @@ async fn push_note(
     // Update sync_event_id and last_pushed_at in DB
     let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
     conn.execute(
-        "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
+        "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
         params![event_id, note_id],
     )
     .map_err(|e| e.to_string())?;
-    save_last_pushed_at(&conn);
 
     eprintln!("[sync] pushed note={note_id} event={}", &event_id[..8]);
 
@@ -1397,11 +1374,10 @@ async fn push_notebook(
 
     let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
     conn.execute(
-        "UPDATE notebooks SET sync_event_id = ?1 WHERE id = ?2",
+        "UPDATE notebooks SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
         params![event_id, notebook_id],
     )
     .map_err(|e| e.to_string())?;
-    save_last_pushed_at(&conn);
 
     eprintln!("[sync] pushed notebook={notebook_id} event={}", &event_id[..8]);
 

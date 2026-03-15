@@ -100,6 +100,10 @@ fn migrations() -> Migrations<'static> {
         M::up(
             "ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;",
         ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE notebooks ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;",
+        ),
     ])
 }
 

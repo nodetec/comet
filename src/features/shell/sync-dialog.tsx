@@ -30,6 +30,8 @@ type SyncInfo = {
   npub: string | null;
   syncedNotes: number;
   syncedNotebooks: number;
+  pendingNotes: number;
+  pendingNotebooks: number;
   totalNotes: number;
   checkpoint: number;
   blobsStored: number;
@@ -171,6 +173,18 @@ export function SyncDialog({
                 label="Notebooks synced"
                 value={info.syncedNotebooks}
               />
+
+              {info.pendingNotes + info.pendingNotebooks > 0 ? (
+                <InfoRow
+                  icon={<CloudSync className="size-3.5" />}
+                  label="Pending sync"
+                  value={
+                    <span className="text-amber-400">
+                      {info.pendingNotes + info.pendingNotebooks} unsynced
+                    </span>
+                  }
+                />
+              ) : null}
 
               {info.blossomUrl ? (
                 <InfoRow
