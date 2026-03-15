@@ -134,9 +134,12 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
             tag_end += 1;
         }
 
-        let mut tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]).into_owned();
-        tag.make_ascii_lowercase();
-        tags.insert(tag);
+        // Skip tags that are purely numeric (e.g. #2, #123)
+        if bytes[tag_start..tag_end].iter().any(|b| b.is_ascii_alphabetic()) {
+            let mut tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]).into_owned();
+            tag.make_ascii_lowercase();
+            tags.insert(tag);
+        }
         index = tag_end;
     }
 
