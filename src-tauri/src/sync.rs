@@ -296,6 +296,33 @@ fn upsert_notebook_from_sync(
     Ok(())
 }
 
+fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
+    EventBuilder::new(Kind::LongFormTextNote, "")
+        .tags(vec![
+            Tag::identifier(note_id),
+            Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
+        ])
+        .build(pubkey)
+}
+
+fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedEvent {
+    EventBuilder::new(Kind::Custom(NOTEBOOK_EVENT_KIND), "")
+        .tags(vec![
+            Tag::identifier(notebook_id),
+            Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+            Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
+        ])
+        .build(pubkey)
+}
+
+fn is_deleted_rumor(rumor: &UnsignedEvent) -> bool {
+    rumor
+        .tags
+        .find(TagKind::custom("deleted"))
+        .and_then(|t| t.content())
+        == Some("true")
+}
+
 /// Compute a deterministic d-tag for a gift wrap using HMAC-SHA256.
 /// This allows the relay to replace old versions without leaking the note ID.
 fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
@@ -770,7 +797,7 @@ async fn run_sync_connection(
                     }
                     Some(SyncCommand::PushDeletion(id, sync_event_id)) => {
                         eprintln!("[sync] pushing deletion for {id}");
-                        push_deletion(app, &keys, &mut ws_write, &id, &sync_event_id).await?;
+                        push_deletion(app, &keys, &mut ws_write, &id, &sync_event_id, &mut recent_pushes).await?;
                     }
                     None => break, // channel closed
                 }
@@ -871,6 +898,43 @@ async fn process_relay_message(
                     return Ok(());
                 }
             };
+
+            // Check for deletion tombstone
+            if is_deleted_rumor(&unwrapped.rumor) {
+                let d_tag = unwrapped.rumor
+                    .tags
+                    .find(TagKind::d())
+                    .and_then(|t| t.content())
+                    .unwrap_or_default()
+                    .to_string();
+                eprintln!("[sync] received deletion tombstone for {d_tag}");
+
+                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+
+                if is_notebook_rumor(&unwrapped.rumor) {
+                    // Delete notebook
+                    conn.execute("DELETE FROM notebooks WHERE id = ?1", params![d_tag])
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    // Archive the note (soft-delete)
+                    let now = now_ms();
+                    conn.execute(
+                        "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
+                        params![now, d_tag],
+                    )
+                    .map_err(|e| e.to_string())?;
+                }
+                save_checkpoint(&conn, seq);
+
+                let _ = app.emit(
+                    "sync-remote-change",
+                    SyncChangePayload {
+                        note_id: d_tag,
+                        action: "delete".to_string(),
+                    },
+                );
+                return Ok(());
+            }
 
             // Dispatch based on rumor kind
             if is_notebook_rumor(&unwrapped.rumor) {
@@ -1232,23 +1296,43 @@ async fn push_deletion(
         >,
         Message,
     >,
-    note_id: &str,
-    sync_event_id: &str,
+    entity_id: &str,
+    _sync_event_id: &str,
+    recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), String> {
-    let event_id = EventId::parse(sync_event_id)
-        .map_err(|e| format!("Invalid sync event ID: {e}"))?;
+    // Push a tombstone gift wrap — a deleted marker that replaces the current version
+    // via the same HMAC'd d-tag. This is more reliable than NIP-09 since the relay's
+    // replaceable gift wrap mechanism ensures the tombstone replaces the content.
+    let is_notebook = entity_id.starts_with("notebook-");
+    let rumor = if is_notebook {
+        deleted_notebook_rumor(entity_id, keys.public_key())
+    } else {
+        deleted_note_rumor(entity_id, keys.public_key())
+    };
 
-    let deletion = EventBuilder::delete(
-        EventDeletionRequest::new().id(event_id)
+    let d_tag_input = if is_notebook {
+        format!("notebook:{entity_id}")
+    } else {
+        entity_id.to_string()
+    };
+    let d_tag = gift_wrap_d_tag(keys.secret_key(), &d_tag_input);
+    let gift_wrap = EventBuilder::gift_wrap(
+        keys,
+        &keys.public_key(),
+        rumor,
+        [Tag::identifier(&d_tag)],
     )
-    .sign_with_keys(keys)
-    .map_err(|e| format!("Failed to sign deletion: {e}"))?;
+    .await
+    .map_err(|e| format!("Failed to gift wrap deletion: {e}"))?;
 
-    let deletion_json: serde_json::Value = serde_json::from_str(&deletion.as_json())
-        .map_err(|e| format!("Failed to serialize deletion: {e}"))?;
-    let del_msg = serde_json::json!(["EVENT", deletion_json]);
+    let event_id = gift_wrap.id.to_hex();
+    recent_pushes.insert(event_id.clone(), std::time::Instant::now());
+
+    let gift_wrap_json: serde_json::Value = serde_json::from_str(&gift_wrap.as_json())
+        .map_err(|e| format!("Failed to serialize gift wrap: {e}"))?;
+    let event_msg = serde_json::json!(["EVENT", gift_wrap_json]);
     ws_write
-        .send(Message::from(del_msg.to_string()))
+        .send(Message::from(event_msg.to_string()))
         .await
         .map_err(|e| format!("Failed to send deletion: {e}"))?;
 
@@ -1256,11 +1340,11 @@ async fn push_deletion(
     if let Ok(conn) = crate::db::database_connection(app) {
         let _ = conn.execute(
             "DELETE FROM pending_deletions WHERE sync_event_id = ?1",
-            params![sync_event_id],
+            params![_sync_event_id],
         );
     }
 
-    eprintln!("[sync] pushed deletion event={}", &sync_event_id[..8]);
+    eprintln!("[sync] pushed deletion tombstone for {entity_id} event={}", &event_id[..8]);
 
     Ok(())
 }
