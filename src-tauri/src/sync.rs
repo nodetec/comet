@@ -519,6 +519,7 @@ async fn run_sync_connection(
     let pubkey = keys.public_key();
 
     // Connect WebSocket
+    eprintln!("[sync] connecting to {relay_url}");
     set_state(state, SyncState::Connecting, app).await;
 
     let (ws_stream, _) = connect_async(&relay_url)
@@ -576,6 +577,7 @@ async fn run_sync_connection(
     if !ok {
         return Err("AUTH rejected by relay".to_string());
     }
+    eprintln!("[sync] authenticated");
 
     // Read checkpoint and subscribe to CHANGES
     set_state(state, SyncState::Syncing, app).await;
@@ -598,6 +600,7 @@ async fn run_sync_connection(
         .send(Message::from(changes_msg.to_string()))
         .await
         .map_err(|e| format!("Failed to send CHANGES: {e}"))?;
+    eprintln!("[sync] subscribed to CHANGES since={checkpoint}");
 
     // Track recently pushed event IDs to avoid echo
     let mut recent_pushes: HashMap<String, std::time::Instant> = HashMap::new();
@@ -617,6 +620,7 @@ async fn run_sync_connection(
             .collect();
         for note_id in &ready {
             pending_pushes.remove(note_id);
+            eprintln!("[sync] pushing {note_id}");
             if let Err(e) = push_note(app, &keys, &mut ws_write, note_id, &mut recent_pushes).await {
                 eprintln!("[sync] push error for {note_id}: {e}");
             }
@@ -653,13 +657,14 @@ async fn run_sync_connection(
             cmd = push_rx.recv() => {
                 match cmd {
                     Some(SyncCommand::PushNote(note_id)) => {
-                        // Debounce: reset timer for this note
+                        eprintln!("[sync] queued push for {note_id} (debounce {debounce_duration:?})");
                         pending_pushes.insert(
                             note_id,
                             tokio::time::Instant::now() + debounce_duration,
                         );
                     }
                     Some(SyncCommand::PushDeletion(note_id, sync_event_id)) => {
+                        eprintln!("[sync] pushing deletion for {note_id}");
                         push_deletion(app, &keys, &mut ws_write, &note_id, &sync_event_id).await?;
                     }
                     None => break, // channel closed
@@ -744,11 +749,12 @@ async fn process_relay_message(
 
             // Skip echo (events we just pushed)
             if recent_pushes.contains_key(&event_id) {
-                // Still update checkpoint
+                eprintln!("[sync] echo skip seq={seq} event={}", &event_id[..8]);
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                 save_checkpoint(&conn, seq);
                 return Ok(());
             }
+            eprintln!("[sync] received EVENT seq={seq} event={}", &event_id[..8]);
 
             // Unwrap gift wrap (skip events we can't decrypt, e.g. from a previous key)
             let unwrapped = match nip59::extract_rumor(keys, &event).await {
@@ -771,10 +777,12 @@ async fn process_relay_message(
                 }
             };
             let note_id = synced_note.id.clone();
+            eprintln!("[sync] unwrapped note={note_id} modified_at={}", synced_note.modified_at);
 
             // Upsert into local DB
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
             let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
+            eprintln!("[sync] upsert note={note_id} updated={}", updated.is_some());
             save_checkpoint(&conn, seq);
 
             // Download missing attachment blobs from Blossom
@@ -798,6 +806,7 @@ async fn process_relay_message(
         "DELETED" => {
             let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
             let deleted_event_id = arr.get(4).and_then(|v| v.as_str()).unwrap_or("");
+            eprintln!("[sync] received DELETED seq={seq} event={}", &deleted_event_id[..8.min(deleted_event_id.len())]);
 
             // Find note by sync_event_id
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
@@ -832,6 +841,7 @@ async fn process_relay_message(
         }
         "EOSE" => {
             let max_seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
+            eprintln!("[sync] EOSE max_seq={max_seq}");
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
             save_checkpoint(&conn, max_seq);
             set_state(state, SyncState::Connected, app).await;
@@ -984,7 +994,7 @@ async fn push_note(
     )
     .map_err(|e| e.to_string())?;
 
-    log::info!("[sync] pushed note {note_id} as event {}", &event_id[..8]);
+    eprintln!("[sync] pushed note={note_id} event={}", &event_id[..8]);
 
     Ok(())
 }
@@ -1018,7 +1028,7 @@ async fn push_deletion(
         .await
         .map_err(|e| format!("Failed to send deletion: {e}"))?;
 
-    log::info!("[sync] pushed deletion for note {note_id}");
+    eprintln!("[sync] pushed deletion for note={note_id}");
 
     Ok(())
 }
