@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { listen } from "@tauri-apps/api/event";
 import { initAttachmentsBasePath } from "@/lib/attachments";
 
 const PENDING_DRAFT_KEY = "comet-pending-draft";
@@ -732,6 +733,25 @@ export function useShellController() {
       localStorage.removeItem(PENDING_DRAFT_KEY);
     }
   }, [bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Invalidate queries when a remote sync change arrives
+  useEffect(() => {
+    const unlisten = listen<{ noteId: string; action: string }>(
+      "sync-remote-change",
+      (event) => {
+        const { noteId, action } = event.payload;
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
+        queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+        queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+        if (action === "delete") {
+          queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
+        }
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!currentNote || draftNoteId !== currentNote.id) {
