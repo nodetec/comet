@@ -38,7 +38,7 @@ pub struct NoteSummary {
     pub id: String,
     pub title: String,
     pub notebook: Option<NotebookRef>,
-    pub modified_at: i64,
+    pub edited_at: i64,
     pub preview: String,
     pub search_snippet: Option<String>,
     pub archived_at: Option<i64>,
@@ -237,8 +237,8 @@ pub fn create_note(
 
     transaction
         .execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5)",
             params![note_id, title, markdown, notebook_id, now],
         )
         .map_err(|error| error.to_string())?;
@@ -276,7 +276,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, St
         let now = current_timestamp_millis();
         transaction
             .execute(
-                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3 WHERE id = ?4",
+                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3 WHERE id = ?4",
                 params![title, input.markdown, now, input.id],
             )
             .map_err(|error| error.to_string())?
@@ -521,7 +521,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     let active_tags = normalized_active_tags(&input.active_tags);
 
     let mut sql = String::from(
-        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.pinned_at
+        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.pinned_at
          FROM notes n
          LEFT JOIN notebooks b ON b.id = n.notebook_id",
     );
@@ -580,7 +580,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     }
 
     let sort_column = match input.sort_field {
-        NoteSortField::ModifiedAt => "n.modified_at",
+        NoteSortField::ModifiedAt => "n.edited_at",
         NoteSortField::CreatedAt => "n.created_at",
         NoteSortField::Title => "n.title",
     };
@@ -679,7 +679,7 @@ fn append_note_view_clauses(
         }
         NoteFilterInput::Today => {
             clauses.push("n.archived_at IS NULL".to_string());
-            clauses.push("n.modified_at >= ?".to_string());
+            clauses.push("n.edited_at >= ?".to_string());
             values.push(Value::from(current_timestamp_millis() - 24 * 60 * 60 * 1000));
         }
         NoteFilterInput::Archive => {
@@ -737,8 +737,8 @@ Comet stores note content locally in its own database, with markdown as the unde
 
     transaction
         .execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at)
-             VALUES (?1, ?2, ?3, NULL, ?4, ?4)",
+            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at)
+             VALUES (?1, ?2, ?3, NULL, ?4, ?4, ?4)",
             params!["welcome", title, markdown, now],
         )
         .map_err(|error| error.to_string())?;
@@ -862,7 +862,7 @@ fn row_to_note_summary(
         notebook: notebook_id
             .zip(notebook_name)
             .map(|(id, name)| NotebookRef { id, name }),
-        modified_at: row.get(3)?,
+        edited_at: row.get(3)?,
         preview: preview_from_markdown(&markdown),
         search_snippet: search_snippet_for_summary(&markdown, search_tokens),
         archived_at: row.get(6)?,
@@ -899,7 +899,7 @@ fn next_active_note_id(
          FROM notes
          WHERE archived_at IS NULL
            AND (?1 IS NULL OR id != ?1)
-         ORDER BY pinned_at IS NULL ASC, pinned_at DESC, modified_at DESC, created_at DESC
+         ORDER BY pinned_at IS NULL ASC, pinned_at DESC, edited_at DESC, created_at DESC
          LIMIT 1",
         params![excluding_note_id],
         |row| row.get(0),

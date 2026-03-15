@@ -485,9 +485,9 @@ export function NotesPane({
                             <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
                           ) : null}
                           <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
-                            {Date.now() - note.modifiedAt < 60_000
+                            {Date.now() - note.editedAt < 60_000
                               ? "just now"
-                              : formatDistanceToNow(new Date(note.modifiedAt), {
+                              : formatDistanceToNow(new Date(note.editedAt), {
                                   addSuffix: true,
                                 }).replace(/^about /, "")}
                           </span>

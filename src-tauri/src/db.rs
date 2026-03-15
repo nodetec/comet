@@ -86,6 +86,11 @@ fn migrations() -> Migrations<'static> {
         M::up(
             "ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;",
         ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN edited_at INTEGER;
+             UPDATE notes SET edited_at = modified_at;
+             CREATE INDEX IF NOT EXISTS idx_notes_edited_at ON notes(edited_at DESC);",
+        ),
     ])
 }
 

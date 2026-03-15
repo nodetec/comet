@@ -459,7 +459,7 @@ fn upsert_from_sync(
     if existing.is_some() {
         // Update existing note
         conn.execute(
-            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, \
+            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?4, \
              archived_at = ?5, pinned_at = ?6, sync_event_id = ?7 WHERE id = ?8",
             params![
                 note.title,
@@ -476,8 +476,8 @@ fn upsert_from_sync(
     } else {
         // Insert new note
         conn.execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, \
-             archived_at, pinned_at, sync_event_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
+             archived_at, pinned_at, sync_event_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7, ?8, ?9)",
             params![
                 note.id,
                 note.title,
