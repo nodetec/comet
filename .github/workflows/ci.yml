@@ -99,19 +99,15 @@ jobs:
           pattern: dmg-*
           merge-multiple: true
 
-      - name: Generate release tag
-        id: tag
-        run: |
-          VERSION=$(jq -r .version src-tauri/tauri.conf.json)
-          DATE=$(date -u +%Y%m%d)
-          SHORT_SHA=${GITHUB_SHA::7}
-          echo "tag=v${VERSION}-dev.${DATE}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Generate short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ steps.tag.outputs.tag }}
+          tag_name: alpha-${{ steps.sha.outputs.short }}
+          name: alpha-${{ steps.sha.outputs.short }}
           body: |
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
           files: artifacts/*.dmg
