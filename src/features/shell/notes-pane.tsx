@@ -476,17 +476,22 @@ export function NotesPane({
                       >
                         {renderHighlightedText(cardPreview, searchWords)}
                       </div>
-                      <div className="flex w-full items-center gap-3">
+                      <div className="flex w-full items-center gap-1.5">
                         {note.pinnedAt ? (
                           <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
                         ) : null}
-                        <span className="text-muted-foreground/70 text-xs">
+                        <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
                           {Date.now() - note.modifiedAt < 60_000
                             ? "just now"
                             : formatDistanceToNow(new Date(note.modifiedAt), {
                                 addSuffix: true,
-                              })}
+                              }).replace(/^about /, "")}
                         </span>
+                        {note.notebook ? (
+                          <span className="text-primary ml-auto min-w-0 truncate text-xs">
+                            {note.notebook.name}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </button>
