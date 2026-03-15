@@ -34,3 +34,8 @@ sha2 = "0.10"
 tokio-tungstenite = { version = "0.28.0", features = ["native-tls"] }
 futures-util = "0.3.32"
 log = "0.4.29"
+reqwest = { version = "0.13.2", features = ["native-tls"] }
+base64 = "0.22.1"
+regex-lite = "0.1.9"
+chacha20poly1305 = "0.10.1"
+hex = "0.4.3"

@@ -9,8 +9,10 @@ const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg"
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedImage {
-    pub relative_path: String,
-    pub absolute_path: String,
+    /// Content-addressed URI: attachment://{sha256}.{ext}
+    pub uri: String,
+    /// Full SHA-256 hash of the file content
+    pub hash: String,
 }
 
 fn attachments_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -19,9 +21,7 @@ fn attachments_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .app_config_dir()
         .map_err(|e| format!("Failed to resolve app config dir: {e}"))?;
     let dir = config_dir.join("attachments");
-    if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| format!("Failed to create attachments dir: {e}"))?;
-    }
+    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create attachments dir: {e}"))?;
     Ok(dir)
 }
 
@@ -53,16 +53,9 @@ pub fn import_image(app: &AppHandle, source_path: &str) -> Result<ImportedImage,
 
     let mut hasher = Sha256::new();
     hasher.update(&file_bytes);
-    let hash = hasher.finalize();
-    let hash_hex = format!("{:x}", hash);
-    let hash_prefix = &hash_hex[..12];
+    let hash = format!("{:x}", hasher.finalize());
 
-    let stem = source
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-    let dest_filename = format!("{hash_prefix}-{stem}.{ext}");
-
+    let dest_filename = format!("{hash}.{ext}");
     let dir = attachments_dir(app)?;
     let dest_path = dir.join(&dest_filename);
 
@@ -71,13 +64,57 @@ pub fn import_image(app: &AppHandle, source_path: &str) -> Result<ImportedImage,
             .map_err(|e| format!("Failed to write attachment: {e}"))?;
     }
 
-    let absolute_path = dest_path
-        .to_str()
-        .ok_or_else(|| "Destination path is not valid UTF-8".to_string())?
-        .to_string();
-
     Ok(ImportedImage {
-        relative_path: format!("attachments/{dest_filename}"),
-        absolute_path,
+        uri: format!("attachment://{dest_filename}"),
+        hash,
     })
+}
+
+/// Resolve an attachment:// URI to the absolute file path.
+/// Returns None if the URI is not an attachment:// URI.
+pub fn resolve_attachment_path(app: &AppHandle, uri: &str) -> Result<Option<String>, String> {
+    let filename = match uri.strip_prefix("attachment://") {
+        Some(f) => f,
+        None => return Ok(None),
+    };
+    let dir = attachments_dir(app)?;
+    let path = dir.join(filename);
+    path.to_str()
+        .map(|s| Some(s.to_string()))
+        .ok_or_else(|| "Path is not valid UTF-8".to_string())
+}
+
+const KNOWN_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bin"];
+
+/// Check if a blob exists locally by its plaintext hash.
+pub fn has_local_blob(app: &AppHandle, hash: &str) -> Result<bool, String> {
+    let dir = attachments_dir(app)?;
+    for ext in KNOWN_EXTENSIONS {
+        if dir.join(format!("{hash}.{ext}")).exists() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Save a blob to the attachments directory with the given hash and extension.
+pub fn save_blob(app: &AppHandle, hash: &str, ext: &str, data: &[u8]) -> Result<(), String> {
+    let dir = attachments_dir(app)?;
+    let filename = format!("{hash}.{ext}");
+    let path = dir.join(filename);
+    fs::write(&path, data).map_err(|e| format!("Failed to save blob: {e}"))
+}
+
+/// Read a blob from the attachments directory by its hash.
+/// Returns (bytes, extension).
+pub fn read_blob(app: &AppHandle, hash: &str) -> Result<Option<(Vec<u8>, String)>, String> {
+    let dir = attachments_dir(app)?;
+    for ext in KNOWN_EXTENSIONS {
+        let path = dir.join(format!("{hash}.{ext}"));
+        if path.exists() {
+            let data = fs::read(&path).map_err(|e| e.to_string())?;
+            return Ok(Some((data, ext.to_string())));
+        }
+    }
+    Ok(None)
 }

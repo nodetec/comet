@@ -71,6 +71,12 @@ CREATE TABLE notes (
   sync_event_id TEXT
 );
 
+CREATE TABLE blob_meta (
+  plaintext_hash  TEXT PRIMARY KEY,
+  ciphertext_hash TEXT NOT NULL,
+  encryption_key  TEXT NOT NULL
+);
+
 CREATE TABLE nostr_identity (
   secret_key TEXT NOT NULL,
   public_key TEXT NOT NULL,
@@ -280,7 +286,8 @@ This one exists to exercise archive and restore flows.
   );
 
 INSERT INTO app_settings (key, value) VALUES
-  ('last_open_note_id', 'note-writing-draft');
+  ('last_open_note_id', 'note-writing-draft'),
+  ('blossom_url', 'https://comet-blossom.fly.dev');
 
 INSERT INTO note_tags (note_id, tag) VALUES
   ('note-pinned-trail', 'design'),
@@ -318,7 +325,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 PRAGMA foreign_keys = ON;
 SQL

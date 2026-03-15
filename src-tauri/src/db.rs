@@ -76,6 +76,13 @@ fn migrations() -> Migrations<'static> {
         M::up(
             "ALTER TABLE notes ADD COLUMN sync_event_id TEXT;",
         ),
+        M::up(
+            "CREATE TABLE IF NOT EXISTS blob_meta (
+               plaintext_hash  TEXT PRIMARY KEY,
+               ciphertext_hash TEXT NOT NULL,
+               encryption_key  TEXT NOT NULL
+             );",
+        ),
     ])
 }
 

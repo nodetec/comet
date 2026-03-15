@@ -1,10 +1,12 @@
 mod attachments;
+mod blossom;
 mod db;
 mod nostr;
 mod notes;
 mod sync;
 
 use db::database_connection;
+use rusqlite::OptionalExtension;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, LoadedNote, NotePagePayload, NoteQueryInput, NotebookSummary,
@@ -188,20 +190,28 @@ fn sync_push_deletion(app: &AppHandle, note_id: &str, sync_event_id: &str) {
     });
 }
 
-#[tauri::command]
-fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
-    let conn = database_connection(&app)?;
-    let npub = nostr::import_nsec(&conn, &nsec)?;
-    // Reset sync state on identity change
+fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute("UPDATE notes SET sync_event_id = NULL", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn restart_sync_async(app: &AppHandle) {
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         let manager = app_clone.state::<sync::SyncManager>();
         manager.start(app_clone.clone()).await;
     });
+}
+
+#[tauri::command]
+fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
+    let conn = database_connection(&app)?;
+    let npub = nostr::import_nsec(&conn, &nsec)?;
+    reset_sync_state(&conn)?;
+    restart_sync_async(&app);
     Ok(npub)
 }
 
@@ -215,16 +225,8 @@ fn list_relays(app: AppHandle) -> Result<Vec<nostr::Relay>, String> {
 fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<nostr::Relay>, String> {
     let conn = database_connection(&app)?;
     let relays = nostr::set_sync_relay(&conn, &url)?;
-    // Clear checkpoint and restart sync for new relay
-    conn.execute("UPDATE notes SET sync_event_id = NULL", [])
-        .map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
-        .map_err(|e| e.to_string())?;
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let manager = app_clone.state::<sync::SyncManager>();
-        manager.start(app_clone.clone()).await;
-    });
+    reset_sync_state(&conn)?;
+    restart_sync_async(&app);
     Ok(relays)
 }
 
@@ -234,10 +236,104 @@ fn remove_sync_relay(app: AppHandle) -> Result<Vec<nostr::Relay>, String> {
     let relays = nostr::remove_sync_relay(&conn)?;
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
-        let manager = app_clone.state::<sync::SyncManager>();
-        manager.stop().await;
+        app_clone.state::<sync::SyncManager>().stop().await;
     });
     Ok(relays)
+}
+
+#[tauri::command]
+fn get_blossom_url(app: AppHandle) -> Result<Option<String>, String> {
+    let conn = database_connection(&app)?;
+    Ok(sync::get_blossom_url(&conn))
+}
+
+#[tauri::command]
+fn set_blossom_url(app: AppHandle, url: String) -> Result<(), String> {
+    let url = url.trim().trim_end_matches('/').to_string();
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Blossom URL must start with https:// or http://".into());
+    }
+    let conn = database_connection(&app)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('blossom_url', ?1)",
+        rusqlite::params![url],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, String> {
+    // Check if already local
+    if crate::attachments::has_local_blob(&app, &hash)? {
+        return Ok(true);
+    }
+
+    let conn = database_connection(&app)?;
+
+    // Look up blob metadata
+    let meta: Option<(String, String)> = conn
+        .query_row(
+            "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1",
+            rusqlite::params![hash],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    let (ciphertext_hash, key_hex) = match meta {
+        Some(m) => m,
+        None => return Ok(false), // no metadata, can't download
+    };
+
+    let blossom_url = match sync::get_blossom_url(&conn) {
+        Some(u) => u,
+        None => return Ok(false),
+    };
+
+    // Get keys for decryption and Blossom auth
+    let secret_hex: String = conn
+        .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?
+        .ok_or("No identity configured")?;
+
+    drop(conn); // release before async work
+
+    let secret_key = nostr_sdk::prelude::SecretKey::parse(&secret_hex)
+        .map_err(|e| format!("Invalid secret key: {e}"))?;
+    let keys = nostr_sdk::prelude::Keys::new(secret_key);
+
+    // Download from Blossom
+    let http_client = reqwest::Client::new();
+    let ciphertext = crate::blossom::download_blob(&http_client, &blossom_url, &ciphertext_hash, &keys).await?;
+
+    // Decrypt
+    let plaintext = crate::blossom::decrypt_blob(&ciphertext, &key_hex)?;
+
+    // Determine extension from local notes referencing this hash
+    let conn2 = database_connection(&app)?;
+    let ext: String = conn2
+        .query_row(
+            "SELECT markdown FROM notes WHERE markdown LIKE ?1 LIMIT 1",
+            rusqlite::params![format!("%attachment://{}%", hash)],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .and_then(|md| sync::extract_blob_extension(&md, &hash))
+        .unwrap_or_else(|| "bin".to_string());
+
+    crate::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn remove_blossom_url(app: AppHandle) -> Result<(), String> {
+    let conn = database_connection(&app)?;
+    conn.execute("DELETE FROM app_settings WHERE key = 'blossom_url'", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -316,6 +412,10 @@ pub fn run() {
             remove_relay,
             publish_note,
             delete_published_note,
+            get_blossom_url,
+            set_blossom_url,
+            remove_blossom_url,
+            fetch_blob,
             get_sync_status,
             restart_sync
         ])

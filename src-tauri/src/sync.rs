@@ -136,6 +136,17 @@ pub async fn auto_start(app: &AppHandle) {
 
 // ── DB helpers ──────────────────────────────────────────────────────────
 
+pub(crate) fn get_blossom_url(conn: &Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM app_settings WHERE key = 'blossom_url'",
+        [],
+        |row| row.get(0),
+    )
+    .optional()
+    .ok()
+    .flatten()
+}
+
 fn get_sync_relay_url(conn: &Connection) -> Option<String> {
     conn.query_row(
         "SELECT url FROM relays WHERE kind = 'sync' LIMIT 1",
@@ -180,15 +191,15 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
-fn strip_title_line(markdown: &str) -> String {
-    if let Some(rest) = markdown.strip_prefix("# ") {
-        match rest.find('\n') {
-            Some(pos) => rest[pos..].trim_start_matches('\n').to_string(),
-            None => String::new(),
-        }
-    } else {
-        markdown.to_string()
-    }
+use crate::nostr::strip_title_line;
+
+/// Extract attachment:// hashes from markdown content.
+fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
+    static RE: std::sync::LazyLock<regex_lite::Regex> =
+        std::sync::LazyLock::new(|| regex_lite::Regex::new(r"attachment://([a-f0-9]{64})\.\w+").unwrap());
+    RE.captures_iter(markdown)
+        .map(|cap| cap[1].to_string())
+        .collect()
 }
 
 fn note_to_rumor(
@@ -202,6 +213,7 @@ fn note_to_rumor(
     archived_at: Option<i64>,
     pinned_at: Option<i64>,
     tags: &[String],
+    blob_tags: &[(String, String, String)], // (plaintext_hash, ciphertext_hash, encryption_key_hex)
     pubkey: PublicKey,
 ) -> UnsignedEvent {
     let content = strip_title_line(markdown);
@@ -230,6 +242,13 @@ fn note_to_rumor(
 
     for t in tags {
         event_tags.push(Tag::hashtag(t));
+    }
+
+    for (plaintext_hash, ciphertext_hash, key_hex) in blob_tags {
+        event_tags.push(Tag::custom(
+            TagKind::custom("blob"),
+            vec![plaintext_hash.clone(), ciphertext_hash.clone(), key_hex.clone()],
+        ));
     }
 
     EventBuilder::new(Kind::LongFormTextNote, content)
@@ -736,6 +755,14 @@ async fn process_relay_message(
             let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
             save_checkpoint(&conn, seq);
 
+            // Download missing attachment blobs from Blossom
+            if updated.is_some() {
+                let blossom_url = get_blossom_url(&conn);
+                if let Some(blossom_url) = blossom_url {
+                    download_missing_blobs(app, keys, &unwrapped.rumor, &blossom_url).await;
+                }
+            }
+
             if updated.is_some() {
                 let _ = app.emit(
                     "sync-remote-change",
@@ -812,7 +839,7 @@ async fn push_note(
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), String> {
     // Read note from DB
-    let (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags) = {
+    let (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags, blossom_url) = {
         let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
         let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>)> = conn
@@ -846,8 +873,45 @@ async fn push_note(
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
 
-        (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags)
+        let blossom_url = get_blossom_url(&conn);
+
+        (title, markdown, notebook_id, notebook_name, created_at, modified_at, archived_at, pinned_at, tags, blossom_url)
     };
+
+    // Upload attachment blobs to Blossom if configured
+    let mut blob_tags: Vec<(String, String, String)> = Vec::new();
+    let attachment_hashes = extract_attachment_hashes(&markdown);
+    if let Some(ref blossom_url) = blossom_url {
+        let http_client = reqwest::Client::new();
+        for hash in &attachment_hashes {
+            // Read the local blob
+            let blob_data = match crate::attachments::read_blob(app, hash)? {
+                Some((data, _ext)) => data,
+                None => continue,
+            };
+
+            // Encrypt with ChaCha20-Poly1305 (NIP-44 has a 65KB size limit)
+            let (ciphertext_bytes, key_hex) = crate::blossom::encrypt_blob(&blob_data)?;
+
+            // Upload to Blossom
+            let ciphertext_hash = crate::blossom::upload_blob(
+                &http_client,
+                blossom_url,
+                ciphertext_bytes,
+                keys,
+            )
+            .await?;
+
+            // Save blob metadata for on-demand download on other devices
+            let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
+                params![hash, ciphertext_hash, key_hex],
+            ).map_err(|e| e.to_string())?;
+
+            blob_tags.push((hash.clone(), ciphertext_hash, key_hex));
+        }
+    }
 
     // Build rumor
     let rumor = note_to_rumor(
@@ -861,6 +925,7 @@ async fn push_note(
         archived_at,
         pinned_at,
         &tags,
+        &blob_tags,
         keys.public_key(),
     );
 
@@ -928,4 +993,90 @@ async fn push_deletion(
     log::info!("[sync] pushed deletion for note {note_id}");
 
     Ok(())
+}
+
+// ── Blob sync ──────────────────────────────────────────────────────────
+
+/// Download any attachment blobs referenced in the rumor that are missing locally.
+async fn download_missing_blobs(
+    app: &AppHandle,
+    keys: &Keys,
+    rumor: &UnsignedEvent,
+    blossom_url: &str,
+) {
+    // Extract blob tags: ["blob", plaintext_hash, ciphertext_hash, encryption_key_hex]
+    let blob_tags: Vec<(&str, &str, &str)> = rumor
+        .tags
+        .filter(TagKind::custom("blob"))
+        .filter_map(|tag| {
+            let s = tag.as_slice();
+            if s.len() >= 4 {
+                Some((s[1].as_str(), s[2].as_str(), s[3].as_str()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (plaintext_hash, ciphertext_hash, key_hex) in &blob_tags {
+        // Save blob metadata for on-demand download
+        if let Ok(conn) = crate::db::database_connection(app) {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
+                params![plaintext_hash, ciphertext_hash, key_hex],
+            );
+        }
+
+        // Check if we already have it locally
+        match crate::attachments::has_local_blob(app, plaintext_hash) {
+            Ok(true) => continue,
+            Ok(false) => {}
+            Err(e) => {
+                log::error!("[sync] failed to check local blob {}: {e}", &plaintext_hash[..8]);
+                continue;
+            }
+        }
+
+        // Download from Blossom
+        let http_client = reqwest::Client::new();
+        let ciphertext_bytes = match crate::blossom::download_blob(&http_client, blossom_url, ciphertext_hash, keys).await {
+            Ok(data) => data,
+            Err(e) => {
+                log::error!("[sync] failed to download blob {}: {e}", &ciphertext_hash[..8]);
+                continue;
+            }
+        };
+
+        // Decrypt with ChaCha20-Poly1305
+        let plaintext = match crate::blossom::decrypt_blob(&ciphertext_bytes, key_hex) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[sync] failed to decrypt blob: {e}");
+                continue;
+            }
+        };
+
+        // Determine extension from attachment references in the content
+        let ext = extract_blob_extension(&rumor.content, plaintext_hash).unwrap_or("bin".to_string());
+
+        // Save locally
+        if let Err(e) = crate::attachments::save_blob(app, plaintext_hash, &ext, &plaintext) {
+            log::error!("[sync] failed to save blob {}: {e}", &plaintext_hash[..8]);
+        } else {
+            log::info!("[sync] downloaded blob {}.{ext}", &plaintext_hash[..8]);
+        }
+    }
+}
+
+/// Extract the file extension for a blob hash from markdown content.
+pub(crate) fn extract_blob_extension(content: &str, hash: &str) -> Option<String> {
+    let pattern = format!("attachment://{hash}.");
+    if let Some(pos) = content.find(&pattern) {
+        let after = &content[pos + pattern.len()..];
+        let ext: String = after.chars().take_while(|c| c.is_alphanumeric()).collect();
+        if !ext.is_empty() {
+            return Some(ext);
+        }
+    }
+    None
 }

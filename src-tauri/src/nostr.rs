@@ -371,7 +371,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
     })
 }
 
-fn strip_title_line(markdown: &str) -> String {
+pub(crate) fn strip_title_line(markdown: &str) -> String {
     if let Some(rest) = markdown.strip_prefix("# ") {
         // Skip the first line (the H1 title)
         match rest.find('\n') {

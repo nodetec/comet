@@ -23,6 +23,7 @@ export function RelaysSettings() {
   return (
     <div className="space-y-8">
       <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
+      <BlossomSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
     </div>
   );
@@ -106,6 +107,96 @@ function SyncRelaySection({
           error={
             setSyncMutation.isError
               ? (setSyncMutation.error as Error).message
+              : undefined
+          }
+          submitLabel="Save"
+        />
+      )}
+    </div>
+  );
+}
+
+function BlossomSection({
+  queryClient,
+}: {
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+
+  const { data: blossomUrl } = useQuery({
+    queryKey: ["blossom-url"],
+    queryFn: () => invoke<string | null>("get_blossom_url"),
+  });
+
+  const setMutation = useMutation({
+    mutationFn: (url: string) => invoke("set_blossom_url", { url }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
+      setEditing(false);
+      setUrlInput("");
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () => invoke("remove_blossom_url"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
+    },
+  });
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">Blob Storage</h3>
+      <p className="text-muted-foreground mb-3 text-xs">
+        A Blossom server used to sync image attachments between devices.
+      </p>
+
+      {blossomUrl && !editing ? (
+        <div className="flex items-center gap-2">
+          <code className="bg-muted rounded px-2 py-1 text-sm">
+            {blossomUrl}
+          </code>
+          <button
+            type="button"
+            onClick={() => {
+              setUrlInput(blossomUrl);
+              setEditing(true);
+            }}
+            className="text-xs text-blue-500 hover:underline"
+          >
+            Change
+          </button>
+          <button
+            type="button"
+            onClick={() => removeMutation.mutate()}
+            className="text-xs text-red-500 hover:underline"
+          >
+            Remove
+          </button>
+        </div>
+      ) : !editing ? (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-sm text-blue-500 hover:underline"
+        >
+          Set Blossom server
+        </button>
+      ) : (
+        <RelayUrlForm
+          value={urlInput}
+          onChange={setUrlInput}
+          onSubmit={() => setMutation.mutate(urlInput.trim())}
+          onCancel={() => {
+            setEditing(false);
+            setUrlInput("");
+            setMutation.reset();
+          }}
+          isPending={setMutation.isPending}
+          error={
+            setMutation.isError
+              ? (setMutation.error as Error).message
               : undefined
           }
           submitLabel="Save"

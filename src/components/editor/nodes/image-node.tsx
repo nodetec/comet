@@ -32,6 +32,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface ImagePayload {
   src: string;
@@ -67,7 +68,35 @@ function ImageComponent({
   const [isSelected, setSelected, clearSelection] =
     useLexicalNodeSelection(nodeKey);
   const [isLoadError, setIsLoadError] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [cacheBust, setCacheBust] = useState(0);
+  const fetchAttempted = useRef(false);
   const isEditable = useLexicalEditable();
+
+  const onImageError = useCallback(() => {
+    if (fetchAttempted.current) {
+      setIsLoadError(true);
+      return;
+    }
+    const hashMatch = src.match(/([a-f0-9]{64})\.\w+/);
+    if (hashMatch) {
+      fetchAttempted.current = true;
+      setIsFetching(true);
+      invoke<boolean>("fetch_blob", { hash: hashMatch[1] })
+        .then((found) => {
+          if (found) {
+            setCacheBust(Date.now());
+            setIsLoadError(false);
+          } else {
+            setIsLoadError(true);
+          }
+        })
+        .catch(() => setIsLoadError(true))
+        .finally(() => setIsFetching(false));
+    } else {
+      setIsLoadError(true);
+    }
+  }, [src]);
 
   const $onDelete = useCallback(
     (event: KeyboardEvent) => {
@@ -156,6 +185,14 @@ function ImageComponent({
 
   const isFocused = isSelected && isEditable;
 
+  if (isFetching) {
+    return (
+      <span className="bg-muted text-muted-foreground inline rounded p-2 text-sm">
+        Downloading image…
+      </span>
+    );
+  }
+
   if (isLoadError) {
     return (
       <span className="bg-muted text-muted-foreground inline rounded p-2 text-sm">
@@ -171,13 +208,13 @@ function ImageComponent({
     >
       <img
         ref={imageRef}
-        src={src}
+        src={cacheBust ? `${src}?t=${cacheBust}` : src}
         alt={altText}
         className={`my-2 max-w-full cursor-default rounded-lg border-2 ${
           isFocused ? "border-primary" : "border-transparent"
         }`}
         draggable="false"
-        onError={() => setIsLoadError(true)}
+        onError={onImageError}
       />
     </span>
   );
