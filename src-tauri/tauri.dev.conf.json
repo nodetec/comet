@@ -1,0 +1,10 @@
+{
+  "identifier": "md.comet.dev",
+  "app": {
+    "windows": [
+      {
+        "title": "comet (dev)"
+      }
+    ]
+  }
+}

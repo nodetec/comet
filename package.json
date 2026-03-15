@@ -10,7 +10,8 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "seed:db": "sh ./scripts/seed-db.sh",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

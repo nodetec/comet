@@ -12,7 +12,7 @@ Before making product or UX decisions, read `docs/vision.md`, `docs/principles.m
 
 ```bash
 npm install                          # Install dependencies
-npm run tauri dev                    # Start app in dev mode (Rust backend + Vite on port 1420)
+npm run tauri:dev                    # Start app in dev mode (separate DB from production)
 npm run tauri build -- --bundles app # Production app bundle
 npm run build                       # Frontend only: tsc + Vite build
 npm run format                       # Prettier (with tailwindcss plugin)

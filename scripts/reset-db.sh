@@ -2,7 +2,7 @@
 
 set -eu
 
-APP_DIR="${HOME}/Library/Application Support/app.comet.desktop"
+APP_DIR="${HOME}/Library/Application Support/md.comet.dev"
 DEFAULT_DB_PATH="${APP_DIR}/comet.db"
 DB_PATH="${COMET_DB_PATH:-$DEFAULT_DB_PATH}"
 
