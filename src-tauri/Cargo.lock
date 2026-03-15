@@ -558,6 +558,7 @@ dependencies = [
  "futures-util",
  "gray_matter",
  "hex",
+ "hmac",
  "log",
  "nostr-sdk",
  "notify",

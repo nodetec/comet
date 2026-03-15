@@ -211,7 +211,28 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
     let conn = database_connection(&app)?;
     let npub = nostr::import_nsec(&conn, &nsec)?;
     reset_sync_state(&conn)?;
-    restart_sync_async(&app);
+
+    // Collect all note IDs to re-push under the new key
+    let mut stmt = conn
+        .prepare("SELECT id FROM notes WHERE archived_at IS NULL")
+        .map_err(|e| e.to_string())?;
+    let note_ids: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt);
+    drop(conn);
+
+    let manager = app.state::<sync::SyncManager>().inner().clone();
+    tauri::async_runtime::spawn(async move {
+        manager.start(app.clone()).await;
+        // Push all existing notes under the new key
+        for note_id in note_ids {
+            manager.push(sync::SyncCommand::PushNote(note_id)).await;
+        }
+    });
+
     Ok(npub)
 }
 

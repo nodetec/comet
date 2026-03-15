@@ -1,5 +1,7 @@
 use futures_util::{SinkExt, StreamExt};
+use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
+use sha2::Sha256;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -192,6 +194,15 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
 use crate::nostr::strip_title_line;
+
+/// Compute a deterministic d-tag for a gift wrap using HMAC-SHA256.
+/// This allows the relay to replace old versions without leaking the note ID.
+fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret_key.as_secret_bytes())
+        .expect("HMAC accepts any key size");
+    mac.update(note_id.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
 
 /// Extract attachment:// hashes from markdown content.
 fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
@@ -742,12 +753,26 @@ async fn process_relay_message(
                 return Ok(());
             }
 
-            // Unwrap gift wrap
-            let unwrapped = nip59::extract_rumor(keys, &event)
-                .await
-                .map_err(|e| format!("Failed to unwrap gift wrap: {e}"))?;
+            // Unwrap gift wrap (skip events we can't decrypt, e.g. from a previous key)
+            let unwrapped = match nip59::extract_rumor(keys, &event).await {
+                Ok(u) => u,
+                Err(e) => {
+                    eprintln!("[sync] skipping undecryptable event {}: {e}", &event_id[..8]);
+                    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                    save_checkpoint(&conn, seq);
+                    return Ok(());
+                }
+            };
 
-            let synced_note = rumor_to_synced_note(&unwrapped.rumor)?;
+            let synced_note = match rumor_to_synced_note(&unwrapped.rumor) {
+                Ok(n) => n,
+                Err(e) => {
+                    eprintln!("[sync] skipping malformed rumor {}: {e}", &event_id[..8]);
+                    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                    save_checkpoint(&conn, seq);
+                    return Ok(());
+                }
+            };
             let note_id = synced_note.id.clone();
 
             // Upsert into local DB
@@ -929,10 +954,16 @@ async fn push_note(
         keys.public_key(),
     );
 
-    // Gift wrap to self
-    let gift_wrap = EventBuilder::gift_wrap(keys, &keys.public_key(), rumor, [])
-        .await
-        .map_err(|e| format!("Failed to gift wrap: {e}"))?;
+    // Gift wrap to self with HMAC'd d-tag for relay-side replacement
+    let d_tag = gift_wrap_d_tag(keys.secret_key(), note_id);
+    let gift_wrap = EventBuilder::gift_wrap(
+        keys,
+        &keys.public_key(),
+        rumor,
+        [Tag::identifier(&d_tag)],
+    )
+    .await
+    .map_err(|e| format!("Failed to gift wrap: {e}"))?;
 
     let event_id = gift_wrap.id.to_hex();
 
