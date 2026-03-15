@@ -990,6 +990,45 @@ async fn process_relay_message(
             eprintln!("[sync] EOSE max_seq={max_seq}");
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
             save_checkpoint(&conn, max_seq);
+
+            // Push any local notes/notebooks that haven't been synced yet
+            // (created or modified while offline)
+            let (unsynced_notebooks, unsynced_notes) = {
+                let mut stmt = conn
+                    .prepare("SELECT id FROM notebooks WHERE sync_event_id IS NULL")
+                    .map_err(|e| e.to_string())?;
+                let nbs: Vec<String> = stmt
+                    .query_map([], |row| row.get(0))
+                    .map_err(|e| e.to_string())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| e.to_string())?;
+                drop(stmt);
+
+                let mut stmt = conn
+                    .prepare("SELECT id FROM notes WHERE sync_event_id IS NULL AND archived_at IS NULL")
+                    .map_err(|e| e.to_string())?;
+                let notes: Vec<String> = stmt
+                    .query_map([], |row| row.get(0))
+                    .map_err(|e| e.to_string())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| e.to_string())?;
+
+                (nbs, notes)
+            }; // conn and stmts dropped here
+
+            if !unsynced_notebooks.is_empty() || !unsynced_notes.is_empty() {
+                eprintln!("[sync] pushing {} unsynced notebooks, {} unsynced notes",
+                    unsynced_notebooks.len(), unsynced_notes.len());
+            }
+
+            let manager = app.state::<SyncManager>();
+            for nb_id in unsynced_notebooks {
+                manager.push(SyncCommand::PushNotebook(nb_id)).await;
+            }
+            for note_id in unsynced_notes {
+                manager.push(SyncCommand::PushNote(note_id)).await;
+            }
+
             set_state(state, SyncState::Connected, app).await;
         }
         "ERR" => {
