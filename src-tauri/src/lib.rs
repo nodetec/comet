@@ -13,7 +13,7 @@ use notes::{
     RenameNotebookInput, SaveNoteInput,
 };
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -419,6 +419,32 @@ pub fn run() {
             get_sync_status,
             restart_sync
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            match event {
+                RunEvent::WindowEvent {
+                    event: WindowEvent::CloseRequested { api, .. },
+                    ..
+                } => {
+                    // Hide the window instead of quitting (standard macOS behavior)
+                    api.prevent_close();
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    #[cfg(target_os = "macos")]
+                    let _ = app.hide();
+                }
+                RunEvent::Reopen { .. } => {
+                    // Re-show when the dock icon is clicked
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                    #[cfg(target_os = "macos")]
+                    let _ = app.show();
+                }
+                _ => {}
+            }
+        });
 }
