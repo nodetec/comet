@@ -57,6 +57,7 @@ type NotesPaneProps = {
   onDeleteNotePermanently(noteId: string): void;
   onLoadMore(): void;
   onSetNotePinned(noteId: string, pinned: boolean): void;
+  onExportNotes(): void;
   onRestoreNote(noteId: string): void;
   onSelectNote(noteId: string): void;
 };
@@ -128,6 +129,7 @@ export function NotesPane({
   onCopyNoteContent,
   onCreateNote,
   onDeleteNotePermanently,
+  onExportNotes,
   onLoadMore,
   onSetNotePinned,
   onRestoreNote,
@@ -347,7 +349,17 @@ export function NotesPane({
                       ],
                     });
 
-                    const menu = await Menu.new({ items: [sortSubmenu] });
+                    const menu = await Menu.new({
+                      items: [
+                        sortSubmenu,
+                        await PredefinedMenuItem.new({ item: "Separator" }),
+                        {
+                          id: "export-notes",
+                          text: "Export as Markdown…",
+                          action: () => onExportNotes(),
+                        },
+                      ],
+                    });
                     try {
                       await menu.popup(
                         new LogicalPosition(rect.left, rect.bottom),

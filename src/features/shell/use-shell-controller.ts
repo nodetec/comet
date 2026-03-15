@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   useInfiniteQuery,
@@ -6,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
 import { toastErrorHandler } from "@/lib/mutation-utils";
 import { errorMessage } from "@/lib/utils";
@@ -26,6 +28,7 @@ import {
   queryNotes,
   restoreNote,
   saveNote,
+  exportNotes,
   unpinNote,
 } from "./api";
 import {
@@ -721,6 +724,27 @@ export function useShellController() {
     })();
   };
 
+  const handleExportNotes = () => {
+    void (async () => {
+      try {
+        const selected = await open({ directory: true, title: "Export notes" });
+        if (!selected) return;
+
+        const count = await exportNotes({
+          noteFilter: noteFilter,
+          activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
+          exportDir: selected as string,
+        });
+
+        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
+          id: "export-notes-success",
+        });
+      } catch (error) {
+        toastErrorHandler("Couldn't export notes", "export-notes-error")(error);
+      }
+    })();
+  };
+
   // Keep latest handler references for stable memoized callbacks
   const currentHandlers = {
     fetchNextPage: notesQuery.fetchNextPage,
@@ -731,6 +755,7 @@ export function useShellController() {
     handleCreateNote,
     handleDeleteNotebook: notebook.handleDeleteNotebook,
     handleDeleteNotePermanently,
+    handleExportNotes,
     handleRestoreNote,
     handleSelectAll,
     handleSelectArchive,
@@ -900,6 +925,7 @@ export function useShellController() {
         latestRef.current.handleCreateNote(source),
       onDeleteNotePermanently: (noteId: string) =>
         latestRef.current.handleDeleteNotePermanently(noteId),
+      onExportNotes: () => latestRef.current.handleExportNotes(),
       onLoadMore() {
         if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
           void latestRef.current.fetchNextPage();

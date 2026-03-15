@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { initAttachmentsBasePath } from "@/lib/attachments";
+import { type NoteFilter } from "@/stores/use-shell-store";
 
 import {
   type AssignNoteNotebookInput,
@@ -97,4 +98,12 @@ export async function publishNote(input: PublishNoteInput) {
 
 export async function deletePublishedNote(noteId: string) {
   return invoke<PublishResult>("delete_published_note", { noteId });
+}
+
+export async function exportNotes(input: {
+  noteFilter: NoteFilter;
+  activeNotebookId: string | null;
+  exportDir: string;
+}) {
+  return invoke<number>("export_notes", { input });
 }

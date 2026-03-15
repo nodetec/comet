@@ -743,6 +743,108 @@ pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, String> 
     Ok(tags)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportNotesInput {
+    pub note_filter: NoteFilterInput,
+    pub active_notebook_id: Option<String>,
+    pub export_dir: String,
+}
+
+pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, String> {
+    if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
+        return Ok(0);
+    }
+
+    let conn = database_connection(app)?;
+
+    let mut sql = String::from(
+        "SELECT n.title, n.markdown FROM notes n WHERE ",
+    );
+    let mut clauses = Vec::new();
+    let mut values = Vec::new();
+
+    append_note_view_clauses(
+        &mut clauses,
+        &mut values,
+        input.note_filter,
+        input.active_notebook_id.as_deref(),
+    );
+
+    sql.push_str(&clauses.join(" AND "));
+    sql.push_str(" ORDER BY n.edited_at DESC");
+
+    let mut statement = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params_from_iter(values.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let export_dir = std::path::PathBuf::from(&input.export_dir);
+    let mut used_names: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut count = 0;
+
+    for row in rows {
+        let (title, markdown) = row.map_err(|e| e.to_string())?;
+        let base = sanitize_filename(&title);
+
+        let entry = used_names.entry(base.clone()).or_insert(0);
+        *entry += 1;
+        let filename = if *entry == 1 {
+            format!("{}.md", base)
+        } else {
+            format!("{} {}.md", base, entry)
+        };
+
+        std::fs::write(export_dir.join(&filename), &markdown)
+            .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+        count += 1;
+    }
+
+    Ok(count)
+}
+
+fn sanitize_filename(title: &str) -> String {
+    let sanitized: String = title
+        .chars()
+        .filter(|c| !c.is_control())
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+
+    let trimmed = sanitized.trim().trim_matches('-').to_string();
+
+    // Collapse consecutive dashes
+    let mut result = String::with_capacity(trimmed.len());
+    let mut prev_dash = false;
+    for c in trimmed.chars() {
+        if c == '-' {
+            if !prev_dash {
+                result.push(c);
+            }
+            prev_dash = true;
+        } else {
+            result.push(c);
+            prev_dash = false;
+        }
+    }
+
+    if result.is_empty() {
+        "Untitled".to_string()
+    } else if result.len() > 200 {
+        result.chars().take(200).collect()
+    } else {
+        result
+    }
+}
+
 fn query_contextual_tags(
     conn: &Connection,
     input: &ContextualTagsInput,
