@@ -26,6 +26,11 @@
         "trafficLightPosition": {
           "x": 18,
           "y": 24
+        },
+        "webviewPreferences": {
+          "automaticTextReplacementEnabled": false,
+          "automaticQuoteSubstitutionEnabled": false,
+          "automaticDashSubstitutionEnabled": false
         }
       }
     ],
