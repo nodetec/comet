@@ -17,6 +17,8 @@ import { LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
 
+import { searchWordsFromQuery } from "@/lib/search";
+
 import theme from "./theme";
 import { TRANSFORMERS } from "./transformers";
 import InitialContentPlugin from "./plugins/initial-content-plugin";
@@ -32,6 +34,7 @@ import LinkPastePlugin from "./plugins/link-paste-plugin";
 import MarkdownCopyPlugin from "./plugins/markdown-copy-plugin";
 import MarkdownPastePlugin from "./plugins/markdown-paste-plugin";
 import ImageDropPlugin from "./plugins/image-drop-plugin";
+import SearchHighlightPlugin from "./plugins/search-highlight-plugin";
 import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 
@@ -55,6 +58,7 @@ function EditorInner({
   isNew,
   markdown,
   readOnly,
+  searchQuery,
   toolbarContainer,
   onChange,
   onFocusHandled,
@@ -63,6 +67,10 @@ function EditorInner({
   editorRef: React.RefObject<NoteEditorHandle | null>;
 }) {
   const [editor] = useLexicalComposerContext();
+  const searchWords = useMemo(
+    () => searchWordsFromQuery(searchQuery),
+    [searchQuery],
+  );
 
   useEffect(() => {
     editor.setEditable(!readOnly);
@@ -115,6 +123,7 @@ function EditorInner({
       <MarkdownPastePlugin />
       <YouTubeEmbedPlugin />
       <ImageDropPlugin />
+      <SearchHighlightPlugin searchWords={searchWords} />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
   );

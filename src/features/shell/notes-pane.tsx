@@ -100,7 +100,7 @@ const HighlightedText = memo(function HighlightedText({
   return (
     <Highlighter
       autoEscape
-      highlightClassName="bg-yellow-300/40 text-secondary-foreground rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
+      highlightClassName="bg-yellow-300 text-background rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
       searchWords={searchWords}
       textToHighlight={text}
     />
