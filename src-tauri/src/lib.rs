@@ -397,6 +397,65 @@ async fn delete_published_note(app: AppHandle, note_id: String) -> Result<nostr:
     nostr::delete_published_note(&app, &note_id).await
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncInfo {
+    state: sync::SyncState,
+    relay_url: Option<String>,
+    blossom_url: Option<String>,
+    npub: Option<String>,
+    synced_notes: i64,
+    synced_notebooks: i64,
+    total_notes: i64,
+    checkpoint: i64,
+    blobs_stored: i64,
+}
+
+#[tauri::command]
+async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
+    let manager = app.state::<sync::SyncManager>();
+    let state = manager.state().await;
+
+    let conn = database_connection(&app)?;
+
+    let relay_url = sync::get_sync_relay_url(&conn);
+    let blossom_url = sync::get_blossom_url(&conn);
+    let npub: Option<String> = conn
+        .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    let synced_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let total_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE archived_at IS NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let synced_notebooks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let checkpoint: i64 = sync::get_checkpoint(&conn);
+
+    let blobs_stored: i64 = conn
+        .query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    Ok(SyncInfo {
+        state,
+        relay_url,
+        blossom_url,
+        npub,
+        synced_notes,
+        synced_notebooks,
+        total_notes,
+        checkpoint,
+        blobs_stored,
+    })
+}
+
 #[tauri::command]
 async fn get_sync_status(app: AppHandle) -> Result<sync::SyncState, String> {
     let manager = app.state::<sync::SyncManager>();
@@ -455,6 +514,7 @@ pub fn run() {
             set_blossom_url,
             remove_blossom_url,
             fetch_blob,
+            get_sync_info,
             get_sync_status,
             restart_sync
         ])

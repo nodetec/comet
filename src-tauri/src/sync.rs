@@ -150,7 +150,7 @@ pub(crate) fn get_blossom_url(conn: &Connection) -> Option<String> {
     .flatten()
 }
 
-fn get_sync_relay_url(conn: &Connection) -> Option<String> {
+pub(crate) fn get_sync_relay_url(conn: &Connection) -> Option<String> {
     conn.query_row(
         "SELECT url FROM relays WHERE kind = 'sync' LIMIT 1",
         [],
@@ -172,7 +172,7 @@ fn get_identity(conn: &Connection) -> Option<(String, String)> {
     .flatten()
 }
 
-fn get_checkpoint(conn: &Connection) -> i64 {
+pub(crate) fn get_checkpoint(conn: &Connection) -> i64 {
     conn.query_row(
         "SELECT value FROM app_settings WHERE key = 'sync_checkpoint'",
         [],

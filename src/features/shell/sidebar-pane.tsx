@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SyncDialog } from "./sync-dialog";
 import { useUIStore } from "@/stores/use-ui-store";
 import { type NoteFilter } from "@/stores/use-shell-store";
 
@@ -97,6 +98,7 @@ export function SidebarPane({
     };
   }, []);
 
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showFooterBorder, setShowFooterBorder] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
@@ -193,9 +195,7 @@ export function SidebarPane({
             className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             size="icon-sm"
             variant="ghost"
-            onClick={() => {
-              openSettings(true);
-            }}
+            onClick={() => setSyncDialogOpen(true)}
           >
             {syncState === "connected" && (
               <CloudCheck className="size-[1.2rem]" />
@@ -212,6 +212,7 @@ export function SidebarPane({
               <CloudOff className="size-[1.2rem]" />
             )}
           </Button>
+          <SyncDialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen} />
           <Button
             aria-label="Settings"
             className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
