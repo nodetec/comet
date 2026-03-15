@@ -104,7 +104,7 @@ function App() {
           </Section>
 
           <Bar
-            className="bg-border z-30 cursor-col-resize"
+            className="bg-accent/35 z-30 cursor-col-resize"
             expandInteractiveArea={{ left: 5, right: 5 }}
             size={1}
           />

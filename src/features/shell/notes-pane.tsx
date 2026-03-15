@@ -462,7 +462,7 @@ export function NotesPane({
                         {note.pinnedAt ? (
                           <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
                         ) : null}
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-muted-foreground/70 text-xs">
                           {Date.now() - note.modifiedAt < 60_000
                             ? "just now"
                             : formatDistanceToNow(new Date(note.modifiedAt), {
@@ -473,7 +473,7 @@ export function NotesPane({
                     </div>
                   </button>
                   <div className="w-full px-[0.30rem]">
-                    <div className="bg-accent/30 h-px w-full" />
+                    <div className="bg-accent/35 h-px w-full" />
                   </div>
                 </motion.div>
               );
