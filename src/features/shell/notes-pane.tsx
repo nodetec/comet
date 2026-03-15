@@ -1,6 +1,6 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { formatDistanceToNow } from "date-fns";
-import { AnimatePresence, motion } from "framer-motion";
+import { LayoutGroup, motion } from "framer-motion";
 import {
   CheckMenuItem,
   Menu,
@@ -129,6 +129,21 @@ export function NotesPane({
     () => searchQuery.length > 0,
   );
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
+  const knownNoteIdsRef = useRef<Set<string>>(new Set());
+  const newNoteIds = useMemo(() => {
+    const newIds = new Set<string>();
+    for (const note of filteredNotes) {
+      if (!knownNoteIdsRef.current.has(note.id)) {
+        newIds.add(note.id);
+      }
+    }
+    return newIds;
+  }, [filteredNotes]);
+  useEffect(() => {
+    for (const note of filteredNotes) {
+      knownNoteIdsRef.current.add(note.id);
+    }
+  }, [filteredNotes]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -413,9 +428,10 @@ export function NotesPane({
           </div>
         ) : (
           <div className="space-y-0 px-3">
-            <AnimatePresence initial={false}>
+            <LayoutGroup>
             {filteredNotes.map((note) => {
               const isActive = note.id === selectedNoteId;
+              const isNew = newNoteIds.has(note.id);
               const cardPreview =
                 searchWords.length > 0
                   ? note.searchSnippet || note.preview || "No content yet"
@@ -424,10 +440,8 @@ export function NotesPane({
               return (
                 <motion.div
                   layout
-                  initial={{ opacity: 0, x: -50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  className="flex w-full flex-col items-center"
+                  transition={{ layout: { duration: 0.2, ease: "easeInOut" } }}
+                  className={`flex w-full flex-col items-center ${isNew ? "animate-slide-in-left" : ""}`}
                   key={note.id}
                 >
                   <button
@@ -478,7 +492,7 @@ export function NotesPane({
                 </motion.div>
               );
             })}
-            </AnimatePresence>
+            </LayoutGroup>
             {hasMoreNotes ? (
               <div className="px-[0.30rem] py-4" ref={loadMoreRef}>
                 <div className="text-muted-foreground text-center text-xs">
