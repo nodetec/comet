@@ -200,6 +200,7 @@ function BlossomSection({
               : undefined
           }
           submitLabel="Save"
+          placeholder="https://..."
         />
       )}
     </div>
@@ -299,6 +300,7 @@ function RelayUrlForm({
   isPending,
   error,
   submitLabel,
+  placeholder = "wss://...",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -307,6 +309,7 @@ function RelayUrlForm({
   isPending: boolean;
   error: string | undefined;
   submitLabel: string;
+  placeholder?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -314,7 +317,7 @@ function RelayUrlForm({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="wss://..."
+        placeholder={placeholder}
         className="bg-muted w-full rounded border px-2 py-1 font-mono text-sm"
         onKeyDown={(e) => {
           if (e.key === "Enter" && value.trim()) onSubmit();
