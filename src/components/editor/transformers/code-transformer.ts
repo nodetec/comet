@@ -102,7 +102,14 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     // Shortcut mode (user typed ``` + Enter): children is set, linesInBetween is null.
     // Delegate to the default CODE transformer which handles node replacement.
     if (children) {
-      return CODE.replace(rootNode, children, startMatch, endMatch, linesInBetween, isImport);
+      return CODE.replace(
+        rootNode,
+        children,
+        startMatch,
+        endMatch,
+        linesInBetween,
+        isImport,
+      );
     }
     if (!linesInBetween) return;
 
