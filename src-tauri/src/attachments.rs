@@ -70,20 +70,6 @@ pub fn import_image(app: &AppHandle, source_path: &str) -> Result<ImportedImage,
     })
 }
 
-/// Resolve an attachment:// URI to the absolute file path.
-/// Returns None if the URI is not an attachment:// URI.
-pub fn resolve_attachment_path(app: &AppHandle, uri: &str) -> Result<Option<String>, String> {
-    let filename = match uri.strip_prefix("attachment://") {
-        Some(f) => f,
-        None => return Ok(None),
-    };
-    let dir = attachments_dir(app)?;
-    let path = dir.join(filename);
-    path.to_str()
-        .map(|s| Some(s.to_string()))
-        .ok_or_else(|| "Path is not valid UTF-8".to_string())
-}
-
 const KNOWN_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bin"];
 
 /// Check if a blob exists locally by its plaintext hash.

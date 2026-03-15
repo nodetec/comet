@@ -325,8 +325,3 @@ pub fn read_theme(app: &AppHandle, theme_id: &str) -> Result<ThemeData, String> 
     serde_json::from_str(&contents)
         .map_err(|e| format!("Invalid theme file: {}", e))
 }
-
-pub fn get_themes_path(app: &AppHandle) -> Result<String, String> {
-    let dir = themes_dir(app)?;
-    Ok(dir.to_string_lossy().into_owned())
-}
