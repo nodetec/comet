@@ -28,7 +28,8 @@ pub enum SyncState {
 #[derive(Debug)]
 pub enum SyncCommand {
     PushNote(String),
-    /// note_id, sync_event_id (pre-fetched before local delete)
+    PushNotebook(String),
+    /// entity_id, sync_event_id (pre-fetched before local delete)
     PushDeletion(String, String),
 }
 
@@ -194,6 +195,74 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
 use crate::nostr::strip_title_line;
+
+const NOTEBOOK_EVENT_KIND: u16 = 30078;
+
+// ── Notebook ↔ Event mapping ───────────────────────────────────────────
+
+fn notebook_to_rumor(
+    notebook_id: &str,
+    name: &str,
+    pubkey: PublicKey,
+) -> UnsignedEvent {
+    let event_tags: Vec<Tag> = vec![
+        Tag::identifier(notebook_id),
+        Tag::title(name),
+        Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+    ];
+
+    EventBuilder::new(Kind::Custom(NOTEBOOK_EVENT_KIND), "")
+        .tags(event_tags)
+        .build(pubkey)
+}
+
+struct SyncedNotebook {
+    id: String,
+    name: String,
+}
+
+fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, String> {
+    let id = rumor
+        .tags
+        .find(TagKind::d())
+        .and_then(|t| t.content())
+        .map(|s| s.to_string())
+        .ok_or("Missing d tag in notebook event")?;
+
+    let name = rumor
+        .tags
+        .find(TagKind::Title)
+        .and_then(|t| t.content())
+        .map(|s| s.to_string())
+        .ok_or("Missing title tag in notebook event")?;
+
+    Ok(SyncedNotebook { id, name })
+}
+
+fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
+    rumor.kind == Kind::Custom(NOTEBOOK_EVENT_KIND)
+        && rumor
+            .tags
+            .find(TagKind::custom("type"))
+            .and_then(|t| t.content())
+            == Some("notebook")
+}
+
+fn upsert_notebook_from_sync(
+    conn: &Connection,
+    notebook: &SyncedNotebook,
+    sync_event_id: &str,
+) -> Result<(), String> {
+    let now = now_ms();
+    conn.execute(
+        "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id) \
+         VALUES (?1, ?2, ?3, ?3, ?4) \
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, sync_event_id = excluded.sync_event_id",
+        params![notebook.id, notebook.name, now, sync_event_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
 
 /// Compute a deterministic d-tag for a gift wrap using HMAC-SHA256.
 /// This allows the relay to replace old versions without leaking the note ID.
@@ -663,9 +732,15 @@ async fn run_sync_connection(
                             tokio::time::Instant::now() + debounce_duration,
                         );
                     }
-                    Some(SyncCommand::PushDeletion(note_id, sync_event_id)) => {
-                        eprintln!("[sync] pushing deletion for {note_id}");
-                        push_deletion(app, &keys, &mut ws_write, &note_id, &sync_event_id).await?;
+                    Some(SyncCommand::PushNotebook(notebook_id)) => {
+                        eprintln!("[sync] pushing notebook {notebook_id}");
+                        if let Err(e) = push_notebook(app, &keys, &mut ws_write, &notebook_id, &mut recent_pushes).await {
+                            eprintln!("[sync] push notebook error for {notebook_id}: {e}");
+                        }
+                    }
+                    Some(SyncCommand::PushDeletion(id, sync_event_id)) => {
+                        eprintln!("[sync] pushing deletion for {id}");
+                        push_deletion(app, &keys, &mut ws_write, &id, &sync_event_id).await?;
                     }
                     None => break, // channel closed
                 }
@@ -767,40 +842,64 @@ async fn process_relay_message(
                 }
             };
 
-            let synced_note = match rumor_to_synced_note(&unwrapped.rumor) {
-                Ok(n) => n,
-                Err(e) => {
-                    eprintln!("[sync] skipping malformed rumor {}: {e}", &event_id[..8]);
-                    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
-                    save_checkpoint(&conn, seq);
-                    return Ok(());
-                }
-            };
-            let note_id = synced_note.id.clone();
-            eprintln!("[sync] unwrapped note={note_id} modified_at={}", synced_note.modified_at);
+            // Dispatch based on rumor kind
+            if is_notebook_rumor(&unwrapped.rumor) {
+                let notebook = match rumor_to_synced_notebook(&unwrapped.rumor) {
+                    Ok(n) => n,
+                    Err(e) => {
+                        eprintln!("[sync] skipping malformed notebook rumor {}: {e}", &event_id[..8]);
+                        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                        save_checkpoint(&conn, seq);
+                        return Ok(());
+                    }
+                };
+                eprintln!("[sync] unwrapped notebook={} name={}", notebook.id, notebook.name);
 
-            // Upsert into local DB
-            let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
-            let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
-            eprintln!("[sync] upsert note={note_id} updated={}", updated.is_some());
-            save_checkpoint(&conn, seq);
+                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                upsert_notebook_from_sync(&conn, &notebook, &event_id)?;
+                save_checkpoint(&conn, seq);
 
-            // Download missing attachment blobs from Blossom
-            if updated.is_some() {
-                let blossom_url = get_blossom_url(&conn);
-                if let Some(blossom_url) = blossom_url {
-                    download_missing_blobs(app, keys, &unwrapped.rumor, &blossom_url).await;
-                }
-            }
-
-            if updated.is_some() {
                 let _ = app.emit(
                     "sync-remote-change",
                     SyncChangePayload {
-                        note_id,
+                        note_id: notebook.id,
                         action: "upsert".to_string(),
                     },
                 );
+            } else {
+                let synced_note = match rumor_to_synced_note(&unwrapped.rumor) {
+                    Ok(n) => n,
+                    Err(e) => {
+                        eprintln!("[sync] skipping malformed rumor {}: {e}", &event_id[..8]);
+                        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                        save_checkpoint(&conn, seq);
+                        return Ok(());
+                    }
+                };
+                let note_id = synced_note.id.clone();
+                eprintln!("[sync] unwrapped note={note_id} modified_at={}", synced_note.modified_at);
+
+                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
+                eprintln!("[sync] upsert note={note_id} updated={}", updated.is_some());
+                save_checkpoint(&conn, seq);
+
+                if updated.is_some() {
+                    let blossom_url = get_blossom_url(&conn);
+                    if let Some(blossom_url) = blossom_url {
+                        download_missing_blobs(app, keys, &unwrapped.rumor, &blossom_url).await;
+                    }
+                }
+
+                if updated.is_some() {
+                    let _ = app.emit(
+                        "sync-remote-change",
+                        SyncChangePayload {
+                            note_id,
+                            action: "upsert".to_string(),
+                        },
+                    );
+                }
             }
         }
         "DELETED" => {
@@ -808,8 +907,9 @@ async fn process_relay_message(
             let deleted_event_id = arr.get(4).and_then(|v| v.as_str()).unwrap_or("");
             eprintln!("[sync] received DELETED seq={seq} event={}", &deleted_event_id[..8.min(deleted_event_id.len())]);
 
-            // Find note by sync_event_id
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+
+            // Check if it's a note deletion
             let note_id: Option<String> = conn
                 .query_row(
                     "SELECT id FROM notes WHERE sync_event_id = ?1",
@@ -820,7 +920,6 @@ async fn process_relay_message(
                 .map_err(|e| e.to_string())?;
 
             if let Some(note_id) = note_id {
-                // Archive the note (soft-delete for safety)
                 let now = now_ms();
                 conn.execute(
                     "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
@@ -835,7 +934,36 @@ async fn process_relay_message(
                         action: "delete".to_string(),
                     },
                 );
+            } else {
+
+            // Check if it's a notebook deletion
+            let notebook_id: Option<String> = conn
+                .query_row(
+                    "SELECT id FROM notebooks WHERE sync_event_id = ?1",
+                    params![deleted_event_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?;
+
+            if let Some(notebook_id) = notebook_id {
+                // Delete notebook (FK ON DELETE SET NULL handles note unassignment)
+                conn.execute(
+                    "DELETE FROM notebooks WHERE id = ?1",
+                    params![notebook_id],
+                )
+                .map_err(|e| e.to_string())?;
+                eprintln!("[sync] deleted notebook={notebook_id}");
+
+                let _ = app.emit(
+                    "sync-remote-change",
+                    SyncChangePayload {
+                        note_id: notebook_id,
+                        action: "delete".to_string(),
+                    },
+                );
             }
+            } // else (not a note deletion)
 
             save_checkpoint(&conn, seq);
         }
@@ -1029,6 +1157,68 @@ async fn push_deletion(
         .map_err(|e| format!("Failed to send deletion: {e}"))?;
 
     eprintln!("[sync] pushed deletion for note={note_id}");
+
+    Ok(())
+}
+
+// ── Notebook push ──────────────────────────────────────────────────────
+
+async fn push_notebook(
+    app: &AppHandle,
+    keys: &Keys,
+    ws_write: &mut futures_util::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+        Message,
+    >,
+    notebook_id: &str,
+    recent_pushes: &mut HashMap<String, std::time::Instant>,
+) -> Result<(), String> {
+    let (name,) = {
+        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+        let row: Option<(String,)> = conn
+            .query_row(
+                "SELECT name FROM notebooks WHERE id = ?1",
+                params![notebook_id],
+                |row| Ok((row.get(0)?,)),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        row.ok_or_else(|| format!("Notebook not found: {notebook_id}"))?
+    };
+
+    let rumor = notebook_to_rumor(notebook_id, &name, keys.public_key());
+
+    let d_tag = gift_wrap_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
+    let gift_wrap = EventBuilder::gift_wrap(
+        keys,
+        &keys.public_key(),
+        rumor,
+        [Tag::identifier(&d_tag)],
+    )
+    .await
+    .map_err(|e| format!("Failed to gift wrap notebook: {e}"))?;
+
+    let event_id = gift_wrap.id.to_hex();
+    recent_pushes.insert(event_id.clone(), std::time::Instant::now());
+
+    let gift_wrap_json: serde_json::Value = serde_json::from_str(&gift_wrap.as_json())
+        .map_err(|e| format!("Failed to serialize gift wrap: {e}"))?;
+    let event_msg = serde_json::json!(["EVENT", gift_wrap_json]);
+    ws_write
+        .send(Message::from(event_msg.to_string()))
+        .await
+        .map_err(|e| format!("Failed to send event: {e}"))?;
+
+    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE notebooks SET sync_event_id = ?1 WHERE id = ?2",
+        params![event_id, notebook_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    eprintln!("[sync] pushed notebook={notebook_id} event={}", &event_id[..8]);
 
     Ok(())
 }

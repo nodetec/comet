@@ -47,7 +47,8 @@ CREATE TABLE notebooks (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  sync_event_id TEXT
 );
 
 CREATE TABLE relays (
@@ -325,7 +326,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 PRAGMA foreign_keys = ON;
 SQL

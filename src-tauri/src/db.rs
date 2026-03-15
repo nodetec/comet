@@ -83,6 +83,9 @@ fn migrations() -> Migrations<'static> {
                encryption_key  TEXT NOT NULL
              );",
         ),
+        M::up(
+            "ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;",
+        ),
     ])
 }
 

@@ -91,21 +91,21 @@ fn create_note(app: AppHandle, notebook_id: Option<String>, tags: Vec<String>) -
 #[tauri::command]
 fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, String> {
     let note = notes::save_note(&app, input)?;
-    sync_push_note(&app, &note.id);
+    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn archive_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::archive_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::restore_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
@@ -124,24 +124,43 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), String
     };
     notes::delete_note_permanently(&app, &note_id)?;
     if let Some(event_id) = sync_event_id {
-        sync_push_deletion(&app, &note_id, &event_id);
+        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone(), event_id));
     }
     Ok(())
 }
 
 #[tauri::command]
 fn create_notebook(app: AppHandle, input: CreateNotebookInput) -> Result<NotebookSummary, String> {
-    notes::create_notebook(&app, input)
+    let notebook = notes::create_notebook(&app, input)?;
+    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
+    Ok(notebook)
 }
 
 #[tauri::command]
 fn rename_notebook(app: AppHandle, input: RenameNotebookInput) -> Result<NotebookSummary, String> {
-    notes::rename_notebook(&app, input)
+    let notebook = notes::rename_notebook(&app, input)?;
+    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
+    Ok(notebook)
 }
 
 #[tauri::command]
 fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), String> {
-    notes::delete_notebook(&app, &notebook_id)
+    // Pre-fetch sync_event_id before the row is deleted
+    let sync_event_id: Option<String> = {
+        let conn = database_connection(&app)?;
+        conn.query_row(
+            "SELECT sync_event_id FROM notebooks WHERE id = ?1",
+            rusqlite::params![notebook_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten()
+    };
+    notes::delete_notebook(&app, &notebook_id)?;
+    if let Some(event_id) = sync_event_id {
+        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone(), event_id));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -151,47 +170,35 @@ fn assign_note_notebook(
 ) -> Result<LoadedNote, String> {
     let note_id = input.note_id.clone();
     let note = notes::assign_note_notebook(&app, input)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn pin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::pin_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn unpin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::unpin_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
-fn sync_push_note(app: &AppHandle, note_id: &str) {
-    let manager = app.state::<sync::SyncManager>();
-    let note_id = note_id.to_string();
-    let manager = manager.inner().clone();
+fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
+    let manager = app.state::<sync::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
-        manager.push(sync::SyncCommand::PushNote(note_id)).await;
-    });
-}
-
-fn sync_push_deletion(app: &AppHandle, note_id: &str, sync_event_id: &str) {
-    let manager = app.state::<sync::SyncManager>();
-    let note_id = note_id.to_string();
-    let sync_event_id = sync_event_id.to_string();
-    let manager = manager.inner().clone();
-    tauri::async_runtime::spawn(async move {
-        manager
-            .push(sync::SyncCommand::PushDeletion(note_id, sync_event_id))
-            .await;
+        manager.push(cmd).await;
     });
 }
 
 fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute("UPDATE notes SET sync_event_id = NULL", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("UPDATE notebooks SET sync_event_id = NULL", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
         .map_err(|e| e.to_string())?;
@@ -212,7 +219,7 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
     let npub = nostr::import_nsec(&conn, &nsec)?;
     reset_sync_state(&conn)?;
 
-    // Collect all note IDs to re-push under the new key
+    // Collect all note and notebook IDs to re-push under the new key
     let mut stmt = conn
         .prepare("SELECT id FROM notes WHERE archived_at IS NULL")
         .map_err(|e| e.to_string())?;
@@ -222,12 +229,23 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
     drop(stmt);
+    let mut stmt2 = conn
+        .prepare("SELECT id FROM notebooks")
+        .map_err(|e| e.to_string())?;
+    let notebook_ids: Vec<String> = stmt2
+        .query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt2);
     drop(conn);
 
     let manager = app.state::<sync::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
         manager.start(app.clone()).await;
-        // Push all existing notes under the new key
+        for nb_id in notebook_ids {
+            manager.push(sync::SyncCommand::PushNotebook(nb_id)).await;
+        }
         for note_id in note_ids {
             manager.push(sync::SyncCommand::PushNote(note_id)).await;
         }
