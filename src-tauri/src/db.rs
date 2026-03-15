@@ -83,6 +83,27 @@ fn migrations() -> Migrations<'static> {
                encryption_key  TEXT NOT NULL
              );",
         ),
+        M::up(
+            "ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;",
+        ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN edited_at INTEGER;
+             UPDATE notes SET edited_at = modified_at;
+             CREATE INDEX IF NOT EXISTS idx_notes_edited_at ON notes(edited_at DESC);",
+        ),
+        M::up(
+            "CREATE TABLE IF NOT EXISTS pending_deletions (
+               sync_event_id TEXT PRIMARY KEY,
+               created_at INTEGER NOT NULL
+             );",
+        ),
+        M::up(
+            "ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;",
+        ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE notebooks ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;",
+        ),
     ])
 }
 

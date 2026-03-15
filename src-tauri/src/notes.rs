@@ -38,7 +38,7 @@ pub struct NoteSummary {
     pub id: String,
     pub title: String,
     pub notebook: Option<NotebookRef>,
-    pub modified_at: i64,
+    pub edited_at: i64,
     pub preview: String,
     pub search_snippet: Option<String>,
     pub archived_at: Option<i64>,
@@ -237,8 +237,8 @@ pub fn create_note(
 
     transaction
         .execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
+            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, locally_modified)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5, 1)",
             params![note_id, title, markdown, notebook_id, now],
         )
         .map_err(|error| error.to_string())?;
@@ -276,7 +276,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, St
         let now = current_timestamp_millis();
         transaction
             .execute(
-                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3 WHERE id = ?4",
+                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3, locally_modified = 1 WHERE id = ?4",
                 params![title, input.markdown, now, input.id],
             )
             .map_err(|error| error.to_string())?
@@ -309,7 +309,7 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String
     let updated = conn
         .execute(
             "UPDATE notes
-             SET archived_at = ?1, pinned_at = NULL, modified_at = ?1
+             SET archived_at = ?1, pinned_at = NULL, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
             params![now, note_id],
         )
@@ -334,7 +334,7 @@ pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String
     let updated = conn
         .execute(
             "UPDATE notes
-             SET archived_at = NULL, modified_at = ?1
+             SET archived_at = NULL, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NOT NULL",
             params![now, note_id],
         )
@@ -380,8 +380,8 @@ pub fn create_notebook(
     let now = current_timestamp_millis();
 
     conn.execute(
-        "INSERT INTO notebooks (id, name, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?3)",
+        "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
+         VALUES (?1, ?2, ?3, ?3, 1)",
         params![notebook_id, name, now],
     )
     .map_err(handle_notebook_write_error)?;
@@ -399,7 +399,7 @@ pub fn rename_notebook(
 
     let updated = conn
         .execute(
-            "UPDATE notebooks SET name = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE notebooks SET name = ?1, updated_at = ?2, locally_modified = 1 WHERE id = ?3",
             params![name, current_timestamp_millis(), input.notebook_id],
         )
         .map_err(handle_notebook_write_error)?;
@@ -453,10 +453,11 @@ pub fn assign_note_notebook(
         }
     }
 
+    let now = current_timestamp_millis();
     let updated = conn
         .execute(
-            "UPDATE notes SET notebook_id = ?1 WHERE id = ?2",
-            params![input.notebook_id, input.note_id],
+            "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
+            params![input.notebook_id, now, input.note_id],
         )
         .map_err(|error| error.to_string())?;
 
@@ -475,7 +476,7 @@ pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
     let updated = conn
         .execute(
             "UPDATE notes
-             SET pinned_at = ?1
+             SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
             params![current_timestamp_millis(), note_id],
         )
@@ -493,8 +494,8 @@ pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> 
     let conn = database_connection(app)?;
     let updated = conn
         .execute(
-            "UPDATE notes SET pinned_at = NULL WHERE id = ?1",
-            params![note_id],
+            "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
+            params![current_timestamp_millis(), note_id],
         )
         .map_err(|error| error.to_string())?;
 
@@ -520,7 +521,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     let active_tags = normalized_active_tags(&input.active_tags);
 
     let mut sql = String::from(
-        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.pinned_at
+        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.pinned_at
          FROM notes n
          LEFT JOIN notebooks b ON b.id = n.notebook_id",
     );
@@ -579,7 +580,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     }
 
     let sort_column = match input.sort_field {
-        NoteSortField::ModifiedAt => "n.modified_at",
+        NoteSortField::ModifiedAt => "n.edited_at",
         NoteSortField::CreatedAt => "n.created_at",
         NoteSortField::Title => "n.title",
     };
@@ -678,7 +679,7 @@ fn append_note_view_clauses(
         }
         NoteFilterInput::Today => {
             clauses.push("n.archived_at IS NULL".to_string());
-            clauses.push("n.modified_at >= ?".to_string());
+            clauses.push("n.edited_at >= ?".to_string());
             values.push(Value::from(current_timestamp_millis() - 24 * 60 * 60 * 1000));
         }
         NoteFilterInput::Archive => {
@@ -736,8 +737,8 @@ Comet stores note content locally in its own database, with markdown as the unde
 
     transaction
         .execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at)
-             VALUES (?1, ?2, ?3, NULL, ?4, ?4)",
+            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at)
+             VALUES (?1, ?2, ?3, NULL, ?4, ?4, ?4)",
             params!["welcome", title, markdown, now],
         )
         .map_err(|error| error.to_string())?;
@@ -861,7 +862,7 @@ fn row_to_note_summary(
         notebook: notebook_id
             .zip(notebook_name)
             .map(|(id, name)| NotebookRef { id, name }),
-        modified_at: row.get(3)?,
+        edited_at: row.get(3)?,
         preview: preview_from_markdown(&markdown),
         search_snippet: search_snippet_for_summary(&markdown, search_tokens),
         archived_at: row.get(6)?,
@@ -898,7 +899,7 @@ fn next_active_note_id(
          FROM notes
          WHERE archived_at IS NULL
            AND (?1 IS NULL OR id != ?1)
-         ORDER BY pinned_at IS NULL ASC, pinned_at DESC, modified_at DESC, created_at DESC
+         ORDER BY pinned_at IS NULL ASC, pinned_at DESC, edited_at DESC, created_at DESC
          LIMIT 1",
         params![excluding_note_id],
         |row| row.get(0),

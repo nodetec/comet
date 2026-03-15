@@ -4,8 +4,12 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
+pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
+pub const DEFAULT_BLOSSOM_URL: &str = "https://blossom.comet.md";
+
 /// Returns the npub for the stored identity,
 /// generating a new keypair if one does not exist yet.
+/// On first launch, also sets up default relay and blossom server.
 pub fn ensure_identity(conn: &Connection) -> Result<String, String> {
     if let Some(npub) = get_npub(conn)? {
         return Ok(npub);
@@ -29,6 +33,20 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, String> {
         ],
     )
     .map_err(|e| e.to_string())?;
+
+    // Set default relays and blossom server on first launch
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO relays (url, kind, created_at) VALUES (?1, 'sync', ?2)",
+        params![DEFAULT_SYNC_RELAY, now],
+    );
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO relays (url, kind, created_at) VALUES (?1, 'publish', ?2)",
+        params![DEFAULT_SYNC_RELAY, now],
+    );
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('blossom_url', ?1)",
+        params![DEFAULT_BLOSSOM_URL],
+    );
 
     Ok(npub)
 }

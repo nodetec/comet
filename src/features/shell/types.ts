@@ -13,8 +13,8 @@ export type NotebookRef = {
 
 export type NoteSummary = {
   archivedAt: number | null;
+  editedAt: number;
   id: string;
-  modifiedAt: number;
   notebook: NotebookRef | null;
   pinnedAt: number | null;
   preview: string;

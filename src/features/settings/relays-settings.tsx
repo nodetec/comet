@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
 
+import { Switch } from "@/components/ui/switch";
+
 type Relay = {
   url: string;
   kind: "sync" | "publish";
@@ -22,9 +24,45 @@ export function RelaysSettings() {
 
   return (
     <div className="space-y-8">
+      <SyncToggle />
       <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
       <BlossomSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
+    </div>
+  );
+}
+
+function SyncToggle() {
+  const queryClient = useQueryClient();
+
+  const { data: enabled, isLoading } = useQuery({
+    queryKey: ["sync-enabled"],
+    queryFn: () => invoke<boolean>("is_sync_enabled"),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (newEnabled: boolean) =>
+      invoke("set_sync_enabled", { enabled: newEnabled }),
+    onMutate: async (newEnabled) => {
+      await queryClient.cancelQueries({ queryKey: ["sync-enabled"] });
+      queryClient.setQueryData(["sync-enabled"], newEnabled);
+    },
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-sm font-medium">Sync</h3>
+        <p className="text-muted-foreground text-xs">
+          Sync notes across your devices.
+        </p>
+      </div>
+      <Switch
+        checked={enabled ?? true}
+        onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+      />
     </div>
   );
 }

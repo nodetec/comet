@@ -10,7 +10,10 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { listen } from "@tauri-apps/api/event";
 import { initAttachmentsBasePath } from "@/lib/attachments";
+
+const PENDING_DRAFT_KEY = "comet-pending-draft";
 import { useShellStore } from "@/stores/use-shell-store";
 import { defaultNoteSortPrefs, useUIStore } from "@/stores/use-ui-store";
 
@@ -163,6 +166,7 @@ export function useShellController() {
   const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
     string | null
   >(null);
+  const [syncEditorRevision, setSyncEditorRevision] = useState(0);
   const [editorFocusMode, setEditorFocusMode] = useState<
     "none" | "immediate" | "pointerup"
   >("none");
@@ -433,6 +437,11 @@ export function useShellController() {
     onSuccess: (savedNote) => {
       queryClient.setQueryData(["note", savedNote.id], savedNote);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
+      try {
+        localStorage.removeItem(PENDING_DRAFT_KEY);
+      } catch {
+        // Ignore
+      }
     },
     onError: (error) => {
       toast.error("Couldn't save note", {
@@ -704,6 +713,56 @@ export function useShellController() {
       : currentNote.markdown
     : "";
 
+  // Recover any draft that was pending when the app quit
+  useEffect(() => {
+    if (!bootstrapQuery.isSuccess) return;
+    try {
+      const raw = localStorage.getItem(PENDING_DRAFT_KEY);
+      if (!raw) return;
+      const { noteId, markdown } = JSON.parse(raw) as {
+        noteId: string;
+        markdown: string;
+      };
+      if (noteId && markdown) {
+        invoke("save_note", { input: { id: noteId, markdown } }).then(() => {
+          localStorage.removeItem(PENDING_DRAFT_KEY);
+          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+          queryClient.invalidateQueries({ queryKey: ["notes"] });
+        });
+      }
+    } catch {
+      localStorage.removeItem(PENDING_DRAFT_KEY);
+    }
+  }, [bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Invalidate queries when a remote sync change arrives
+  useEffect(() => {
+    const unlisten = listen<{ noteId: string; action: string }>(
+      "sync-remote-change",
+      (event) => {
+        const { noteId, action } = event.payload;
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
+        queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+        queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+        queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
+        // If the updated note is currently open, refetch it then
+        // remount the editor with new content
+        const { draftNoteId: currentDraftId } = useShellStore.getState();
+        if (currentDraftId === noteId && action === "upsert") {
+          queryClient
+            .refetchQueries({ queryKey: ["note", noteId] })
+            .then(() => {
+              useShellStore.getState().setDraft("", "");
+              setSyncEditorRevision((r) => r + 1);
+            });
+        }
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [queryClient]);
+
   useEffect(() => {
     if (!currentNote || draftNoteId !== currentNote.id) {
       return;
@@ -713,12 +772,22 @@ export function useShellController() {
       return;
     }
 
+    // Persist draft for crash recovery (survives app quit during debounce)
+    try {
+      localStorage.setItem(
+        PENDING_DRAFT_KEY,
+        JSON.stringify({ noteId: currentNote.id, markdown: draftMarkdown }),
+      );
+    } catch {
+      // Ignore storage errors
+    }
+
     pendingSaveTimeoutRef.current = window.setTimeout(() => {
       saveNoteMutation.mutate({
         id: currentNote.id,
         markdown: draftMarkdown,
       });
-    }, 500);
+    }, 3000);
 
     return () => {
       if (pendingSaveTimeoutRef.current !== null) {
@@ -958,6 +1027,7 @@ export function useShellController() {
       notebook: currentNote?.notebook ?? null,
       notebooks,
       noteId: currentNote?.id ?? null,
+      editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
       searchQuery,

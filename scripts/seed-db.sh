@@ -47,7 +47,8 @@ CREATE TABLE notebooks (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  sync_event_id TEXT
 );
 
 CREATE TABLE relays (
@@ -64,6 +65,7 @@ CREATE TABLE notes (
   notebook_id TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
   created_at INTEGER NOT NULL,
   modified_at INTEGER NOT NULL,
+  edited_at INTEGER,
   archived_at INTEGER,
   pinned_at INTEGER,
   nostr_d_tag TEXT,
@@ -75,6 +77,11 @@ CREATE TABLE blob_meta (
   plaintext_hash  TEXT PRIMARY KEY,
   ciphertext_hash TEXT NOT NULL,
   encryption_key  TEXT NOT NULL
+);
+
+CREATE TABLE pending_deletions (
+  entity_id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
 );
 
 CREATE TABLE nostr_identity (
@@ -98,6 +105,7 @@ CREATE VIRTUAL TABLE notes_fts USING fts5(
 );
 
 CREATE INDEX idx_notes_modified_at ON notes(modified_at DESC);
+CREATE INDEX idx_notes_edited_at ON notes(edited_at DESC);
 CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
   WHERE archived_at IS NULL;
 CREATE INDEX idx_notes_archived_at ON notes(archived_at);
@@ -118,6 +126,7 @@ INSERT INTO notes (
   notebook_id,
   created_at,
   modified_at,
+  edited_at,
   archived_at,
   pinned_at
 ) VALUES
@@ -137,6 +146,7 @@ Comet should feel quiet, local, and dependable.
     'notebook-ideas',
     $PINNED_AT,
     $PINNED_AT,
+    $PINNED_AT,
     NULL,
     $PINNED_AT
   ),
@@ -154,6 +164,7 @@ Local notes. Calm UI. Clear trail.
 #writing #launch
 ',
     'notebook-writing',
+    $RECENT_AT,
     $RECENT_AT,
     $RECENT_AT,
     NULL,
@@ -177,6 +188,7 @@ has to pull useful context around it without clipping the word or returning a us
     'notebook-product',
     $DEEP_MATCH_AT,
     $DEEP_MATCH_AT,
+    $DEEP_MATCH_AT,
     NULL,
     NULL
   ),
@@ -193,6 +205,7 @@ Use this note to verify title highlighting while the card can still fall back to
     'notebook-writing',
     $TITLE_MATCH_AT,
     $TITLE_MATCH_AT,
+    $TITLE_MATCH_AT,
     NULL,
     NULL
   ),
@@ -207,6 +220,7 @@ This note exists to exercise the short-query LIKE fallback and editor highlights
 #ai #tools
 ',
     'notebook-research',
+    $SHORT_QUERY_AT,
     $SHORT_QUERY_AT,
     $SHORT_QUERY_AT,
     NULL,
@@ -226,6 +240,7 @@ There is room in the middle.
     'notebook-research',
     $RESEARCH_AT,
     $RESEARCH_AT,
+    $RESEARCH_AT,
     NULL,
     NULL
   ),
@@ -241,6 +256,7 @@ This note is intentionally outside a notebook so the uncategorized path stays ex
     NULL,
     $UNCATEGORIZED_AT,
     $UNCATEGORIZED_AT,
+    $UNCATEGORIZED_AT,
     NULL,
     NULL
   ),
@@ -249,6 +265,7 @@ This note is intentionally outside a notebook so the uncategorized path stays ex
     'Untitled note',
     '',
     NULL,
+    $EMPTY_AT,
     $EMPTY_AT,
     $EMPTY_AT,
     NULL,
@@ -266,6 +283,7 @@ Buy groceries, clean the desk, and leave time to read in the afternoon.
     'notebook-personal',
     $PERSONAL_AT,
     $PERSONAL_AT,
+    $PERSONAL_AT,
     NULL,
     NULL
   ),
@@ -279,6 +297,7 @@ This one exists to exercise archive and restore flows.
 #archive #draft
 ',
     'notebook-writing',
+    $ARCHIVED_AT,
     $ARCHIVED_AT,
     $ARCHIVED_AT,
     $ARCHIVED_AT,
@@ -319,13 +338,13 @@ INSERT INTO nostr_identity (secret_key, public_key, npub, created_at) VALUES (
 );
 
 INSERT INTO relays (url, kind, created_at) VALUES
-  ('ws://localhost:3000', 'sync', $NOW_MS),
-  ('ws://localhost:3000', 'publish', $NOW_MS);
+  ('wss://relay.comet.md', 'sync', $NOW_MS),
+  ('wss://relay.comet.md', 'publish', $NOW_MS);
 
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 3;
+PRAGMA user_version = 8;
 
 PRAGMA foreign_keys = ON;
 SQL

@@ -20,6 +20,7 @@ import { type NotebookRef, type NotebookSummary } from "./types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
+  editorKey: string | null;
   focusMode: "none" | "immediate" | "pointerup";
   isDeletePublishedNotePending: boolean;
   isNewNote: boolean;
@@ -47,6 +48,7 @@ function firstLineH1Title(markdown: string) {
 
 export function EditorPane({
   archivedAt,
+  editorKey,
   focusMode,
   isDeletePublishedNotePending,
   isNewNote,
@@ -304,7 +306,7 @@ export function EditorPane({
             <NoteEditor
               focusMode={focusMode}
               isNew={isNewNote}
-              key={noteId}
+              key={editorKey ?? noteId}
               markdown={markdown}
               onChange={onChange}
               onFocusHandled={onFocusHandled}

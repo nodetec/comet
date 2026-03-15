@@ -91,21 +91,21 @@ fn create_note(app: AppHandle, notebook_id: Option<String>, tags: Vec<String>) -
 #[tauri::command]
 fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, String> {
     let note = notes::save_note(&app, input)?;
-    sync_push_note(&app, &note.id);
+    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn archive_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::archive_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::restore_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
@@ -123,25 +123,55 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), String
         .flatten()
     };
     notes::delete_note_permanently(&app, &note_id)?;
-    if let Some(event_id) = sync_event_id {
-        sync_push_deletion(&app, &note_id, &event_id);
+    if sync_event_id.is_some() {
+        // Store pending deletion so it survives offline/restart
+        let conn = database_connection(&app)?;
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![note_id, sync::now_ms_pub()],
+        );
+        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
     }
     Ok(())
 }
 
 #[tauri::command]
 fn create_notebook(app: AppHandle, input: CreateNotebookInput) -> Result<NotebookSummary, String> {
-    notes::create_notebook(&app, input)
+    let notebook = notes::create_notebook(&app, input)?;
+    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
+    Ok(notebook)
 }
 
 #[tauri::command]
 fn rename_notebook(app: AppHandle, input: RenameNotebookInput) -> Result<NotebookSummary, String> {
-    notes::rename_notebook(&app, input)
+    let notebook = notes::rename_notebook(&app, input)?;
+    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
+    Ok(notebook)
 }
 
 #[tauri::command]
 fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), String> {
-    notes::delete_notebook(&app, &notebook_id)
+    // Pre-fetch sync_event_id before the row is deleted
+    let sync_event_id: Option<String> = {
+        let conn = database_connection(&app)?;
+        conn.query_row(
+            "SELECT sync_event_id FROM notebooks WHERE id = ?1",
+            rusqlite::params![notebook_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten()
+    };
+    notes::delete_notebook(&app, &notebook_id)?;
+    if sync_event_id.is_some() {
+        let conn = database_connection(&app)?;
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![notebook_id, sync::now_ms_pub()],
+        );
+        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -151,49 +181,39 @@ fn assign_note_notebook(
 ) -> Result<LoadedNote, String> {
     let note_id = input.note_id.clone();
     let note = notes::assign_note_notebook(&app, input)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn pin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::pin_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
 #[tauri::command]
 fn unpin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, String> {
     let note = notes::unpin_note(&app, &note_id)?;
-    sync_push_note(&app, &note_id);
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
     Ok(note)
 }
 
-fn sync_push_note(app: &AppHandle, note_id: &str) {
-    let manager = app.state::<sync::SyncManager>();
-    let note_id = note_id.to_string();
-    let manager = manager.inner().clone();
+fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
+    let manager = app.state::<sync::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
-        manager.push(sync::SyncCommand::PushNote(note_id)).await;
-    });
-}
-
-fn sync_push_deletion(app: &AppHandle, note_id: &str, sync_event_id: &str) {
-    let manager = app.state::<sync::SyncManager>();
-    let note_id = note_id.to_string();
-    let sync_event_id = sync_event_id.to_string();
-    let manager = manager.inner().clone();
-    tauri::async_runtime::spawn(async move {
-        manager
-            .push(sync::SyncCommand::PushDeletion(note_id, sync_event_id))
-            .await;
+        manager.push(cmd).await;
     });
 }
 
 fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute("UPDATE notes SET sync_event_id = NULL", [])
         .map_err(|e| e.to_string())?;
+    conn.execute("UPDATE notebooks SET sync_event_id = NULL", [])
+        .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM pending_deletions", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -212,7 +232,7 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
     let npub = nostr::import_nsec(&conn, &nsec)?;
     reset_sync_state(&conn)?;
 
-    // Collect all note IDs to re-push under the new key
+    // Collect all note and notebook IDs to re-push under the new key
     let mut stmt = conn
         .prepare("SELECT id FROM notes WHERE archived_at IS NULL")
         .map_err(|e| e.to_string())?;
@@ -222,12 +242,23 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
     drop(stmt);
+    let mut stmt2 = conn
+        .prepare("SELECT id FROM notebooks")
+        .map_err(|e| e.to_string())?;
+    let notebook_ids: Vec<String> = stmt2
+        .query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt2);
     drop(conn);
 
     let manager = app.state::<sync::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
         manager.start(app.clone()).await;
-        // Push all existing notes under the new key
+        for nb_id in notebook_ids {
+            manager.push(sync::SyncCommand::PushNotebook(nb_id)).await;
+        }
         for note_id in note_ids {
             manager.push(sync::SyncCommand::PushNote(note_id)).await;
         }
@@ -379,6 +410,111 @@ async fn delete_published_note(app: AppHandle, note_id: String) -> Result<nostr:
     nostr::delete_published_note(&app, &note_id).await
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncInfo {
+    state: sync::SyncState,
+    relay_url: Option<String>,
+    blossom_url: Option<String>,
+    npub: Option<String>,
+    synced_notes: i64,
+    synced_notebooks: i64,
+    pending_notes: i64,
+    pending_notebooks: i64,
+    total_notes: i64,
+    checkpoint: i64,
+    blobs_stored: i64,
+}
+
+#[tauri::command]
+async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, String> {
+    let manager = app.state::<sync::SyncManager>();
+    let state = manager.state().await;
+
+    let conn = database_connection(&app)?;
+
+    let relay_url = sync::get_sync_relay_url(&conn);
+    let blossom_url = sync::get_blossom_url(&conn);
+    let npub: Option<String> = conn
+        .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| row.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    let synced_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let total_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE archived_at IS NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let synced_notebooks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let pending_notes: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notes WHERE locally_modified = 1", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let pending_notebooks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM notebooks WHERE locally_modified = 1", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let checkpoint: i64 = sync::get_checkpoint(&conn);
+
+    let blobs_stored: i64 = conn
+        .query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    Ok(SyncInfo {
+        state,
+        relay_url,
+        blossom_url,
+        npub,
+        synced_notes,
+        synced_notebooks,
+        pending_notes,
+        pending_notebooks,
+        total_notes,
+        checkpoint,
+        blobs_stored,
+    })
+}
+
+#[tauri::command]
+fn is_sync_enabled(app: AppHandle) -> Result<bool, String> {
+    let conn = database_connection(&app)?;
+    let val: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'sync_enabled'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    // Default to true if not set
+    Ok(val.as_deref() != Some("false"))
+}
+
+#[tauri::command]
+async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let conn = database_connection(&app)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_enabled', ?1)",
+        rusqlite::params![if enabled { "true" } else { "false" }],
+    )
+    .map_err(|e| e.to_string())?;
+    drop(conn);
+
+    let manager = app.state::<sync::SyncManager>();
+    if enabled {
+        manager.start(app.clone()).await;
+    } else {
+        manager.stop().await;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn get_sync_status(app: AppHandle) -> Result<sync::SyncState, String> {
     let manager = app.state::<sync::SyncManager>();
@@ -437,6 +573,9 @@ pub fn run() {
             set_blossom_url,
             remove_blossom_url,
             fetch_blob,
+            get_sync_info,
+            is_sync_enabled,
+            set_sync_enabled,
             get_sync_status,
             restart_sync
         ])

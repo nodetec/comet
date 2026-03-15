@@ -1,5 +1,6 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { formatDistanceToNow } from "date-fns";
+import { LayoutGroup, motion } from "framer-motion";
 import {
   CheckMenuItem,
   Menu,
@@ -128,6 +129,24 @@ export function NotesPane({
     () => searchQuery.length > 0,
   );
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
+  const knownNoteIdsRef = useRef<Set<string>>(new Set());
+  const hasMountedRef = useRef(false);
+  const newNoteIds = useMemo(() => {
+    if (!hasMountedRef.current) return new Set<string>();
+    const newIds = new Set<string>();
+    for (const note of filteredNotes) {
+      if (!knownNoteIdsRef.current.has(note.id)) {
+        newIds.add(note.id);
+      }
+    }
+    return newIds;
+  }, [filteredNotes]);
+  useEffect(() => {
+    for (const note of filteredNotes) {
+      knownNoteIdsRef.current.add(note.id);
+    }
+    hasMountedRef.current = true;
+  }, [filteredNotes]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -412,66 +431,83 @@ export function NotesPane({
           </div>
         ) : (
           <div className="space-y-0 px-3">
-            {filteredNotes.map((note) => {
-              const isActive = note.id === selectedNoteId;
-              const cardPreview =
-                searchWords.length > 0
-                  ? note.searchSnippet || note.preview || "No content yet"
-                  : note.preview || "No content yet";
+            <LayoutGroup>
+              {filteredNotes.map((note, index) => {
+                const isActive = note.id === selectedNoteId;
+                const isNextActive =
+                  filteredNotes[index + 1]?.id === selectedNoteId;
+                const isNew = newNoteIds.has(note.id);
+                const fallback = note.title ? "" : "No content yet";
+                const cardPreview =
+                  searchWords.length > 0
+                    ? note.searchSnippet || note.preview || fallback
+                    : note.preview || fallback;
 
-              return (
-                <div
-                  className="flex w-full flex-col items-center"
-                  key={note.id}
-                >
-                  <button
-                    className={[
-                      "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-2.5 py-2.5 text-left text-sm",
-                      isActive ? "bg-accent/50" : "",
-                    ].join(" ")}
-                    onClick={() => onSelectNote(note.id)}
-                    onContextMenu={(event) =>
-                      void handleNoteContextMenu(event, note)
-                    }
-                    onMouseDown={(event) => {
-                      if (event.button === 2) {
-                        event.preventDefault();
-                      }
+                return (
+                  <motion.div
+                    layout
+                    transition={{
+                      layout: { duration: 0.2, ease: "easeInOut" },
                     }}
-                    disabled={isMutatingNote}
-                    type="button"
+                    className={`flex w-full flex-col items-center ${isNew ? "animate-slide-in-left" : ""}`}
+                    key={note.id}
                   >
-                    <div className="flex w-full flex-1 flex-col gap-1.5">
-                      {note.title ? (
-                        <h3 className="text-secondary-foreground min-w-0 truncate font-semibold">
-                          {renderHighlightedText(note.title, searchWords)}
-                        </h3>
-                      ) : null}
-                      <div
-                        className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
-                      >
-                        {renderHighlightedText(cardPreview, searchWords)}
-                      </div>
-                      <div className="flex w-full items-center gap-3">
-                        {note.pinnedAt ? (
-                          <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+                    <button
+                      className={[
+                        "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-2.5 py-2.5 text-left text-sm",
+                        isActive ? "bg-accent/50" : "",
+                      ].join(" ")}
+                      onClick={() => onSelectNote(note.id)}
+                      onContextMenu={(event) =>
+                        void handleNoteContextMenu(event, note)
+                      }
+                      onMouseDown={(event) => {
+                        if (event.button === 2) {
+                          event.preventDefault();
+                        }
+                      }}
+                      disabled={isMutatingNote}
+                      type="button"
+                    >
+                      <div className="flex w-full flex-1 flex-col gap-1.5">
+                        {note.title ? (
+                          <h3 className="text-secondary-foreground min-w-0 truncate font-semibold">
+                            {renderHighlightedText(note.title, searchWords)}
+                          </h3>
                         ) : null}
-                        <span className="text-muted-foreground text-xs">
-                          {Date.now() - note.modifiedAt < 60_000
-                            ? "just now"
-                            : formatDistanceToNow(new Date(note.modifiedAt), {
-                                addSuffix: true,
-                              })}
-                        </span>
+                        <div
+                          className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
+                        >
+                          {renderHighlightedText(cardPreview, searchWords)}
+                        </div>
+                        <div className="flex w-full items-center gap-1.5">
+                          {note.pinnedAt ? (
+                            <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+                          ) : null}
+                          <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
+                            {Date.now() - note.editedAt < 60_000
+                              ? "just now"
+                              : formatDistanceToNow(new Date(note.editedAt), {
+                                  addSuffix: true,
+                                }).replace(/^about /, "")}
+                          </span>
+                          {note.notebook ? (
+                            <span className="text-primary ml-auto min-w-0 truncate text-xs">
+                              {note.notebook.name}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
+                    </button>
+                    <div className="w-full px-[0.30rem]">
+                      <div
+                        className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`}
+                      />
                     </div>
-                  </button>
-                  <div className="w-full px-[0.30rem]">
-                    <div className="bg-accent/30 h-px w-full" />
-                  </div>
-                </div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </LayoutGroup>
             {hasMoreNotes ? (
               <div className="px-[0.30rem] py-4" ref={loadMoreRef}>
                 <div className="text-muted-foreground text-center text-xs">
