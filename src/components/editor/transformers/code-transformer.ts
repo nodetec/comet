@@ -108,7 +108,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
         startMatch,
         endMatch,
         linesInBetween,
-        isImport,
+        isImport ?? false,
       );
     }
     if (!linesInBetween) return;
