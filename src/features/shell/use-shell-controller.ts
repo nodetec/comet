@@ -1000,27 +1000,55 @@ export function useShellController() {
     deleteNotebookMutation.mutate(notebookId);
   };
 
-  return {
-    activeNotebookId,
-    bootstrapError:
-      bootstrapQuery.isError && bootstrapQuery.error instanceof Error
-        ? bootstrapQuery.error.message
-        : bootstrapQuery.isError
-          ? "Failed to load the note library."
-          : null,
-    bootstrapLoading: bootstrapQuery.isLoading,
-    readyToRevealWindow,
-    retryBootstrap() {
-      void bootstrapQuery.refetch();
-      void invalidateNotes();
-      void invalidateContextualTags();
-    },
-    editorPaneProps: {
+  // Keep latest handler references for stable memoized callbacks
+  const latestRef = useRef({
+    fetchNextPage: notesQuery.fetchNextPage,
+    flushCurrentDraftAsync,
+    handleAssignNoteNotebook,
+    handleArchiveNote,
+    handleCopyNoteContent,
+    handleCreateNote,
+    handleDeleteNotebook,
+    handleDeleteNotePermanently,
+    handleRestoreNote,
+    handleSelectAll,
+    handleSelectArchive,
+    handleSelectNote,
+    handleSelectNotebook,
+    handleSelectToday,
+    handleSetNotePinned,
+    handleToggleTag,
+    submitNotebook,
+    submitRenameNotebook,
+  });
+  latestRef.current = {
+    fetchNextPage: notesQuery.fetchNextPage,
+    flushCurrentDraftAsync,
+    handleAssignNoteNotebook,
+    handleArchiveNote,
+    handleCopyNoteContent,
+    handleCreateNote,
+    handleDeleteNotebook,
+    handleDeleteNotePermanently,
+    handleRestoreNote,
+    handleSelectAll,
+    handleSelectArchive,
+    handleSelectNote,
+    handleSelectNotebook,
+    handleSelectToday,
+    handleSetNotePinned,
+    handleToggleTag,
+    submitNotebook,
+    submitRenameNotebook,
+  };
+
+  const editorPaneProps = useMemo(
+    () => ({
       archivedAt: currentNote?.archivedAt ?? null,
       focusMode:
         currentNote && currentNote.id === selectedNoteId
           ? editorFocusMode
-          : "none",
+          : ("none" as const),
       isNewNote: currentNote?.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
@@ -1034,7 +1062,10 @@ export function useShellController() {
       isDeletePublishedNotePending: deletePublishedNoteMutation.isPending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
-          handleAssignNoteNotebook(currentNote.id, notebookId);
+          latestRef.current.handleAssignNoteNotebook(
+            currentNote.id,
+            notebookId,
+          );
         }
       },
       onDeletePublishedNote() {
@@ -1054,13 +1085,13 @@ export function useShellController() {
         }
 
         void (async () => {
-          await flushCurrentDraftAsync();
+          await latestRef.current.flushCurrentDraftAsync();
           setPublishDialogOpen(true);
         })().catch(() => {});
       },
       onSetPinned(pinned: boolean) {
         if (currentNote) {
-          handleSetNotePinned(currentNote.id, pinned);
+          latestRef.current.handleSetNotePinned(currentNote.id, pinned);
         }
       },
       onChange(markdown: string) {
@@ -1071,8 +1102,25 @@ export function useShellController() {
       onFocusHandled() {
         setEditorFocusMode("none");
       },
-    },
-    publishDialogProps: {
+    }),
+    [
+      creatingSelectedNoteId,
+      currentEditorMarkdown,
+      currentNote,
+      deletePublishedNoteMutation.isPending,
+      editorFocusMode,
+      notebooks,
+      publishNoteMutation.isPending,
+      searchQuery,
+      selectedNoteId,
+      setDraft,
+      setEditorFocusMode,
+      syncEditorRevision,
+    ],
+  );
+
+  const publishDialogProps = useMemo(
+    () => ({
       initialTitle: currentNote?.title ?? "",
       initialTags: currentNote?.tags ?? [],
       noteId: currentNote?.id ?? "",
@@ -1082,8 +1130,19 @@ export function useShellController() {
       onSubmit(input: PublishNoteInput) {
         publishNoteMutation.mutate(input);
       },
-    },
-    deletePublishDialogProps: {
+    }),
+    [
+      currentNote?.id,
+      currentNote?.tags,
+      currentNote?.title,
+      publishDialogOpen,
+      publishNoteMutation.isPending,
+      publishNoteMutation.mutate,
+    ],
+  );
+
+  const deletePublishDialogProps = useMemo(
+    () => ({
       open: deletePublishDialogOpen,
       pending: deletePublishedNoteMutation.isPending,
       onOpenChange: setDeletePublishDialogOpen,
@@ -1092,8 +1151,25 @@ export function useShellController() {
           deletePublishedNoteMutation.mutate(currentNote.id);
         }
       },
-    },
-    notesPaneProps: {
+    }),
+    [
+      currentNote,
+      deletePublishDialogOpen,
+      deletePublishedNoteMutation.isPending,
+      deletePublishedNoteMutation.mutate,
+    ],
+  );
+
+  const isMutatingNote =
+    archiveNoteMutation.isPending ||
+    restoreNoteMutation.isPending ||
+    deleteNotePermanentlyMutation.isPending ||
+    assignNoteNotebookMutation.isPending ||
+    pinNoteMutation.isPending ||
+    unpinNoteMutation.isPending;
+
+  const notesPaneProps = useMemo(
+    () => ({
       activeNotebook,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
@@ -1105,33 +1181,55 @@ export function useShellController() {
         setNoteSortPrefs(sortViewKey, { field }),
       onChangeSortDirection: (direction: NoteSortDirection) =>
         setNoteSortPrefs(sortViewKey, { direction }),
-      isMutatingNote:
-        archiveNoteMutation.isPending ||
-        restoreNoteMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending ||
-        assignNoteNotebookMutation.isPending ||
-        pinNoteMutation.isPending ||
-        unpinNoteMutation.isPending,
+      isMutatingNote,
       notebooks,
       noteFilter,
-      onAssignNoteNotebook: handleAssignNoteNotebook,
-      onArchiveNote: handleArchiveNote,
+      onAssignNoteNotebook: (noteId: string, notebookId: string | null) =>
+        latestRef.current.handleAssignNoteNotebook(noteId, notebookId),
+      onArchiveNote: (noteId: string) =>
+        latestRef.current.handleArchiveNote(noteId),
       onChangeSearch: setSearchQuery,
-      onCopyNoteContent: handleCopyNoteContent,
-      onCreateNote: handleCreateNote,
-      onDeleteNotePermanently: handleDeleteNotePermanently,
+      onCopyNoteContent: (noteId: string) =>
+        latestRef.current.handleCopyNoteContent(noteId),
+      onCreateNote: (source: "keyboard" | "pointer") =>
+        latestRef.current.handleCreateNote(source),
+      onDeleteNotePermanently: (noteId: string) =>
+        latestRef.current.handleDeleteNotePermanently(noteId),
       onLoadMore() {
         if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
-          void notesQuery.fetchNextPage();
+          void latestRef.current.fetchNextPage();
         }
       },
-      onRestoreNote: handleRestoreNote,
-      onSelectNote: handleSelectNote,
-      onSetNotePinned: handleSetNotePinned,
+      onRestoreNote: (noteId: string) =>
+        latestRef.current.handleRestoreNote(noteId),
+      onSelectNote: (noteId: string) =>
+        latestRef.current.handleSelectNote(noteId),
+      onSetNotePinned: (noteId: string, pinned: boolean) =>
+        latestRef.current.handleSetNotePinned(noteId, pinned),
       searchQuery,
       selectedNoteId: displayedSelectedNoteId,
-    },
-    sidebarPaneProps: {
+    }),
+    [
+      activeNotebook,
+      currentNotes,
+      displayedSelectedNoteId,
+      isCreatingNote,
+      isMutatingNote,
+      notebooks,
+      noteFilter,
+      noteSortDirection,
+      noteSortField,
+      notesQuery.hasNextPage,
+      notesQuery.isFetchingNextPage,
+      searchQuery,
+      setNoteSortPrefs,
+      setSearchQuery,
+      sortViewKey,
+    ],
+  );
+
+  const sidebarPaneProps = useMemo(
+    () => ({
       activeNotebookId,
       activeTags,
       availableTags,
@@ -1142,8 +1240,9 @@ export function useShellController() {
       notebooks,
       onChangeNotebookName: setNewNotebookName,
       onChangeRenamingNotebookName: setRenamingNotebookName,
-      onCreateNotebook: submitNotebook,
-      onDeleteNotebook: handleDeleteNotebook,
+      onCreateNotebook: () => latestRef.current.submitNotebook(),
+      onDeleteNotebook: (notebookId: string) =>
+        latestRef.current.handleDeleteNotebook(notebookId),
       onHideCreateNotebook() {
         setIsCreatingNotebook(false);
         setNewNotebookName("");
@@ -1152,10 +1251,11 @@ export function useShellController() {
         setEditingNotebookId(null);
         setRenamingNotebookName("");
       },
-      onSelectAll: handleSelectAll,
-      onSelectToday: handleSelectToday,
-      onSelectArchive: handleSelectArchive,
-      onSelectNotebook: handleSelectNotebook,
+      onSelectAll: () => latestRef.current.handleSelectAll(),
+      onSelectToday: () => latestRef.current.handleSelectToday(),
+      onSelectArchive: () => latestRef.current.handleSelectArchive(),
+      onSelectNotebook: (notebookId: string) =>
+        latestRef.current.handleSelectNotebook(notebookId),
       onShowCreateNotebook() {
         setEditingNotebookId(null);
         setRenamingNotebookName("");
@@ -1172,11 +1272,46 @@ export function useShellController() {
         setEditingNotebookId(notebookId);
         setRenamingNotebookName(notebook.name);
       },
-      onSubmitRenameNotebook: submitRenameNotebook,
-      onToggleTag: handleToggleTag,
+      onSubmitRenameNotebook: () => latestRef.current.submitRenameNotebook(),
+      onToggleTag: (tag: string) => latestRef.current.handleToggleTag(tag),
       renameNotebookDisabled:
         renameNotebookMutation.isPending || deleteNotebookMutation.isPending,
       renamingNotebookName,
+    }),
+    [
+      activeNotebookId,
+      activeTags,
+      availableTags,
+      deleteNotebookMutation.isPending,
+      editingNotebookId,
+      isCreatingNotebook,
+      newNotebookName,
+      noteFilter,
+      notebooks,
+      renameNotebookMutation.isPending,
+      renamingNotebookName,
+    ],
+  );
+
+  return {
+    activeNotebookId,
+    bootstrapError:
+      bootstrapQuery.isError && bootstrapQuery.error instanceof Error
+        ? bootstrapQuery.error.message
+        : bootstrapQuery.isError
+          ? "Failed to load the note library."
+          : null,
+    bootstrapLoading: bootstrapQuery.isLoading,
+    readyToRevealWindow,
+    retryBootstrap() {
+      void bootstrapQuery.refetch();
+      void invalidateNotes();
+      void invalidateContextualTags();
     },
+    editorPaneProps,
+    publishDialogProps,
+    deletePublishDialogProps,
+    notesPaneProps,
+    sidebarPaneProps,
   };
 }

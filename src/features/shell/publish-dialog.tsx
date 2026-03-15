@@ -32,21 +32,36 @@ export function PublishDialog({
   onOpenChange,
   onSubmit,
 }: PublishDialogProps) {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogPortal>
+        <DialogBackdrop />
+        {open && (
+          <PublishDialogContent
+            key={`${noteId}-${open}`}
+            initialTitle={initialTitle}
+            initialTags={initialTags}
+            noteId={noteId}
+            pending={pending}
+            onSubmit={onSubmit}
+          />
+        )}
+      </DialogPortal>
+    </DialogRoot>
+  );
+}
+
+function PublishDialogContent({
+  initialTitle,
+  initialTags,
+  noteId,
+  pending,
+  onSubmit,
+}: Omit<PublishDialogProps, "open" | "onOpenChange">) {
   const [title, setTitle] = useState(initialTitle);
   const [image, setImage] = useState("");
   const [tags, setTags] = useState<string[]>(initialTags);
   const [tagInput, setTagInput] = useState("");
-
-  // Reset local state when dialog opens with new values
-  const lastOpenRef = useState({ open: false, noteId: "" })[0];
-  if (open && (!lastOpenRef.open || lastOpenRef.noteId !== noteId)) {
-    setTitle(initialTitle);
-    setImage("");
-    setTags(initialTags);
-    setTagInput("");
-  }
-  lastOpenRef.open = open;
-  lastOpenRef.noteId = noteId;
 
   const addTag = (raw: string) => {
     const tag = raw.trim().replace(/^#/, "").trim();
@@ -83,82 +98,77 @@ export function PublishDialog({
   };
 
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogPortal>
-        <DialogBackdrop />
-        <DialogPopup className="w-full max-w-md p-6">
-          <DialogTitle className="text-base font-semibold">
-            Publish to Nostr
-          </DialogTitle>
+    <DialogPopup className="w-full max-w-md p-6">
+      <DialogTitle className="text-base font-semibold">
+        Publish to Nostr
+      </DialogTitle>
 
-          <div className="mt-4 flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Title
-              </span>
-              <input
-                className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={initialTitle}
-                type="text"
-                value={title}
-              />
-            </label>
+      <div className="mt-4 flex flex-col gap-4">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-muted-foreground text-xs font-medium">
+            Title
+          </span>
+          <input
+            className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={initialTitle}
+            type="text"
+            value={title}
+          />
+        </label>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Cover Image URL
-              </span>
-              <input
-                className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
-                onChange={(e) => setImage(e.target.value)}
-                placeholder="https://…"
-                type="url"
-                value={image}
-              />
-            </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-muted-foreground text-xs font-medium">
+            Cover Image URL
+          </span>
+          <input
+            className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
+            onChange={(e) => setImage(e.target.value)}
+            placeholder="https://…"
+            type="url"
+            value={image}
+          />
+        </label>
 
-            <div className="flex flex-col gap-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
-                Tags
-              </span>
-              <div className="border-input bg-background focus-within:ring-ring flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 focus-within:ring-1">
-                {tags.map((tag) => (
-                  <button
-                    className="bg-accent text-accent-foreground hover:bg-accent/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
-                    key={tag}
-                    onClick={() => removeTag(tag)}
-                    type="button"
-                  >
-                    {tag}
-                    <X className="size-3" />
-                  </button>
-                ))}
-                <input
-                  className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={() => {
-                    if (tagInput.trim()) addTag(tagInput);
-                  }}
-                  placeholder={tags.length === 0 ? "Add tags…" : ""}
-                  type="text"
-                  value={tagInput}
-                />
-              </div>
-            </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-muted-foreground text-xs font-medium">
+            Tags
+          </span>
+          <div className="border-input bg-background focus-within:ring-ring flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 focus-within:ring-1">
+            {tags.map((tag) => (
+              <button
+                className="bg-accent text-accent-foreground hover:bg-accent/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
+                key={tag}
+                onClick={() => removeTag(tag)}
+                type="button"
+              >
+                {tag}
+                <X className="size-3" />
+              </button>
+            ))}
+            <input
+              className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onBlur={() => {
+                if (tagInput.trim()) addTag(tagInput);
+              }}
+              placeholder={tags.length === 0 ? "Add tags…" : ""}
+              type="text"
+              value={tagInput}
+            />
           </div>
+        </div>
+      </div>
 
-          <div className="mt-6 flex justify-end gap-2">
-            <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
-              Cancel
-            </DialogClose>
-            <Button disabled={pending} onClick={handleSubmit} size="sm">
-              {pending ? "Publishing…" : "Publish"}
-            </Button>
-          </div>
-        </DialogPopup>
-      </DialogPortal>
-    </DialogRoot>
+      <div className="mt-6 flex justify-end gap-2">
+        <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
+          Cancel
+        </DialogClose>
+        <Button disabled={pending} onClick={handleSubmit} size="sm">
+          {pending ? "Publishing…" : "Publish"}
+        </Button>
+      </div>
+    </DialogPopup>
   );
 }

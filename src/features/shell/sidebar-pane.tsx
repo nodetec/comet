@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { SyncDialog } from "./sync-dialog";
 import { useUIStore } from "@/stores/use-ui-store";
 import { type NoteFilter } from "@/stores/use-shell-store";
@@ -184,10 +185,10 @@ export function SidebarPane({
   return (
     <aside className="bg-sidebar flex h-full min-h-0 flex-col">
       <header
-        className={[
+        className={cn(
           "flex h-13 shrink-0 items-center justify-end px-3",
-          showHeaderBorder ? "border-b" : "",
-        ].join(" ")}
+          showHeaderBorder && "border-b",
+        )}
       >
         <div className="relative z-40 flex gap-1">
           <Button
@@ -241,19 +242,19 @@ export function SidebarPane({
           >
             <span className="leading-none">Notes</span>
             <ChevronRight
-              className={[
+              className={cn(
                 "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
                 notesOpen ? "rotate-90" : "rotate-0",
-              ].join(" ")}
+              )}
             />
           </button>
           <div
-            className={[
+            className={cn(
               "grid overflow-hidden transition-all duration-200 ease-out",
               notesOpen
                 ? "grid-rows-[1fr] pt-1 opacity-100"
                 : "grid-rows-[0fr] opacity-0",
-            ].join(" ")}
+            )}
           >
             <div className="min-h-0">
               <button
@@ -294,19 +295,19 @@ export function SidebarPane({
           >
             <span className="leading-none">Notebooks</span>
             <ChevronRight
-              className={[
+              className={cn(
                 "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
                 notebooksOpen ? "rotate-90" : "rotate-0",
-              ].join(" ")}
+              )}
             />
           </button>
           <div
-            className={[
+            className={cn(
               "grid overflow-hidden transition-all duration-200 ease-out",
               notebooksOpen
                 ? "grid-rows-[1fr] pt-1 opacity-100"
                 : "grid-rows-[0fr] opacity-0",
-            ].join(" ")}
+            )}
           >
             <div className="min-h-0">
               {isCreatingNotebook ? (
@@ -370,13 +371,13 @@ export function SidebarPane({
                         </div>
                       ) : (
                         <button
-                          className={[
+                          className={cn(
                             "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                             noteFilter === "notebook" &&
-                            activeNotebookId === notebook.id
+                              activeNotebookId === notebook.id
                               ? "bg-accent/80 text-secondary-foreground"
                               : "text-secondary-foreground",
-                          ].join(" ")}
+                          )}
                           disabled={renameNotebookDisabled}
                           key={notebook.id}
                           onClick={() => onSelectNotebook(notebook.id)}
@@ -412,19 +413,19 @@ export function SidebarPane({
             >
               <span className="leading-none">Tags</span>
               <ChevronRight
-                className={[
+                className={cn(
                   "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
                   tagsOpen ? "rotate-90" : "rotate-0",
-                ].join(" ")}
+                )}
               />
             </button>
             <div
-              className={[
+              className={cn(
                 "grid overflow-hidden transition-all duration-200 ease-out",
                 tagsOpen
                   ? "grid-rows-[1fr] pt-2 opacity-100"
                   : "grid-rows-[0fr] opacity-0",
-              ].join(" ")}
+              )}
             >
               <div className="min-h-0">
                 <div className="flex flex-wrap gap-2 pl-1">
@@ -433,12 +434,12 @@ export function SidebarPane({
 
                     return (
                       <button
-                        className={[
+                        className={cn(
                           "rounded-md px-2 py-1 text-xs font-medium transition-colors",
                           isActive
                             ? "bg-primary/25 text-secondary-foreground"
                             : "bg-accent text-secondary-foreground hover:bg-accent/80",
-                        ].join(" ")}
+                        )}
                         key={tag}
                         onClick={() => onToggleTag(tag)}
                         type="button"

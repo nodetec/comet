@@ -10,6 +10,7 @@ import {
 import { ChevronDown, PenBoxIcon, Pin, Search, X } from "lucide-react";
 import Highlighter from "react-highlight-words";
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -83,9 +84,15 @@ function handleCreateButtonClick(
   onCreateNote("keyboard");
 }
 
-function renderHighlightedText(text: string, searchWords: string[]) {
+const HighlightedText = memo(function HighlightedText({
+  text,
+  searchWords,
+}: {
+  text: string;
+  searchWords: string[];
+}) {
   if (searchWords.length === 0 || text.length === 0) {
-    return text;
+    return <>{text}</>;
   }
 
   return (
@@ -96,7 +103,7 @@ function renderHighlightedText(text: string, searchWords: string[]) {
       textToHighlight={text}
     />
   );
-}
+});
 
 export function NotesPane({
   activeNotebook,
@@ -472,13 +479,19 @@ export function NotesPane({
                       <div className="flex w-full flex-1 flex-col gap-1.5">
                         {note.title ? (
                           <h3 className="text-secondary-foreground min-w-0 truncate font-semibold">
-                            {renderHighlightedText(note.title, searchWords)}
+                            <HighlightedText
+                              text={note.title}
+                              searchWords={searchWords}
+                            />
                           </h3>
                         ) : null}
                         <div
                           className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
                         >
-                          {renderHighlightedText(cardPreview, searchWords)}
+                          <HighlightedText
+                            text={cardPreview}
+                            searchWords={searchWords}
+                          />
                         </div>
                         <div className="flex w-full items-center gap-1.5">
                           {note.pinnedAt ? (
