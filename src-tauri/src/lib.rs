@@ -11,7 +11,7 @@ use rusqlite::OptionalExtension;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, LoadedNote, NotePagePayload, NoteQueryInput, NotebookSummary,
-    RenameNotebookInput, SaveNoteInput,
+    RenameNotebookInput, SaveNoteInput, SearchResult,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
@@ -43,6 +43,16 @@ fn app_status(app: AppHandle) -> Result<AppStatus, String> {
 #[tauri::command]
 fn list_themes(app: AppHandle) -> Result<Vec<themes::ThemeSummary>, String> {
     themes::list_themes(&app)
+}
+
+#[tauri::command]
+fn search_notes(app: AppHandle, query: String) -> Result<Vec<SearchResult>, String> {
+    notes::search_notes(&app, &query)
+}
+
+#[tauri::command]
+fn search_tags(app: AppHandle, query: String) -> Result<Vec<String>, String> {
+    notes::search_tags(&app, &query)
 }
 
 #[tauri::command]
@@ -592,6 +602,8 @@ pub fn run() {
             set_sync_enabled,
             get_sync_status,
             restart_sync,
+            search_notes,
+            search_tags,
             list_themes,
             read_theme
         ])

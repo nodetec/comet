@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 
 import { useTheme } from "@/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
+import { CommandPalette } from "@/features/shell/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NotesPane } from "@/features/shell/notes-pane";
 import { PublishDialog } from "@/features/shell/publish-dialog";
@@ -36,7 +37,29 @@ function App() {
     retryBootstrap,
     sidebarPaneProps,
   } = useShellController();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const handleCommandSelect = useCallback(
+    (noteId: string) => notesPaneProps.onSelectNote(noteId),
+    [notesPaneProps.onSelectNote],
+  );
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+
+      if (event.key === "o") {
+        event.preventDefault();
+        setCommandPaletteOpen((open) => !open);
+      } else if (event.key === "k") {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent("comet:focus-search"));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (readyToRevealWindow && !hasCompletedStartupReveal) {
@@ -148,6 +171,15 @@ function App() {
           </DialogPopup>
         </DialogPortal>
       </DialogRoot>
+      <CommandPalette
+        availableTags={sidebarPaneProps.availableTags}
+        notebooks={notesPaneProps.notebooks}
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        onSelectNote={handleCommandSelect}
+        onSelectNotebook={sidebarPaneProps.onSelectNotebook}
+        onToggleTag={sidebarPaneProps.onToggleTag}
+      />
       <SettingsDialog />
       <Toaster closeButton position="bottom-right" richColors />
     </div>

@@ -622,6 +622,127 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     })
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    pub id: String,
+    pub title: String,
+    pub notebook: Option<NotebookRef>,
+    pub preview: String,
+    pub archived_at: Option<i64>,
+}
+
+const SEARCH_RESULTS_LIMIT: usize = 20;
+
+pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, String> {
+    let conn = database_connection(app)?;
+    let search_tokens = search_tokens_from_query(query);
+    let search_mode = match search_mode_from_tokens(&search_tokens) {
+        Some(mode) => mode,
+        None => return Ok(Vec::new()),
+    };
+
+    let (sql, values): (String, Vec<Value>) = match &search_mode {
+        SearchMode::Match(search_query) => (
+            "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+             FROM notes n
+             LEFT JOIN notebooks b ON b.id = n.notebook_id
+             JOIN notes_fts ON notes_fts.note_id = n.id
+             WHERE notes_fts MATCH ?
+             ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC
+             LIMIT ?"
+                .to_string(),
+            vec![
+                Value::from(search_query.clone()),
+                Value::from((SEARCH_RESULTS_LIMIT + 1) as i64),
+            ],
+        ),
+        SearchMode::Like(patterns) => {
+            let mut sql = String::from(
+                "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+                 FROM notes n
+                 LEFT JOIN notebooks b ON b.id = n.notebook_id
+                 JOIN notes_fts ON notes_fts.note_id = n.id
+                 WHERE ",
+            );
+            let mut vals = Vec::new();
+            let mut like_clauses = Vec::new();
+            for pattern in patterns {
+                like_clauses.push(
+                    "(notes_fts.title LIKE ? ESCAPE '\\' OR notes_fts.markdown LIKE ? ESCAPE '\\')"
+                        .to_string(),
+                );
+                vals.push(Value::from(pattern.clone()));
+                vals.push(Value::from(pattern.clone()));
+            }
+            sql.push_str(&like_clauses.join(" AND "));
+            sql.push_str(
+                " ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC LIMIT ?",
+            );
+            vals.push(Value::from((SEARCH_RESULTS_LIMIT + 1) as i64));
+            (sql, vals)
+        }
+    };
+
+    let mut statement = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map(params_from_iter(values.iter()), |row| {
+            let markdown: String = row.get(2)?;
+            let notebook_id: Option<String> = row.get(3)?;
+            let notebook_name: Option<String> = row.get(4)?;
+
+            Ok(SearchResult {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                notebook: notebook_id
+                    .zip(notebook_name)
+                    .map(|(id, name)| NotebookRef { id, name }),
+                preview: search_snippet_for_summary(&markdown, &search_tokens)
+                    .unwrap_or_else(|| preview_from_markdown(&markdown)),
+                archived_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| e.to_string())?);
+        if results.len() >= SEARCH_RESULTS_LIMIT {
+            break;
+        }
+    }
+
+    Ok(results)
+}
+
+pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, String> {
+    let conn = database_connection(app)?;
+    let pattern = format!(
+        "%{}%",
+        escape_like_pattern(&query.to_ascii_lowercase())
+    );
+
+    let mut statement = conn
+        .prepare(
+            "SELECT DISTINCT tag FROM note_tags
+             WHERE tag LIKE ? ESCAPE '\\'
+             ORDER BY tag ASC
+             LIMIT 20",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = statement
+        .query_map(params![pattern], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+
+    let mut tags = Vec::new();
+    for row in rows {
+        tags.push(row.map_err(|e| e.to_string())?);
+    }
+
+    Ok(tags)
+}
+
 fn query_contextual_tags(
     conn: &Connection,
     input: &ContextualTagsInput,

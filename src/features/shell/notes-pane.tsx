@@ -181,6 +181,13 @@ export function NotesPane({
   }, [isSearchOpen]);
 
   useEffect(() => {
+    const handleFocusSearch = () => setIsSearchOpen(true);
+    window.addEventListener("comet:focus-search", handleFocusSearch);
+    return () =>
+      window.removeEventListener("comet:focus-search", handleFocusSearch);
+  }, []);
+
+  useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
   }, [activeNotebook?.id, filteredNotes.length, noteFilter, searchQuery]);
 
