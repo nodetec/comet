@@ -1,9 +1,23 @@
 {
-  "identifier": "md.comet.dev",
+  "identifier": "md.comet-alpha.dev",
   "app": {
     "windows": [
       {
-        "title": "comet (dev)"
+        "label": "main",
+        "title": "comet (dev)",
+        "acceptFirstMouse": true,
+        "decorations": true,
+        "visible": false,
+        "width": 1200,
+        "height": 600,
+        "minWidth": 710,
+        "minHeight": 370,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 24
+        }
       }
     ]
   }
