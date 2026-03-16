@@ -129,6 +129,9 @@ jobs:
           pattern: linux-*
           merge-multiple: true
 
+      - name: List artifacts
+        run: find artifacts -type f 2>/dev/null || echo "No artifacts found"
+
       - name: Generate short SHA
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -141,8 +144,8 @@ jobs:
           body: |
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
           files: |
-            artifacts/*.dmg
-            artifacts/*.deb
-            artifacts/*.rpm
-            artifacts/*.AppImage
+            artifacts/**/*.dmg
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.AppImage
           make_latest: true
