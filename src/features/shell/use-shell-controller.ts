@@ -838,7 +838,7 @@ export function useShellController() {
       modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,
       notebooks,
-      noteId: displayedSelectedNoteId ? (currentNote?.id ?? null) : null,
+      noteId: (displayedSelectedNoteId || isCreatingNote) ? (currentNote?.id ?? null) : null,
       editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
