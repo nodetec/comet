@@ -96,7 +96,10 @@ export default function MarkdownCopyPlugin() {
       event.preventDefault();
 
       const markdown = $selectionToMarkdown(editor);
-      clipboardData.setData("text/plain", markdown || selection.getTextContent());
+      clipboardData.setData(
+        "text/plain",
+        markdown || selection.getTextContent(),
+      );
 
       // Preserve Lexical JSON for paste within the editor
       const { nodes } = $generateJSONFromSelectedNodes(editor, selection);

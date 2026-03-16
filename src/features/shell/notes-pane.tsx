@@ -38,6 +38,7 @@ import {
 type NotesPaneProps = {
   activeNotebook: NotebookSummary | null;
   activeTags: string[];
+  creatingNoteId: string | null;
   filteredNotes: NoteSummary[];
   hasMoreNotes: boolean | undefined;
   isCreatingNote: boolean;
@@ -113,6 +114,7 @@ const HighlightedText = memo(function HighlightedText({
 export function NotesPane({
   activeNotebook,
   activeTags,
+  creatingNoteId,
   filteredNotes,
   hasMoreNotes,
   isCreatingNote,
@@ -143,24 +145,16 @@ export function NotesPane({
     () => searchQuery.length > 0,
   );
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
-  const knownNoteIdsRef = useRef<Set<string>>(new Set());
-  const hasMountedRef = useRef(false);
-  const newNoteIds = useMemo(() => {
-    if (!hasMountedRef.current) return new Set<string>();
-    const newIds = new Set<string>();
-    for (const note of filteredNotes) {
-      if (!knownNoteIdsRef.current.has(note.id)) {
-        newIds.add(note.id);
-      }
-    }
-    return newIds;
-  }, [filteredNotes]);
+  const [slideInNoteId, setSlideInNoteId] = useState<string | null>(null);
+
+  // When creatingNoteId changes to a new value, mark it for slide-in
   useEffect(() => {
-    for (const note of filteredNotes) {
-      knownNoteIdsRef.current.add(note.id);
+    if (creatingNoteId) {
+      setSlideInNoteId(creatingNoteId);
     }
-    hasMountedRef.current = true;
-  }, [filteredNotes]);
+  }, [creatingNoteId]);
+
+  const viewKey = `${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -428,15 +422,14 @@ export function NotesPane({
             <p className="text-muted-foreground text-xl">No Notes</p>
           </div>
         ) : (
-          <div className="space-y-0 px-3">
-            <LayoutGroup
-              key={`${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`}
-            >
+          <>
+            <div className="space-y-0 px-3">
+            <LayoutGroup key={viewKey}>
               {filteredNotes.map((note, index) => {
                 const isActive = note.id === selectedNoteId;
                 const isNextActive =
                   filteredNotes[index + 1]?.id === selectedNoteId;
-                const isNew = newNoteIds.has(note.id);
+                const isJustCreated = note.id === slideInNoteId;
                 const fallback = note.title ? "" : "No content yet";
                 const cardPreview =
                   searchWords.length > 0
@@ -445,12 +438,15 @@ export function NotesPane({
 
                 return (
                   <motion.div
-                    layout
+                    layout="position"
                     transition={{
                       layout: { duration: 0.2, ease: "easeInOut" },
                     }}
-                    className={`flex w-full flex-col items-center ${isNew ? "animate-slide-in-left" : ""}`}
+                    className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
                     key={note.id}
+                    onAnimationEnd={() => {
+                      if (isJustCreated) setSlideInNoteId(null);
+                    }}
                   >
                     <button
                       className={[
@@ -514,6 +510,7 @@ export function NotesPane({
                 );
               })}
             </LayoutGroup>
+            </div>
             {hasMoreNotes ? (
               <div className="px-[0.30rem] py-4" ref={loadMoreRef}>
                 <div className="text-muted-foreground text-center text-xs">
@@ -521,7 +518,7 @@ export function NotesPane({
                 </div>
               </div>
             ) : null}
-          </div>
+          </>
         )}
       </div>
     </section>

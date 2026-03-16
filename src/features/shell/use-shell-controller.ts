@@ -502,11 +502,8 @@ export function useShellController() {
         queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         // If the updated note is currently open, refetch then remount editor
         // — but only if the user isn't actively editing (unsaved draft)
-        const { draftNoteId: currentDraftId } =
-          useShellStore.getState();
-        const hasPendingSave = Boolean(
-          pendingSaveTimeoutRef.current,
-        );
+        const { draftNoteId: currentDraftId } = useShellStore.getState();
+        const hasPendingSave = Boolean(pendingSaveTimeoutRef.current);
         if (
           currentDraftId === noteId &&
           action === "upsert" &&
@@ -915,6 +912,7 @@ export function useShellController() {
     () => ({
       activeNotebook,
       activeTags,
+      creatingNoteId: creatingSelectedNoteId,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
       isCreatingNote,
@@ -957,6 +955,7 @@ export function useShellController() {
     [
       activeNotebook,
       activeTags,
+      creatingSelectedNoteId,
       currentNotes,
       displayedSelectedNoteId,
       isCreatingNote,
