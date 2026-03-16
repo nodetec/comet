@@ -6,6 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import { useUIStore } from "@/stores/use-ui-store";
+import cometLogo from "../../../comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 
@@ -286,12 +287,13 @@ export function EditorPane({
             />
           </div>
         ) : (
-          <div className="border-border mx-auto flex max-w-2xl flex-col gap-4 rounded-md border border-dashed px-8">
-            <p className="text-2xl font-semibold">Open a note to keep going.</p>
-            <p className="text-muted-foreground text-sm leading-7">
-              Comet will bias toward the note you were just in. Right now,
-              choose one from the list or create a new note.
-            </p>
+          <div className="flex h-full items-center justify-center">
+            <img
+              src={cometLogo}
+              alt=""
+              className="size-32 opacity-50"
+              draggable={false}
+            />
           </div>
         )}
       </div>

@@ -504,6 +504,19 @@ export function useShellController() {
         // — but only if the user isn't actively editing (unsaved draft)
         const { draftNoteId: currentDraftId } = useShellStore.getState();
         const hasPendingSave = Boolean(pendingSaveTimeoutRef.current);
+
+        // If the currently open note was deleted remotely, close the editor
+        if (action === "delete") {
+          const { selectedNoteId: currentSelectedId } = useShellStore.getState();
+          if (currentDraftId === noteId || currentSelectedId === noteId) {
+            queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
+            useShellStore.getState().setDraft("", "");
+            useShellStore.getState().setSelectedNoteId(null);
+            setSyncEditorRevision((r) => r + 1);
+          }
+          return;
+        }
+
         if (
           currentDraftId === noteId &&
           action === "upsert" &&
@@ -629,6 +642,10 @@ export function useShellController() {
   };
 
   const handleSelectNotebook = (notebookId: string) => {
+    if (currentNote && currentNote.notebook?.id !== notebookId) {
+      setSelectedNoteId(null);
+      setDraft("", "");
+    }
     setNotebookFilter(notebookId);
   };
 
@@ -821,7 +838,7 @@ export function useShellController() {
       modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,
       notebooks,
-      noteId: currentNote?.id ?? null,
+      noteId: displayedSelectedNoteId ? (currentNote?.id ?? null) : null,
       editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,

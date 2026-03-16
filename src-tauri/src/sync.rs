@@ -221,12 +221,14 @@ const NOTEBOOK_EVENT_KIND: Kind = Kind::ApplicationSpecificData;
 fn notebook_to_rumor(
     notebook_id: &str,
     name: &str,
+    updated_at: i64,
     pubkey: PublicKey,
 ) -> UnsignedEvent {
     let event_tags: Vec<Tag> = vec![
         Tag::identifier(notebook_id),
         Tag::title(name),
         Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+        Tag::custom(TagKind::custom("updated_at"), vec![updated_at.to_string()]),
     ];
 
     EventBuilder::new(NOTEBOOK_EVENT_KIND, "")
@@ -237,6 +239,7 @@ fn notebook_to_rumor(
 struct SyncedNotebook {
     id: String,
     name: String,
+    updated_at: i64,
 }
 
 fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, AppError> {
@@ -254,7 +257,14 @@ fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, App
         .map(|s| s.to_string())
         .ok_or_else(|| AppError::custom("Missing title tag in notebook event"))?;
 
-    Ok(SyncedNotebook { id, name })
+    let updated_at = rumor
+        .tags
+        .find(TagKind::custom("updated_at"))
+        .and_then(|t| t.content())
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or_else(|| rumor.created_at.as_secs() as i64 * 1000);
+
+    Ok(SyncedNotebook { id, name, updated_at })
 }
 
 fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
@@ -271,13 +281,34 @@ fn upsert_notebook_from_sync(
     notebook: &SyncedNotebook,
     sync_event_id: &str,
 ) -> Result<(), AppError> {
-    let now = now_millis();
-    conn.execute(
-        "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
-         VALUES (?1, ?2, ?3, ?3, ?4, 0) \
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, sync_event_id = excluded.sync_event_id, locally_modified = 0",
-        params![notebook.id, notebook.name, now, sync_event_id],
-    )?;
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT updated_at FROM notebooks WHERE id = ?1",
+            params![notebook.id],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    if let Some(local_updated) = existing {
+        if local_updated >= notebook.updated_at {
+            // Local version is same or newer — just update sync_event_id
+            conn.execute(
+                "UPDATE notebooks SET sync_event_id = ?1 WHERE id = ?2",
+                params![sync_event_id, notebook.id],
+            )?;
+            return Ok(());
+        }
+        conn.execute(
+            "UPDATE notebooks SET name = ?1, updated_at = ?2, sync_event_id = ?3, locally_modified = 0 WHERE id = ?4",
+            params![notebook.name, notebook.updated_at, sync_event_id, notebook.id],
+        )?;
+    } else {
+        conn.execute(
+            "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
+             VALUES (?1, ?2, ?3, ?3, ?4, 0)",
+            params![notebook.id, notebook.name, notebook.updated_at, sync_event_id],
+        )?;
+    }
     Ok(())
 }
 
@@ -489,11 +520,12 @@ fn upsert_from_sync(
         }
     }
 
-    // Ensure referenced notebook exists (it may arrive after the note in the sync stream)
+    // Ensure referenced notebook exists (it may arrive after the note in the sync stream).
+    // Stub gets updated_at = 0 so the real notebook event always wins LWW.
     if let Some(ref nb_id) = note.notebook_id {
         let now = now_millis();
         conn.execute(
-            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, ?2, 0)",
+            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, 0, 0)",
             params![nb_id, now],
         )?;
     }
@@ -718,6 +750,7 @@ async fn run_sync_connection(
     let debounce_duration = Duration::from_secs(2);
     let mut last_ping = tokio::time::Instant::now();
     let ping_interval = Duration::from_secs(30);
+    let mut post_eose = false;
 
     // Main select loop
     loop {
@@ -766,7 +799,7 @@ async fn run_sync_connection(
                     Some(Ok(Message::Text(ref text))) => {
                         process_relay_message(
                             app, &keys, text.as_ref(), state,
-                            &mut recent_pushes,
+                            &mut recent_pushes, &mut post_eose,
                         ).await?;
                     }
                     Some(Ok(Message::Close(_))) | None => {
@@ -851,6 +884,7 @@ async fn process_relay_message(
     text: &str,
     state: &Arc<Mutex<SyncState>>,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
+    post_eose: &mut bool,
 ) -> Result<(), AppError> {
     let parsed: serde_json::Value =
         serde_json::from_str(text).map_err(|e| AppError::custom(format!("Invalid JSON: {e}")))?;
@@ -881,8 +915,6 @@ async fn process_relay_message(
             // Skip echo (events we just pushed)
             if recent_pushes.contains_key(&event_id) {
                 sync_log(app, &format!("echo skip seq={seq}"));
-                let conn = crate::db::database_connection(app)?;
-                save_checkpoint(&conn, seq);
                 return Ok(());
             }
             sync_log(app, &format!("received event seq={seq}"));
@@ -892,8 +924,6 @@ async fn process_relay_message(
                 Ok(u) => u,
                 Err(e) => {
                     sync_log(app, &format!("skip undecryptable event: {e}"));
-                    let conn = crate::db::database_connection(app)?;
-                    save_checkpoint(&conn, seq);
                     return Ok(());
                 }
             };
@@ -918,7 +948,6 @@ async fn process_relay_message(
                     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![d_tag])?;
                     conn.execute("DELETE FROM notes WHERE id = ?1", params![d_tag])?;
                 }
-                save_checkpoint(&conn, seq);
 
                 let _ = app.emit(
                     "sync-remote-change",
@@ -936,8 +965,6 @@ async fn process_relay_message(
                     Ok(n) => n,
                     Err(e) => {
                         sync_log(app, &format!("skip malformed notebook: {e}"));
-                        let conn = crate::db::database_connection(app)?;
-                        save_checkpoint(&conn, seq);
                         return Ok(());
                     }
                 };
@@ -947,7 +974,6 @@ async fn process_relay_message(
                 if let Err(e) = upsert_notebook_from_sync(&conn, &notebook, &event_id) {
                     sync_log(app, &format!("notebook upsert failed {}: {e}", notebook.id));
                 }
-                save_checkpoint(&conn, seq);
 
                 let _ = app.emit(
                     "sync-remote-change",
@@ -961,8 +987,6 @@ async fn process_relay_message(
                     Ok(n) => n,
                     Err(e) => {
                         sync_log(app, &format!("skip malformed note: {e}"));
-                        let conn = crate::db::database_connection(app)?;
-                        save_checkpoint(&conn, seq);
                         return Ok(());
                     }
                 };
@@ -974,7 +998,6 @@ async fn process_relay_message(
                 if updated.is_some() {
                     sync_log(app, &format!("updated note {note_id}"));
                 }
-                save_checkpoint(&conn, seq);
 
                 if updated.is_some() {
                     let blossom_url = get_blossom_url(&conn);
@@ -993,84 +1016,20 @@ async fn process_relay_message(
                     );
                 }
             }
-        }
-        "DELETED" => {
-            let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
-            let deleted_event_id = arr.get(4).and_then(|v| v.as_str()).unwrap_or("");
-            let reason = arr.get(5);
-            let is_supersede = reason
-                .and_then(|r| r.get("superseded_by"))
-                .is_some();
-            // Superseded events are just version replacements — skip entirely
-            if is_supersede {
+
+            // In live mode, checkpoint each event so we don't re-process on reconnect.
+            // During initial catchup (pre-EOSE), skip per-event checkpoints — EOSE will set it.
+            if *post_eose {
                 let conn = crate::db::database_connection(app)?;
                 save_checkpoint(&conn, seq);
-                return Ok(());
             }
-
-            sync_log(app, &format!("received deleted seq={seq}"));
-
-            let conn = crate::db::database_connection(app)?;
-
-            // Check if it's a note deletion
-            let note_id: Option<String> = conn
-                .query_row(
-                    "SELECT id FROM notes WHERE sync_event_id = ?1",
-                    params![deleted_event_id],
-                    |row| row.get(0),
-                )
-                .optional()?;
-
-            if let Some(note_id) = note_id {
-                let now = now_millis();
-                conn.execute(
-                    "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
-                    params![now, note_id],
-                )?;
-
-                let _ = app.emit(
-                    "sync-remote-change",
-                    SyncChangePayload {
-                        note_id,
-                        action: "delete".to_string(),
-                    },
-                );
-            } else {
-
-            // Check if it's a notebook deletion
-            let notebook_id: Option<String> = conn
-                .query_row(
-                    "SELECT id FROM notebooks WHERE sync_event_id = ?1",
-                    params![deleted_event_id],
-                    |row| row.get(0),
-                )
-                .optional()?;
-
-            if let Some(notebook_id) = notebook_id {
-                // Delete notebook (FK ON DELETE SET NULL handles note unassignment)
-                conn.execute(
-                    "DELETE FROM notebooks WHERE id = ?1",
-                    params![notebook_id],
-                )?;
-                sync_log(app, &format!("deleted notebook {notebook_id}"));
-
-                let _ = app.emit(
-                    "sync-remote-change",
-                    SyncChangePayload {
-                        note_id: notebook_id,
-                        action: "delete".to_string(),
-                    },
-                );
-            }
-            } // else (not a note deletion)
-
-            save_checkpoint(&conn, seq);
         }
         "EOSE" => {
             let max_seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
             sync_log(app, &format!("synced to seq={max_seq}"));
             let conn = crate::db::database_connection(app)?;
             save_checkpoint(&conn, max_seq);
+            *post_eose = true;
 
             // Push any locally modified notes/notebooks (created or edited while offline)
             let (unsynced_notebooks, unsynced_notes) = {
@@ -1353,19 +1312,19 @@ async fn push_notebook(
     notebook_id: &str,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), AppError> {
-    let (name,) = {
+    let (name, updated_at) = {
         let conn = crate::db::database_connection(app)?;
-        let row: Option<(String,)> = conn
+        let row: Option<(String, i64)> = conn
             .query_row(
-                "SELECT name FROM notebooks WHERE id = ?1",
+                "SELECT name, updated_at FROM notebooks WHERE id = ?1",
                 params![notebook_id],
-                |row| Ok((row.get(0)?,)),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
         row.ok_or_else(|| AppError::custom(format!("Notebook not found: {notebook_id}")))?
     };
 
-    let rumor = notebook_to_rumor(notebook_id, &name, keys.public_key());
+    let rumor = notebook_to_rumor(notebook_id, &name, updated_at, keys.public_key());
 
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
     let gift_wrap = EventBuilder::gift_wrap(
