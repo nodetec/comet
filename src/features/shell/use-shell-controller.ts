@@ -501,8 +501,17 @@ export function useShellController() {
         queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
         queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         // If the updated note is currently open, refetch then remount editor
-        const { draftNoteId: currentDraftId } = useShellStore.getState();
-        if (currentDraftId === noteId && action === "upsert") {
+        // — but only if the user isn't actively editing (unsaved draft)
+        const { draftNoteId: currentDraftId } =
+          useShellStore.getState();
+        const hasPendingSave = Boolean(
+          pendingSaveTimeoutRef.current,
+        );
+        if (
+          currentDraftId === noteId &&
+          action === "upsert" &&
+          !hasPendingSave
+        ) {
           queryClient
             .fetchQuery({
               queryKey: ["note", noteId],
@@ -511,11 +520,9 @@ export function useShellController() {
             .then((freshNote) => {
               if (freshNote) {
                 queryClient.setQueryData(["note", noteId], freshNote);
-                // Only remount editor if the remote markdown actually differs
-                // from the current draft. Without this check, echo events from
-                // our own pushes cause an infinite remount→save→push cycle.
-                const { draftMarkdown } = useShellStore.getState();
-                if (freshNote.markdown !== draftMarkdown) {
+                const { draftMarkdown: currentDraft } =
+                  useShellStore.getState();
+                if (freshNote.markdown !== currentDraft) {
                   useShellStore.getState().setDraft("", "");
                   setSyncEditorRevision((r) => r + 1);
                 }
