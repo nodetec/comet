@@ -6,13 +6,18 @@ use tauri::{AppHandle, Manager};
 
 const DATABASE_FILE: &str = "comet.db";
 
-pub fn database_connection(app: &AppHandle) -> Result<Connection, AppError> {
+/// Run migrations. Call once at app startup.
+pub fn init_database(app: &AppHandle) -> Result<(), AppError> {
     let database_path = database_path(app)?;
     let mut conn = Connection::open(database_path)?;
-
-    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     migrations().to_latest(&mut conn)?;
+    Ok(())
+}
 
+pub fn database_connection(app: &AppHandle) -> Result<Connection, AppError> {
+    let database_path = database_path(app)?;
+    let conn = Connection::open(database_path)?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     Ok(conn)
 }
 

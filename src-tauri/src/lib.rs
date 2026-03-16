@@ -545,6 +545,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(sync::SyncManager::new())
         .setup(|app| {
+            db::init_database(app.handle())?;
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 sync::auto_start(&handle).await;
