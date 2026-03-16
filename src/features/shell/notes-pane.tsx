@@ -424,92 +424,92 @@ export function NotesPane({
         ) : (
           <>
             <div className="space-y-0 px-3">
-            <LayoutGroup key={viewKey}>
-              {filteredNotes.map((note, index) => {
-                const isActive = note.id === selectedNoteId;
-                const isNextActive =
-                  filteredNotes[index + 1]?.id === selectedNoteId;
-                const isJustCreated = note.id === slideInNoteId;
-                const fallback = note.title ? "" : "No content yet";
-                const cardPreview =
-                  searchWords.length > 0
-                    ? note.searchSnippet || note.preview || fallback
-                    : note.preview || fallback;
+              <LayoutGroup key={viewKey}>
+                {filteredNotes.map((note, index) => {
+                  const isActive = note.id === selectedNoteId;
+                  const isNextActive =
+                    filteredNotes[index + 1]?.id === selectedNoteId;
+                  const isJustCreated = note.id === slideInNoteId;
+                  const fallback = note.title ? "" : "No content yet";
+                  const cardPreview =
+                    searchWords.length > 0
+                      ? note.searchSnippet || note.preview || fallback
+                      : note.preview || fallback;
 
-                return (
-                  <motion.div
-                    layout="position"
-                    transition={{
-                      layout: { duration: 0.2, ease: "easeInOut" },
-                    }}
-                    className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
-                    key={note.id}
-                    onAnimationEnd={() => {
-                      if (isJustCreated) setSlideInNoteId(null);
-                    }}
-                  >
-                    <button
-                      className={[
-                        "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-2.5 py-2.5 text-left text-sm",
-                        isActive ? "bg-accent/50" : "",
-                      ].join(" ")}
-                      onClick={() => onSelectNote(note.id)}
-                      onContextMenu={(event) =>
-                        void handleNoteContextMenu(event, note)
-                      }
-                      onMouseDown={(event) => {
-                        if (event.button === 2) {
-                          event.preventDefault();
-                        }
+                  return (
+                    <motion.div
+                      layout="position"
+                      transition={{
+                        layout: { duration: 0.2, ease: "easeInOut" },
                       }}
-                      disabled={isMutatingNote}
-                      type="button"
+                      className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
+                      key={note.id}
+                      onAnimationEnd={() => {
+                        if (isJustCreated) setSlideInNoteId(null);
+                      }}
                     >
-                      <div className="flex w-full flex-1 flex-col gap-1.5">
-                        {note.title ? (
-                          <h3 className="min-w-0 truncate font-semibold text-[var(--heading-color)]">
+                      <button
+                        className={[
+                          "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-2.5 py-2.5 text-left text-sm",
+                          isActive ? "bg-accent/50" : "",
+                        ].join(" ")}
+                        onClick={() => onSelectNote(note.id)}
+                        onContextMenu={(event) =>
+                          void handleNoteContextMenu(event, note)
+                        }
+                        onMouseDown={(event) => {
+                          if (event.button === 2) {
+                            event.preventDefault();
+                          }
+                        }}
+                        disabled={isMutatingNote}
+                        type="button"
+                      >
+                        <div className="flex w-full flex-1 flex-col gap-1.5">
+                          {note.title ? (
+                            <h3 className="min-w-0 truncate font-semibold text-[var(--heading-color)]">
+                              <HighlightedText
+                                text={note.title}
+                                searchWords={searchWords}
+                              />
+                            </h3>
+                          ) : null}
+                          <div
+                            className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
+                          >
                             <HighlightedText
-                              text={note.title}
+                              text={cardPreview}
                               searchWords={searchWords}
                             />
-                          </h3>
-                        ) : null}
-                        <div
-                          className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
-                        >
-                          <HighlightedText
-                            text={cardPreview}
-                            searchWords={searchWords}
-                          />
-                        </div>
-                        <div className="flex w-full items-center gap-1.5">
-                          {note.pinnedAt ? (
-                            <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
-                          ) : null}
-                          <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
-                            {Date.now() - note.editedAt < 60_000
-                              ? "just now"
-                              : formatDistanceToNow(new Date(note.editedAt), {
-                                  addSuffix: true,
-                                }).replace(/^about /, "")}
-                          </span>
-                          {note.notebook ? (
-                            <span className="text-primary ml-auto min-w-0 truncate text-xs">
-                              {note.notebook.name}
+                          </div>
+                          <div className="flex w-full items-center gap-1.5">
+                            {note.pinnedAt ? (
+                              <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+                            ) : null}
+                            <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
+                              {Date.now() - note.editedAt < 60_000
+                                ? "just now"
+                                : formatDistanceToNow(new Date(note.editedAt), {
+                                    addSuffix: true,
+                                  }).replace(/^about /, "")}
                             </span>
-                          ) : null}
+                            {note.notebook ? (
+                              <span className="text-primary ml-auto min-w-0 truncate text-xs">
+                                {note.notebook.name}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
+                      </button>
+                      <div className="w-full px-[0.30rem]">
+                        <div
+                          className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`}
+                        />
                       </div>
-                    </button>
-                    <div className="w-full px-[0.30rem]">
-                      <div
-                        className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`}
-                      />
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </LayoutGroup>
+                    </motion.div>
+                  );
+                })}
+              </LayoutGroup>
             </div>
             {hasMoreNotes ? (
               <div className="px-[0.30rem] py-4" ref={loadMoreRef}>
