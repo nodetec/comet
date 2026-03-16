@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
+pub const DEFAULT_PUBLISH_RELAY: &str = "wss://relay.damus.io";
 pub const DEFAULT_BLOSSOM_URL: &str = "https://blossom.comet.md";
 
 /// Returns the npub for the stored identity,
@@ -37,7 +38,7 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, AppError> {
     );
     let _ = conn.execute(
         "INSERT OR IGNORE INTO relays (url, kind, created_at) VALUES (?1, 'publish', ?2)",
-        params![DEFAULT_SYNC_RELAY, now],
+        params![DEFAULT_PUBLISH_RELAY, now],
     );
     let _ = conn.execute(
         "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('blossom_url', ?1)",
