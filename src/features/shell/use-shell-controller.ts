@@ -156,7 +156,20 @@ export function useShellController() {
           }
         : undefined,
     initialPageParam: 0,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => {
+      // Only reuse previous data when paginating within the same view.
+      // Showing stale data from a different view causes layout animations
+      // as items shift from old positions to new ones.
+      const prevKey = previousQuery?.queryKey;
+      if (!prevKey || !previousData) return undefined;
+      const keyMatches =
+        prevKey[1] === noteFilter &&
+        prevKey[2] ===
+          (noteFilter === "notebook" ? (activeNotebookId ?? "") : "") &&
+        prevKey[3] === normalizedQuery &&
+        prevKey[4] === normalizedActiveTags.join("\u0000");
+      return keyMatches ? previousData : undefined;
+    },
     queryFn: ({ pageParam }) =>
       queryNotes({
         ...notesQueryInput,
