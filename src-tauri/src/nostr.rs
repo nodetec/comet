@@ -1,8 +1,7 @@
-use crate::error::AppError;
+use crate::error::{now_millis, now_secs, AppError};
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
@@ -18,7 +17,7 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, AppError> {
 
     let keys = Keys::generate();
     let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
-    let now = now_ms()?;
+    let now = now_millis();
 
     conn.execute(
         "INSERT INTO nostr_identity (secret_key, public_key, npub, created_at)
@@ -81,7 +80,7 @@ pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
 
 pub fn set_sync_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
     let url = normalize_relay_url(url)?;
-    let now = now_ms()?;
+    let now = now_millis();
 
     // Remove any existing sync relay
     conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])?;
@@ -101,7 +100,7 @@ pub fn remove_sync_relay(conn: &Connection) -> Result<Vec<Relay>, AppError> {
 
 pub fn add_publish_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
     let url = normalize_relay_url(url)?;
-    let now = now_ms()?;
+    let now = now_millis();
 
     conn.execute(
         "INSERT INTO relays (url, kind, created_at) VALUES (?1, 'publish', ?2)",
@@ -130,12 +129,6 @@ fn normalize_relay_url(raw: &str) -> Result<String, AppError> {
     Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
 
-fn now_ms() -> Result<i64, AppError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| AppError::custom(e.to_string()))
-        .map(|d| d.as_millis() as i64)
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -210,10 +203,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
         SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| AppError::custom(e.to_string()))?
-        .as_secs();
+    let now = now_secs() as u64;
 
     let mut event_tags: Vec<Tag> = vec![
         Tag::identifier(&d_tag),
@@ -260,7 +250,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
 
     if success_count > 0 {
         let conn = crate::db::database_connection(app)?;
-        let published_at = now_ms()?;
+        let published_at = now_millis();
         conn.execute(
             "UPDATE notes SET published_at = ?1 WHERE id = ?2",
             params![published_at, note_id],
@@ -385,7 +375,7 @@ pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, AppError> {
     let secret_key = SecretKey::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
     let keys = Keys::new(secret_key);
     let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
-    let now = now_ms()?;
+    let now = now_millis();
 
     conn.execute("DELETE FROM nostr_identity", [])?;
 

@@ -5,7 +5,6 @@ use chacha20poly1305::{
 };
 use nostr_sdk::prelude::*;
 use sha2::{Digest, Sha256};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Upload an encrypted blob to a Blossom server.
 /// Returns the SHA-256 hash of the ciphertext (the Blossom content address).
@@ -124,10 +123,7 @@ fn sign_blossom_auth(
     blob_hash: &str,
     blossom_url: &str,
 ) -> Result<String, AppError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| AppError::custom(e.to_string()))?
-        .as_secs();
+    let now = crate::error::now_secs() as u64;
     let expiration = now + 300;
 
     let domain = url::Url::parse(blossom_url)

@@ -1,12 +1,11 @@
 use crate::db::{database_connection, extract_tags};
-use crate::error::AppError;
+use crate::error::{now_millis, AppError};
 use crate::nostr;
 use rusqlite::{
     params, params_from_iter, types::Value, Connection, OptionalExtension, Transaction,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
 const LAST_OPEN_NOTE_KEY: &str = "last_open_note_id";
@@ -234,7 +233,7 @@ pub fn create_note(
         tag_line
     };
     let title = title_from_markdown(&markdown);
-    let now = current_timestamp_millis();
+    let now = now_millis();
 
     transaction
         .execute(
@@ -272,7 +271,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
     let content_changed = existing_markdown != input.markdown;
 
     let updated = if content_changed {
-        let now = current_timestamp_millis();
+        let now = now_millis();
         transaction
             .execute(
                 "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3, locally_modified = 1 WHERE id = ?4",
@@ -301,7 +300,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
 pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
-    let now = current_timestamp_millis();
+    let now = now_millis();
 
     let updated = conn
         .execute(
@@ -325,7 +324,7 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
 pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
-    let now = current_timestamp_millis();
+    let now = now_millis();
 
     let updated = conn
         .execute(
@@ -371,7 +370,7 @@ pub fn create_notebook(
     let conn = database_connection(app)?;
     let notebook_id = generate_notebook_id();
     let name = normalize_notebook_name(&input.name)?;
-    let now = current_timestamp_millis();
+    let now = now_millis();
 
     conn.execute(
         "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
@@ -394,7 +393,7 @@ pub fn rename_notebook(
     let updated = conn
         .execute(
             "UPDATE notebooks SET name = ?1, updated_at = ?2, locally_modified = 1 WHERE id = ?3",
-            params![name, current_timestamp_millis(), input.notebook_id],
+            params![name, now_millis(), input.notebook_id],
         )
         .map_err(handle_notebook_write_error)?;
 
@@ -445,7 +444,7 @@ pub fn assign_note_notebook(
         }
     }
 
-    let now = current_timestamp_millis();
+    let now = now_millis();
     let updated = conn
         .execute(
             "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
@@ -469,7 +468,7 @@ pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> 
             "UPDATE notes
              SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
-            params![current_timestamp_millis(), note_id],
+            params![now_millis(), note_id],
         )?;
 
     if updated == 0 {
@@ -485,7 +484,7 @@ pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError
     let updated = conn
         .execute(
             "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
-            params![current_timestamp_millis(), note_id],
+            params![now_millis(), note_id],
         )?;
 
     if updated == 0 {
@@ -886,7 +885,7 @@ fn append_note_view_clauses(
         NoteFilterInput::Today => {
             clauses.push("n.archived_at IS NULL".to_string());
             clauses.push("n.edited_at >= ?".to_string());
-            values.push(Value::from(current_timestamp_millis() - 24 * 60 * 60 * 1000));
+            values.push(Value::from(now_millis() - 24 * 60 * 60 * 1000));
         }
         NoteFilterInput::Archive => {
             clauses.push("n.archived_at IS NOT NULL".to_string());
@@ -936,7 +935,7 @@ Comet stores note content locally in its own database, with markdown as the unde
 
     let transaction = conn
         .unchecked_transaction()?;
-    let now = current_timestamp_millis();
+    let now = now_millis();
     let title = title_from_markdown(markdown);
 
     transaction
@@ -1470,19 +1469,12 @@ fn normalize_notebook_name(name: &str) -> Result<String, AppError> {
     Ok(trimmed.to_string())
 }
 
-fn current_timestamp_millis() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_default()
-}
-
 fn generate_note_id() -> String {
-    format!("note-{}", current_timestamp_millis())
+    format!("note-{}", now_millis())
 }
 
 fn generate_notebook_id() -> String {
-    format!("notebook-{}", current_timestamp_millis())
+    format!("notebook-{}", now_millis())
 }
 
 fn handle_notebook_write_error(error: rusqlite::Error) -> AppError {

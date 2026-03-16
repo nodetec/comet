@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use crate::error::{now_millis, AppError};
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
@@ -7,7 +7,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, watch, Mutex};
 use tokio::task::JoinHandle;
@@ -271,7 +271,7 @@ fn upsert_notebook_from_sync(
     notebook: &SyncedNotebook,
     sync_event_id: &str,
 ) -> Result<(), AppError> {
-    let now = now_ms();
+    let now = now_millis();
     conn.execute(
         "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
          VALUES (?1, ?2, ?3, ?3, ?4, 0) \
@@ -491,7 +491,7 @@ fn upsert_from_sync(
 
     // Ensure referenced notebook exists (it may arrive after the note in the sync stream)
     if let Some(ref nb_id) = note.notebook_id {
-        let now = now_ms();
+        let now = now_millis();
         conn.execute(
             "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, ?2, 0)",
             params![nb_id, now],
@@ -557,16 +557,6 @@ fn upsert_from_sync(
     Ok(Some(note.id.clone()))
 }
 
-pub(crate) fn now_ms_pub() -> i64 {
-    now_ms()
-}
-
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64
-}
 
 // ── Sync loop ──────────────────────────────────────────────────────────
 
@@ -1024,7 +1014,7 @@ async fn process_relay_message(
                 .optional()?;
 
             if let Some(note_id) = note_id {
-                let now = now_ms();
+                let now = now_millis();
                 conn.execute(
                     "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
                     params![now, note_id],

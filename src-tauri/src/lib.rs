@@ -159,7 +159,7 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppErr
         let conn = database_connection(&app)?;
         let _ = conn.execute(
             "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![note_id, sync::now_ms_pub()],
+            rusqlite::params![note_id, error::now_millis()],
         );
         sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
     }
@@ -198,7 +198,7 @@ fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), AppError> 
         let conn = database_connection(&app)?;
         let _ = conn.execute(
             "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![notebook_id, sync::now_ms_pub()],
+            rusqlite::params![notebook_id, error::now_millis()],
         );
         sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
     }
