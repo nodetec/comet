@@ -617,6 +617,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             match event {
+                #[cfg(target_os = "macos")]
                 RunEvent::WindowEvent {
                     event: WindowEvent::CloseRequested { api, .. },
                     ..
@@ -626,16 +627,15 @@ pub fn run() {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.hide();
                     }
-                    #[cfg(target_os = "macos")]
                     let _ = app.hide();
                 }
+                #[cfg(target_os = "macos")]
                 RunEvent::Reopen { .. } => {
                     // Re-show when the dock icon is clicked
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();
                     }
-                    #[cfg(target_os = "macos")]
                     let _ = app.show();
                 }
                 _ => {}
