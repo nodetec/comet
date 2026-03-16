@@ -521,8 +521,8 @@ fn is_sync_enabled(app: AppHandle) -> Result<bool, String> {
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    // Default to true if not set
-    Ok(val.as_deref() != Some("false"))
+    // Default to false if not set
+    Ok(val.as_deref() == Some("true"))
 }
 
 #[tauri::command]

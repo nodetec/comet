@@ -137,7 +137,7 @@ pub async fn auto_start(app: &AppHandle) {
             .ok()
             .flatten()
             .as_deref()
-            != Some("false");
+            == Some("true");
         has_relay && enabled
     };
 
