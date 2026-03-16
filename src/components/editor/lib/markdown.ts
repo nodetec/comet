@@ -202,7 +202,10 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
 
   // Fast path: no empty paragraphs, use standard export
   if (!segments.includes("empty")) {
-    return $convertToMarkdownString(transformers, undefined, false);
+    return $convertToMarkdownString(transformers, undefined, false).replace(
+      /\u200B/g,
+      "",
+    );
   }
 
   // Standard export (loses empties, but gives correct markdown for content blocks)
@@ -301,7 +304,8 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
     result += "\n";
   }
 
-  return result;
+  // Strip zero-width spaces injected by normalizeEmptyHeadings during import
+  return result.replace(/\u200B/g, "");
 }
 
 /**

@@ -542,6 +542,35 @@ export function useShellController() {
       return;
     }
 
+    // Log the diff to diagnose phantom updates
+    console.log("[save-debounce] markdown changed without user edit");
+    console.log(
+      "[save-debounce] stored length:",
+      currentNote.markdown.length,
+      "draft length:",
+      draftMarkdown.length,
+    );
+    // Find first difference
+    for (
+      let i = 0;
+      i < Math.max(currentNote.markdown.length, draftMarkdown.length);
+      i++
+    ) {
+      if (currentNote.markdown[i] !== draftMarkdown[i]) {
+        const ctx = 20;
+        console.log(
+          `[save-debounce] first diff at char ${i}:`,
+          JSON.stringify(
+            currentNote.markdown.slice(Math.max(0, i - ctx), i + ctx),
+          ),
+          "→",
+          JSON.stringify(draftMarkdown.slice(Math.max(0, i - ctx), i + ctx)),
+        );
+        break;
+      }
+    }
+    console.trace("[save-debounce] triggered from");
+
     // Persist draft for crash recovery (survives app quit during debounce)
     try {
       localStorage.setItem(

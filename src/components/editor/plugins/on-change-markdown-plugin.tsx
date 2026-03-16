@@ -22,6 +22,15 @@ export default function OnChangeMarkdownPlugin({
       ({ editorState, dirtyElements, dirtyLeaves }) => {
         if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
+        const dirtyKeys = [
+          ...Array.from(dirtyElements.keys()),
+          ...Array.from(dirtyLeaves.keys()),
+        ];
+        console.log(
+          `[onChange] dirty: ${dirtyElements.size} elements, ${dirtyLeaves.size} leaves`,
+          dirtyKeys.slice(0, 5),
+        );
+
         editorState.read(() => {
           const markdown = $exportMarkdown(TRANSFORMERS);
           onChangeRef.current(markdown);
