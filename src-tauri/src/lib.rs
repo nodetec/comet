@@ -142,27 +142,15 @@ fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError>
 
 #[tauri::command]
 fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppError> {
-    // Pre-fetch sync_event_id before the row is deleted
-    let sync_event_id: Option<String> = {
-        let conn = database_connection(&app)?;
-        conn.query_row(
-            "SELECT sync_event_id FROM notes WHERE id = ?1",
-            rusqlite::params![note_id],
-            |row| row.get(0),
-        )
-        .ok()
-        .flatten()
-    };
     notes::delete_note_permanently(&app, &note_id)?;
-    if sync_event_id.is_some() {
-        // Store pending deletion so it survives offline/restart
-        let conn = database_connection(&app)?;
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![note_id, error::now_millis()],
-        );
-        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
-    }
+    // Always queue deletion — covers the race where sync pushes the note
+    // between creation and deletion, and is a harmless no-op if never synced.
+    let conn = database_connection(&app)?;
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+        rusqlite::params![note_id, error::now_millis()],
+    );
+    sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
     Ok(())
 }
 
@@ -182,26 +170,13 @@ fn rename_notebook(app: AppHandle, input: RenameNotebookInput) -> Result<Noteboo
 
 #[tauri::command]
 fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), AppError> {
-    // Pre-fetch sync_event_id before the row is deleted
-    let sync_event_id: Option<String> = {
-        let conn = database_connection(&app)?;
-        conn.query_row(
-            "SELECT sync_event_id FROM notebooks WHERE id = ?1",
-            rusqlite::params![notebook_id],
-            |row| row.get(0),
-        )
-        .ok()
-        .flatten()
-    };
     notes::delete_notebook(&app, &notebook_id)?;
-    if sync_event_id.is_some() {
-        let conn = database_connection(&app)?;
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![notebook_id, error::now_millis()],
-        );
-        sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
-    }
+    let conn = database_connection(&app)?;
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+        rusqlite::params![notebook_id, error::now_millis()],
+    );
+    sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
     Ok(())
 }
 

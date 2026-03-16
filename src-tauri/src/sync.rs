@@ -575,6 +575,7 @@ async fn run_sync_loop(
     let max_backoff = Duration::from_secs(30);
 
     loop {
+        let started = tokio::time::Instant::now();
         match run_sync_connection(&app, &state, &mut shutdown_rx, &mut push_rx).await {
             Ok(()) => break, // clean shutdown
             Err(e) => {
@@ -585,6 +586,11 @@ async fn run_sync_loop(
                     &app,
                 )
                 .await;
+
+                // Reset backoff if we were connected for a meaningful duration
+                if started.elapsed() > Duration::from_secs(60) {
+                    backoff = Duration::from_secs(1);
+                }
 
                 // Backoff before reconnect
                 tokio::select! {
@@ -788,7 +794,9 @@ async fn run_sync_connection(
                     }
                     Some(SyncCommand::PushDeletion(id)) => {
                         sync_log(app, &format!("pushing deletion {id}"));
-                        push_deletion(app, &keys, &mut ws_write, &id, &mut recent_pushes).await?;
+                        if let Err(e) = push_deletion(app, &keys, &mut ws_write, &id, &mut recent_pushes).await {
+                            sync_log(app, &format!("push deletion error: {id}: {e}"));
+                        }
                     }
                     None => break, // channel closed
                 }
@@ -1172,6 +1180,22 @@ async fn push_note(
     if let Some(ref blossom_url) = blossom_url {
         let http_client = reqwest::Client::new();
         for hash in &attachment_hashes {
+            // Check if we already have blob metadata (already uploaded)
+            let existing: Option<(String, String)> = {
+                let conn = crate::db::database_connection(app)?;
+                conn.query_row(
+                    "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1",
+                    params![hash],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?
+            };
+
+            if let Some((ct_hash, key_hex)) = existing {
+                blob_tags.push((hash.clone(), ct_hash, key_hex));
+                continue;
+            }
+
             // Read the local blob
             let blob_data = match crate::attachments::read_blob(app, hash)? {
                 Some((data, _ext)) => data,
@@ -1398,6 +1422,7 @@ async fn download_missing_blobs(
         })
         .collect();
 
+    let http_client = reqwest::Client::new();
     for (plaintext_hash, ciphertext_hash, key_hex) in &blob_tags {
         // Save blob metadata for on-demand download
         if let Ok(conn) = crate::db::database_connection(app) {
@@ -1418,7 +1443,6 @@ async fn download_missing_blobs(
         }
 
         // Download from Blossom
-        let http_client = reqwest::Client::new();
         let ciphertext_bytes = match crate::blossom::download_blob(&http_client, blossom_url, ciphertext_hash, keys).await {
             Ok(data) => data,
             Err(e) => {
