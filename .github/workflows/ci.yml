@@ -115,11 +115,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download DMG artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: "{dmg-*,linux-*}"
+          pattern: dmg-*
+          merge-multiple: true
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: linux-*
           merge-multiple: true
 
       - name: Generate short SHA
