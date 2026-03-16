@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  ChevronRight,
   Cloud,
   CloudAlert,
   CloudCheck,
@@ -12,6 +13,7 @@ import {
   Image,
   Key,
   Notebook,
+  ScrollText,
 } from "lucide-react";
 
 import {
@@ -22,6 +24,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 type SyncInfo = {
   state: string | { error: { message: string } };
@@ -103,6 +106,8 @@ function InfoRow({
   );
 }
 
+const MAX_LOGS = 100;
+
 export function SyncDialog({
   open,
   onOpenChange,
@@ -111,6 +116,9 @@ export function SyncDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [info, setInfo] = useState<SyncInfo | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -128,6 +136,26 @@ export function SyncDialog({
     };
   }, [open]);
 
+  // Collect sync log events
+  useEffect(() => {
+    const unlisten = listen<string>("sync-log", (event) => {
+      setLogs((prev) => {
+        const next = [...prev, event.payload];
+        return next.length > MAX_LOGS ? next.slice(-MAX_LOGS) : next;
+      });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // Auto-scroll logs when new entries arrive
+  useEffect(() => {
+    if (logsOpen) {
+      logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs, logsOpen]);
+
   const { label, icon } = info
     ? stateLabel(info.state)
     : { label: "Loading", icon: <Cloud className="size-4" /> };
@@ -136,7 +164,7 @@ export function SyncDialog({
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogBackdrop />
-        <DialogPopup className="w-80 p-4">
+        <DialogPopup className="w-96 p-4">
           <DialogTitle className="mb-3 flex items-center gap-2 text-sm font-medium">
             {icon}
             Sync — {label}
@@ -213,6 +241,44 @@ export function SyncDialog({
           ) : (
             <p className="text-muted-foreground text-xs">Loading…</p>
           )}
+
+          {/* Collapsible sync log */}
+          <div className="mt-3 border-t border-accent/30 pt-2">
+            <button
+              className="text-muted-foreground flex w-full items-center gap-1.5 text-xs hover:text-foreground"
+              onClick={() => setLogsOpen((o) => !o)}
+              type="button"
+            >
+              <ChevronRight
+                className={cn(
+                  "size-3 transition-transform",
+                  logsOpen && "rotate-90",
+                )}
+              />
+              <ScrollText className="size-3" />
+              Sync log ({logs.length})
+            </button>
+
+            {logsOpen && (
+              <div className="bg-muted/50 mt-2 max-h-48 overflow-y-auto rounded-md p-2 font-mono text-[10px] leading-relaxed">
+                {logs.length === 0 ? (
+                  <span className="text-muted-foreground">
+                    No log entries yet…
+                  </span>
+                ) : (
+                  logs.map((line, i) => (
+                    <div
+                      key={i}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      {line}
+                    </div>
+                  ))
+                )}
+                <div ref={logEndRef} />
+              </div>
+            )}
+          </div>
 
           <div className="mt-3 flex justify-end">
             <DialogClose className="text-muted-foreground hover:text-foreground text-xs">

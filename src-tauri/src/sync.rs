@@ -45,6 +45,12 @@ pub struct SyncChangePayload {
     pub action: String, // "upsert" or "delete"
 }
 
+/// Emit a sync log line to both stderr and the frontend.
+fn sync_log(app: &AppHandle, msg: &str) {
+    eprintln!("[sync] {msg}");
+    let _ = app.emit("sync-log", msg.to_string());
+}
+
 /// Note fields extracted from a synced event rumor.
 pub struct SyncedNote {
     pub id: String,
@@ -581,7 +587,7 @@ async fn run_sync_loop(
         match run_sync_connection(&app, &state, &mut shutdown_rx, &mut push_rx).await {
             Ok(()) => break, // clean shutdown
             Err(e) => {
-                eprintln!("[sync] connection error: {e}");
+                sync_log(&app, &format!("connection error: {e}"));
                 set_state(
                     &state,
                     SyncState::Error { message: e.clone() },
@@ -624,7 +630,7 @@ async fn run_sync_connection(
     let pubkey = keys.public_key();
 
     // Connect WebSocket
-    eprintln!("[sync] connecting to {relay_url}");
+    sync_log(app, &format!("connecting to {relay_url}"));
     set_state(state, SyncState::Connecting, app).await;
 
     let (ws_stream, _) = connect_async(&relay_url)
@@ -682,7 +688,7 @@ async fn run_sync_connection(
     if !ok {
         return Err("AUTH rejected by relay".to_string());
     }
-    eprintln!("[sync] authenticated");
+    sync_log(app, "authenticated");
 
     // Read checkpoint and subscribe to CHANGES
     set_state(state, SyncState::Syncing, app).await;
@@ -705,7 +711,7 @@ async fn run_sync_connection(
         .send(Message::from(changes_msg.to_string()))
         .await
         .map_err(|e| format!("Failed to send CHANGES: {e}"))?;
-    eprintln!("[sync] subscribed to CHANGES since={checkpoint}");
+    sync_log(app, &format!("subscribed since={checkpoint}"));
 
     // Track recently pushed event IDs to avoid echo
     let mut recent_pushes: HashMap<String, std::time::Instant> = HashMap::new();
@@ -735,9 +741,9 @@ async fn run_sync_connection(
             .collect();
         for note_id in &ready {
             pending_pushes.remove(note_id);
-            eprintln!("[sync] pushing {note_id}");
+            sync_log(app, &format!("pushing {note_id}"));
             if let Err(e) = push_note(app, &keys, &mut ws_write, note_id, &mut recent_pushes).await {
-                eprintln!("[sync] push error for {note_id}: {e}");
+                sync_log(app, &format!("push error: {note_id}: {e}"));
             }
         }
 
@@ -777,20 +783,20 @@ async fn run_sync_connection(
             cmd = push_rx.recv() => {
                 match cmd {
                     Some(SyncCommand::PushNote(note_id)) => {
-                        eprintln!("[sync] queued push for {note_id} (debounce {debounce_duration:?})");
+                        sync_log(app, &format!("queued push {note_id}"));
                         pending_pushes.insert(
                             note_id,
                             tokio::time::Instant::now() + debounce_duration,
                         );
                     }
                     Some(SyncCommand::PushNotebook(notebook_id)) => {
-                        eprintln!("[sync] pushing notebook {notebook_id}");
+                        sync_log(app, &format!("pushing notebook {notebook_id}"));
                         if let Err(e) = push_notebook(app, &keys, &mut ws_write, &notebook_id, &mut recent_pushes).await {
-                            eprintln!("[sync] push notebook error for {notebook_id}: {e}");
+                            sync_log(app, &format!("push notebook error: {notebook_id}: {e}"));
                         }
                     }
                     Some(SyncCommand::PushDeletion(id)) => {
-                        eprintln!("[sync] pushing deletion for {id}");
+                        sync_log(app, &format!("pushing deletion {id}"));
                         push_deletion(app, &keys, &mut ws_write, &id, &mut recent_pushes).await?;
                     }
                     None => break, // channel closed
@@ -875,18 +881,18 @@ async fn process_relay_message(
 
             // Skip echo (events we just pushed)
             if recent_pushes.contains_key(&event_id) {
-                eprintln!("[sync] echo skip seq={seq} event={}", &event_id[..8]);
+                sync_log(app, &format!("echo skip seq={seq}"));
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                 save_checkpoint(&conn, seq);
                 return Ok(());
             }
-            eprintln!("[sync] received EVENT seq={seq} event={}", &event_id[..8]);
+            sync_log(app, &format!("received event seq={seq}"));
 
             // Unwrap gift wrap (skip events we can't decrypt, e.g. from a previous key)
             let unwrapped = match nip59::extract_rumor(keys, &event).await {
                 Ok(u) => u,
                 Err(e) => {
-                    eprintln!("[sync] skipping undecryptable event {}: {e}", &event_id[..8]);
+                    sync_log(app, &format!("skip undecryptable event: {e}"));
                     let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                     save_checkpoint(&conn, seq);
                     return Ok(());
@@ -901,7 +907,7 @@ async fn process_relay_message(
                     .and_then(|t| t.content())
                     .unwrap_or_default()
                     .to_string();
-                eprintln!("[sync] received deletion tombstone for {d_tag}");
+                sync_log(app, &format!("received delete for {d_tag}"));
 
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
@@ -933,17 +939,17 @@ async fn process_relay_message(
                 let notebook = match rumor_to_synced_notebook(&unwrapped.rumor) {
                     Ok(n) => n,
                     Err(e) => {
-                        eprintln!("[sync] skipping malformed notebook rumor {}: {e}", &event_id[..8]);
+                        sync_log(app, &format!("skip malformed notebook: {e}"));
                         let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                         save_checkpoint(&conn, seq);
                         return Ok(());
                     }
                 };
-                eprintln!("[sync] unwrapped notebook={} name={}", notebook.id, notebook.name);
+                sync_log(app, &format!("received notebook {} ({})", notebook.id, notebook.name));
 
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                 if let Err(e) = upsert_notebook_from_sync(&conn, &notebook, &event_id) {
-                    eprintln!("[sync] notebook upsert failed for {}: {e}", notebook.id);
+                    sync_log(app, &format!("notebook upsert failed {}: {e}", notebook.id));
                 }
                 save_checkpoint(&conn, seq);
 
@@ -958,18 +964,20 @@ async fn process_relay_message(
                 let synced_note = match rumor_to_synced_note(&unwrapped.rumor) {
                     Ok(n) => n,
                     Err(e) => {
-                        eprintln!("[sync] skipping malformed rumor {}: {e}", &event_id[..8]);
+                        sync_log(app, &format!("skip malformed note: {e}"));
                         let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                         save_checkpoint(&conn, seq);
                         return Ok(());
                     }
                 };
                 let note_id = synced_note.id.clone();
-                eprintln!("[sync] unwrapped note={note_id} modified_at={} notebook={:?}", synced_note.modified_at, synced_note.notebook_id);
+                sync_log(app, &format!("received note {note_id}"));
 
                 let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
                 let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
-                eprintln!("[sync] upsert note={note_id} updated={}", updated.is_some());
+                if updated.is_some() {
+                    sync_log(app, &format!("updated note {note_id}"));
+                }
                 save_checkpoint(&conn, seq);
 
                 if updated.is_some() {
@@ -1004,7 +1012,7 @@ async fn process_relay_message(
                 return Ok(());
             }
 
-            eprintln!("[sync] received DELETED seq={seq} event={}", &deleted_event_id[..8.min(deleted_event_id.len())]);
+            sync_log(app, &format!("received deleted seq={seq}"));
 
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
 
@@ -1052,7 +1060,7 @@ async fn process_relay_message(
                     params![notebook_id],
                 )
                 .map_err(|e| e.to_string())?;
-                eprintln!("[sync] deleted notebook={notebook_id}");
+                sync_log(app, &format!("deleted notebook {notebook_id}"));
 
                 let _ = app.emit(
                     "sync-remote-change",
@@ -1068,7 +1076,7 @@ async fn process_relay_message(
         }
         "EOSE" => {
             let max_seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
-            eprintln!("[sync] EOSE max_seq={max_seq}");
+            sync_log(app, &format!("synced to seq={max_seq}"));
             let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
             save_checkpoint(&conn, max_seq);
 
@@ -1097,8 +1105,8 @@ async fn process_relay_message(
             }; // conn and stmts dropped here
 
             if !unsynced_notebooks.is_empty() || !unsynced_notes.is_empty() {
-                eprintln!("[sync] pushing {} unsynced notebooks, {} unsynced notes",
-                    unsynced_notebooks.len(), unsynced_notes.len());
+                sync_log(app, &format!("pushing {} unsynced notebooks, {} unsynced notes",
+                    unsynced_notebooks.len(), unsynced_notes.len()));
             }
 
             // Process pending deletions (queued while offline)
@@ -1115,7 +1123,7 @@ async fn process_relay_message(
             };
 
             if !pending_deletions.is_empty() {
-                eprintln!("[sync] pushing {} pending deletions", pending_deletions.len());
+                sync_log(app, &format!("pushing {} pending deletions", pending_deletions.len()));
             }
 
             let manager = app.state::<SyncManager>();
@@ -1271,7 +1279,7 @@ async fn push_note(
     )
     .map_err(|e| e.to_string())?;
 
-    eprintln!("[sync] pushed note={note_id} event={}", &event_id[..8]);
+    sync_log(app, &format!("pushed note {note_id}"));
 
     Ok(())
 }
@@ -1332,7 +1340,7 @@ async fn push_deletion(
         );
     }
 
-    eprintln!("[sync] pushed deletion tombstone for {entity_id} event={}", &event_id[..8]);
+    sync_log(app, &format!("pushed delete {entity_id}"));
 
     Ok(())
 }
@@ -1394,7 +1402,7 @@ async fn push_notebook(
     )
     .map_err(|e| e.to_string())?;
 
-    eprintln!("[sync] pushed notebook={notebook_id} event={}", &event_id[..8]);
+    sync_log(app, &format!("pushed notebook {notebook_id}"));
 
     Ok(())
 }
@@ -1455,7 +1463,7 @@ async fn download_missing_blobs(
         let plaintext = match crate::blossom::decrypt_blob(&ciphertext_bytes, key_hex) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("[sync] failed to decrypt blob: {e}");
+                sync_log(app, &format!("failed to decrypt blob: {e}"));
                 continue;
             }
         };
