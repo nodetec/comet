@@ -6,7 +6,6 @@ import {
   COMMAND_PRIORITY_CRITICAL,
   $getSelection,
   $isRangeSelection,
-  $parseSerializedNode,
   $getRoot,
   createEditor,
   ParagraphNode,
@@ -14,7 +13,7 @@ import {
 } from "lexical";
 import {
   $generateJSONFromSelectedNodes,
-  $getLexicalContent,
+  $generateNodesFromSerializedNodes,
 } from "@lexical/clipboard";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ListNode, ListItemNode } from "@lexical/list";
@@ -28,50 +27,49 @@ import { YouTubeNode } from "../nodes/youtube-node";
 import { TRANSFORMERS } from "../transformers";
 import { $exportMarkdownForClipboard } from "../lib/markdown";
 
-function createHeadlessEditor() {
-  return createEditor({
-    namespace: "MarkdownCopy",
-    nodes: [
-      HeadingNode,
-      QuoteNode,
-      ListNode,
-      ListItemNode,
-      CodeNode,
-      CodeHighlightNode,
-      HorizontalRuleNode,
-      TableNode,
-      TableRowNode,
-      TableCellNode,
-      LinkNode,
-      HashtagNode,
-      ImageNode,
-      YouTubeNode,
-      ParagraphNode,
-      TextNode,
-    ],
-    onError: (error) => console.error("Markdown copy error:", error),
-  });
-}
+const HEADLESS_NODES = [
+  HeadingNode,
+  QuoteNode,
+  ListNode,
+  ListItemNode,
+  CodeNode,
+  CodeHighlightNode,
+  HorizontalRuleNode,
+  TableNode,
+  TableRowNode,
+  TableCellNode,
+  LinkNode,
+  HashtagNode,
+  ImageNode,
+  YouTubeNode,
+  ParagraphNode,
+  TextNode,
+];
 
-function $getMarkdownContent(
+function $selectionToMarkdown(
   editor: ReturnType<typeof useLexicalComposerContext>[0],
 ): string {
   const selection = $getSelection();
-  if (!selection || ($isRangeSelection(selection) && selection.isCollapsed())) {
-    return "";
-  }
+  if (!selection) return "";
+  if ($isRangeSelection(selection) && selection.isCollapsed()) return "";
 
   const { nodes } = $generateJSONFromSelectedNodes(editor, selection);
   if (nodes.length === 0) return "";
 
-  const headless = createHeadlessEditor();
+  const headless = createEditor({
+    namespace: "MarkdownCopy",
+    nodes: HEADLESS_NODES,
+    onError: () => {},
+  });
+
   headless.update(
     () => {
       const root = $getRoot();
       root.clear();
-      for (const json of nodes) {
-        root.append($parseSerializedNode(json));
-      }
+      // $generateNodesFromSerializedNodes properly trims nodes
+      // to the selection boundaries (unlike $parseSerializedNode)
+      const generated = $generateNodesFromSerializedNodes(nodes);
+      root.append(...generated);
     },
     { discrete: true },
   );
@@ -92,21 +90,22 @@ export default function MarkdownCopyPlugin() {
       if (!clipboardData) return false;
 
       const selection = $getSelection();
-      if (
-        !selection ||
-        ($isRangeSelection(selection) && selection.isCollapsed())
-      ) {
-        return false;
-      }
+      if (!selection) return false;
+      if ($isRangeSelection(selection) && selection.isCollapsed()) return false;
 
       event.preventDefault();
 
-      const markdown = $getMarkdownContent(editor);
-      const lexicalJson = $getLexicalContent(editor, selection);
+      const markdown = $selectionToMarkdown(editor);
+      clipboardData.setData("text/plain", markdown || selection.getTextContent());
 
-      clipboardData.setData("text/plain", markdown);
-      if (lexicalJson)
-        clipboardData.setData("application/x-lexical-editor", lexicalJson);
+      // Preserve Lexical JSON for paste within the editor
+      const { nodes } = $generateJSONFromSelectedNodes(editor, selection);
+      if (nodes.length > 0) {
+        clipboardData.setData(
+          "application/x-lexical-editor",
+          JSON.stringify({ nodes }),
+        );
+      }
 
       return true;
     };
@@ -126,7 +125,6 @@ export default function MarkdownCopyPlugin() {
         if (!(event instanceof ClipboardEvent)) return false;
         const handled = handleCopy(event);
         if (handled) {
-          // Remove selected content after copying
           editor.update(() => {
             const selection = $getSelection();
             if ($isRangeSelection(selection)) {
