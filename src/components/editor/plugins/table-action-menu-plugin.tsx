@@ -289,11 +289,34 @@ function TableCellActionMenuContainer({
 
   // Track hovered cell and position the menu
   useEffect(() => {
+    const activeCellRef: { current: HTMLElement | null } = { current: null };
+
     const moveMenu = (cellDOM: HTMLElement) => {
       const menu = menuButtonRef.current;
       if (!menu) return;
 
+      activeCellRef.current = cellDOM;
+
+      const scrollContainer = cellDOM.closest(
+        "[data-editor-scroll-container]",
+      );
+      const containerRect = scrollContainer
+        ? scrollContainer.getBoundingClientRect()
+        : anchorElem.getBoundingClientRect();
+
       const cellRect = cellDOM.getBoundingClientRect();
+
+      // Hide if cell is scrolled out of the visible area
+      if (
+        scrollContainer &&
+        (cellRect.bottom < containerRect.top ||
+          cellRect.top > containerRect.bottom)
+      ) {
+        menu.style.opacity = "0";
+        menu.style.pointerEvents = "none";
+        return;
+      }
+
       const anchorRect = anchorElem.getBoundingClientRect();
       const top = cellRect.top - anchorRect.top + 6;
       const right = anchorRect.right - cellRect.right + 1;
@@ -309,6 +332,7 @@ function TableCellActionMenuContainer({
         menu.style.opacity = "0";
         menu.style.pointerEvents = "none";
       }
+      activeCellRef.current = null;
       setTableMenuCellNode(null);
     };
 
@@ -342,15 +366,38 @@ function TableCellActionMenuContainer({
       });
     };
 
+    const onScroll = () => {
+      if (activeCellRef.current) {
+        moveMenu(activeCellRef.current);
+      }
+    };
+
+    let scrollContainer: Element | null = null;
+
     const removeRootListener = editor.registerRootListener(
       (rootElement, prevRootElement) => {
         prevRootElement?.removeEventListener("pointermove", onPointerMove);
         rootElement?.addEventListener("pointermove", onPointerMove);
+
+        // Listen for scroll on the editor's scroll container
+        if (scrollContainer) {
+          scrollContainer.removeEventListener("scroll", onScroll);
+        }
+        scrollContainer =
+          rootElement?.closest("[data-editor-scroll-container]") ?? null;
+        if (scrollContainer) {
+          scrollContainer.addEventListener("scroll", onScroll, {
+            passive: true,
+          });
+        }
       },
     );
 
     return () => {
       removeRootListener();
+      if (scrollContainer) {
+        scrollContainer.removeEventListener("scroll", onScroll);
+      }
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [editor, anchorElem]);
