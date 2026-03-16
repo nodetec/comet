@@ -222,7 +222,7 @@ export function NotesPane({
             },
             {
               id: `delete-forever-${note.id}`,
-              text: "Delete Permanently",
+              text: "Delete",
               action: () => onDeleteNotePermanently(note.id),
             },
           ]
@@ -243,6 +243,11 @@ export function NotesPane({
               id: `archive-${note.id}`,
               text: "Archive",
               action: () => onArchiveNote(note.id),
+            },
+            {
+              id: `delete-${note.id}`,
+              text: "Delete",
+              action: () => onDeleteNotePermanently(note.id),
             },
           ],
     });

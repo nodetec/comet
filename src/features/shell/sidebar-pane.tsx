@@ -167,7 +167,7 @@ export function SidebarPane({
         },
         {
           id: `delete-notebook-${notebookId}`,
-          text: "Delete Notebook",
+          text: "Delete",
           action: () => {
             onDeleteNotebook(notebookId);
           },
