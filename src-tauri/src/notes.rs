@@ -1253,7 +1253,7 @@ fn replace_note_tags(
     markdown: &str,
 ) -> Result<(), AppError> {
     let next_tags = extract_tags(markdown);
-    let current_tags = tags_for_note_in_transaction(transaction, note_id)?;
+    let current_tags = tags_for_note(transaction, note_id)?;
 
     if current_tags == next_tags {
         return Ok(());
@@ -1352,23 +1352,6 @@ fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, AppErr
     Ok(tags)
 }
 
-fn tags_for_note_in_transaction(
-    transaction: &Transaction<'_>,
-    note_id: &str,
-) -> Result<Vec<String>, AppError> {
-    let mut statement = transaction
-        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
-
-    let rows = statement
-        .query_map(params![note_id], |row| row.get::<_, String>(0))?;
-
-    let mut tags = Vec::new();
-    for row in rows {
-        tags.push(row?);
-    }
-
-    Ok(tags)
-}
 
 fn normalized_active_tags(tags: &[String]) -> Vec<String> {
     let mut unique_tags = BTreeSet::new();
