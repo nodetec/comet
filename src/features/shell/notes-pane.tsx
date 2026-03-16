@@ -466,7 +466,7 @@ export function NotesPane({
                     >
                       <div className="flex w-full flex-1 flex-col gap-1.5">
                         {note.title ? (
-                          <h3 className="text-secondary-foreground min-w-0 truncate font-semibold">
+                          <h3 className="min-w-0 truncate font-semibold text-[var(--heading-color)]">
                             <HighlightedText
                               text={note.title}
                               searchWords={searchWords}

@@ -59,12 +59,12 @@ const theme: EditorThemeClasses = {
   quote:
     "border-l-4 mb-6 border-primary/30 pl-4 italic text-muted-foreground last:mb-0",
   heading: {
-    h1: "text-3xl font-bold tracking-wide mb-2",
-    h2: "text-2xl font-bold tracking-wide mb-2 mt-3",
-    h3: "text-xl font-bold tracking-wide mb-2 mt-3",
-    h4: "text-lg font-bold tracking-wide mb-2 mt-3",
-    h5: "text-base font-bold tracking-wide mb-2 mt-3",
-    h6: "text-sm font-bold tracking-wide mb-2 mt-3",
+    h1: "text-3xl font-bold tracking-wide mb-2 text-[var(--heading-color)]",
+    h2: "text-2xl font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
+    h3: "text-xl font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
+    h4: "text-lg font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
+    h5: "text-base font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
+    h6: "text-sm font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
   },
   list: {
     nested: {
