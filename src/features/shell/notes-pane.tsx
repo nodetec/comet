@@ -155,6 +155,17 @@ export function NotesPane({
   }, [creatingNoteId]);
 
   const viewKey = `${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`;
+  const prevViewKeyRef = useRef(viewKey);
+  const skipAnimationUntilRef = useRef(0);
+
+  // When the view changes, suppress animations until the data settles.
+  // We use a timestamp so that any renders within the window get duration: 0.
+  if (prevViewKeyRef.current !== viewKey) {
+    prevViewKeyRef.current = viewKey;
+    skipAnimationUntilRef.current = Date.now() + 500;
+  }
+
+  const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -445,7 +456,10 @@ export function NotesPane({
                     <motion.div
                       layout="position"
                       transition={{
-                        layout: { duration: 0.2, ease: "easeInOut" },
+                        layout: {
+                          duration: shouldSkipAnimation ? 0 : 0.2,
+                          ease: "easeInOut",
+                        },
                       }}
                       className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
                       key={note.id}
