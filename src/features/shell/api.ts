@@ -64,6 +64,14 @@ export async function restoreNote(noteId: string) {
   return invoke<LoadedNote>("restore_note", { noteId });
 }
 
+export async function trashNote(noteId: string) {
+  return invoke<LoadedNote>("trash_note", { noteId });
+}
+
+export async function restoreFromTrash(noteId: string) {
+  return invoke<LoadedNote>("restore_from_trash", { noteId });
+}
+
 export async function deleteNotePermanently(noteId: string) {
   return invoke("delete_note_permanently", { noteId });
 }

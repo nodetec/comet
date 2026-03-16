@@ -141,6 +141,20 @@ fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError>
 }
 
 #[tauri::command]
+fn trash_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
+    let note = notes::trash_note(&app, &note_id)?;
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
+    Ok(note)
+}
+
+#[tauri::command]
+fn restore_from_trash(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
+    let note = notes::restore_from_trash(&app, &note_id)?;
+    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
+    Ok(note)
+}
+
+#[tauri::command]
 fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppError> {
     notes::delete_note_permanently(&app, &note_id)?;
     // Always queue deletion — covers the race where sync pushes the note
@@ -567,6 +581,8 @@ pub fn run() {
             save_note,
             archive_note,
             restore_note,
+            trash_note,
+            restore_from_trash,
             delete_note_permanently,
             create_notebook,
             rename_notebook,

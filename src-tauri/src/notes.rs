@@ -42,6 +42,7 @@ pub struct NoteSummary {
     pub preview: String,
     pub search_snippet: Option<String>,
     pub archived_at: Option<i64>,
+    pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
 }
 
@@ -54,6 +55,7 @@ pub struct LoadedNote {
     pub modified_at: i64,
     pub markdown: String,
     pub archived_at: Option<i64>,
+    pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
     pub tags: Vec<String>,
     pub nostr_d_tag: Option<String>,
@@ -82,6 +84,8 @@ pub struct BootstrapPayload {
     pub selected_note_id: Option<String>,
     pub initial_notes: NotePagePayload,
     pub initial_tags: ContextualTagsPayload,
+    pub archived_count: i64,
+    pub trashed_count: i64,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -90,6 +94,7 @@ pub enum NoteFilterInput {
     All,
     Today,
     Archive,
+    Trash,
     Notebook,
 }
 
@@ -186,12 +191,23 @@ pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, AppError> {
         },
     )?;
 
+    let (archived_count, trashed_count): (i64, i64) = conn.query_row(
+        "SELECT \
+           SUM(CASE WHEN archived_at IS NOT NULL AND deleted_at IS NULL THEN 1 ELSE 0 END), \
+           SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END) \
+         FROM notes",
+        [],
+        |row| Ok((row.get::<_, Option<i64>>(0)?.unwrap_or(0), row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+    )?;
+
     Ok(BootstrapPayload {
         npub,
         notebooks,
         selected_note_id,
         initial_notes,
         initial_tags,
+        archived_count,
+        trashed_count,
     })
 }
 
@@ -333,6 +349,48 @@ pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
              WHERE id = ?2 AND archived_at IS NOT NULL",
             params![now, note_id],
         )?;
+
+    if updated == 0 {
+        return Err(AppError::custom("Note not found."));
+    }
+
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+}
+
+pub fn trash_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
+    validate_note_id(note_id)?;
+    let conn = database_connection(app)?;
+    let now = now_millis();
+
+    let updated = conn.execute(
+        "UPDATE notes
+         SET deleted_at = ?1, pinned_at = NULL, modified_at = ?1, locally_modified = 1
+         WHERE id = ?2 AND deleted_at IS NULL",
+        params![now, note_id],
+    )?;
+
+    if updated == 0 {
+        return Err(AppError::custom("Note not found."));
+    }
+
+    if last_open_note_id(&conn)?.as_deref() == Some(note_id) {
+        set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
+    }
+
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+}
+
+pub fn restore_from_trash(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
+    validate_note_id(note_id)?;
+    let conn = database_connection(app)?;
+    let now = now_millis();
+
+    let updated = conn.execute(
+        "UPDATE notes
+         SET deleted_at = NULL, modified_at = ?1, locally_modified = 1
+         WHERE id = ?2 AND deleted_at IS NOT NULL",
+        params![now, note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
@@ -509,7 +567,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     let active_tags = normalized_active_tags(&input.active_tags);
 
     let mut sql = String::from(
-        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.pinned_at
+        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at
          FROM notes n
          LEFT JOIN notebooks b ON b.id = n.notebook_id",
     );
@@ -520,7 +578,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         match search_mode {
             SearchMode::Match(search_query) => {
                 sql = String::from(
-                    "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.pinned_at
+                    "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at
                      FROM notes n
                      LEFT JOIN notebooks b ON b.id = n.notebook_id
                      JOIN notes_fts ON notes_fts.note_id = n.id",
@@ -881,17 +939,24 @@ fn append_note_view_clauses(
     match note_filter {
         NoteFilterInput::All => {
             clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
         }
         NoteFilterInput::Today => {
             clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
             clauses.push("n.edited_at >= ?".to_string());
             values.push(Value::from(now_millis() - 24 * 60 * 60 * 1000));
         }
         NoteFilterInput::Archive => {
             clauses.push("n.archived_at IS NOT NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+        }
+        NoteFilterInput::Trash => {
+            clauses.push("n.deleted_at IS NOT NULL".to_string());
         }
         NoteFilterInput::Notebook => {
             clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
             clauses.push("n.notebook_id = ?".to_string());
             values.push(Value::from(
                 active_notebook_id.unwrap_or_default().to_string(),
@@ -902,7 +967,7 @@ fn append_note_view_clauses(
 
 fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, AppError> {
     conn.query_row(
-        "SELECT archived_at IS NULL FROM notes WHERE id = ?1",
+        "SELECT archived_at IS NULL AND deleted_at IS NULL FROM notes WHERE id = ?1",
         params![note_id],
         |row| row.get::<_, bool>(0),
     )
@@ -1039,10 +1104,11 @@ fn row_to_loaded_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
             .zip(notebook_name)
             .map(|(id, name)| NotebookRef { id, name }),
         archived_at: row.get(6)?,
-        pinned_at: row.get(7)?,
+        deleted_at: row.get(7)?,
+        pinned_at: row.get(8)?,
         tags: Vec::new(),
-        nostr_d_tag: row.get(8)?,
-        published_at: row.get(9)?,
+        nostr_d_tag: row.get(9)?,
+        published_at: row.get(10)?,
     })
 }
 
@@ -1064,14 +1130,15 @@ fn row_to_note_summary(
         preview: preview_from_markdown(&markdown),
         search_snippet: search_snippet_for_summary(&markdown, search_tokens),
         archived_at: row.get(6)?,
-        pinned_at: row.get(7)?,
+        deleted_at: row.get(7)?,
+        pinned_at: row.get(8)?,
     })
 }
 
 fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, AppError> {
     let note = conn
         .query_row(
-            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.pinned_at, n.nostr_d_tag, n.published_at
+            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.nostr_d_tag, n.published_at
              FROM notes n
              LEFT JOIN notebooks b ON b.id = n.notebook_id
              WHERE n.id = ?1",
@@ -1094,7 +1161,7 @@ fn next_active_note_id(
     conn.query_row(
         "SELECT id
          FROM notes
-         WHERE archived_at IS NULL
+         WHERE archived_at IS NULL AND deleted_at IS NULL
            AND (?1 IS NULL OR id != ?1)
          ORDER BY pinned_at IS NULL ASC, pinned_at DESC, edited_at DESC, created_at DESC
          LIMIT 1",

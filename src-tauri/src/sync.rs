@@ -62,6 +62,7 @@ pub struct SyncedNote {
     pub modified_at: i64,
     pub edited_at: i64,
     pub archived_at: Option<i64>,
+    pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
     pub tags: Vec<String>,
 }
@@ -366,6 +367,7 @@ fn note_to_rumor(
     created_at: i64,
     notebook_id: Option<&str>,
     archived_at: Option<i64>,
+    deleted_at: Option<i64>,
     pinned_at: Option<i64>,
     tags: &[String],
     blob_tags: &[(String, String, String)], // (plaintext_hash, ciphertext_hash, encryption_key_hex)
@@ -390,6 +392,10 @@ fn note_to_rumor(
 
     if let Some(ts) = archived_at {
         event_tags.push(Tag::custom(TagKind::custom("archived_at"), vec![ts.to_string()]));
+    }
+
+    if let Some(ts) = deleted_at {
+        event_tags.push(Tag::custom(TagKind::custom("deleted_at"), vec![ts.to_string()]));
     }
 
     if let Some(ts) = pinned_at {
@@ -460,6 +466,12 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
         .and_then(|t| t.content())
         .and_then(|s| s.parse::<i64>().ok());
 
+    let deleted_at = rumor
+        .tags
+        .find(TagKind::custom("deleted_at"))
+        .and_then(|t| t.content())
+        .and_then(|s| s.parse::<i64>().ok());
+
     let pinned_at = rumor
         .tags
         .find(TagKind::custom("pinned_at"))
@@ -488,6 +500,7 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
         modified_at,
         edited_at,
         archived_at,
+        deleted_at,
         pinned_at,
         tags,
     })
@@ -534,7 +547,7 @@ fn upsert_from_sync(
         // Update existing note
         conn.execute(
             "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?5, \
-             archived_at = ?6, pinned_at = ?7, sync_event_id = ?8, locally_modified = 0 WHERE id = ?9",
+             archived_at = ?6, deleted_at = ?7, pinned_at = ?8, sync_event_id = ?9, locally_modified = 0 WHERE id = ?10",
             params![
                 note.title,
                 note.markdown,
@@ -542,6 +555,7 @@ fn upsert_from_sync(
                 note.modified_at,
                 note.edited_at,
                 note.archived_at,
+                note.deleted_at,
                 note.pinned_at,
                 sync_event_id,
                 note.id,
@@ -551,7 +565,7 @@ fn upsert_from_sync(
         // Insert new note
         conn.execute(
             "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
-             archived_at, pinned_at, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0)",
+             archived_at, deleted_at, pinned_at, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0)",
             params![
                 note.id,
                 note.title,
@@ -561,6 +575,7 @@ fn upsert_from_sync(
                 note.modified_at,
                 note.edited_at,
                 note.archived_at,
+                note.deleted_at,
                 note.pinned_at,
                 sync_event_id,
             ],
@@ -1106,18 +1121,18 @@ async fn push_note(
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), AppError> {
     // Read note from DB
-    let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url) = {
+    let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at, tags, blossom_url) = {
         let conn = crate::db::database_connection(app)?;
 
-        let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>)> = conn
+        let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>, Option<i64>)> = conn
             .query_row(
-                "SELECT title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at FROM notes WHERE id = ?1",
+                "SELECT title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at FROM notes WHERE id = ?1",
                 params![note_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?)),
             )
             .optional()?;
 
-        let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at) =
+        let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at) =
             note.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
         let edited_at = edited_at.unwrap_or(modified_at);
 
@@ -1130,7 +1145,7 @@ async fn push_note(
 
         let blossom_url = get_blossom_url(&conn);
 
-        (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url)
+        (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at, tags, blossom_url)
     };
 
     // Upload attachment blobs to Blossom if configured
@@ -1194,6 +1209,7 @@ async fn push_note(
         created_at,
         notebook_id.as_deref(),
         archived_at,
+        deleted_at,
         pinned_at,
         &tags,
         &blob_tags,

@@ -59,9 +59,11 @@ type NotesPaneProps = {
   onCreateNote(source: "keyboard" | "pointer"): void;
   onDeleteNotePermanently(noteId: string): void;
   onLoadMore(): void;
+  onRestoreFromTrash(noteId: string): void;
   onSetNotePinned(noteId: string, pinned: boolean): void;
   onExportNotes(): void;
   onRestoreNote(noteId: string): void;
+  onTrashNote(noteId: string): void;
   onSelectNote(noteId: string): void;
 };
 
@@ -136,11 +138,14 @@ export function NotesPane({
   onDeleteNotePermanently,
   onExportNotes,
   onLoadMore,
+  onRestoreFromTrash,
   onSetNotePinned,
   onRestoreNote,
   onSelectNote,
+  onTrashNote,
 }: NotesPaneProps) {
   const isArchive = noteFilter === "archive";
+  const isTrash = noteFilter === "trash";
   const [isSearchOpen, setIsSearchOpen] = useState(
     () => searchQuery.length > 0,
   );
@@ -216,6 +221,7 @@ export function NotesPane({
     event.preventDefault();
     const moveToNotebookSubmenu =
       !isArchive &&
+      !isTrash &&
       (await buildNotebookSubmenu({
         currentNotebook: note.notebook,
         notebooks,
@@ -224,17 +230,30 @@ export function NotesPane({
       }));
 
     const menu = await Menu.new({
-      items: isArchive
+      items: isTrash
         ? [
             {
-              id: `restore-${note.id}`,
+              id: `restore-trash-${note.id}`,
               text: "Restore",
-              action: () => onRestoreNote(note.id),
+              action: () => onRestoreFromTrash(note.id),
             },
             {
               id: `delete-forever-${note.id}`,
-              text: "Delete",
+              text: "Delete Permanently",
               action: () => onDeleteNotePermanently(note.id),
+            },
+          ]
+        : isArchive
+        ? [
+            {
+              id: `restore-${note.id}`,
+              text: "Unarchive",
+              action: () => onRestoreNote(note.id),
+            },
+            {
+              id: `delete-${note.id}`,
+              text: "Delete",
+              action: () => onTrashNote(note.id),
             },
           ]
         : [
@@ -258,7 +277,7 @@ export function NotesPane({
             {
               id: `delete-${note.id}`,
               text: "Delete",
-              action: () => onDeleteNotePermanently(note.id),
+              action: () => onTrashNote(note.id),
             },
           ],
     });

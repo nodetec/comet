@@ -13,6 +13,7 @@ export type NotebookRef = {
 
 export type NoteSummary = {
   archivedAt: number | null;
+  deletedAt: number | null;
   editedAt: number;
   id: string;
   notebook: NotebookRef | null;
@@ -24,6 +25,7 @@ export type NoteSummary = {
 
 export type LoadedNote = {
   archivedAt: number | null;
+  deletedAt: number | null;
   id: string;
   markdown: string;
   modifiedAt: number;
@@ -41,6 +43,8 @@ export type BootstrapPayload = {
   initialTags: ContextualTagsPayload;
   notebooks: NotebookSummary[];
   selectedNoteId: string | null;
+  archivedCount: number;
+  trashedCount: number;
 };
 
 export type NoteSortField = "modified_at" | "created_at" | "title";
@@ -99,6 +103,10 @@ export function notesHeading(
 ) {
   if (noteFilter === "archive") {
     return "Archive";
+  }
+
+  if (noteFilter === "trash") {
+    return "Trash";
   }
 
   if (noteFilter === "today") {

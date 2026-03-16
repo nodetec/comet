@@ -27,8 +27,10 @@ import {
   pinNote,
   queryNotes,
   restoreNote,
+  restoreFromTrash,
   saveNote,
   exportNotes,
+  trashNote,
   unpinNote,
 } from "./api";
 import {
@@ -248,6 +250,7 @@ export function useShellController() {
     ]);
   };
 
+
   const flushCurrentDraft = () => {
     if (!currentNote || draftNoteId !== currentNote.id) {
       return;
@@ -336,6 +339,7 @@ export function useShellController() {
     onSuccess: (archivedNote) => {
       queryClient.setQueryData(["note", archivedNote.id], archivedNote);
 
+
       if (selectedNoteId === archivedNote.id && noteFilter !== "archive") {
         setSelectedNoteId(
           nextSelectedNoteIdAfterRemoval(currentNotes, archivedNote.id),
@@ -352,6 +356,7 @@ export function useShellController() {
     onSuccess: (restoredNote) => {
       queryClient.setQueryData(["note", restoredNote.id], restoredNote);
 
+
       if (selectedNoteId === restoredNote.id && noteFilter === "archive") {
         setSelectedNoteId(
           nextSelectedNoteIdAfterRemoval(currentNotes, restoredNote.id),
@@ -363,10 +368,47 @@ export function useShellController() {
     onError: toastErrorHandler("Couldn't restore note", "restore-note-error"),
   });
 
+  const trashNoteMutation = useMutation({
+    mutationFn: trashNote,
+    onSuccess: (trashedNote) => {
+      queryClient.setQueryData(["note", trashedNote.id], trashedNote);
+
+
+      if (selectedNoteId === trashedNote.id && noteFilter !== "trash") {
+        setSelectedNoteId(
+          nextSelectedNoteIdAfterRemoval(currentNotes, trashedNote.id),
+        );
+      }
+
+      void invalidateShellData();
+    },
+    onError: toastErrorHandler("Couldn't delete note", "trash-note-error"),
+  });
+
+  const restoreFromTrashMutation = useMutation({
+    mutationFn: restoreFromTrash,
+    onSuccess: (restoredNote) => {
+      queryClient.setQueryData(["note", restoredNote.id], restoredNote);
+
+
+      if (selectedNoteId === restoredNote.id && noteFilter === "trash") {
+        setSelectedNoteId(
+          nextSelectedNoteIdAfterRemoval(currentNotes, restoredNote.id),
+        );
+      }
+
+      void invalidateShellData();
+    },
+    onError: toastErrorHandler("Couldn't restore note", "restore-from-trash-error"),
+  });
+
   const deleteNotePermanentlyMutation = useMutation({
     mutationFn: deleteNotePermanently,
     onSuccess: (_, noteId) => {
       queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
+      if (noteFilter === "trash") {
+  
+      }
 
       if (draftNoteId === noteId) {
         setDraft("", "");
@@ -629,20 +671,37 @@ export function useShellController() {
     });
   };
 
+  const clearSelectionIfNotActive = () => {
+    if (currentNote && (currentNote.archivedAt || currentNote.deletedAt)) {
+      setSelectedNoteId(null);
+      setDraft("", "");
+    }
+  };
+
   const handleSelectAll = () => {
+    clearSelectionIfNotActive();
     setNoteFilter("all");
   };
 
   const handleSelectToday = () => {
+    clearSelectionIfNotActive();
     setNoteFilter("today");
   };
 
   const handleSelectArchive = () => {
+    setSelectedNoteId(null);
+    setDraft("", "");
     setNoteFilter("archive");
   };
 
+  const handleSelectTrash = () => {
+    setSelectedNoteId(null);
+    setDraft("", "");
+    setNoteFilter("trash");
+  };
+
   const handleSelectNotebook = (notebookId: string) => {
-    if (currentNote && currentNote.notebook?.id !== notebookId) {
+    if (currentNote && (currentNote.notebook?.id !== notebookId || currentNote.archivedAt || currentNote.deletedAt)) {
       setSelectedNoteId(null);
       setDraft("", "");
     }
@@ -700,11 +759,41 @@ export function useShellController() {
     })().catch(() => {});
   };
 
+  const handleTrashNote = (noteId: string) => {
+    void (async () => {
+      if (
+        trashNoteMutation.isPending ||
+        deleteNotePermanentlyMutation.isPending
+      ) {
+        return;
+      }
+
+      if (noteId === selectedNoteId) {
+        discardPendingSave();
+      }
+
+      await trashNoteMutation.mutateAsync(noteId);
+    })().catch(() => {});
+  };
+
+  const handleRestoreFromTrash = (noteId: string) => {
+    void (async () => {
+      if (
+        restoreFromTrashMutation.isPending ||
+        deleteNotePermanentlyMutation.isPending
+      ) {
+        return;
+      }
+
+      await restoreFromTrashMutation.mutateAsync(noteId);
+    })().catch(() => {});
+  };
+
   const handleDeleteNotePermanently = (noteId: string) => {
     void (async () => {
       if (
-        archiveNoteMutation.isPending ||
-        restoreNoteMutation.isPending ||
+        trashNoteMutation.isPending ||
+        restoreFromTrashMutation.isPending ||
         deleteNotePermanentlyMutation.isPending
       ) {
         return;
@@ -812,9 +901,12 @@ export function useShellController() {
     handleDeleteNotebook: notebook.handleDeleteNotebook,
     handleDeleteNotePermanently,
     handleExportNotes,
+    handleRestoreFromTrash,
     handleRestoreNote,
     handleSelectAll,
     handleSelectArchive,
+    handleSelectTrash,
+    handleTrashNote,
     handleSelectNote,
     handleSelectNotebook,
     handleSelectToday,
@@ -829,6 +921,7 @@ export function useShellController() {
   const editorPaneProps = useMemo(
     () => ({
       archivedAt: currentNote?.archivedAt ?? null,
+      deletedAt: currentNote?.deletedAt ?? null,
       focusMode:
         currentNote && currentNote.id === selectedNoteId
           ? editorFocusMode
@@ -989,8 +1082,12 @@ export function useShellController() {
           void latestRef.current.fetchNextPage();
         }
       },
+      onRestoreFromTrash: (noteId: string) =>
+        latestRef.current.handleRestoreFromTrash(noteId),
       onRestoreNote: (noteId: string) =>
         latestRef.current.handleRestoreNote(noteId),
+      onTrashNote: (noteId: string) =>
+        latestRef.current.handleTrashNote(noteId),
       onSelectNote: (noteId: string) =>
         latestRef.current.handleSelectNote(noteId),
       onSetNotePinned: (noteId: string, pinned: boolean) =>
@@ -1027,6 +1124,8 @@ export function useShellController() {
       editingNotebookId: notebook.editingNotebookId,
       isCreatingNotebook: notebook.isCreatingNotebook,
       newNotebookName: notebook.newNotebookName,
+      archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
+      trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
       noteFilter,
       notebooks,
       onChangeNotebookName: notebook.setNewNotebookName,
@@ -1039,6 +1138,7 @@ export function useShellController() {
       onSelectAll: () => latestRef.current.handleSelectAll(),
       onSelectToday: () => latestRef.current.handleSelectToday(),
       onSelectArchive: () => latestRef.current.handleSelectArchive(),
+      onSelectTrash: () => latestRef.current.handleSelectTrash(),
       onSelectNotebook: (notebookId: string) =>
         latestRef.current.handleSelectNotebook(notebookId),
       onShowCreateNotebook: notebook.showCreateNotebook,
@@ -1055,6 +1155,8 @@ export function useShellController() {
       activeNotebookId,
       activeTags,
       availableTags,
+      bootstrapQuery.data?.archivedCount,
+      bootstrapQuery.data?.trashedCount,
       notebook.deleteNotebookMutation.isPending,
       notebook.editingNotebookId,
       notebook.isCreatingNotebook,

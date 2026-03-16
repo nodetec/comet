@@ -67,10 +67,12 @@ CREATE TABLE notes (
   modified_at INTEGER NOT NULL,
   edited_at INTEGER,
   archived_at INTEGER,
+  deleted_at INTEGER,
   pinned_at INTEGER,
   nostr_d_tag TEXT,
   published_at INTEGER,
-  sync_event_id TEXT
+  sync_event_id TEXT,
+  locally_modified INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE blob_meta (
@@ -344,7 +346,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 8;
+PRAGMA user_version = 9;
 
 PRAGMA foreign_keys = ON;
 SQL

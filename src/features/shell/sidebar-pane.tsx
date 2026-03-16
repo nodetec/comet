@@ -15,6 +15,7 @@ import {
   FileTextIcon,
   PlusCircleIcon,
   Settings2,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ import { type NotebookSummary, sidebarItemClasses } from "./types";
 type SidebarPaneProps = {
   activeNotebookId: string | null;
   activeTags: string[];
+  archivedCount: number;
+  trashedCount: number;
   editingNotebookId: string | null;
   availableTags: string[];
   isCreatingNotebook: boolean;
@@ -45,6 +48,7 @@ type SidebarPaneProps = {
   onSelectToday(): void;
   onSelectNotebook(notebookId: string): void;
   onSelectArchive(): void;
+  onSelectTrash(): void;
   onToggleTag(tag: string): void;
   onShowRenameNotebook(notebookId: string): void;
   onSubmitRenameNotebook(): void;
@@ -55,6 +59,8 @@ type SidebarPaneProps = {
 export function SidebarPane({
   activeNotebookId,
   activeTags,
+  archivedCount,
+  trashedCount,
   availableTags,
   editingNotebookId,
   isCreatingNotebook,
@@ -71,6 +77,7 @@ export function SidebarPane({
   onSelectToday,
   onSelectNotebook,
   onSelectArchive,
+  onSelectTrash,
   onToggleTag,
   onShowRenameNotebook,
   onShowCreateNotebook,
@@ -273,14 +280,26 @@ export function SidebarPane({
                 <CalendarDays className="text-primary size-4 shrink-0" />
                 Today
               </button>
-              <button
-                className={sidebarItemClasses(noteFilter === "archive")}
-                onClick={onSelectArchive}
-                type="button"
-              >
-                <Archive className="text-primary size-4 shrink-0" />
-                Archive
-              </button>
+              {(archivedCount > 0 || noteFilter === "archive") && (
+                <button
+                  className={sidebarItemClasses(noteFilter === "archive")}
+                  onClick={onSelectArchive}
+                  type="button"
+                >
+                  <Archive className="text-primary size-4 shrink-0" />
+                  Archive
+                </button>
+              )}
+              {(trashedCount > 0 || noteFilter === "trash") && (
+                <button
+                  className={sidebarItemClasses(noteFilter === "trash")}
+                  onClick={onSelectTrash}
+                  type="button"
+                >
+                  <Trash2 className="text-primary size-4 shrink-0" />
+                  Trash
+                </button>
+              )}
             </div>
           </div>
         </section>

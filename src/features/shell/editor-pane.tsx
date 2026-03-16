@@ -23,6 +23,7 @@ import { type NotebookRef, type NotebookSummary } from "./types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
+  deletedAt: number | null;
   editorKey: string | null;
   focusMode: "none" | "immediate" | "pointerup";
   isDeletePublishedNotePending: boolean;
@@ -51,6 +52,7 @@ function firstLineH1Title(markdown: string) {
 
 export function EditorPane({
   archivedAt,
+  deletedAt,
   editorKey,
   focusMode,
   isDeletePublishedNotePending,
@@ -71,6 +73,7 @@ export function EditorPane({
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
+  const isReadOnly = isArchived || deletedAt !== null;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
@@ -176,7 +179,7 @@ export function EditorPane({
   };
 
   const handleEditorSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (isArchived) {
+    if (isReadOnly) {
       return;
     }
 
@@ -211,7 +214,7 @@ export function EditorPane({
             {noteTitle ?? ""}
           </p>
         </div>
-        {noteId && !isArchived ? (
+        {noteId && !isReadOnly ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
             {publishedAt != null &&
               (modifiedAt <= publishedAt ? (
@@ -258,7 +261,7 @@ export function EditorPane({
       <div
         className={cn(
           "min-h-0 flex-1 overflow-y-scroll overscroll-y-contain",
-          !isArchived && "cursor-text",
+          !isReadOnly && "cursor-text",
         )}
         data-editor-scroll-container
         onMouseDown={handleEditorSurfaceMouseDown}
@@ -280,7 +283,7 @@ export function EditorPane({
               markdown={markdown}
               onChange={onChange}
               onFocusHandled={onFocusHandled}
-              readOnly={isArchived}
+              readOnly={isReadOnly}
               ref={editorRef}
               searchQuery={searchQuery}
               toolbarContainer={toolbarContainer}
@@ -298,7 +301,7 @@ export function EditorPane({
         )}
       </div>
 
-      {noteId && !isArchived && showToolbar && (
+      {noteId && !isReadOnly && showToolbar && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
           <div className="pointer-events-auto" ref={toolbarContainerRef} />
         </div>
