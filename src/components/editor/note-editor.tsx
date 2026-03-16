@@ -13,6 +13,7 @@ import {
 } from "@lexical/extension";
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "@lexical/hashtag";
+import { TableExtension } from "@lexical/table";
 import { LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
@@ -37,6 +38,9 @@ import ImageDropPlugin from "./plugins/image-drop-plugin";
 import SearchHighlightPlugin from "./plugins/search-highlight-plugin";
 import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
+import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
+
+import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 
 type NoteEditorProps = {
   focusMode: "none" | "immediate" | "pointerup";
@@ -128,6 +132,9 @@ function EditorInner({
       <YouTubeEmbedPlugin />
       <ImageDropPlugin />
       <SearchHighlightPlugin searchWords={searchWords} />
+      <TableActionMenuPlugin />
+
+      <TableClickOutsidePlugin />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
   );
@@ -149,6 +156,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             ListExtension,
             HorizontalRuleExtension,
             TabIndentationExtension,
+            TableExtension,
             CodeExtension,
             HashtagExtension,
           ],

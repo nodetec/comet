@@ -1,12 +1,14 @@
 import {
   ELEMENT_TRANSFORMERS,
   TEXT_FORMAT_TRANSFORMERS,
+  type ElementTransformer,
 } from "@lexical/markdown";
 
 import { LINK } from "./link-transformer";
 import { CODE_BLOCK } from "./code-transformer";
 import { IMAGE } from "./image-transformer";
 import { YOUTUBE } from "./youtube-transformer";
+import { TABLE, setTableTransformers } from "./table-transformer";
 
 /**
  * Shared transformer array for the Comet editor.
@@ -19,6 +21,7 @@ import { YOUTUBE } from "./youtube-transformer";
  * link transformer that conflicts with our custom LINK.
  */
 export const TRANSFORMERS = [
+  TABLE,
   YOUTUBE,
   IMAGE,
   LINK,
@@ -26,3 +29,6 @@ export const TRANSFORMERS = [
   CODE_BLOCK,
   ...TEXT_FORMAT_TRANSFORMERS,
 ];
+
+// Set transformers for table cell content parsing
+setTableTransformers(TRANSFORMERS as ElementTransformer[]);

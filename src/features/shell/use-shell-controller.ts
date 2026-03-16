@@ -511,8 +511,14 @@ export function useShellController() {
             .then((freshNote) => {
               if (freshNote) {
                 queryClient.setQueryData(["note", noteId], freshNote);
-                useShellStore.getState().setDraft("", "");
-                setSyncEditorRevision((r) => r + 1);
+                // Only remount editor if the remote markdown actually differs
+                // from the current draft. Without this check, echo events from
+                // our own pushes cause an infinite remount→save→push cycle.
+                const { draftMarkdown } = useShellStore.getState();
+                if (freshNote.markdown !== draftMarkdown) {
+                  useShellStore.getState().setDraft("", "");
+                  setSyncEditorRevision((r) => r + 1);
+                }
               }
             });
         }

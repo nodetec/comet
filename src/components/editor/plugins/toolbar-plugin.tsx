@@ -33,9 +33,11 @@ import {
   Pilcrow,
   CodeXml,
   Image,
+  Table,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { $createImageNode } from "../nodes/image-node";
+import { INSERT_TABLE_COMMAND } from "@lexical/table";
 
 type BlockType = "paragraph" | "h1" | "h2" | "h3" | "code";
 
@@ -228,6 +230,19 @@ export default function ToolbarPlugin({ portalContainer }: ToolbarPluginProps) {
 
       <ToolbarButton onClick={() => void insertImage()} title="Insert image">
         <Image className="size-4" />
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={() => {
+          editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+            rows: "2",
+            columns: "2",
+            includeHeaders: { rows: true, columns: false },
+          });
+        }}
+        title="Insert table"
+      >
+        <Table className="size-4" />
       </ToolbarButton>
     </div>
   );

@@ -63,7 +63,7 @@ body {
   --editor-text: oklch(0.906 0.001 197.14);
   --editor-caret: #6cb4ee;
   --editor-selection: rgba(108, 180, 238, 0.18);
-  --heading-color: oklch(0.883 0.020 233.88);
+  --heading-color: oklch(0.883 0.02 233.88);
 }
 
 @theme inline {
@@ -135,10 +135,64 @@ body {
   min-height: 100%;
   width: 100%;
   box-sizing: border-box;
+
   padding-bottom: 35vh;
-  padding-left: max(3.5rem, calc((100% - 40rem) / 2));
-  padding-right: max(3.5rem, calc((100% - 40rem) / 2));
+  padding-left: max(3.5rem, calc((100% - 41rem) / 2));
+  padding-right: max(3.5rem, calc((100% - 41rem) / 2));
   padding-top: 0.25rem;
+}
+
+.comet-table-wrapper {
+  display: block;
+  overflow: auto;
+  margin-bottom: 1.5rem;
+}
+
+.comet-table-wrapper tr:nth-child(even) td {
+  background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.comet-table tr:first-of-type td:first-child,
+.comet-table tr:first-of-type th:first-child {
+  border-top-left-radius: 0.5rem;
+}
+
+.comet-table tr:first-of-type td:last-child,
+.comet-table tr:first-of-type th:last-child {
+  border-top-right-radius: 0.5rem;
+}
+
+.comet-table tr:last-of-type td:first-child,
+.comet-table tr:last-of-type th:first-child {
+  border-bottom-left-radius: 0.5rem;
+}
+
+.comet-table tr:last-of-type td:last-child,
+.comet-table tr:last-of-type th:last-child {
+  border-bottom-right-radius: 0.5rem;
+}
+
+.comet-table td,
+.comet-table th {
+  min-width: 8rem;
+  max-width: 10rem;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.comet-table tr:first-of-type td,
+.comet-table tr:first-of-type th {
+  border-top: 1px solid var(--accent);
+}
+
+.comet-table tr:last-of-type td,
+.comet-table tr:last-of-type th {
+  border-bottom: 1px solid var(--accent);
+}
+
+.comet-table td:first-child,
+.comet-table th:first-child {
+  border-left: 1px solid var(--accent);
 }
 
 .comet-editor-placeholder {
