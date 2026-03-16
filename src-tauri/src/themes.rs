@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -257,10 +258,10 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
 }"##),
 ];
 
-fn themes_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+fn themes_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let config_dir = app.path().app_config_dir()?;
     let dir = config_dir.join("themes");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir)?;
     Ok(dir)
 }
 
@@ -272,7 +273,7 @@ fn seed_bundled_themes(dir: &PathBuf) {
     }
 }
 
-pub fn list_themes(app: &AppHandle) -> Result<Vec<ThemeSummary>, String> {
+pub fn list_themes(app: &AppHandle) -> Result<Vec<ThemeSummary>, AppError> {
     let dir = themes_dir(app)?;
     seed_bundled_themes(&dir);
 
@@ -281,7 +282,7 @@ pub fn list_themes(app: &AppHandle) -> Result<Vec<ThemeSummary>, String> {
         name: "Default".to_string(),
     }];
 
-    let entries = fs::read_dir(&dir).map_err(|e| e.to_string())?;
+    let entries = fs::read_dir(&dir)?;
     for entry in entries {
         let entry = match entry {
             Ok(e) => e,
@@ -317,11 +318,11 @@ pub fn list_themes(app: &AppHandle) -> Result<Vec<ThemeSummary>, String> {
     Ok(themes)
 }
 
-pub fn read_theme(app: &AppHandle, theme_id: &str) -> Result<ThemeData, String> {
+pub fn read_theme(app: &AppHandle, theme_id: &str) -> Result<ThemeData, AppError> {
     let dir = themes_dir(app)?;
     let path = dir.join(format!("{}.json", theme_id));
     let contents = fs::read_to_string(&path)
-        .map_err(|_| format!("Theme '{}' not found", theme_id))?;
+        .map_err(|_| AppError::custom(format!("Theme '{}' not found", theme_id)))?;
     serde_json::from_str(&contents)
-        .map_err(|e| format!("Invalid theme file: {}", e))
+        .map_err(|e| AppError::custom(format!("Invalid theme file: {}", e)))
 }

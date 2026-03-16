@@ -1,4 +1,5 @@
 use crate::db::{database_connection, extract_tags};
+use crate::error::AppError;
 use crate::nostr;
 use rusqlite::{
     params, params_from_iter, types::Value, Connection, OptionalExtension, Transaction,
@@ -155,7 +156,7 @@ pub struct AssignNoteNotebookInput {
     pub notebook_id: Option<String>,
 }
 
-pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, String> {
+pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, AppError> {
     let conn = database_connection(app)?;
     let npub = nostr::ensure_identity(&conn)?;
     seed_welcome_note_if_empty(&conn)?;
@@ -195,7 +196,7 @@ pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, String> {
     })
 }
 
-pub fn query_notes(app: &AppHandle, input: NoteQueryInput) -> Result<NotePagePayload, String> {
+pub fn query_notes(app: &AppHandle, input: NoteQueryInput) -> Result<NotePagePayload, AppError> {
     let conn = database_connection(app)?;
     query_note_page(&conn, &input)
 }
@@ -203,16 +204,16 @@ pub fn query_notes(app: &AppHandle, input: NoteQueryInput) -> Result<NotePagePay
 pub fn contextual_tags(
     app: &AppHandle,
     input: ContextualTagsInput,
-) -> Result<ContextualTagsPayload, String> {
+) -> Result<ContextualTagsPayload, AppError> {
     let conn = database_connection(app)?;
     query_contextual_tags(&conn, &input)
 }
 
-pub fn load_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
+pub fn load_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
 
-    let note = note_by_id(&conn, note_id)?.ok_or_else(|| "Note not found.".to_string())?;
+    let note = note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))?;
 
     set_last_open_note_id(&conn, Some(note_id))?;
     Ok(note)
@@ -222,9 +223,9 @@ pub fn create_note(
     app: &AppHandle,
     notebook_id: Option<&str>,
     tags: &[String],
-) -> Result<LoadedNote, String> {
+) -> Result<LoadedNote, AppError> {
     let mut conn = database_connection(app)?;
-    let transaction = conn.transaction().map_err(|error| error.to_string())?;
+    let transaction = conn.transaction()?;
     let note_id = generate_note_id();
     let markdown = if tags.is_empty() {
         String::new()
@@ -240,24 +241,23 @@ pub fn create_note(
             "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, locally_modified)
              VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5, 1)",
             params![note_id, title, markdown, notebook_id, now],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     upsert_note_search_document(&transaction, &note_id, &title, &markdown)?;
     if !tags.is_empty() {
         replace_note_tags(&transaction, &note_id, &markdown)?;
     }
-    transaction.commit().map_err(|error| error.to_string())?;
+    transaction.commit()?;
 
     set_last_open_note_id(&conn, Some(&note_id))?;
-    note_by_id(&conn, &note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, &note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, String> {
+pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
     validate_note_id(&input.id)?;
     let mut conn = database_connection(app)?;
     let title = title_from_markdown(&input.markdown);
 
-    let transaction = conn.transaction().map_err(|error| error.to_string())?;
+    let transaction = conn.transaction()?;
 
     // Only update modified_at when the markdown content actually changed.
     // The editor may re-serialize markdown with minor normalization differences,
@@ -267,8 +267,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, St
             "SELECT markdown FROM notes WHERE id = ?1",
             params![input.id],
             |row| row.get(0),
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     let content_changed = existing_markdown != input.markdown;
 
@@ -278,30 +277,28 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, St
             .execute(
                 "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3, locally_modified = 1 WHERE id = ?4",
                 params![title, input.markdown, now, input.id],
-            )
-            .map_err(|error| error.to_string())?
+            )?
     } else {
         transaction
             .execute(
                 "UPDATE notes SET title = ?1, markdown = ?2 WHERE id = ?3",
                 params![title, input.markdown, input.id],
-            )
-            .map_err(|error| error.to_string())?
+            )?
     };
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
     upsert_note_search_document(&transaction, &input.id, &title, &input.markdown)?;
     replace_note_tags(&transaction, &input.id, &input.markdown)?;
-    transaction.commit().map_err(|error| error.to_string())?;
+    transaction.commit()?;
     set_last_open_note_id(&conn, Some(&input.id))?;
 
-    note_by_id(&conn, &input.id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, &input.id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
+pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
     let now = current_timestamp_millis();
@@ -312,21 +309,20 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String
              SET archived_at = ?1, pinned_at = NULL, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
             params![now, note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
     if last_open_note_id(&conn)?.as_deref() == Some(note_id) {
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
+pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
     let now = current_timestamp_millis();
@@ -337,31 +333,29 @@ pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String
              SET archived_at = NULL, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NOT NULL",
             params![now, note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<(), String> {
+pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<(), AppError> {
     validate_note_id(note_id)?;
     let mut conn = database_connection(app)?;
-    let transaction = conn.transaction().map_err(|error| error.to_string())?;
+    let transaction = conn.transaction()?;
 
     delete_note_search_document(&transaction, note_id)?;
     let deleted = transaction
-        .execute("DELETE FROM notes WHERE id = ?1", params![note_id])
-        .map_err(|error| error.to_string())?;
+        .execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
 
     if deleted == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
-    transaction.commit().map_err(|error| error.to_string())?;
+    transaction.commit()?;
 
     if last_open_note_id(&conn)?.as_deref() == Some(note_id) {
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
@@ -373,7 +367,7 @@ pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<(), Str
 pub fn create_notebook(
     app: &AppHandle,
     input: CreateNotebookInput,
-) -> Result<NotebookSummary, String> {
+) -> Result<NotebookSummary, AppError> {
     let conn = database_connection(app)?;
     let notebook_id = generate_notebook_id();
     let name = normalize_notebook_name(&input.name)?;
@@ -386,13 +380,13 @@ pub fn create_notebook(
     )
     .map_err(handle_notebook_write_error)?;
 
-    notebook_by_id(&conn, &notebook_id)?.ok_or_else(|| "Failed to create notebook.".to_string())
+    notebook_by_id(&conn, &notebook_id)?.ok_or_else(|| AppError::custom("Failed to create notebook."))
 }
 
 pub fn rename_notebook(
     app: &AppHandle,
     input: RenameNotebookInput,
-) -> Result<NotebookSummary, String> {
+) -> Result<NotebookSummary, AppError> {
     validate_notebook_id(&input.notebook_id)?;
     let conn = database_connection(app)?;
     let name = normalize_notebook_name(&input.name)?;
@@ -405,22 +399,21 @@ pub fn rename_notebook(
         .map_err(handle_notebook_write_error)?;
 
     if updated == 0 {
-        return Err("Notebook not found.".to_string());
+        return Err(AppError::custom("Notebook not found."));
     }
 
     notebook_by_id(&conn, &input.notebook_id)?
-        .ok_or_else(|| "Failed to rename notebook.".to_string())
+        .ok_or_else(|| AppError::custom("Failed to rename notebook."))
 }
 
-pub fn delete_notebook(app: &AppHandle, notebook_id: &str) -> Result<(), String> {
+pub fn delete_notebook(app: &AppHandle, notebook_id: &str) -> Result<(), AppError> {
     validate_notebook_id(notebook_id)?;
     let conn = database_connection(app)?;
     let deleted = conn
-        .execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])
-        .map_err(|error| error.to_string())?;
+        .execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])?;
 
     if deleted == 0 {
-        return Err("Notebook not found.".to_string());
+        return Err(AppError::custom("Notebook not found."));
     }
 
     Ok(())
@@ -429,7 +422,7 @@ pub fn delete_notebook(app: &AppHandle, notebook_id: &str) -> Result<(), String>
 pub fn assign_note_notebook(
     app: &AppHandle,
     input: AssignNoteNotebookInput,
-) -> Result<LoadedNote, String> {
+) -> Result<LoadedNote, AppError> {
     validate_note_id(&input.note_id)?;
     if let Some(notebook_id) = input.notebook_id.as_deref() {
         validate_notebook_id(notebook_id)?;
@@ -444,12 +437,11 @@ pub fn assign_note_notebook(
                 params![notebook_id],
                 |_| Ok(()),
             )
-            .optional()
-            .map_err(|error| error.to_string())?
+            .optional()?
             .is_some();
 
         if !exists {
-            return Err("Notebook not found.".to_string());
+            return Err(AppError::custom("Notebook not found."));
         }
     }
 
@@ -458,19 +450,18 @@ pub fn assign_note_notebook(
         .execute(
             "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
             params![input.notebook_id, now, input.note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
     set_last_open_note_id(&conn, Some(&input.note_id))?;
 
-    note_by_id(&conn, &input.note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, &input.note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
+pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
     let updated = conn
@@ -479,34 +470,32 @@ pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
              SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
             params![current_timestamp_millis(), note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, String> {
+pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
     let updated = conn
         .execute(
             "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
             params![current_timestamp_millis(), note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     if updated == 0 {
-        return Err("Note not found.".to_string());
+        return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| "Note not found.".to_string())
+    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePagePayload, String> {
+fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePagePayload, AppError> {
     if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
         return Ok(NotePagePayload {
             notes: Vec::new(),
@@ -598,16 +587,15 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     values.push(Value::from((limit + 1) as i64));
     values.push(Value::from(input.offset as i64));
 
-    let mut statement = conn.prepare(&sql).map_err(|error| error.to_string())?;
+    let mut statement = conn.prepare(&sql)?;
     let rows = statement
         .query_map(params_from_iter(values.iter()), |row| {
             row_to_note_summary(row, &search_tokens)
-        })
-        .map_err(|error| error.to_string())?;
+        })?;
 
     let mut notes = Vec::new();
     for row in rows {
-        notes.push(row.map_err(|error| error.to_string())?);
+        notes.push(row?);
     }
 
     let has_more = notes.len() > limit;
@@ -634,7 +622,7 @@ pub struct SearchResult {
 
 const SEARCH_RESULTS_LIMIT: usize = 20;
 
-pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, String> {
+pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, AppError> {
     let conn = database_connection(app)?;
     let search_tokens = search_tokens_from_query(query);
     let search_mode = match search_mode_from_tokens(&search_tokens) {
@@ -684,7 +672,7 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, S
         }
     };
 
-    let mut statement = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut statement = conn.prepare(&sql)?;
     let rows = statement
         .query_map(params_from_iter(values.iter()), |row| {
             let markdown: String = row.get(2)?;
@@ -701,12 +689,11 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, S
                     .unwrap_or_else(|| preview_from_markdown(&markdown)),
                 archived_at: row.get(5)?,
             })
-        })
-        .map_err(|e| e.to_string())?;
+        })?;
 
     let mut results = Vec::new();
     for row in rows {
-        results.push(row.map_err(|e| e.to_string())?);
+        results.push(row?);
         if results.len() >= SEARCH_RESULTS_LIMIT {
             break;
         }
@@ -715,7 +702,7 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, S
     Ok(results)
 }
 
-pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, String> {
+pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, AppError> {
     let conn = database_connection(app)?;
     let pattern = format!(
         "%{}%",
@@ -728,16 +715,14 @@ pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, String> 
              WHERE tag LIKE ? ESCAPE '\\'
              ORDER BY tag ASC
              LIMIT 20",
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
 
     let rows = statement
-        .query_map(params![pattern], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?;
+        .query_map(params![pattern], |row| row.get::<_, String>(0))?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|e| e.to_string())?);
+        tags.push(row?);
     }
 
     Ok(tags)
@@ -751,7 +736,7 @@ pub struct ExportNotesInput {
     pub export_dir: String,
 }
 
-pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, String> {
+pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, AppError> {
     if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
         return Ok(0);
     }
@@ -774,12 +759,11 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, S
     sql.push_str(&clauses.join(" AND "));
     sql.push_str(" ORDER BY n.edited_at DESC");
 
-    let mut statement = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut statement = conn.prepare(&sql)?;
     let rows = statement
         .query_map(params_from_iter(values.iter()), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| e.to_string())?;
+        })?;
 
     let export_dir = std::path::PathBuf::from(&input.export_dir);
     let mut used_names: std::collections::HashMap<String, usize> =
@@ -787,7 +771,7 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, S
     let mut count = 0;
 
     for row in rows {
-        let (title, markdown) = row.map_err(|e| e.to_string())?;
+        let (title, markdown) = row?;
         let base = sanitize_filename(&title);
 
         let entry = used_names.entry(base.clone()).or_insert(0);
@@ -799,7 +783,7 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, S
         };
 
         std::fs::write(export_dir.join(&filename), &markdown)
-            .map_err(|e| format!("Failed to write {}: {}", filename, e))?;
+            .map_err(|e| AppError::custom(format!("Failed to write {}: {}", filename, e)))?;
         count += 1;
     }
 
@@ -848,7 +832,7 @@ fn sanitize_filename(title: &str) -> String {
 fn query_contextual_tags(
     conn: &Connection,
     input: &ContextualTagsInput,
-) -> Result<ContextualTagsPayload, String> {
+) -> Result<ContextualTagsPayload, AppError> {
     if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
         return Ok(ContextualTagsPayload { tags: Vec::new() });
     }
@@ -875,16 +859,15 @@ fn query_contextual_tags(
 
     sql.push_str(" ORDER BY nt.tag ASC");
 
-    let mut statement = conn.prepare(&sql).map_err(|error| error.to_string())?;
+    let mut statement = conn.prepare(&sql)?;
     let rows = statement
         .query_map(params_from_iter(values.iter()), |row| {
             row.get::<_, String>(0)
-        })
-        .map_err(|error| error.to_string())?;
+        })?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|error| error.to_string())?);
+        tags.push(row?);
     }
 
     Ok(ContextualTagsPayload { tags })
@@ -918,21 +901,20 @@ fn append_note_view_clauses(
     }
 }
 
-fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, String> {
+fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, AppError> {
     conn.query_row(
         "SELECT archived_at IS NULL FROM notes WHERE id = ?1",
         params![note_id],
         |row| row.get::<_, bool>(0),
     )
     .optional()
-    .map_err(|error| error.to_string())
+    .map_err(AppError::from)
     .map(|value| value.unwrap_or(false))
 }
 
-fn seed_welcome_note_if_empty(conn: &Connection) -> Result<(), String> {
+fn seed_welcome_note_if_empty(conn: &Connection) -> Result<(), AppError> {
     let note_count = conn
-        .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get::<_, i64>(0))
-        .map_err(|error| error.to_string())?;
+        .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get::<_, i64>(0))?;
 
     if note_count > 0 {
         return Ok(());
@@ -953,8 +935,7 @@ Comet stores note content locally in its own database, with markdown as the unde
 "#;
 
     let transaction = conn
-        .unchecked_transaction()
-        .map_err(|error| error.to_string())?;
+        .unchecked_transaction()?;
     let now = current_timestamp_millis();
     let title = title_from_markdown(markdown);
 
@@ -963,16 +944,15 @@ Comet stores note content locally in its own database, with markdown as the unde
             "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at)
              VALUES (?1, ?2, ?3, NULL, ?4, ?4, ?4)",
             params!["welcome", title, markdown, now],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     upsert_note_search_document(&transaction, "welcome", &title, markdown)?;
     replace_note_tags(&transaction, "welcome", markdown)?;
-    transaction.commit().map_err(|error| error.to_string())?;
+    transaction.commit()?;
 
     Ok(())
 }
 
-fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, String> {
+fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, AppError> {
     let mut statement = conn
         .prepare(
             "SELECT b.id, b.name, COUNT(n.id) AS note_count
@@ -980,8 +960,7 @@ fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, String> {
              LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
              GROUP BY b.id, b.name, b.created_at
              ORDER BY LOWER(b.name) ASC, b.created_at ASC",
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     let rows = statement
         .query_map([], |row| {
@@ -990,18 +969,17 @@ fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, String> {
                 name: row.get(1)?,
                 note_count: row.get::<_, i64>(2)? as usize,
             })
-        })
-        .map_err(|error| error.to_string())?;
+        })?;
 
     let mut notebooks = Vec::new();
     for row in rows {
-        notebooks.push(row.map_err(|error| error.to_string())?);
+        notebooks.push(row?);
     }
 
     Ok(notebooks)
 }
 
-fn notebook_by_id(conn: &Connection, notebook_id: &str) -> Result<Option<NotebookSummary>, String> {
+fn notebook_by_id(conn: &Connection, notebook_id: &str) -> Result<Option<NotebookSummary>, AppError> {
     conn.query_row(
         "SELECT b.id, b.name, COUNT(n.id) AS note_count
          FROM notebooks b
@@ -1018,34 +996,32 @@ fn notebook_by_id(conn: &Connection, notebook_id: &str) -> Result<Option<Noteboo
         },
     )
     .optional()
-    .map_err(|error| error.to_string())
+    .map_err(AppError::from)
 }
 
-fn last_open_note_id(conn: &Connection) -> Result<Option<String>, String> {
+fn last_open_note_id(conn: &Connection) -> Result<Option<String>, AppError> {
     conn.query_row(
         "SELECT value FROM app_settings WHERE key = ?1",
         params![LAST_OPEN_NOTE_KEY],
         |row| row.get(0),
     )
     .optional()
-    .map_err(|error| error.to_string())
+    .map_err(AppError::from)
 }
 
-fn set_last_open_note_id(conn: &Connection, note_id: Option<&str>) -> Result<(), String> {
+fn set_last_open_note_id(conn: &Connection, note_id: Option<&str>) -> Result<(), AppError> {
     if let Some(note_id) = note_id {
         conn.execute(
             "INSERT INTO app_settings (key, value)
              VALUES (?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![LAST_OPEN_NOTE_KEY, note_id],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     } else {
         conn.execute(
             "DELETE FROM app_settings WHERE key = ?1",
             params![LAST_OPEN_NOTE_KEY],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
     }
 
     Ok(())
@@ -1093,7 +1069,7 @@ fn row_to_note_summary(
     })
 }
 
-fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, String> {
+fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, AppError> {
     let note = conn
         .query_row(
             "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.pinned_at, n.nostr_d_tag, n.published_at
@@ -1103,8 +1079,7 @@ fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, St
             params![note_id],
             row_to_loaded_note,
         )
-        .optional()
-        .map_err(|error| error.to_string())?;
+        .optional()?;
 
     note.map(|mut note| {
         note.tags = tags_for_note(conn, &note.id)?;
@@ -1116,7 +1091,7 @@ fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, St
 fn next_active_note_id(
     conn: &Connection,
     excluding_note_id: Option<&str>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, AppError> {
     conn.query_row(
         "SELECT id
          FROM notes
@@ -1128,7 +1103,7 @@ fn next_active_note_id(
         |row| row.get(0),
     )
     .optional()
-    .map_err(|error| error.to_string())
+    .map_err(AppError::from)
 }
 
 fn title_from_markdown(markdown: &str) -> String {
@@ -1277,7 +1252,7 @@ fn replace_note_tags(
     transaction: &Transaction<'_>,
     note_id: &str,
     markdown: &str,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let next_tags = extract_tags(markdown);
     let current_tags = tags_for_note_in_transaction(transaction, note_id)?;
 
@@ -1297,8 +1272,7 @@ fn replace_note_tags(
                     .execute(
                         "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
                         params![note_id, &current_tags[ci]],
-                    )
-                    .map_err(|error| error.to_string())?;
+                    )?;
                 ci += 1;
             }
             std::cmp::Ordering::Greater => {
@@ -1307,8 +1281,7 @@ fn replace_note_tags(
                     .execute(
                         "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
                         params![note_id, &next_tags[ni]],
-                    )
-                    .map_err(|error| error.to_string())?;
+                    )?;
                 ni += 1;
             }
             std::cmp::Ordering::Equal => {
@@ -1324,8 +1297,7 @@ fn replace_note_tags(
             .execute(
                 "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
                 params![note_id, &current_tags[ci]],
-            )
-            .map_err(|error| error.to_string())?;
+            )?;
         ci += 1;
     }
 
@@ -1335,8 +1307,7 @@ fn replace_note_tags(
             .execute(
                 "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
                 params![note_id, &next_tags[ni]],
-            )
-            .map_err(|error| error.to_string())?;
+            )?;
         ni += 1;
     }
 
@@ -1348,40 +1319,35 @@ fn upsert_note_search_document(
     note_id: &str,
     title: &str,
     markdown: &str,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     transaction
-        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])
-        .map_err(|error| error.to_string())?;
+        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
     transaction
         .execute(
             "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
             params![note_id, title, markdown],
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
 
     Ok(())
 }
 
-fn delete_note_search_document(transaction: &Transaction<'_>, note_id: &str) -> Result<(), String> {
+fn delete_note_search_document(transaction: &Transaction<'_>, note_id: &str) -> Result<(), AppError> {
     transaction
-        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])
-        .map_err(|error| error.to_string())?;
+        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
 
     Ok(())
 }
 
-fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, String> {
+fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, AppError> {
     let mut statement = conn
-        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")
-        .map_err(|error| error.to_string())?;
+        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
 
     let rows = statement
-        .query_map(params![note_id], |row| row.get::<_, String>(0))
-        .map_err(|error| error.to_string())?;
+        .query_map(params![note_id], |row| row.get::<_, String>(0))?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|error| error.to_string())?);
+        tags.push(row?);
     }
 
     Ok(tags)
@@ -1390,18 +1356,16 @@ fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, String
 fn tags_for_note_in_transaction(
     transaction: &Transaction<'_>,
     note_id: &str,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, AppError> {
     let mut statement = transaction
-        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")
-        .map_err(|error| error.to_string())?;
+        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
 
     let rows = statement
-        .query_map(params![note_id], |row| row.get::<_, String>(0))
-        .map_err(|error| error.to_string())?;
+        .query_map(params![note_id], |row| row.get::<_, String>(0))?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|error| error.to_string())?);
+        tags.push(row?);
     }
 
     Ok(tags)
@@ -1469,38 +1433,38 @@ fn escape_like_pattern(token: &str) -> String {
     escaped
 }
 
-fn validate_note_id(note_id: &str) -> Result<(), String> {
+fn validate_note_id(note_id: &str) -> Result<(), AppError> {
     if note_id.is_empty()
         || note_id.contains('/')
         || note_id.contains('\\')
         || note_id.contains("..")
     {
-        return Err("Invalid note id.".to_string());
+        return Err(AppError::custom("Invalid note id."));
     }
 
     Ok(())
 }
 
-fn validate_notebook_id(notebook_id: &str) -> Result<(), String> {
+fn validate_notebook_id(notebook_id: &str) -> Result<(), AppError> {
     if notebook_id.is_empty()
         || notebook_id.contains('/')
         || notebook_id.contains('\\')
         || notebook_id.contains("..")
     {
-        return Err("Invalid notebook id.".to_string());
+        return Err(AppError::custom("Invalid notebook id."));
     }
 
     Ok(())
 }
 
-fn normalize_notebook_name(name: &str) -> Result<String, String> {
+fn normalize_notebook_name(name: &str) -> Result<String, AppError> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err("Notebook name cannot be empty.".to_string());
+        return Err(AppError::custom("Notebook name cannot be empty."));
     }
 
     if trimmed.len() > 80 {
-        return Err("Notebook name is too long.".to_string());
+        return Err(AppError::custom("Notebook name is too long."));
     }
 
     Ok(trimmed.to_string())
@@ -1521,11 +1485,11 @@ fn generate_notebook_id() -> String {
     format!("notebook-{}", current_timestamp_millis())
 }
 
-fn handle_notebook_write_error(error: rusqlite::Error) -> String {
+fn handle_notebook_write_error(error: rusqlite::Error) -> AppError {
     match error {
         rusqlite::Error::SqliteFailure(inner, _) if inner.extended_code == 2067 => {
-            "A notebook with that name already exists.".to_string()
+            AppError::custom("A notebook with that name already exists.")
         }
-        other => other.to_string(),
+        other => AppError::Db(other),
     }
 }

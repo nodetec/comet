@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -10,17 +11,14 @@ pub const DEFAULT_BLOSSOM_URL: &str = "https://blossom.comet.md";
 /// Returns the npub for the stored identity,
 /// generating a new keypair if one does not exist yet.
 /// On first launch, also sets up default relay and blossom server.
-pub fn ensure_identity(conn: &Connection) -> Result<String, String> {
+pub fn ensure_identity(conn: &Connection) -> Result<String, AppError> {
     if let Some(npub) = get_npub(conn)? {
         return Ok(npub);
     }
 
     let keys = Keys::generate();
-    let npub = keys.public_key().to_bech32().map_err(|e| e.to_string())?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis() as i64;
+    let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
+    let now = now_ms()?;
 
     conn.execute(
         "INSERT INTO nostr_identity (secret_key, public_key, npub, created_at)
@@ -31,8 +29,7 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, String> {
             npub,
             now,
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     // Set default relays and blossom server on first launch
     let _ = conn.execute(
@@ -51,12 +48,12 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, String> {
     Ok(npub)
 }
 
-fn get_npub(conn: &Connection) -> Result<Option<String>, String> {
+fn get_npub(conn: &Connection) -> Result<Option<String>, AppError> {
     conn.query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
         row.get(0)
     })
     .optional()
-    .map_err(|e| e.to_string())
+    .map_err(Into::into)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,10 +64,9 @@ pub struct Relay {
     pub created_at: i64,
 }
 
-pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, String> {
+pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
     let mut stmt = conn
-        .prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")
-        .map_err(|e| e.to_string())?;
+        .prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")?;
     let relays = stmt
         .query_map([], |row| {
             Ok(Relay {
@@ -78,37 +74,32 @@ pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, String> {
                 kind: row.get(1)?,
                 created_at: row.get(2)?,
             })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(relays)
 }
 
-pub fn set_sync_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, String> {
+pub fn set_sync_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
     let url = normalize_relay_url(url)?;
     let now = now_ms()?;
 
     // Remove any existing sync relay
-    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])
-        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])?;
 
     conn.execute(
         "INSERT OR REPLACE INTO relays (url, kind, created_at) VALUES (?1, 'sync', ?2)",
         params![url, now],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     list_relays(conn)
 }
 
-pub fn remove_sync_relay(conn: &Connection) -> Result<Vec<Relay>, String> {
-    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])
-        .map_err(|e| e.to_string())?;
+pub fn remove_sync_relay(conn: &Connection) -> Result<Vec<Relay>, AppError> {
+    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])?;
     list_relays(conn)
 }
 
-pub fn add_publish_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, String> {
+pub fn add_publish_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
     let url = normalize_relay_url(url)?;
     let now = now_ms()?;
 
@@ -116,33 +107,32 @@ pub fn add_publish_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, Str
         "INSERT INTO relays (url, kind, created_at) VALUES (?1, 'publish', ?2)",
         params![url, now],
     )
-    .map_err(|_| format!("Relay already added: {url}"))?;
+    .map_err(|_| AppError::custom(format!("Relay already added: {url}")))?;
 
     list_relays(conn)
 }
 
-pub fn remove_relay(conn: &Connection, url: &str, kind: &str) -> Result<Vec<Relay>, String> {
+pub fn remove_relay(conn: &Connection, url: &str, kind: &str) -> Result<Vec<Relay>, AppError> {
     conn.execute(
         "DELETE FROM relays WHERE url = ?1 AND kind = ?2",
         params![url, kind],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     list_relays(conn)
 }
 
-fn normalize_relay_url(url: &str) -> Result<String, String> {
+fn normalize_relay_url(url: &str) -> Result<String, AppError> {
     let url = url.trim();
     if !url.starts_with("wss://") && !url.starts_with("ws://") {
-        return Err("Relay URL must start with wss:// or ws://".into());
+        return Err(AppError::custom("Relay URL must start with wss:// or ws://"));
     }
     // Strip trailing slash for consistency
     Ok(url.trim_end_matches('/').to_string())
 }
 
-fn now_ms() -> Result<i64, String> {
+fn now_ms() -> Result<i64, AppError> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::custom(e.to_string()))
         .map(|d| d.as_millis() as i64)
 }
 
@@ -163,7 +153,7 @@ pub struct PublishNoteInput {
     pub tags: Vec<String>,
 }
 
-pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<PublishResult, String> {
+pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
 
     // Synchronous DB block — Connection is not Send, must drop before any .await
@@ -176,9 +166,8 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Note not found.".to_string())?;
+            .optional()?
+            .ok_or_else(|| AppError::custom("Note not found."))?;
 
         let secret_hex: String = conn
             .query_row(
@@ -186,21 +175,17 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
                 [],
                 |row| row.get(0),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "No Nostr identity configured.".to_string())?;
+            .optional()?
+            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
         let mut stmt = conn
-            .prepare("SELECT url FROM relays WHERE kind = 'publish'")
-            .map_err(|e| e.to_string())?;
+            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?;
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
 
         if relay_urls.is_empty() {
-            return Err("No publish relays configured. Add one in Settings → Relays.".to_string());
+            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
         }
 
         let d_tag = match existing_d_tag {
@@ -209,8 +194,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
                 conn.execute(
                     "UPDATE notes SET nostr_d_tag = ?1 WHERE id = ?1",
                     params![id],
-                )
-                .map_err(|e| e.to_string())?;
+                )?;
                 id.clone()
             }
         };
@@ -222,12 +206,12 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
 
     // Async relay block
     let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| format!("Invalid secret key: {e}"))?;
+        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| AppError::custom(e.to_string()))?
         .as_secs();
 
     let mut event_tags: Vec<Tag> = vec![
@@ -248,14 +232,14 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
     let event = EventBuilder::new(Kind::LongFormTextNote, &content)
         .tags(event_tags)
         .sign_with_keys(&keys)
-        .map_err(|e| format!("Failed to sign event: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to sign event: {e}")))?;
 
     let client = Client::new(keys);
     for url in &relay_urls {
         client
             .add_relay(url.as_str())
             .await
-            .map_err(|e| format!("Failed to add relay {url}: {e}"))?;
+            .map_err(|e| AppError::custom(format!("Failed to add relay {url}: {e}")))?;
     }
     client.connect().await;
 
@@ -265,8 +249,8 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
         client.send_event(&event),
     )
     .await
-    .map_err(|_| "Timed out sending event to relays.".to_string())?
-    .map_err(|e| format!("Failed to send event: {e}"))?;
+    .map_err(|_| AppError::custom("Timed out sending event to relays."))?
+    .map_err(|e| AppError::custom(format!("Failed to send event: {e}")))?;
 
     client.disconnect().await;
 
@@ -279,8 +263,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
         conn.execute(
             "UPDATE notes SET published_at = ?1 WHERE id = ?2",
             params![published_at, note_id],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     Ok(PublishResult {
@@ -290,7 +273,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
     })
 }
 
-pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, String> {
+pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, AppError> {
     // Synchronous DB block
     let (secret_hex, d_tag, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
@@ -301,12 +284,11 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "Note not found.".to_string())?;
+            .optional()?
+            .ok_or_else(|| AppError::custom("Note not found."))?;
 
         let d_tag = existing_d_tag
-            .ok_or_else(|| "This note has not been published to Nostr.".to_string())?;
+            .ok_or_else(|| AppError::custom("This note has not been published to Nostr."))?;
 
         let secret_hex: String = conn
             .query_row(
@@ -314,21 +296,17 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
                 [],
                 |row| row.get(0),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "No Nostr identity configured.".to_string())?;
+            .optional()?
+            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
         let mut stmt = conn
-            .prepare("SELECT url FROM relays WHERE kind = 'publish'")
-            .map_err(|e| e.to_string())?;
+            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?;
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
 
         if relay_urls.is_empty() {
-            return Err("No publish relays configured. Add one in Settings → Relays.".to_string());
+            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
         }
 
         let _ = id;
@@ -337,7 +315,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
 
     // Async relay block
     let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| format!("Invalid secret key: {e}"))?;
+        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
     let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key())
@@ -348,14 +326,14 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
             .coordinate(coordinate)
     )
     .sign_with_keys(&keys)
-    .map_err(|e| format!("Failed to sign deletion event: {e}"))?;
+    .map_err(|e| AppError::custom(format!("Failed to sign deletion event: {e}")))?;
 
     let client = Client::new(keys);
     for url in &relay_urls {
         client
             .add_relay(url.as_str())
             .await
-            .map_err(|e| format!("Failed to add relay {url}: {e}"))?;
+            .map_err(|e| AppError::custom(format!("Failed to add relay {url}: {e}")))?;
     }
     client.connect().await;
 
@@ -365,8 +343,8 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
         client.send_event(&deletion),
     )
     .await
-    .map_err(|_| "Timed out sending deletion event to relays.".to_string())?
-    .map_err(|e| format!("Failed to send deletion event: {e}"))?;
+    .map_err(|_| AppError::custom("Timed out sending deletion event to relays."))?
+    .map_err(|e| AppError::custom(format!("Failed to send deletion event: {e}")))?;
 
     client.disconnect().await;
 
@@ -378,8 +356,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
         conn.execute(
             "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL WHERE id = ?1",
             params![note_id],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     Ok(PublishResult {
@@ -403,17 +380,13 @@ pub(crate) fn strip_title_line(markdown: &str) -> String {
 
 /// Imports an nsec (bech32 or hex), replacing the existing identity.
 /// Returns the new npub.
-pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, String> {
-    let secret_key = SecretKey::parse(nsec).map_err(|e| format!("Invalid key: {e}"))?;
+pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, AppError> {
+    let secret_key = SecretKey::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
     let keys = Keys::new(secret_key);
-    let npub = keys.public_key().to_bech32().map_err(|e| e.to_string())?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis() as i64;
+    let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
+    let now = now_ms()?;
 
-    conn.execute("DELETE FROM nostr_identity", [])
-        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM nostr_identity", [])?;
 
     conn.execute(
         "INSERT INTO nostr_identity (secret_key, public_key, npub, created_at)
@@ -424,8 +397,7 @@ pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, String> {
             npub,
             now,
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(npub)
 }

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
@@ -238,20 +239,20 @@ struct SyncedNotebook {
     name: String,
 }
 
-fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, String> {
+fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, AppError> {
     let id = rumor
         .tags
         .find(TagKind::d())
         .and_then(|t| t.content())
         .map(|s| s.to_string())
-        .ok_or("Missing d tag in notebook event")?;
+        .ok_or_else(|| AppError::custom("Missing d tag in notebook event"))?;
 
     let name = rumor
         .tags
         .find(TagKind::Title)
         .and_then(|t| t.content())
         .map(|s| s.to_string())
-        .ok_or("Missing title tag in notebook event")?;
+        .ok_or_else(|| AppError::custom("Missing title tag in notebook event"))?;
 
     Ok(SyncedNotebook { id, name })
 }
@@ -269,15 +270,14 @@ fn upsert_notebook_from_sync(
     conn: &Connection,
     notebook: &SyncedNotebook,
     sync_event_id: &str,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let now = now_ms();
     conn.execute(
         "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
          VALUES (?1, ?2, ?3, ?3, ?4, 0) \
          ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, sync_event_id = excluded.sync_event_id, locally_modified = 0",
         params![notebook.id, notebook.name, now, sync_event_id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     Ok(())
 }
 
@@ -381,13 +381,13 @@ fn note_to_rumor(
         .build(pubkey)
 }
 
-fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, String> {
+fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
     let d_tag = rumor
         .tags
         .find(TagKind::d())
         .and_then(|t| t.content())
         .map(|s| s.to_string())
-        .ok_or("Missing d tag in synced event")?;
+        .ok_or_else(|| AppError::custom("Missing d tag in synced event"))?;
 
     let title = rumor
         .tags
@@ -468,15 +468,14 @@ fn upsert_from_sync(
     conn: &Connection,
     note: &SyncedNote,
     sync_event_id: &str,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, AppError> {
     let existing: Option<(String, i64)> = conn
         .query_row(
             "SELECT id, modified_at FROM notes WHERE id = ?1",
             params![note.id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .optional()
-        .map_err(|e| e.to_string())?;
+        .optional()?;
 
     if let Some((_, local_modified)) = &existing {
         if *local_modified >= note.modified_at {
@@ -485,8 +484,7 @@ fn upsert_from_sync(
             conn.execute(
                 "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
                 params![sync_event_id, note.id],
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
             return Ok(None);
         }
     }
@@ -497,8 +495,7 @@ fn upsert_from_sync(
         conn.execute(
             "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, ?2, 0)",
             params![nb_id, now],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     if existing.is_some() {
@@ -517,8 +514,7 @@ fn upsert_from_sync(
                 sync_event_id,
                 note.id,
             ],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     } else {
         // Insert new note
         conn.execute(
@@ -536,32 +532,27 @@ fn upsert_from_sync(
                 note.pinned_at,
                 sync_event_id,
             ],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     // Update tags
-    conn.execute("DELETE FROM note_tags WHERE note_id = ?1", params![note.id])
-        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM note_tags WHERE note_id = ?1", params![note.id])?;
     for tag in &note.tags {
         conn.execute(
             "INSERT OR IGNORE INTO note_tags (note_id, tag) VALUES (?1, ?2)",
             params![note.id, tag],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     // Update FTS
     conn.execute(
         "DELETE FROM notes_fts WHERE note_id = ?1",
         params![note.id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     conn.execute(
         "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
         params![note.id, note.title, note.markdown],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(Some(note.id.clone()))
 }
@@ -600,7 +591,7 @@ async fn run_sync_loop(
                 sync_log(&app, &format!("connection error: {e}"));
                 set_state(
                     &state,
-                    SyncState::Error { message: e.clone() },
+                    SyncState::Error { message: e.to_string() },
                     &app,
                 )
                 .await;
@@ -623,19 +614,19 @@ async fn run_sync_connection(
     state: &Arc<Mutex<SyncState>>,
     shutdown_rx: &mut watch::Receiver<bool>,
     push_rx: &mut mpsc::Receiver<SyncCommand>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     // Read config from DB
     let (relay_url, secret_hex, _public_hex) = {
-        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+        let conn = crate::db::database_connection(app)?;
         let relay_url =
-            get_sync_relay_url(&conn).ok_or("No sync relay configured".to_string())?;
+            get_sync_relay_url(&conn).ok_or_else(|| AppError::custom("No sync relay configured"))?;
         let (secret_hex, public_hex) =
-            get_identity(&conn).ok_or("No Nostr identity configured".to_string())?;
+            get_identity(&conn).ok_or_else(|| AppError::custom("No Nostr identity configured"))?;
         (relay_url, secret_hex, public_hex)
     };
 
     let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| format!("Invalid secret key: {e}"))?;
+        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
     let pubkey = keys.public_key();
 
@@ -645,7 +636,7 @@ async fn run_sync_connection(
 
     let (ws_stream, _) = connect_async(&relay_url)
         .await
-        .map_err(|e| format!("WebSocket connection failed: {e}"))?;
+        .map_err(|e| AppError::custom(format!("WebSocket connection failed: {e}")))?;
 
     let (mut ws_write, mut ws_read) = ws_stream.split();
 
@@ -658,7 +649,7 @@ async fn run_sync_connection(
                 match msg {
                     Some(Ok(Message::Text(ref text))) => {
                         let parsed: serde_json::Value = serde_json::from_str(text.as_ref())
-                            .map_err(|e| format!("Invalid JSON from relay: {e}"))?;
+                            .map_err(|e| AppError::custom(format!("Invalid JSON from relay: {e}")))?;
                         if let Some(arr) = parsed.as_array() {
                             if arr.first().and_then(|v| v.as_str()) == Some("AUTH") {
                                 if let Some(c) = arr.get(1).and_then(|v| v.as_str()) {
@@ -667,8 +658,8 @@ async fn run_sync_connection(
                             }
                         }
                     }
-                    Some(Err(e)) => return Err(format!("WebSocket error: {e}")),
-                    None => return Err("Connection closed before AUTH".to_string()),
+                    Some(Err(e)) => return Err(AppError::custom(format!("WebSocket error: {e}"))),
+                    None => return Err(AppError::custom("Connection closed before AUTH")),
                     _ => {}
                 }
             }
@@ -683,20 +674,20 @@ async fn run_sync_connection(
             Tag::custom(TagKind::custom("challenge"), vec![challenge]),
         ])
         .sign_with_keys(&keys)
-        .map_err(|e| format!("Failed to sign AUTH event: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to sign AUTH event: {e}")))?;
 
     let auth_json: serde_json::Value = serde_json::from_str(&auth_event.as_json())
-        .map_err(|e| format!("Failed to serialize AUTH event: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to serialize AUTH event: {e}")))?;
     let auth_msg = serde_json::json!(["AUTH", auth_json]);
     ws_write
         .send(Message::from(auth_msg.to_string()))
         .await
-        .map_err(|e| format!("Failed to send AUTH: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to send AUTH: {e}")))?;
 
     // Wait for OK
     let ok = wait_for_ok(&mut ws_read, shutdown_rx).await?;
     if !ok {
-        return Err("AUTH rejected by relay".to_string());
+        return Err(AppError::custom("AUTH rejected by relay"));
     }
     sync_log(app, "authenticated");
 
@@ -704,7 +695,7 @@ async fn run_sync_connection(
     set_state(state, SyncState::Syncing, app).await;
 
     let checkpoint = {
-        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+        let conn = crate::db::database_connection(app)?;
         get_checkpoint(&conn)
     };
 
@@ -720,7 +711,7 @@ async fn run_sync_connection(
     ws_write
         .send(Message::from(changes_msg.to_string()))
         .await
-        .map_err(|e| format!("Failed to send CHANGES: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to send CHANGES: {e}")))?;
     sync_log(app, &format!("subscribed since={checkpoint}"));
 
     // Track recently pushed event IDs to avoid echo
@@ -739,7 +730,7 @@ async fn run_sync_connection(
             ws_write
                 .send(Message::Ping(vec![].into()))
                 .await
-                .map_err(|e| format!("Ping failed: {e}"))?;
+                .map_err(|e| AppError::custom(format!("Ping failed: {e}")))?;
             last_ping = tokio::time::Instant::now();
         }
         // Fire any ready debounced pushes before waiting for new events
@@ -783,9 +774,9 @@ async fn run_sync_connection(
                         ).await?;
                     }
                     Some(Ok(Message::Close(_))) | None => {
-                        return Err("Connection closed by relay".to_string());
+                        return Err(AppError::custom("Connection closed by relay"));
                     }
-                    Some(Err(e)) => return Err(format!("WebSocket error: {e}")),
+                    Some(Err(e)) => return Err(AppError::custom(format!("WebSocket error: {e}"))),
                     _ => {}
                 }
             }
@@ -830,26 +821,26 @@ async fn wait_for_ok(
         >,
     >,
     shutdown_rx: &mut watch::Receiver<bool>,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     loop {
         tokio::select! {
             msg = ws_read.next() => {
                 match msg {
                     Some(Ok(Message::Text(ref text))) => {
                         let parsed: serde_json::Value = serde_json::from_str(text.as_ref())
-                            .map_err(|e| format!("Invalid JSON: {e}"))?;
+                            .map_err(|e| AppError::custom(format!("Invalid JSON: {e}")))?;
                         if let Some(arr) = parsed.as_array() {
                             if arr.first().and_then(|v| v.as_str()) == Some("OK") {
                                 return Ok(arr.get(2).and_then(|v| v.as_bool()).unwrap_or(false));
                             }
                         }
                     }
-                    Some(Err(e)) => return Err(format!("WebSocket error: {e}")),
-                    None => return Err("Connection closed".to_string()),
+                    Some(Err(e)) => return Err(AppError::custom(format!("WebSocket error: {e}"))),
+                    None => return Err(AppError::custom("Connection closed")),
                     _ => {}
                 }
             }
-            _ = shutdown_rx.changed() => return Err("Shutdown".to_string()),
+            _ = shutdown_rx.changed() => return Err(AppError::custom("Shutdown")),
         }
     }
 }
@@ -862,9 +853,9 @@ async fn process_relay_message(
     text: &str,
     state: &Arc<Mutex<SyncState>>,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let parsed: serde_json::Value =
-        serde_json::from_str(text).map_err(|e| format!("Invalid JSON: {e}"))?;
+        serde_json::from_str(text).map_err(|e| AppError::custom(format!("Invalid JSON: {e}")))?;
 
     let arr = match parsed.as_array() {
         Some(a) => a,
@@ -882,17 +873,17 @@ async fn process_relay_message(
     match sub_type {
         "EVENT" => {
             let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
-            let event_json = arr.get(4).ok_or("Missing event in CHANGES EVENT")?;
+            let event_json = arr.get(4).ok_or_else(|| AppError::custom("Missing event in CHANGES EVENT"))?;
 
             let event: Event = Event::from_json(event_json.to_string())
-                .map_err(|e| format!("Invalid event: {e}"))?;
+                .map_err(|e| AppError::custom(format!("Invalid event: {e}")))?;
 
             let event_id = event.id.to_hex();
 
             // Skip echo (events we just pushed)
             if recent_pushes.contains_key(&event_id) {
                 sync_log(app, &format!("echo skip seq={seq}"));
-                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let conn = crate::db::database_connection(app)?;
                 save_checkpoint(&conn, seq);
                 return Ok(());
             }
@@ -903,7 +894,7 @@ async fn process_relay_message(
                 Ok(u) => u,
                 Err(e) => {
                     sync_log(app, &format!("skip undecryptable event: {e}"));
-                    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                    let conn = crate::db::database_connection(app)?;
                     save_checkpoint(&conn, seq);
                     return Ok(());
                 }
@@ -919,18 +910,15 @@ async fn process_relay_message(
                     .to_string();
                 sync_log(app, &format!("received delete for {d_tag}"));
 
-                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let conn = crate::db::database_connection(app)?;
 
                 if is_notebook_rumor(&unwrapped.rumor) {
                     // Delete notebook
-                    conn.execute("DELETE FROM notebooks WHERE id = ?1", params![d_tag])
-                        .map_err(|e| e.to_string())?;
+                    conn.execute("DELETE FROM notebooks WHERE id = ?1", params![d_tag])?;
                 } else {
                     // Permanently delete the note
-                    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![d_tag])
-                        .map_err(|e| e.to_string())?;
-                    conn.execute("DELETE FROM notes WHERE id = ?1", params![d_tag])
-                        .map_err(|e| e.to_string())?;
+                    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![d_tag])?;
+                    conn.execute("DELETE FROM notes WHERE id = ?1", params![d_tag])?;
                 }
                 save_checkpoint(&conn, seq);
 
@@ -950,14 +938,14 @@ async fn process_relay_message(
                     Ok(n) => n,
                     Err(e) => {
                         sync_log(app, &format!("skip malformed notebook: {e}"));
-                        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                        let conn = crate::db::database_connection(app)?;
                         save_checkpoint(&conn, seq);
                         return Ok(());
                     }
                 };
                 sync_log(app, &format!("received notebook {} ({})", notebook.id, notebook.name));
 
-                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let conn = crate::db::database_connection(app)?;
                 if let Err(e) = upsert_notebook_from_sync(&conn, &notebook, &event_id) {
                     sync_log(app, &format!("notebook upsert failed {}: {e}", notebook.id));
                 }
@@ -975,7 +963,7 @@ async fn process_relay_message(
                     Ok(n) => n,
                     Err(e) => {
                         sync_log(app, &format!("skip malformed note: {e}"));
-                        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                        let conn = crate::db::database_connection(app)?;
                         save_checkpoint(&conn, seq);
                         return Ok(());
                     }
@@ -983,7 +971,7 @@ async fn process_relay_message(
                 let note_id = synced_note.id.clone();
                 sync_log(app, &format!("received note {note_id}"));
 
-                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let conn = crate::db::database_connection(app)?;
                 let updated = upsert_from_sync(&conn, &synced_note, &event_id)?;
                 if updated.is_some() {
                     sync_log(app, &format!("updated note {note_id}"));
@@ -1017,14 +1005,14 @@ async fn process_relay_message(
                 .is_some();
             // Superseded events are just version replacements — skip entirely
             if is_supersede {
-                let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+                let conn = crate::db::database_connection(app)?;
                 save_checkpoint(&conn, seq);
                 return Ok(());
             }
 
             sync_log(app, &format!("received deleted seq={seq}"));
 
-            let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+            let conn = crate::db::database_connection(app)?;
 
             // Check if it's a note deletion
             let note_id: Option<String> = conn
@@ -1033,16 +1021,14 @@ async fn process_relay_message(
                     params![deleted_event_id],
                     |row| row.get(0),
                 )
-                .optional()
-                .map_err(|e| e.to_string())?;
+                .optional()?;
 
             if let Some(note_id) = note_id {
                 let now = now_ms();
                 conn.execute(
                     "UPDATE notes SET archived_at = ?1 WHERE id = ?2 AND archived_at IS NULL",
                     params![now, note_id],
-                )
-                .map_err(|e| e.to_string())?;
+                )?;
 
                 let _ = app.emit(
                     "sync-remote-change",
@@ -1060,16 +1046,14 @@ async fn process_relay_message(
                     params![deleted_event_id],
                     |row| row.get(0),
                 )
-                .optional()
-                .map_err(|e| e.to_string())?;
+                .optional()?;
 
             if let Some(notebook_id) = notebook_id {
                 // Delete notebook (FK ON DELETE SET NULL handles note unassignment)
                 conn.execute(
                     "DELETE FROM notebooks WHERE id = ?1",
                     params![notebook_id],
-                )
-                .map_err(|e| e.to_string())?;
+                )?;
                 sync_log(app, &format!("deleted notebook {notebook_id}"));
 
                 let _ = app.emit(
@@ -1087,29 +1071,23 @@ async fn process_relay_message(
         "EOSE" => {
             let max_seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
             sync_log(app, &format!("synced to seq={max_seq}"));
-            let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+            let conn = crate::db::database_connection(app)?;
             save_checkpoint(&conn, max_seq);
 
             // Push any locally modified notes/notebooks (created or edited while offline)
             let (unsynced_notebooks, unsynced_notes) = {
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notebooks WHERE locally_modified = 1")
-                    .map_err(|e| e.to_string())?;
+                    .prepare("SELECT id FROM notebooks WHERE locally_modified = 1")?;
                 let nbs: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))
-                    .map_err(|e| e.to_string())?
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| e.to_string())?;
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<Vec<_>, _>>()?;
                 drop(stmt);
 
                 let mut stmt = conn
-                    .prepare("SELECT id FROM notes WHERE locally_modified = 1")
-                    .map_err(|e| e.to_string())?;
+                    .prepare("SELECT id FROM notes WHERE locally_modified = 1")?;
                 let notes: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))
-                    .map_err(|e| e.to_string())?
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| e.to_string())?;
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<Vec<_>, _>>()?;
 
                 (nbs, notes)
             }; // conn and stmts dropped here
@@ -1122,13 +1100,10 @@ async fn process_relay_message(
             // Process pending deletions (queued while offline)
             let pending_deletions: Vec<String> = {
                 let mut stmt = conn
-                    .prepare("SELECT entity_id FROM pending_deletions")
-                    .map_err(|e| e.to_string())?;
+                    .prepare("SELECT entity_id FROM pending_deletions")?;
                 let ids: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))
-                    .map_err(|e| e.to_string())?
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| e.to_string())?;
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<Vec<_>, _>>()?;
                 ids
             };
 
@@ -1151,7 +1126,7 @@ async fn process_relay_message(
         }
         "ERR" => {
             let message = arr.get(3).and_then(|v| v.as_str()).unwrap_or("unknown error");
-            return Err(format!("CHANGES error: {message}"));
+            return Err(AppError::custom(format!("CHANGES error: {message}")));
         }
         _ => {}
     }
@@ -1172,10 +1147,10 @@ async fn push_note(
     >,
     note_id: &str,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     // Read note from DB
     let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at, tags, blossom_url) = {
-        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+        let conn = crate::db::database_connection(app)?;
 
         let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>)> = conn
             .query_row(
@@ -1183,22 +1158,18 @@ async fn push_note(
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
             )
-            .optional()
-            .map_err(|e| e.to_string())?;
+            .optional()?;
 
         let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, pinned_at) =
-            note.ok_or_else(|| format!("Note not found: {note_id}"))?;
+            note.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
         let edited_at = edited_at.unwrap_or(modified_at);
 
         // Get tags
         let mut tag_stmt = conn
-            .prepare("SELECT tag FROM note_tags WHERE note_id = ?1")
-            .map_err(|e| e.to_string())?;
+            .prepare("SELECT tag FROM note_tags WHERE note_id = ?1")?;
         let tags: Vec<String> = tag_stmt
-            .query_map(params![note_id], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?;
+            .query_map(params![note_id], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
 
         let blossom_url = get_blossom_url(&conn);
 
@@ -1230,11 +1201,11 @@ async fn push_note(
             .await?;
 
             // Save blob metadata for on-demand download on other devices
-            let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+            let conn = crate::db::database_connection(app)?;
             conn.execute(
                 "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
                 params![hash, ciphertext_hash, key_hex],
-            ).map_err(|e| e.to_string())?;
+            )?;
 
             blob_tags.push((hash.clone(), ciphertext_hash, key_hex));
         }
@@ -1265,7 +1236,7 @@ async fn push_note(
         [Tag::identifier(&d_tag)],
     )
     .await
-    .map_err(|e| format!("Failed to gift wrap: {e}"))?;
+    .map_err(|e| AppError::custom(format!("Failed to gift wrap: {e}")))?;
 
     let event_id = gift_wrap.id.to_hex();
 
@@ -1274,20 +1245,19 @@ async fn push_note(
 
     // Send to relay
     let gift_wrap_json: serde_json::Value = serde_json::from_str(&gift_wrap.as_json())
-        .map_err(|e| format!("Failed to serialize gift wrap: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to serialize gift wrap: {e}")))?;
     let event_msg = serde_json::json!(["EVENT", gift_wrap_json]);
     ws_write
         .send(Message::from(event_msg.to_string()))
         .await
-        .map_err(|e| format!("Failed to send event: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to send event: {e}")))?;
 
     // Update sync_event_id and last_pushed_at in DB
-    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+    let conn = crate::db::database_connection(app)?;
     conn.execute(
         "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
         params![event_id, note_id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     sync_log(app, &format!("pushed note {note_id}"));
 
@@ -1305,7 +1275,7 @@ async fn push_deletion(
     >,
     entity_id: &str,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     // Push a tombstone gift wrap — a deleted marker that replaces the current version
     // via the same HMAC'd d-tag. This is more reliable than NIP-09 since the relay's
     // replaceable gift wrap mechanism ensures the tombstone replaces the content.
@@ -1329,18 +1299,18 @@ async fn push_deletion(
         [Tag::identifier(&d_tag)],
     )
     .await
-    .map_err(|e| format!("Failed to gift wrap deletion: {e}"))?;
+    .map_err(|e| AppError::custom(format!("Failed to gift wrap deletion: {e}")))?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
 
     let gift_wrap_json: serde_json::Value = serde_json::from_str(&gift_wrap.as_json())
-        .map_err(|e| format!("Failed to serialize gift wrap: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to serialize gift wrap: {e}")))?;
     let event_msg = serde_json::json!(["EVENT", gift_wrap_json]);
     ws_write
         .send(Message::from(event_msg.to_string()))
         .await
-        .map_err(|e| format!("Failed to send deletion: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to send deletion: {e}")))?;
 
     // Remove from pending_deletions if it was queued for offline
     if let Ok(conn) = crate::db::database_connection(app) {
@@ -1368,18 +1338,17 @@ async fn push_notebook(
     >,
     notebook_id: &str,
     recent_pushes: &mut HashMap<String, std::time::Instant>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let (name,) = {
-        let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+        let conn = crate::db::database_connection(app)?;
         let row: Option<(String,)> = conn
             .query_row(
                 "SELECT name FROM notebooks WHERE id = ?1",
                 params![notebook_id],
                 |row| Ok((row.get(0)?,)),
             )
-            .optional()
-            .map_err(|e| e.to_string())?;
-        row.ok_or_else(|| format!("Notebook not found: {notebook_id}"))?
+            .optional()?;
+        row.ok_or_else(|| AppError::custom(format!("Notebook not found: {notebook_id}")))?
     };
 
     let rumor = notebook_to_rumor(notebook_id, &name, keys.public_key());
@@ -1392,25 +1361,24 @@ async fn push_notebook(
         [Tag::identifier(&d_tag)],
     )
     .await
-    .map_err(|e| format!("Failed to gift wrap notebook: {e}"))?;
+    .map_err(|e| AppError::custom(format!("Failed to gift wrap notebook: {e}")))?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
 
     let gift_wrap_json: serde_json::Value = serde_json::from_str(&gift_wrap.as_json())
-        .map_err(|e| format!("Failed to serialize gift wrap: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to serialize gift wrap: {e}")))?;
     let event_msg = serde_json::json!(["EVENT", gift_wrap_json]);
     ws_write
         .send(Message::from(event_msg.to_string()))
         .await
-        .map_err(|e| format!("Failed to send event: {e}"))?;
+        .map_err(|e| AppError::custom(format!("Failed to send event: {e}")))?;
 
-    let conn = crate::db::database_connection(app).map_err(|e| e.to_string())?;
+    let conn = crate::db::database_connection(app)?;
     conn.execute(
         "UPDATE notebooks SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
         params![event_id, notebook_id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     sync_log(app, &format!("pushed notebook {notebook_id}"));
 

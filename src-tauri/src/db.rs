@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
 use std::{fs, path::PathBuf};
@@ -5,15 +6,12 @@ use tauri::{AppHandle, Manager};
 
 const DATABASE_FILE: &str = "comet.db";
 
-pub fn database_connection(app: &AppHandle) -> Result<Connection, String> {
+pub fn database_connection(app: &AppHandle) -> Result<Connection, AppError> {
     let database_path = database_path(app)?;
-    let mut conn = Connection::open(database_path).map_err(|error| error.to_string())?;
+    let mut conn = Connection::open(database_path)?;
 
-    conn.execute_batch("PRAGMA foreign_keys = ON;")
-        .map_err(|error| error.to_string())?;
-    migrations()
-        .to_latest(&mut conn)
-        .map_err(|error| error.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    migrations().to_latest(&mut conn)?;
 
     Ok(conn)
 }
@@ -150,11 +148,8 @@ fn is_tag_char(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
 }
 
-fn database_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let config_directory = app
-        .path()
-        .app_config_dir()
-        .map_err(|error| error.to_string())?;
-    fs::create_dir_all(&config_directory).map_err(|error| error.to_string())?;
+fn database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let config_directory = app.path().app_config_dir()?;
+    fs::create_dir_all(&config_directory)?;
     Ok(config_directory.join(DATABASE_FILE))
 }
