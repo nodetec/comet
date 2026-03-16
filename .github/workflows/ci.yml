@@ -39,10 +39,23 @@ jobs:
           - platform: macos-latest
             args: --target x86_64-apple-darwin
             arch: x86_64
+          - platform: ubuntu-22.04
+            args: ""
+            arch: x86_64-linux
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -77,11 +90,21 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Upload DMG artifact
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && startsWith(matrix.platform, 'macos')
         uses: actions/upload-artifact@v4
         with:
           name: dmg-${{ matrix.arch }}
           path: src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Upload Linux artifacts
+        if: github.event_name == 'push' && matrix.platform == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
 
   release:
     if: github.event_name == 'push'
@@ -92,11 +115,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all DMG artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: dmg-*
+          pattern: "{dmg-*,linux-*}"
           merge-multiple: true
 
       - name: Generate short SHA
@@ -110,5 +133,9 @@ jobs:
           name: alpha-${{ steps.sha.outputs.short }}
           body: |
             Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
-          files: artifacts/*.dmg
+          files: |
+            artifacts/*.dmg
+            artifacts/*.deb
+            artifacts/*.rpm
+            artifacts/*.AppImage
           make_latest: true
