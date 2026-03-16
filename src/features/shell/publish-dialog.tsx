@@ -34,18 +34,16 @@ export function PublishDialog({
 }: PublishDialogProps) {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogPortal>
+      <DialogPortal keepMounted={false}>
         <DialogBackdrop />
-        {open && (
-          <PublishDialogContent
-            key={`${noteId}-${open}`}
-            initialTitle={initialTitle}
-            initialTags={initialTags}
-            noteId={noteId}
-            pending={pending}
-            onSubmit={onSubmit}
-          />
-        )}
+        <PublishDialogContent
+          key={noteId}
+          initialTitle={initialTitle}
+          initialTags={initialTags}
+          noteId={noteId}
+          pending={pending}
+          onSubmit={onSubmit}
+        />
       </DialogPortal>
     </DialogRoot>
   );
