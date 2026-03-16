@@ -491,6 +491,16 @@ fn upsert_from_sync(
         }
     }
 
+    // Ensure referenced notebook exists (it may arrive after the note in the sync stream)
+    if let Some(ref nb_id) = note.notebook_id {
+        let now = now_ms();
+        conn.execute(
+            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, ?2, 0)",
+            params![nb_id, now],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
     if existing.is_some() {
         // Update existing note
         conn.execute(
