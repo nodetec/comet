@@ -907,6 +907,7 @@ export function useShellController() {
   const notesPaneProps = useMemo(
     () => ({
       activeNotebook,
+      activeTags,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
       isCreatingNote,
@@ -948,6 +949,7 @@ export function useShellController() {
     }),
     [
       activeNotebook,
+      activeTags,
       currentNotes,
       displayedSelectedNoteId,
       isCreatingNote,

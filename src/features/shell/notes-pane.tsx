@@ -1,6 +1,6 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { formatDistanceToNow } from "date-fns";
-import { LayoutGroup, motion } from "framer-motion";
+
 import {
   CheckMenuItem,
   Menu,
@@ -9,6 +9,7 @@ import {
 } from "@tauri-apps/api/menu";
 import { ChevronDown, PenBoxIcon, Pin, Search, X } from "lucide-react";
 import Highlighter from "react-highlight-words";
+import { LayoutGroup, motion } from "framer-motion";
 import {
   memo,
   useEffect,
@@ -36,6 +37,7 @@ import {
 
 type NotesPaneProps = {
   activeNotebook: NotebookSummary | null;
+  activeTags: string[];
   filteredNotes: NoteSummary[];
   hasMoreNotes: boolean | undefined;
   isCreatingNote: boolean;
@@ -110,6 +112,7 @@ const HighlightedText = memo(function HighlightedText({
 
 export function NotesPane({
   activeNotebook,
+  activeTags,
   filteredNotes,
   hasMoreNotes,
   isCreatingNote,
@@ -426,7 +429,7 @@ export function NotesPane({
           </div>
         ) : (
           <div className="space-y-0 px-3">
-            <LayoutGroup>
+            <LayoutGroup key={`${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`}>
               {filteredNotes.map((note, index) => {
                 const isActive = note.id === selectedNoteId;
                 const isNextActive =
