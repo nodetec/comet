@@ -203,19 +203,23 @@ function ImageComponent({
 
   return (
     <span
-      className="mb-2 inline-flex items-center align-middle"
+      className="relative mb-2 inline-flex items-center align-middle"
       style={{ maxWidth: "min(99%, 99%)" }}
     >
       <img
         ref={imageRef}
         src={cacheBust ? `${src}?t=${cacheBust}` : src}
         alt={altText}
-        className={`my-2 max-w-full cursor-default rounded-lg border-2 ${
-          isFocused ? "border-primary" : "border-transparent"
-        }`}
+        className="my-2 max-w-full cursor-default border-2 border-transparent overflow-hidden"
         draggable="false"
         onError={onImageError}
       />
+      {isFocused && (
+        <span
+          className="pointer-events-none absolute inset-x-0 top-2 bottom-2 rounded-lg]"
+          style={{ backgroundColor: "var(--editor-selection)" }}
+        />
+      )}
     </span>
   );
 }
