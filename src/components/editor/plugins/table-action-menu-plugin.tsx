@@ -297,9 +297,7 @@ function TableCellActionMenuContainer({
 
       activeCellRef.current = cellDOM;
 
-      const scrollContainer = cellDOM.closest(
-        "[data-editor-scroll-container]",
-      );
+      const scrollContainer = cellDOM.closest("[data-editor-scroll-container]");
       const containerRect = scrollContainer
         ? scrollContainer.getBoundingClientRect()
         : anchorElem.getBoundingClientRect();

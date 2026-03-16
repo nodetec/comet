@@ -429,7 +429,9 @@ export function NotesPane({
           </div>
         ) : (
           <div className="space-y-0 px-3">
-            <LayoutGroup key={`${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`}>
+            <LayoutGroup
+              key={`${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`}
+            >
               {filteredNotes.map((note, index) => {
                 const isActive = note.id === selectedNoteId;
                 const isNextActive =

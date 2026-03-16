@@ -243,9 +243,9 @@ export function SyncDialog({
           )}
 
           {/* Collapsible sync log */}
-          <div className="mt-3 border-t border-accent/30 pt-2">
+          <div className="border-accent/30 mt-3 border-t pt-2">
             <button
-              className="text-muted-foreground flex w-full items-center gap-1.5 text-xs hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 text-xs"
               onClick={() => setLogsOpen((o) => !o)}
               type="button"
             >
