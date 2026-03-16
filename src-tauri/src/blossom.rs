@@ -22,6 +22,7 @@ pub async fn upload_blob(
     let auth_header = sign_blossom_auth(keys, "upload", &ciphertext_hash, blossom_url)?;
 
     let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
+
     let resp = client
         .put(&url)
         .header("Authorization", auth_header)
@@ -129,10 +130,10 @@ fn sign_blossom_auth(
         .as_secs();
     let expiration = now + 300;
 
-    let domain = blossom_url
-        .trim_start_matches("https://")
-        .trim_start_matches("http://")
-        .trim_end_matches('/');
+    let domain = url::Url::parse(blossom_url)
+        .ok()
+        .and_then(|u| u.host_str().map(String::from))
+        .unwrap_or_else(|| blossom_url.to_string());
 
     let event = EventBuilder::new(Kind::Custom(24242), format!("{action} blob"))
         .tags(vec![

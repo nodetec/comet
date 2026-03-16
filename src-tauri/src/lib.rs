@@ -322,10 +322,13 @@ fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
 
 #[tauri::command]
 fn set_blossom_url(app: AppHandle, url: String) -> Result<(), AppError> {
-    let url = url.trim().trim_end_matches('/').to_string();
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err(AppError::custom("Blossom URL must start with https:// or http://"));
+    let parsed = url::Url::parse(url.trim())
+        .map_err(|_| AppError::custom("Invalid Blossom URL"))?;
+    match parsed.scheme() {
+        "https" | "http" => {}
+        _ => return Err(AppError::custom("Blossom URL must start with https:// or http://")),
     }
+    let url = parsed.as_str().trim_end_matches('/').to_string();
     let conn = database_connection(&app)?;
     conn.execute(
         "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('blossom_url', ?1)",

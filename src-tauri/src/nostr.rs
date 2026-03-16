@@ -120,13 +120,14 @@ pub fn remove_relay(conn: &Connection, url: &str, kind: &str) -> Result<Vec<Rela
     list_relays(conn)
 }
 
-fn normalize_relay_url(url: &str) -> Result<String, AppError> {
-    let url = url.trim();
-    if !url.starts_with("wss://") && !url.starts_with("ws://") {
-        return Err(AppError::custom("Relay URL must start with wss:// or ws://"));
+fn normalize_relay_url(raw: &str) -> Result<String, AppError> {
+    let parsed = url::Url::parse(raw.trim())
+        .map_err(|_| AppError::custom("Invalid relay URL"))?;
+    match parsed.scheme() {
+        "wss" | "ws" => {}
+        _ => return Err(AppError::custom("Relay URL must start with wss:// or ws://")),
     }
-    // Strip trailing slash for consistency
-    Ok(url.trim_end_matches('/').to_string())
+    Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
 
 fn now_ms() -> Result<i64, AppError> {
