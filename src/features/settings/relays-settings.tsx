@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
-import { X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,7 @@ export function RelaysSettings() {
       <SyncToggle />
       <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
       <BlossomSection queryClient={queryClient} />
+      <ResyncSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
     </div>
   );
@@ -225,6 +226,39 @@ function BlossomSection({
           placeholder="https://..."
         />
       )}
+    </div>
+  );
+}
+
+function ResyncSection({
+  queryClient,
+}: {
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const resyncMutation = useMutation({
+    mutationFn: () => invoke("resync"),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+    },
+  });
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">Resync</h3>
+      <p className="text-muted-foreground mb-3 text-xs">
+        Delete all local data and re-download from the sync relay.
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => resyncMutation.mutate()}
+        disabled={resyncMutation.isPending}
+      >
+        <RefreshCw
+          className={`mr-2 size-3.5 ${resyncMutation.isPending ? "animate-spin" : ""}`}
+        />
+        {resyncMutation.isPending ? "Resyncing..." : "Resync"}
+      </Button>
     </div>
   );
 }

@@ -507,6 +507,29 @@ async fn get_sync_status(app: AppHandle) -> Result<sync::SyncState, AppError> {
 }
 
 #[tauri::command]
+async fn resync(app: AppHandle) -> Result<(), AppError> {
+    // Stop sync first
+    let manager = app.state::<sync::SyncManager>();
+    manager.stop().await;
+
+    // Wipe all local data except identity, relays, and app_settings
+    let conn = database_connection(&app)?;
+    conn.execute_batch(
+        "DELETE FROM notes_fts;
+         DELETE FROM note_tags;
+         DELETE FROM notes;
+         DELETE FROM notebooks;
+         DELETE FROM blob_meta;
+         DELETE FROM pending_deletions;
+         DELETE FROM app_settings WHERE key = 'sync_checkpoint';"
+    )?;
+
+    // Restart sync — will pull everything fresh from the relay
+    manager.start(app.clone()).await;
+    Ok(())
+}
+
+#[tauri::command]
 async fn restart_sync(app: AppHandle) -> Result<(), AppError> {
     let manager = app.state::<sync::SyncManager>();
     manager.start(app.clone()).await;
@@ -568,6 +591,7 @@ pub fn run() {
             set_sync_enabled,
             get_sync_status,
             restart_sync,
+            resync,
             search_notes,
             search_tags,
             export_notes,

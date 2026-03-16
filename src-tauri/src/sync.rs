@@ -214,7 +214,7 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 
 use crate::nostr::strip_title_line;
 
-const NOTEBOOK_EVENT_KIND: u16 = 30078;
+const NOTEBOOK_EVENT_KIND: Kind = Kind::ApplicationSpecificData;
 
 // ── Notebook ↔ Event mapping ───────────────────────────────────────────
 
@@ -229,7 +229,7 @@ fn notebook_to_rumor(
         Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
     ];
 
-    EventBuilder::new(Kind::Custom(NOTEBOOK_EVENT_KIND), "")
+    EventBuilder::new(NOTEBOOK_EVENT_KIND, "")
         .tags(event_tags)
         .build(pubkey)
 }
@@ -258,7 +258,7 @@ fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, App
 }
 
 fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
-    rumor.kind == Kind::Custom(NOTEBOOK_EVENT_KIND)
+    rumor.kind == NOTEBOOK_EVENT_KIND
         && rumor
             .tags
             .find(TagKind::custom("type"))
@@ -291,7 +291,7 @@ fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
 }
 
 fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedEvent {
-    EventBuilder::new(Kind::Custom(NOTEBOOK_EVENT_KIND), "")
+    EventBuilder::new(NOTEBOOK_EVENT_KIND, "")
         .tags(vec![
             Tag::identifier(notebook_id),
             Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
