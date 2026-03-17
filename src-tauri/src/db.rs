@@ -117,6 +117,16 @@ fn migrations() -> Migrations<'static> {
         M::up(
             "SELECT 1;",
         ),
+        M::up(
+            "CREATE TABLE IF NOT EXISTS blob_uploads (
+                hash TEXT NOT NULL,
+                server_url TEXT NOT NULL,
+                encrypted INTEGER NOT NULL DEFAULT 0,
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                uploaded_at INTEGER NOT NULL,
+                PRIMARY KEY (hash, server_url)
+            );",
+        ),
     ])
 }
 

@@ -204,6 +204,17 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
         SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
+    // Upload attachment images to Blossom and rewrite URIs to public URLs
+    let blossom_url = {
+        let conn = crate::db::database_connection(app)?;
+        crate::sync::get_blossom_url(&conn)
+    };
+    let content = if let Some(ref blossom_url) = blossom_url {
+        crate::blossom::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+    } else {
+        content
+    };
+
     let now = now_secs() as u64;
 
     let mut event_tags: Vec<Tag> = vec![
@@ -214,7 +225,16 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
             vec![now.to_string()],
         ),
     ];
-    if let Some(ref image) = input.image {
+    // Rewrite cover image URI if it references a local attachment
+    let image = input.image.as_ref().map(|img| {
+        if let Some(ref blossom_url) = blossom_url {
+            if img.starts_with("attachment://") {
+                return img.replace("attachment://", &format!("{}/", blossom_url.trim_end_matches('/')));
+            }
+        }
+        img.clone()
+    });
+    if let Some(ref image) = image {
         event_tags.push(Tag::custom(TagKind::custom("image"), vec![image.clone()]));
     }
     for t in &input.tags {
@@ -314,6 +334,17 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
     let secret_key =
         SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
+
+    // Upload attachment images to Blossom and rewrite URIs to public URLs
+    let blossom_url = {
+        let conn = crate::db::database_connection(app)?;
+        crate::sync::get_blossom_url(&conn)
+    };
+    let content = if let Some(ref blossom_url) = blossom_url {
+        crate::blossom::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+    } else {
+        content
+    };
 
     let mut event_tags: Vec<Tag> = Vec::new();
     for t in &input.tags {

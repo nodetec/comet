@@ -1194,6 +1194,10 @@ async fn push_note(
                 "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
                 params![hash, ciphertext_hash, key_hex],
             )?;
+            conn.execute(
+                "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at) VALUES (?1, ?2, 1, ?3, ?4)",
+                params![ciphertext_hash, blossom_url, blob_data.len() as i64, crate::error::now_millis()],
+            )?;
 
             blob_tags.push((hash.clone(), ciphertext_hash, key_hex));
         }
