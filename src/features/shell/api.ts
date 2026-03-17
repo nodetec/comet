@@ -13,6 +13,7 @@ import {
   type NotePagePayload,
   type NoteQueryInput,
   type PublishNoteInput,
+  type PublishShortNoteInput,
   type RenameNotebookInput,
 } from "./types";
 
@@ -106,6 +107,10 @@ export async function unpinNote(noteId: string) {
 
 export async function publishNote(input: PublishNoteInput) {
   return invoke<PublishResult>("publish_note", { input });
+}
+
+export async function publishShortNote(input: PublishShortNoteInput) {
+  return invoke<PublishResult>("publish_short_note", { input });
 }
 
 export async function deletePublishedNote(noteId: string) {

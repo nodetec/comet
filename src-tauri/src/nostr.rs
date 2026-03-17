@@ -265,6 +265,105 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
     })
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishShortNoteInput {
+    pub note_id: String,
+    pub tags: Vec<String>,
+}
+
+pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -> Result<PublishResult, AppError> {
+    let note_id = &input.note_id;
+
+    let (secret_hex, content, relay_urls) = {
+        let conn = crate::db::database_connection(app)?;
+
+        let markdown: String = conn
+            .query_row(
+                "SELECT markdown FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| AppError::custom("Note not found."))?;
+
+        let secret_hex: String = conn
+            .query_row(
+                "SELECT secret_key FROM nostr_identity LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
+
+        let mut stmt = conn
+            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
+        let relay_urls: Vec<String> = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if relay_urls.is_empty() {
+            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
+        }
+
+        let content = strip_title_line(&markdown);
+
+        (secret_hex, content, relay_urls)
+    };
+
+    let secret_key =
+        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+    let keys = Keys::new(secret_key);
+
+    let mut event_tags: Vec<Tag> = Vec::new();
+    for t in &input.tags {
+        event_tags.push(Tag::hashtag(t));
+    }
+
+    let event = EventBuilder::new(Kind::TextNote, &content)
+        .tags(event_tags)
+        .sign_with_keys(&keys)
+        .map_err(|e| AppError::custom(format!("Failed to sign event: {e}")))?;
+
+    let client = Client::new(keys);
+    for url in &relay_urls {
+        client
+            .add_relay(url.as_str())
+            .await
+            .map_err(|e| AppError::custom(format!("Failed to add relay {url}: {e}")))?;
+    }
+    client.connect().await;
+
+    let relay_count = relay_urls.len();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        client.send_event(&event),
+    )
+    .await
+    .map_err(|_| AppError::custom("Timed out sending event to relays."))?
+    .map_err(|e| AppError::custom(format!("Failed to send event: {e}")))?;
+
+    client.disconnect().await;
+
+    let success_count = result.success.len();
+    let fail_count = result.failed.len();
+
+    if success_count > 0 {
+        let conn = crate::db::database_connection(app)?;
+        let published_at = now_millis();
+        conn.execute(
+            "UPDATE notes SET published_at = ?1 WHERE id = ?2",
+            params![published_at, note_id],
+        )?;
+    }
+
+    Ok(PublishResult {
+        success_count,
+        fail_count,
+        relay_count,
+    })
+}
+
 pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, AppError> {
     // Synchronous DB block
     let (secret_hex, d_tag, relay_urls) = {

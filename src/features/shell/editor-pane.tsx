@@ -8,7 +8,7 @@ import {
 import { useUIStore } from "@/stores/use-ui-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu } from "@tauri-apps/api/menu";
+import { Menu, Submenu } from "@tauri-apps/api/menu";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
 import { Ellipsis, PanelBottomOpen, PanelBottomClose } from "lucide-react";
@@ -39,6 +39,7 @@ type EditorPaneProps = {
   onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
   onOpenPublishDialog(): void;
+  onPublishShortNote(): void;
   onSetPinned(pinned: boolean): void;
   onFocusHandled(): void;
   onChange(markdown: string): void;
@@ -68,6 +69,7 @@ export function EditorPane({
   onAssignNotebook,
   onDeletePublishedNote,
   onOpenPublishDialog,
+  onPublishShortNote,
   onSetPinned,
   onFocusHandled,
   onChange,
@@ -127,15 +129,25 @@ export function EditorPane({
       onAssign: (notebookId) => onAssignNotebook(notebookId),
     });
 
+    const publishAsSubmenu = await Submenu.new({
+      text: publishedAt ? "Update on Nostr" : "Publish As",
+      items: [
+        {
+          id: "editor-menu-publish-note",
+          text: "Note",
+          action: () => onPublishShortNote(),
+        },
+        {
+          id: "editor-menu-publish-article",
+          text: "Article",
+          action: () => onOpenPublishDialog(),
+        },
+      ],
+    });
+
     const publishItems = publishedAt
       ? [
-          {
-            id: "editor-menu-publish",
-            text: "Update on Nostr",
-            action: () => {
-              onOpenPublishDialog();
-            },
-          },
+          publishAsSubmenu,
           {
             id: "editor-menu-delete-published",
             text: "Delete from Nostr",
@@ -145,15 +157,7 @@ export function EditorPane({
             },
           },
         ]
-      : [
-          {
-            id: "editor-menu-publish",
-            text: "Publish to Nostr",
-            action: () => {
-              onOpenPublishDialog();
-            },
-          },
-        ];
+      : [publishAsSubmenu];
 
     const menu = await Menu.new({
       items: [

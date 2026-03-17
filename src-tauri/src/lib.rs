@@ -428,6 +428,11 @@ async fn publish_note(app: AppHandle, input: nostr::PublishNoteInput) -> Result<
 }
 
 #[tauri::command]
+async fn publish_short_note(app: AppHandle, input: nostr::PublishShortNoteInput) -> Result<nostr::PublishResult, AppError> {
+    nostr::publish_short_note(&app, input).await
+}
+
+#[tauri::command]
 async fn delete_published_note(app: AppHandle, note_id: String) -> Result<nostr::PublishResult, AppError> {
     nostr::delete_published_note(&app, &note_id).await
 }
@@ -612,6 +617,7 @@ pub fn run() {
             add_publish_relay,
             remove_relay,
             publish_note,
+            publish_short_note,
             delete_published_note,
             get_blossom_url,
             set_blossom_url,

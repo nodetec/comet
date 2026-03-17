@@ -97,6 +97,11 @@ export type PublishNoteInput = {
   tags: string[];
 };
 
+export type PublishShortNoteInput = {
+  noteId: string;
+  tags: string[];
+};
+
 export function notesHeading(
   noteFilter: NoteFilter,
   activeNotebook: NotebookSummary | null,

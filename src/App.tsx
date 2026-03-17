@@ -17,7 +17,10 @@ import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/shell/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NotesPane } from "@/features/shell/notes-pane";
-import { PublishDialog } from "@/features/shell/publish-dialog";
+import {
+  PublishDialog,
+  PublishShortNoteDialog,
+} from "@/features/shell/publish-dialog";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
@@ -33,6 +36,7 @@ function App() {
     editorPaneProps,
     notesPaneProps,
     publishDialogProps,
+    publishShortNoteDialogProps,
     readyToRevealWindow,
     retryBootstrap,
     sidebarPaneProps,
@@ -141,6 +145,7 @@ function App() {
         </Container>
       </div>
       <PublishDialog {...publishDialogProps} />
+      <PublishShortNoteDialog {...publishShortNoteDialogProps} />
       <DialogRoot
         open={deletePublishDialogProps.open}
         onOpenChange={deletePublishDialogProps.onOpenChange}

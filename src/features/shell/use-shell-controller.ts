@@ -40,6 +40,7 @@ import {
   type NoteSortDirection,
   type NoteSortField,
   type PublishNoteInput,
+  type PublishShortNoteInput,
 } from "./types";
 import { useNotebookState } from "./use-notebook-state";
 import { usePublishState } from "./use-publish-state";
@@ -990,6 +991,16 @@ export function useShellController() {
           publish.setPublishDialogOpen(true);
         })().catch(() => {});
       },
+      onPublishShortNote() {
+        if (!currentNote || publish.publishShortNoteMutation.isPending) {
+          return;
+        }
+
+        void (async () => {
+          await latestRef.current.flushCurrentDraftAsync();
+          publish.setPublishShortNoteDialogOpen(true);
+        })().catch(() => {});
+      },
       onSetPinned(pinned: boolean) {
         if (currentNote) {
           latestRef.current.handleSetNotePinned(currentNote.id, pinned);
@@ -1039,6 +1050,28 @@ export function useShellController() {
       publish.publishDialogOpen,
       publish.publishNoteMutation.isPending,
       publish.publishNoteMutation.mutate,
+    ],
+  );
+
+  const publishShortNoteDialogProps = useMemo(
+    () => ({
+      content: currentEditorMarkdown.replace(/^#\s+.*\n*/, "").trim(),
+      initialTags: currentNote?.tags ?? [],
+      noteId: currentNote?.id ?? "",
+      open: publish.publishShortNoteDialogOpen,
+      pending: publish.publishShortNoteMutation.isPending,
+      onOpenChange: publish.setPublishShortNoteDialogOpen,
+      onSubmit(input: PublishShortNoteInput) {
+        publish.publishShortNoteMutation.mutate(input);
+      },
+    }),
+    [
+      currentEditorMarkdown,
+      currentNote?.id,
+      currentNote?.tags,
+      publish.publishShortNoteDialogOpen,
+      publish.publishShortNoteMutation.isPending,
+      publish.publishShortNoteMutation.mutate,
     ],
   );
 
@@ -1206,6 +1239,7 @@ export function useShellController() {
     },
     editorPaneProps,
     publishDialogProps,
+    publishShortNoteDialogProps,
     deletePublishDialogProps,
     notesPaneProps,
     sidebarPaneProps,
