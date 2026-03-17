@@ -163,6 +163,37 @@ pub async fn upload_and_rewrite_attachments(
     Ok(result)
 }
 
+/// Delete a blob from a Blossom server by its hash.
+pub async fn delete_blob(
+    client: &reqwest::Client,
+    blossom_url: &str,
+    hash: &str,
+    keys: &Keys,
+) -> Result<(), AppError> {
+    eprintln!("[blossom] deleting hash={} from {}", &hash[..8.min(hash.len())], blossom_url);
+    let auth_header = sign_blossom_auth(keys, "delete", hash, blossom_url)?;
+    let url = format!("{}/{}", blossom_url.trim_end_matches('/'), hash);
+
+    let resp = client
+        .delete(&url)
+        .header("Authorization", auth_header)
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("[blossom] delete request failed: {e}");
+            AppError::custom(format!("Blossom delete failed: {e}"))
+        })?;
+
+    if !resp.status().is_success() && resp.status().as_u16() != 404 {
+        let status = resp.status();
+        eprintln!("[blossom] delete failed ({status}) for hash={}", &hash[..8.min(hash.len())]);
+        return Err(AppError::custom(format!("Blossom delete failed ({status})")));
+    }
+
+    eprintln!("[blossom] delete ok hash={}", &hash[..8.min(hash.len())]);
+    Ok(())
+}
+
 /// Download an encrypted blob from a Blossom server by its ciphertext hash.
 pub async fn download_blob(
     client: &reqwest::Client,

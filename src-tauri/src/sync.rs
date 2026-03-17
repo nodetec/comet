@@ -349,14 +349,7 @@ fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-/// Extract attachment:// hashes from markdown content.
-fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
-    static RE: std::sync::LazyLock<regex_lite::Regex> =
-        std::sync::LazyLock::new(|| regex_lite::Regex::new(r"attachment://([a-f0-9]{64})\.\w+").unwrap());
-    RE.captures_iter(markdown)
-        .map(|cap| cap[1].to_string())
-        .collect()
-}
+use crate::attachments::{cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes};
 
 fn note_to_rumor(
     note_id: &str,
@@ -959,9 +952,25 @@ async fn process_relay_message(
                     // Delete notebook
                     conn.execute("DELETE FROM notebooks WHERE id = ?1", params![d_tag])?;
                 } else {
+                    // Collect orphaned blobs before deleting the note
+                    let orphaned = find_orphaned_blob_hashes(&conn, &[d_tag.clone()]).unwrap_or_default();
                     // Permanently delete the note
                     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![d_tag])?;
                     conn.execute("DELETE FROM notes WHERE id = ?1", params![d_tag])?;
+                    // Clean up orphaned blobs (local + metadata)
+                    let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);
+                    // Spawn Blossom deletes in background to not block sync
+                    if !blossom_deletions.is_empty() {
+                        let keys = keys.clone();
+                        tokio::spawn(async move {
+                            let http_client = reqwest::Client::new();
+                            for (server_url, ciphertext_hash) in blossom_deletions {
+                                if let Err(e) = crate::blossom::delete_blob(&http_client, &server_url, &ciphertext_hash, &keys).await {
+                                    eprintln!("[blob-gc] blossom delete failed: {e}");
+                                }
+                            }
+                        });
+                    }
                 }
 
                 let _ = app.emit(

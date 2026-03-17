@@ -1,3 +1,4 @@
+use crate::attachments::{cleanup_orphaned_blobs, find_orphaned_blob_hashes};
 use crate::db::{database_connection, extract_tags};
 use crate::error::{now_millis, AppError};
 use crate::nostr;
@@ -400,35 +401,39 @@ pub fn restore_from_trash(app: &AppHandle, note_id: &str) -> Result<LoadedNote, 
     note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<(), AppError> {
+pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<Vec<(String, String)>, AppError> {
     validate_note_id(note_id)?;
     let mut conn = database_connection(app)?;
-    let transaction = conn.transaction()?;
 
+    let orphaned = find_orphaned_blob_hashes(&conn, &[note_id.to_string()])?;
+
+    let transaction = conn.transaction()?;
     delete_note_search_document(&transaction, note_id)?;
     let deleted = transaction
         .execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
-
     if deleted == 0 {
         return Err(AppError::custom("Note not found."));
     }
-
     transaction.commit()?;
+
+    let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);
 
     if last_open_note_id(&conn)?.as_deref() == Some(note_id) {
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
     }
 
-    Ok(())
+    Ok(blossom_deletions)
 }
 
-pub fn empty_trash(app: &AppHandle) -> Result<Vec<String>, AppError> {
+pub fn empty_trash(app: &AppHandle) -> Result<(Vec<String>, Vec<(String, String)>), AppError> {
     let mut conn = database_connection(app)?;
     // Collect IDs of trashed notes for sync deletion
     let note_ids: Vec<String> = conn
         .prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")?
         .query_map([], |row| row.get(0))?
         .collect::<Result<Vec<_>, _>>()?;
+
+    let orphaned = find_orphaned_blob_hashes(&conn, &note_ids)?;
 
     let transaction = conn.transaction()?;
     transaction.execute_batch(
@@ -437,7 +442,9 @@ pub fn empty_trash(app: &AppHandle) -> Result<Vec<String>, AppError> {
     )?;
     transaction.commit()?;
 
-    Ok(note_ids)
+    let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);
+
+    Ok((note_ids, blossom_deletions))
 }
 
 pub fn create_notebook(

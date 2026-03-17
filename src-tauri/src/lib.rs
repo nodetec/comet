@@ -9,6 +9,7 @@ mod themes;
 
 use db::database_connection;
 use error::AppError;
+use nostr_sdk::prelude::Keys;
 use rusqlite::OptionalExtension;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
@@ -156,7 +157,8 @@ fn restore_from_trash(app: AppHandle, note_id: String) -> Result<LoadedNote, App
 
 #[tauri::command]
 fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppError> {
-    notes::delete_note_permanently(&app, &note_id)?;
+    let blossom_deletions = notes::delete_note_permanently(&app, &note_id)?;
+    spawn_blossom_deletions(&app, blossom_deletions);
     // Always queue deletion — covers the race where sync pushes the note
     // between creation and deletion, and is a harmless no-op if never synced.
     let conn = database_connection(&app)?;
@@ -170,7 +172,8 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppErr
 
 #[tauri::command]
 fn empty_trash(app: AppHandle) -> Result<(), AppError> {
-    let note_ids = notes::empty_trash(&app)?;
+    let (note_ids, blossom_deletions) = notes::empty_trash(&app)?;
+    spawn_blossom_deletions(&app, blossom_deletions);
     let conn = database_connection(&app)?;
     for note_id in &note_ids {
         let _ = conn.execute(
@@ -237,6 +240,42 @@ fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
     let manager = app.state::<sync::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
         manager.push(cmd).await;
+    });
+}
+
+/// Spawn async Blossom blob deletions for orphaned blobs.
+/// blossom_deletions is a list of (server_url, ciphertext_hash) pairs.
+fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, String)>) {
+    if blossom_deletions.is_empty() {
+        return;
+    }
+
+    let conn = match database_connection(app) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let keys = match conn
+        .query_row(
+            "SELECT secret_key FROM nostr_identity LIMIT 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+    {
+        Ok(Some(secret_hex)) => match Keys::parse(&secret_hex) {
+            Ok(k) => k,
+            Err(_) => return,
+        },
+        _ => return,
+    };
+
+    tauri::async_runtime::spawn(async move {
+        let client = reqwest::Client::new();
+        for (server_url, ciphertext_hash) in blossom_deletions {
+            if let Err(e) = crate::blossom::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await {
+                eprintln!("[blob-gc] failed to delete from Blossom: {e}");
+            }
+        }
     });
 }
 
