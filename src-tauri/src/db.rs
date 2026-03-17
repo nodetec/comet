@@ -111,6 +111,9 @@ fn migrations() -> Migrations<'static> {
             "ALTER TABLE notes ADD COLUMN deleted_at INTEGER;
              CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);",
         ),
+        M::up(
+            "ALTER TABLE notes ADD COLUMN published_event_id TEXT;",
+        ),
     ])
 }
 

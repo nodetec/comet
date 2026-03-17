@@ -351,9 +351,10 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
     if success_count > 0 {
         let conn = crate::db::database_connection(app)?;
         let published_at = now_millis();
+        let event_id = event.id.to_hex();
         conn.execute(
-            "UPDATE notes SET published_at = ?1 WHERE id = ?2",
-            params![published_at, note_id],
+            "UPDATE notes SET published_at = ?1, published_event_id = ?2 WHERE id = ?3",
+            params![published_at, event_id, note_id],
         )?;
     }
 
@@ -366,20 +367,21 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
 
 pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, AppError> {
     // Synchronous DB block
-    let (secret_hex, d_tag, relay_urls) = {
+    let (secret_hex, d_tag, published_event_id, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
 
-        let (id, existing_d_tag): (String, Option<String>) = conn
+        let (existing_d_tag, published_event_id): (Option<String>, Option<String>) = conn
             .query_row(
-                "SELECT id, nostr_d_tag FROM notes WHERE id = ?1",
+                "SELECT nostr_d_tag, published_event_id FROM notes WHERE id = ?1",
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?
             .ok_or_else(|| AppError::custom("Note not found."))?;
 
-        let d_tag = existing_d_tag
-            .ok_or_else(|| AppError::custom("This note has not been published to Nostr."))?;
+        if existing_d_tag.is_none() && published_event_id.is_none() {
+            return Err(AppError::custom("This note has not been published to Nostr."));
+        }
 
         let secret_hex: String = conn
             .query_row(
@@ -400,8 +402,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
             return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
         }
 
-        let _ = id;
-        (secret_hex, d_tag, relay_urls)
+        (secret_hex, existing_d_tag, published_event_id, relay_urls)
     };
 
     // Async relay block
@@ -409,15 +410,22 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
         SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
-    let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key())
-        .identifier(&d_tag);
+    // Build deletion request — target by coordinate (article) or event ID (note)
+    let mut deletion_request = EventDeletionRequest::new();
+    if let Some(ref d) = d_tag {
+        let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key())
+            .identifier(d);
+        deletion_request = deletion_request.coordinate(coordinate);
+    }
+    if let Some(ref eid) = published_event_id {
+        let event_id = EventId::parse(eid)
+            .map_err(|e| AppError::custom(format!("Invalid published event ID: {e}")))?;
+        deletion_request = deletion_request.id(event_id);
+    }
 
-    let deletion = EventBuilder::delete(
-        EventDeletionRequest::new()
-            .coordinate(coordinate)
-    )
-    .sign_with_keys(&keys)
-    .map_err(|e| AppError::custom(format!("Failed to sign deletion event: {e}")))?;
+    let deletion = EventBuilder::delete(deletion_request)
+        .sign_with_keys(&keys)
+        .map_err(|e| AppError::custom(format!("Failed to sign deletion event: {e}")))?;
 
     let client = Client::new(keys);
     for url in &relay_urls {
@@ -445,7 +453,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
     if success_count > 0 {
         let conn = crate::db::database_connection(app)?;
         conn.execute(
-            "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL WHERE id = ?1",
+            "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL, published_event_id = NULL WHERE id = ?1",
             params![note_id],
         )?;
     }
