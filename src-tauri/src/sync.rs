@@ -1151,10 +1151,12 @@ async fn push_note(
     // Upload attachment blobs to Blossom if configured
     let mut blob_tags: Vec<(String, String, String)> = Vec::new();
     let attachment_hashes = extract_attachment_hashes(&markdown);
+    eprintln!("[sync] note has {} attachment(s), blossom_url={:?}", attachment_hashes.len(), blossom_url);
     if let Some(ref blossom_url) = blossom_url {
         let http_client = reqwest::Client::new();
         let pubkey_hex = keys.public_key().to_hex();
         for hash in &attachment_hashes {
+            eprintln!("[sync] processing attachment hash={}", &hash[..8]);
             let existing: Option<(String, String)> = {
                 let conn = crate::db::database_connection(app)?;
                 conn.query_row(
@@ -1166,14 +1168,33 @@ async fn push_note(
             };
 
             if let Some((ct_hash, key_hex)) = existing {
-                blob_tags.push((hash.clone(), ct_hash, key_hex));
-                continue;
+                // Verify the ciphertext still exists on the server
+                let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ct_hash);
+                let exists = http_client.head(&head_url).send().await.map(|r| r.status().is_success()).unwrap_or(false);
+                if exists {
+                    eprintln!("[sync] attachment hash={} verified on server (ct={})", &hash[..8], &ct_hash[..8]);
+                    blob_tags.push((hash.clone(), ct_hash, key_hex));
+                    continue;
+                }
+                // Blob missing from server — clear stale metadata and re-upload
+                eprintln!("[sync] attachment hash={} missing from server, re-uploading", &hash[..8]);
+                let conn = crate::db::database_connection(app)?;
+                conn.execute(
+                    "DELETE FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                    params![hash, blossom_url, pubkey_hex],
+                )?;
             }
 
             // Read the local blob
             let blob_data = match crate::attachments::read_blob(app, hash)? {
-                Some((data, _ext)) => data,
-                None => continue,
+                Some((data, _ext)) => {
+                    eprintln!("[sync] attachment hash={} read {} bytes locally", &hash[..8], data.len());
+                    data
+                }
+                None => {
+                    eprintln!("[sync] attachment hash={} NOT found locally, skipping", &hash[..8]);
+                    continue;
+                }
             };
 
             // Encrypt with ChaCha20-Poly1305
