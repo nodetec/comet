@@ -250,7 +250,6 @@ export function useShellController() {
     ]);
   };
 
-
   const flushCurrentDraft = () => {
     if (!currentNote || draftNoteId !== currentNote.id) {
       return;
@@ -339,7 +338,6 @@ export function useShellController() {
     onSuccess: (archivedNote) => {
       queryClient.setQueryData(["note", archivedNote.id], archivedNote);
 
-
       if (selectedNoteId === archivedNote.id && noteFilter !== "archive") {
         setSelectedNoteId(
           nextSelectedNoteIdAfterRemoval(currentNotes, archivedNote.id),
@@ -355,7 +353,6 @@ export function useShellController() {
     mutationFn: restoreNote,
     onSuccess: (restoredNote) => {
       queryClient.setQueryData(["note", restoredNote.id], restoredNote);
-
 
       if (selectedNoteId === restoredNote.id && noteFilter === "archive") {
         setSelectedNoteId(
@@ -373,7 +370,6 @@ export function useShellController() {
     onSuccess: (trashedNote) => {
       queryClient.setQueryData(["note", trashedNote.id], trashedNote);
 
-
       if (selectedNoteId === trashedNote.id && noteFilter !== "trash") {
         setSelectedNoteId(
           nextSelectedNoteIdAfterRemoval(currentNotes, trashedNote.id),
@@ -390,7 +386,6 @@ export function useShellController() {
     onSuccess: (restoredNote) => {
       queryClient.setQueryData(["note", restoredNote.id], restoredNote);
 
-
       if (selectedNoteId === restoredNote.id && noteFilter === "trash") {
         setSelectedNoteId(
           nextSelectedNoteIdAfterRemoval(currentNotes, restoredNote.id),
@@ -399,7 +394,10 @@ export function useShellController() {
 
       void invalidateShellData();
     },
-    onError: toastErrorHandler("Couldn't restore note", "restore-from-trash-error"),
+    onError: toastErrorHandler(
+      "Couldn't restore note",
+      "restore-from-trash-error",
+    ),
   });
 
   const deleteNotePermanentlyMutation = useMutation({
@@ -407,7 +405,6 @@ export function useShellController() {
     onSuccess: (_, noteId) => {
       queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
       if (noteFilter === "trash") {
-  
       }
 
       if (draftNoteId === noteId) {
@@ -549,9 +546,13 @@ export function useShellController() {
 
         // If the currently open note was deleted remotely, close the editor
         if (action === "delete") {
-          const { selectedNoteId: currentSelectedId } = useShellStore.getState();
+          const { selectedNoteId: currentSelectedId } =
+            useShellStore.getState();
           if (currentDraftId === noteId || currentSelectedId === noteId) {
-            queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
+            queryClient.removeQueries({
+              exact: true,
+              queryKey: ["note", noteId],
+            });
             useShellStore.getState().setDraft("", "");
             useShellStore.getState().setSelectedNoteId(null);
             setSyncEditorRevision((r) => r + 1);
@@ -701,7 +702,12 @@ export function useShellController() {
   };
 
   const handleSelectNotebook = (notebookId: string) => {
-    if (currentNote && (currentNote.notebook?.id !== notebookId || currentNote.archivedAt || currentNote.deletedAt)) {
+    if (
+      currentNote &&
+      (currentNote.notebook?.id !== notebookId ||
+        currentNote.archivedAt ||
+        currentNote.deletedAt)
+    ) {
       setSelectedNoteId(null);
       setDraft("", "");
     }
@@ -931,7 +937,10 @@ export function useShellController() {
       modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,
       notebooks,
-      noteId: (displayedSelectedNoteId || isCreatingNote) ? (currentNote?.id ?? null) : null,
+      noteId:
+        displayedSelectedNoteId || isCreatingNote
+          ? (currentNote?.id ?? null)
+          : null,
       editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
