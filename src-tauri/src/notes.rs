@@ -1178,10 +1178,8 @@ fn title_from_markdown(markdown: &str) -> String {
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .find_map(|line| {
-            if !line.starts_with('#') {
-                return None;
-            }
-            let cleaned = line.trim_start_matches('#').trim();
+            let rest = line.strip_prefix("# ")?;
+            let cleaned = rest.trim();
             (!cleaned.is_empty()).then(|| cleaned.to_string())
         })
         .unwrap_or_default()

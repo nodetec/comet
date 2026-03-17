@@ -530,13 +530,15 @@ export function NotesPane({
                               />
                             </h3>
                           ) : null}
-                          <div
-                            className={`text-muted-foreground min-w-0 flex-1 overflow-hidden text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
-                          >
-                            <HighlightedText
-                              text={cardPreview}
-                              searchWords={searchWords}
-                            />
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <p
+                              className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
+                            >
+                              <HighlightedText
+                                text={cardPreview}
+                                searchWords={searchWords}
+                              />
+                            </p>
                           </div>
                           <div className="flex w-full items-center gap-1.5">
                             {note.pinnedAt ? (
