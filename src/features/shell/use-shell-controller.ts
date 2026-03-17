@@ -926,7 +926,7 @@ export function useShellController() {
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
 
-  const editorPaneProps = useMemo(
+  const nextEditorPaneProps = useMemo(
     () => ({
       archivedAt: currentNote?.archivedAt ?? null,
       deletedAt: currentNote?.deletedAt ?? null,
@@ -1018,6 +1018,16 @@ export function useShellController() {
       syncEditorRevision,
     ],
   );
+
+  // Freeze editor pane props while React Query is showing placeholder data
+  // from the previous note, so the old note's content doesn't flash.
+  const editorPanePropsRef = useRef(nextEditorPaneProps);
+  if (!noteQuery.isPlaceholderData) {
+    editorPanePropsRef.current = nextEditorPaneProps;
+  }
+  const editorPaneProps = noteQuery.isPlaceholderData
+    ? editorPanePropsRef.current
+    : nextEditorPaneProps;
 
   const publishDialogProps = useMemo(
     () => ({
