@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $setSelection } from "lexical";
-import { $createHeadingNode, $isHeadingNode } from "@lexical/rich-text";
+import { $isHeadingNode } from "@lexical/rich-text";
 import { TRANSFORMERS } from "../transformers";
 import { $importMarkdown } from "../lib/markdown";
 
@@ -37,22 +37,14 @@ export default function InitialContentPlugin({
 
     editor.update(() => {
       if (isNew) {
-        // New note: always start with an empty H1.
+        // New note: markdown already contains "# " (with optional tags).
+        // Import it and place the cursor at the end of the heading.
+        $importMarkdown(normalizeEmptyHeadings(markdown), TRANSFORMERS);
         const root = $getRoot();
-        root.clear();
-        const heading = $createHeadingNode("h1");
-        root.append(heading);
-
-        if (markdown) {
-          // Convert tag content, then prepend the heading.
-          $importMarkdown(markdown, TRANSFORMERS);
-          const firstChild = $getRoot().getFirstChild();
-          if (firstChild && !$isHeadingNode(firstChild)) {
-            firstChild.insertBefore(heading);
-          }
+        const firstChild = root.getFirstChild();
+        if ($isHeadingNode(firstChild)) {
+          firstChild.selectEnd();
         }
-
-        heading.selectEnd();
       } else if (!markdown.trim()) {
         // Empty existing note: leave the default empty paragraph.
         // (Lexical initializes with one ParagraphNode by default.)

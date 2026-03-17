@@ -244,10 +244,10 @@ pub fn create_note(
     let transaction = conn.transaction()?;
     let note_id = generate_note_id();
     let markdown = if tags.is_empty() {
-        String::new()
+        "# ".to_string()
     } else {
         let tag_line = tags.iter().map(|t| format!("#{t}")).collect::<Vec<_>>().join(" ");
-        tag_line
+        format!("# \n\n{tag_line}")
     };
     let title = title_from_markdown(&markdown);
     let now = now_millis();
