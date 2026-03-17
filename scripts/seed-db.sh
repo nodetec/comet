@@ -340,8 +340,8 @@ INSERT INTO nostr_identity (secret_key, public_key, npub, created_at) VALUES (
 );
 
 INSERT INTO relays (url, kind, created_at) VALUES
-  ('wss://relay.comet.md', 'sync', $NOW_MS),
-  ('wss://relay.comet.md', 'publish', $NOW_MS);
+  ('wss://comet.md', 'sync', $NOW_MS),
+  ('wss://comet.md', 'publish', $NOW_MS);
 
 COMMIT;
 

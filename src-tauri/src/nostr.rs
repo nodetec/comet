@@ -4,9 +4,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
-pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
+pub const DEFAULT_SYNC_RELAY: &str = "wss://comet.md";
 pub const DEFAULT_PUBLISH_RELAY: &str = "wss://relay.damus.io";
-pub const DEFAULT_BLOSSOM_URL: &str = "https://blossom.comet.md";
+pub const DEFAULT_BLOSSOM_URL: &str = "https://comet.md";
 
 /// Returns the npub for the stored identity,
 /// generating a new keypair if one does not exist yet.
