@@ -312,7 +312,7 @@ export function NotesPane({
       <header
         className={[
           "h-13 w-full shrink-0 px-3",
-          showHeaderBorder ? "border-b border-divider" : "",
+          showHeaderBorder ? "border-divider border-b" : "",
         ].join(" ")}
       >
         <div className="flex h-full items-center justify-between">

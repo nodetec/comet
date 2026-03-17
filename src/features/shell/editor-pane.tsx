@@ -11,7 +11,12 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, Submenu } from "@tauri-apps/api/menu";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
-import { Ellipsis, Lock, PanelBottomOpen, PanelBottomClose } from "lucide-react";
+import {
+  Ellipsis,
+  Lock,
+  PanelBottomOpen,
+  PanelBottomClose,
+} from "lucide-react";
 
 import {
   NoteEditor,
@@ -227,7 +232,7 @@ export function EditorPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
-          showHeaderBorder && "border-b border-divider",
+          showHeaderBorder && "border-divider border-b",
         )}
       >
         <div className="min-w-0 flex-1">

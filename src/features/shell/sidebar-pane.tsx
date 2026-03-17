@@ -218,7 +218,7 @@ export function SidebarPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-end px-3",
-          showHeaderBorder && "border-b border-divider",
+          showHeaderBorder && "border-divider border-b",
         )}
       >
         <div className="relative z-40 flex gap-1">
@@ -500,7 +500,7 @@ export function SidebarPane({
         <div className="h-px shrink-0" ref={footerSentinelRef} />
       </nav>
 
-      <div className={showFooterBorder ? "border-t border-divider" : ""}>
+      <div className={showFooterBorder ? "border-divider border-t" : ""}>
         <Button
           className="text-muted-foreground justify-start bg-transparent px-3 hover:bg-transparent"
           onClick={onShowCreateNotebook}

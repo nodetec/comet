@@ -300,9 +300,7 @@ function PublishShortNoteDialogContent({
 
       <div className="bg-muted/50 mt-4 flex items-start gap-2 rounded-md border px-3 py-2.5">
         <Lock className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
-        <p className="text-muted-foreground text-xs">
-          {LOCK_WARNING}
-        </p>
+        <p className="text-muted-foreground text-xs">{LOCK_WARNING}</p>
       </div>
 
       <div className="mt-4 flex justify-end gap-2">
