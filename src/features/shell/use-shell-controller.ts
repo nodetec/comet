@@ -62,6 +62,7 @@ export function useShellController() {
   const notebook = useNotebookState();
   const publish = usePublishState();
   const pendingSaveTimeoutRef = useRef<number | null>(null);
+  const isSavingRef = useRef(false);
 
   const queryClient = useQueryClient();
   const activeNotebookId = useShellStore((state) => state.activeNotebookId);
@@ -319,6 +320,9 @@ export function useShellController() {
 
   const saveNoteMutation = useMutation({
     mutationFn: saveNote,
+    onMutate: () => {
+      isSavingRef.current = true;
+    },
     onSuccess: (savedNote) => {
       queryClient.setQueryData(["note", savedNote.id], savedNote);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
@@ -333,6 +337,9 @@ export function useShellController() {
       "save-note-error",
       "Your latest changes were not saved.",
     ),
+    onSettled: () => {
+      isSavingRef.current = false;
+    },
   });
 
   const archiveNoteMutation = useMutation({
@@ -552,7 +559,8 @@ export function useShellController() {
         // If the updated note is currently open, refetch then remount editor
         // — but only if the user isn't actively editing (unsaved draft)
         const { draftNoteId: currentDraftId } = useShellStore.getState();
-        const hasPendingSave = Boolean(pendingSaveTimeoutRef.current);
+        const hasPendingSave =
+          Boolean(pendingSaveTimeoutRef.current) || isSavingRef.current;
 
         // If the currently open note was deleted remotely, close the editor
         if (action === "delete") {
