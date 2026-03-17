@@ -58,16 +58,19 @@ export default function OnChangeMarkdownPlugin({
           );
 
           if (!initCompleteRef.current) {
-            console.log(
-              "[editor:update] pre-init update, skipping onChange",
-            );
+            console.log("[editor:update] pre-init update, skipping onChange");
             return;
           }
 
           const markdown = $exportMarkdown(TRANSFORMERS);
 
-          if (prevMarkdownRef.current !== null && prevMarkdownRef.current === markdown) {
-            console.log("[editor:update] markdown unchanged, skipping onChange");
+          if (
+            prevMarkdownRef.current !== null &&
+            prevMarkdownRef.current === markdown
+          ) {
+            console.log(
+              "[editor:update] markdown unchanged, skipping onChange",
+            );
             return;
           }
 

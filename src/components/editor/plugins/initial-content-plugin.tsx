@@ -31,9 +31,7 @@ export default function InitialContentPlugin({
     hasInitialized.current = true;
 
     const mode = isNew ? "new" : !markdown.trim() ? "empty" : "existing";
-    console.log(
-      `[editor:init] mode=${mode} markdown=${markdown.length} chars`,
-    );
+    console.log(`[editor:init] mode=${mode} markdown=${markdown.length} chars`);
 
     editor.update(() => {
       if (isNew) {
@@ -55,9 +53,7 @@ export default function InitialContentPlugin({
       }
 
       const root = $getRoot();
-      console.log(
-        `[editor:init] imported ${root.getChildrenSize()} nodes`,
-      );
+      console.log(`[editor:init] imported ${root.getChildrenSize()} nodes`);
     });
 
     onInitComplete();

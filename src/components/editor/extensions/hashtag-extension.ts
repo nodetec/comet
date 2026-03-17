@@ -137,8 +137,7 @@ function getHashtagRegexStringChars() {
     "\u1040-\u1049\u17E0-\u17E9\u1810-\u1819\u1946-\u194F\u19D0-\u19D9" +
     "\uFF10-\uFF19";
 
-  const alpha =
-    unicodeLetters + latinAccents + nonLatinChars + cjkChars;
+  const alpha = unicodeLetters + latinAccents + nonLatinChars + cjkChars;
   const numeric = unicodeDigits + "_";
   const alphanumeric = alpha + unicodeAccents + numeric;
   const hashChars = "#\\uFF03";
@@ -211,19 +210,18 @@ function registerHashtag(editor: LexicalEditor) {
   );
 
   // Revert any HashtagNode that ends up inside a code context
-  const removeCodeGuard = editor.registerNodeTransform(
-    HashtagNode,
-    (node) => {
-      if ($isInsideCode(node)) {
-        const text = node.getTextContent();
-        const reason = $isCodeNode(node.getParent()!) ? "code-block" : "inline-code";
-        console.log(`[editor:hashtag] reverted "${text}" (inside ${reason})`);
-        const textNode = $createTextNode(text);
-        textNode.setFormat(node.getFormat());
-        node.replace(textNode);
-      }
-    },
-  );
+  const removeCodeGuard = editor.registerNodeTransform(HashtagNode, (node) => {
+    if ($isInsideCode(node)) {
+      const text = node.getTextContent();
+      const reason = $isCodeNode(node.getParent()!)
+        ? "code-block"
+        : "inline-code";
+      console.log(`[editor:hashtag] reverted "${text}" (inside ${reason})`);
+      const textNode = $createTextNode(text);
+      textNode.setFormat(node.getFormat());
+      node.replace(textNode);
+    }
+  });
 
   // Prevent the forward transform from creating hashtags in code contexts
   const removeTextGuard = editor.registerNodeTransform(TextNode, (node) => {
@@ -233,13 +231,17 @@ function registerHashtag(editor: LexicalEditor) {
     const prev = node.getPreviousSibling();
     const next = node.getNextSibling();
     if (prev instanceof HashtagNode) {
-      console.log(`[editor:hashtag] cleaned sibling "${prev.getTextContent()}" (prev, in code)`);
+      console.log(
+        `[editor:hashtag] cleaned sibling "${prev.getTextContent()}" (prev, in code)`,
+      );
       const textNode = $createTextNode(prev.getTextContent());
       textNode.setFormat(prev.getFormat());
       prev.replace(textNode);
     }
     if (next instanceof HashtagNode) {
-      console.log(`[editor:hashtag] cleaned sibling "${next.getTextContent()}" (next, in code)`);
+      console.log(
+        `[editor:hashtag] cleaned sibling "${next.getTextContent()}" (next, in code)`,
+      );
       const textNode = $createTextNode(next.getTextContent());
       textNode.setFormat(next.getFormat());
       next.replace(textNode);
