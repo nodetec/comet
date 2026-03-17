@@ -6,7 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import { useUIStore } from "@/stores/use-ui-store";
-import cometLogo from "../../../comet.svg";
+import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 
