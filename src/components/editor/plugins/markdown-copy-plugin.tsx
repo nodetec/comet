@@ -21,7 +21,7 @@ import { CodeNode, CodeHighlightNode } from "@lexical/code";
 import { HorizontalRuleNode } from "@lexical/extension";
 import { TableNode, TableRowNode, TableCellNode } from "@lexical/table";
 import { LinkNode } from "@lexical/link";
-import { HashtagNode } from "@lexical/hashtag";
+import { HashtagNode } from "../nodes/hashtag-node";
 import { ImageNode } from "../nodes/image-node";
 import { YouTubeNode } from "../nodes/youtube-node";
 import { TRANSFORMERS } from "../transformers";

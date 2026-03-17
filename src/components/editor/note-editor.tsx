@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -12,7 +19,7 @@ import {
   TabIndentationExtension,
 } from "@lexical/extension";
 import { CodeExtension } from "@lexical/code";
-import { HashtagExtension } from "@lexical/hashtag";
+import { HashtagExtension } from "./extensions/hashtag-extension";
 import { TableExtension } from "@lexical/table";
 import { LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
@@ -71,6 +78,8 @@ function EditorInner({
   editorRef: React.RefObject<NoteEditorHandle | null>;
 }) {
   const [editor] = useLexicalComposerContext();
+  const [initComplete, setInitComplete] = useState(false);
+  const handleInitComplete = useCallback(() => setInitComplete(true), []);
   const searchWords = useMemo(
     () => searchWordsFromQuery(searchQuery),
     [searchQuery],
@@ -116,8 +125,12 @@ function EditorInner({
         autoCapitalize="off"
         autoCorrect="off"
       />
-      <InitialContentPlugin isNew={isNew} markdown={markdown} />
-      <OnChangeMarkdownPlugin onChange={onChange} />
+      <OnChangeMarkdownPlugin initComplete={initComplete} onChange={onChange} />
+      <InitialContentPlugin
+        isNew={isNew}
+        markdown={markdown}
+        onInitComplete={handleInitComplete}
+      />
       <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
       <CodeHighlightPlugin />
       <ScrollCenterCurrentLinePlugin />

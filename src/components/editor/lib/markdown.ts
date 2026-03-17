@@ -179,6 +179,18 @@ export function $importMarkdown(
   const processed = options?.preserveBlankLines
     ? normalized
     : preprocessForImport(normalized);
+
+  if (normalized !== markdown) {
+    console.log(
+      `[editor:markdown] import normalized: ${markdown.length} → ${normalized.length} chars`,
+    );
+  }
+  if (processed !== normalized) {
+    console.log(
+      `[editor:markdown] import preprocessed: ${normalized.length} → ${processed.length} chars`,
+    );
+  }
+
   // 3. Import with shouldPreserveNewLines=true
   $convertFromMarkdownString(processed, transformers, node, true);
 }

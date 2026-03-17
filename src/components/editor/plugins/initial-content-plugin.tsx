@@ -15,11 +15,13 @@ function normalizeEmptyHeadings(markdown: string): string {
 interface InitialContentPluginProps {
   isNew: boolean;
   markdown: string;
+  onInitComplete(): void;
 }
 
 export default function InitialContentPlugin({
   isNew,
   markdown,
+  onInitComplete,
 }: InitialContentPluginProps) {
   const [editor] = useLexicalComposerContext();
   const hasInitialized = useRef(false);
@@ -27,6 +29,11 @@ export default function InitialContentPlugin({
   useEffect(() => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
+
+    const mode = isNew ? "new" : !markdown.trim() ? "empty" : "existing";
+    console.log(
+      `[editor:init] mode=${mode} markdown=${markdown.length} chars`,
+    );
 
     editor.update(() => {
       if (isNew) {
@@ -47,17 +54,22 @@ export default function InitialContentPlugin({
 
         heading.selectEnd();
       } else if (!markdown.trim()) {
-        // Empty note: start with an H1 like a new note.
-        const root = $getRoot();
-        root.clear();
-        root.append($createHeadingNode("h1"));
+        // Empty existing note: leave the default empty paragraph.
+        // (Lexical initializes with one ParagraphNode by default.)
         $setSelection(null);
       } else {
         $importMarkdown(normalizeEmptyHeadings(markdown), TRANSFORMERS);
         $setSelection(null);
       }
+
+      const root = $getRoot();
+      console.log(
+        `[editor:init] imported ${root.getChildrenSize()} nodes`,
+      );
     });
-  }, [editor, isNew, markdown]);
+
+    onInitComplete();
+  }, [editor, isNew, markdown, onInitComplete]);
 
   return null;
 }

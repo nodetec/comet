@@ -153,8 +153,72 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
     let bytes = markdown.as_bytes();
     let mut tags = std::collections::BTreeSet::new();
     let mut index = 0;
+    let mut fence_char: u8 = 0;
+    let mut fence_len: usize = 0;
 
     while index < bytes.len() {
+        let at_line_start = index == 0 || bytes[index - 1] == b'\n';
+
+        // Check for fenced code block delimiter (``` or ~~~, 3+ chars) at start of line
+        if at_line_start && index + 2 < bytes.len() && (bytes[index] == b'`' || bytes[index] == b'~') {
+            let ch = bytes[index];
+            let mut run = 0;
+            while index + run < bytes.len() && bytes[index + run] == ch {
+                run += 1;
+            }
+            if run >= 3 {
+                if fence_len == 0 {
+                    // Open a fenced block
+                    fence_char = ch;
+                    fence_len = run;
+                } else if ch == fence_char && run >= fence_len {
+                    // Close the fenced block (closing fence must use same char and be >= opening length)
+                    fence_char = 0;
+                    fence_len = 0;
+                }
+                // Skip to end of line
+                index += run;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+                continue;
+            }
+        }
+
+        // Skip everything inside fenced code blocks
+        if fence_len > 0 {
+            index += 1;
+            continue;
+        }
+
+        // Skip inline code spans (handles multi-backtick delimiters like `` `code` ``)
+        if bytes[index] == b'`' {
+            let mut tick_count = 0;
+            while index + tick_count < bytes.len() && bytes[index + tick_count] == b'`' {
+                tick_count += 1;
+            }
+            index += tick_count;
+            // Scan for matching closing backtick run
+            loop {
+                if index >= bytes.len() {
+                    break;
+                }
+                if bytes[index] == b'`' {
+                    let mut close_count = 0;
+                    while index + close_count < bytes.len() && bytes[index + close_count] == b'`' {
+                        close_count += 1;
+                    }
+                    index += close_count;
+                    if close_count == tick_count {
+                        break;
+                    }
+                } else {
+                    index += 1;
+                }
+            }
+            continue;
+        }
+
         if bytes[index] != b'#' {
             index += 1;
             continue;
