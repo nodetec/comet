@@ -346,7 +346,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
 COMMIT;
 
 -- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 11;
+PRAGMA user_version = 13;
 
 PRAGMA foreign_keys = ON;
 SQL
