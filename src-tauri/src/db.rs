@@ -127,6 +127,27 @@ fn migrations() -> Migrations<'static> {
                 PRIMARY KEY (hash, server_url)
             );",
         ),
+        M::up(
+            "DROP TABLE IF EXISTS blob_meta;
+             CREATE TABLE blob_meta (
+               plaintext_hash  TEXT NOT NULL,
+               server_url      TEXT NOT NULL,
+               ciphertext_hash TEXT NOT NULL,
+               encryption_key  TEXT NOT NULL,
+               PRIMARY KEY (plaintext_hash, server_url)
+             );",
+        ),
+        M::up(
+            "DROP TABLE IF EXISTS blob_meta;
+             CREATE TABLE blob_meta (
+               plaintext_hash  TEXT NOT NULL,
+               server_url      TEXT NOT NULL,
+               pubkey          TEXT NOT NULL,
+               ciphertext_hash TEXT NOT NULL,
+               encryption_key  TEXT NOT NULL,
+               PRIMARY KEY (plaintext_hash, server_url, pubkey)
+             );",
+        ),
     ])
 }
 

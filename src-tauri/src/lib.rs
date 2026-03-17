@@ -359,30 +359,34 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
 
     let conn = database_connection(&app)?;
 
-    // Look up blob metadata
-    let meta: Option<(String, String)> = conn
-        .query_row(
-            "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1",
-            rusqlite::params![hash],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?;
-
-    let (ciphertext_hash, key_hex) = match meta {
-        Some(m) => m,
-        None => return Ok(false), // no metadata, can't download
-    };
-
     let blossom_url = match sync::get_blossom_url(&conn) {
         Some(u) => u,
         None => return Ok(false),
     };
 
     // Get keys for decryption and Blossom auth
-    let secret_hex: String = conn
-        .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| row.get(0))
+    let (secret_hex, pubkey_hex): (String, String) = conn
+        .query_row(
+            "SELECT secret_key, public_key FROM nostr_identity LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
         .optional()?
         .ok_or_else(|| AppError::custom("No identity configured"))?;
+
+    // Look up blob metadata for the current server + identity
+    let meta: Option<(String, String)> = conn
+        .query_row(
+            "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+            rusqlite::params![hash, blossom_url, pubkey_hex],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+
+    let (ciphertext_hash, key_hex) = match meta {
+        Some(m) => m,
+        None => return Ok(false), // no metadata for this server+identity, can't download
+    };
 
     drop(conn); // release before async work
 

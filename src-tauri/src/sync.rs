@@ -1153,13 +1153,13 @@ async fn push_note(
     let attachment_hashes = extract_attachment_hashes(&markdown);
     if let Some(ref blossom_url) = blossom_url {
         let http_client = reqwest::Client::new();
+        let pubkey_hex = keys.public_key().to_hex();
         for hash in &attachment_hashes {
-            // Check if we already have blob metadata (already uploaded)
             let existing: Option<(String, String)> = {
                 let conn = crate::db::database_connection(app)?;
                 conn.query_row(
-                    "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1",
-                    params![hash],
+                    "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                    params![hash, blossom_url, pubkey_hex],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .optional()?
@@ -1176,7 +1176,7 @@ async fn push_note(
                 None => continue,
             };
 
-            // Encrypt with ChaCha20-Poly1305 (NIP-44 has a 65KB size limit)
+            // Encrypt with ChaCha20-Poly1305
             let (ciphertext_bytes, key_hex) = crate::blossom::encrypt_blob(&blob_data)?;
 
             // Upload to Blossom
@@ -1188,11 +1188,11 @@ async fn push_note(
             )
             .await?;
 
-            // Save blob metadata for on-demand download on other devices
+            // Save blob metadata keyed to this server + identity
             let conn = crate::db::database_connection(app)?;
             conn.execute(
-                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
-                params![hash, ciphertext_hash, key_hex],
+                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![hash, blossom_url, pubkey_hex, ciphertext_hash, key_hex],
             )?;
             conn.execute(
                 "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at) VALUES (?1, ?2, 1, ?3, ?4)",
@@ -1402,12 +1402,13 @@ async fn download_missing_blobs(
         .collect();
 
     let http_client = reqwest::Client::new();
+    let pubkey_hex = keys.public_key().to_hex();
     for (plaintext_hash, ciphertext_hash, key_hex) in &blob_tags {
-        // Save blob metadata for on-demand download
+        // Save blob metadata keyed to this server + identity for on-demand download
         if let Ok(conn) = crate::db::database_connection(app) {
             let _ = conn.execute(
-                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3)",
-                params![plaintext_hash, ciphertext_hash, key_hex],
+                "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![plaintext_hash, blossom_url, pubkey_hex, ciphertext_hash, key_hex],
             );
         }
 
