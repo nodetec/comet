@@ -1187,25 +1187,88 @@ fn title_from_markdown(markdown: &str) -> String {
 
 fn preview_from_markdown(markdown: &str) -> String {
     let mut skipped_title = false;
+    let mut in_code_block = false;
     let mut preview = String::with_capacity(160);
-    for line in markdown.lines().map(str::trim) {
-        if line.is_empty() || line.starts_with("```") {
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
             continue;
         }
-        if !skipped_title && line.starts_with('#') {
+        if in_code_block || trimmed.is_empty() {
+            continue;
+        }
+        // Skip first H1 (already shown as card title)
+        if !skipped_title && trimmed.starts_with("# ") {
             skipped_title = true;
+            continue;
+        }
+        // Skip images and horizontal rules
+        if trimmed.starts_with("![") || trimmed.starts_with("---") || trimmed.starts_with("***") {
+            continue;
+        }
+        let cleaned = strip_markdown_syntax(trimmed);
+        if cleaned.is_empty() {
             continue;
         }
         if !preview.is_empty() {
             preview.push(' ');
         }
-        preview.push_str(line);
+        preview.push_str(&cleaned);
         if preview.len() >= 140 {
             break;
         }
     }
     preview.truncate(preview.chars().take(140).map(|c| c.len_utf8()).sum());
     preview
+}
+
+/// Strip common markdown inline and block syntax for plain-text preview.
+fn strip_markdown_syntax(line: &str) -> String {
+    let mut s = line.to_string();
+
+    // Strip heading markers
+    if s.starts_with('#') {
+        s = s.trim_start_matches('#').trim().to_string();
+    }
+    // Strip blockquote markers
+    while s.starts_with("> ") || s.starts_with('>') {
+        s = s.strip_prefix("> ").or_else(|| s.strip_prefix('>')).unwrap_or(&s).to_string();
+    }
+    // Strip list markers: "- ", "* ", "+ ", "1. ", "2) " etc.
+    if let Some(rest) = s.strip_prefix("- ").or_else(|| s.strip_prefix("* ")).or_else(|| s.strip_prefix("+ ")) {
+        s = rest.to_string();
+    } else if s.len() > 2 {
+        let bytes = s.as_bytes();
+        if bytes[0].is_ascii_digit() && (bytes[1] == b'.' || bytes[1] == b')') {
+            s = s[2..].trim_start().to_string();
+        } else if bytes.len() > 3 && bytes[0].is_ascii_digit() && bytes[1].is_ascii_digit() && (bytes[2] == b'.' || bytes[2] == b')') {
+            s = s[3..].trim_start().to_string();
+        }
+    }
+    // Strip checkbox markers
+    s = s.strip_prefix("[ ] ").or_else(|| s.strip_prefix("[x] ")).unwrap_or(&s).to_string();
+    // Strip inline markdown: bold, italic, strikethrough, inline code
+    s = s.replace("***", "").replace("**", "").replace("~~", "");
+    // Strip inline code backticks
+    s = s.replace('`', "");
+    // Strip markdown links [text](url) → text
+    while let Some(start) = s.find('[') {
+        if let Some(mid) = s[start..].find("](") {
+            if let Some(end) = s[start + mid..].find(')') {
+                let text = &s[start + 1..start + mid].to_string();
+                s = format!("{}{}{}", &s[..start], text, &s[start + mid + end + 1..]);
+                continue;
+            }
+        }
+        break;
+    }
+    // Strip standalone emphasis markers (* or _) but keep the content
+    s = s.replace(" *", " ").replace("* ", " ").replace(" _", " ").replace("_ ", " ");
+    if s.starts_with('*') || s.starts_with('_') { s = s[1..].to_string(); }
+    if s.ends_with('*') || s.ends_with('_') { s = s[..s.len()-1].to_string(); }
+
+    s
 }
 
 fn searchable_markdown_text(markdown: &str) -> String {
