@@ -29,7 +29,7 @@ pub async fn upload_blob(
     let resp = client
         .put(&url)
         .header("Authorization", auth_header)
-        .header("Content-Type", "image/png")
+        .header("Content-Type", "application/octet-stream")
         .header("X-SHA-256", &ciphertext_hash)
         .body(ciphertext)
         .send()
