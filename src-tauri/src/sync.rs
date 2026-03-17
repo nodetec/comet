@@ -1470,8 +1470,10 @@ async fn download_missing_blobs(
             }
         };
 
-        // Determine extension from attachment references in the content
-        let ext = extract_blob_extension(&rumor.content, plaintext_hash).unwrap_or("bin".to_string());
+        // Determine extension from attachment references in the content, or detect from magic bytes
+        let ext = extract_blob_extension(&rumor.content, plaintext_hash)
+            .or_else(|| detect_image_extension(&plaintext))
+            .unwrap_or_else(|| "bin".to_string());
 
         // Save locally
         if let Err(e) = crate::attachments::save_blob(app, plaintext_hash, &ext, &plaintext) {
@@ -1479,6 +1481,23 @@ async fn download_missing_blobs(
         } else {
             log::info!("[sync] downloaded blob {}.{ext}", &plaintext_hash[..8]);
         }
+    }
+}
+
+/// Detect image format from magic bytes.
+fn detect_image_extension(data: &[u8]) -> Option<String> {
+    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        Some("png".to_string())
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg".to_string())
+    } else if data.starts_with(b"GIF8") {
+        Some("gif".to_string())
+    } else if data.starts_with(b"RIFF") && data.len() > 11 && &data[8..12] == b"WEBP" {
+        Some("webp".to_string())
+    } else if data.starts_with(b"<svg") || data.starts_with(b"<?xml") {
+        Some("svg".to_string())
+    } else {
+        None
     }
 }
 
