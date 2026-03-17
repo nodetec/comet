@@ -230,56 +230,75 @@ export function NotesPane({
       }));
 
     const menu = await Menu.new({
-      items: isTrash
-        ? [
-            {
-              id: `restore-trash-${note.id}`,
-              text: "Restore",
-              action: () => onRestoreFromTrash(note.id),
-            },
-            {
-              id: `delete-forever-${note.id}`,
-              text: "Delete Permanently",
-              action: () => onDeleteNotePermanently(note.id),
-            },
-          ]
-        : isArchive
-        ? [
-            {
-              id: `restore-${note.id}`,
-              text: "Unarchive",
-              action: () => onRestoreNote(note.id),
-            },
-            {
-              id: `delete-${note.id}`,
-              text: "Delete",
-              action: () => onTrashNote(note.id),
-            },
-          ]
-        : [
-            {
-              id: `copy-${note.id}`,
-              text: "Copy",
-              action: () => onCopyNoteContent(note.id),
-            },
-            { item: "Separator" as const },
-            {
-              id: `${note.pinnedAt ? "unpin" : "pin"}-${note.id}`,
-              text: note.pinnedAt ? "Unpin" : "Pin To Top",
-              action: () => onSetNotePinned(note.id, !note.pinnedAt),
-            },
-            ...(moveToNotebookSubmenu ? [moveToNotebookSubmenu] : []),
-            {
-              id: `archive-${note.id}`,
-              text: "Archive",
-              action: () => onArchiveNote(note.id),
-            },
-            {
-              id: `delete-${note.id}`,
-              text: "Delete",
-              action: () => onTrashNote(note.id),
-            },
-          ],
+      items: [
+        {
+          id: `${note.pinnedAt ? "unpin" : "pin"}-${note.id}`,
+          text: note.pinnedAt ? "Unpin" : "Pin To Top",
+          enabled: !isArchive && !isTrash,
+          action: () => onSetNotePinned(note.id, !note.pinnedAt),
+        },
+        {
+          id: `copy-${note.id}`,
+          text: "Copy",
+          action: () => onCopyNoteContent(note.id),
+        },
+        ...(moveToNotebookSubmenu
+          ? [{ item: "Separator" as const }, moveToNotebookSubmenu]
+          : []),
+        { item: "Separator" as const },
+        ...(isTrash
+          ? [
+              {
+                id: `delete-forever-${note.id}`,
+                text: "Delete",
+                action: () => onDeleteNotePermanently(note.id),
+              },
+              {
+                id: `restore-trash-${note.id}`,
+                text: "Restore",
+                action: () => onRestoreFromTrash(note.id),
+              },
+            ]
+          : [
+              {
+                id: `delete-${note.id}`,
+                text: "Delete",
+                action: () => onTrashNote(note.id),
+              },
+              {
+                id: `restore-trash-${note.id}`,
+                text: "Restore",
+                enabled: false,
+              },
+            ]),
+        { item: "Separator" as const },
+        ...(isArchive
+          ? [
+              {
+                id: `archive-${note.id}`,
+                text: "Archive",
+                enabled: false,
+              },
+              {
+                id: `unarchive-${note.id}`,
+                text: "Unarchive",
+                action: () => onRestoreNote(note.id),
+              },
+            ]
+          : [
+              {
+                id: `archive-${note.id}`,
+                text: "Archive",
+                enabled: !isTrash,
+                action: () => onArchiveNote(note.id),
+              },
+              {
+                id: `unarchive-${note.id}`,
+                text: "Unarchive",
+                enabled: false,
+              },
+            ]),
+      ],
     });
 
     try {
