@@ -60,6 +60,7 @@ pub struct LoadedNote {
     pub tags: Vec<String>,
     pub nostr_d_tag: Option<String>,
     pub published_at: Option<i64>,
+    pub published_kind: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1127,6 +1128,7 @@ fn row_to_loaded_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
         tags: Vec::new(),
         nostr_d_tag: row.get(9)?,
         published_at: row.get(10)?,
+        published_kind: row.get(11)?,
     })
 }
 
@@ -1156,7 +1158,7 @@ fn row_to_note_summary(
 fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, AppError> {
     let note = conn
         .query_row(
-            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.nostr_d_tag, n.published_at
+            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.nostr_d_tag, n.published_at, n.published_kind
              FROM notes n
              LEFT JOIN notebooks b ON b.id = n.notebook_id
              WHERE n.id = ?1",

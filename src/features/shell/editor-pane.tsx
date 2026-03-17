@@ -35,6 +35,7 @@ type EditorPaneProps = {
   noteId: string | null;
   pinnedAt: number | null;
   publishedAt: number | null;
+  publishedKind: number | null;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
@@ -65,6 +66,7 @@ export function EditorPane({
   noteId,
   pinnedAt,
   publishedAt,
+  publishedKind,
   searchQuery,
   onAssignNotebook,
   onDeletePublishedNote,
@@ -75,7 +77,8 @@ export function EditorPane({
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
-  const isReadOnly = isArchived || deletedAt !== null;
+  const isPublishedNote = publishedKind === 1;
+  const isReadOnly = isArchived || deletedAt !== null || isPublishedNote;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
@@ -218,7 +221,9 @@ export function EditorPane({
             {noteTitle ?? ""}
           </p>
         </div>
-        {noteId && !isReadOnly ? (
+        {noteId && isPublishedNote ? (
+          <span className="text-muted-foreground text-xs">Published</span>
+        ) : noteId && !isReadOnly ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
             {publishedAt != null &&
               (modifiedAt <= publishedAt ? (

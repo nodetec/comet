@@ -33,6 +33,7 @@ export type LoadedNote = {
   notebook: NotebookRef | null;
   pinnedAt: number | null;
   publishedAt: number | null;
+  publishedKind: number | null;
   tags: string[];
   title: string;
 };

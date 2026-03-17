@@ -253,7 +253,7 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
         let conn = crate::db::database_connection(app)?;
         let published_at = now_millis();
         conn.execute(
-            "UPDATE notes SET published_at = ?1 WHERE id = ?2",
+            "UPDATE notes SET published_at = ?1, published_kind = 30023 WHERE id = ?2",
             params![published_at, note_id],
         )?;
     }
@@ -353,7 +353,7 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
         let published_at = now_millis();
         let event_id = event.id.to_hex();
         conn.execute(
-            "UPDATE notes SET published_at = ?1, published_event_id = ?2 WHERE id = ?3",
+            "UPDATE notes SET published_at = ?1, published_event_id = ?2, published_kind = 1 WHERE id = ?3",
             params![published_at, event_id, note_id],
         )?;
     }
@@ -453,7 +453,7 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
     if success_count > 0 {
         let conn = crate::db::database_connection(app)?;
         conn.execute(
-            "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL, published_event_id = NULL WHERE id = ?1",
+            "UPDATE notes SET published_at = NULL, nostr_d_tag = NULL, published_event_id = NULL, published_kind = NULL WHERE id = ?1",
             params![note_id],
         )?;
     }

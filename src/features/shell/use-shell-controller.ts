@@ -959,6 +959,7 @@ export function useShellController() {
       editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
+      publishedKind: currentNote?.publishedKind ?? null,
       searchQuery,
       isDeletePublishedNotePending:
         publish.deletePublishedNoteMutation.isPending,
