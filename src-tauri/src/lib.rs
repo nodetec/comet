@@ -241,11 +241,21 @@ fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
 }
 
 fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
-    conn.execute("UPDATE notes SET sync_event_id = NULL", [])?;
-    conn.execute("UPDATE notebooks SET sync_event_id = NULL", [])?;
-    conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])?;
-    conn.execute("DELETE FROM pending_deletions", [])?;
-    Ok(())
+    conn.execute_batch("BEGIN")?;
+    let result = (|| -> Result<(), AppError> {
+        conn.execute("UPDATE notes SET sync_event_id = NULL, locally_modified = 1", [])?;
+        conn.execute("UPDATE notebooks SET sync_event_id = NULL, locally_modified = 1", [])?;
+        conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])?;
+        conn.execute("DELETE FROM app_settings WHERE key = 'sync_relay_url'", [])?;
+        conn.execute("DELETE FROM pending_deletions", [])?;
+        Ok(())
+    })();
+    if result.is_ok() {
+        conn.execute_batch("COMMIT")?;
+    } else {
+        let _ = conn.execute_batch("ROLLBACK");
+    }
+    result
 }
 
 fn restart_sync_async(app: &AppHandle) {
