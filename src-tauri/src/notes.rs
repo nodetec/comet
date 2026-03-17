@@ -321,7 +321,7 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
     let updated = conn
         .execute(
             "UPDATE notes
-             SET archived_at = ?1, pinned_at = NULL, modified_at = ?1, locally_modified = 1
+             SET archived_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
             params![now, note_id],
         )?;
@@ -364,7 +364,7 @@ pub fn trash_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError
 
     let updated = conn.execute(
         "UPDATE notes
-         SET deleted_at = ?1, pinned_at = NULL, modified_at = ?1, locally_modified = 1
+         SET deleted_at = ?1, modified_at = ?1, locally_modified = 1
          WHERE id = ?2 AND deleted_at IS NULL",
         params![now, note_id],
     )?;
@@ -525,7 +525,7 @@ pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> 
         .execute(
             "UPDATE notes
              SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
-             WHERE id = ?2 AND archived_at IS NULL",
+             WHERE id = ?2",
             params![now_millis(), note_id],
         )?;
 

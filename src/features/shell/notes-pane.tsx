@@ -234,7 +234,6 @@ export function NotesPane({
         {
           id: `${note.pinnedAt ? "unpin" : "pin"}-${note.id}`,
           text: note.pinnedAt ? "Unpin" : "Pin To Top",
-          enabled: !isArchive && !isTrash,
           action: () => onSetNotePinned(note.id, !note.pinnedAt),
         },
         {
@@ -441,7 +440,7 @@ export function NotesPane({
                 </Button>
                 <Button
                   className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  disabled={isCreatingNote}
+                  disabled={isCreatingNote || isArchive || isTrash}
                   onClick={(event) =>
                     handleCreateButtonClick(event, onCreateNote)
                   }
