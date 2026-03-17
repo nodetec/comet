@@ -227,7 +227,7 @@ export function EditorPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
-          showHeaderBorder && "border-b",
+          showHeaderBorder && "border-b border-divider",
         )}
       >
         <div className="min-w-0 flex-1">

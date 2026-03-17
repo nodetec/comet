@@ -311,8 +311,8 @@ export function NotesPane({
     <section className="bg-background flex h-full min-h-0 flex-col">
       <header
         className={[
-          "h-[52px] w-full shrink-0 px-3",
-          showHeaderBorder ? "border-b" : "",
+          "h-13 w-full shrink-0 px-3",
+          showHeaderBorder ? "border-b border-divider" : "",
         ].join(" ")}
       >
         <div className="flex h-full items-center justify-between">
