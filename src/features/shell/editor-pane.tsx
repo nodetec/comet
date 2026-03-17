@@ -137,46 +137,36 @@ export function EditorPane({
       onAssign: (notebookId) => onAssignNotebook(notebookId),
     });
 
-    const publishAsSubmenu = await Submenu.new({
-      text: publishedAt ? "Update on Nostr" : "Publish As",
-      items: [
-        {
-          id: "editor-menu-publish-note",
-          text: "Note",
-          action: () => onPublishShortNote(),
-        },
-        {
-          id: "editor-menu-publish-article",
-          text: "Article",
-          action: () => onOpenPublishDialog(),
-        },
-      ],
-    });
+    const deletePublishedItem = {
+      id: "editor-menu-delete-published",
+      text: "Delete from Nostr",
+      enabled: !isDeletePublishedNotePending,
+      action: onDeletePublishedNote,
+    };
 
-    const publishItems = isPublishedNote
-      ? [
+    let publishItems;
+    if (isPublishedNote) {
+      publishItems = [deletePublishedItem];
+    } else {
+      const publishAsSubmenu = await Submenu.new({
+        text: publishedAt ? "Update on Nostr" : "Publish As",
+        items: [
           {
-            id: "editor-menu-delete-published",
-            text: "Delete from Nostr",
-            enabled: !isDeletePublishedNotePending,
-            action: () => {
-              onDeletePublishedNote();
-            },
+            id: "editor-menu-publish-note",
+            text: "Note",
+            action: () => onPublishShortNote(),
           },
-        ]
-      : publishedAt
-        ? [
-            publishAsSubmenu,
-            {
-              id: "editor-menu-delete-published",
-              text: "Delete from Nostr",
-              enabled: !isDeletePublishedNotePending,
-              action: () => {
-                onDeletePublishedNote();
-              },
-            },
-          ]
+          {
+            id: "editor-menu-publish-article",
+            text: "Article",
+            action: () => onOpenPublishDialog(),
+          },
+        ],
+      });
+      publishItems = publishedAt
+        ? [publishAsSubmenu, deletePublishedItem]
         : [publishAsSubmenu];
+    }
 
     const menu = await Menu.new({
       items: [
@@ -219,6 +209,19 @@ export function EditorPane({
     editorRef.current?.focus();
   };
 
+  const menuButton = (
+    <Button
+      className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+      onClick={(event: MouseEvent<HTMLButtonElement>) =>
+        void handleOpenMenu(event)
+      }
+      size="icon-sm"
+      variant="ghost"
+    >
+      <Ellipsis className="size-[1.2rem]" />
+    </Button>
+  );
+
   return (
     <section className="bg-background relative flex h-full min-h-0 flex-col">
       <header
@@ -239,25 +242,18 @@ export function EditorPane({
         </div>
         {noteId && isPublishedNote ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
+            <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
+              Published
+            </span>
             <Tooltip>
               <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
-                <Lock className="size-3" />
+                <Lock className="size-[1.2rem]" />
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 Short notes are immutable on Nostr and can't be updated.
               </TooltipContent>
             </Tooltip>
-            <span className="text-muted-foreground pointer-events-auto text-xs">
-              Published
-            </span>
-            <Button
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-              onClick={(event) => void handleOpenMenu(event)}
-              size="icon-sm"
-              variant="ghost"
-            >
-              <Ellipsis className="size-[1.2rem]" />
-            </Button>
+            {menuButton}
           </div>
         ) : noteId && !isReadOnly ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
@@ -291,14 +287,7 @@ export function EditorPane({
                 <PanelBottomOpen className="size-[1.2rem]" />
               )}
             </Button>
-            <Button
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-              onClick={(event) => void handleOpenMenu(event)}
-              size="icon-sm"
-              variant="ghost"
-            >
-              <Ellipsis className="size-[1.2rem]" />
-            </Button>
+            {menuButton}
           </div>
         ) : null}
       </header>
