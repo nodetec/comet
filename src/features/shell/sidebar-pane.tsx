@@ -49,6 +49,7 @@ type SidebarPaneProps = {
   onSelectNotebook(notebookId: string): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
+  onEmptyTrash(): void;
   onToggleTag(tag: string): void;
   onShowRenameNotebook(notebookId: string): void;
   onSubmitRenameNotebook(): void;
@@ -78,6 +79,7 @@ export function SidebarPane({
   onSelectNotebook,
   onSelectArchive,
   onSelectTrash,
+  onEmptyTrash,
   onToggleTag,
   onShowRenameNotebook,
   onShowCreateNotebook,
@@ -156,6 +158,28 @@ export function SidebarPane({
     noteFilter,
     notebooks.length,
   ]);
+
+  const handleTrashContextMenu = async (
+    event: MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+
+    const menu = await Menu.new({
+      items: [
+        {
+          id: "empty-trash",
+          text: "Empty Trash",
+          action: () => onEmptyTrash(),
+        },
+      ],
+    });
+
+    try {
+      await menu.popup(new LogicalPosition(event.clientX, event.clientY));
+    } finally {
+      await menu.close();
+    }
+  };
 
   const handleNotebookContextMenu = async (
     event: MouseEvent<HTMLButtonElement>,
@@ -294,6 +318,7 @@ export function SidebarPane({
                 <button
                   className={sidebarItemClasses(noteFilter === "trash")}
                   onClick={onSelectTrash}
+                  onContextMenu={(event) => void handleTrashContextMenu(event)}
                   type="button"
                 >
                   <Trash2 className="text-primary size-4 shrink-0" />

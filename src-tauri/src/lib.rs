@@ -169,6 +169,20 @@ fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppErr
 }
 
 #[tauri::command]
+fn empty_trash(app: AppHandle) -> Result<(), AppError> {
+    let note_ids = notes::empty_trash(&app)?;
+    let conn = database_connection(&app)?;
+    for note_id in &note_ids {
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            rusqlite::params![note_id, error::now_millis()],
+        );
+        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn create_notebook(app: AppHandle, input: CreateNotebookInput) -> Result<NotebookSummary, AppError> {
     let notebook = notes::create_notebook(&app, input)?;
     sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
@@ -584,6 +598,7 @@ pub fn run() {
             trash_note,
             restore_from_trash,
             delete_note_permanently,
+            empty_trash,
             create_notebook,
             rename_notebook,
             delete_notebook,

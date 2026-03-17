@@ -19,6 +19,7 @@ import {
   assignNoteNotebook,
   createNote,
   deleteNotePermanently,
+  emptyTrash,
   getBootstrap,
   getContextualTags,
   loadNote,
@@ -404,8 +405,6 @@ export function useShellController() {
     mutationFn: deleteNotePermanently,
     onSuccess: (_, noteId) => {
       queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
-      if (noteFilter === "trash") {
-      }
 
       if (draftNoteId === noteId) {
         setDraft("", "");
@@ -418,6 +417,16 @@ export function useShellController() {
       void invalidateShellData();
     },
     onError: toastErrorHandler("Couldn't delete note", "delete-note-error"),
+  });
+
+  const emptyTrashMutation = useMutation({
+    mutationFn: emptyTrash,
+    onSuccess: () => {
+      setSelectedNoteId(null);
+      setDraft("", "");
+      void invalidateShellData();
+    },
+    onError: toastErrorHandler("Couldn't empty trash", "empty-trash-error"),
   });
 
   const assignNoteNotebookMutation = useMutation({
@@ -701,6 +710,10 @@ export function useShellController() {
     setNoteFilter("trash");
   };
 
+  const handleEmptyTrash = () => {
+    emptyTrashMutation.mutate();
+  };
+
   const handleSelectNotebook = (notebookId: string) => {
     if (
       currentNote &&
@@ -906,6 +919,7 @@ export function useShellController() {
     handleCreateNote,
     handleDeleteNotebook: notebook.handleDeleteNotebook,
     handleDeleteNotePermanently,
+    handleEmptyTrash,
     handleExportNotes,
     handleRestoreFromTrash,
     handleRestoreNote,
@@ -1148,6 +1162,7 @@ export function useShellController() {
       onSelectToday: () => latestRef.current.handleSelectToday(),
       onSelectArchive: () => latestRef.current.handleSelectArchive(),
       onSelectTrash: () => latestRef.current.handleSelectTrash(),
+      onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
       onSelectNotebook: (notebookId: string) =>
         latestRef.current.handleSelectNotebook(notebookId),
       onShowCreateNotebook: notebook.showCreateNotebook,

@@ -522,17 +522,19 @@ export function NotesPane({
                         type="button"
                       >
                         <div className="flex w-full flex-1 flex-col gap-1.5">
-                          {note.title ? (
-                            <h3 className="min-w-0 truncate font-semibold text-[var(--heading-color)]">
+                          {note.title || !note.preview ? (
+                            <h3
+                              className={`min-w-0 truncate font-semibold ${note.title ? "text-[var(--heading-color)]" : "text-muted-foreground"}`}
+                            >
                               <HighlightedText
-                                text={note.title}
+                                text={note.title || "Untitled"}
                                 searchWords={searchWords}
                               />
                             </h3>
                           ) : null}
                           <div className="min-w-0 flex-1 overflow-hidden">
                             <p
-                              className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title ? "line-clamp-2" : "line-clamp-3"}`}
+                              className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title || !note.preview ? "line-clamp-2" : "line-clamp-3"}`}
                             >
                               <HighlightedText
                                 text={cardPreview}

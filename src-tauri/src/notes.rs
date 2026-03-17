@@ -421,6 +421,24 @@ pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<(), App
     Ok(())
 }
 
+pub fn empty_trash(app: &AppHandle) -> Result<Vec<String>, AppError> {
+    let mut conn = database_connection(app)?;
+    // Collect IDs of trashed notes for sync deletion
+    let note_ids: Vec<String> = conn
+        .prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let transaction = conn.transaction()?;
+    transaction.execute_batch(
+        "DELETE FROM notes_fts WHERE note_id IN (SELECT id FROM notes WHERE deleted_at IS NOT NULL);
+         DELETE FROM notes WHERE deleted_at IS NOT NULL;",
+    )?;
+    transaction.commit()?;
+
+    Ok(note_ids)
+}
+
 pub fn create_notebook(
     app: &AppHandle,
     input: CreateNotebookInput,
