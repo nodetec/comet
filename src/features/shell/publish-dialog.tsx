@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from "react";
-import { X } from "lucide-react";
+import { Lock, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -98,7 +98,7 @@ function PublishDialogContent({
   return (
     <DialogPopup className="w-full max-w-md p-6">
       <DialogTitle className="text-base font-semibold">
-        Publish to Nostr
+        Publish Article
       </DialogTitle>
 
       <div className="mt-4 flex flex-col gap-4">
@@ -172,6 +172,9 @@ function PublishDialogContent({
 }
 
 // ── Publish Short Note (kind 1) dialog ────────────────────────────────
+
+const LOCK_WARNING =
+  "This note will be locked after publishing. Short notes can't be edited on Nostr — you can only delete and republish.";
 
 type PublishShortNoteDialogProps = {
   content: string;
@@ -295,7 +298,14 @@ function PublishShortNoteDialogContent({
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end gap-2">
+      <div className="bg-muted/50 mt-4 flex items-start gap-2 rounded-md border px-3 py-2.5">
+        <Lock className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+        <p className="text-muted-foreground text-xs">
+          {LOCK_WARNING}
+        </p>
+      </div>
+
+      <div className="mt-4 flex justify-end gap-2">
         <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
           Cancel
         </DialogClose>

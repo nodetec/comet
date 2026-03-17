@@ -11,13 +11,18 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, Submenu } from "@tauri-apps/api/menu";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
-import { Ellipsis, PanelBottomOpen, PanelBottomClose } from "lucide-react";
+import { Ellipsis, Lock, PanelBottomOpen, PanelBottomClose } from "lucide-react";
 
 import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/components/editor/note-editor";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { type NotebookRef, type NotebookSummary } from "./types";
 
@@ -148,9 +153,8 @@ export function EditorPane({
       ],
     });
 
-    const publishItems = publishedAt
+    const publishItems = isPublishedNote
       ? [
-          publishAsSubmenu,
           {
             id: "editor-menu-delete-published",
             text: "Delete from Nostr",
@@ -160,7 +164,19 @@ export function EditorPane({
             },
           },
         ]
-      : [publishAsSubmenu];
+      : publishedAt
+        ? [
+            publishAsSubmenu,
+            {
+              id: "editor-menu-delete-published",
+              text: "Delete from Nostr",
+              enabled: !isDeletePublishedNotePending,
+              action: () => {
+                onDeletePublishedNote();
+              },
+            },
+          ]
+        : [publishAsSubmenu];
 
     const menu = await Menu.new({
       items: [
@@ -222,7 +238,27 @@ export function EditorPane({
           </p>
         </div>
         {noteId && isPublishedNote ? (
-          <span className="text-muted-foreground text-xs">Published</span>
+          <div className="pointer-events-none relative z-40 flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
+                <Lock className="size-3" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                Short notes are immutable on Nostr and can't be updated.
+              </TooltipContent>
+            </Tooltip>
+            <span className="text-muted-foreground pointer-events-auto text-xs">
+              Published
+            </span>
+            <Button
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+              onClick={(event) => void handleOpenMenu(event)}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <Ellipsis className="size-[1.2rem]" />
+            </Button>
+          </div>
         ) : noteId && !isReadOnly ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
             {publishedAt != null &&
