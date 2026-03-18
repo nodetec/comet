@@ -283,7 +283,6 @@ export function SyncDialog({
               </div>
             )}
           </div>
-
         </DialogPopup>
       </DialogPortal>
     </DialogRoot>

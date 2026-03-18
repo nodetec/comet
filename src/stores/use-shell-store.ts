@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
-export type NoteFilter = "all" | "today" | "todo" | "notebook" | "archive" | "trash";
+export type NoteFilter =
+  | "all"
+  | "today"
+  | "todo"
+  | "notebook"
+  | "archive"
+  | "trash";
 
 type ShellStore = {
   activeNotebookId: string | null;

@@ -668,7 +668,11 @@ export function useShellController() {
 
     flushCurrentDraft();
     const tagsForNewNote = [...activeTags];
-    if (noteFilter !== "notebook" && noteFilter !== "today" && noteFilter !== "todo") {
+    if (
+      noteFilter !== "notebook" &&
+      noteFilter !== "today" &&
+      noteFilter !== "todo"
+    ) {
       setNoteFilter("all");
     }
     setSearchQuery("");
