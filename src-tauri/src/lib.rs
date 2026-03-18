@@ -73,12 +73,15 @@ fn reveal_main_window(app: AppHandle) -> Result<(), AppError> {
     #[cfg(target_os = "macos")]
     app.show()?;
 
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| AppError::custom("Main window not found."))?;
+    #[cfg(not(target_os = "ios"))]
+    {
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| AppError::custom("Main window not found."))?;
 
-    window.show()?;
-    window.set_focus()?;
+        window.show()?;
+        window.set_focus()?;
+    }
     Ok(())
 }
 
