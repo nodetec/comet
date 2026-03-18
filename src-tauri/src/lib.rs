@@ -121,8 +121,8 @@ fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
 }
 
 #[tauri::command]
-fn create_note(app: AppHandle, notebook_id: Option<String>, tags: Vec<String>) -> Result<LoadedNote, AppError> {
-    notes::create_note(&app, notebook_id.as_deref(), &tags)
+fn create_note(app: AppHandle, notebook_id: Option<String>, tags: Vec<String>, markdown: Option<String>) -> Result<LoadedNote, AppError> {
+    notes::create_note(&app, notebook_id.as_deref(), &tags, markdown.as_deref())
 }
 
 #[tauri::command]

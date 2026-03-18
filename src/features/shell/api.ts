@@ -53,6 +53,7 @@ export async function loadNote(noteId: string) {
 export async function createNote(input: {
   notebookId: string | null;
   tags: string[];
+  markdown?: string;
 }) {
   return invoke<LoadedNote>("create_note", input);
 }

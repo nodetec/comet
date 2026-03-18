@@ -314,10 +314,7 @@ export function useShellController() {
       queryClient.setQueryData(["note", note.id], note);
       setCreatingSelectedNoteId(note.id);
       setSelectedNoteId(note.id);
-      // In todo view, start with a checkbox instead of a heading
-      const initialMarkdown =
-        noteFilter === "todo" ? "- [ ] " : note.markdown;
-      setDraft(note.id, initialMarkdown);
+      setDraft(note.id, note.markdown);
       setIsCreatingNoteTransition(false);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
     },
@@ -681,6 +678,7 @@ export function useShellController() {
     createNoteMutation.mutate({
       notebookId: noteFilter === "notebook" ? activeNotebookId : null,
       tags: tagsForNewNote,
+      markdown: noteFilter === "todo" ? "- [ ] " : undefined,
     });
   };
 

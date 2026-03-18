@@ -241,15 +241,21 @@ pub fn create_note(
     app: &AppHandle,
     notebook_id: Option<&str>,
     tags: &[String],
+    initial_markdown: Option<&str>,
 ) -> Result<LoadedNote, AppError> {
     let mut conn = database_connection(app)?;
     let transaction = conn.transaction()?;
     let note_id = generate_note_id();
-    let markdown = if tags.is_empty() {
-        "# ".to_string()
-    } else {
-        let tag_line = tags.iter().map(|t| format!("#{t}")).collect::<Vec<_>>().join(" ");
-        format!("# \n\n{tag_line}")
+    let markdown = match initial_markdown {
+        Some(md) => md.to_string(),
+        None => {
+            if tags.is_empty() {
+                "# ".to_string()
+            } else {
+                let tag_line = tags.iter().map(|t| format!("#{t}")).collect::<Vec<_>>().join(" ");
+                format!("# \n\n{tag_line}")
+            }
+        }
     };
     let title = title_from_markdown(&markdown);
     let now = now_millis();
@@ -1275,8 +1281,10 @@ fn strip_markdown_syntax(line: &str) -> String {
             s = s[3..].trim_start().to_string();
         }
     }
-    // Strip checkbox markers
-    s = s.strip_prefix("[ ] ").or_else(|| s.strip_prefix("[x] ")).unwrap_or(&s).to_string();
+    // Strip checkbox markers (with or without trailing space/content)
+    s = s.strip_prefix("[ ] ").or_else(|| s.strip_prefix("[x] "))
+        .or_else(|| s.strip_prefix("[ ]")).or_else(|| s.strip_prefix("[x]"))
+        .unwrap_or(&s).trim().to_string();
     // Strip inline markdown: bold, italic, strikethrough, inline code
     s = s.replace("***", "").replace("**", "").replace("~~", "");
     // Strip inline code backticks
