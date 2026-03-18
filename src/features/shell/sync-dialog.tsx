@@ -14,6 +14,7 @@ import {
   Key,
   Notebook,
   ScrollText,
+  X,
 } from "lucide-react";
 
 import {
@@ -165,6 +166,9 @@ export function SyncDialog({
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup className="w-96 p-4">
+          <DialogClose className="absolute top-4 right-4 cursor-pointer rounded-sm opacity-70 transition-opacity hover:opacity-100">
+            <X className="size-4" />
+          </DialogClose>
           <DialogTitle className="mb-3 flex items-center gap-2 text-sm font-medium">
             {icon}
             Sync — {label}
@@ -280,11 +284,6 @@ export function SyncDialog({
             )}
           </div>
 
-          <div className="mt-3 flex justify-end">
-            <DialogClose className="text-muted-foreground hover:text-foreground text-xs">
-              Close
-            </DialogClose>
-          </div>
         </DialogPopup>
       </DialogPortal>
     </DialogRoot>
