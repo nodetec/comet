@@ -70,9 +70,9 @@ const theme: EditorThemeClasses = {
     nested: {
       listitem: "list-none",
     },
-    checklist: "comet-checklist mt-3 border border-transparent",
-    ol: "list-decimal ml-6 mb-2",
-    ul: "list-disc ml-6 mb-2",
+    checklist: "comet-checklist comet-checklist border border-transparent",
+    ol: "list-decimal ml-6",
+    ul: "list-disc ml-6",
     listitem: "mb-1",
     listitemChecked:
       "comet-check-item comet-check-item--checked line-through text-muted-foreground",
