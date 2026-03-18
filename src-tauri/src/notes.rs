@@ -165,7 +165,6 @@ pub struct AssignNoteNotebookInput {
 pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, AppError> {
     let conn = database_connection(app)?;
     let npub = nostr::ensure_identity(&conn)?;
-    seed_welcome_note_if_empty(&conn)?;
 
     let notebooks = list_notebooks(&conn)?;
     let selected_note_id = last_open_note_id(&conn)?
@@ -1002,45 +1001,6 @@ fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, AppError> {
     .map(|value| value.unwrap_or(false))
 }
 
-fn seed_welcome_note_if_empty(conn: &Connection) -> Result<(), AppError> {
-    let note_count = conn
-        .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get::<_, i64>(0))?;
-
-    if note_count > 0 {
-        return Ok(());
-    }
-
-    let markdown = r#"# Leave a trail
-
-Welcome to comet.
-
-Comet stores note content locally in its own database, with markdown as the underlying format.
-
-## Start here
-
-- Create a note
-- Edit it freely
-- Come back later and pick up the thread
-- Publish when the note is ready
-"#;
-
-    let transaction = conn
-        .unchecked_transaction()?;
-    let now = now_millis();
-    let title = title_from_markdown(markdown);
-
-    transaction
-        .execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at)
-             VALUES (?1, ?2, ?3, NULL, ?4, ?4, ?4)",
-            params!["welcome", title, markdown, now],
-        )?;
-    upsert_note_search_document(&transaction, "welcome", &title, markdown)?;
-    replace_note_tags(&transaction, "welcome", markdown)?;
-    transaction.commit()?;
-
-    Ok(())
-}
 
 fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, AppError> {
     let mut statement = conn
