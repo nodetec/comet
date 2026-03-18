@@ -2,6 +2,8 @@ mod attachments;
 mod blossom;
 mod db;
 mod error;
+mod nip44_ext;
+mod nip59_ext;
 mod nostr;
 mod notes;
 mod sync;

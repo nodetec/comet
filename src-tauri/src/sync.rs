@@ -941,7 +941,7 @@ async fn process_relay_message(
             sync_log(app, &format!("received event seq={seq}"));
 
             // Unwrap gift wrap (skip events we can't decrypt, e.g. from a previous key)
-            let unwrapped = match nip59::extract_rumor(keys, &event).await {
+            let unwrapped = match crate::nip59_ext::extract_rumor(keys, &event) {
                 Ok(u) => u,
                 Err(e) => {
                     sync_log(app, &format!("skip undecryptable event: {e}"));
@@ -1265,14 +1265,12 @@ async fn push_note(
 
     // Gift wrap to self with HMAC'd d-tag for relay-side replacement
     let d_tag = gift_wrap_d_tag(keys.secret_key(), note_id);
-    let gift_wrap = EventBuilder::gift_wrap(
+    let gift_wrap = crate::nip59_ext::gift_wrap(
         keys,
         &keys.public_key(),
         rumor,
         [Tag::identifier(&d_tag)],
-    )
-    .await
-    .map_err(|e| AppError::custom(format!("Failed to gift wrap: {e}")))?;
+    )?;
 
     let event_id = gift_wrap.id.to_hex();
 
@@ -1328,14 +1326,12 @@ async fn push_deletion(
         entity_id.to_string()
     };
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &d_tag_input);
-    let gift_wrap = EventBuilder::gift_wrap(
+    let gift_wrap = crate::nip59_ext::gift_wrap(
         keys,
         &keys.public_key(),
         rumor,
         [Tag::identifier(&d_tag)],
-    )
-    .await
-    .map_err(|e| AppError::custom(format!("Failed to gift wrap deletion: {e}")))?;
+    )?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
@@ -1390,14 +1386,12 @@ async fn push_notebook(
     let rumor = notebook_to_rumor(notebook_id, &name, updated_at, keys.public_key());
 
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
-    let gift_wrap = EventBuilder::gift_wrap(
+    let gift_wrap = crate::nip59_ext::gift_wrap(
         keys,
         &keys.public_key(),
         rumor,
         [Tag::identifier(&d_tag)],
-    )
-    .await
-    .map_err(|e| AppError::custom(format!("Failed to gift wrap notebook: {e}")))?;
+    )?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());

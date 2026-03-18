@@ -38,7 +38,10 @@ reqwest = { version = "0.13.2", features = ["native-tls"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 base64 = "0.22.1"
 regex-lite = "0.1.9"
+chacha20 = "0.9"
 chacha20poly1305 = "0.10.1"
+subtle = "2"
+getrandom = "0.3"
 hex = "0.4.3"
 hmac = "0.12.1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
