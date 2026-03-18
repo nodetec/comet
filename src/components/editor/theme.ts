@@ -71,7 +71,7 @@ const theme: EditorThemeClasses = {
       listitem: "list-none",
     },
     checklist: "comet-checklist comet-checklist border border-transparent",
-    ol: "list-decimal ml-6",
+    ol: "list-decimal ml-6 mb-1.5",
     ul: "list-disc ml-6",
     listitem: "mb-1",
     listitemChecked:
