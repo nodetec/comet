@@ -210,8 +210,6 @@ body {
   content: "";
   width: 1.15em;
   height: 1.15em;
-  top: 50%;
-  transform: translateY(-50%);
   left: 0;
   cursor: pointer;
   display: block;
@@ -219,6 +217,9 @@ body {
   border: 1.5px solid var(--muted-foreground);
   border-radius: 0.25em;
   background-color: transparent;
+  /* Align to first line: use first line's baseline.
+     line-height is 1.6, checkbox is 1.15em, offset to center within first line */
+  top: calc(0.5lh - 0.575em);
 }
 
 .comet-check-item--checked::before {
@@ -233,6 +234,16 @@ body {
 .comet-check-item:focus::before {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
   border-radius: 0.25em;
+}
+
+/* Hide checkbox on nested list wrappers (li that only contains a sub-list) */
+.comet-check-item.list-none::before {
+  display: none;
+}
+
+.comet-check-item.list-none {
+  padding-left: 0;
+  margin-left: 0;
 }
 
 .comet-editor-placeholder {

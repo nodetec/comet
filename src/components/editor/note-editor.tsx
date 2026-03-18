@@ -14,6 +14,7 @@ import { defineExtension } from "lexical";
 import { RichTextExtension } from "@lexical/rich-text";
 import { HistoryExtension } from "@lexical/history";
 import { CheckListExtension, ListExtension } from "@lexical/list";
+import { configExtension } from "lexical";
 import {
   HorizontalRuleExtension,
   TabIndentationExtension,
@@ -48,6 +49,7 @@ import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
+import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
 
 type NoteEditorProps = {
   focusMode: "none" | "immediate" | "pointerup";
@@ -148,6 +150,7 @@ function EditorInner({
       <TableActionMenuPlugin />
 
       <TableClickOutsidePlugin />
+      <TodoShortcutPlugin />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
   );
@@ -167,7 +170,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             RichTextExtension,
             HistoryExtension,
             ListExtension,
-            CheckListExtension,
+            configExtension(CheckListExtension, {
+              disableTakeFocusOnClick: true,
+            }),
             HorizontalRuleExtension,
             TabIndentationExtension,
             TableExtension,

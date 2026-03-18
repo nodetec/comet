@@ -55,7 +55,7 @@ const codeHighlightClasses = {
 const theme: EditorThemeClasses = {
   ltr: "text-left",
   rtl: "text-right",
-  paragraph: "last:mb-0 leading-[1.6] tracking-wide mb-1",
+  paragraph: "last:mb-0 leading-[1.6] tracking-wide mb-1 py-2",
   quote:
     "border-l-4 mb-6 border-primary/30 pl-4 italic text-muted-foreground last:mb-0",
   heading: {
@@ -70,7 +70,7 @@ const theme: EditorThemeClasses = {
     nested: {
       listitem: "list-none",
     },
-    checklist: "comet-checklist",
+    checklist: "comet-checklist mt-3 border border-transparent",
     ol: "list-decimal ml-6 mb-2",
     ul: "list-disc ml-6 mb-2",
     listitem: "mb-1",

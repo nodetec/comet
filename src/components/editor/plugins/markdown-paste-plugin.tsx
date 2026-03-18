@@ -115,7 +115,7 @@ export default function MarkdownPastePlugin() {
 
         event.preventDefault();
 
-        const dom = markdownToDOM(text);
+        const dom = markdownToDOM(text, { paste: true });
 
         editor.update(() => {
           const allNodes = $generateNodesFromDOM(editor, dom);

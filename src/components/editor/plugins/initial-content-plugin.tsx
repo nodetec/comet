@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $setSelection } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
+import { $createListItemNode, $createListNode } from "@lexical/list";
 import { $importMarkdown } from "../lib/markdown";
 
 interface InitialContentPluginProps {
@@ -27,13 +28,24 @@ export default function InitialContentPlugin({
 
     editor.update(() => {
       if (isNew) {
-        // New note: markdown already contains "# " (with optional tags).
-        // Import it and place the cursor at the end of the heading.
-        $importMarkdown(markdown);
-        const root = $getRoot();
-        const firstChild = root.getFirstChild();
-        if ($isHeadingNode(firstChild)) {
-          firstChild.selectEnd();
+        if (markdown === "- [ ] ") {
+          // Todo mode: create an empty checklist item directly
+          // (marked can't parse "- [ ] " without text after it)
+          const root = $getRoot();
+          root.clear();
+          const checkList = $createListNode("check");
+          const checkItem = $createListItemNode(false);
+          checkList.append(checkItem);
+          root.append(checkList);
+          checkItem.selectEnd();
+        } else {
+          // Normal new note: import markdown and place cursor at heading end
+          $importMarkdown(markdown);
+          const root = $getRoot();
+          const firstChild = root.getFirstChild();
+          if ($isHeadingNode(firstChild)) {
+            firstChild.selectEnd();
+          }
         }
       } else if (!markdown.trim()) {
         // Empty existing note: leave the default empty paragraph.

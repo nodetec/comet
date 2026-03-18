@@ -34,6 +34,10 @@ export async function getBootstrap() {
   return bootstrap;
 }
 
+export async function getTodoCount() {
+  return invoke<number>("todo_count");
+}
+
 export async function queryNotes(input: NoteQueryInput) {
   return invoke<NotePagePayload>("query_notes", { input });
 }

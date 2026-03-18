@@ -90,12 +90,8 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
     if (!empty) contentCount++;
   }
 
-  // Fast path: no empty paragraphs, use standard Lexical export.
-  if (contentCount === children.length) {
-    return $convertToMarkdownString(transformers, undefined, false);
-  }
-
-  // Standard export (loses empties, but gives correct markdown for content blocks)
+  // Export content blocks via Lexical (loses empties, but gives correct
+  // markdown for content blocks).
   const exported = $convertToMarkdownString(transformers, undefined, false);
 
   // Split Lexical's export into blocks (it uses \n\n between them),
@@ -130,24 +126,44 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
     return exported;
   }
 
-  // Interleave content blocks with blank lines for empty paragraphs.
-  const lines: string[] = [];
+  // Assemble: content blocks are separated by \n\n (standard markdown).
+  // Empty paragraphs add an extra \n per empty paragraph.
+  // So [content, content] → "A\n\nB"
+  //    [content, empty, content] → "A\n\n\nB"
+  //    [content, empty, empty, content] → "A\n\n\n\nB"
+  let result = "";
   let blockIdx = 0;
 
   for (let i = 0; i < children.length; i++) {
     if (isEmpty[i]) {
-      lines.push("");
+      // Each empty paragraph adds one \n beyond the standard separator
+      result += "\n";
     } else {
-      lines.push(exportedBlocks[blockIdx]);
+      if (blockIdx > 0) {
+        // Standard \n\n separator between content blocks
+        result += "\n\n";
+      }
+      result += exportedBlocks[blockIdx];
       blockIdx++;
     }
   }
 
-  // Trim trailing blank lines (Lexical always adds a trailing empty paragraph
-  // for cursor placement, but it shouldn't appear in stored markdown)
-  while (lines.length > 0 && lines[lines.length - 1] === "") {
-    lines.pop();
-  }
+  return result;
+}
 
-  return lines.join("\n");
+/**
+ * Exports markdown for the clipboard. Takes the storage export and
+ * reduces all newline runs by 1, converting the internal storage
+ * convention back to standard markdown:
+ *   \n\n (separator) → \n (adjacent blocks)
+ *   \n\n\n (separator + 1 empty) → \n\n (one blank line)
+ *   \n\n\n\n (separator + 2 empties) → \n\n\n (two blank lines)
+ */
+export function $exportMarkdownForClipboard(
+  transformers: Array<Transformer>,
+): string {
+  const stored = $exportMarkdown(transformers);
+  return stored.replace(/\n{2,}/g, (match) => {
+    return "\n".repeat(match.length - 1);
+  });
 }

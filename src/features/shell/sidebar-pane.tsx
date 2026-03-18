@@ -7,6 +7,8 @@ import {
   Archive,
   BookText,
   CalendarDays,
+  CheckSquare,
+  Square,
   ChevronRight,
   CloudAlert,
   CloudOff,
@@ -30,6 +32,7 @@ type SidebarPaneProps = {
   activeNotebookId: string | null;
   activeTags: string[];
   archivedCount: number;
+  todoCount: number;
   trashedCount: number;
   editingNotebookId: string | null;
   availableTags: string[];
@@ -46,6 +49,7 @@ type SidebarPaneProps = {
   onDeleteNotebook(notebookId: string): void;
   onSelectAll(): void;
   onSelectToday(): void;
+  onSelectTodo(): void;
   onSelectNotebook(notebookId: string): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
@@ -61,6 +65,7 @@ export function SidebarPane({
   activeNotebookId,
   activeTags,
   archivedCount,
+  todoCount,
   trashedCount,
   availableTags,
   editingNotebookId,
@@ -76,6 +81,7 @@ export function SidebarPane({
   onDeleteNotebook,
   onSelectAll,
   onSelectToday,
+  onSelectTodo,
   onSelectNotebook,
   onSelectArchive,
   onSelectTrash,
@@ -303,6 +309,18 @@ export function SidebarPane({
               >
                 <CalendarDays className="text-primary size-4 shrink-0" />
                 Today
+              </button>
+              <button
+                className={sidebarItemClasses(noteFilter === "todo")}
+                onClick={onSelectTodo}
+                type="button"
+              >
+                {todoCount > 0 ? (
+                  <Square className="text-primary size-4 shrink-0" />
+                ) : (
+                  <CheckSquare className="text-primary size-4 shrink-0" />
+                )}
+                Todo
               </button>
               {(archivedCount > 0 || noteFilter === "archive") && (
                 <button

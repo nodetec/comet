@@ -22,6 +22,7 @@ import {
   emptyTrash,
   getBootstrap,
   getContextualTags,
+  getTodoCount,
   loadNote,
   NOTE_PAGE_SIZE,
   PENDING_DRAFT_KEY,
@@ -98,6 +99,12 @@ export function useShellController() {
   const bootstrapQuery = useQuery({
     queryKey: ["bootstrap"],
     queryFn: getBootstrap,
+  });
+
+  const todoCountQuery = useQuery({
+    queryKey: ["todo-count"],
+    queryFn: getTodoCount,
+    enabled: bootstrapQuery.isSuccess,
   });
 
   const notebooks = bootstrapQuery.data?.notebooks ?? [];
@@ -307,7 +314,10 @@ export function useShellController() {
       queryClient.setQueryData(["note", note.id], note);
       setCreatingSelectedNoteId(note.id);
       setSelectedNoteId(note.id);
-      setDraft(note.id, note.markdown);
+      // In todo view, start with a checkbox instead of a heading
+      const initialMarkdown =
+        noteFilter === "todo" ? "- [ ] " : note.markdown;
+      setDraft(note.id, initialMarkdown);
       setIsCreatingNoteTransition(false);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
     },
@@ -326,7 +336,11 @@ export function useShellController() {
     },
     onSuccess: (savedNote) => {
       queryClient.setQueryData(["note", savedNote.id], savedNote);
-      void Promise.all([invalidateNotes(), invalidateContextualTags()]);
+      void Promise.all([
+        invalidateNotes(),
+        invalidateContextualTags(),
+        queryClient.invalidateQueries({ queryKey: ["todo-count"] }),
+      ]);
       try {
         localStorage.removeItem(PENDING_DRAFT_KEY);
       } catch {
@@ -657,7 +671,7 @@ export function useShellController() {
 
     flushCurrentDraft();
     const tagsForNewNote = [...activeTags];
-    if (noteFilter !== "notebook" && noteFilter !== "today") {
+    if (noteFilter !== "notebook" && noteFilter !== "today" && noteFilter !== "todo") {
       setNoteFilter("all");
     }
     setSearchQuery("");
@@ -685,6 +699,11 @@ export function useShellController() {
   const handleSelectToday = () => {
     clearSelectionIfNotActive();
     setNoteFilter("today");
+  };
+
+  const handleSelectTodo = () => {
+    clearSelectionIfNotActive();
+    setNoteFilter("todo");
   };
 
   const handleSelectArchive = () => {
@@ -919,6 +938,7 @@ export function useShellController() {
     handleSelectNote,
     handleSelectNotebook,
     handleSelectToday,
+    handleSelectTodo,
     handleSetNotePinned,
     handleToggleTag,
     submitNotebook: notebook.submitNotebook,
@@ -1182,6 +1202,7 @@ export function useShellController() {
       isCreatingNotebook: notebook.isCreatingNotebook,
       newNotebookName: notebook.newNotebookName,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
+      todoCount: todoCountQuery.data ?? 0,
       trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
       noteFilter,
       notebooks,
@@ -1194,6 +1215,7 @@ export function useShellController() {
       onHideRenameNotebook: notebook.hideRenameNotebook,
       onSelectAll: () => latestRef.current.handleSelectAll(),
       onSelectToday: () => latestRef.current.handleSelectToday(),
+      onSelectTodo: () => latestRef.current.handleSelectTodo(),
       onSelectArchive: () => latestRef.current.handleSelectArchive(),
       onSelectTrash: () => latestRef.current.handleSelectTrash(),
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
@@ -1215,6 +1237,7 @@ export function useShellController() {
       availableTags,
       bootstrapQuery.data?.archivedCount,
       bootstrapQuery.data?.trashedCount,
+      todoCountQuery.data,
       notebook.deleteNotebookMutation.isPending,
       notebook.editingNotebookId,
       notebook.isCreatingNotebook,

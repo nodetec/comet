@@ -98,6 +98,11 @@ fn bootstrap(app: AppHandle) -> Result<BootstrapPayload, AppError> {
 }
 
 #[tauri::command]
+fn todo_count(app: AppHandle) -> Result<i64, AppError> {
+    notes::todo_count(&app)
+}
+
+#[tauri::command]
 fn query_notes(app: AppHandle, input: NoteQueryInput) -> Result<NotePagePayload, AppError> {
     notes::query_notes(&app, input)
 }
@@ -646,6 +651,7 @@ pub fn run() {
             get_attachments_dir,
             import_image,
             bootstrap,
+            todo_count,
             query_notes,
             contextual_tags,
             load_note,

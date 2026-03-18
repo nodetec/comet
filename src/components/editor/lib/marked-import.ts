@@ -174,15 +174,78 @@ const emptyParagraphPreprocess: MarkedExtension = {
           continue;
         }
 
-        // Blank line group: each blank becomes an empty paragraph marker.
-        // We surround each marker with blank lines so marked still sees
-        // block separators between adjacent content.
+        // Blank line group: first blank is the standard block separator
+        // (needed for marked to recognize block boundaries). Each
+        // additional blank becomes an empty paragraph marker.
         if (line.trim() === "") {
           let blankCount = 0;
           while (i < lines.length && lines[i].trim() === "") {
             blankCount++;
             i++;
           }
+          // First blank = standard separator
+          result.push("");
+          // Additional blanks = empty paragraphs
+          for (let j = 1; j < blankCount; j++) {
+            result.push("<p><br></p>");
+            result.push("");
+          }
+        } else {
+          result.push(line);
+          i++;
+        }
+      }
+
+      return result.join("\n");
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Paste preprocess: every blank line becomes an empty paragraph (Bear behavior)
+// ---------------------------------------------------------------------------
+
+const pastePreprocess: MarkedExtension = {
+  hooks: {
+    preprocess(markdown: string) {
+      const lines = markdown.split("\n");
+      const result: string[] = [];
+      let fenceChar: string | null = null;
+      let fenceLen = 0;
+
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trimStart();
+
+        const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
+        if (fenceMatch && !/^(`{3,})[^`]+\1$/.test(line)) {
+          const char = fenceMatch[1][0];
+          const len = fenceMatch[1].length;
+          if (fenceChar === null) {
+            fenceChar = char;
+            fenceLen = len;
+          } else if (char === fenceChar && len >= fenceLen) {
+            fenceChar = null;
+          }
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        if (fenceChar !== null) {
+          result.push(line);
+          i++;
+          continue;
+        }
+
+        if (line.trim() === "") {
+          let blankCount = 0;
+          while (i < lines.length && lines[i].trim() === "") {
+            blankCount++;
+            i++;
+          }
+          // Every blank becomes an empty paragraph
           for (let j = 0; j < blankCount; j++) {
             result.push("");
             result.push("<p><br></p>");
@@ -200,9 +263,10 @@ const emptyParagraphPreprocess: MarkedExtension = {
 };
 
 // ---------------------------------------------------------------------------
-// Configured Marked instance
+// Configured Marked instances
 // ---------------------------------------------------------------------------
 
+// For loading stored notes: first blank line = separator, extras = empty paragraphs
 const markedInstance = new Marked();
 markedInstance.use(
   { gfm: true, breaks: true },
@@ -212,18 +276,28 @@ markedInstance.use(
   emptyParagraphPreprocess,
 );
 
+// For pasting external markdown: every blank line = empty paragraph
+const markedInstanceForPaste = new Marked();
+markedInstanceForPaste.use(
+  { gfm: true, breaks: true },
+  youtubeExtension,
+  highlightExtension,
+  rendererOverrides,
+  pastePreprocess,
+);
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Converts a markdown string to a DOM Document suitable for
- * `$generateNodesFromDOM()`.
- */
 const domParser = new DOMParser();
 
-export function markdownToDOM(markdown: string): Document {
-  const html = markedInstance.parse(markdown) as string;
+export function markdownToDOM(
+  markdown: string,
+  options?: { paste?: boolean },
+): Document {
+  const instance = options?.paste ? markedInstanceForPaste : markedInstance;
+  const html = instance.parse(markdown) as string;
   return domParser.parseFromString(
     `<!DOCTYPE html><html><body>${html}</body></html>`,
     "text/html",

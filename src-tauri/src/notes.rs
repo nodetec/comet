@@ -96,6 +96,7 @@ pub struct BootstrapPayload {
 pub enum NoteFilterInput {
     All,
     Today,
+    Todo,
     Archive,
     Trash,
     Notebook,
@@ -998,6 +999,11 @@ fn append_note_view_clauses(
             clauses.push("n.edited_at >= ?".to_string());
             values.push(Value::from(now_millis() - 24 * 60 * 60 * 1000));
         }
+        NoteFilterInput::Todo => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+            clauses.push("n.markdown LIKE '%- [ ] %'".to_string());
+        }
         NoteFilterInput::Archive => {
             clauses.push("n.archived_at IS NOT NULL".to_string());
             clauses.push("n.deleted_at IS NULL".to_string());
@@ -1014,6 +1020,16 @@ fn append_note_view_clauses(
             ));
         }
     }
+}
+
+pub fn todo_count(app: &AppHandle) -> Result<i64, AppError> {
+    let conn = database_connection(app)?;
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE archived_at IS NULL AND deleted_at IS NULL AND markdown LIKE '%- [ ] %'",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(count)
 }
 
 fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, AppError> {
