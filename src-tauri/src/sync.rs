@@ -216,6 +216,15 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 use crate::nostr::strip_title_line;
 
 const COMET_EVENT_KIND: Kind = Kind::ApplicationSpecificData; // 30078
+const COMET_SCHEMA_VERSION: &str = "1";
+const COMET_CLIENT: &str = "comet";
+
+fn comet_base_tags() -> Vec<Tag> {
+    vec![
+        Tag::custom(TagKind::custom("client"), vec![COMET_CLIENT.to_string()]),
+        Tag::custom(TagKind::custom("v"), vec![COMET_SCHEMA_VERSION.to_string()]),
+    ]
+}
 
 // ── Notebook ↔ Event mapping ───────────────────────────────────────────
 
@@ -225,15 +234,16 @@ fn notebook_to_rumor(
     updated_at: i64,
     pubkey: PublicKey,
 ) -> UnsignedEvent {
-    let event_tags: Vec<Tag> = vec![
-        Tag::custom(TagKind::custom("id"), vec![notebook_id.to_string()]),
+    let mut tags = comet_base_tags();
+    tags.extend([
+        Tag::identifier(notebook_id),
         Tag::title(name),
         Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
         Tag::custom(TagKind::custom("modified_at"), vec![updated_at.to_string()]),
-    ];
+    ]);
 
     EventBuilder::new(COMET_EVENT_KIND, "")
-        .tags(event_tags)
+        .tags(tags)
         .build(pubkey)
 }
 
@@ -246,10 +256,10 @@ struct SyncedNotebook {
 fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, AppError> {
     let id = rumor
         .tags
-        .find(TagKind::custom("id"))
+        .find(TagKind::d())
         .and_then(|t| t.content())
         .map(|s| s.to_string())
-        .ok_or_else(|| AppError::custom("Missing id tag in notebook event"))?;
+        .ok_or_else(|| AppError::custom("Missing d tag in notebook event"))?;
 
     let name = rumor
         .tags
@@ -314,23 +324,23 @@ fn upsert_notebook_from_sync(
 }
 
 fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
-    EventBuilder::new(COMET_EVENT_KIND, "")
-        .tags(vec![
-            Tag::custom(TagKind::custom("id"), vec![note_id.to_string()]),
-            Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
-            Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
-        ])
-        .build(pubkey)
+    let mut tags = comet_base_tags();
+    tags.extend([
+        Tag::identifier(note_id),
+        Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
+        Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
+    ]);
+    EventBuilder::new(COMET_EVENT_KIND, "").tags(tags).build(pubkey)
 }
 
 fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedEvent {
-    EventBuilder::new(COMET_EVENT_KIND, "")
-        .tags(vec![
-            Tag::custom(TagKind::custom("id"), vec![notebook_id.to_string()]),
-            Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
-            Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
-        ])
-        .build(pubkey)
+    let mut tags = comet_base_tags();
+    tags.extend([
+        Tag::identifier(notebook_id),
+        Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+        Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
+    ]);
+    EventBuilder::new(COMET_EVENT_KIND, "").tags(tags).build(pubkey)
 }
 
 fn is_deleted_rumor(rumor: &UnsignedEvent) -> bool {
@@ -369,14 +379,15 @@ fn note_to_rumor(
 ) -> UnsignedEvent {
     let content = strip_title_line(markdown);
 
-    let mut event_tags: Vec<Tag> = vec![
-        Tag::custom(TagKind::custom("id"), vec![note_id.to_string()]),
+    let mut event_tags = comet_base_tags();
+    event_tags.extend([
+        Tag::identifier(note_id),
         Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
         Tag::title(title),
         Tag::custom(TagKind::custom("modified_at"), vec![modified_at.to_string()]),
         Tag::custom(TagKind::custom("edited_at"), vec![edited_at.to_string()]),
         Tag::custom(TagKind::custom("created_at"), vec![created_at.to_string()]),
-    ];
+    ]);
 
     if let Some(nb_id) = notebook_id {
         event_tags.push(Tag::custom(
@@ -416,10 +427,10 @@ fn note_to_rumor(
 fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
     let note_id = rumor
         .tags
-        .find(TagKind::custom("id"))
+        .find(TagKind::d())
         .and_then(|t| t.content())
         .map(|s| s.to_string())
-        .ok_or_else(|| AppError::custom("Missing id tag in synced event"))?;
+        .ok_or_else(|| AppError::custom("Missing d tag in synced event"))?;
 
     let title = rumor
         .tags
@@ -942,7 +953,7 @@ async fn process_relay_message(
             if is_deleted_rumor(&unwrapped.rumor) {
                 let entity_id = unwrapped.rumor
                     .tags
-                    .find(TagKind::custom("id"))
+                    .find(TagKind::d())
                     .and_then(|t| t.content())
                     .unwrap_or_default()
                     .to_string();
