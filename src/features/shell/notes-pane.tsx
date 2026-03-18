@@ -50,6 +50,7 @@ type NotesPaneProps = {
   selectedNoteId: string | null;
   sortField: NoteSortField;
   sortDirection: NoteSortDirection;
+  totalNoteCount: number;
   onAssignNoteNotebook(noteId: string, notebookId: string | null): void;
   onArchiveNote(noteId: string): void;
   onChangeSearch(query: string): void;
@@ -143,6 +144,7 @@ export function NotesPane({
   onRestoreNote,
   onSelectNote,
   onTrashNote,
+  totalNoteCount,
 }: NotesPaneProps) {
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";
@@ -399,8 +401,15 @@ export function NotesPane({
                       ],
                     });
 
+                    const noteCountLabel = `${totalNoteCount} ${totalNoteCount === 1 ? "note" : "notes"}`;
                     const menu = await Menu.new({
                       items: [
+                        {
+                          id: "note-count",
+                          text: noteCountLabel,
+                          enabled: false,
+                        },
+                        await PredefinedMenuItem.new({ item: "Separator" }),
                         sortSubmenu,
                         await PredefinedMenuItem.new({ item: "Separator" }),
                         {

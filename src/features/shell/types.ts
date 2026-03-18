@@ -66,6 +66,7 @@ export type NotePagePayload = {
   hasMore: boolean;
   nextOffset: number | null;
   notes: NoteSummary[];
+  totalCount: number;
 };
 
 export type ContextualTagsInput = {

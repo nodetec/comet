@@ -173,6 +173,7 @@ export function useShellController() {
     () => flattenNotePages(notesQuery.data),
     [notesQuery.data],
   );
+  const totalNoteCount = notesQuery.data?.pages[0]?.totalCount ?? 0;
 
   const contextualTagsQuery = useQuery({
     enabled: bootstrapQuery.isSuccess,
@@ -1148,6 +1149,7 @@ export function useShellController() {
         latestRef.current.handleSetNotePinned(noteId, pinned),
       searchQuery,
       selectedNoteId: displayedSelectedNoteId,
+      totalNoteCount,
     }),
     [
       activeNotebook,
@@ -1167,6 +1169,7 @@ export function useShellController() {
       setNoteSortPrefs,
       setSearchQuery,
       sortViewKey,
+      totalNoteCount,
     ],
   );
 

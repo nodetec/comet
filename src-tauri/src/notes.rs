@@ -70,6 +70,7 @@ pub struct NotePagePayload {
     pub notes: Vec<NoteSummary>,
     pub has_more: bool,
     pub next_offset: Option<usize>,
+    pub total_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -583,6 +584,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
             notes: Vec::new(),
             has_more: false,
             next_offset: None,
+            total_count: 0,
         });
     }
 
@@ -645,10 +647,33 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         values.push(Value::from(tag.clone()));
     }
 
-    if !clauses.is_empty() {
-        sql.push_str(" WHERE ");
-        sql.push_str(&clauses.join(" AND "));
-    }
+    let where_clause = if clauses.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", clauses.join(" AND "))
+    };
+
+    // Only run the count query on the first page — the frontend reads
+    // totalCount from pages[0] and ignores it on subsequent pages.
+    let total_count = if input.offset == 0 {
+        let count_sql = if search_mode.is_some() {
+            format!(
+                "SELECT COUNT(*) FROM notes n JOIN notes_fts ON notes_fts.note_id = n.id{}",
+                where_clause
+            )
+        } else {
+            format!("SELECT COUNT(*) FROM notes n{}", where_clause)
+        };
+        conn.query_row(
+            &count_sql,
+            params_from_iter(values.iter()),
+            |row| row.get::<_, i64>(0),
+        )? as usize
+    } else {
+        0
+    };
+
+    sql.push_str(&where_clause);
 
     let sort_column = match input.sort_field {
         NoteSortField::ModifiedAt => "n.edited_at",
@@ -689,6 +714,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         next_offset: has_more.then_some(input.offset + limit),
         has_more,
         notes,
+        total_count,
     })
 }
 
