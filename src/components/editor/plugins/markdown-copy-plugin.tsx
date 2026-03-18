@@ -25,7 +25,7 @@ import { HashtagNode } from "../nodes/hashtag-node";
 import { ImageNode } from "../nodes/image-node";
 import { YouTubeNode } from "../nodes/youtube-node";
 import { TRANSFORMERS } from "../transformers";
-import { $exportMarkdownForClipboard } from "../lib/markdown";
+import { $exportMarkdown } from "../lib/markdown";
 
 const HEADLESS_NODES = [
   HeadingNode,
@@ -76,7 +76,7 @@ function $selectionToMarkdown(
 
   let markdown = "";
   headless.getEditorState().read(() => {
-    markdown = $exportMarkdownForClipboard(TRANSFORMERS);
+    markdown = $exportMarkdown(TRANSFORMERS);
   });
   return markdown;
 }

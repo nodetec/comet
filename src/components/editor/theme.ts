@@ -70,11 +70,13 @@ const theme: EditorThemeClasses = {
     nested: {
       listitem: "list-none",
     },
+    checklist: "comet-checklist",
     ol: "list-decimal ml-6 mb-2",
     ul: "list-disc ml-6 mb-2",
     listitem: "mb-1",
-    listitemChecked: "line-through text-muted-foreground",
-    listitemUnchecked: "",
+    listitemChecked:
+      "comet-check-item comet-check-item--checked line-through text-muted-foreground",
+    listitemUnchecked: "comet-check-item",
   },
   link: "inline text-primary no-underline hover:underline cursor-pointer",
   text: {

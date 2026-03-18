@@ -2,15 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $setSelection } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
-import { TRANSFORMERS } from "../transformers";
 import { $importMarkdown } from "../lib/markdown";
-
-// The Lexical markdown heading transformer requires text after "# ",
-// so empty headings don't survive a round-trip. This normalizes
-// bare heading markers ("# ", "## ", etc.) so they parse correctly.
-function normalizeEmptyHeadings(markdown: string): string {
-  return markdown.replace(/^(#{1,6})\s*$/gm, "$1 \u200B");
-}
 
 interface InitialContentPluginProps {
   isNew: boolean;
@@ -37,7 +29,7 @@ export default function InitialContentPlugin({
       if (isNew) {
         // New note: markdown already contains "# " (with optional tags).
         // Import it and place the cursor at the end of the heading.
-        $importMarkdown(normalizeEmptyHeadings(markdown), TRANSFORMERS);
+        $importMarkdown(markdown);
         const root = $getRoot();
         const firstChild = root.getFirstChild();
         if ($isHeadingNode(firstChild)) {
@@ -48,7 +40,7 @@ export default function InitialContentPlugin({
         // (Lexical initializes with one ParagraphNode by default.)
         $setSelection(null);
       } else {
-        $importMarkdown(normalizeEmptyHeadings(markdown), TRANSFORMERS);
+        $importMarkdown(markdown);
         $setSelection(null);
       }
 

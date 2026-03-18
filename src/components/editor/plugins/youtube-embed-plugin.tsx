@@ -3,20 +3,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $createParagraphNode } from "lexical";
 import { $isLinkNode, LinkNode } from "@lexical/link";
 import { $createYouTubeNode } from "../nodes/youtube-node";
-
-function isYouTubeUrl(text: string): boolean {
-  return (
-    text.includes("youtube.com") ||
-    text.includes("youtu.be") ||
-    text.includes("youtube-nocookie.com")
-  );
-}
-
-function extractYouTubeVideoId(text: string): string | null {
-  const match =
-    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
-  return match?.[2] && match[2].length === 11 ? match[2] : null;
-}
+import { extractYouTubeVideoId, isYouTubeUrl } from "../lib/youtube-utils";
 
 /**
  * Automatically converts LinkNodes with YouTube URLs into YouTubeNode embeds.

@@ -9,20 +9,7 @@ import {
   $isYouTubeNode,
   YouTubeNode,
 } from "../nodes/youtube-node";
-
-function extractYouTubeVideoId(text: string): string | null {
-  const match =
-    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
-  return match?.[2] && match[2].length === 11 ? match[2] : null;
-}
-
-function isYouTubeUrl(text: string): boolean {
-  return (
-    text.includes("youtube.com") ||
-    text.includes("youtu.be") ||
-    text.includes("youtube-nocookie.com")
-  );
-}
+import { extractYouTubeVideoId, isYouTubeUrl } from "../lib/youtube-utils";
 
 export const YOUTUBE: ElementTransformer = {
   dependencies: [YouTubeNode],

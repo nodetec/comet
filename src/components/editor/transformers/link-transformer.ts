@@ -17,9 +17,9 @@ export const LINK: TextMatchTransformer = {
     }
     const displayText = node.getTextContent();
     const url = node.getURL();
-    // Always use markdown link format to prevent raw URLs from being
-    // auto-converted by other transformers (e.g., YouTube)
-    return `[${displayText || url}](${url})`;
+    const title = node.getTitle();
+    const titlePart = title ? ` "${title}"` : "";
+    return `[${displayText || url}](${url}${titlePart})`;
   },
   // Match [text](url) format, but NOT ![text](url) which is an image
   importRegExp: /(?<!!)\[([^\]]+)\]\(([^)]+)\)/,

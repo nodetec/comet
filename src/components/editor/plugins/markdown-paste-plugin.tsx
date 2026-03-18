@@ -6,22 +6,11 @@ import {
   $getSelection,
   $isRangeSelection,
   $getRoot,
-  createEditor,
-  $parseSerializedNode,
-  ParagraphNode,
-  TextNode,
+  $isElementNode,
+  $isDecoratorNode,
 } from "lexical";
-import { $importMarkdown } from "../lib/markdown";
-import { HeadingNode, QuoteNode } from "@lexical/rich-text";
-import { ListNode, ListItemNode } from "@lexical/list";
-import { CodeNode, CodeHighlightNode } from "@lexical/code";
-import { HorizontalRuleNode } from "@lexical/extension";
-import { TableNode, TableRowNode, TableCellNode } from "@lexical/table";
-import { LinkNode } from "@lexical/link";
-import { HashtagNode } from "../nodes/hashtag-node";
-import { ImageNode } from "../nodes/image-node";
-import { YouTubeNode } from "../nodes/youtube-node";
-import { TRANSFORMERS } from "../transformers";
+import { $generateNodesFromDOM } from "@lexical/html";
+import { markdownToDOM } from "../lib/marked-import";
 
 // Patterns that strongly indicate markdown content
 const MARKDOWN_PATTERNS = [
@@ -100,32 +89,6 @@ function isLikelyMarkdown(text: string): boolean {
   return false;
 }
 
-// Create a headless editor to parse markdown without affecting the main editor
-function createMarkdownParser() {
-  return createEditor({
-    namespace: "MarkdownParser",
-    nodes: [
-      HeadingNode,
-      QuoteNode,
-      ListNode,
-      ListItemNode,
-      CodeNode,
-      CodeHighlightNode,
-      HorizontalRuleNode,
-      TableNode,
-      TableRowNode,
-      TableCellNode,
-      LinkNode,
-      HashtagNode,
-      ImageNode,
-      YouTubeNode,
-      ParagraphNode,
-      TextNode,
-    ],
-    onError: (error) => console.error("Markdown parser error:", error),
-  });
-}
-
 export default function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -139,6 +102,11 @@ export default function MarkdownPastePlugin() {
         const text = clipboardData.getData("text/plain");
         if (!text) return false;
 
+        // If Lexical JSON is on the clipboard, let the built-in handler use it
+        if (clipboardData.getData("application/x-lexical-editor")) {
+          return false;
+        }
+
         // Skip if it looks like JSON
         if (isLikelyJSON(text)) return false;
 
@@ -147,37 +115,57 @@ export default function MarkdownPastePlugin() {
 
         event.preventDefault();
 
-        // Use a headless editor to parse markdown, then insert nodes
-        const parserEditor = createMarkdownParser();
+        const dom = markdownToDOM(text);
 
-        parserEditor.update(
-          () => {
-            $importMarkdown(text, TRANSFORMERS, undefined, {
-              preserveBlankLines: true,
-            });
-          },
-          { discrete: true },
-        );
-
-        // Get the full editor state JSON which includes all nested children
-        const parsedStateJSON = parserEditor.getEditorState().toJSON();
-        const rootChildren = parsedStateJSON.root?.children || [];
-
-        // Insert into main editor at current selection
         editor.update(() => {
+          const allNodes = $generateNodesFromDOM(editor, dom);
+          // Filter to block-level nodes only — $generateNodesFromDOM may
+          // produce stray TextNodes from whitespace between HTML tags
+          const nodes = allNodes.filter(
+            (n) => $isElementNode(n) || $isDecoratorNode(n),
+          );
+          if (nodes.length === 0) return;
+
           const selection = $getSelection();
 
-          // Import nodes from JSON using Lexical's parser (handles nested children)
-          const nodesToInsert = rootChildren.map((json: any) =>
-            $parseSerializedNode(json),
-          );
-
-          if ($isRangeSelection(selection)) {
-            selection.insertNodes(nodesToInsert);
-          } else {
-            // Fallback: append to root
+          if (!$isRangeSelection(selection)) {
             const root = $getRoot();
-            nodesToInsert.forEach((node) => root.append(node));
+            for (const node of nodes) {
+              root.append(node);
+            }
+            return;
+          }
+
+          // Delete selected content first
+          if (!selection.isCollapsed()) {
+            selection.removeText();
+          }
+
+          // Find the block element containing the cursor
+          const anchorNode = selection.anchor.getNode();
+          const targetBlock = anchorNode.getTopLevelElementOrThrow();
+
+          // If cursor is at the start of an empty paragraph, replace it
+          const isEmptyBlock =
+            $isElementNode(targetBlock) &&
+            targetBlock.getTextContentSize() === 0;
+
+          if (isEmptyBlock) {
+            targetBlock.replace(nodes[0]);
+            for (let i = 1; i < nodes.length; i++) {
+              nodes[i - 1].insertAfter(nodes[i]);
+            }
+          } else {
+            for (let i = 0; i < nodes.length; i++) {
+              const after = i === 0 ? targetBlock : nodes[i - 1];
+              after.insertAfter(nodes[i]);
+            }
+          }
+
+          // Place cursor at end of last inserted node
+          const lastNode = nodes[nodes.length - 1];
+          if ($isElementNode(lastNode)) {
+            lastNode.selectEnd();
           }
         });
 

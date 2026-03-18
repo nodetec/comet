@@ -13,7 +13,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { defineExtension } from "lexical";
 import { RichTextExtension } from "@lexical/rich-text";
 import { HistoryExtension } from "@lexical/history";
-import { ListExtension } from "@lexical/list";
+import { CheckListExtension, ListExtension } from "@lexical/list";
 import {
   HorizontalRuleExtension,
   TabIndentationExtension,
@@ -167,6 +167,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             RichTextExtension,
             HistoryExtension,
             ListExtension,
+            CheckListExtension,
             HorizontalRuleExtension,
             TabIndentationExtension,
             TableExtension,

@@ -12,25 +12,12 @@ import {
 } from "lexical";
 import { $createLinkNode } from "@lexical/link";
 import { $createYouTubeNode } from "../nodes/youtube-node";
+import { extractYouTubeVideoId, isYouTubeUrl } from "../lib/youtube-utils";
 
 const URL_REGEX = /^https?:\/\/[^\s]+$/;
 
 function isValidUrl(text: string): boolean {
   return URL_REGEX.test(text.trim());
-}
-
-function isYouTubeUrl(text: string): boolean {
-  return (
-    text.includes("youtube.com") ||
-    text.includes("youtu.be") ||
-    text.includes("youtube-nocookie.com")
-  );
-}
-
-function extractYouTubeVideoId(text: string): string | null {
-  const match =
-    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(text);
-  return match?.[2] && match[2].length === 11 ? match[2] : null;
 }
 
 function getLinkAttributes(url: string) {

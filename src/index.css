@@ -197,6 +197,44 @@ body {
   border-left: 1px solid var(--accent);
 }
 
+/* Checklist items */
+.comet-check-item {
+  position: relative;
+  padding-left: 1.5em;
+  margin-left: -1.5em;
+  list-style-type: none;
+  outline: none;
+}
+
+.comet-check-item::before {
+  content: "";
+  width: 1.15em;
+  height: 1.15em;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
+  cursor: pointer;
+  display: block;
+  position: absolute;
+  border: 1.5px solid var(--muted-foreground);
+  border-radius: 0.25em;
+  background-color: transparent;
+}
+
+.comet-check-item--checked::before {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.comet-check-item:focus::before {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
+  border-radius: 0.25em;
+}
+
 .comet-editor-placeholder {
   font-family: var(--font-editor);
 }

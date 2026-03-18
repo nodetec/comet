@@ -19,12 +19,24 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     const language = node.getLanguage();
     const languageTag = language && language !== "plain" ? language : "";
     const textContent = node.getTextContent();
+
+    // Use dynamic fence length: find the longest run of backticks in the
+    // content and use one more than that (minimum 3).
+    let maxRun = 0;
+    const backtickRuns = textContent.match(/`+/g);
+    if (backtickRuns) {
+      for (const run of backtickRuns) {
+        maxRun = Math.max(maxRun, run.length);
+      }
+    }
+    const fence = "`".repeat(Math.max(3, maxRun + 1));
+
     return (
-      "```" +
+      fence +
       languageTag +
       (textContent ? "\n" + textContent : "") +
       "\n" +
-      "```"
+      fence
     );
   },
   // Override handleImportAfterStartMatch because the inherited version
