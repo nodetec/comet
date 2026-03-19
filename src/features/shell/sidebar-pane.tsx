@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SyncDialog } from "./sync-dialog";
 import { useUIStore } from "@/stores/use-ui-store";
-import { type NoteFilter } from "@/stores/use-shell-store";
+import { type NoteFilter, useShellStore } from "@/stores/use-shell-store";
 
 import { type NotebookSummary, sidebarItemClasses } from "./types";
 
@@ -93,6 +93,7 @@ export function SidebarPane({
   renameNotebookDisabled,
   renamingNotebookName,
 }: SidebarPaneProps) {
+  const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
   const [syncState, setSyncState] = useState<string>("disconnected");
 
@@ -295,7 +296,7 @@ export function SidebarPane({
           >
             <div className="min-h-0">
               <button
-                className={sidebarItemClasses(noteFilter === "all")}
+                className={sidebarItemClasses(noteFilter === "all", isFocused)}
                 onClick={onSelectAll}
                 type="button"
               >
@@ -303,7 +304,7 @@ export function SidebarPane({
                 All Notes
               </button>
               <button
-                className={sidebarItemClasses(noteFilter === "today")}
+                className={sidebarItemClasses(noteFilter === "today", isFocused)}
                 onClick={onSelectToday}
                 type="button"
               >
@@ -311,7 +312,7 @@ export function SidebarPane({
                 Today
               </button>
               <button
-                className={sidebarItemClasses(noteFilter === "todo")}
+                className={sidebarItemClasses(noteFilter === "todo", isFocused)}
                 onClick={onSelectTodo}
                 type="button"
               >
@@ -324,7 +325,7 @@ export function SidebarPane({
               </button>
               {(archivedCount > 0 || noteFilter === "archive") && (
                 <button
-                  className={sidebarItemClasses(noteFilter === "archive")}
+                  className={sidebarItemClasses(noteFilter === "archive", isFocused)}
                   onClick={onSelectArchive}
                   type="button"
                 >
@@ -334,7 +335,7 @@ export function SidebarPane({
               )}
               {(trashedCount > 0 || noteFilter === "trash") && (
                 <button
-                  className={sidebarItemClasses(noteFilter === "trash")}
+                  className={sidebarItemClasses(noteFilter === "trash", isFocused)}
                   onClick={onSelectTrash}
                   onContextMenu={(event) => void handleTrashContextMenu(event)}
                   type="button"
@@ -437,7 +438,9 @@ export function SidebarPane({
                             "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                             noteFilter === "notebook" &&
                               activeNotebookId === notebook.id
-                              ? "bg-accent/80 text-secondary-foreground"
+                              ? isFocused
+                                ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
+                                : "bg-accent/80 text-secondary-foreground"
                               : "text-secondary-foreground",
                           )}
                           disabled={renameNotebookDisabled}

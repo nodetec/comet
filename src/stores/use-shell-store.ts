@@ -8,17 +8,21 @@ export type NoteFilter =
   | "archive"
   | "trash";
 
+export type FocusedPane = "sidebar" | "notes" | "editor";
+
 type ShellStore = {
   activeNotebookId: string | null;
   activeTags: string[];
   draftMarkdown: string;
   draftNoteId: string | null;
+  focusedPane: FocusedPane;
   noteFilter: NoteFilter;
   searchQuery: string;
   selectedNoteId: string | null;
   clearActiveTags(): void;
   setDraft(noteId: string, markdown: string): void;
   setActiveTags(tags: string[]): void;
+  setFocusedPane(pane: FocusedPane): void;
   setNoteFilter(filter: NoteFilter): void;
   setNotebookFilter(notebookId: string): void;
   setSearchQuery(query: string): void;
@@ -30,6 +34,7 @@ export const useShellStore = create<ShellStore>((set) => ({
   activeTags: [],
   draftMarkdown: "",
   draftNoteId: null,
+  focusedPane: "notes",
   noteFilter: "all",
   searchQuery: "",
   selectedNoteId: null,
@@ -41,6 +46,9 @@ export const useShellStore = create<ShellStore>((set) => ({
   },
   setActiveTags: (activeTags) => {
     set({ activeTags });
+  },
+  setFocusedPane: (focusedPane) => {
+    set({ focusedPane });
   },
   setNoteFilter: (noteFilter) => {
     set((state) => ({

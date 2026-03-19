@@ -23,7 +23,7 @@ import { useInView } from "react-intersection-observer";
 
 import { Button } from "@/components/ui/button";
 import { searchWordsFromQuery } from "@/lib/search";
-import { type NoteFilter } from "@/stores/use-shell-store";
+import { type NoteFilter, useShellStore } from "@/stores/use-shell-store";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
 
@@ -146,6 +146,7 @@ export function NotesPane({
   onTrashNote,
   totalNoteCount,
 }: NotesPaneProps) {
+  const focusedPane = useShellStore((s) => s.focusedPane);
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";
   const [isSearchOpen, setIsSearchOpen] = useState(
@@ -515,8 +516,11 @@ export function NotesPane({
                     >
                       <button
                         className={[
-                          "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-2.5 py-2.5 text-left text-sm",
+                          "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
                           isActive ? "bg-accent/50" : "",
+                          isActive && focusedPane === "notes"
+                            ? "ring-primary/50 ring-2 ring-inset"
+                            : "",
                         ].join(" ")}
                         onClick={() => onSelectNote(note.id)}
                         onContextMenu={(event) =>

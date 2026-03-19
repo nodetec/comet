@@ -4,6 +4,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
@@ -52,6 +53,7 @@ import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
+import { useShellStore } from "@/stores/use-shell-store";
 
 type NoteEditorProps = {
   devtoolsContainer: HTMLElement | null;
@@ -67,6 +69,7 @@ type NoteEditorProps = {
 };
 
 export type NoteEditorHandle = {
+  blur(): void;
   focus(): void;
 };
 
@@ -100,6 +103,9 @@ function EditorInner({
   useImperativeHandle(
     editorRef,
     () => ({
+      blur() {
+        editor.blur();
+      },
       focus() {
         if (readOnly) return;
         editor.focus();
@@ -107,6 +113,18 @@ function EditorInner({
     }),
     [editor, readOnly],
   );
+
+  // Blur the editor when another pane gains focus
+  const prevPaneRef = useRef(useShellStore.getState().focusedPane);
+  useEffect(() => {
+    return useShellStore.subscribe((state) => {
+      const prev = prevPaneRef.current;
+      prevPaneRef.current = state.focusedPane;
+      if (prev === "editor" && state.focusedPane !== "editor") {
+        editor.blur();
+      }
+    });
+  }, [editor]);
 
   useEffect(() => {
     if (readOnly || focusMode === "none") return;

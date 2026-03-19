@@ -24,6 +24,7 @@ import {
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
+import { useShellStore } from "@/stores/use-shell-store";
 
 function App() {
   useTheme();
@@ -41,6 +42,7 @@ function App() {
     retryBootstrap,
     sidebarPaneProps,
   } = useShellController();
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
@@ -110,6 +112,7 @@ function App() {
             disableResponsive
             minSize={180}
             className="select-none"
+            onClickCapture={() => setFocusedPane("sidebar")}
           >
             <SidebarPane {...sidebarPaneProps} />
           </Section>
@@ -125,6 +128,7 @@ function App() {
             maxSize={340}
             minSize={220}
             className="select-none"
+            onMouseDown={() => setFocusedPane("notes")}
           >
             <NotesPane {...notesPaneProps} />
           </Section>
@@ -135,7 +139,7 @@ function App() {
             size={1}
           />
 
-          <Section minSize={300}>
+          <Section minSize={300} onMouseDown={() => setFocusedPane("editor")}>
             <EditorPane {...editorPaneProps} />
           </Section>
         </Container>
