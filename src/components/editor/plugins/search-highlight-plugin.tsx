@@ -40,11 +40,13 @@ export default function SearchHighlightPlugin({
   activeMatchIndex = null,
   highlightAllMatchesYellow = false,
   onMatchCountChange,
+  scrollRevision,
   searchWords,
 }: {
   activeMatchIndex?: number | null;
   highlightAllMatchesYellow?: boolean;
   onMatchCountChange?(count: number): void;
+  scrollRevision?: number;
   searchWords: string[];
 }) {
   const [editor] = useLexicalComposerContext();
@@ -208,6 +210,7 @@ export default function SearchHighlightPlugin({
     editor,
     highlightAllMatchesYellow,
     onMatchCountChange,
+    scrollRevision,
     searchWords,
   ]);
 

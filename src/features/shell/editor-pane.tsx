@@ -120,6 +120,7 @@ export function EditorPane({
   const [findMatchCount, setFindMatchCount] = useState(0);
   const [findQuery, setFindQuery] = useState("");
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
+  const [findScrollRevision, setFindScrollRevision] = useState(0);
   const [hidePanelSearchInEditor, setHidePanelSearchInEditor] = useState(false);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const noteTitle = firstLineH1Title(markdown);
@@ -228,6 +229,7 @@ export function EditorPane({
         }
         return nextIndex;
       });
+      setFindScrollRevision((r) => r + 1);
     },
     [findMatchCount],
   );
@@ -544,6 +546,7 @@ export function EditorPane({
                   hasEditorFindQuery ? activeFindMatchIndex : null
                 }
                 searchQuery={editorSearchQuery}
+                searchScrollRevision={findScrollRevision}
                 toolbarContainer={toolbarContainer}
               />
             </div>

@@ -68,6 +68,7 @@ type NoteEditorProps = {
   searchHighlightAllMatchesYellow?: boolean;
   searchActiveMatchIndex?: number | null;
   searchQuery: string;
+  searchScrollRevision?: number;
   toolbarContainer: HTMLElement | null;
   onChange(markdown: string): void;
   onFocusHandled(): void;
@@ -88,6 +89,7 @@ function EditorInner({
   searchHighlightAllMatchesYellow,
   searchActiveMatchIndex,
   searchQuery,
+  searchScrollRevision,
   toolbarContainer,
   onChange,
   onEditorFocusChange,
@@ -220,6 +222,7 @@ function EditorInner({
         activeMatchIndex={searchActiveMatchIndex}
         highlightAllMatchesYellow={searchHighlightAllMatchesYellow}
         onMatchCountChange={onSearchMatchCountChange}
+        scrollRevision={searchScrollRevision}
         searchWords={searchWords}
       />
       <TableActionMenuPlugin />
