@@ -303,7 +303,11 @@ export function NotesPane({
   }, [isSearchOpen]);
 
   useEffect(() => {
-    const handleFocusSearch = () => setIsSearchOpen(true);
+    const handleFocusSearch = () => {
+      setIsSearchOpen(true);
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
     window.addEventListener("comet:focus-search", handleFocusSearch);
     return () =>
       window.removeEventListener("comet:focus-search", handleFocusSearch);
