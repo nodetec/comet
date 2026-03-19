@@ -126,6 +126,10 @@ body {
   background: transparent;
 }
 
+.comet-editor-content-wrap {
+  min-height: 100%;
+}
+
 .comet-editor-content {
   font-family: "Figtree Variable", sans-serif;
   font-size: var(--editor-font-size, 15px);

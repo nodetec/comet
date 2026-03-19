@@ -128,11 +128,13 @@ function EditorInner({
 
   return (
     <>
-      <ContentEditable
-        className="comet-editor-content"
-        autoCapitalize="off"
-        autoCorrect="off"
-      />
+      <div className="comet-editor-content-wrap">
+        <ContentEditable
+          className="comet-editor-content"
+          autoCapitalize="off"
+          autoCorrect="off"
+        />
+      </div>
       <OnChangeMarkdownPlugin initComplete={initComplete} onChange={onChange} />
       <InitialContentPlugin
         html={html}
