@@ -57,7 +57,7 @@ const theme: EditorThemeClasses = {
   rtl: "text-right",
   paragraph: "last:mb-0 leading-[1.6] tracking-wide mb-1",
   quote:
-    "border-l-4 mb-6 border-primary/30 pl-4 italic text-muted-foreground last:mb-0",
+    "relative mb-6 pl-4 italic text-muted-foreground last:mb-0 before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-full before:bg-primary/60 before:content-['']",
   heading: {
     h1: "text-3xl font-bold tracking-wide mb-2 text-[var(--heading-color)]",
     h2: "text-2xl font-bold tracking-wide mb-2 mt-3 text-[var(--heading-color)]",
