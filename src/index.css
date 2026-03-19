@@ -148,6 +148,18 @@ body {
   padding-top: 0.25rem;
 }
 
+.comet-editor-content ol,
+.comet-editor-content ul {
+  &::marker,
+  & li::marker {
+    color: var(--primary);
+  }
+}
+
+.comet-editor-content ul li::marker {
+  font-size: 1.3em;
+}
+
 .comet-table-wrapper {
   display: block;
   overflow: auto;

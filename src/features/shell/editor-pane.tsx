@@ -423,57 +423,61 @@ export function EditorPane({
       </header>
 
       {findOpen && noteId && (
-        <div className="border-divider flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-          <Search className="text-muted-foreground size-3.5 shrink-0" />
-          <input
-            ref={findInputRef}
-            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
-            placeholder="Find in note…"
-            value={findQuery}
-            onChange={(e) => {
-              setFindQuery(e.target.value);
-              setActiveFindMatchIndex(0);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                stepActiveFindMatch(e.shiftKey ? -1 : 1);
-                return;
-              }
+        <div className="border-divider flex shrink-0 items-center gap-2 border-b px-3 pb-4">
+          <label className="border-input/60 focus-within:border-primary relative flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-1">
+            <Search className="text-muted-foreground size-3.5 shrink-0" />
+            <input
+              ref={findInputRef}
+              className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
+              placeholder="Search…"
+              value={findQuery}
+              onChange={(e) => {
+                setFindQuery(e.target.value);
+                setActiveFindMatchIndex(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  stepActiveFindMatch(e.shiftKey ? -1 : 1);
+                  return;
+                }
 
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closeFind(true);
-              }
-            }}
-          />
-          <span className="text-muted-foreground min-w-[3rem] text-right text-xs tabular-nums">
-            {findQuery && findMatchCount > 0
-              ? `${activeFindMatchIndex + 1}/${findMatchCount}`
-              : findQuery
-                ? "0"
-                : ""}
-          </span>
-          <button
-            className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40"
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  closeFind(true);
+                }
+              }}
+            />
+            <span className="text-muted-foreground min-w-12 text-right text-xs tabular-nums">
+              {findQuery && findMatchCount > 0
+                ? `${activeFindMatchIndex + 1}/${findMatchCount}`
+                : findQuery
+                  ? "0"
+                  : ""}
+            </span>
+          </label>
+          <Button
+            className="text-muted-foreground"
             disabled={findMatchCount === 0}
             onClick={() => stepActiveFindMatch(-1)}
             onMouseDown={(event) => event.preventDefault()}
-            type="button"
+            size="icon-xs"
+            variant="ghost"
           >
             <ChevronUp className="size-3.5" />
-          </button>
-          <button
-            className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40"
+          </Button>
+          <Button
+            className="text-muted-foreground"
             disabled={findMatchCount === 0}
             onClick={() => stepActiveFindMatch(1)}
             onMouseDown={(event) => event.preventDefault()}
-            type="button"
+            size="icon-xs"
+            variant="ghost"
           >
             <ChevronDown className="size-3.5" />
-          </button>
-          <button
-            className="text-muted-foreground hover:text-foreground"
+          </Button>
+          <Button
+            className="text-muted-foreground"
             onClick={() => {
               if (findQuery) {
                 setFindMatchCount(0);
@@ -485,10 +489,11 @@ export function EditorPane({
               }
             }}
             onMouseDown={(event) => event.preventDefault()}
-            type="button"
+            size="icon-xs"
+            variant="ghost"
           >
             <X className="size-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -497,6 +502,7 @@ export function EditorPane({
           className={cn(
             "h-full min-h-0 overflow-y-scroll overscroll-y-contain",
             !isReadOnly && "cursor-text",
+            findOpen && "pt-2",
           )}
           data-editor-scroll-container
           onMouseDown={handleEditorSurfaceMouseDown}
