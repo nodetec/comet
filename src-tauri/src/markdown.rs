@@ -3,8 +3,8 @@
 //! Produces HTML that Lexical's `$generateNodesFromDOM` can consume directly,
 //! matching the output of the marked.js pipeline in the frontend.
 
-use comrak::Arena;
 use comrak::options::{Extension, Options, Parse, Render};
+use comrak::Arena;
 
 /// Full pipeline: preprocess → parse → render → postprocess.
 pub fn markdown_to_lexical_html(markdown: &str) -> String {
@@ -63,10 +63,12 @@ fn postprocess_html(html: &str) -> String {
     // Strip whitespace between block-level tags. DOMParser turns newlines between
     // tags (e.g. `</p>\n<pre>`, `</li>\n<li>`) into text nodes that Lexical wraps
     // in phantom empty paragraphs or list items.
-    result = regex_lite::Regex::new(r#">\s+<(/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)"#)
-        .unwrap()
-        .replace_all(&result, "><$1$2")
-        .to_string();
+    result = regex_lite::Regex::new(
+        r#">\s+<(/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)"#,
+    )
+    .unwrap()
+    .replace_all(&result, "><$1$2")
+    .to_string();
 
     result
 }
@@ -186,28 +188,46 @@ mod tests {
     fn test_empty_paragraphs() {
         let html = markdown_to_lexical_html("hello\n\n\n\nworld");
         let count = html.matches("<p><br></p>").count();
-        assert_eq!(count, 2, "Expected 2 empty paragraphs, got {count}. HTML: {html}");
+        assert_eq!(
+            count, 2,
+            "Expected 2 empty paragraphs, got {count}. HTML: {html}"
+        );
     }
 
     #[test]
     fn test_soft_breaks_become_hard() {
         let html = markdown_to_lexical_html("line1\nline2");
-        assert!(html.contains("<br"), "Soft break should become <br>. HTML: {html}");
+        assert!(
+            html.contains("<br"),
+            "Soft break should become <br>. HTML: {html}"
+        );
     }
 
     #[test]
     fn test_checklist_classes() {
         let html = markdown_to_lexical_html("- [x] done\n- [ ] todo");
-        assert!(html.contains("contains-task-list"), "UL should have contains-task-list. HTML: {html}");
-        assert!(html.contains("task-list-item"), "LI should have task-list-item. HTML: {html}");
+        assert!(
+            html.contains("contains-task-list"),
+            "UL should have contains-task-list. HTML: {html}"
+        );
+        assert!(
+            html.contains("task-list-item"),
+            "LI should have task-list-item. HTML: {html}"
+        );
     }
 
     #[test]
     fn test_checklist_no_phantom_item() {
         let md = "## Action Items\n\n- [x] First\n- [ ] Second\n- [ ] Third";
         let html = markdown_to_lexical_html(md);
-        assert!(!html.contains("<li>\n</li>"), "Unexpected empty list item. HTML: {html}");
-        assert!(!html.contains("<li></li>"), "Unexpected empty list item. HTML: {html}");
+        assert!(
+            !html.contains("<li>\n</li>"),
+            "Unexpected empty list item. HTML: {html}"
+        );
+        assert!(
+            !html.contains("<li></li>"),
+            "Unexpected empty list item. HTML: {html}"
+        );
     }
 
     #[test]
@@ -215,9 +235,19 @@ mod tests {
         let md = "## Action Items\n\n\n- [x] Sarah to create Jira epics\n- [x] Marcus to schedule design review\n- [ ] David to benchmark latency";
         let html = markdown_to_lexical_html(md);
         // Should have exactly 3 list items and no empty ones
-        assert_eq!(html.matches("<li").count(), 3, "Expected 3 <li> tags. HTML: {html}");
-        assert!(!html.contains("<li>\n</li>"), "Unexpected empty list item. HTML: {html}");
-        assert!(!html.contains("<li></li>"), "Unexpected empty list item. HTML: {html}");
+        assert_eq!(
+            html.matches("<li").count(),
+            3,
+            "Expected 3 <li> tags. HTML: {html}"
+        );
+        assert!(
+            !html.contains("<li>\n</li>"),
+            "Unexpected empty list item. HTML: {html}"
+        );
+        assert!(
+            !html.contains("<li></li>"),
+            "Unexpected empty list item. HTML: {html}"
+        );
     }
 
     #[test]

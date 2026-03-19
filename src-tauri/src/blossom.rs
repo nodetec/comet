@@ -20,7 +20,12 @@ pub async fn upload_blob(
     hasher.update(&ciphertext);
     let ciphertext_hash = format!("{:x}", hasher.finalize());
 
-    eprintln!("[blossom] uploading encrypted blob hash={} size={} to {}", &ciphertext_hash[..8], ciphertext.len(), blossom_url);
+    eprintln!(
+        "[blossom] uploading encrypted blob hash={} size={} to {}",
+        &ciphertext_hash[..8],
+        ciphertext.len(),
+        blossom_url
+    );
 
     let auth_header = sign_blossom_auth(keys, "upload", &ciphertext_hash, blossom_url)?;
 
@@ -49,7 +54,9 @@ pub async fn upload_blob(
             .to_string();
         let body = resp.text().await.unwrap_or_default();
         eprintln!("[blossom] upload failed ({status}): {reason_header} {body}");
-        return Err(AppError::custom(format!("Blossom upload failed ({status}): {reason_header} {body}")));
+        return Err(AppError::custom(format!(
+            "Blossom upload failed ({status}): {reason_header} {body}"
+        )));
     }
 
     eprintln!("[blossom] upload ok hash={}", &ciphertext_hash[..8]);
@@ -78,7 +85,13 @@ pub async fn upload_plaintext_blob(
         _ => "application/octet-stream",
     };
 
-    eprintln!("[blossom] uploading plaintext blob hash={} size={} type={} to {}", &hash[..8], data.len(), content_type, blossom_url);
+    eprintln!(
+        "[blossom] uploading plaintext blob hash={} size={} type={} to {}",
+        &hash[..8],
+        data.len(),
+        content_type,
+        blossom_url
+    );
 
     let auth_header = sign_blossom_auth(keys, "upload", &hash, blossom_url)?;
     let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
@@ -106,7 +119,9 @@ pub async fn upload_plaintext_blob(
             .to_string();
         let body = resp.text().await.unwrap_or_default();
         eprintln!("[blossom] plaintext upload failed ({status}): {reason_header} {body}");
-        return Err(AppError::custom(format!("Blossom upload failed ({status}): {reason_header} {body}")));
+        return Err(AppError::custom(format!(
+            "Blossom upload failed ({status}): {reason_header} {body}"
+        )));
     }
 
     Ok(hash)
@@ -147,12 +162,7 @@ pub async fn upload_and_rewrite_attachments(
             rusqlite::params![hash, blossom_url, size_bytes, crate::error::now_millis()],
         )?;
 
-        let public_url = format!(
-            "{}/{}.{}",
-            blossom_url.trim_end_matches('/'),
-            hash,
-            ext
-        );
+        let public_url = format!("{}/{}.{}", blossom_url.trim_end_matches('/'), hash, ext);
         replacements.push((full_match, public_url));
     }
 
@@ -170,7 +180,11 @@ pub async fn delete_blob(
     hash: &str,
     keys: &Keys,
 ) -> Result<(), AppError> {
-    eprintln!("[blossom] deleting hash={} from {}", &hash[..8.min(hash.len())], blossom_url);
+    eprintln!(
+        "[blossom] deleting hash={} from {}",
+        &hash[..8.min(hash.len())],
+        blossom_url
+    );
     let auth_header = sign_blossom_auth(keys, "delete", hash, blossom_url)?;
     let url = format!("{}/{}", blossom_url.trim_end_matches('/'), hash);
 
@@ -186,8 +200,13 @@ pub async fn delete_blob(
 
     if !resp.status().is_success() && resp.status().as_u16() != 404 {
         let status = resp.status();
-        eprintln!("[blossom] delete failed ({status}) for hash={}", &hash[..8.min(hash.len())]);
-        return Err(AppError::custom(format!("Blossom delete failed ({status})")));
+        eprintln!(
+            "[blossom] delete failed ({status}) for hash={}",
+            &hash[..8.min(hash.len())]
+        );
+        return Err(AppError::custom(format!(
+            "Blossom delete failed ({status})"
+        )));
     }
 
     eprintln!("[blossom] delete ok hash={}", &hash[..8.min(hash.len())]);
@@ -201,7 +220,11 @@ pub async fn download_blob(
     ciphertext_hash: &str,
     keys: &Keys,
 ) -> Result<Vec<u8>, AppError> {
-    eprintln!("[blossom] downloading hash={} from {}", &ciphertext_hash[..8], blossom_url);
+    eprintln!(
+        "[blossom] downloading hash={} from {}",
+        &ciphertext_hash[..8],
+        blossom_url
+    );
     let auth_header = sign_blossom_auth(keys, "get", ciphertext_hash, blossom_url)?;
 
     let url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
@@ -217,8 +240,13 @@ pub async fn download_blob(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        eprintln!("[blossom] download failed ({status}) for hash={}", &ciphertext_hash[..8]);
-        return Err(AppError::custom(format!("Blossom download failed ({status})")));
+        eprintln!(
+            "[blossom] download failed ({status}) for hash={}",
+            &ciphertext_hash[..8]
+        );
+        return Err(AppError::custom(format!(
+            "Blossom download failed ({status})"
+        )));
     }
 
     resp.bytes()
@@ -255,7 +283,8 @@ pub fn decrypt_blob(data: &[u8], key_hex: &str) -> Result<Vec<u8>, AppError> {
         return Err(AppError::custom("Ciphertext too short"));
     }
 
-    let key_bytes = hex::decode(key_hex).map_err(|e| AppError::custom(format!("Invalid key hex: {e}")))?;
+    let key_bytes =
+        hex::decode(key_hex).map_err(|e| AppError::custom(format!("Invalid key hex: {e}")))?;
     let cipher = ChaCha20Poly1305::new_from_slice(&key_bytes)
         .map_err(|e| AppError::custom(format!("Failed to create cipher: {e}")))?;
 

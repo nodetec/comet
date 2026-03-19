@@ -3,9 +3,9 @@
 //! Replaces `EventBuilder::gift_wrap()` and `nip59::extract_rumor()` to support
 //! payloads larger than the standard NIP-44 v2 limit of ~64KB.
 
-use nostr_sdk::prelude::*;
 use nostr_sdk::prelude::nip44::v2::ConversationKey;
 use nostr_sdk::prelude::nip59::RANGE_RANDOM_TIMESTAMP_TWEAK;
+use nostr_sdk::prelude::*;
 
 use crate::error::AppError;
 use crate::nip44_ext;

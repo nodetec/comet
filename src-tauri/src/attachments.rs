@@ -116,7 +116,10 @@ pub fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
 
 /// Find attachment hashes in the given notes that are not referenced by any other note.
 /// Must be called BEFORE the notes are deleted.
-pub fn find_orphaned_blob_hashes(conn: &Connection, note_ids: &[String]) -> Result<HashSet<String>, AppError> {
+pub fn find_orphaned_blob_hashes(
+    conn: &Connection,
+    note_ids: &[String],
+) -> Result<HashSet<String>, AppError> {
     if note_ids.is_empty() {
         return Ok(HashSet::new());
     }
@@ -143,12 +146,16 @@ pub fn find_orphaned_blob_hashes(conn: &Connection, note_ids: &[String]) -> Resu
 
     // Check which hashes are still referenced by other notes using SQL
     // to avoid pulling all markdown into memory
-    let excluded = format!("SELECT markdown FROM notes WHERE id NOT IN ({})", placeholders);
+    let excluded = format!(
+        "SELECT markdown FROM notes WHERE id NOT IN ({})",
+        placeholders
+    );
     let mut remaining_stmt = conn.prepare(&excluded)?;
     let excluded_params: Vec<Value> = note_ids.iter().map(|id| Value::from(id.clone())).collect();
-    let remaining_rows = remaining_stmt.query_map(params_from_iter(excluded_params.iter()), |row| {
-        row.get::<_, String>(0)
-    })?;
+    let remaining_rows = remaining_stmt
+        .query_map(params_from_iter(excluded_params.iter()), |row| {
+            row.get::<_, String>(0)
+        })?;
 
     for row in remaining_rows {
         for hash in extract_attachment_hashes(&row?) {
@@ -203,7 +210,10 @@ pub fn cleanup_orphaned_blobs(
             let _ = stmt.execute(params![hash]);
         }
         let _ = delete_local_blob(app, hash);
-        eprintln!("[blob-gc] cleaned up orphaned blob hash={}", &hash[..8.min(hash.len())]);
+        eprintln!(
+            "[blob-gc] cleaned up orphaned blob hash={}",
+            &hash[..8.min(hash.len())]
+        );
     }
 
     blossom_deletions

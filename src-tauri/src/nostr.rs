@@ -17,7 +17,10 @@ pub fn ensure_identity(conn: &Connection) -> Result<String, AppError> {
     }
 
     let keys = Keys::generate();
-    let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
+    let npub = keys
+        .public_key()
+        .to_bech32()
+        .map_err(|e| AppError::custom(e.to_string()))?;
     let now = now_millis();
 
     conn.execute(
@@ -65,8 +68,7 @@ pub struct Relay {
 }
 
 pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
-    let mut stmt = conn
-        .prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")?;
+    let mut stmt = conn.prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")?;
     let relays = stmt
         .query_map([], |row| {
             Ok(Relay {
@@ -121,15 +123,17 @@ pub fn remove_relay(conn: &Connection, url: &str, kind: &str) -> Result<Vec<Rela
 }
 
 fn normalize_relay_url(raw: &str) -> Result<String, AppError> {
-    let parsed = url::Url::parse(raw.trim())
-        .map_err(|_| AppError::custom("Invalid relay URL"))?;
+    let parsed = url::Url::parse(raw.trim()).map_err(|_| AppError::custom("Invalid relay URL"))?;
     match parsed.scheme() {
         "wss" | "ws" => {}
-        _ => return Err(AppError::custom("Relay URL must start with wss:// or ws://")),
+        _ => {
+            return Err(AppError::custom(
+                "Relay URL must start with wss:// or ws://",
+            ))
+        }
     }
     Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
-
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,7 +152,10 @@ pub struct PublishNoteInput {
     pub tags: Vec<String>,
 }
 
-pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<PublishResult, AppError> {
+pub async fn publish_note(
+    app: &AppHandle,
+    input: PublishNoteInput,
+) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
 
     // Synchronous DB block — Connection is not Send, must drop before any .await
@@ -165,22 +172,21 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
             .ok_or_else(|| AppError::custom("Note not found."))?;
 
         let secret_hex: String = conn
-            .query_row(
-                "SELECT secret_key FROM nostr_identity LIMIT 1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
+                row.get(0)
+            })
             .optional()?
             .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
-        let mut stmt = conn
-            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
+        let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
         if relay_urls.is_empty() {
-            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
+            return Err(AppError::custom(
+                "No publish relays configured. Add one in Settings → Relays.",
+            ));
         }
 
         let d_tag = match existing_d_tag {
@@ -200,8 +206,8 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
     };
 
     // Async relay block
-    let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+    let secret_key = SecretKey::parse(&secret_hex)
+        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
     // Upload attachment images to Blossom and rewrite URIs to public URLs
@@ -220,16 +226,16 @@ pub async fn publish_note(app: &AppHandle, input: PublishNoteInput) -> Result<Pu
     let mut event_tags: Vec<Tag> = vec![
         Tag::identifier(&d_tag),
         Tag::title(&input.title),
-        Tag::custom(
-            TagKind::custom("published_at"),
-            vec![now.to_string()],
-        ),
+        Tag::custom(TagKind::custom("published_at"), vec![now.to_string()]),
     ];
     // Rewrite cover image URI if it references a local attachment
     let image = input.image.as_ref().map(|img| {
         if let Some(ref blossom_url) = blossom_url {
             if img.starts_with("attachment://") {
-                return img.replace("attachment://", &format!("{}/", blossom_url.trim_end_matches('/')));
+                return img.replace(
+                    "attachment://",
+                    &format!("{}/", blossom_url.trim_end_matches('/')),
+                );
             }
         }
         img.clone()
@@ -292,7 +298,10 @@ pub struct PublishShortNoteInput {
     pub tags: Vec<String>,
 }
 
-pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -> Result<PublishResult, AppError> {
+pub async fn publish_short_note(
+    app: &AppHandle,
+    input: PublishShortNoteInput,
+) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
 
     let (secret_hex, content, relay_urls) = {
@@ -308,22 +317,21 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
             .ok_or_else(|| AppError::custom("Note not found."))?;
 
         let secret_hex: String = conn
-            .query_row(
-                "SELECT secret_key FROM nostr_identity LIMIT 1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
+                row.get(0)
+            })
             .optional()?
             .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
-        let mut stmt = conn
-            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
+        let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
         if relay_urls.is_empty() {
-            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
+            return Err(AppError::custom(
+                "No publish relays configured. Add one in Settings → Relays.",
+            ));
         }
 
         let content = strip_title_line(&markdown);
@@ -331,8 +339,8 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
         (secret_hex, content, relay_urls)
     };
 
-    let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+    let secret_key = SecretKey::parse(&secret_hex)
+        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
     // Upload attachment images to Blossom and rewrite URIs to public URLs
@@ -396,7 +404,10 @@ pub async fn publish_short_note(app: &AppHandle, input: PublishShortNoteInput) -
     })
 }
 
-pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<PublishResult, AppError> {
+pub async fn delete_published_note(
+    app: &AppHandle,
+    note_id: &str,
+) -> Result<PublishResult, AppError> {
     // Synchronous DB block
     let (secret_hex, d_tag, published_event_id, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
@@ -411,41 +422,41 @@ pub async fn delete_published_note(app: &AppHandle, note_id: &str) -> Result<Pub
             .ok_or_else(|| AppError::custom("Note not found."))?;
 
         if existing_d_tag.is_none() && published_event_id.is_none() {
-            return Err(AppError::custom("This note has not been published to Nostr."));
+            return Err(AppError::custom(
+                "This note has not been published to Nostr.",
+            ));
         }
 
         let secret_hex: String = conn
-            .query_row(
-                "SELECT secret_key FROM nostr_identity LIMIT 1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
+                row.get(0)
+            })
             .optional()?
             .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
-        let mut stmt = conn
-            .prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
+        let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
         if relay_urls.is_empty() {
-            return Err(AppError::custom("No publish relays configured. Add one in Settings → Relays."));
+            return Err(AppError::custom(
+                "No publish relays configured. Add one in Settings → Relays.",
+            ));
         }
 
         (secret_hex, existing_d_tag, published_event_id, relay_urls)
     };
 
     // Async relay block
-    let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+    let secret_key = SecretKey::parse(&secret_hex)
+        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
 
     // Build deletion request — target by coordinate (article) or event ID (note)
     let mut deletion_request = EventDeletionRequest::new();
     if let Some(ref d) = d_tag {
-        let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key())
-            .identifier(d);
+        let coordinate = Coordinate::new(Kind::LongFormTextNote, keys.public_key()).identifier(d);
         deletion_request = deletion_request.coordinate(coordinate);
     }
     if let Some(ref eid) = published_event_id {
@@ -511,9 +522,13 @@ pub(crate) fn strip_title_line(markdown: &str) -> String {
 /// Imports an nsec (bech32 or hex), replacing the existing identity.
 /// Returns the new npub.
 pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, AppError> {
-    let secret_key = SecretKey::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
+    let secret_key =
+        SecretKey::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
     let keys = Keys::new(secret_key);
-    let npub = keys.public_key().to_bech32().map_err(|e| AppError::custom(e.to_string()))?;
+    let npub = keys
+        .public_key()
+        .to_bech32()
+        .map_err(|e| AppError::custom(e.to_string()))?;
     let now = now_millis();
 
     conn.execute("DELETE FROM nostr_identity", [])?;

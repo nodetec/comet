@@ -24,7 +24,7 @@ pub fn database_connection(app: &AppHandle) -> Result<Connection, AppError> {
 fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
         M::up(
-        "CREATE TABLE app_settings (
+            "CREATE TABLE app_settings (
            key TEXT PRIMARY KEY,
            value TEXT NOT NULL
          );
@@ -76,9 +76,7 @@ fn migrations() -> Migrations<'static> {
          CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
          CREATE INDEX idx_note_tags_tag ON note_tags(tag);",
         ),
-        M::up(
-            "ALTER TABLE notes ADD COLUMN sync_event_id TEXT;",
-        ),
+        M::up("ALTER TABLE notes ADD COLUMN sync_event_id TEXT;"),
         M::up(
             "CREATE TABLE IF NOT EXISTS blob_meta (
                plaintext_hash  TEXT PRIMARY KEY,
@@ -86,9 +84,7 @@ fn migrations() -> Migrations<'static> {
                encryption_key  TEXT NOT NULL
              );",
         ),
-        M::up(
-            "ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;",
-        ),
+        M::up("ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;"),
         M::up(
             "ALTER TABLE notes ADD COLUMN edited_at INTEGER;
              UPDATE notes SET edited_at = modified_at;
@@ -100,9 +96,7 @@ fn migrations() -> Migrations<'static> {
                created_at INTEGER NOT NULL
              );",
         ),
-        M::up(
-            "ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;",
-        ),
+        M::up("ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;"),
         M::up(
             "ALTER TABLE notes ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;
              ALTER TABLE notebooks ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;",
@@ -160,7 +154,10 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
         let at_line_start = index == 0 || bytes[index - 1] == b'\n';
 
         // Check for fenced code block delimiter (``` or ~~~, 3+ chars) at start of line
-        if at_line_start && index + 2 < bytes.len() && (bytes[index] == b'`' || bytes[index] == b'~') {
+        if at_line_start
+            && index + 2 < bytes.len()
+            && (bytes[index] == b'`' || bytes[index] == b'~')
+        {
             let ch = bytes[index];
             let mut run = 0;
             while index + run < bytes.len() && bytes[index + run] == ch {
@@ -270,7 +267,10 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
         }
 
         // Skip tags that are purely numeric (e.g. #2, #123)
-        if bytes[tag_start..tag_end].iter().any(|b| b.is_ascii_alphabetic()) {
+        if bytes[tag_start..tag_end]
+            .iter()
+            .any(|b| b.is_ascii_alphabetic())
+        {
             let mut tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]).into_owned();
             tag.make_ascii_lowercase();
             tags.insert(tag);

@@ -9,10 +9,10 @@
 use base64::engine::{general_purpose, Engine};
 use chacha20::cipher::{KeyIvInit, StreamCipher};
 use chacha20::ChaCha20;
-use nostr_sdk::prelude::nip44::v2::ConversationKey;
 use nostr_sdk::prelude::hashes::hmac::{Hmac, HmacEngine};
 use nostr_sdk::prelude::hashes::sha256::Hash as Sha256Hash;
 use nostr_sdk::prelude::hashes::{Hash, HashEngine};
+use nostr_sdk::prelude::nip44::v2::ConversationKey;
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
@@ -38,8 +38,12 @@ impl MessageKeys {
     }
 }
 
-fn get_message_keys(conversation_key: &ConversationKey, nonce: &[u8]) -> Result<MessageKeys, AppError> {
-    let expanded = nostr_sdk::prelude::hkdf::expand(conversation_key.as_bytes(), nonce, MESSAGE_KEYS_SIZE);
+fn get_message_keys(
+    conversation_key: &ConversationKey,
+    nonce: &[u8],
+) -> Result<MessageKeys, AppError> {
+    let expanded =
+        nostr_sdk::prelude::hkdf::expand(conversation_key.as_bytes(), nonce, MESSAGE_KEYS_SIZE);
     let arr: [u8; MESSAGE_KEYS_SIZE] = expanded
         .try_into()
         .map_err(|_| AppError::custom("HKDF expand returned wrong length"))?;
@@ -103,7 +107,9 @@ fn unpad_params(padded: &[u8]) -> Result<(usize, usize), AppError> {
     let (prefix_len, unpadded_len) = if first_two == 0 {
         // Extended format
         if padded.len() < 6 {
-            return Err(AppError::custom("NIP-44: padded data too short for extended prefix"));
+            return Err(AppError::custom(
+                "NIP-44: padded data too short for extended prefix",
+            ));
         }
         let len = u32::from_be_bytes([padded[2], padded[3], padded[4], padded[5]]) as usize;
         if len < EXTENDED_PREFIX_THRESHOLD {
@@ -124,7 +130,9 @@ fn unpad_params(padded: &[u8]) -> Result<(usize, usize), AppError> {
 
     let expected_total = prefix_len + calc_padding(unpadded_len);
     if padded.len() != expected_total {
-        return Err(AppError::custom("NIP-44: invalid padding (wrong total length)"));
+        return Err(AppError::custom(
+            "NIP-44: invalid padding (wrong total length)",
+        ));
     }
 
     Ok((prefix_len, unpadded_len))
@@ -137,8 +145,7 @@ fn unpad_params(padded: &[u8]) -> Result<(usize, usize), AppError> {
 pub fn encrypt(conversation_key: &ConversationKey, plaintext: &[u8]) -> Result<String, AppError> {
     // Generate random nonce
     let mut nonce = [0u8; 32];
-    getrandom::fill(&mut nonce)
-        .map_err(|e| AppError::custom(format!("RNG failure: {e}")))?;
+    getrandom::fill(&mut nonce).map_err(|e| AppError::custom(format!("RNG failure: {e}")))?;
 
     let keys = get_message_keys(conversation_key, &nonce)?;
 
@@ -167,7 +174,10 @@ pub fn encrypt(conversation_key: &ConversationKey, plaintext: &[u8]) -> Result<S
 
 /// Decrypt a base64-encoded NIP-44 v2 payload with extended prefix support.
 /// Handles both standard u16 and extended u32 length prefixes.
-pub fn decrypt(conversation_key: &ConversationKey, base64_payload: &str) -> Result<Vec<u8>, AppError> {
+pub fn decrypt(
+    conversation_key: &ConversationKey,
+    base64_payload: &str,
+) -> Result<Vec<u8>, AppError> {
     let payload = general_purpose::STANDARD
         .decode(base64_payload)
         .map_err(|e| AppError::custom(format!("NIP-44: base64 decode failed: {e}")))?;
@@ -184,7 +194,10 @@ fn decrypt_bytes(conversation_key: &ConversationKey, payload: &[u8]) -> Result<V
 
     // Check version
     if payload[0] != 0x02 {
-        return Err(AppError::custom(format!("NIP-44: unknown version {}", payload[0])));
+        return Err(AppError::custom(format!(
+            "NIP-44: unknown version {}",
+            payload[0]
+        )));
     }
 
     let nonce = &payload[1..33];

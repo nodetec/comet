@@ -18,7 +18,9 @@ pub struct ThemeData {
 }
 
 const BUNDLED_THEMES: &[(&str, &str)] = &[
-    ("rosepine", r##"{
+    (
+        "rosepine",
+        r##"{
   "name": "Rosé Pine",
   "colors": {
     "background": "oklch(22.4% 0.012 277.7)",
@@ -51,8 +53,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "#c4a7e7",
     "editor-selection": "rgba(196, 167, 231, 0.15)"
   }
-}"##),
-    ("evergreen", r##"{
+}"##,
+    ),
+    (
+        "evergreen",
+        r##"{
   "name": "Evergreen",
   "colors": {
     "background": "oklch(21% 0.015 155)",
@@ -85,8 +90,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "#7ec99d",
     "editor-selection": "rgba(126, 201, 157, 0.15)"
   }
-}"##),
-    ("amber", r##"{
+}"##,
+    ),
+    (
+        "amber",
+        r##"{
   "name": "Amber",
   "colors": {
     "background": "oklch(22% 0.012 60)",
@@ -119,8 +127,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "#d4a54a",
     "editor-selection": "rgba(212, 165, 74, 0.15)"
   }
-}"##),
-    ("midnight", r##"{
+}"##,
+    ),
+    (
+        "midnight",
+        r##"{
   "name": "Midnight",
   "colors": {
     "background": "oklch(15% 0.005 265)",
@@ -153,8 +164,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "#6cb4ee",
     "editor-selection": "rgba(108, 180, 238, 0.15)"
   }
-}"##),
-    ("light", r##"{
+}"##,
+    ),
+    (
+        "light",
+        r##"{
   "name": "Light",
   "colors": {
     "background": "oklch(97% 0.004 265)",
@@ -187,8 +201,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(50% 0.2 252)",
     "editor-selection": "rgba(80, 140, 220, 0.18)"
   }
-}"##),
-    ("paper", r##"{
+}"##,
+    ),
+    (
+        "paper",
+        r##"{
   "name": "Paper",
   "colors": {
     "background": "oklch(95.5% 0.01 80)",
@@ -221,8 +238,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(48% 0.12 30)",
     "editor-selection": "rgba(160, 100, 60, 0.15)"
   }
-}"##),
-    ("sol-light", r##"{
+}"##,
+    ),
+    (
+        "sol-light",
+        r##"{
   "name": "Solarized Light",
   "colors": {
     "background": "oklch(96% 0.015 90)",
@@ -255,7 +275,8 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(55% 0.12 235)",
     "editor-selection": "rgba(70, 130, 180, 0.15)"
   }
-}"##),
+}"##,
+    ),
 ];
 
 fn themes_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
