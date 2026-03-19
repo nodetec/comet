@@ -217,10 +217,20 @@ export default function TagCompletionPlugin() {
           return;
         }
 
-        const textUpToCursor = anchorNode
-          .getTextContent()
-          .slice(0, anchor.offset);
+        const fullText = anchorNode.getTextContent();
+        const textUpToCursor = fullText.slice(0, anchor.offset);
         const match = matchHashtag(textUpToCursor);
+
+        // Only show menu when caret is at the end of the tag
+        const charAfterCursor = fullText[anchor.offset];
+        if (
+          charAfterCursor !== undefined &&
+          /[^\s.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;#]/.test(charAfterCursor)
+        ) {
+          closeMenu();
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          return;
+        }
 
         if (!match) {
           closeMenu();
