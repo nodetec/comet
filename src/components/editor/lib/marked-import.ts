@@ -2,6 +2,14 @@ import { Marked, type MarkedExtension, type Tokens } from "marked";
 import { resolveImageSrc } from "@/lib/attachments";
 import { extractYouTubeVideoId } from "./youtube-utils";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Block-level extension: bare YouTube URLs on their own line become embeds.
  * Renders an <iframe data-lexical-youtube="videoId"> that YouTubeNode.importDOM
@@ -98,6 +106,11 @@ const rendererOverrides: MarkedExtension = {
     // handles <s> but not <del>.
     del({ tokens }: Tokens.Del) {
       return `<s>${this.parser.parseInline(tokens)}</s>`;
+    },
+
+    link({ href, tokens, title }: Tokens.Link) {
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+      return `<a href="${escapeHtml(href)}"${titleAttr}>${this.parser.parseInline(tokens)}</a>`;
     },
 
     // Images: resolve attachment:// URIs for rendering.

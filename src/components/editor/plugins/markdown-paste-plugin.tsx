@@ -16,6 +16,7 @@ import {
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { markdownToDOM } from "../lib/marked-import";
+import { normalizeImportedNodes } from "../lib/markdown";
 
 // Patterns that strongly indicate markdown content
 const MARKDOWN_PATTERNS = [
@@ -189,7 +190,9 @@ export default function MarkdownPastePlugin() {
         const dom = markdownToDOM(text, { paste: true });
 
         editor.update(() => {
-          const allNodes = $generateNodesFromDOM(editor, dom);
+          const allNodes = normalizeImportedNodes(
+            $generateNodesFromDOM(editor, dom),
+          );
           // Filter to block-level nodes only — $generateNodesFromDOM may
           // produce stray TextNodes from whitespace between HTML tags
           const filteredNodes = allNodes.filter(

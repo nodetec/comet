@@ -1,8 +1,18 @@
-import { $convertToMarkdownString } from "@lexical/markdown";
 import type { Transformer } from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
 import type { ElementNode, LexicalNode } from "lexical";
-import { $getEditor, $getRoot, $isParagraphNode, $isTextNode } from "lexical";
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getEditor,
+  $getRoot,
+  $isElementNode,
+  $isParagraphNode,
+  $isTextNode,
+} from "lexical";
+import { $isCodeNode } from "@lexical/code";
+import { $isQuoteNode } from "@lexical/rich-text";
+import { $convertToMarkdownStringNormalized } from "./markdown-export";
 
 // Patterns matching block-level markdown structures that should NOT be merged
 // with adjacent lines (mirrors Lexical's internal normalizeMarkdown logic).
@@ -14,6 +24,9 @@ const CODE_SINGLE_LINE_RE = /^(`{3,})[^`]+\1$/;
  * character and be at least as long as the opening fence (CommonMark spec).
  */
 type FenceState = { char: string; length: number } | null;
+
+const CLIPBOARD_EMAIL_LINK_RE =
+  /\[([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\]\(mailto:\1\)/g;
 
 function updateFenceState(line: string, current: FenceState): FenceState {
   const trimmed = line.trimStart();
@@ -56,6 +69,70 @@ function isEmptyParagraph(node: LexicalNode): boolean {
   return false;
 }
 
+function normalizeImportedQuoteSpacing(node: LexicalNode): void {
+  if ($isElementNode(node)) {
+    for (const child of node.getChildren()) {
+      normalizeImportedQuoteSpacing(child);
+    }
+  }
+
+  if (!$isQuoteNode(node)) {
+    return;
+  }
+
+  let previousNonEmptyParagraph: LexicalNode | null = null;
+  for (const child of [...node.getChildren()]) {
+    if ($isParagraphNode(child)) {
+      if (isEmptyParagraph(child)) {
+        previousNonEmptyParagraph = null;
+      } else {
+        if (previousNonEmptyParagraph) {
+          previousNonEmptyParagraph.insertAfter($createParagraphNode());
+        }
+        previousNonEmptyParagraph = child;
+      }
+      continue;
+    }
+
+    previousNonEmptyParagraph = null;
+  }
+}
+
+function normalizeLoadedCodeBlockTrailingNewline(node: LexicalNode): void {
+  if ($isElementNode(node)) {
+    for (const child of node.getChildren()) {
+      normalizeLoadedCodeBlockTrailingNewline(child);
+    }
+  }
+
+  if (!$isCodeNode(node)) {
+    return;
+  }
+
+  const text = node.getTextContent();
+  if (!text.endsWith("\n")) {
+    return;
+  }
+
+  // Comrak renders fenced code blocks as <pre><code>content\n</code></pre>.
+  // Lexical preserves that final newline as an extra empty line in the editor,
+  // but our markdown import path does not. Trim only the synthetic final
+  // newline so reload matches paste behavior while preserving intentional
+  // trailing blank lines inside the block.
+  const normalized = text.slice(0, -1);
+  node.clear();
+  if (normalized.length > 0) {
+    node.append($createTextNode(normalized));
+  }
+}
+
+export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
+  for (const node of nodes) {
+    normalizeImportedQuoteSpacing(node);
+  }
+  return nodes;
+}
+
 /**
  * Imports pre-rendered HTML into the Lexical editor.
  * Used for note loading — HTML is provided by the Rust backend (comrak).
@@ -73,7 +150,10 @@ export function $importMarkdownFromHTML(
     "text/html",
   );
   const t1 = performance.now();
-  const nodes = $generateNodesFromDOM(editor, dom);
+  const nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
+  for (const node of nodes) {
+    normalizeLoadedCodeBlockTrailingNewline(node);
+  }
   const t2 = performance.now();
   const target = node ?? $getRoot();
   target.clear();
@@ -110,7 +190,11 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
 
   // Export content blocks via Lexical (loses empties, but gives correct
   // markdown for content blocks).
-  const exported = $convertToMarkdownString(transformers, undefined, false);
+  const exported = $convertToMarkdownStringNormalized(
+    transformers,
+    undefined,
+    false,
+  );
 
   // Split Lexical's export into blocks (it uses \n\n between them),
   // respecting code fences.
@@ -218,5 +302,5 @@ export function $exportMarkdownForClipboard(
 
   flushBlankRun(fence !== null);
 
-  return result.join("\n");
+  return result.join("\n").replace(CLIPBOARD_EMAIL_LINK_RE, "$1");
 }
