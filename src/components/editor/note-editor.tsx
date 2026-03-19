@@ -22,7 +22,7 @@ import {
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "./extensions/hashtag-extension";
 import { TableExtension } from "@lexical/table";
-import { LinkNode } from "@lexical/link";
+import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
 
@@ -40,6 +40,7 @@ import HeadingAnchorPlugin from "./plugins/heading-anchor-plugin";
 import HeadingBackspacePlugin from "./plugins/heading-backspace-plugin";
 import LinkClickPlugin from "./plugins/link-click-plugin";
 import LinkPastePlugin from "./plugins/link-paste-plugin";
+import AutoLinkPlugin from "./plugins/autolink-plugin";
 import MarkdownCopyPlugin from "./plugins/markdown-copy-plugin";
 import MarkdownPastePlugin from "./plugins/markdown-paste-plugin";
 import ImageDropPlugin from "./plugins/image-drop-plugin";
@@ -145,6 +146,7 @@ function EditorInner({
       <HeadingBackspacePlugin />
       <LinkClickPlugin />
       <LinkPastePlugin />
+      <AutoLinkPlugin />
       <MarkdownCopyPlugin />
       <MarkdownPastePlugin />
       <YouTubeEmbedPlugin />
@@ -167,7 +169,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           name: "CometEditor",
           namespace: "CometEditor",
           theme,
-          nodes: [LinkNode, ImageNode, YouTubeNode],
+          nodes: [AutoLinkNode, LinkNode, ImageNode, YouTubeNode],
           onError: (error: Error) => console.error("Lexical error:", error),
           dependencies: [
             RichTextExtension,

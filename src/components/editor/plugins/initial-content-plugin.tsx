@@ -44,7 +44,7 @@ export default function InitialContentPlugin({
           $setSelection(null);
         } else if (html) {
           // Use pre-rendered HTML from Rust backend (comrak)
-          $importMarkdownFromHTML(html);
+          $importMarkdownFromHTML(html, markdown);
           if (isNew) {
             // Place cursor at end of heading for new notes
             const root = $getRoot();

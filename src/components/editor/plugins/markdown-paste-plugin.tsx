@@ -138,8 +138,7 @@ function trimBoundaryEmptyParagraphs(
   if (nodes.length === 0) return nodes;
 
   const lines = sourceMarkdown.split("\n");
-  const hasLeadingBlankLine =
-    lines.length > 0 && lines[0]?.trim().length === 0;
+  const hasLeadingBlankLine = lines.length > 0 && lines[0]?.trim().length === 0;
   const hasTrailingBlankLine =
     lines.length > 0 && lines[lines.length - 1]?.trim().length === 0;
 

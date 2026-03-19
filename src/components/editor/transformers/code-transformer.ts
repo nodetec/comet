@@ -18,7 +18,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     }
     const language = node.getLanguage();
     const languageTag = language && language !== "plain" ? language : "";
-    const textContent = node.getTextContent().replace(/\n+$/, "");
+    const textContent = node.getTextContent();
 
     // Use dynamic fence length: find the longest run of backticks in the
     // content and use one more than that (minimum 3).

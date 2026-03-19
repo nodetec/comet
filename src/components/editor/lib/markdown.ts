@@ -98,10 +98,93 @@ function normalizeImportedQuoteSpacing(node: LexicalNode): void {
   }
 }
 
-function normalizeLoadedCodeBlockTrailingNewline(node: LexicalNode): void {
+type FencedCodeBlock = {
+  signature: string;
+  text: string;
+};
+
+function normalizeCodeBlockLanguage(
+  language: string | null | undefined,
+): string {
+  return !language || language === "plain" ? "" : language;
+}
+
+function getCodeBlockSignature(
+  language: string | null | undefined,
+  text: string,
+): string {
+  return `${normalizeCodeBlockLanguage(language)}\u0000${text.replace(/\n+$/, "")}`;
+}
+
+function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
+  const lines = markdown.split("\n");
+  const blocks: FencedCodeBlock[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trimStart();
+
+    if (CODE_SINGLE_LINE_RE.test(trimmed)) {
+      blocks.push({
+        signature: getCodeBlockSignature("", ""),
+        text: "",
+      });
+      continue;
+    }
+
+    const match = CODE_FENCE_RE.exec(trimmed);
+    if (!match) {
+      continue;
+    }
+
+    const fenceChar = match[1][0];
+    const fenceLen = match[1].length;
+    const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
+    const closeFenceRe = new RegExp(
+      `^[ \\t]*${escapedFenceChar}{${fenceLen},}[ \\t]*$`,
+    );
+
+    let end = i + 1;
+    while (end < lines.length && !closeFenceRe.test(lines[end])) {
+      end++;
+    }
+
+    const contentLines = lines.slice(i + 1, end);
+    let trailingBlankLines = 0;
+    for (let j = contentLines.length - 1; j >= 0; j--) {
+      if (contentLines[j].trim() !== "") {
+        break;
+      }
+      trailingBlankLines++;
+    }
+
+    const baseLines =
+      trailingBlankLines > 0
+        ? contentLines.slice(0, contentLines.length - trailingBlankLines)
+        : contentLines;
+    const text = baseLines.join("\n") + "\n".repeat(trailingBlankLines);
+    const info = trimmed.slice(match[1].length).trim();
+    const language =
+      info.length > 0
+        ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0])
+        : "";
+    blocks.push({
+      signature: getCodeBlockSignature(language, text),
+      text,
+    });
+    i = end;
+  }
+
+  return blocks;
+}
+
+function normalizeImportedCodeBlockText(
+  node: LexicalNode,
+  codeBlocksBySignature: Map<string, string[]>,
+): void {
   if ($isElementNode(node)) {
     for (const child of node.getChildren()) {
-      normalizeLoadedCodeBlockTrailingNewline(child);
+      normalizeImportedCodeBlockText(child, codeBlocksBySignature);
     }
   }
 
@@ -109,20 +192,39 @@ function normalizeLoadedCodeBlockTrailingNewline(node: LexicalNode): void {
     return;
   }
 
-  const text = node.getTextContent();
-  if (!text.endsWith("\n")) {
+  const expectedText = codeBlocksBySignature
+    .get(getCodeBlockSignature(node.getLanguage(), node.getTextContent()))
+    ?.shift();
+  if (expectedText == null) {
     return;
   }
 
-  // Comrak renders fenced code blocks as <pre><code>content\n</code></pre>.
-  // Lexical preserves that final newline as an extra empty line in the editor,
-  // but our markdown import path does not. Trim only the synthetic final
-  // newline so reload matches paste behavior while preserving intentional
-  // trailing blank lines inside the block.
-  const normalized = text.slice(0, -1);
+  if (node.getTextContent() === expectedText) {
+    return;
+  }
+
   node.clear();
-  if (normalized.length > 0) {
-    node.append($createTextNode(normalized));
+  if (expectedText.length > 0) {
+    node.append($createTextNode(expectedText));
+  }
+}
+
+function normalizeImportedCodeBlocksFromMarkdown(
+  nodes: LexicalNode[],
+  markdown: string,
+): void {
+  const codeBlocksBySignature = new Map<string, string[]>();
+  for (const block of collectFencedCodeBlocks(markdown)) {
+    const existing = codeBlocksBySignature.get(block.signature);
+    if (existing) {
+      existing.push(block.text);
+    } else {
+      codeBlocksBySignature.set(block.signature, [block.text]);
+    }
+  }
+
+  for (const node of nodes) {
+    normalizeImportedCodeBlockText(node, codeBlocksBySignature);
   }
 }
 
@@ -130,6 +232,7 @@ export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   for (const node of nodes) {
     normalizeImportedQuoteSpacing(node);
   }
+
   return nodes;
 }
 
@@ -141,6 +244,7 @@ const domParser = new DOMParser();
 
 export function $importMarkdownFromHTML(
   html: string,
+  markdown: string,
   node?: ElementNode,
 ): void {
   const t0 = performance.now();
@@ -151,9 +255,7 @@ export function $importMarkdownFromHTML(
   );
   const t1 = performance.now();
   const nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
-  for (const node of nodes) {
-    normalizeLoadedCodeBlockTrailingNewline(node);
-  }
+  normalizeImportedCodeBlocksFromMarkdown(nodes, markdown);
   const t2 = performance.now();
   const target = node ?? $getRoot();
   target.clear();

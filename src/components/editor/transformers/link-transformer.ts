@@ -9,6 +9,19 @@ function getLinkAttributes(url: string) {
   return { target: "_blank", rel: "noopener noreferrer" };
 }
 
+function isPlainEmailAutolink(
+  displayText: string,
+  url: string,
+  title: string | null,
+) {
+  return (
+    title == null &&
+    displayText.length > 0 &&
+    url.startsWith("mailto:") &&
+    url.slice("mailto:".length) === displayText
+  );
+}
+
 export const LINK: TextMatchTransformer = {
   dependencies: [LinkNode],
   export: (node) => {
@@ -18,6 +31,9 @@ export const LINK: TextMatchTransformer = {
     const displayText = node.getTextContent();
     const url = node.getURL();
     const title = node.getTitle();
+    if (isPlainEmailAutolink(displayText, url, title)) {
+      return displayText;
+    }
     const titlePart = title ? ` "${title}"` : "";
     return `[${displayText || url}](${url}${titlePart})`;
   },
