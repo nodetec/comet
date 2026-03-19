@@ -261,3 +261,37 @@ fn database_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     fs::create_dir_all(&config_directory)?;
     Ok(config_directory.join(DATABASE_FILE))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::extract_tags;
+
+    #[test]
+    fn extract_tags_ignores_code_and_dedupes_sorted() {
+        let markdown = [
+            "#Tag #tag-two #123 #Tag",
+            "",
+            "Inline `#ignored` and ``#also_ignored``",
+            "",
+            "```rust",
+            "#not-a-tag",
+            "```",
+            "",
+            "~~~bash",
+            "#still-not-a-tag",
+            "~~~",
+            "",
+            "#real_tag",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_tags(&markdown),
+            vec![
+                "real_tag".to_string(),
+                "tag".to_string(),
+                "tag-two".to_string(),
+            ]
+        );
+    }
+}

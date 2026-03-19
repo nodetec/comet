@@ -531,3 +531,24 @@ pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, AppError> {
 
     Ok(npub)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::strip_title_line;
+
+    #[test]
+    fn strip_title_line_removes_h1_and_keeps_body() {
+        assert_eq!(strip_title_line("# Title\n\nBody"), "Body");
+    }
+
+    #[test]
+    fn strip_title_line_handles_title_only_notes() {
+        assert_eq!(strip_title_line("# Title"), "");
+    }
+
+    #[test]
+    fn strip_title_line_leaves_non_h1_markdown_unchanged() {
+        let markdown = "## Section\nBody";
+        assert_eq!(strip_title_line(markdown), markdown);
+    }
+}

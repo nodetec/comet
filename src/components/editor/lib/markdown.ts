@@ -240,8 +240,6 @@ export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
  * Imports pre-rendered HTML into the Lexical editor.
  * Used for note loading — HTML is provided by the Rust backend (comrak).
  */
-const domParser = new DOMParser();
-
 export function $importMarkdownFromHTML(
   html: string,
   markdown: string,
@@ -249,7 +247,7 @@ export function $importMarkdownFromHTML(
 ): void {
   const t0 = performance.now();
   const editor = $getEditor();
-  const dom = domParser.parseFromString(
+  const dom = new DOMParser().parseFromString(
     `<!DOCTYPE html><html><body>${html}</body></html>`,
     "text/html",
   );

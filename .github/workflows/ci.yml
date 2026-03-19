@@ -7,8 +7,8 @@ on:
     branches: [master]
 
 jobs:
-  check:
-    runs-on: macos-latest
+  format:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -24,11 +24,39 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
       - name: TypeScript & Vite build
         run: npm run build
 
   build:
-    needs: check
+    needs: [format, test]
     strategy:
       fail-fast: false
       matrix:

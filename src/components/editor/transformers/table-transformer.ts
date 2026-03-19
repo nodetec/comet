@@ -29,7 +29,7 @@ export function setTableTransformers(transformers: ElementTransformer[]) {
 const $createTableCell = (textContent: string): TableCellNode => {
   textContent = textContent.replace(/\\n/g, "\n");
   const cell = $createTableCellNode(TableCellHeaderStates.NO_STATUS);
-  $convertFromMarkdownString(textContent, ALL_TRANSFORMERS, cell, false);
+  $convertFromMarkdownString(textContent, ALL_TRANSFORMERS, cell, true);
   return cell;
 };
 
@@ -66,6 +66,7 @@ export const TABLE: ElementTransformer = {
         if ($isTableCellNode(cell)) {
           rowOutput.push(
             $convertToMarkdownString(ALL_TRANSFORMERS, cell, false)
+              .replace(/\n+/g, "\n")
               .replace(/\n/g, "\\n")
               .trim(),
           );
@@ -161,10 +162,24 @@ export const TABLE: ElementTransformer = {
     }
 
     const previousSibling = parentNode.getPreviousSibling();
-    if (
-      $isTableNode(previousSibling) &&
-      getTableColumnsSize(previousSibling) === maxCells
-    ) {
+    const previousColumns = $isTableNode(previousSibling)
+      ? getTableColumnsSize(previousSibling)
+      : 0;
+    const targetColumns =
+      previousColumns >= maxCells ? previousColumns : maxCells;
+
+    if (targetColumns > maxCells) {
+      for (const row of table.getChildren()) {
+        if (!$isTableRowNode(row)) {
+          continue;
+        }
+        for (let i = row.getChildrenSize(); i < targetColumns; i++) {
+          row.append($createTableCell(""));
+        }
+      }
+    }
+
+    if ($isTableNode(previousSibling) && previousColumns === targetColumns) {
       previousSibling.append(...table.getChildren());
       parentNode.remove();
     } else {

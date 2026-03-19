@@ -2,6 +2,11 @@ import type { TextMatchTransformer } from "@lexical/markdown";
 import { $createTextNode } from "lexical";
 import { $createLinkNode, $isLinkNode, LinkNode } from "@lexical/link";
 
+const MARKDOWN_LINK_IMPORT_RE =
+  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)/;
+const MARKDOWN_LINK_END_RE =
+  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)$/;
+
 function getLinkAttributes(url: string) {
   if (url.startsWith("#")) {
     return undefined;
@@ -38,11 +43,11 @@ export const LINK: TextMatchTransformer = {
     return `[${displayText || url}](${url}${titlePart})`;
   },
   // Match [text](url) format, but NOT ![text](url) which is an image
-  importRegExp: /(?<!!)\[([^\]]+)\]\(([^)]+)\)/,
-  regExp: /(?<!!)\[([^\]]+)\]\(([^)]+)\)$/,
+  importRegExp: MARKDOWN_LINK_IMPORT_RE,
+  regExp: MARKDOWN_LINK_END_RE,
   trigger: ")",
   replace: (textNode, match) => {
-    const [, displayText, url] = match;
+    const [, displayText, url, rawTitle] = match;
     const parent = textNode.getParent();
     if (parent && $isLinkNode(parent)) {
       return;
@@ -51,9 +56,14 @@ export const LINK: TextMatchTransformer = {
     if (normalizedUrl.length === 0) {
       return;
     }
+    const title = rawTitle?.replace(/\\"/g, '"');
+    const attributes = {
+      ...(getLinkAttributes(normalizedUrl) ?? {}),
+      ...(title ? { title } : {}),
+    };
     const linkNode = $createLinkNode(
       normalizedUrl,
-      getLinkAttributes(normalizedUrl),
+      Object.keys(attributes).length > 0 ? attributes : undefined,
     );
     linkNode.append($createTextNode(displayText));
     textNode.replace(linkNode);

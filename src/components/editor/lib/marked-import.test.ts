@@ -56,4 +56,21 @@ plain text
     expect(html).not.toContain("<code>");
     expect(html).not.toContain("</code>");
   });
+
+  it("uses different blank-line handling for stored markdown and paste", () => {
+    const markdown = ["alpha", "", "", "beta"].join("\n");
+
+    const storedHtml = renderMarkdownToHTML(markdown);
+    const pastedHtml = renderMarkdownToHTML(markdown, { paste: true });
+
+    expect(storedHtml.match(/<p><br><\/p>/g)).toHaveLength(1);
+    expect(pastedHtml.match(/<p><br><\/p>/g)).toHaveLength(2);
+  });
+
+  it("adds checklist classes for task lists", () => {
+    const html = renderMarkdownToHTML("- [x] done\n- [ ] todo");
+
+    expect(html).toContain('class="contains-task-list"');
+    expect(html.match(/class="task-list-item"/g)).toHaveLength(2);
+  });
 });
