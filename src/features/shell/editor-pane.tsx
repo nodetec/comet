@@ -36,6 +36,7 @@ type EditorPaneProps = {
   deletedAt: number | null;
   editorKey: string | null;
   focusMode: "none" | "immediate" | "pointerup";
+  html: string | null;
   isDeletePublishedNotePending: boolean;
   isNewNote: boolean;
   markdown: string;
@@ -67,6 +68,7 @@ export function EditorPane({
   deletedAt,
   editorKey,
   focusMode,
+  html,
   isDeletePublishedNotePending,
   isNewNote,
   markdown,
@@ -317,6 +319,7 @@ export function EditorPane({
           <div className="relative flex min-h-full w-full flex-col">
             <NoteEditor
               focusMode={focusMode}
+              html={html}
               isNew={isNewNote}
               key={editorKey ?? noteId}
               markdown={markdown}

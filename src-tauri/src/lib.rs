@@ -2,6 +2,7 @@ mod attachments;
 mod blossom;
 mod db;
 mod error;
+mod markdown;
 mod nip44_ext;
 mod nip59_ext;
 mod nostr;

@@ -96,6 +96,11 @@ export default function MarkdownCopyPlugin() {
       event.preventDefault();
 
       const markdown = $selectionToMarkdown(editor);
+      // Debug
+      const fIdx = markdown.indexOf("```");
+      if (fIdx >= 0) {
+        console.log("[copy:debug] clipboard around fence:", JSON.stringify(markdown.slice(Math.max(0, fIdx - 60), fIdx + 20)));
+      }
       clipboardData.setData(
         "text/plain",
         markdown || selection.getTextContent(),

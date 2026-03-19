@@ -53,6 +53,7 @@ import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
 
 type NoteEditorProps = {
   focusMode: "none" | "immediate" | "pointerup";
+  html: string | null;
   isNew: boolean;
   markdown: string;
   readOnly: boolean;
@@ -68,6 +69,7 @@ export type NoteEditorHandle = {
 
 function EditorInner({
   focusMode,
+  html,
   isNew,
   markdown,
   readOnly,
@@ -129,6 +131,7 @@ function EditorInner({
       />
       <OnChangeMarkdownPlugin initComplete={initComplete} onChange={onChange} />
       <InitialContentPlugin
+        html={html}
         isNew={isNew}
         markdown={markdown}
         onInitComplete={handleInitComplete}

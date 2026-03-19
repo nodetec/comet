@@ -33,6 +33,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { resolveImageSrc } from "@/lib/attachments";
 
 export interface ImagePayload {
   src: string;
@@ -254,8 +255,9 @@ export class ImageNode extends DecoratorNode<ReactNode> {
       img: () => ({
         conversion: (domNode: HTMLElement) => {
           const img = domNode as HTMLImageElement;
-          const src = img.getAttribute("src");
-          if (!src) return null;
+          const rawSrc = img.getAttribute("src");
+          if (!rawSrc) return null;
+          const src = resolveImageSrc(rawSrc);
           const altText = img.getAttribute("alt") || "";
           return {
             node: $createImageNode({ src, altText }),

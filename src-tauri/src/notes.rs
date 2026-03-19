@@ -55,6 +55,7 @@ pub struct LoadedNote {
     pub notebook: Option<NotebookRef>,
     pub modified_at: i64,
     pub markdown: String,
+    pub html: String,
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
@@ -1128,11 +1129,14 @@ fn set_last_open_note_id(conn: &Connection, note_id: Option<&str>) -> Result<(),
 fn row_to_loaded_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
     let notebook_id: Option<String> = row.get(4)?;
     let notebook_name: Option<String> = row.get(5)?;
+    let markdown: String = row.get(2)?;
+    let html = crate::markdown::markdown_to_lexical_html(&markdown);
 
     Ok(LoadedNote {
         id: row.get(0)?,
         title: row.get(1)?,
-        markdown: row.get(2)?,
+        markdown,
+        html,
         modified_at: row.get(3)?,
         notebook: notebook_id
             .zip(notebook_name)

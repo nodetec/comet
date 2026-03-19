@@ -3,7 +3,6 @@ import type { Transformer } from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
 import type { ElementNode, LexicalNode } from "lexical";
 import { $getEditor, $getRoot, $isParagraphNode, $isTextNode } from "lexical";
-import { markdownToDOM } from "./marked-import";
 
 // Patterns matching block-level markdown structures that should NOT be merged
 // with adjacent lines (mirrors Lexical's internal normalizeMarkdown logic).
@@ -58,16 +57,35 @@ function isEmptyParagraph(node: LexicalNode): boolean {
 }
 
 /**
- * Imports markdown into the Lexical editor using marked.js for parsing.
- * Converts markdown → HTML (via marked) → Lexical nodes (via $generateNodesFromDOM).
+ * Imports pre-rendered HTML into the Lexical editor.
+ * Used for note loading — HTML is provided by the Rust backend (comrak).
  */
-export function $importMarkdown(markdown: string, node?: ElementNode): void {
+const domParser = new DOMParser();
+
+export function $importMarkdownFromHTML(
+  html: string,
+  node?: ElementNode,
+): void {
+  const t0 = performance.now();
   const editor = $getEditor();
-  const dom = markdownToDOM(markdown);
+  const dom = domParser.parseFromString(
+    `<!DOCTYPE html><html><body>${html}</body></html>`,
+    "text/html",
+  );
+  const t1 = performance.now();
   const nodes = $generateNodesFromDOM(editor, dom);
+  const t2 = performance.now();
   const target = node ?? $getRoot();
   target.clear();
   target.append(...nodes);
+  const t3 = performance.now();
+  console.log(
+    `[editor:importFromHTML] ${html.length} chars HTML → ` +
+      `DOMParser: ${(t1 - t0).toFixed(1)}ms, ` +
+      `$generateNodesFromDOM: ${(t2 - t1).toFixed(1)}ms, ` +
+      `append: ${(t3 - t2).toFixed(1)}ms, ` +
+      `total: ${(t3 - t0).toFixed(1)}ms`,
+  );
 }
 
 /**
@@ -152,18 +170,53 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
 }
 
 /**
- * Exports markdown for the clipboard. Takes the storage export and
- * reduces all newline runs by 1, converting the internal storage
- * convention back to standard markdown:
- *   \n\n (separator) → \n (adjacent blocks)
- *   \n\n\n (separator + 1 empty) → \n\n (one blank line)
- *   \n\n\n\n (separator + 2 empties) → \n\n\n (two blank lines)
+ * Exports markdown for the clipboard. The storage format uses extra newlines
+ * for empty paragraphs (Bear/Obsidian behavior):
+ *   \n\n = standard block separator
+ *   \n\n\n = separator + 1 empty paragraph
+ *   \n\n\n\n = separator + 2 empty paragraphs
+ *
+ * Standard markdown only needs \n\n between blocks. We reduce runs of 3+
+ * newlines by 1 (collapsing the extra empty paragraphs), but preserve \n\n
+ * separators and all newlines inside code fences.
  */
 export function $exportMarkdownForClipboard(
   transformers: Array<Transformer>,
 ): string {
   const stored = $exportMarkdown(transformers);
-  return stored.replace(/\n{2,}/g, (match) => {
-    return "\n".repeat(match.length - 1);
-  });
+
+  const lines = stored.split("\n");
+  const result: string[] = [];
+  let fence: FenceState = null;
+  let blankRun = 0;
+
+  const flushBlankRun = (insideFence: boolean) => {
+    const output = insideFence
+      ? blankRun
+      : blankRun <= 1
+        ? blankRun
+        : blankRun - 1;
+    for (let j = 0; j < output; j++) {
+      result.push("");
+    }
+    blankRun = 0;
+  };
+
+  for (const line of lines) {
+    if (line.trim() === "") {
+      blankRun++;
+      continue;
+    }
+
+    // The blank run belongs to the region before this line. Use the current
+    // fence state, not the next one, so blanks before an opening fence are
+    // normalized as regular block separators.
+    flushBlankRun(fence !== null);
+    result.push(line);
+    fence = updateFenceState(line, fence);
+  }
+
+  flushBlankRun(fence !== null);
+
+  return result.join("\n");
 }

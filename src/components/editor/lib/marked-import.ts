@@ -122,11 +122,13 @@ const rendererOverrides: MarkedExtension = {
       // For task items, marked already includes a checkbox token in `tokens`.
       // We just need to add the "task-list-item" class for Lexical's
       // $convertListItemElement to detect the checked state.
+      // No trailing \n — whitespace between </li> and <li> creates phantom
+      // empty list items in Lexical's $normalizeChildren.
       const inner = this.parser.parse(tokens);
       if (task) {
-        return `<li class="task-list-item">${inner}</li>\n`;
+        return `<li class="task-list-item">${inner}</li>`;
       }
-      return `<li>${inner}</li>\n`;
+      return `<li>${inner}</li>`;
     },
   },
 };
@@ -245,7 +247,8 @@ const pastePreprocess: MarkedExtension = {
             blankCount++;
             i++;
           }
-          // Every blank becomes an empty paragraph
+          // Every blank becomes an empty paragraph (Bear/Obsidian convention:
+          // each blank line is a visible, clickable spacer in the editor)
           for (let j = 0; j < blankCount; j++) {
             result.push("");
             result.push("<p><br></p>");
@@ -292,14 +295,21 @@ markedInstanceForPaste.use(
 
 const domParser = new DOMParser();
 
+// Strip whitespace between block-level tags to prevent DOMParser from creating
+// text nodes that Lexical interprets as empty paragraphs or phantom list items.
+const BLOCK_WS_RE =
+  />\s+<(\/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)/g;
+
 export function markdownToDOM(
   markdown: string,
   options?: { paste?: boolean },
 ): Document {
   const instance = options?.paste ? markedInstanceForPaste : markedInstance;
-  const html = instance.parse(markdown) as string;
+  const html = instance
+    .parse(markdown) as string;
+  const cleaned = html.replace(BLOCK_WS_RE, "><$1$2");
   return domParser.parseFromString(
-    `<!DOCTYPE html><html><body>${html}</body></html>`,
+    `<!DOCTYPE html><html><body>${cleaned}</body></html>`,
     "text/html",
   );
 }

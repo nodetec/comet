@@ -957,6 +957,7 @@ export function useShellController() {
         currentNote && currentNote.id === selectedNoteId
           ? editorFocusMode
           : ("none" as const),
+      html: currentNote?.html ?? null,
       isNewNote: currentNote?.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,

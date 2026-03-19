@@ -1,6 +1,9 @@
 import {
+  CHECK_LIST,
   ELEMENT_TRANSFORMERS,
+  ORDERED_LIST,
   TEXT_FORMAT_TRANSFORMERS,
+  UNORDERED_LIST,
   type ElementTransformer,
 } from "@lexical/markdown";
 import { $isHorizontalRuleNode, HorizontalRuleNode } from "@lexical/extension";
@@ -10,6 +13,11 @@ import { $isElementNode } from "lexical";
 import { LINK } from "./link-transformer";
 import { CODE_BLOCK } from "./code-transformer";
 import { IMAGE } from "./image-transformer";
+import {
+  CHECK_LIST as CUSTOM_CHECK_LIST,
+  ORDERED_LIST as CUSTOM_ORDERED_LIST,
+  UNORDERED_LIST as CUSTOM_UNORDERED_LIST,
+} from "./list-transformer";
 import { YOUTUBE } from "./youtube-transformer";
 import { TABLE, setTableTransformers } from "./table-transformer";
 
@@ -60,7 +68,11 @@ const QUOTE: ElementTransformer = {
 // Filter out Lexical's built-in QUOTE from ELEMENT_TRANSFORMERS since we
 // override it with our own.
 const BASE_ELEMENT_TRANSFORMERS = ELEMENT_TRANSFORMERS.filter(
-  (t) => !t.dependencies.includes(QuoteNode),
+  (t) =>
+    !t.dependencies.includes(QuoteNode) &&
+    t !== UNORDERED_LIST &&
+    t !== CHECK_LIST &&
+    t !== ORDERED_LIST,
 );
 
 /**
@@ -79,6 +91,9 @@ export const TRANSFORMERS = [
   LINK,
   HORIZONTAL_RULE,
   QUOTE,
+  CUSTOM_UNORDERED_LIST,
+  CUSTOM_CHECK_LIST,
+  CUSTOM_ORDERED_LIST,
   ...BASE_ELEMENT_TRANSFORMERS,
   CODE_BLOCK,
   ...TEXT_FORMAT_TRANSFORMERS,

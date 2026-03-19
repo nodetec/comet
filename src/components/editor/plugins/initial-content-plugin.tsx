@@ -3,15 +3,17 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $getRoot, $setSelection } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $createListItemNode, $createListNode } from "@lexical/list";
-import { $importMarkdown } from "../lib/markdown";
+import { $importMarkdownFromHTML } from "../lib/markdown";
 
 interface InitialContentPluginProps {
+  html: string | null;
   isNew: boolean;
   markdown: string;
   onInitComplete(): void;
 }
 
 export default function InitialContentPlugin({
+  html,
   isNew,
   markdown,
   onInitComplete,
@@ -28,33 +30,31 @@ export default function InitialContentPlugin({
 
     editor.update(
       () => {
-        if (isNew) {
-          if (markdown === "- [ ] ") {
-            // Todo mode: create an empty checklist item directly
-            // (marked can't parse "- [ ] " without text after it)
-            const root = $getRoot();
-            root.clear();
-            const checkList = $createListNode("check");
-            const checkItem = $createListItemNode(false);
-            checkList.append(checkItem);
-            root.append(checkList);
-            checkItem.selectEnd();
-          } else {
-            // Normal new note: import markdown and place cursor at heading end
-            $importMarkdown(markdown);
+        if (isNew && markdown === "- [ ] ") {
+          // Todo mode: create an empty checklist item directly
+          const root = $getRoot();
+          root.clear();
+          const checkList = $createListNode("check");
+          const checkItem = $createListItemNode(false);
+          checkList.append(checkItem);
+          root.append(checkList);
+          checkItem.selectEnd();
+        } else if (!markdown.trim()) {
+          // Empty existing note: leave the default empty paragraph.
+          $setSelection(null);
+        } else if (html) {
+          // Use pre-rendered HTML from Rust backend (comrak)
+          $importMarkdownFromHTML(html);
+          if (isNew) {
+            // Place cursor at end of heading for new notes
             const root = $getRoot();
             const firstChild = root.getFirstChild();
             if ($isHeadingNode(firstChild)) {
               firstChild.selectEnd();
             }
+          } else {
+            $setSelection(null);
           }
-        } else if (!markdown.trim()) {
-          // Empty existing note: leave the default empty paragraph.
-          // (Lexical initializes with one ParagraphNode by default.)
-          $setSelection(null);
-        } else {
-          $importMarkdown(markdown);
-          $setSelection(null);
         }
 
         const root = $getRoot();
@@ -67,7 +67,7 @@ export default function InitialContentPlugin({
     );
 
     onInitComplete();
-  }, [editor, isNew, markdown, onInitComplete]);
+  }, [editor, html, isNew, markdown, onInitComplete]);
 
   return null;
 }

@@ -8,7 +8,12 @@ import {
   $getRoot,
   $isElementNode,
   $isDecoratorNode,
+  $isParagraphNode,
+  $isTextNode,
+  $isLineBreakNode,
+  type LexicalNode,
 } from "lexical";
+import { $isHeadingNode } from "@lexical/rich-text";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { markdownToDOM } from "../lib/marked-import";
 
@@ -89,6 +94,72 @@ function isLikelyMarkdown(text: string): boolean {
   return false;
 }
 
+function isEmptyParagraphNode(node: LexicalNode): boolean {
+  if (!$isParagraphNode(node)) return false;
+
+  const children = node.getChildren();
+  if (children.length === 0) return true;
+
+  return children.every((child) => {
+    if ($isLineBreakNode(child)) return true;
+    if ($isTextNode(child)) {
+      return child.getTextContent().trim() === "";
+    }
+    return false;
+  });
+}
+
+function isReplaceableEmptyBlockNode(node: LexicalNode): boolean {
+  if (!$isParagraphNode(node) && !$isHeadingNode(node)) {
+    return false;
+  }
+
+  if (node.getTextContent().trim() !== "") {
+    return false;
+  }
+
+  const children = node.getChildren();
+  if (children.length === 0) return true;
+
+  return children.every((child) => {
+    if ($isLineBreakNode(child)) return true;
+    if ($isTextNode(child)) {
+      return child.getTextContent().trim() === "";
+    }
+    return false;
+  });
+}
+
+function trimBoundaryEmptyParagraphs(
+  nodes: LexicalNode[],
+  sourceMarkdown: string,
+): LexicalNode[] {
+  if (nodes.length === 0) return nodes;
+
+  const lines = sourceMarkdown.split("\n");
+  const hasLeadingBlankLine =
+    lines.length > 0 && lines[0]?.trim().length === 0;
+  const hasTrailingBlankLine =
+    lines.length > 0 && lines[lines.length - 1]?.trim().length === 0;
+
+  let start = 0;
+  let end = nodes.length;
+
+  if (!hasLeadingBlankLine) {
+    while (start < end && isEmptyParagraphNode(nodes[start])) {
+      start++;
+    }
+  }
+
+  if (!hasTrailingBlankLine) {
+    while (end > start && isEmptyParagraphNode(nodes[end - 1])) {
+      end--;
+    }
+  }
+
+  return start === 0 && end === nodes.length ? nodes : nodes.slice(start, end);
+}
+
 export default function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -121,9 +192,10 @@ export default function MarkdownPastePlugin() {
           const allNodes = $generateNodesFromDOM(editor, dom);
           // Filter to block-level nodes only — $generateNodesFromDOM may
           // produce stray TextNodes from whitespace between HTML tags
-          const nodes = allNodes.filter(
-            (n) => $isElementNode(n) || $isDecoratorNode(n),
+          const filteredNodes = allNodes.filter(
+            (node) => $isElementNode(node) || $isDecoratorNode(node),
           );
+          const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
           if (nodes.length === 0) return;
 
           const selection = $getSelection();
@@ -146,9 +218,7 @@ export default function MarkdownPastePlugin() {
           const targetBlock = anchorNode.getTopLevelElementOrThrow();
 
           // If cursor is at the start of an empty paragraph, replace it
-          const isEmptyBlock =
-            $isElementNode(targetBlock) &&
-            targetBlock.getTextContentSize() === 0;
+          const isEmptyBlock = isReplaceableEmptyBlockNode(targetBlock);
 
           if (isEmptyBlock) {
             targetBlock.replace(nodes[0]);
