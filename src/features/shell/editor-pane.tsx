@@ -257,7 +257,7 @@ export function EditorPane({
                 <Lock className="size-[1.2rem]" />
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                Short notes are immutable on Nostr and can't be updated.
+                Short notes are immutable on Nostr and can&apos;t be updated.
               </TooltipContent>
             </Tooltip>
             {menuButton}

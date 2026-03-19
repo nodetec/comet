@@ -139,26 +139,17 @@ export function useShellController() {
     ],
   );
   const notesQueryKey = useMemo(
-    () => [
-      "notes",
-      noteFilter,
-      noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
-      normalizedQuery,
-      normalizedActiveTags.join("\u0000"),
-      noteSortField,
-      noteSortDirection,
-    ],
-    [
-      activeNotebookId,
-      normalizedActiveTags,
-      normalizedQuery,
-      noteFilter,
-      noteSortField,
-      noteSortDirection,
-    ],
+    () => ["notes", notesQueryInput] as const,
+    [notesQueryInput],
   );
   const notesQuery = useInfiniteQuery({
-    enabled: bootstrapQuery.isSuccess,
+    queryKey: notesQueryKey,
+    queryFn: ({ pageParam }) =>
+      queryNotes({
+        ...notesQueryInput,
+        offset: pageParam,
+      }),
+    initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     initialData:
       isDefaultNotesView && bootstrapQuery.data
@@ -167,14 +158,8 @@ export function useShellController() {
             pages: [bootstrapQuery.data.initialNotes],
           }
         : undefined,
-    initialPageParam: 0,
     placeholderData: (previousData) => previousData,
-    queryFn: ({ pageParam }) =>
-      queryNotes({
-        ...notesQueryInput,
-        offset: pageParam,
-      }),
-    queryKey: notesQueryKey,
+    enabled: bootstrapQuery.isSuccess,
   });
   const currentNotes = useMemo(
     () => flattenNotePages(notesQuery.data),
@@ -420,6 +405,8 @@ export function useShellController() {
       "restore-from-trash-error",
     ),
   });
+  const { isPending: saveNotePending, mutate: mutateSaveNote } =
+    saveNoteMutation;
 
   const deleteNotePermanentlyMutation = useMutation({
     mutationFn: deleteNotePermanently,
@@ -547,11 +534,13 @@ export function useShellController() {
         markdown: string;
       };
       if (noteId && markdown) {
-        saveNote({ id: noteId, markdown }).then(() => {
-          localStorage.removeItem(PENDING_DRAFT_KEY);
-          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-          queryClient.invalidateQueries({ queryKey: ["notes"] });
-        });
+        void saveNote({ id: noteId, markdown })
+          .then(() => {
+            localStorage.removeItem(PENDING_DRAFT_KEY);
+            void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+            void queryClient.invalidateQueries({ queryKey: ["notes"] });
+          })
+          .catch(() => {});
       }
     } catch {
       localStorage.removeItem(PENDING_DRAFT_KEY);
@@ -564,10 +553,10 @@ export function useShellController() {
       "sync-remote-change",
       (event) => {
         const { noteId, action } = event.payload;
-        queryClient.invalidateQueries({ queryKey: ["notes"] });
-        queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-        queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
-        queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
+        void queryClient.invalidateQueries({ queryKey: ["notes"] });
+        void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+        void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+        void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         // If the updated note is currently open, refetch then remount editor
         // — but only if the user isn't actively editing (unsaved draft)
         const { draftNoteId: currentDraftId } = useShellStore.getState();
@@ -595,7 +584,7 @@ export function useShellController() {
           action === "upsert" &&
           !hasPendingSave
         ) {
-          queryClient
+          void queryClient
             .fetchQuery({
               queryKey: ["note", noteId],
               queryFn: () => loadNote(noteId),
@@ -610,12 +599,13 @@ export function useShellController() {
                   setSyncEditorRevision((r) => r + 1);
                 }
               }
-            });
+            })
+            .catch(() => {});
         }
       },
     );
     return () => {
-      unlisten.then((fn) => fn());
+      void unlisten.then((fn) => fn());
     };
   }, [queryClient]);
 
@@ -624,7 +614,7 @@ export function useShellController() {
       return;
     }
 
-    if (saveNoteMutation.isPending || draftMarkdown === currentNote.markdown) {
+    if (saveNotePending || draftMarkdown === currentNote.markdown) {
       return;
     }
 
@@ -639,7 +629,7 @@ export function useShellController() {
     }
 
     pendingSaveTimeoutRef.current = window.setTimeout(() => {
-      saveNoteMutation.mutate({
+      mutateSaveNote({
         id: currentNote.id,
         markdown: draftMarkdown,
       });
@@ -651,7 +641,13 @@ export function useShellController() {
         pendingSaveTimeoutRef.current = null;
       }
     };
-  }, [currentNote, draftMarkdown, draftNoteId, saveNoteMutation]);
+  }, [
+    currentNote,
+    draftMarkdown,
+    draftNoteId,
+    mutateSaveNote,
+    saveNotePending,
+  ]);
 
   const handleCreateNote = (source: "keyboard" | "pointer") => {
     if (isCreatingNote) {

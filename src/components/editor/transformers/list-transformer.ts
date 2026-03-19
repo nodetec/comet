@@ -33,7 +33,9 @@ function exportListNode(
     }
 
     const indent = " ".repeat(depth * 2);
-    output.push(indent + listItemPrefix(listNode, child, ordinal) + exportChildren(child));
+    output.push(
+      indent + listItemPrefix(listNode, child, ordinal) + exportChildren(child),
+    );
     ordinal++;
   }
 

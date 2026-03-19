@@ -15,12 +15,11 @@ npm install                          # Install dependencies
 npm run tauri:dev                    # Start app in dev mode (separate DB from production)
 npm run tauri build -- --bundles app # Production app bundle
 npm run build                       # Frontend only: tsc + Vite build
+npm run lint                        # ESLint (React + TypeScript + TanStack Query)
 npm run format                       # Prettier (with tailwindcss plugin)
 npm run format:check                 # Check formatting without modifying
 npm run seed:db                      # Seed demo data (resets local DB by default)
 ```
-
-There are no test or lint commands configured.
 
 ## Architecture
 

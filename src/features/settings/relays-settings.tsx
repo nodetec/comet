@@ -163,7 +163,7 @@ function BlossomSection({
   const setMutation = useMutation({
     mutationFn: (url: string) => invoke("set_blossom_url", { url }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
+      void queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
       editor.close();
     },
   });
@@ -171,7 +171,7 @@ function BlossomSection({
   const removeMutation = useMutation({
     mutationFn: () => invoke("remove_blossom_url"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
+      void queryClient.invalidateQueries({ queryKey: ["blossom-url"] });
     },
   });
 
@@ -238,7 +238,7 @@ function ResyncSection({
   const resyncMutation = useMutation({
     mutationFn: () => invoke("resync"),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      void queryClient.invalidateQueries();
     },
   });
 

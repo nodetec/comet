@@ -10,6 +10,12 @@ dev:
 build:
   npm run build
 
+lint:
+  npm run lint
+
+lint-fix:
+  npm run lint:fix
+
 bundle:
   npm run tauri build -- --bundles app
 
@@ -32,4 +38,10 @@ format-check:
 seed:
   npm run seed:db
 
-check: format-check test build
+outdated-npm:
+  -npm outdated
+
+outdated-crates:
+  cargo upgrade --dry-run --manifest-path src-tauri/Cargo.toml --incompatible allow
+
+check: format-check lint test build

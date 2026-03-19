@@ -24,6 +24,23 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Run ESLint
+        run: npm run lint
+
   test:
     runs-on: macos-latest
     steps:
@@ -56,7 +73,7 @@ jobs:
         run: npm run build
 
   build:
-    needs: [format, test]
+    needs: [format, lint, test]
     strategy:
       fail-fast: false
       matrix:

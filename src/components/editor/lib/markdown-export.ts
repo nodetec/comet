@@ -278,7 +278,10 @@ function hasFormat(
   return $isTextNode(node) && node.hasFormat(format);
 }
 
-function checkHasFormat(node: TextNode | null, format: TextFormatType): boolean {
+function checkHasFormat(
+  node: TextNode | null,
+  format: TextFormatType,
+): boolean {
   if (!node || !hasFormat(node, format)) {
     return false;
   }

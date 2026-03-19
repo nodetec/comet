@@ -21,7 +21,7 @@ export function ProfileSettings() {
   const importMutation = useMutation({
     mutationFn: (nsec: string) => invoke<string>("import_nsec", { nsec }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
+      void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
       editor.close();
     },
   });

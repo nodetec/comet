@@ -31,9 +31,9 @@ const HORIZONTAL_RULE: ElementTransformer = {
   type: "element",
 };
 
-function isEmptyParagraphChild(child: Parameters<
-  NonNullable<ElementTransformer["export"]>
->[0]): boolean {
+function isEmptyParagraphChild(
+  child: Parameters<NonNullable<ElementTransformer["export"]>>[0],
+): boolean {
   if (!$isParagraphNode(child)) {
     return false;
   }
@@ -90,15 +90,15 @@ const QUOTE: ElementTransformer = {
 
       pendingBlankLines = 0;
       lines.push(
-        ...childMd
-          .split("\n")
-          .map((line) => (line === "" ? ">" : `> ${line}`)),
+        ...childMd.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)),
       );
       hasContent = true;
     }
 
     if (pendingBlankLines > 0) {
-      pushBlankLines(hasContent ? Math.max(1, pendingBlankLines) : pendingBlankLines);
+      pushBlankLines(
+        hasContent ? Math.max(1, pendingBlankLines) : pendingBlankLines,
+      );
     }
 
     return lines.join("\n");

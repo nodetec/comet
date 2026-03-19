@@ -4,11 +4,7 @@ import { HorizontalRuleNode } from "@lexical/extension";
 import { LinkNode, $createLinkNode } from "@lexical/link";
 import { ListItemNode, ListNode } from "@lexical/list";
 import { HeadingNode, QuoteNode, $createQuoteNode } from "@lexical/rich-text";
-import {
-  TableCellNode,
-  TableNode,
-  TableRowNode,
-} from "@lexical/table";
+import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import {
   $createParagraphNode,
   $createTextNode,
@@ -218,9 +214,9 @@ describe("markdown editor pipeline", () => {
   });
 
   it("round-trips markdown links with titles", () => {
-    expect(
-      roundtripMarkdown('[Open docs](https://example.com "Docs")'),
-    ).toBe('[Open docs](https://example.com "Docs")');
+    expect(roundtripMarkdown('[Open docs](https://example.com "Docs")')).toBe(
+      '[Open docs](https://example.com "Docs")',
+    );
   });
 
   it("exports code blocks with longer fences when content contains backticks", () => {
@@ -249,9 +245,7 @@ describe("markdown editor pipeline", () => {
 
   it("pads uneven table rows on export", () => {
     expect(
-      roundtripMarkdown(
-        ["| A | B |", "| --- | --- |", "| 1 |"].join("\n"),
-      ),
+      roundtripMarkdown(["| A | B |", "| --- | --- |", "| 1 |"].join("\n")),
     ).toBe(["| A | B |", "| --- | --- |", "| 1 |  |"].join("\n"));
   });
 
@@ -293,8 +287,6 @@ describe("markdown editor pipeline", () => {
       root.append(paragraph);
     });
 
-    expect(markdown).toBe(
-      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    );
+    expect(markdown).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   });
 });
