@@ -48,3 +48,4 @@ hmac = "0.12.1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 thiserror = "2"
 url = "2"
+tauri-plugin-log = "2.8.0"
