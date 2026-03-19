@@ -247,7 +247,7 @@ body {
   background-repeat: no-repeat;
 }
 
-.comet-check-item:focus::before {
+.comet-check-item:focus-visible::before {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
   border-radius: 0.25em;
 }
