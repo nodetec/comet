@@ -313,13 +313,3 @@ body {
 .animate-slide-in-left {
   animation: slide-in-left 0.25s ease-out;
 }
-
-::highlight(comet-search) {
-  background-color: rgb(253 224 71);
-  color: var(--background);
-}
-
-[data-lexical-editor]:focus ::highlight(comet-search) {
-  background-color: transparent;
-  color: unset;
-}
