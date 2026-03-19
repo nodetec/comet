@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Comet is a desktop notes app built with **Tauri 2** (Rust backend) + **React 19** (TypeScript frontend). Single-user, local-first, markdown-native. Notes are stored as markdown in SQLite. The editor is built on Lexical.
 
-Before making product or UX decisions, read `docs/vision.md`, `docs/principles.md`, and `docs/roadmap.md`. The `AGENTS.md` file has hard repo defaults for builders.
+The `AGENTS.md` file has hard repo defaults for builders.
 
 ## Commands
 

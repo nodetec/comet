@@ -6,16 +6,6 @@ Build `comet` as a desktop notes app for the thoughtful professional.
 
 The product promise is simple: `Comet is the best place to leave a trail.` Build toward a calm, native-feeling, text-first notes app that helps users capture thoughts, resume context, connect notes, and publish when they choose.
 
-## Read First
-
-Before making product or UX decisions, read these files:
-
-- `docs/vision.md`
-- `docs/principles.md`
-- `docs/roadmap.md`
-
-These are the source of truth for product direction. `AGENTS.md` exists to turn that direction into hard repo defaults for builders.
-
 ## Product Defaults
 
 - Treat v1 as desktop-first and single-user.
