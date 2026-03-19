@@ -39,12 +39,14 @@ function getOrCreateStyleElement() {
 export default function SearchHighlightPlugin({
   activeMatchIndex = null,
   highlightAllMatchesYellow = false,
+  loadKey,
   onMatchCountChange,
   scrollRevision,
   searchWords,
 }: {
   activeMatchIndex?: number | null;
   highlightAllMatchesYellow?: boolean;
+  loadKey: string;
   onMatchCountChange?(count: number): void;
   scrollRevision?: number;
   searchWords: string[];
@@ -79,6 +81,10 @@ export default function SearchHighlightPlugin({
       getOrCreateStyleElement().textContent = HIGHLIGHT_STYLES;
     }
   }, [editor]);
+
+  useEffect(() => {
+    shouldScrollRef.current = true;
+  }, [loadKey]);
 
   useEffect(() => {
     const highlights = (CSS as CSSWithHighlights).highlights;
@@ -209,6 +215,7 @@ export default function SearchHighlightPlugin({
     activeMatchIndex,
     editor,
     highlightAllMatchesYellow,
+    loadKey,
     onMatchCountChange,
     scrollRevision,
     searchWords,

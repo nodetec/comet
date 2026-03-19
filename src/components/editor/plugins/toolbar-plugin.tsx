@@ -8,18 +8,13 @@ import {
   $getSelection,
   $isNodeSelection,
   $isRangeSelection,
-  $isRootOrShadowRoot,
   $setSelection,
   FORMAT_TEXT_COMMAND,
 } from "lexical";
-import {
-  $isHeadingNode,
-  $createHeadingNode,
-  type HeadingTagType,
-} from "@lexical/rich-text";
+import { $createHeadingNode, type HeadingTagType } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
-import { $isCodeNode, $createCodeNode } from "@lexical/code";
-import { $findMatchingParent, mergeRegister } from "@lexical/utils";
+import { $createCodeNode } from "@lexical/code";
+import { mergeRegister } from "@lexical/utils";
 import { open } from "@tauri-apps/plugin-dialog";
 import { IMAGE_EXTENSIONS, importImage } from "@/lib/attachments";
 import {
@@ -38,11 +33,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { $createImageNode } from "../nodes/image-node";
 import { INSERT_TABLE_COMMAND } from "@lexical/table";
-
-type BlockType = "paragraph" | "h1" | "h2" | "h3" | "code";
+import {
+  DEFAULT_TOOLBAR_STATE,
+  type BlockType,
+  getToolbarStateFromSelection,
+} from "../lib/toolbar-state";
 
 const BLOCK_CYCLE: BlockType[] = ["paragraph", "h1", "h2", "h3"];
-
 const BLOCK_ICONS: Record<BlockType, React.ReactNode> = {
   paragraph: <Pilcrow className="size-4" />,
   h1: <Heading1 className="size-4" />,
@@ -52,10 +49,14 @@ const BLOCK_ICONS: Record<BlockType, React.ReactNode> = {
 };
 
 interface ToolbarPluginProps {
+  loadKey: string;
   portalContainer: HTMLElement | null;
 }
 
-export default function ToolbarPlugin({ portalContainer }: ToolbarPluginProps) {
+export default function ToolbarPlugin({
+  loadKey,
+  portalContainer,
+}: ToolbarPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
@@ -64,36 +65,21 @@ export default function ToolbarPlugin({ portalContainer }: ToolbarPluginProps) {
   const [blockType, setBlockType] = useState<BlockType>("paragraph");
 
   const updateToolbar = useCallback(() => {
-    const selection = $getSelection();
-
-    if ($isRangeSelection(selection)) {
-      setIsBold(selection.hasFormat("bold"));
-      setIsItalic(selection.hasFormat("italic"));
-      setIsStrikethrough(selection.hasFormat("strikethrough"));
-      setIsCode(selection.hasFormat("code"));
-
-      const anchorNode = selection.anchor.getNode();
-      let element =
-        anchorNode.getKey() === "root"
-          ? anchorNode
-          : $findMatchingParent(anchorNode, (e) => {
-              const parent = e.getParent();
-              return parent !== null && $isRootOrShadowRoot(parent);
-            });
-
-      if (element === null) {
-        element = anchorNode.getTopLevelElementOrThrow();
-      }
-
-      if ($isHeadingNode(element)) {
-        setBlockType(element.getTag() as BlockType);
-      } else if ($isCodeNode(element)) {
-        setBlockType("code");
-      } else {
-        setBlockType("paragraph");
-      }
-    }
+    const nextState = getToolbarStateFromSelection();
+    setIsBold(nextState.isBold);
+    setIsItalic(nextState.isItalic);
+    setIsStrikethrough(nextState.isStrikethrough);
+    setIsCode(nextState.isCode);
+    setBlockType(nextState.blockType);
   }, []);
+
+  useEffect(() => {
+    setIsBold(DEFAULT_TOOLBAR_STATE.isBold);
+    setIsItalic(DEFAULT_TOOLBAR_STATE.isItalic);
+    setIsStrikethrough(DEFAULT_TOOLBAR_STATE.isStrikethrough);
+    setIsCode(DEFAULT_TOOLBAR_STATE.isCode);
+    setBlockType(DEFAULT_TOOLBAR_STATE.blockType);
+  }, [loadKey]);
 
   useEffect(() => {
     return mergeRegister(

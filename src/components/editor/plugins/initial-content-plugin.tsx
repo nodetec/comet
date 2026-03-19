@@ -1,6 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $getRoot, $setSelection } from "lexical";
+import {
+  $createParagraphNode,
+  $getRoot,
+  $setSelection,
+  CLEAR_HISTORY_COMMAND,
+} from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $createListItemNode, $createListNode } from "@lexical/list";
 import { $importMarkdownFromHTML } from "../lib/markdown";
@@ -8,6 +13,7 @@ import { $importMarkdownFromHTML } from "../lib/markdown";
 interface InitialContentPluginProps {
   html: string | null;
   isNew: boolean;
+  loadKey: string;
   markdown: string;
   onInitComplete(): void;
 }
@@ -15,18 +21,25 @@ interface InitialContentPluginProps {
 export default function InitialContentPlugin({
   html,
   isNew,
+  loadKey,
   markdown,
   onInitComplete,
 }: InitialContentPluginProps) {
   const [editor] = useLexicalComposerContext();
-  const hasInitialized = useRef(false);
+  const lastLoadKeyRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
+  useLayoutEffect(() => {
+    if (lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+    lastLoadKeyRef.current = loadKey;
 
     const mode = isNew ? "new" : !markdown.trim() ? "empty" : "existing";
-    console.log(`[editor:init] mode=${mode} markdown=${markdown.length} chars`);
+    if (import.meta.env.DEV) {
+      console.log(
+        `[editor:init] mode=${mode} markdown=${markdown.length} chars`,
+      );
+    }
 
     editor.update(
       () => {
@@ -40,7 +53,9 @@ export default function InitialContentPlugin({
           root.append(checkList);
           checkItem.selectEnd();
         } else if (!markdown.trim()) {
-          // Empty existing note: leave the default empty paragraph.
+          const root = $getRoot();
+          root.clear();
+          root.append($createParagraphNode());
           $setSelection(null);
         } else if (html) {
           // Use pre-rendered HTML from Rust backend (comrak)
@@ -58,16 +73,19 @@ export default function InitialContentPlugin({
         }
 
         const root = $getRoot();
-        console.log(`[editor:init] imported ${root.getChildrenSize()} nodes`);
+        if (import.meta.env.DEV) {
+          console.log(`[editor:init] imported ${root.getChildrenSize()} nodes`);
+        }
       },
       // Use discrete so the update settles synchronously before onInitComplete.
       // This ensures the OnChangeMarkdownPlugin baseline is recorded from the
       // post-import state, not the pre-import state.
       { discrete: true },
     );
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
 
     onInitComplete();
-  }, [editor, html, isNew, markdown, onInitComplete]);
+  }, [editor, html, isNew, loadKey, markdown, onInitComplete]);
 
   return null;
 }

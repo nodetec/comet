@@ -257,8 +257,10 @@ function TableActionMenu({
 
 function TableCellActionMenuContainer({
   anchorElem,
+  loadKey,
 }: {
   anchorElem: HTMLElement;
+  loadKey: string;
 }) {
   const [editor] = useLexicalComposerContext();
   const menuButtonRef = useRef<HTMLDivElement | null>(null);
@@ -268,6 +270,19 @@ function TableCellActionMenuContainer({
     null,
   );
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    isMenuOpenRef.current = false;
+    setIsMenuOpen(false);
+    setTableMenuCellNode(null);
+
+    const menu = menuButtonRef.current;
+    if (menu) {
+      menu.style.opacity = "0";
+      menu.style.pointerEvents = "none";
+      menu.style.transform = "translate(0, 0)";
+    }
+  }, [loadKey]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -452,8 +467,10 @@ function TableCellActionMenuContainer({
 
 export default function TableActionMenuPlugin({
   anchorElem,
+  loadKey,
 }: {
   anchorElem?: HTMLElement;
+  loadKey: string;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -465,7 +482,7 @@ export default function TableActionMenuPlugin({
 
   const target = anchorElem ?? document.body;
   return createPortal(
-    <TableCellActionMenuContainer anchorElem={target} />,
+    <TableCellActionMenuContainer anchorElem={target} loadKey={loadKey} />,
     target,
   );
 }

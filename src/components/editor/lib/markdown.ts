@@ -334,13 +334,15 @@ export function $importMarkdownFromHTML(
   target.clear();
   target.append(...nodes);
   const t3 = performance.now();
-  console.log(
-    `[editor:importFromHTML] ${html.length} chars HTML → ` +
-      `DOMParser: ${(t1 - t0).toFixed(1)}ms, ` +
-      `$generateNodesFromDOM: ${(t2 - t1).toFixed(1)}ms, ` +
-      `append: ${(t3 - t2).toFixed(1)}ms, ` +
-      `total: ${(t3 - t0).toFixed(1)}ms`,
-  );
+  if (import.meta.env.DEV) {
+    console.log(
+      `[editor:importFromHTML] ${html.length} chars HTML → ` +
+        `DOMParser: ${(t1 - t0).toFixed(1)}ms, ` +
+        `$generateNodesFromDOM: ${(t2 - t1).toFixed(1)}ms, ` +
+        `append: ${(t3 - t2).toFixed(1)}ms, ` +
+        `total: ${(t3 - t0).toFixed(1)}ms`,
+    );
+  }
 }
 
 /**

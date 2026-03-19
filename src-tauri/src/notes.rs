@@ -6,16 +6,120 @@ use rusqlite::{
     params, params_from_iter, types::Value, Connection, OptionalExtension, Transaction,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use tauri::AppHandle;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager};
 
 const LAST_OPEN_NOTE_KEY: &str = "last_open_note_id";
 const INITIAL_NOTES_PAGE_SIZE: usize = 40;
 const MAX_NOTES_PAGE_SIZE: usize = 100;
+const RENDERED_HTML_CACHE_MAX_BYTES: usize = 8 * 1024 * 1024;
+const RENDERED_HTML_CACHE_MAX_ENTRY_BYTES: usize = 256 * 1024;
+
+#[derive(Default)]
+pub struct RenderedHtmlCache {
+    state: Mutex<RenderedHtmlCacheState>,
+}
+
+#[derive(Clone)]
+struct RenderedHtmlCacheEntry {
+    html: String,
+    modified_at: i64,
+    size_bytes: usize,
+    last_access_tick: u64,
+}
+
+#[derive(Default)]
+struct RenderedHtmlCacheState {
+    entries: HashMap<String, RenderedHtmlCacheEntry>,
+    next_access_tick: u64,
+    total_bytes: usize,
+}
 
 enum SearchMode {
     Match(String),
     Like(Vec<String>),
+}
+
+impl RenderedHtmlCacheState {
+    fn get(&mut self, note_id: &str, modified_at: i64) -> Option<String> {
+        let access_tick = self.bump_access_tick();
+        let entry = self.entries.get_mut(note_id)?;
+        if entry.modified_at != modified_at {
+            return None;
+        }
+
+        entry.last_access_tick = access_tick;
+        Some(entry.html.clone())
+    }
+
+    fn insert(&mut self, note_id: String, modified_at: i64, html: String) {
+        self.insert_with_limits(
+            note_id,
+            modified_at,
+            html,
+            RENDERED_HTML_CACHE_MAX_BYTES,
+            RENDERED_HTML_CACHE_MAX_ENTRY_BYTES,
+        );
+    }
+
+    fn insert_with_limits(
+        &mut self,
+        note_id: String,
+        modified_at: i64,
+        html: String,
+        max_total_bytes: usize,
+        max_entry_bytes: usize,
+    ) {
+        let size_bytes = html.len();
+        self.remove(&note_id);
+
+        if size_bytes > max_entry_bytes || size_bytes > max_total_bytes {
+            return;
+        }
+
+        self.evict_until_fits(size_bytes, max_total_bytes);
+
+        let access_tick = self.bump_access_tick();
+        self.total_bytes = self.total_bytes.saturating_add(size_bytes);
+        self.entries.insert(
+            note_id,
+            RenderedHtmlCacheEntry {
+                html,
+                modified_at,
+                size_bytes,
+                last_access_tick: access_tick,
+            },
+        );
+    }
+
+    fn remove(&mut self, note_id: &str) {
+        if let Some(entry) = self.entries.remove(note_id) {
+            self.total_bytes = self.total_bytes.saturating_sub(entry.size_bytes);
+        }
+    }
+
+    fn evict_until_fits(&mut self, incoming_size_bytes: usize, max_total_bytes: usize) {
+        while !self.entries.is_empty()
+            && self.total_bytes.saturating_add(incoming_size_bytes) > max_total_bytes
+        {
+            let lru_note_id = self
+                .entries
+                .iter()
+                .min_by_key(|(_, entry)| entry.last_access_tick)
+                .map(|(note_id, _)| note_id.clone());
+
+            match lru_note_id {
+                Some(note_id) => self.remove(&note_id),
+                None => break,
+            }
+        }
+    }
+
+    fn bump_access_tick(&mut self) -> u64 {
+        self.next_access_tick = self.next_access_tick.wrapping_add(1);
+        self.next_access_tick
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -201,7 +305,12 @@ pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, AppError> {
            SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END) \
          FROM notes",
         [],
-        |row| Ok((row.get::<_, Option<i64>>(0)?.unwrap_or(0), row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+        |row| {
+            Ok((
+                row.get::<_, Option<i64>>(0)?.unwrap_or(0),
+                row.get::<_, Option<i64>>(1)?.unwrap_or(0),
+            ))
+        },
     )?;
 
     Ok(BootstrapPayload {
@@ -232,7 +341,8 @@ pub fn load_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError>
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
 
-    let note = note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))?;
+    let note =
+        note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))?;
 
     set_last_open_note_id(&conn, Some(note_id))?;
     Ok(note)
@@ -253,7 +363,11 @@ pub fn create_note(
             if tags.is_empty() {
                 "# ".to_string()
             } else {
-                let tag_line = tags.iter().map(|t| format!("#{t}")).collect::<Vec<_>>().join(" ");
+                let tag_line = tags
+                    .iter()
+                    .map(|t| format!("#{t}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 format!("# \n\n{tag_line}")
             }
         }
@@ -274,7 +388,7 @@ pub fn create_note(
     transaction.commit()?;
 
     set_last_open_note_id(&conn, Some(&note_id))?;
-    note_by_id(&conn, &note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, &note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
@@ -287,12 +401,11 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
     // Only update modified_at when the markdown content actually changed.
     // The editor may re-serialize markdown with minor normalization differences,
     // which triggers a save even though the user made no real edits.
-    let existing_markdown: String = transaction
-        .query_row(
-            "SELECT markdown FROM notes WHERE id = ?1",
-            params![input.id],
-            |row| row.get(0),
-        )?;
+    let existing_markdown: String = transaction.query_row(
+        "SELECT markdown FROM notes WHERE id = ?1",
+        params![input.id],
+        |row| row.get(0),
+    )?;
 
     let content_changed = existing_markdown != input.markdown;
 
@@ -304,11 +417,10 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
                 params![title, input.markdown, now, input.id],
             )?
     } else {
-        transaction
-            .execute(
-                "UPDATE notes SET title = ?1, markdown = ?2 WHERE id = ?3",
-                params![title, input.markdown, input.id],
-            )?
+        transaction.execute(
+            "UPDATE notes SET title = ?1, markdown = ?2 WHERE id = ?3",
+            params![title, input.markdown, input.id],
+        )?
     };
 
     if updated == 0 {
@@ -320,7 +432,7 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
     transaction.commit()?;
     set_last_open_note_id(&conn, Some(&input.id))?;
 
-    note_by_id(&conn, &input.id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, &input.id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
@@ -328,13 +440,12 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
     let conn = database_connection(app)?;
     let now = now_millis();
 
-    let updated = conn
-        .execute(
-            "UPDATE notes
+    let updated = conn.execute(
+        "UPDATE notes
              SET archived_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NULL",
-            params![now, note_id],
-        )?;
+        params![now, note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
@@ -344,7 +455,7 @@ pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
@@ -352,19 +463,18 @@ pub fn restore_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppErr
     let conn = database_connection(app)?;
     let now = now_millis();
 
-    let updated = conn
-        .execute(
-            "UPDATE notes
+    let updated = conn.execute(
+        "UPDATE notes
              SET archived_at = NULL, modified_at = ?1, locally_modified = 1
              WHERE id = ?2 AND archived_at IS NOT NULL",
-            params![now, note_id],
-        )?;
+        params![now, note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn trash_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
@@ -387,7 +497,7 @@ pub fn trash_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn restore_from_trash(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
@@ -406,10 +516,13 @@ pub fn restore_from_trash(app: &AppHandle, note_id: &str) -> Result<LoadedNote, 
         return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
-pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<Vec<(String, String)>, AppError> {
+pub fn delete_note_permanently(
+    app: &AppHandle,
+    note_id: &str,
+) -> Result<Vec<(String, String)>, AppError> {
     validate_note_id(note_id)?;
     let mut conn = database_connection(app)?;
 
@@ -417,8 +530,7 @@ pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<Vec<(St
 
     let transaction = conn.transaction()?;
     delete_note_search_document(&transaction, note_id)?;
-    let deleted = transaction
-        .execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
+    let deleted = transaction.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
     if deleted == 0 {
         return Err(AppError::custom("Note not found."));
     }
@@ -429,6 +541,7 @@ pub fn delete_note_permanently(app: &AppHandle, note_id: &str) -> Result<Vec<(St
     if last_open_note_id(&conn)?.as_deref() == Some(note_id) {
         set_last_open_note_id(&conn, next_active_note_id(&conn, Some(note_id))?.as_deref())?;
     }
+    invalidate_rendered_html_cache(app, note_id);
 
     Ok(blossom_deletions)
 }
@@ -449,6 +562,9 @@ pub fn empty_trash(app: &AppHandle) -> Result<(Vec<String>, Vec<(String, String)
          DELETE FROM notes WHERE deleted_at IS NOT NULL;",
     )?;
     transaction.commit()?;
+    for note_id in &note_ids {
+        invalidate_rendered_html_cache(app, note_id);
+    }
 
     let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);
 
@@ -471,7 +587,8 @@ pub fn create_notebook(
     )
     .map_err(handle_notebook_write_error)?;
 
-    notebook_by_id(&conn, &notebook_id)?.ok_or_else(|| AppError::custom("Failed to create notebook."))
+    notebook_by_id(&conn, &notebook_id)?
+        .ok_or_else(|| AppError::custom("Failed to create notebook."))
 }
 
 pub fn rename_notebook(
@@ -500,8 +617,7 @@ pub fn rename_notebook(
 pub fn delete_notebook(app: &AppHandle, notebook_id: &str) -> Result<(), AppError> {
     validate_notebook_id(notebook_id)?;
     let conn = database_connection(app)?;
-    let deleted = conn
-        .execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])?;
+    let deleted = conn.execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])?;
 
     if deleted == 0 {
         return Err(AppError::custom("Notebook not found."));
@@ -537,11 +653,10 @@ pub fn assign_note_notebook(
     }
 
     let now = now_millis();
-    let updated = conn
-        .execute(
-            "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
-            params![input.notebook_id, now, input.note_id],
-        )?;
+    let updated = conn.execute(
+        "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
+        params![input.notebook_id, now, input.note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
@@ -549,41 +664,39 @@ pub fn assign_note_notebook(
 
     set_last_open_note_id(&conn, Some(&input.note_id))?;
 
-    note_by_id(&conn, &input.note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, &input.note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn pin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
-    let updated = conn
-        .execute(
-            "UPDATE notes
+    let updated = conn.execute(
+        "UPDATE notes
              SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
              WHERE id = ?2",
-            params![now_millis(), note_id],
-        )?;
+        params![now_millis(), note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn unpin_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
     validate_note_id(note_id)?;
     let conn = database_connection(app)?;
-    let updated = conn
-        .execute(
-            "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
-            params![now_millis(), note_id],
-        )?;
+    let updated = conn.execute(
+        "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
+        params![now_millis(), note_id],
+    )?;
 
     if updated == 0 {
         return Err(AppError::custom("Note not found."));
     }
 
-    note_by_id(&conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
+    note_by_id(app, &conn, note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePagePayload, AppError> {
@@ -672,11 +785,9 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         } else {
             format!("SELECT COUNT(*) FROM notes n{}", where_clause)
         };
-        conn.query_row(
-            &count_sql,
-            params_from_iter(values.iter()),
-            |row| row.get::<_, i64>(0),
-        )? as usize
+        conn.query_row(&count_sql, params_from_iter(values.iter()), |row| {
+            row.get::<_, i64>(0)
+        })? as usize
     } else {
         0
     };
@@ -703,10 +814,9 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     values.push(Value::from(input.offset as i64));
 
     let mut statement = conn.prepare(&sql)?;
-    let rows = statement
-        .query_map(params_from_iter(values.iter()), |row| {
-            row_to_note_summary(row, &search_tokens)
-        })?;
+    let rows = statement.query_map(params_from_iter(values.iter()), |row| {
+        row_to_note_summary(row, &search_tokens)
+    })?;
 
     let mut notes = Vec::new();
     for row in rows {
@@ -780,32 +890,29 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, A
                 vals.push(Value::from(pattern.clone()));
             }
             sql.push_str(&like_clauses.join(" AND "));
-            sql.push_str(
-                " ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC LIMIT ?",
-            );
+            sql.push_str(" ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC LIMIT ?");
             vals.push(Value::from((SEARCH_RESULTS_LIMIT + 1) as i64));
             (sql, vals)
         }
     };
 
     let mut statement = conn.prepare(&sql)?;
-    let rows = statement
-        .query_map(params_from_iter(values.iter()), |row| {
-            let markdown: String = row.get(2)?;
-            let notebook_id: Option<String> = row.get(3)?;
-            let notebook_name: Option<String> = row.get(4)?;
+    let rows = statement.query_map(params_from_iter(values.iter()), |row| {
+        let markdown: String = row.get(2)?;
+        let notebook_id: Option<String> = row.get(3)?;
+        let notebook_name: Option<String> = row.get(4)?;
 
-            Ok(SearchResult {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                notebook: notebook_id
-                    .zip(notebook_name)
-                    .map(|(id, name)| NotebookRef { id, name }),
-                preview: search_snippet_for_summary(&markdown, &search_tokens)
-                    .unwrap_or_else(|| preview_from_markdown(&markdown)),
-                archived_at: row.get(5)?,
-            })
-        })?;
+        Ok(SearchResult {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            notebook: notebook_id
+                .zip(notebook_name)
+                .map(|(id, name)| NotebookRef { id, name }),
+            preview: search_snippet_for_summary(&markdown, &search_tokens)
+                .unwrap_or_else(|| preview_from_markdown(&markdown)),
+            archived_at: row.get(5)?,
+        })
+    })?;
 
     let mut results = Vec::new();
     for row in rows {
@@ -826,21 +933,19 @@ pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, AppError
 
     // Rank: prefix matches first, then contains matches.
     // Within each group, sort by frequency (most-used tags first).
-    let mut statement = conn
-        .prepare(
-            "SELECT tag, COUNT(*) AS freq,
+    let mut statement = conn.prepare(
+        "SELECT tag, COUNT(*) AS freq,
                     CASE WHEN tag LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
              FROM note_tags
              WHERE tag LIKE ?1 ESCAPE '\\'
              GROUP BY tag
              ORDER BY rank ASC, freq DESC, tag ASC
              LIMIT 20",
-        )?;
+    )?;
 
-    let rows = statement
-        .query_map(params![contains_pattern, prefix_pattern], |row| {
-            row.get::<_, String>(0)
-        })?;
+    let rows = statement.query_map(params![contains_pattern, prefix_pattern], |row| {
+        row.get::<_, String>(0)
+    })?;
 
     let mut tags = Vec::new();
     for row in rows {
@@ -865,9 +970,7 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, A
 
     let conn = database_connection(app)?;
 
-    let mut sql = String::from(
-        "SELECT n.title, n.markdown FROM notes n WHERE ",
-    );
+    let mut sql = String::from("SELECT n.title, n.markdown FROM notes n WHERE ");
     let mut clauses = Vec::new();
     let mut values = Vec::new();
 
@@ -882,14 +985,12 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, A
     sql.push_str(" ORDER BY n.edited_at DESC");
 
     let mut statement = conn.prepare(&sql)?;
-    let rows = statement
-        .query_map(params_from_iter(values.iter()), |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })?;
+    let rows = statement.query_map(params_from_iter(values.iter()), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
 
     let export_dir = std::path::PathBuf::from(&input.export_dir);
-    let mut used_names: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
+    let mut used_names: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     let mut count = 0;
 
     for row in rows {
@@ -982,10 +1083,9 @@ fn query_contextual_tags(
     sql.push_str(" ORDER BY nt.tag ASC");
 
     let mut statement = conn.prepare(&sql)?;
-    let rows = statement
-        .query_map(params_from_iter(values.iter()), |row| {
-            row.get::<_, String>(0)
-        })?;
+    let rows = statement.query_map(params_from_iter(values.iter()), |row| {
+        row.get::<_, String>(0)
+    })?;
 
     let mut tags = Vec::new();
     for row in rows {
@@ -1056,25 +1156,22 @@ fn note_is_active(conn: &Connection, note_id: &str) -> Result<bool, AppError> {
     .map(|value| value.unwrap_or(false))
 }
 
-
 fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, AppError> {
-    let mut statement = conn
-        .prepare(
-            "SELECT b.id, b.name, COUNT(n.id) AS note_count
+    let mut statement = conn.prepare(
+        "SELECT b.id, b.name, COUNT(n.id) AS note_count
              FROM notebooks b
              LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
              GROUP BY b.id, b.name, b.created_at
              ORDER BY LOWER(b.name) ASC, b.created_at ASC",
-        )?;
+    )?;
 
-    let rows = statement
-        .query_map([], |row| {
-            Ok(NotebookSummary {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                note_count: row.get::<_, i64>(2)? as usize,
-            })
-        })?;
+    let rows = statement.query_map([], |row| {
+        Ok(NotebookSummary {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            note_count: row.get::<_, i64>(2)? as usize,
+        })
+    })?;
 
     let mut notebooks = Vec::new();
     for row in rows {
@@ -1084,7 +1181,10 @@ fn list_notebooks(conn: &Connection) -> Result<Vec<NotebookSummary>, AppError> {
     Ok(notebooks)
 }
 
-fn notebook_by_id(conn: &Connection, notebook_id: &str) -> Result<Option<NotebookSummary>, AppError> {
+fn notebook_by_id(
+    conn: &Connection,
+    notebook_id: &str,
+) -> Result<Option<NotebookSummary>, AppError> {
     conn.query_row(
         "SELECT b.id, b.name, COUNT(n.id) AS note_count
          FROM notebooks b
@@ -1132,18 +1232,50 @@ fn set_last_open_note_id(conn: &Connection, note_id: Option<&str>) -> Result<(),
     Ok(())
 }
 
-fn row_to_loaded_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
+fn rendered_html_for_note(
+    app: &AppHandle,
+    note_id: &str,
+    modified_at: i64,
+    markdown: &str,
+) -> String {
+    let cache = app.state::<RenderedHtmlCache>();
+
+    if let Ok(mut state) = cache.state.lock() {
+        if let Some(html) = state.get(note_id, modified_at) {
+            return html;
+        }
+    }
+
+    let html = crate::markdown::markdown_to_lexical_html(markdown);
+
+    if let Ok(mut state) = cache.state.lock() {
+        state.insert(note_id.to_string(), modified_at, html.clone());
+    }
+
+    html
+}
+
+pub(crate) fn invalidate_rendered_html_cache(app: &AppHandle, note_id: &str) {
+    let cache = app.state::<RenderedHtmlCache>();
+    if let Ok(mut state) = cache.state.lock() {
+        state.remove(note_id);
+    };
+}
+
+fn row_to_loaded_note(app: &AppHandle, row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
     let notebook_id: Option<String> = row.get(4)?;
     let notebook_name: Option<String> = row.get(5)?;
+    let id: String = row.get(0)?;
     let markdown: String = row.get(2)?;
-    let html = crate::markdown::markdown_to_lexical_html(&markdown);
+    let modified_at: i64 = row.get(3)?;
+    let html = rendered_html_for_note(app, &id, modified_at, &markdown);
 
     Ok(LoadedNote {
-        id: row.get(0)?,
+        id,
         title: row.get(1)?,
         markdown,
         html,
-        modified_at: row.get(3)?,
+        modified_at,
         notebook: notebook_id
             .zip(notebook_name)
             .map(|(id, name)| NotebookRef { id, name }),
@@ -1180,7 +1312,11 @@ fn row_to_note_summary(
     })
 }
 
-fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, AppError> {
+fn note_by_id(
+    app: &AppHandle,
+    conn: &Connection,
+    note_id: &str,
+) -> Result<Option<LoadedNote>, AppError> {
     let note = conn
         .query_row(
             "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.nostr_d_tag, n.published_at, n.published_kind
@@ -1188,7 +1324,7 @@ fn note_by_id(conn: &Connection, note_id: &str) -> Result<Option<LoadedNote>, Ap
              LEFT JOIN notebooks b ON b.id = n.notebook_id
              WHERE n.id = ?1",
             params![note_id],
-            row_to_loaded_note,
+            |row| row_to_loaded_note(app, row),
         )
         .optional()?;
 
@@ -1278,23 +1414,40 @@ fn strip_markdown_syntax(line: &str) -> String {
     }
     // Strip blockquote markers
     while s.starts_with("> ") || s.starts_with('>') {
-        s = s.strip_prefix("> ").or_else(|| s.strip_prefix('>')).unwrap_or(&s).to_string();
+        s = s
+            .strip_prefix("> ")
+            .or_else(|| s.strip_prefix('>'))
+            .unwrap_or(&s)
+            .to_string();
     }
     // Strip list markers: "- ", "* ", "+ ", "1. ", "2) " etc.
-    if let Some(rest) = s.strip_prefix("- ").or_else(|| s.strip_prefix("* ")).or_else(|| s.strip_prefix("+ ")) {
+    if let Some(rest) = s
+        .strip_prefix("- ")
+        .or_else(|| s.strip_prefix("* "))
+        .or_else(|| s.strip_prefix("+ "))
+    {
         s = rest.to_string();
     } else if s.len() > 2 {
         let bytes = s.as_bytes();
         if bytes[0].is_ascii_digit() && (bytes[1] == b'.' || bytes[1] == b')') {
             s = s[2..].trim_start().to_string();
-        } else if bytes.len() > 3 && bytes[0].is_ascii_digit() && bytes[1].is_ascii_digit() && (bytes[2] == b'.' || bytes[2] == b')') {
+        } else if bytes.len() > 3
+            && bytes[0].is_ascii_digit()
+            && bytes[1].is_ascii_digit()
+            && (bytes[2] == b'.' || bytes[2] == b')')
+        {
             s = s[3..].trim_start().to_string();
         }
     }
     // Strip checkbox markers (with or without trailing space/content)
-    s = s.strip_prefix("[ ] ").or_else(|| s.strip_prefix("[x] "))
-        .or_else(|| s.strip_prefix("[ ]")).or_else(|| s.strip_prefix("[x]"))
-        .unwrap_or(&s).trim().to_string();
+    s = s
+        .strip_prefix("[ ] ")
+        .or_else(|| s.strip_prefix("[x] "))
+        .or_else(|| s.strip_prefix("[ ]"))
+        .or_else(|| s.strip_prefix("[x]"))
+        .unwrap_or(&s)
+        .trim()
+        .to_string();
     // Strip inline markdown: bold, italic, strikethrough, inline code
     s = s.replace("***", "").replace("**", "").replace("~~", "");
     // Strip inline code backticks
@@ -1311,9 +1464,17 @@ fn strip_markdown_syntax(line: &str) -> String {
         break;
     }
     // Strip standalone emphasis markers (* or _) but keep the content
-    s = s.replace(" *", " ").replace("* ", " ").replace(" _", " ").replace("_ ", " ");
-    if s.starts_with('*') || s.starts_with('_') { s = s[1..].to_string(); }
-    if s.ends_with('*') || s.ends_with('_') { s = s[..s.len()-1].to_string(); }
+    s = s
+        .replace(" *", " ")
+        .replace("* ", " ")
+        .replace(" _", " ")
+        .replace("_ ", " ");
+    if s.starts_with('*') || s.starts_with('_') {
+        s = s[1..].to_string();
+    }
+    if s.ends_with('*') || s.ends_with('_') {
+        s = s[..s.len() - 1].to_string();
+    }
 
     s
 }
@@ -1442,20 +1603,18 @@ fn replace_note_tags(
         match current_tags[ci].cmp(&next_tags[ni]) {
             std::cmp::Ordering::Less => {
                 // In current but not next — remove
-                transaction
-                    .execute(
-                        "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
-                        params![note_id, &current_tags[ci]],
-                    )?;
+                transaction.execute(
+                    "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
+                    params![note_id, &current_tags[ci]],
+                )?;
                 ci += 1;
             }
             std::cmp::Ordering::Greater => {
                 // In next but not current — add
-                transaction
-                    .execute(
-                        "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-                        params![note_id, &next_tags[ni]],
-                    )?;
+                transaction.execute(
+                    "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
+                    params![note_id, &next_tags[ni]],
+                )?;
                 ni += 1;
             }
             std::cmp::Ordering::Equal => {
@@ -1467,21 +1626,19 @@ fn replace_note_tags(
 
     // Remaining current tags were removed
     while ci < current_tags.len() {
-        transaction
-            .execute(
-                "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
-                params![note_id, &current_tags[ci]],
-            )?;
+        transaction.execute(
+            "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
+            params![note_id, &current_tags[ci]],
+        )?;
         ci += 1;
     }
 
     // Remaining next tags are new
     while ni < next_tags.len() {
-        transaction
-            .execute(
-                "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-                params![note_id, &next_tags[ni]],
-            )?;
+        transaction.execute(
+            "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
+            params![note_id, &next_tags[ni]],
+        )?;
         ni += 1;
     }
 
@@ -1494,30 +1651,29 @@ fn upsert_note_search_document(
     title: &str,
     markdown: &str,
 ) -> Result<(), AppError> {
-    transaction
-        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
-    transaction
-        .execute(
-            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
-            params![note_id, title, markdown],
-        )?;
+    transaction.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
+    transaction.execute(
+        "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+        params![note_id, title, markdown],
+    )?;
 
     Ok(())
 }
 
-fn delete_note_search_document(transaction: &Transaction<'_>, note_id: &str) -> Result<(), AppError> {
-    transaction
-        .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
+fn delete_note_search_document(
+    transaction: &Transaction<'_>,
+    note_id: &str,
+) -> Result<(), AppError> {
+    transaction.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
 
     Ok(())
 }
 
 fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, AppError> {
-    let mut statement = conn
-        .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
+    let mut statement =
+        conn.prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
 
-    let rows = statement
-        .query_map(params![note_id], |row| row.get::<_, String>(0))?;
+    let rows = statement.query_map(params![note_id], |row| row.get::<_, String>(0))?;
 
     let mut tags = Vec::new();
     for row in rows {
@@ -1526,7 +1682,6 @@ fn tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, AppErr
 
     Ok(tags)
 }
-
 
 fn normalized_active_tags(tags: &[String]) -> Vec<String> {
     let mut unique_tags = BTreeSet::new();
@@ -1646,7 +1801,9 @@ fn handle_notebook_write_error(error: rusqlite::Error) -> AppError {
 
 #[cfg(test)]
 mod tests {
-    use super::{preview_from_markdown, strip_markdown_syntax, title_from_markdown};
+    use super::{
+        preview_from_markdown, strip_markdown_syntax, title_from_markdown, RenderedHtmlCacheState,
+    };
 
     #[test]
     fn title_from_markdown_uses_first_non_empty_h1() {
@@ -1681,5 +1838,31 @@ mod tests {
     fn strip_markdown_syntax_removes_common_markdown_markup() {
         let line = "> - [x] **Task** [label](https://example.com) `code`";
         assert_eq!(strip_markdown_syntax(line), "Task label code");
+    }
+
+    #[test]
+    fn rendered_html_cache_skips_entries_above_size_limit() {
+        let mut cache = RenderedHtmlCacheState::default();
+
+        cache.insert_with_limits("note-1".into(), 1, "abcdef".into(), 10, 5);
+
+        assert!(cache.entries.is_empty());
+        assert_eq!(cache.total_bytes, 0);
+    }
+
+    #[test]
+    fn rendered_html_cache_evicts_lru_entries_by_total_bytes() {
+        let mut cache = RenderedHtmlCacheState::default();
+
+        cache.insert_with_limits("note-1".into(), 1, "aaaa".into(), 8, 8);
+        cache.insert_with_limits("note-2".into(), 1, "bbbb".into(), 8, 8);
+        assert_eq!(cache.get("note-1", 1).as_deref(), Some("aaaa"));
+
+        cache.insert_with_limits("note-3".into(), 1, "cccc".into(), 8, 8);
+
+        assert_eq!(cache.get("note-1", 1).as_deref(), Some("aaaa"));
+        assert_eq!(cache.get("note-2", 1), None);
+        assert_eq!(cache.get("note-3", 1).as_deref(), Some("cccc"));
+        assert_eq!(cache.total_bytes, 8);
     }
 }

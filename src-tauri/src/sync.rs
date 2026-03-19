@@ -2,9 +2,9 @@ use crate::error::{now_millis, AppError};
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
-use sha2::Sha256;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -50,6 +50,17 @@ pub struct SyncChangePayload {
 fn sync_log(app: &AppHandle, msg: &str) {
     eprintln!("[sync] {msg}");
     let _ = app.emit("sync-log", msg.to_string());
+}
+
+fn delete_note_from_sync(
+    conn: &Connection,
+    note_id: &str,
+    mut invalidate_cache: impl FnMut(&str),
+) -> Result<(), AppError> {
+    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
+    conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
+    invalidate_cache(note_id);
+    Ok(())
 }
 
 /// Note fields extracted from a synced event rumor.
@@ -210,7 +221,6 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
     );
 }
 
-
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
 use crate::nostr::strip_title_line;
@@ -275,7 +285,11 @@ fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, App
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or_else(|| rumor.created_at.as_secs() as i64 * 1000);
 
-    Ok(SyncedNotebook { id, name, updated_at })
+    Ok(SyncedNotebook {
+        id,
+        name,
+        updated_at,
+    })
 }
 
 fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
@@ -330,7 +344,9 @@ fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
         Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
         Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
-    EventBuilder::new(COMET_EVENT_KIND, "").tags(tags).build(pubkey)
+    EventBuilder::new(COMET_EVENT_KIND, "")
+        .tags(tags)
+        .build(pubkey)
 }
 
 fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedEvent {
@@ -340,7 +356,9 @@ fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedEvent
         Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
         Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
-    EventBuilder::new(COMET_EVENT_KIND, "").tags(tags).build(pubkey)
+    EventBuilder::new(COMET_EVENT_KIND, "")
+        .tags(tags)
+        .build(pubkey)
 }
 
 fn is_deleted_rumor(rumor: &UnsignedEvent) -> bool {
@@ -360,7 +378,9 @@ fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-use crate::attachments::{cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes};
+use crate::attachments::{
+    cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes,
+};
 
 fn note_to_rumor(
     note_id: &str,
@@ -384,7 +404,10 @@ fn note_to_rumor(
         Tag::identifier(note_id),
         Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
         Tag::title(title),
-        Tag::custom(TagKind::custom("modified_at"), vec![modified_at.to_string()]),
+        Tag::custom(
+            TagKind::custom("modified_at"),
+            vec![modified_at.to_string()],
+        ),
         Tag::custom(TagKind::custom("edited_at"), vec![edited_at.to_string()]),
         Tag::custom(TagKind::custom("created_at"), vec![created_at.to_string()]),
     ]);
@@ -397,15 +420,24 @@ fn note_to_rumor(
     }
 
     if let Some(ts) = archived_at {
-        event_tags.push(Tag::custom(TagKind::custom("archived_at"), vec![ts.to_string()]));
+        event_tags.push(Tag::custom(
+            TagKind::custom("archived_at"),
+            vec![ts.to_string()],
+        ));
     }
 
     if let Some(ts) = deleted_at {
-        event_tags.push(Tag::custom(TagKind::custom("deleted_at"), vec![ts.to_string()]));
+        event_tags.push(Tag::custom(
+            TagKind::custom("deleted_at"),
+            vec![ts.to_string()],
+        ));
     }
 
     if let Some(ts) = pinned_at {
-        event_tags.push(Tag::custom(TagKind::custom("pinned_at"), vec![ts.to_string()]));
+        event_tags.push(Tag::custom(
+            TagKind::custom("pinned_at"),
+            vec![ts.to_string()],
+        ));
     }
 
     for t in tags {
@@ -415,7 +447,11 @@ fn note_to_rumor(
     for (plaintext_hash, ciphertext_hash, key_hex) in blob_tags {
         event_tags.push(Tag::custom(
             TagKind::custom("blob"),
-            vec![plaintext_hash.clone(), ciphertext_hash.clone(), key_hex.clone()],
+            vec![
+                plaintext_hash.clone(),
+                ciphertext_hash.clone(),
+                key_hex.clone(),
+            ],
         ));
     }
 
@@ -529,7 +565,10 @@ fn upsert_from_sync(
 
     if let Some((_, local_modified)) = &existing {
         if *local_modified >= note.modified_at {
-            eprintln!("[sync] skip upsert note={} local_modified={} remote_modified={}", note.id, local_modified, note.modified_at);
+            eprintln!(
+                "[sync] skip upsert note={} local_modified={} remote_modified={}",
+                note.id, local_modified, note.modified_at
+            );
             // Local version is same or newer — just update sync_event_id
             conn.execute(
                 "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
@@ -598,10 +637,7 @@ fn upsert_from_sync(
     }
 
     // Update FTS
-    conn.execute(
-        "DELETE FROM notes_fts WHERE note_id = ?1",
-        params![note.id],
-    )?;
+    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note.id])?;
     conn.execute(
         "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
         params![note.id, note.title, note.markdown],
@@ -609,7 +645,6 @@ fn upsert_from_sync(
 
     Ok(Some(note.id.clone()))
 }
-
 
 // ── Sync loop ──────────────────────────────────────────────────────────
 
@@ -635,7 +670,9 @@ async fn run_sync_loop(
                 sync_log(&app, &format!("connection error: {e}"));
                 set_state(
                     &state,
-                    SyncState::Error { message: e.to_string() },
+                    SyncState::Error {
+                        message: e.to_string(),
+                    },
                     &app,
                 )
                 .await;
@@ -667,15 +704,15 @@ async fn run_sync_connection(
     // Read config from DB
     let (relay_url, secret_hex, _public_hex) = {
         let conn = crate::db::database_connection(app)?;
-        let relay_url =
-            get_sync_relay_url(&conn).ok_or_else(|| AppError::custom("No sync relay configured"))?;
+        let relay_url = get_sync_relay_url(&conn)
+            .ok_or_else(|| AppError::custom("No sync relay configured"))?;
         let (secret_hex, public_hex) =
             get_identity(&conn).ok_or_else(|| AppError::custom("No Nostr identity configured"))?;
         (relay_url, secret_hex, public_hex)
     };
 
-    let secret_key =
-        SecretKey::parse(&secret_hex).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+    let secret_key = SecretKey::parse(&secret_hex)
+        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
     let keys = Keys::new(secret_key);
     let pubkey = keys.public_key();
 
@@ -793,7 +830,8 @@ async fn run_sync_connection(
         for note_id in &ready {
             pending_pushes.remove(note_id);
             sync_log(app, &format!("pushing {note_id}"));
-            if let Err(e) = push_note(app, &keys, &mut ws_write, note_id, &mut recent_pushes).await {
+            if let Err(e) = push_note(app, &keys, &mut ws_write, note_id, &mut recent_pushes).await
+            {
                 sync_log(app, &format!("push error: {note_id}: {e}"));
             }
         }
@@ -926,7 +964,9 @@ async fn process_relay_message(
     match sub_type {
         "EVENT" => {
             let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
-            let event_json = arr.get(4).ok_or_else(|| AppError::custom("Missing event in CHANGES EVENT"))?;
+            let event_json = arr
+                .get(4)
+                .ok_or_else(|| AppError::custom("Missing event in CHANGES EVENT"))?;
 
             let event: Event = Event::from_json(event_json.to_string())
                 .map_err(|e| AppError::custom(format!("Invalid event: {e}")))?;
@@ -951,7 +991,8 @@ async fn process_relay_message(
 
             // Check for deletion tombstone
             if is_deleted_rumor(&unwrapped.rumor) {
-                let entity_id = unwrapped.rumor
+                let entity_id = unwrapped
+                    .rumor
                     .tags
                     .find(TagKind::d())
                     .and_then(|t| t.content())
@@ -966,10 +1007,12 @@ async fn process_relay_message(
                     conn.execute("DELETE FROM notebooks WHERE id = ?1", params![entity_id])?;
                 } else {
                     // Collect orphaned blobs before deleting the note
-                    let orphaned = find_orphaned_blob_hashes(&conn, &[entity_id.clone()]).unwrap_or_default();
+                    let orphaned =
+                        find_orphaned_blob_hashes(&conn, &[entity_id.clone()]).unwrap_or_default();
                     // Permanently delete the note
-                    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![entity_id])?;
-                    conn.execute("DELETE FROM notes WHERE id = ?1", params![entity_id])?;
+                    delete_note_from_sync(&conn, &entity_id, |note_id| {
+                        crate::notes::invalidate_rendered_html_cache(app, note_id);
+                    })?;
                     // Clean up orphaned blobs (local + metadata)
                     let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);
                     // Spawn Blossom deletes in background to not block sync
@@ -978,7 +1021,14 @@ async fn process_relay_message(
                         tokio::spawn(async move {
                             let http_client = reqwest::Client::new();
                             for (server_url, ciphertext_hash) in blossom_deletions {
-                                if let Err(e) = crate::blossom::delete_blob(&http_client, &server_url, &ciphertext_hash, &keys).await {
+                                if let Err(e) = crate::blossom::delete_blob(
+                                    &http_client,
+                                    &server_url,
+                                    &ciphertext_hash,
+                                    &keys,
+                                )
+                                .await
+                                {
                                     eprintln!("[blob-gc] blossom delete failed: {e}");
                                 }
                             }
@@ -1005,7 +1055,10 @@ async fn process_relay_message(
                         return Ok(());
                     }
                 };
-                sync_log(app, &format!("received notebook {} ({})", notebook.id, notebook.name));
+                sync_log(
+                    app,
+                    &format!("received notebook {} ({})", notebook.id, notebook.name),
+                );
 
                 let conn = crate::db::database_connection(app)?;
                 if let Err(e) = upsert_notebook_from_sync(&conn, &notebook, &event_id) {
@@ -1070,15 +1123,14 @@ async fn process_relay_message(
 
             // Push any locally modified notes/notebooks (created or edited while offline)
             let (unsynced_notebooks, unsynced_notes) = {
-                let mut stmt = conn
-                    .prepare("SELECT id FROM notebooks WHERE locally_modified = 1")?;
+                let mut stmt =
+                    conn.prepare("SELECT id FROM notebooks WHERE locally_modified = 1")?;
                 let nbs: Vec<String> = stmt
                     .query_map([], |row| row.get(0))?
                     .collect::<Result<Vec<_>, _>>()?;
                 drop(stmt);
 
-                let mut stmt = conn
-                    .prepare("SELECT id FROM notes WHERE locally_modified = 1")?;
+                let mut stmt = conn.prepare("SELECT id FROM notes WHERE locally_modified = 1")?;
                 let notes: Vec<String> = stmt
                     .query_map([], |row| row.get(0))?
                     .collect::<Result<Vec<_>, _>>()?;
@@ -1087,14 +1139,19 @@ async fn process_relay_message(
             }; // conn and stmts dropped here
 
             if !unsynced_notebooks.is_empty() || !unsynced_notes.is_empty() {
-                sync_log(app, &format!("pushing {} unsynced notebooks, {} unsynced notes",
-                    unsynced_notebooks.len(), unsynced_notes.len()));
+                sync_log(
+                    app,
+                    &format!(
+                        "pushing {} unsynced notebooks, {} unsynced notes",
+                        unsynced_notebooks.len(),
+                        unsynced_notes.len()
+                    ),
+                );
             }
 
             // Process pending deletions (queued while offline)
             let pending_deletions: Vec<String> = {
-                let mut stmt = conn
-                    .prepare("SELECT entity_id FROM pending_deletions")?;
+                let mut stmt = conn.prepare("SELECT entity_id FROM pending_deletions")?;
                 let ids: Vec<String> = stmt
                     .query_map([], |row| row.get(0))?
                     .collect::<Result<Vec<_>, _>>()?;
@@ -1102,12 +1159,17 @@ async fn process_relay_message(
             };
 
             if !pending_deletions.is_empty() {
-                sync_log(app, &format!("pushing {} pending deletions", pending_deletions.len()));
+                sync_log(
+                    app,
+                    &format!("pushing {} pending deletions", pending_deletions.len()),
+                );
             }
 
             let manager = app.state::<SyncManager>();
             for entity_id in &pending_deletions {
-                manager.push(SyncCommand::PushDeletion(entity_id.clone())).await;
+                manager
+                    .push(SyncCommand::PushDeletion(entity_id.clone()))
+                    .await;
             }
             for nb_id in unsynced_notebooks {
                 manager.push(SyncCommand::PushNotebook(nb_id)).await;
@@ -1119,7 +1181,10 @@ async fn process_relay_message(
             set_state(state, SyncState::Connected, app).await;
         }
         "ERR" => {
-            let message = arr.get(3).and_then(|v| v.as_str()).unwrap_or("unknown error");
+            let message = arr
+                .get(3)
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown error");
             return Err(AppError::custom(format!("CHANGES error: {message}")));
         }
         _ => {}
@@ -1143,7 +1208,19 @@ async fn push_note(
     recent_pushes: &mut HashMap<String, std::time::Instant>,
 ) -> Result<(), AppError> {
     // Read note from DB
-    let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at, tags, blossom_url) = {
+    let (
+        title,
+        markdown,
+        notebook_id,
+        created_at,
+        modified_at,
+        edited_at,
+        archived_at,
+        deleted_at,
+        pinned_at,
+        tags,
+        blossom_url,
+    ) = {
         let conn = crate::db::database_connection(app)?;
 
         let note: Option<(String, String, Option<String>, i64, i64, Option<i64>, Option<i64>, Option<i64>, Option<i64>)> = conn
@@ -1154,26 +1231,50 @@ async fn push_note(
             )
             .optional()?;
 
-        let (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at) =
-            note.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
+        let (
+            title,
+            markdown,
+            notebook_id,
+            created_at,
+            modified_at,
+            edited_at,
+            archived_at,
+            deleted_at,
+            pinned_at,
+        ) = note.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
         let edited_at = edited_at.unwrap_or(modified_at);
 
         // Get tags
-        let mut tag_stmt = conn
-            .prepare("SELECT tag FROM note_tags WHERE note_id = ?1")?;
+        let mut tag_stmt = conn.prepare("SELECT tag FROM note_tags WHERE note_id = ?1")?;
         let tags: Vec<String> = tag_stmt
             .query_map(params![note_id], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
         let blossom_url = get_blossom_url(&conn);
 
-        (title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, pinned_at, tags, blossom_url)
+        (
+            title,
+            markdown,
+            notebook_id,
+            created_at,
+            modified_at,
+            edited_at,
+            archived_at,
+            deleted_at,
+            pinned_at,
+            tags,
+            blossom_url,
+        )
     };
 
     // Upload attachment blobs to Blossom if configured
     let mut blob_tags: Vec<(String, String, String)> = Vec::new();
     let attachment_hashes = extract_attachment_hashes(&markdown);
-    eprintln!("[sync] note has {} attachment(s), blossom_url={:?}", attachment_hashes.len(), blossom_url);
+    eprintln!(
+        "[sync] note has {} attachment(s), blossom_url={:?}",
+        attachment_hashes.len(),
+        blossom_url
+    );
     if let Some(ref blossom_url) = blossom_url {
         let http_client = reqwest::Client::new();
         let pubkey_hex = keys.public_key().to_hex();
@@ -1192,14 +1293,26 @@ async fn push_note(
             if let Some((ct_hash, key_hex)) = existing {
                 // Verify the ciphertext still exists on the server
                 let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ct_hash);
-                let exists = http_client.head(&head_url).send().await.map(|r| r.status().is_success()).unwrap_or(false);
+                let exists = http_client
+                    .head(&head_url)
+                    .send()
+                    .await
+                    .map(|r| r.status().is_success())
+                    .unwrap_or(false);
                 if exists {
-                    eprintln!("[sync] attachment hash={} verified on server (ct={})", &hash[..8], &ct_hash[..8]);
+                    eprintln!(
+                        "[sync] attachment hash={} verified on server (ct={})",
+                        &hash[..8],
+                        &ct_hash[..8]
+                    );
                     blob_tags.push((hash.clone(), ct_hash, key_hex));
                     continue;
                 }
                 // Blob missing from server — clear stale metadata and re-upload
-                eprintln!("[sync] attachment hash={} missing from server, re-uploading", &hash[..8]);
+                eprintln!(
+                    "[sync] attachment hash={} missing from server, re-uploading",
+                    &hash[..8]
+                );
                 let conn = crate::db::database_connection(app)?;
                 conn.execute(
                     "DELETE FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
@@ -1210,11 +1323,18 @@ async fn push_note(
             // Read the local blob
             let blob_data = match crate::attachments::read_blob(app, hash)? {
                 Some((data, _ext)) => {
-                    eprintln!("[sync] attachment hash={} read {} bytes locally", &hash[..8], data.len());
+                    eprintln!(
+                        "[sync] attachment hash={} read {} bytes locally",
+                        &hash[..8],
+                        data.len()
+                    );
                     data
                 }
                 None => {
-                    eprintln!("[sync] attachment hash={} NOT found locally, skipping", &hash[..8]);
+                    eprintln!(
+                        "[sync] attachment hash={} NOT found locally, skipping",
+                        &hash[..8]
+                    );
                     continue;
                 }
             };
@@ -1223,13 +1343,9 @@ async fn push_note(
             let (ciphertext_bytes, key_hex) = crate::blossom::encrypt_blob(&blob_data)?;
 
             // Upload to Blossom
-            let ciphertext_hash = crate::blossom::upload_blob(
-                &http_client,
-                blossom_url,
-                ciphertext_bytes,
-                keys,
-            )
-            .await?;
+            let ciphertext_hash =
+                crate::blossom::upload_blob(&http_client, blossom_url, ciphertext_bytes, keys)
+                    .await?;
 
             // Save blob metadata keyed to this server + identity
             let conn = crate::db::database_connection(app)?;
@@ -1265,12 +1381,8 @@ async fn push_note(
 
     // Gift wrap to self with HMAC'd d-tag for relay-side replacement
     let d_tag = gift_wrap_d_tag(keys.secret_key(), note_id);
-    let gift_wrap = crate::nip59_ext::gift_wrap(
-        keys,
-        &keys.public_key(),
-        rumor,
-        [Tag::identifier(&d_tag)],
-    )?;
+    let gift_wrap =
+        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
 
@@ -1326,12 +1438,8 @@ async fn push_deletion(
         entity_id.to_string()
     };
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &d_tag_input);
-    let gift_wrap = crate::nip59_ext::gift_wrap(
-        keys,
-        &keys.public_key(),
-        rumor,
-        [Tag::identifier(&d_tag)],
-    )?;
+    let gift_wrap =
+        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
@@ -1386,12 +1494,8 @@ async fn push_notebook(
     let rumor = notebook_to_rumor(notebook_id, &name, updated_at, keys.public_key());
 
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
-    let gift_wrap = crate::nip59_ext::gift_wrap(
-        keys,
-        &keys.public_key(),
-        rumor,
-        [Tag::identifier(&d_tag)],
-    )?;
+    let gift_wrap =
+        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
@@ -1454,19 +1558,28 @@ async fn download_missing_blobs(
             Ok(true) => continue,
             Ok(false) => {}
             Err(e) => {
-                log::error!("[sync] failed to check local blob {}: {e}", &plaintext_hash[..8]);
+                log::error!(
+                    "[sync] failed to check local blob {}: {e}",
+                    &plaintext_hash[..8]
+                );
                 continue;
             }
         }
 
         // Download from Blossom
-        let ciphertext_bytes = match crate::blossom::download_blob(&http_client, blossom_url, ciphertext_hash, keys).await {
-            Ok(data) => data,
-            Err(e) => {
-                log::error!("[sync] failed to download blob {}: {e}", &ciphertext_hash[..8]);
-                continue;
-            }
-        };
+        let ciphertext_bytes =
+            match crate::blossom::download_blob(&http_client, blossom_url, ciphertext_hash, keys)
+                .await
+            {
+                Ok(data) => data,
+                Err(e) => {
+                    log::error!(
+                        "[sync] failed to download blob {}: {e}",
+                        &ciphertext_hash[..8]
+                    );
+                    continue;
+                }
+            };
 
         // Decrypt with ChaCha20-Poly1305
         let plaintext = match crate::blossom::decrypt_blob(&ciphertext_bytes, key_hex) {
@@ -1519,4 +1632,55 @@ pub(crate) fn extract_blob_extension(content: &str, hash: &str) -> Option<String
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::delete_note_from_sync;
+    use rusqlite::{params, Connection};
+
+    #[test]
+    fn sync_delete_removes_note_and_invalidates_cache() {
+        let conn = Connection::open_in_memory().expect("open sqlite");
+        conn.execute_batch(
+            "CREATE TABLE notes (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                markdown TEXT NOT NULL
+            );
+            CREATE TABLE notes_fts (
+                note_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                markdown TEXT NOT NULL
+            );",
+        )
+        .expect("create schema");
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Title", "Body"],
+        )
+        .expect("insert note");
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Title", "Body"],
+        )
+        .expect("insert fts");
+
+        let mut invalidated_note_id: Option<String> = None;
+        delete_note_from_sync(&conn, "note-1", |note_id| {
+            invalidated_note_id = Some(note_id.to_string());
+        })
+        .expect("delete note from sync");
+
+        let notes_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
+            .expect("count notes");
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
+            .expect("count notes_fts");
+
+        assert_eq!(notes_count, 0);
+        assert_eq!(fts_count, 0);
+        assert_eq!(invalidated_note_id.as_deref(), Some("note-1"));
+    }
 }

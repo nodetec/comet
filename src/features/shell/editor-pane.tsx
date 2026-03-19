@@ -526,7 +526,7 @@ export function EditorPane({
                 focusMode={focusMode}
                 html={html}
                 isNew={isNewNote}
-                key={editorKey ?? noteId}
+                loadKey={editorKey ?? noteId}
                 markdown={markdown}
                 onChange={onChange}
                 onEditorFocusChange={(focused) => {

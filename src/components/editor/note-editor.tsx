@@ -61,6 +61,7 @@ type NoteEditorProps = {
   focusMode: "none" | "immediate" | "pointerup";
   html: string | null;
   isNew: boolean;
+  loadKey: string;
   markdown: string;
   onEditorFocusChange?(focused: boolean): void;
   onSearchMatchCountChange?(count: number): void;
@@ -84,6 +85,7 @@ function EditorInner({
   focusMode,
   html,
   isNew,
+  loadKey,
   markdown,
   readOnly,
   searchHighlightAllMatchesYellow,
@@ -100,8 +102,11 @@ function EditorInner({
   editorRef: React.RefObject<NoteEditorHandle | null>;
 }) {
   const [editor] = useLexicalComposerContext();
-  const [initComplete, setInitComplete] = useState(false);
-  const handleInitComplete = useCallback(() => setInitComplete(true), []);
+  const [initVersion, setInitVersion] = useState(0);
+  const handleInitComplete = useCallback(
+    () => setInitVersion((version) => version + 1),
+    [],
+  );
   const searchWords = useMemo(
     () => searchWordsFromQuery(searchQuery),
     [searchQuery],
@@ -197,10 +202,15 @@ function EditorInner({
           autoCorrect="off"
         />
       </div>
-      <OnChangeMarkdownPlugin initComplete={initComplete} onChange={onChange} />
+      <OnChangeMarkdownPlugin
+        initVersion={initVersion}
+        loadKey={loadKey}
+        onChange={onChange}
+      />
       <InitialContentPlugin
         html={html}
         isNew={isNew}
+        loadKey={loadKey}
         markdown={markdown}
         onInitComplete={handleInitComplete}
       />
@@ -221,17 +231,20 @@ function EditorInner({
       <SearchHighlightPlugin
         activeMatchIndex={searchActiveMatchIndex}
         highlightAllMatchesYellow={searchHighlightAllMatchesYellow}
+        loadKey={loadKey}
         onMatchCountChange={onSearchMatchCountChange}
         scrollRevision={searchScrollRevision}
         searchWords={searchWords}
       />
-      <TableActionMenuPlugin />
+      <TableActionMenuPlugin loadKey={loadKey} />
 
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
-      <TagCompletionPlugin />
+      <TagCompletionPlugin loadKey={loadKey} />
       <DevtoolsPlugin portalContainer={devtoolsContainer} />
-      {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
+      {!readOnly && (
+        <ToolbarPlugin loadKey={loadKey} portalContainer={toolbarContainer} />
+      )}
     </>
   );
 }

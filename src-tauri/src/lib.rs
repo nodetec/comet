@@ -13,12 +13,12 @@ mod themes;
 use db::database_connection;
 use error::AppError;
 use nostr_sdk::prelude::Keys;
-use rusqlite::OptionalExtension;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, ExportNotesInput, LoadedNote, NotePagePayload, NoteQueryInput,
     NotebookSummary, RenameNotebookInput, SaveNoteInput, SearchResult,
 };
+use rusqlite::OptionalExtension;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
@@ -40,7 +40,11 @@ fn app_status(app: AppHandle) -> Result<AppStatus, AppError> {
     let themes_path = config_dir.join("themes");
 
     Ok(AppStatus {
-        version: app.config().version.clone().unwrap_or_else(|| "unknown".into()),
+        version: app
+            .config()
+            .version
+            .clone()
+            .unwrap_or_else(|| "unknown".into()),
         database_path: database_path.to_string_lossy().into_owned(),
         attachments_path: attachments_path.to_string_lossy().into_owned(),
         themes_path: themes_path.to_string_lossy().into_owned(),
@@ -92,7 +96,10 @@ fn get_attachments_dir(app: AppHandle) -> Result<String, AppError> {
 }
 
 #[tauri::command]
-fn import_image(app: AppHandle, source_path: String) -> Result<attachments::ImportedImage, AppError> {
+fn import_image(
+    app: AppHandle,
+    source_path: String,
+) -> Result<attachments::ImportedImage, AppError> {
     attachments::import_image(&app, &source_path)
 }
 
@@ -125,7 +132,12 @@ fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
 }
 
 #[tauri::command]
-fn create_note(app: AppHandle, notebook_id: Option<String>, tags: Vec<String>, markdown: Option<String>) -> Result<LoadedNote, AppError> {
+fn create_note(
+    app: AppHandle,
+    notebook_id: Option<String>,
+    tags: Vec<String>,
+    markdown: Option<String>,
+) -> Result<LoadedNote, AppError> {
     notes::create_note(&app, notebook_id.as_deref(), &tags, markdown.as_deref())
 }
 
@@ -195,14 +207,20 @@ fn empty_trash(app: AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-fn create_notebook(app: AppHandle, input: CreateNotebookInput) -> Result<NotebookSummary, AppError> {
+fn create_notebook(
+    app: AppHandle,
+    input: CreateNotebookInput,
+) -> Result<NotebookSummary, AppError> {
     let notebook = notes::create_notebook(&app, input)?;
     sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
     Ok(notebook)
 }
 
 #[tauri::command]
-fn rename_notebook(app: AppHandle, input: RenameNotebookInput) -> Result<NotebookSummary, AppError> {
+fn rename_notebook(
+    app: AppHandle,
+    input: RenameNotebookInput,
+) -> Result<NotebookSummary, AppError> {
     let notebook = notes::rename_notebook(&app, input)?;
     sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
     Ok(notebook)
@@ -264,11 +282,9 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
         Err(_) => return,
     };
     let keys = match conn
-        .query_row(
-            "SELECT secret_key FROM nostr_identity LIMIT 1",
-            [],
-            |row| row.get::<_, String>(0),
-        )
+        .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
+            row.get::<_, String>(0)
+        })
         .optional()
     {
         Ok(Some(secret_hex)) => match Keys::parse(&secret_hex) {
@@ -281,7 +297,9 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
     tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::new();
         for (server_url, ciphertext_hash) in blossom_deletions {
-            if let Err(e) = crate::blossom::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await {
+            if let Err(e) =
+                crate::blossom::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await
+            {
                 eprintln!("[blob-gc] failed to delete from Blossom: {e}");
             }
         }
@@ -291,8 +309,14 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
 fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
     conn.execute_batch("BEGIN")?;
     let result = (|| -> Result<(), AppError> {
-        conn.execute("UPDATE notes SET sync_event_id = NULL, locally_modified = 1", [])?;
-        conn.execute("UPDATE notebooks SET sync_event_id = NULL, locally_modified = 1", [])?;
+        conn.execute(
+            "UPDATE notes SET sync_event_id = NULL, locally_modified = 1",
+            [],
+        )?;
+        conn.execute(
+            "UPDATE notebooks SET sync_event_id = NULL, locally_modified = 1",
+            [],
+        )?;
         conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])?;
         conn.execute("DELETE FROM app_settings WHERE key = 'sync_relay_url'", [])?;
         conn.execute("DELETE FROM pending_deletions", [])?;
@@ -321,14 +345,12 @@ fn import_nsec(app: AppHandle, nsec: String) -> Result<String, AppError> {
     reset_sync_state(&conn)?;
 
     // Collect all note and notebook IDs to re-push under the new key
-    let mut stmt = conn
-        .prepare("SELECT id FROM notes WHERE archived_at IS NULL")?;
+    let mut stmt = conn.prepare("SELECT id FROM notes WHERE archived_at IS NULL")?;
     let note_ids: Vec<String> = stmt
         .query_map([], |row| row.get(0))?
         .collect::<Result<Vec<_>, _>>()?;
     drop(stmt);
-    let mut stmt2 = conn
-        .prepare("SELECT id FROM notebooks")?;
+    let mut stmt2 = conn.prepare("SELECT id FROM notebooks")?;
     let notebook_ids: Vec<String> = stmt2
         .query_map([], |row| row.get(0))?
         .collect::<Result<Vec<_>, _>>()?;
@@ -383,11 +405,15 @@ fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
 
 #[tauri::command]
 fn set_blossom_url(app: AppHandle, url: String) -> Result<(), AppError> {
-    let parsed = url::Url::parse(url.trim())
-        .map_err(|_| AppError::custom("Invalid Blossom URL"))?;
+    let parsed =
+        url::Url::parse(url.trim()).map_err(|_| AppError::custom("Invalid Blossom URL"))?;
     match parsed.scheme() {
         "https" | "http" => {}
-        _ => return Err(AppError::custom("Blossom URL must start with https:// or http://")),
+        _ => {
+            return Err(AppError::custom(
+                "Blossom URL must start with https:// or http://",
+            ))
+        }
     }
     let url = parsed.as_str().trim_end_matches('/').to_string();
     let conn = database_connection(&app)?;
@@ -444,7 +470,8 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
 
     // Download from Blossom
     let http_client = reqwest::Client::new();
-    let ciphertext = crate::blossom::download_blob(&http_client, &blossom_url, &ciphertext_hash, &keys).await?;
+    let ciphertext =
+        crate::blossom::download_blob(&http_client, &blossom_url, &ciphertext_hash, &keys).await?;
 
     // Decrypt
     let plaintext = crate::blossom::decrypt_blob(&ciphertext, &key_hex)?;
@@ -485,17 +512,26 @@ fn remove_relay(app: AppHandle, url: String, kind: String) -> Result<Vec<nostr::
 }
 
 #[tauri::command]
-async fn publish_note(app: AppHandle, input: nostr::PublishNoteInput) -> Result<nostr::PublishResult, AppError> {
+async fn publish_note(
+    app: AppHandle,
+    input: nostr::PublishNoteInput,
+) -> Result<nostr::PublishResult, AppError> {
     nostr::publish_note(&app, input).await
 }
 
 #[tauri::command]
-async fn publish_short_note(app: AppHandle, input: nostr::PublishShortNoteInput) -> Result<nostr::PublishResult, AppError> {
+async fn publish_short_note(
+    app: AppHandle,
+    input: nostr::PublishShortNoteInput,
+) -> Result<nostr::PublishResult, AppError> {
     nostr::publish_short_note(&app, input).await
 }
 
 #[tauri::command]
-async fn delete_published_note(app: AppHandle, note_id: String) -> Result<nostr::PublishResult, AppError> {
+async fn delete_published_note(
+    app: AppHandle,
+    note_id: String,
+) -> Result<nostr::PublishResult, AppError> {
     nostr::delete_published_note(&app, &note_id).await
 }
 
@@ -525,28 +561,45 @@ async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
     let relay_url = sync::get_sync_relay_url(&conn);
     let blossom_url = sync::get_blossom_url(&conn);
     let npub: Option<String> = conn
-        .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| row.get(0))
+        .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
+            row.get(0)
+        })
         .optional()?;
 
-    let synced_notes: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND archived_at IS NULL", [], |row| row.get(0))?;
+    let synced_notes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND archived_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
-    let total_notes: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notes WHERE archived_at IS NULL", [], |row| row.get(0))?;
+    let total_notes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE archived_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
-    let synced_notebooks: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL", [], |row| row.get(0))?;
+    let synced_notebooks: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
-    let pending_notes: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notes WHERE locally_modified = 1", [], |row| row.get(0))?;
+    let pending_notes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE locally_modified = 1",
+        [],
+        |row| row.get(0),
+    )?;
 
-    let pending_notebooks: i64 = conn
-        .query_row("SELECT COUNT(*) FROM notebooks WHERE locally_modified = 1", [], |row| row.get(0))?;
+    let pending_notebooks: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notebooks WHERE locally_modified = 1",
+        [],
+        |row| row.get(0),
+    )?;
 
     let checkpoint: i64 = sync::get_checkpoint(&conn);
 
-    let blobs_stored: i64 = conn
-        .query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;
+    let blobs_stored: i64 =
+        conn.query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;
 
     Ok(SyncInfo {
         state,
@@ -616,7 +669,7 @@ async fn resync(app: AppHandle) -> Result<(), AppError> {
          DELETE FROM notebooks;
          DELETE FROM blob_meta;
          DELETE FROM pending_deletions;
-         DELETE FROM app_settings WHERE key = 'sync_checkpoint';"
+         DELETE FROM app_settings WHERE key = 'sync_checkpoint';",
     )?;
 
     // Restart sync — will pull everything fresh from the relay
@@ -656,6 +709,7 @@ pub fn run() {
         .plugin(log_plugin.build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(notes::RenderedHtmlCache::default())
         .manage(sync::SyncManager::new())
         .setup(|app| {
             db::init_database(app.handle())?;

@@ -47,7 +47,19 @@ export async function getContextualTags(input: ContextualTagsInput) {
 }
 
 export async function loadNote(noteId: string) {
-  return invoke<LoadedNote>("load_note", { noteId });
+  const startedAt = import.meta.env.DEV ? performance.now() : 0;
+  const note = await invoke<LoadedNote>("load_note", { noteId });
+
+  if (import.meta.env.DEV) {
+    console.log("[editor:loadNote]", {
+      noteId,
+      markdownLength: note.markdown.length,
+      htmlLength: note.html.length,
+      totalMs: Number((performance.now() - startedAt).toFixed(1)),
+    });
+  }
+
+  return note;
 }
 
 export async function createNote(input: {

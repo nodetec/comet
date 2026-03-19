@@ -16,6 +16,7 @@ import {
 import { $isCodeNode } from "@lexical/code";
 import { invoke } from "@tauri-apps/api/core";
 import { mergeRegister } from "@lexical/utils";
+import { createLoadScopedRequestGate } from "../lib/note-load-state";
 
 type MenuState = {
   query: string;
@@ -83,11 +84,12 @@ function TagMenuItem({
   );
 }
 
-export default function TagCompletionPlugin() {
+export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
   const [editor] = useLexicalComposerContext();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestGateRef = useRef(createLoadScopedRequestGate());
 
   // Reset selection when menu changes
   useEffect(() => {
@@ -97,6 +99,15 @@ export default function TagCompletionPlugin() {
   const closeMenu = useCallback(() => {
     setMenu(null);
   }, []);
+
+  useEffect(() => {
+    requestGateRef.current.invalidate();
+    closeMenu();
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, [closeMenu, loadKey]);
 
   const selectTag = useCallback(
     (tag: string) => {
@@ -243,11 +254,16 @@ export default function TagCompletionPlugin() {
 
         // Debounce the search
         if (debounceRef.current) clearTimeout(debounceRef.current);
+        const requestVersion = requestGateRef.current.issue();
         debounceRef.current = setTimeout(() => {
           void invoke<string[]>("search_tags", {
             query: match.matchingString,
           }).then(
             (tags) => {
+              if (!requestGateRef.current.isCurrent(requestVersion)) {
+                return;
+              }
+
               // Filter out exact matches (user already typed this)
               const filtered = tags.filter(
                 (t) => t !== match.matchingString.toLowerCase(),
@@ -257,19 +273,41 @@ export default function TagCompletionPlugin() {
                 return;
               }
 
-              // Get cursor rect for positioning
-              const domSelection = window.getSelection();
-              if (!domSelection || domSelection.rangeCount === 0) return;
-              const range = domSelection.getRangeAt(0);
-              const rect = range.getBoundingClientRect();
+              editor.getEditorState().read(() => {
+                const selection = $getSelection();
+                if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+                  closeMenu();
+                  return;
+                }
 
-              setMenu({
-                query: match.matchingString,
-                tags: filtered,
-                rect,
-                anchorKey,
-                leadOffset: match.leadOffset,
-                replaceableLength: match.replaceableLength,
+                const currentAnchorNode = selection.anchor.getNode();
+                if (
+                  !$isTextNode(currentAnchorNode) ||
+                  currentAnchorNode.getKey() !== anchorKey
+                ) {
+                  closeMenu();
+                  return;
+                }
+
+                // Get cursor rect for positioning only if the caret is still on
+                // the same text node that triggered this request.
+                const domSelection = window.getSelection();
+                if (!domSelection || domSelection.rangeCount === 0) {
+                  closeMenu();
+                  return;
+                }
+
+                const range = domSelection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                setMenu({
+                  query: match.matchingString,
+                  tags: filtered,
+                  rect,
+                  anchorKey,
+                  leadOffset: match.leadOffset,
+                  replaceableLength: match.replaceableLength,
+                });
               });
             },
             () => closeMenu(),
@@ -281,7 +319,9 @@ export default function TagCompletionPlugin() {
 
   // Cleanup debounce on unmount
   useEffect(() => {
+    const requestGate = requestGateRef.current;
     return () => {
+      requestGate.invalidate();
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);

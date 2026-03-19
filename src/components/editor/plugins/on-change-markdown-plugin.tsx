@@ -2,36 +2,43 @@ import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { TRANSFORMERS } from "../transformers";
 import { $exportMarkdown } from "../lib/markdown";
+import { createMarkdownChangeTracker } from "../lib/note-load-state";
 
 interface OnChangeMarkdownPluginProps {
-  initComplete: boolean;
+  initVersion: number;
+  loadKey: string;
   onChange(markdown: string): void;
 }
 
 export default function OnChangeMarkdownPlugin({
-  initComplete,
+  initVersion,
+  loadKey,
   onChange,
 }: OnChangeMarkdownPluginProps) {
   const [editor] = useLexicalComposerContext();
   const onChangeRef = useRef(onChange);
-  const prevMarkdownRef = useRef<string | null>(null);
-  const initCompleteRef = useRef(false);
+  const trackerRef = useRef(createMarkdownChangeTracker());
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // When initComplete flips to true, record the baseline markdown so
-  // subsequent updates can detect real changes vs. init normalization.
   useEffect(() => {
-    if (initComplete && !initCompleteRef.current) {
-      initCompleteRef.current = true;
-      editor.getEditorState().read(() => {
-        const markdown = $exportMarkdown(TRANSFORMERS);
-        prevMarkdownRef.current = markdown;
-      });
+    trackerRef.current.resetForLoad();
+  }, [loadKey]);
+
+  // When a new document load completes, record a fresh baseline so updates
+  // compare against the current note rather than the previous one.
+  useEffect(() => {
+    if (initVersion === 0) {
+      return;
     }
-  }, [editor, initComplete]);
+
+    editor.getEditorState().read(() => {
+      const markdown = $exportMarkdown(TRANSFORMERS);
+      trackerRef.current.setBaseline(markdown);
+    });
+  }, [editor, initVersion]);
 
   useEffect(() => {
     return editor.registerUpdateListener(
@@ -39,21 +46,13 @@ export default function OnChangeMarkdownPlugin({
         if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
         editorState.read(() => {
-          if (!initCompleteRef.current) {
-            return;
-          }
-
           const markdown = $exportMarkdown(TRANSFORMERS);
-
-          if (
-            prevMarkdownRef.current !== null &&
-            prevMarkdownRef.current === markdown
-          ) {
+          const changedMarkdown = trackerRef.current.consume(markdown);
+          if (changedMarkdown === null) {
             return;
           }
 
-          prevMarkdownRef.current = markdown;
-          onChangeRef.current(markdown);
+          onChangeRef.current(changedMarkdown);
         });
       },
     );
