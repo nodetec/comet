@@ -2,7 +2,12 @@ import { $convertFromMarkdownString } from "@lexical/markdown";
 import { $createCodeNode, CodeNode } from "@lexical/code";
 import { HorizontalRuleNode } from "@lexical/extension";
 import { LinkNode, $createLinkNode } from "@lexical/link";
-import { ListItemNode, ListNode } from "@lexical/list";
+import {
+  $createListItemNode,
+  $createListNode,
+  ListItemNode,
+  ListNode,
+} from "@lexical/list";
 import { HeadingNode, QuoteNode, $createQuoteNode } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import {
@@ -35,6 +40,7 @@ import { TRANSFORMERS } from "../transformers";
 import {
   $exportMarkdown,
   $exportMarkdownForClipboard,
+  normalizeImportedNodes,
   normalizeImportedCodeBlocksFromMarkdown,
 } from "./markdown";
 
@@ -199,6 +205,109 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["> first", ">", "> second"].join("\n"));
+  });
+
+  it("exports nested bullet lists under checklist items without converting them", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const parentItem = $createListItemNode(false);
+      parentItem.append($createTextNode("Parent"));
+
+      const nestedList = $createListNode("bullet");
+      const nestedItem = $createListItemNode();
+      nestedItem.append($createTextNode("Child"));
+      nestedList.append(nestedItem);
+
+      parentItem.append(nestedList);
+      checklist.append(parentItem);
+      root.append(checklist);
+    });
+
+    expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("preserves separate top-level bullet lists after a checklist", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const checkItem = $createListItemNode(false);
+      checkItem.append($createTextNode("Task"));
+      checklist.append(checkItem);
+
+      const bulletList = $createListNode("bullet");
+      const bulletItem = $createListItemNode();
+      bulletItem.append($createTextNode("Bullet"));
+      bulletList.append(bulletItem);
+
+      root.append(checklist, bulletList);
+    });
+
+    expect(markdown).toBe(["- [ ] Task", "", "* Bullet"].join("\n"));
+  });
+
+  it("preserves separate top-level checklists in the same list run", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const firstChecklist = $createListNode("check");
+      const firstItem = $createListItemNode(false);
+      firstItem.append($createTextNode("First"));
+      firstChecklist.append(firstItem);
+
+      const secondChecklist = $createListNode("check");
+      const secondItem = $createListItemNode(false);
+      secondItem.append($createTextNode("Second"));
+      secondChecklist.append(secondItem);
+
+      root.append(firstChecklist, secondChecklist);
+    });
+
+    expect(markdown).toBe(["- [ ] First", "", "* [ ] Second"].join("\n"));
+  });
+
+  it("normalizes imported checklist wrappers back into nested bullet lists", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+
+      const parentItem = $createListItemNode(false);
+      parentItem.append($createTextNode("Parent"));
+
+      const wrapperItem = $createListItemNode();
+      const nestedList = $createListNode("bullet");
+      const nestedItem = $createListItemNode();
+      nestedItem.append($createTextNode("Child"));
+      nestedList.append(nestedItem);
+      wrapperItem.append(nestedList);
+
+      checklist.append(parentItem, wrapperItem);
+      root.append(checklist);
+
+      normalizeImportedNodes(root.getChildren());
+    });
+
+    expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("normalizes imported checklist wrappers with empty paragraph padding", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+
+      const parentItem = $createListItemNode(false);
+      parentItem.append($createTextNode("Parent"));
+
+      const wrapperItem = $createListItemNode();
+      wrapperItem.append($createParagraphNode());
+
+      const nestedList = $createListNode("bullet");
+      const nestedItem = $createListItemNode();
+      nestedItem.append($createTextNode("Child"));
+      nestedList.append(nestedItem);
+      wrapperItem.append(nestedList);
+
+      checklist.append(parentItem, wrapperItem);
+      root.append(checklist);
+
+      normalizeImportedNodes(root.getChildren());
+    });
+
+    expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
   });
 
   it("exports plain email autolinks as bare email text", () => {

@@ -221,6 +221,39 @@ mod tests {
     }
 
     #[test]
+    fn test_nested_bullet_list_under_checklist_item_stays_plain_ul() {
+        let md = "- [ ] Parent\n  - Child";
+        let html = markdown_to_lexical_html(md);
+
+        assert_eq!(
+            html.matches("contains-task-list").count(),
+            1,
+            "Expected only the checklist UL to have contains-task-list. HTML: {html}"
+        );
+        assert!(
+            html.contains("<ul><li>Child</li></ul>"),
+            "Expected nested bullet list to stay a plain UL. HTML: {html}"
+        );
+    }
+
+    #[test]
+    fn test_separate_bullet_list_after_checklist_stays_separate() {
+        let md = "- [ ] Task\n\n* Bullet";
+        let html = markdown_to_lexical_html(md);
+
+        assert_eq!(
+            html.matches("<ul").count(),
+            2,
+            "Expected two separate ULs. HTML: {html}"
+        );
+        assert_eq!(
+            html.matches("contains-task-list").count(),
+            1,
+            "Expected only the checklist UL to have checklist classes. HTML: {html}"
+        );
+    }
+
+    #[test]
     fn test_image() {
         let html = markdown_to_lexical_html("![alt](attachment://hash.png)");
         assert!(html.contains("<img"), "HTML: {html}");

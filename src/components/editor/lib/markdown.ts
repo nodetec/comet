@@ -1,5 +1,6 @@
 import type { Transformer } from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
+import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
 import type { ElementNode, LexicalNode } from "lexical";
 import {
   $createParagraphNode,
@@ -95,6 +96,79 @@ function normalizeImportedQuoteSpacing(node: LexicalNode): void {
     }
 
     previousNonEmptyParagraph = null;
+  }
+}
+
+function isIgnorableChecklistWrapperChild(node: LexicalNode): boolean {
+  if ($isParagraphNode(node)) {
+    return isEmptyParagraph(node);
+  }
+
+  if ($isTextNode(node)) {
+    return /^\s*$/.test(node.getTextContent());
+  }
+
+  return false;
+}
+
+function normalizeImportedChecklistNesting(node: LexicalNode): void {
+  if ($isElementNode(node)) {
+    for (const child of node.getChildren()) {
+      normalizeImportedChecklistNesting(child);
+    }
+  }
+
+  if (!$isListNode(node) || node.getListType() !== "check") {
+    return;
+  }
+
+  let previousItem: LexicalNode | null = null;
+
+  for (const child of [...node.getChildren()]) {
+    if (!$isListItemNode(child)) {
+      previousItem = child;
+      continue;
+    }
+
+    const nestedLists = child
+      .getChildren()
+      .filter((grandchild): grandchild is ListNode => $isListNode(grandchild));
+    const hasOnlyNestedListContent =
+      nestedLists.length > 0 &&
+      child
+        .getChildren()
+        .every(
+          (grandchild) =>
+            $isListNode(grandchild) ||
+            isIgnorableChecklistWrapperChild(grandchild),
+        );
+
+    if (
+      previousItem &&
+      $isListItemNode(previousItem) &&
+      hasOnlyNestedListContent
+    ) {
+      for (const nestedList of nestedLists) {
+        previousItem.append(nestedList);
+      }
+
+      if (import.meta.env.DEV) {
+        console.log("[editor:list-roundtrip] merged-checklist-wrapper", {
+          previousText: previousItem.getTextContent(),
+          nestedListTypes: nestedLists.map((nestedList) =>
+            nestedList.getListType(),
+          ),
+          wrapperChildren: child
+            .getChildren()
+            .map((grandchild) => grandchild.getType()),
+        });
+      }
+
+      child.remove();
+      continue;
+    }
+
+    previousItem = child;
   }
 }
 
@@ -231,6 +305,7 @@ export function normalizeImportedCodeBlocksFromMarkdown(
 export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   for (const node of nodes) {
     normalizeImportedQuoteSpacing(node);
+    normalizeImportedChecklistNesting(node);
   }
 
   return nodes;
