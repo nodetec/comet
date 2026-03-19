@@ -55,6 +55,7 @@ pub struct LoadedNote {
     pub notebook: Option<NotebookRef>,
     pub modified_at: i64,
     pub markdown: String,
+    pub html: String,
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
@@ -1128,11 +1129,14 @@ fn set_last_open_note_id(conn: &Connection, note_id: Option<&str>) -> Result<(),
 fn row_to_loaded_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<LoadedNote> {
     let notebook_id: Option<String> = row.get(4)?;
     let notebook_name: Option<String> = row.get(5)?;
+    let markdown: String = row.get(2)?;
+    let html = crate::markdown::markdown_to_lexical_html(&markdown);
 
     Ok(LoadedNote {
         id: row.get(0)?,
         title: row.get(1)?,
-        markdown: row.get(2)?,
+        markdown,
+        html,
         modified_at: row.get(3)?,
         notebook: notebook_id
             .zip(notebook_name)
@@ -1631,5 +1635,45 @@ fn handle_notebook_write_error(error: rusqlite::Error) -> AppError {
             AppError::custom("A notebook with that name already exists.")
         }
         other => AppError::Db(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{preview_from_markdown, strip_markdown_syntax, title_from_markdown};
+
+    #[test]
+    fn title_from_markdown_uses_first_non_empty_h1() {
+        let markdown = "\n\n# Trail Note\n\n## Section\nBody";
+        assert_eq!(title_from_markdown(markdown), "Trail Note");
+    }
+
+    #[test]
+    fn preview_from_markdown_skips_title_images_rules_and_code() {
+        let markdown = [
+            "# Trail Note",
+            "",
+            "![diagram](attachment://hash.png)",
+            "---",
+            "```rust",
+            "let hidden = true;",
+            "```",
+            "",
+            "> Quoted context",
+            "- [x] Done item",
+            "Regular [link](https://example.com) text",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            preview_from_markdown(&markdown),
+            "Quoted context Done item Regular link text"
+        );
+    }
+
+    #[test]
+    fn strip_markdown_syntax_removes_common_markdown_markup() {
+        let line = "> - [x] **Task** [label](https://example.com) `code`";
+        assert_eq!(strip_markdown_syntax(line), "Task label code");
     }
 }

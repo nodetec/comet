@@ -2,6 +2,14 @@ import { Marked, type MarkedExtension, type Tokens } from "marked";
 import { resolveImageSrc } from "@/lib/attachments";
 import { extractYouTubeVideoId } from "./youtube-utils";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Block-level extension: bare YouTube URLs on their own line become embeds.
  * Renders an <iframe data-lexical-youtube="videoId"> that YouTubeNode.importDOM
@@ -82,8 +90,7 @@ const highlightExtension: MarkedExtension = {
 const rendererOverrides: MarkedExtension = {
   renderer: {
     // Code blocks: Lexical's CodeNode.importDOM reads `data-language` from
-    // <pre>, but marked outputs <pre><code class="language-js">. We rewrite
-    // to match Lexical's expectation.
+    // <pre>. Emitting a bare <pre> avoids the nested <code> conversion path.
     code({ text, lang }: Tokens.Code) {
       const escaped = text
         .replace(/&/g, "&amp;")
@@ -91,13 +98,18 @@ const rendererOverrides: MarkedExtension = {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
       const langAttr = lang ? ` data-language="${lang}"` : "";
-      return `<pre${langAttr}><code>${escaped}</code></pre>\n`;
+      return `<pre${langAttr}>${escaped}</pre>\n`;
     },
 
     // Strikethrough: marked outputs <del>, Lexical's TextNode.importDOM
     // handles <s> but not <del>.
     del({ tokens }: Tokens.Del) {
       return `<s>${this.parser.parseInline(tokens)}</s>`;
+    },
+
+    link({ href, tokens, title }: Tokens.Link) {
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+      return `<a href="${escapeHtml(href)}"${titleAttr}>${this.parser.parseInline(tokens)}</a>`;
     },
 
     // Images: resolve attachment:// URIs for rendering.
@@ -122,11 +134,13 @@ const rendererOverrides: MarkedExtension = {
       // For task items, marked already includes a checkbox token in `tokens`.
       // We just need to add the "task-list-item" class for Lexical's
       // $convertListItemElement to detect the checked state.
+      // No trailing \n — whitespace between </li> and <li> creates phantom
+      // empty list items in Lexical's $normalizeChildren.
       const inner = this.parser.parse(tokens);
       if (task) {
-        return `<li class="task-list-item">${inner}</li>\n`;
+        return `<li class="task-list-item">${inner}</li>`;
       }
-      return `<li>${inner}</li>\n`;
+      return `<li>${inner}</li>`;
     },
   },
 };
@@ -245,7 +259,8 @@ const pastePreprocess: MarkedExtension = {
             blankCount++;
             i++;
           }
-          // Every blank becomes an empty paragraph
+          // Every blank becomes an empty paragraph (Bear/Obsidian convention:
+          // each blank line is a visible, clickable spacer in the editor)
           for (let j = 0; j < blankCount; j++) {
             result.push("");
             result.push("<p><br></p>");
@@ -290,16 +305,31 @@ markedInstanceForPaste.use(
 // Public API
 // ---------------------------------------------------------------------------
 
-const domParser = new DOMParser();
+// Strip whitespace between block-level tags to prevent DOMParser from creating
+// text nodes that Lexical interprets as empty paragraphs or phantom list items.
+const BLOCK_WS_RE =
+  />\s+<(\/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)/g;
 
 export function markdownToDOM(
   markdown: string,
   options?: { paste?: boolean },
 ): Document {
+  const html = renderMarkdownToHTML(markdown, options);
+  return htmlToDOM(html);
+}
+
+export function renderMarkdownToHTML(
+  markdown: string,
+  options?: { paste?: boolean },
+): string {
   const instance = options?.paste ? markedInstanceForPaste : markedInstance;
-  const html = instance.parse(markdown) as string;
-  return domParser.parseFromString(
-    `<!DOCTYPE html><html><body>${html}</body></html>`,
+  return instance.parse(markdown) as string;
+}
+
+export function htmlToDOM(html: string): Document {
+  const cleaned = html.replace(BLOCK_WS_RE, "><$1$2");
+  return new DOMParser().parseFromString(
+    `<!DOCTYPE html><html><body>${cleaned}</body></html>`,
     "text/html",
   );
 }

@@ -22,7 +22,7 @@ import {
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "./extensions/hashtag-extension";
 import { TableExtension } from "@lexical/table";
-import { LinkNode } from "@lexical/link";
+import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
 
@@ -40,6 +40,7 @@ import HeadingAnchorPlugin from "./plugins/heading-anchor-plugin";
 import HeadingBackspacePlugin from "./plugins/heading-backspace-plugin";
 import LinkClickPlugin from "./plugins/link-click-plugin";
 import LinkPastePlugin from "./plugins/link-paste-plugin";
+import AutoLinkPlugin from "./plugins/autolink-plugin";
 import MarkdownCopyPlugin from "./plugins/markdown-copy-plugin";
 import MarkdownPastePlugin from "./plugins/markdown-paste-plugin";
 import ImageDropPlugin from "./plugins/image-drop-plugin";
@@ -47,12 +48,15 @@ import SearchHighlightPlugin from "./plugins/search-highlight-plugin";
 import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
+import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
 
 type NoteEditorProps = {
+  devtoolsContainer: HTMLElement | null;
   focusMode: "none" | "immediate" | "pointerup";
+  html: string | null;
   isNew: boolean;
   markdown: string;
   readOnly: boolean;
@@ -67,7 +71,9 @@ export type NoteEditorHandle = {
 };
 
 function EditorInner({
+  devtoolsContainer,
   focusMode,
+  html,
   isNew,
   markdown,
   readOnly,
@@ -122,13 +128,16 @@ function EditorInner({
 
   return (
     <>
-      <ContentEditable
-        className="comet-editor-content"
-        autoCapitalize="off"
-        autoCorrect="off"
-      />
+      <div className="comet-editor-content-wrap">
+        <ContentEditable
+          className="comet-editor-content"
+          autoCapitalize="off"
+          autoCorrect="off"
+        />
+      </div>
       <OnChangeMarkdownPlugin initComplete={initComplete} onChange={onChange} />
       <InitialContentPlugin
+        html={html}
         isNew={isNew}
         markdown={markdown}
         onInitComplete={handleInitComplete}
@@ -142,6 +151,7 @@ function EditorInner({
       <HeadingBackspacePlugin />
       <LinkClickPlugin />
       <LinkPastePlugin />
+      <AutoLinkPlugin />
       <MarkdownCopyPlugin />
       <MarkdownPastePlugin />
       <YouTubeEmbedPlugin />
@@ -151,6 +161,7 @@ function EditorInner({
 
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
+      <DevtoolsPlugin portalContainer={devtoolsContainer} />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
   );
@@ -164,7 +175,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           name: "CometEditor",
           namespace: "CometEditor",
           theme,
-          nodes: [LinkNode, ImageNode, YouTubeNode],
+          nodes: [AutoLinkNode, LinkNode, ImageNode, YouTubeNode],
           onError: (error: Error) => console.error("Lexical error:", error),
           dependencies: [
             RichTextExtension,

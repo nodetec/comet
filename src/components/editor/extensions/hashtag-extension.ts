@@ -216,116 +216,110 @@ function registerHashtag(editor: LexicalEditor) {
     (node.getLatest() as unknown as { __mode: number }).__mode;
 
   // Forward transform: TextNode → HashtagNode (skips code contexts)
-  const removeTextTransform = editor.registerNodeTransform(
-    TextNode,
-    (node) => {
-      if (!node.isSimpleText() || $isInsideCode(node)) {
+  const removeTextTransform = editor.registerNodeTransform(TextNode, (node) => {
+    if (!node.isSimpleText() || $isInsideCode(node)) {
+      return;
+    }
+
+    let prevSibling = node.getPreviousSibling();
+    let text = node.getTextContent();
+    let currentNode: TextNode | undefined = node;
+    let match;
+
+    if ($isTextNode(prevSibling)) {
+      const previousText = prevSibling.getTextContent();
+      const combinedText = previousText + text;
+      const prevMatch = getHashtagMatch(combinedText);
+
+      if ($isHashtagNode(prevSibling)) {
+        if (prevMatch === null || getMode(prevSibling) !== 0) {
+          $replaceWithSimpleText(prevSibling);
+          return;
+        } else {
+          const diff = prevMatch.end - previousText.length;
+          if (diff > 0) {
+            const newTextContent = previousText + text.slice(0, diff);
+            prevSibling.select();
+            prevSibling.setTextContent(newTextContent);
+            if (diff === text.length) {
+              node.remove();
+            } else {
+              node.setTextContent(text.slice(diff));
+            }
+            return;
+          }
+        }
+      } else if (prevMatch === null || prevMatch.start < previousText.length) {
+        return;
+      }
+    }
+
+    let prevMatchLengthToSkip = 0;
+
+    while (true) {
+      match = getHashtagMatch(text);
+      let nextText = match === null ? "" : text.slice(match.end);
+      text = nextText;
+
+      if (nextText === "") {
+        const nextSibling = currentNode!.getNextSibling();
+        if ($isTextNode(nextSibling)) {
+          nextText =
+            currentNode!.getTextContent() + nextSibling.getTextContent();
+          const nextMatch = getHashtagMatch(nextText);
+          if (nextMatch === null) {
+            if ($isHashtagNode(nextSibling)) {
+              $replaceWithSimpleText(nextSibling);
+            } else {
+              nextSibling.markDirty();
+            }
+            return;
+          } else if (nextMatch.start !== 0) {
+            return;
+          }
+        }
+      }
+
+      if (match === null) {
         return;
       }
 
-      let prevSibling = node.getPreviousSibling();
-      let text = node.getTextContent();
-      let currentNode: TextNode | undefined = node;
-      let match;
-
-      if ($isTextNode(prevSibling)) {
-        const previousText = prevSibling.getTextContent();
-        const combinedText = previousText + text;
-        const prevMatch = getHashtagMatch(combinedText);
-
-        if ($isHashtagNode(prevSibling)) {
-          if (prevMatch === null || getMode(prevSibling) !== 0) {
-            $replaceWithSimpleText(prevSibling);
-            return;
-          } else {
-            const diff = prevMatch.end - previousText.length;
-            if (diff > 0) {
-              const newTextContent = previousText + text.slice(0, diff);
-              prevSibling.select();
-              prevSibling.setTextContent(newTextContent);
-              if (diff === text.length) {
-                node.remove();
-              } else {
-                node.setTextContent(text.slice(diff));
-              }
-              return;
-            }
-          }
-        } else if (
-          prevMatch === null ||
-          prevMatch.start < previousText.length
-        ) {
-          return;
-        }
+      if (
+        match.start === 0 &&
+        $isTextNode(prevSibling) &&
+        prevSibling.isTextEntity()
+      ) {
+        prevMatchLengthToSkip += match.end;
+        continue;
       }
 
-      let prevMatchLengthToSkip = 0;
-
-      while (true) {
-        match = getHashtagMatch(text);
-        let nextText = match === null ? "" : text.slice(match.end);
-        text = nextText;
-
-        if (nextText === "") {
-          const nextSibling = currentNode!.getNextSibling();
-          if ($isTextNode(nextSibling)) {
-            nextText =
-              currentNode!.getTextContent() + nextSibling.getTextContent();
-            const nextMatch = getHashtagMatch(nextText);
-            if (nextMatch === null) {
-              if ($isHashtagNode(nextSibling)) {
-                $replaceWithSimpleText(nextSibling);
-              } else {
-                nextSibling.markDirty();
-              }
-              return;
-            } else if (nextMatch.start !== 0) {
-              return;
-            }
-          }
-        }
-
-        if (match === null) {
-          return;
-        }
-
-        if (
-          match.start === 0 &&
-          $isTextNode(prevSibling) &&
-          prevSibling.isTextEntity()
-        ) {
-          prevMatchLengthToSkip += match.end;
-          continue;
-        }
-
-        let nodeToReplace: TextNode | undefined;
-        if (match.start === 0) {
-          [nodeToReplace, currentNode] = currentNode!.splitText(match.end);
-        } else {
-          [, nodeToReplace, currentNode] = currentNode!.splitText(
-            match.start + prevMatchLengthToSkip,
-            match.end + prevMatchLengthToSkip,
-          );
-        }
-
-        if (nodeToReplace === undefined) {
-          return;
-        }
-
-        const replacementNode = $createHashtagNode(
-          nodeToReplace.getTextContent(),
+      let nodeToReplace: TextNode | undefined;
+      if (match.start === 0) {
+        [nodeToReplace, currentNode] = currentNode!.splitText(match.end);
+      } else {
+        [, nodeToReplace, currentNode] = currentNode!.splitText(
+          match.start + prevMatchLengthToSkip,
+          match.end + prevMatchLengthToSkip,
         );
-        replacementNode.setFormat(nodeToReplace.getFormat());
-        nodeToReplace.replace(replacementNode);
-
-        if (currentNode == null) {
-          return;
-        }
-        prevMatchLengthToSkip = 0;
-        prevSibling = replacementNode;
       }
-    },
-  );
+
+      if (nodeToReplace === undefined) {
+        return;
+      }
+
+      const replacementNode = $createHashtagNode(
+        nodeToReplace.getTextContent(),
+      );
+      replacementNode.setFormat(nodeToReplace.getFormat());
+      nodeToReplace.replace(replacementNode);
+
+      if (currentNode == null) {
+        return;
+      }
+      prevMatchLengthToSkip = 0;
+      prevSibling = replacementNode;
+    }
+  });
 
   // Reverse transform: HashtagNode → TextNode (when text no longer matches
   // or the node is inside code)

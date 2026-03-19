@@ -126,6 +126,10 @@ body {
   background: transparent;
 }
 
+.comet-editor-content-wrap {
+  min-height: 100%;
+}
+
 .comet-editor-content {
   font-family: "Figtree Variable", sans-serif;
   font-size: var(--editor-font-size, 15px);
@@ -250,6 +254,47 @@ body {
   font-family: var(--font-editor);
 }
 
+.comet-lexical-tree-view {
+  max-height: min(24rem, 45vh);
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family:
+    "SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.comet-lexical-tree-button {
+  margin-right: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background) 86%, transparent);
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 0.25rem 0.75rem;
+  font: inherit;
+}
+
+.comet-lexical-tree-button:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.comet-lexical-tree-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.comet-lexical-tree-slider {
+  flex: 1;
+}
+
 [data-lexical-editor] ::selection {
   background: var(--editor-selection);
 }
@@ -271,14 +316,4 @@ body {
 
 .animate-slide-in-left {
   animation: slide-in-left 0.25s ease-out;
-}
-
-::highlight(comet-search) {
-  background-color: rgb(253 224 71);
-  color: var(--background);
-}
-
-[data-lexical-editor]:focus ::highlight(comet-search) {
-  background-color: transparent;
-  color: unset;
 }

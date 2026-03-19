@@ -97,11 +97,11 @@ export function SidebarPane({
   const [syncState, setSyncState] = useState<string>("disconnected");
 
   useEffect(() => {
-    invoke<string | { error: { message: string } }>("get_sync_status").then(
-      (s) => {
-        setSyncState(typeof s === "string" ? s : "error");
-      },
-    );
+    void invoke<string | { error: { message: string } }>(
+      "get_sync_status",
+    ).then((s) => {
+      setSyncState(typeof s === "string" ? s : "error");
+    });
     const unlisten = listen<{ state: string | { error: { message: string } } }>(
       "sync-status",
       (event) => {
@@ -110,7 +110,7 @@ export function SidebarPane({
       },
     );
     return () => {
-      unlisten.then((fn) => fn());
+      void unlisten.then((fn) => fn());
     };
   }, []);
 

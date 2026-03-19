@@ -123,17 +123,17 @@ export function SyncDialog({
 
   useEffect(() => {
     if (!open) return;
-    invoke<SyncInfo>("get_sync_info").then(setInfo);
+    void invoke<SyncInfo>("get_sync_info").then(setInfo);
   }, [open]);
 
   // Refresh on sync status changes while dialog is open
   useEffect(() => {
     if (!open) return;
     const unlisten = listen("sync-status", () => {
-      invoke<SyncInfo>("get_sync_info").then(setInfo);
+      void invoke<SyncInfo>("get_sync_info").then(setInfo);
     });
     return () => {
-      unlisten.then((fn) => fn());
+      void unlisten.then((fn) => fn());
     };
   }, [open]);
 
@@ -146,7 +146,7 @@ export function SyncDialog({
       });
     });
     return () => {
-      unlisten.then((fn) => fn());
+      void unlisten.then((fn) => fn());
     };
   }, []);
 

@@ -2,9 +2,32 @@ import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 
 const HIGHLIGHT_NAME = "comet-search";
+const HIGHLIGHT_STYLE_ID = "comet-search-highlight-style";
+const HIGHLIGHT_STYLES = `
+::highlight(${HIGHLIGHT_NAME}) {
+  background-color: rgb(253 224 71);
+  color: var(--background);
+}
+
+[data-lexical-editor]:focus ::highlight(${HIGHLIGHT_NAME}) {
+  background-color: transparent;
+  color: unset;
+}
+`;
 
 function clearHighlight() {
   (CSS as CSSWithHighlights).highlights?.delete(HIGHLIGHT_NAME);
+}
+
+function ensureHighlightStyles() {
+  if (!document.head || document.getElementById(HIGHLIGHT_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = HIGHLIGHT_STYLE_ID;
+  style.textContent = HIGHLIGHT_STYLES;
+  document.head.appendChild(style);
 }
 
 export default function SearchHighlightPlugin({
@@ -17,6 +40,8 @@ export default function SearchHighlightPlugin({
   useEffect(() => {
     const highlights = (CSS as CSSWithHighlights).highlights;
     if (!highlights) return;
+
+    ensureHighlightStyles();
 
     if (searchWords.length === 0) {
       highlights.delete(HIGHLIGHT_NAME);

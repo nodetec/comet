@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Comet is a desktop notes app built with **Tauri 2** (Rust backend) + **React 19** (TypeScript frontend). Single-user, local-first, markdown-native. Notes are stored as markdown in SQLite. The editor is built on Lexical.
 
-Before making product or UX decisions, read `docs/vision.md`, `docs/principles.md`, and `docs/roadmap.md`. The `AGENTS.md` file has hard repo defaults for builders.
+The `AGENTS.md` file has hard repo defaults for builders.
 
 ## Commands
 
@@ -14,13 +14,13 @@ Before making product or UX decisions, read `docs/vision.md`, `docs/principles.m
 npm install                          # Install dependencies
 npm run tauri:dev                    # Start app in dev mode (separate DB from production)
 npm run tauri build -- --bundles app # Production app bundle
-npm run build                       # Frontend only: tsc + Vite build
+npm run typecheck                   # Frontend only: TypeScript check
+npm run build                       # Frontend only: typecheck + Vite build
+npm run lint                        # ESLint (React + TypeScript + TanStack Query)
 npm run format                       # Prettier (with tailwindcss plugin)
 npm run format:check                 # Check formatting without modifying
 npm run seed:db                      # Seed demo data (resets local DB by default)
 ```
-
-There are no test or lint commands configured.
 
 ## Architecture
 

@@ -2,6 +2,7 @@ mod attachments;
 mod blossom;
 mod db;
 mod error;
+mod markdown;
 mod nip44_ext;
 mod nip59_ext;
 mod nostr;
@@ -20,6 +21,7 @@ use notes::{
 };
 use serde::Serialize;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -635,7 +637,23 @@ pub fn run() {
         .install_default()
         .ok();
 
+    let mut log_plugin = tauri_plugin_log::Builder::new()
+        .clear_targets()
+        .target(Target::new(TargetKind::LogDir {
+            file_name: Some("comet".to_string()),
+        }))
+        .level(log::LevelFilter::Info)
+        .level_for("comet_lib::sync", log::LevelFilter::Debug)
+        .rotation_strategy(RotationStrategy::KeepSome(5))
+        .timezone_strategy(TimezoneStrategy::UseLocal);
+
+    #[cfg(debug_assertions)]
+    {
+        log_plugin = log_plugin.target(Target::new(TargetKind::Webview));
+    }
+
     tauri::Builder::default()
+        .plugin(log_plugin.build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(sync::SyncManager::new())

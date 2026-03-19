@@ -1,16 +1,28 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { $createCodeNode, $isCodeNode } from "@lexical/code";
 import {
   PASTE_COMMAND,
-  COMMAND_PRIORITY_LOW,
+  COMMAND_PRIORITY_HIGH,
+  $createTextNode,
   $getSelection,
   $isRangeSelection,
   $getRoot,
   $isElementNode,
   $isDecoratorNode,
+  $isParagraphNode,
+  $isTextNode,
+  $isLineBreakNode,
+  type LexicalNode,
 } from "lexical";
+import { $isHeadingNode } from "@lexical/rich-text";
+import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { markdownToDOM } from "../lib/marked-import";
+import {
+  normalizeImportedCodeBlocksFromMarkdown,
+  normalizeImportedNodes,
+} from "../lib/markdown";
 
 // Patterns that strongly indicate markdown content
 const MARKDOWN_PATTERNS = [
@@ -34,6 +46,90 @@ const MARKDOWN_PATTERNS = [
 const PLAIN_TEXT_INDICATORS = [
   /^https?:\/\/[^\s]+$/, // Single URL
 ];
+
+function parseSingleFencedCodeBlock(
+  markdown: string,
+): { language?: string; code: string } | null {
+  const normalized = markdown.replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n");
+
+  let start = 0;
+  while (start < lines.length && lines[start]?.trim() === "") {
+    start++;
+  }
+
+  let end = lines.length - 1;
+  while (end >= start && lines[end]?.trim() === "") {
+    end--;
+  }
+
+  if (start > end) {
+    return null;
+  }
+
+  const openingLine = lines[start]?.trimStart() ?? "";
+  const openingMatch = /^(`{3,}|~{3,})(.*)$/.exec(openingLine);
+  if (!openingMatch || /^(`{3,})[^`]+\1$/.test(openingLine)) {
+    return null;
+  }
+
+  const fence = openingMatch[1];
+  const fenceChar = fence[0];
+  const fenceLen = fence.length;
+  const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
+  const closingFenceRe = new RegExp(
+    `^[ \\t]*${escapedFenceChar}{${fenceLen},}[ \\t]*$`,
+  );
+
+  if (!closingFenceRe.test(lines[end] ?? "")) {
+    return null;
+  }
+
+  const info = openingMatch[2].trim();
+  const language = info.length > 0 ? info.split(/\s+/, 1)[0] : undefined;
+  const code = lines.slice(start + 1, end).join("\n");
+
+  return { language, code };
+}
+
+function insertBlockNodes(nodes: LexicalNode[]): void {
+  if (nodes.length === 0) return;
+
+  const selection = $getSelection();
+
+  if (!$isRangeSelection(selection)) {
+    const root = $getRoot();
+    for (const node of nodes) {
+      root.append(node);
+    }
+    return;
+  }
+
+  if (!selection.isCollapsed()) {
+    selection.removeText();
+  }
+
+  const anchorNode = selection.anchor.getNode();
+  const targetBlock = anchorNode.getTopLevelElementOrThrow();
+  const isEmptyBlock = isReplaceableEmptyBlockNode(targetBlock);
+
+  if (isEmptyBlock) {
+    targetBlock.replace(nodes[0]);
+    for (let i = 1; i < nodes.length; i++) {
+      nodes[i - 1].insertAfter(nodes[i]);
+    }
+  } else {
+    for (let i = 0; i < nodes.length; i++) {
+      const after = i === 0 ? targetBlock : nodes[i - 1];
+      after.insertAfter(nodes[i]);
+    }
+  }
+
+  const lastNode = nodes[nodes.length - 1];
+  if ($isElementNode(lastNode)) {
+    lastNode.selectEnd();
+  }
+}
 
 // Check if content looks like JSON or JSONC (JSON with comments)
 function isLikelyJSON(text: string): boolean {
@@ -89,6 +185,71 @@ function isLikelyMarkdown(text: string): boolean {
   return false;
 }
 
+function isEmptyParagraphNode(node: LexicalNode): boolean {
+  if (!$isParagraphNode(node)) return false;
+
+  const children = node.getChildren();
+  if (children.length === 0) return true;
+
+  return children.every((child) => {
+    if ($isLineBreakNode(child)) return true;
+    if ($isTextNode(child)) {
+      return child.getTextContent().trim() === "";
+    }
+    return false;
+  });
+}
+
+function isReplaceableEmptyBlockNode(node: LexicalNode): boolean {
+  if (!$isParagraphNode(node) && !$isHeadingNode(node)) {
+    return false;
+  }
+
+  if (node.getTextContent().trim() !== "") {
+    return false;
+  }
+
+  const children = node.getChildren();
+  if (children.length === 0) return true;
+
+  return children.every((child) => {
+    if ($isLineBreakNode(child)) return true;
+    if ($isTextNode(child)) {
+      return child.getTextContent().trim() === "";
+    }
+    return false;
+  });
+}
+
+function trimBoundaryEmptyParagraphs(
+  nodes: LexicalNode[],
+  sourceMarkdown: string,
+): LexicalNode[] {
+  if (nodes.length === 0) return nodes;
+
+  const lines = sourceMarkdown.split("\n");
+  const hasLeadingBlankLine = lines.length > 0 && lines[0]?.trim().length === 0;
+  const hasTrailingBlankLine =
+    lines.length > 0 && lines[lines.length - 1]?.trim().length === 0;
+
+  let start = 0;
+  let end = nodes.length;
+
+  if (!hasLeadingBlankLine) {
+    while (start < end && isEmptyParagraphNode(nodes[start])) {
+      start++;
+    }
+  }
+
+  if (!hasTrailingBlankLine) {
+    while (end > start && isEmptyParagraphNode(nodes[end - 1])) {
+      end--;
+    }
+  }
+
+  return start === 0 && end === nodes.length ? nodes : nodes.slice(start, end);
+}
+
 export default function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -101,10 +262,20 @@ export default function MarkdownPastePlugin() {
 
         const text = clipboardData.getData("text/plain");
         if (!text) return false;
-
         // If Lexical JSON is on the clipboard, let the built-in handler use it
         if (clipboardData.getData("application/x-lexical-editor")) {
           return false;
+        }
+
+        const selection = $getSelection();
+        if ($isRangeSelection(selection)) {
+          const parentCodeNode = $findMatchingParent(
+            selection.anchor.getNode(),
+            $isCodeNode,
+          );
+          if (parentCodeNode) {
+            return false;
+          }
         }
 
         // Skip if it looks like JSON
@@ -115,63 +286,35 @@ export default function MarkdownPastePlugin() {
 
         event.preventDefault();
 
-        const dom = markdownToDOM(text, { paste: true });
+        const singleFencedCodeBlock = parseSingleFencedCodeBlock(text);
 
         editor.update(() => {
-          const allNodes = $generateNodesFromDOM(editor, dom);
-          // Filter to block-level nodes only — $generateNodesFromDOM may
-          // produce stray TextNodes from whitespace between HTML tags
-          const nodes = allNodes.filter(
-            (n) => $isElementNode(n) || $isDecoratorNode(n),
-          );
-          if (nodes.length === 0) return;
-
-          const selection = $getSelection();
-
-          if (!$isRangeSelection(selection)) {
-            const root = $getRoot();
-            for (const node of nodes) {
-              root.append(node);
+          if (singleFencedCodeBlock) {
+            const codeNode = $createCodeNode(singleFencedCodeBlock.language);
+            if (singleFencedCodeBlock.code.length > 0) {
+              codeNode.append($createTextNode(singleFencedCodeBlock.code));
             }
+            insertBlockNodes([codeNode]);
             return;
           }
 
-          // Delete selected content first
-          if (!selection.isCollapsed()) {
-            selection.removeText();
-          }
-
-          // Find the block element containing the cursor
-          const anchorNode = selection.anchor.getNode();
-          const targetBlock = anchorNode.getTopLevelElementOrThrow();
-
-          // If cursor is at the start of an empty paragraph, replace it
-          const isEmptyBlock =
-            $isElementNode(targetBlock) &&
-            targetBlock.getTextContentSize() === 0;
-
-          if (isEmptyBlock) {
-            targetBlock.replace(nodes[0]);
-            for (let i = 1; i < nodes.length; i++) {
-              nodes[i - 1].insertAfter(nodes[i]);
-            }
-          } else {
-            for (let i = 0; i < nodes.length; i++) {
-              const after = i === 0 ? targetBlock : nodes[i - 1];
-              after.insertAfter(nodes[i]);
-            }
-          }
-
-          // Place cursor at end of last inserted node
-          const lastNode = nodes[nodes.length - 1];
-          if ($isElementNode(lastNode)) {
-            lastNode.selectEnd();
-          }
+          const dom = markdownToDOM(text, { paste: true });
+          const allNodes = normalizeImportedNodes(
+            $generateNodesFromDOM(editor, dom),
+          );
+          normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
+          // Filter to block-level nodes only — $generateNodesFromDOM may
+          // produce stray TextNodes from whitespace between HTML tags
+          const filteredNodes = allNodes.filter(
+            (node) => $isElementNode(node) || $isDecoratorNode(node),
+          );
+          const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
+          insertBlockNodes(nodes);
         });
 
         return true;
       },
-      COMMAND_PRIORITY_LOW, // Lower priority so URL plugins run first
+      COMMAND_PRIORITY_HIGH,
     );
   }, [editor]);
 
