@@ -263,7 +263,7 @@ export default function TagCompletionPlugin() {
   return createPortal(
     <ul
       role="listbox"
-      className="fixed z-50 min-w-[160px] max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
+      className="fixed z-50 max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
       style={{
         top: menu.rect.bottom + 4,
         left: menu.rect.left,
