@@ -1,154 +1,148 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { useBasicTypeaheadTriggerMatch } from "@lexical/react/LexicalTypeaheadMenuPlugin";
 import {
-  $getSelection,
-  $isRangeSelection,
-  $isTextNode,
-  IS_CODE,
-} from "lexical";
-import { $isCodeNode } from "@lexical/code";
-import { Menu } from "@tauri-apps/api/menu";
-import { LogicalPosition } from "@tauri-apps/api/dpi";
+  LexicalTypeaheadMenuPlugin,
+  MenuOption,
+  useBasicTypeaheadTriggerMatch,
+} from "@lexical/react/LexicalTypeaheadMenuPlugin";
+import { $createTextNode, TextNode } from "lexical";
 import { invoke } from "@tauri-apps/api/core";
+
+class TagOption extends MenuOption {
+  tag: string;
+  constructor(tag: string) {
+    super(tag);
+    this.tag = tag;
+  }
+}
+
+function TagMenuItem({
+  isSelected,
+  onClick,
+  onMouseEnter,
+  option,
+}: {
+  isSelected: boolean;
+  onClick: () => void;
+  onMouseEnter: () => void;
+  option: TagOption;
+}) {
+  return (
+    <li
+      role="option"
+      aria-selected={isSelected}
+      className={`cursor-pointer px-3 py-1.5 text-sm ${
+        isSelected ? "bg-accent text-accent-foreground" : ""
+      }`}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+    >
+      <span className="text-muted-foreground">#</span>
+      {option.tag}
+    </li>
+  );
+}
+
+function useTagSearch(query: string | null) {
+  const [results, setResults] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (query === null || query.length === 0) {
+      setResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void invoke<string[]>("search_tags", { query }).then(
+        (tags) => {
+          if (!cancelled) {
+            // Filter out tags that exactly match the current query
+            setResults(tags.filter((t) => t !== query.toLowerCase()));
+          }
+        },
+        () => {
+          if (!cancelled) setResults([]);
+        },
+      );
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  return results;
+}
 
 export default function TagCompletionPlugin() {
   const [editor] = useLexicalComposerContext();
+  const [queryString, setQueryString] = useState<string | null>(null);
+
   const checkForTriggerMatch = useBasicTypeaheadTriggerMatch("#", {
     minLength: 1,
   });
-  const menuOpenRef = useRef(false);
-  const dismissedMatchRef = useRef<string | null>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showTagMenu = useCallback(
-    async (
-      matchingString: string,
-      replaceableString: string,
-      leadOffset: number,
-      anchorKey: string,
-    ) => {
-      if (menuOpenRef.current) return;
+  const results = useTagSearch(queryString);
 
-      const tags = await invoke<string[]>("search_tags", {
-        query: matchingString,
-      });
-      if (tags.length === 0) return;
-
-      // Verify the match is still current
-      const stillValid = editor.getEditorState().read(() => {
-        const selection = $getSelection();
-        if (!$isRangeSelection(selection) || !selection.isCollapsed())
-          return false;
-        const node = selection.anchor.getNode();
-        if (!$isTextNode(node) || node.getKey() !== anchorKey) return false;
-        const text = node.getTextContent().slice(0, selection.anchor.offset);
-        const currentMatch = checkForTriggerMatch(text, editor);
-        return currentMatch?.matchingString === matchingString;
-      });
-      if (!stillValid) return;
-
-      // Get cursor position for menu placement
-      const domSelection = window.getSelection();
-      if (!domSelection || domSelection.rangeCount === 0) return;
-      const range = domSelection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-
-      let selectedTag: string | null = null;
-
-      const menu = await Menu.new({
-        items: tags.map((tag) => ({
-          id: `tag-${tag}`,
-          text: `#${tag}`,
-          action: () => {
-            selectedTag = tag;
-          },
-        })),
-      });
-
-      menuOpenRef.current = true;
-      try {
-        await menu.popup(new LogicalPosition(rect.x, rect.bottom));
-      } finally {
-        await menu.close();
-        menuOpenRef.current = false;
-      }
-
-      if (selectedTag) {
-        editor.update(() => {
-          const selection = $getSelection();
-          if (!$isRangeSelection(selection)) return;
-          const node = selection.anchor.getNode();
-          if (!$isTextNode(node)) return;
-          node.spliceText(
-            leadOffset,
-            replaceableString.length,
-            `#${selectedTag}`,
-          );
-          // Move cursor to end of inserted tag
-          node.select(
-            leadOffset + selectedTag!.length + 1,
-            leadOffset + selectedTag!.length + 1,
-          );
-        });
-      } else {
-        // Menu dismissed without selection
-        dismissedMatchRef.current = matchingString;
-      }
-    },
-    [editor, checkForTriggerMatch],
+  const options = useMemo(
+    () => results.map((tag) => new TagOption(tag)),
+    [results],
   );
 
-  useEffect(() => {
-    return editor.registerUpdateListener(({ editorState }) => {
-      if (menuOpenRef.current) return;
+  const onSelectOption = useCallback(
+    (
+      selectedOption: TagOption,
+      nodeToReplace: TextNode | null,
+      closeMenu: () => void,
+    ) => {
+      editor.update(() => {
+        const tagText = `#${selectedOption.tag} `;
+        const newNode = $createTextNode(tagText);
+        if (nodeToReplace) {
+          nodeToReplace.replace(newNode);
+        }
+        newNode.select();
+        closeMenu();
+      });
+    },
+    [editor],
+  );
 
-      editorState.read(() => {
-        const selection = $getSelection();
-        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
-
-        const anchor = selection.anchor;
-        const anchorNode = anchor.getNode();
-        if (!$isTextNode(anchorNode)) return;
-
-        // Skip code contexts
-        const parent = anchorNode.getParent();
-        if (parent && $isCodeNode(parent)) return;
-        if ((anchorNode.getFormat() & IS_CODE) !== 0) return;
-
-        const textUpToCursor = anchorNode
-          .getTextContent()
-          .slice(0, anchor.offset);
-        const match = checkForTriggerMatch(textUpToCursor, editor);
-
-        if (!match) {
-          dismissedMatchRef.current = null;
-          return;
+  return (
+    <LexicalTypeaheadMenuPlugin<TagOption>
+      onQueryChange={setQueryString}
+      onSelectOption={onSelectOption}
+      triggerFn={checkForTriggerMatch}
+      options={options}
+      menuRenderFn={(
+        anchorElementRef,
+        { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex, options },
+      ) => {
+        if (options.length === 0 || !anchorElementRef.current) {
+          return null;
         }
 
-        // Suppress re-trigger after dismiss
-        if (dismissedMatchRef.current === match.matchingString) return;
-
-        // Debounce the tag search
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(() => {
-          void showTagMenu(
-            match.matchingString,
-            match.replaceableString,
-            match.leadOffset,
-            anchorNode.getKey(),
-          );
-        }, 150);
-      });
-    });
-  }, [editor, checkForTriggerMatch, showTagMenu]);
-
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
-  }, []);
-
-  return null;
+        return createPortal(
+          <ul
+            role="listbox"
+            className="min-w-[160px] overflow-hidden rounded-md border border-border bg-popover py-1 shadow-md"
+          >
+            {options.map((option, i) => (
+              <TagMenuItem
+                key={option.key}
+                isSelected={selectedIndex === i}
+                onClick={() => selectOptionAndCleanUp(option)}
+                onMouseEnter={() => setHighlightedIndex(i)}
+                option={option}
+              />
+            ))}
+          </ul>,
+          anchorElementRef.current,
+        );
+      }}
+    />
+  );
 }
