@@ -2,49 +2,49 @@ default:
   @just --list
 
 install:
-  npm install
+  pnpm install
 
 dev:
-  npm run tauri:dev
+  pnpm tauri:dev
 
 build:
-  npm run build
+  pnpm build
 
 typecheck:
-  npm run typecheck
+  pnpm typecheck
 
 lint:
-  npm run lint
+  pnpm lint
 
 lint-fix:
-  npm run lint:fix
+  pnpm lint:fix
 
 bundle:
-  npm run tauri build -- --bundles app
+  pnpm bundle
 
 test:
-  npm test
-  cargo test --manifest-path src-tauri/Cargo.toml
+  pnpm test
+  cargo test --manifest-path app/src-tauri/Cargo.toml
 
 test-frontend:
-  npm test
+  pnpm test
 
 test-backend:
-  cargo test --manifest-path src-tauri/Cargo.toml
+  cargo test --manifest-path app/src-tauri/Cargo.toml
 
 format:
-  npm run format
+  pnpm format
 
 format-check:
-  npm run format:check
+  pnpm format:check
 
 seed:
-  npm run seed:db
+  pnpm seed:db
 
-outdated-npm:
-  -npm outdated
+outdated-js:
+  -pnpm outdated
 
 outdated-crates:
-  cargo upgrade --dry-run --manifest-path src-tauri/Cargo.toml --incompatible allow
+  cargo upgrade --dry-run --manifest-path app/src-tauri/Cargo.toml --incompatible allow
 
 check: format-check lint typecheck test build

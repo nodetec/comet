@@ -1,57 +1,59 @@
 # comet
 
-- Local first note-taking app built with Tauri.
-- Encrypted Sync with nostr
-- Encrypted blob storage with blossom
+Comet is a local-first notes app built with Tauri, React, TypeScript, and Rust.
 
-Development:
+- Local-first note-taking
+- Encrypted sync with Nostr
+- Encrypted blob storage with Blossom
+- Turborepo monorepo with the app in `app/`
 
-- Install dependencies: `npm install`
-- Or with `just`: `just install`
-- Start the desktop app: `npm run tauri:dev`
-- Or with `just`: `just dev`
-- Build the app bundle: `npm run tauri build -- --bundles app`
-- Or with `just`: `just bundle`
-- Seed demo notebooks and notes: `npm run seed:db`
-- Lint frontend code: `npm run lint`
-- Type-check frontend code: `npm run typecheck`
-- Run checks: `just check`
+## Quick Start
+
+1. Install `just`: `brew install just` or `cargo install just`
+2. Install dependencies: `just install`
+3. Start the app: `just dev`
+
+## Commands
+
+- `just dev`: run the app in development mode
+- `just build`: build the frontend workspace
+- `just bundle`: build the packaged Tauri app
+- `just lint`: run ESLint
+- `just lint-fix`: run ESLint with fixes
+- `just typecheck`: run TypeScript checks
+- `just test`: run frontend and Rust tests
+- `just test-backend`: run the Rust test suite
+- `just format`: format the repo
+- `just format-check`: check formatting
+- `just seed`: seed demo notebooks and notes
+- `just outdated-crates`: check for Rust dependency updates
+- `just check`: run the main verification suite
 
 The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
 
-## `just`
+## Repo Layout
 
-This repo includes a project-local [`justfile`](/Users/chris/Repos/project/comet/justfile) for common development commands.
+- [`app`](/Users/chris/Repos/project/comet/app): the Comet app workspace
+- [`app/src`](/Users/chris/Repos/project/comet/app/src): React frontend
+- [`app/src-tauri`](/Users/chris/Repos/project/comet/app/src-tauri): Tauri + Rust backend
+- [`packages`](/Users/chris/Repos/project/comet/packages): shared packages when needed
 
-- Install `just` with `brew install just` or `cargo install just`
-- List available recipes with `just --list`
-- Run commands like `just dev`, `just lint`, `just typecheck`, `just test`, `just check`, `just outdated-npm`, and `just outdated-crates`
-- `just outdated-crates` requires [`cargo-edit`](https://github.com/killercup/cargo-edit): install it with `cargo install cargo-edit`
+## Workspace
+
+- Root scripts use Turborepo for workspace tasks like `build`, `lint`, `typecheck`, and `test`
+- The app source, Vite config, and Tauri project live in [`app`](/Users/chris/Repos/project/comet/app)
+
+## Testing Notes
+
+- `just test-frontend` runs the frontend test suite
+- `just test-backend` runs the Rust test suite
+- `just test` runs both
 
 ## Git hooks
 
-This repo uses Husky + lint-staged for a pre-commit hook on staged files. After `npm install`, the hook is installed automatically via the `prepare` script.
+This repo uses Husky + lint-staged for a pre-commit hook on staged files. After `just install`, the hook is installed automatically via the `prepare` script.
 
 On commit, staged files run through:
 
 - `eslint --fix` and `prettier --write` for `*.ts` and `*.tsx`
 - `prettier --write` for `*.js`, `*.mjs`, `*.cjs`, `*.json`, `*.md`, `*.yml`, and `*.yaml`
-
-### Zsh completion
-
-Generate and install completions:
-
-```sh
-mkdir -p ~/.zsh/completions
-just --completions zsh > ~/.zsh/completions/_just
-```
-
-Then make sure your `~/.zshrc` includes:
-
-```sh
-fpath=(~/.zsh/completions $fpath)
-autoload -U compinit
-compinit
-```
-
-Restart your shell or run `source ~/.zshrc`.

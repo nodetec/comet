@@ -55,12 +55,12 @@ The product promise is simple: `Comet is the best place to leave a trail.` Build
 ## Workflow
 
 - Preferred commands:
-  - `npm install`
-  - `npm run tauri dev`
-  - `npm run build`
-  - `npm run tauri build -- --bundles app`
+  - `pnpm install`
+  - `pnpm tauri:dev`
+  - `pnpm build`
+  - `pnpm bundle`
 - Verify the specific area you change.
 - For Lexical/editor bugs, ask for a tree dump when it is relevant. Prefer before/after tree dumps, the exact user action, saved markdown for round-trip issues, and any related console logs.
 - Prefer small, product-aligned changes over broad refactors.
-- Avoid editing generated or dependency directories such as `node_modules/`, `dist/`, and `src-tauri/target/`.
+- Avoid editing generated or dependency directories such as `node_modules/`, `dist/`, and `app/src-tauri/target/`.
 - If a change would alter product behavior or information architecture, update the relevant docs with it.

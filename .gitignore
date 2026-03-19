@@ -1,6 +1,8 @@
 node_modules/
+.turbo/
 dist/
-src-tauri/target/
+app/dist/
+app/src-tauri/target/
 references/
 old/
 .agents/

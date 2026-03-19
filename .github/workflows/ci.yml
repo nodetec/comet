@@ -16,13 +16,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: npm run format:check
+        run: pnpm format:check
 
   lint:
     runs-on: ubuntu-latest
@@ -33,13 +36,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: npm run lint
+        run: pnpm lint
 
   typecheck:
     runs-on: ubuntu-latest
@@ -50,13 +56,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run TypeScript check
-        run: npm run typecheck
+        run: pnpm typecheck
 
   test:
     runs-on: macos-latest
@@ -67,10 +76,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -78,16 +90,16 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: ./src-tauri -> target
+          workspaces: ./app/src-tauri -> target
 
       - name: Run frontend tests
-        run: npm test
+        run: pnpm test
 
       - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path app/src-tauri/Cargo.toml
 
       - name: Vite build
-        run: npm run build
+        run: pnpm build
 
   build:
     needs: [format, lint, typecheck, test]
@@ -123,7 +135,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: npm
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -133,10 +148,10 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: ./src-tauri -> target
+          workspaces: ./app/src-tauri -> target
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -149,6 +164,7 @@ jobs:
           APPLE_PASSWORD: ${{ github.event_name == 'push' && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ github.event_name == 'push' && secrets.APPLE_TEAM_ID || '' }}
         with:
+          projectPath: app
           args: ${{ matrix.args }}
 
       - name: Upload DMG artifact
@@ -156,7 +172,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dmg-${{ matrix.arch }}
-          path: src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/*.dmg
+          path: app/src-tauri/target/${{ matrix.arch }}-apple-darwin/release/bundle/dmg/*.dmg
 
       - name: Upload Linux artifacts
         if: github.event_name == 'push' && matrix.platform == 'ubuntu-22.04'
@@ -164,9 +180,9 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}
           path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/rpm/*.rpm
-            src-tauri/target/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/release/bundle/deb/*.deb
+            app/src-tauri/target/release/bundle/rpm/*.rpm
+            app/src-tauri/target/release/bundle/appimage/*.AppImage
 
   release:
     if: github.event_name == 'push'
@@ -176,6 +192,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download DMG artifacts
         uses: actions/download-artifact@v4
@@ -198,13 +216,16 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release notes
+        id: notes
+        run: sh .github/scripts/generate-release-notes.sh
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: alpha-${{ steps.sha.outputs.short }}
           name: alpha-${{ steps.sha.outputs.short }}
-          body: |
-            Automated build from [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+          body_path: ${{ steps.notes.outputs.path }}
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.deb

@@ -11,15 +11,16 @@ The `AGENTS.md` file has hard repo defaults for builders.
 ## Commands
 
 ```bash
-npm install                          # Install dependencies
-npm run tauri:dev                    # Start app in dev mode (separate DB from production)
-npm run tauri build -- --bundles app # Production app bundle
-npm run typecheck                   # Frontend only: TypeScript check
-npm run build                       # Frontend only: typecheck + Vite build
-npm run lint                        # ESLint (React + TypeScript + TanStack Query)
-npm run format                       # Prettier (with tailwindcss plugin)
-npm run format:check                 # Check formatting without modifying
-npm run seed:db                      # Seed demo data (resets local DB by default)
+corepack enable                      # One-time: expose pnpm from Corepack if needed
+pnpm install                         # Install dependencies
+pnpm tauri:dev                       # Start app in dev mode (separate DB from production)
+pnpm bundle                          # Production app bundle
+pnpm typecheck                       # Frontend only: TypeScript check
+pnpm build                           # Frontend workspace build via Turbo
+pnpm lint                            # ESLint (React + TypeScript + TanStack Query)
+pnpm format                          # Prettier (with tailwindcss plugin)
+pnpm format:check                    # Check formatting without modifying
+pnpm seed:db                         # Seed demo data (resets local DB by default)
 ```
 
 ## Architecture
@@ -30,7 +31,7 @@ npm run seed:db                      # Seed demo data (resets local DB by defaul
 React UI → useShellController (React Query + Tauri invoke()) → Rust commands (lib.rs) → SQLite
 ```
 
-### Frontend (`src/`)
+### Frontend (`app/src/`)
 
 - **App.tsx**: Root 3-pane resizable layout (sidebar | notes list | editor) using `@column-resizer/react`
 - **features/shell/**: Main app shell — `sidebar-pane`, `notes-pane`, `editor-pane`, and `use-shell-controller.ts` (central orchestration hub, ~1000 lines, handles all Tauri invocations + React Query mutations)
@@ -45,7 +46,7 @@ React UI → useShellController (React Query + Tauri invoke()) → Rust commands
   - `use-shell-store.ts`: Transient UI state (active filter, search, selected note, draft)
   - `use-ui-store.ts`: Persisted UI state via localStorage (font size, sort prefs, toolbar visibility)
 
-### Backend (`src-tauri/src/`)
+### Backend (`app/src-tauri/src/`)
 
 - **lib.rs**: Tauri command exports (the IPC surface)
 - **notes.rs**: Core note/notebook CRUD, queries, tagging (~1300 lines)
