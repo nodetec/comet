@@ -226,4 +226,19 @@ mod tests {
         assert!(html.contains("<img"), "HTML: {html}");
         assert!(html.contains("attachment://hash.png"), "HTML: {html}");
     }
+
+    #[test]
+    fn test_mixed_markdown_code_block_is_not_nested() {
+        let markdown = "Here are some useful commands when debugging error handling:\n\n```bash\n# Run with backtrace enabled\nRUST_BACKTRACE=1 cargo run\n\n# Run tests with output\ncargo test -- --nocapture\n```\n\n## Next";
+        let html = markdown_to_lexical_html(markdown);
+
+        assert_eq!(
+            html.matches("<pre data-language=\"bash\">").count(),
+            1,
+            "HTML: {html}"
+        );
+        assert!(html.contains("RUST_BACKTRACE=1 cargo run"), "HTML: {html}");
+        assert!(!html.contains("<pre><code"), "HTML: {html}");
+        assert!(!html.contains("</code></pre>"), "HTML: {html}");
+    }
 }

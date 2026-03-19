@@ -305,8 +305,6 @@ markedInstanceForPaste.use(
 // Public API
 // ---------------------------------------------------------------------------
 
-const domParser = new DOMParser();
-
 // Strip whitespace between block-level tags to prevent DOMParser from creating
 // text nodes that Lexical interprets as empty paragraphs or phantom list items.
 const BLOCK_WS_RE =
@@ -316,14 +314,21 @@ export function markdownToDOM(
   markdown: string,
   options?: { paste?: boolean },
 ): Document {
-  const instance = options?.paste ? markedInstanceForPaste : markedInstance;
-  const html = instance.parse(markdown) as string;
+  const html = renderMarkdownToHTML(markdown, options);
   return htmlToDOM(html);
+}
+
+export function renderMarkdownToHTML(
+  markdown: string,
+  options?: { paste?: boolean },
+): string {
+  const instance = options?.paste ? markedInstanceForPaste : markedInstance;
+  return instance.parse(markdown) as string;
 }
 
 export function htmlToDOM(html: string): Document {
   const cleaned = html.replace(BLOCK_WS_RE, "><$1$2");
-  return domParser.parseFromString(
+  return new DOMParser().parseFromString(
     `<!DOCTYPE html><html><body>${cleaned}</body></html>`,
     "text/html",
   );
