@@ -121,12 +121,33 @@ export default function TagCompletionPlugin() {
   useEffect(() => {
     if (!menu) return;
 
+    const moveDown = (event: Event) => {
+      event.preventDefault();
+      setSelectedIndex((i) => (i + 1) % menu.tags.length);
+    };
+    const moveUp = (event: Event) => {
+      event.preventDefault();
+      setSelectedIndex((i) => (i - 1 + menu.tags.length) % menu.tags.length);
+    };
+
+    // Ctrl+J / Ctrl+K navigation via DOM listener
+    const root = editor.getRootElement();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey) return;
+      if (e.key === "j") {
+        moveDown(e);
+      } else if (e.key === "k") {
+        moveUp(e);
+      }
+    };
+    root?.addEventListener("keydown", handleKeyDown);
+
     return mergeRegister(
+      () => root?.removeEventListener("keydown", handleKeyDown),
       editor.registerCommand(
         KEY_ARROW_DOWN_COMMAND,
         (event) => {
-          event.preventDefault();
-          setSelectedIndex((i) => (i + 1) % menu.tags.length);
+          moveDown(event);
           return true;
         },
         COMMAND_PRIORITY_HIGH,
@@ -134,8 +155,7 @@ export default function TagCompletionPlugin() {
       editor.registerCommand(
         KEY_ARROW_UP_COMMAND,
         (event) => {
-          event.preventDefault();
-          setSelectedIndex((i) => (i - 1 + menu.tags.length) % menu.tags.length);
+          moveUp(event);
           return true;
         },
         COMMAND_PRIORITY_HIGH,
