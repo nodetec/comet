@@ -54,14 +54,14 @@ export default function DevtoolsPlugin({
       <button
         aria-expanded={open}
         aria-label={open ? "Close Lexical tree view" : "Open Lexical tree view"}
-        className="flex size-9 items-center justify-center rounded-full border border-border bg-background/95 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+        className="border-border bg-background/95 text-foreground hover:bg-accent hover:text-accent-foreground flex size-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm transition-colors"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         <Bug className="size-4" />
       </button>
       {open ? (
-        <div className="mt-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background/95 shadow-xl backdrop-blur-sm">
+        <div className="border-border bg-background/95 mt-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border shadow-xl backdrop-blur-sm">
           <div className="border-divider border-b px-3 py-2 text-sm font-medium">
             Lexical Tree
           </div>

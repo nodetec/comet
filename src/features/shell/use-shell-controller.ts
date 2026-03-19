@@ -94,12 +94,16 @@ export function useShellController() {
     setPublishDialogOpen,
     setPublishShortNoteDialogOpen,
   } = publish;
-  const { isPending: isDeletePublishedNotePending, mutate: mutateDeletePublishedNote } =
-    deletePublishedNoteMutation;
+  const {
+    isPending: isDeletePublishedNotePending,
+    mutate: mutateDeletePublishedNote,
+  } = deletePublishedNoteMutation;
   const { isPending: isPublishNotePending, mutate: mutatePublishNote } =
     publishNoteMutation;
-  const { isPending: isPublishShortNotePending, mutate: mutatePublishShortNote } =
-    publishShortNoteMutation;
+  const {
+    isPending: isPublishShortNotePending,
+    mutate: mutatePublishShortNote,
+  } = publishShortNoteMutation;
   const pendingSaveTimeoutRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 

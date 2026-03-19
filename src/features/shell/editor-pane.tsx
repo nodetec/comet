@@ -110,28 +110,31 @@ export function EditorPane({
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const noteTitle = firstLineH1Title(markdown);
-  const updateHeaderState = useCallback((scrollContainer: HTMLDivElement | null) => {
-    const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
-    setShowHeaderBorder(scrolled);
+  const updateHeaderState = useCallback(
+    (scrollContainer: HTMLDivElement | null) => {
+      const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
+      setShowHeaderBorder(scrolled);
 
-    if (!scrollContainer || !noteId) {
-      setShowHeaderTitle(false);
-      return;
-    }
+      if (!scrollContainer || !noteId) {
+        setShowHeaderTitle(false);
+        return;
+      }
 
-    const firstLine = scrollContainer.querySelector(
-      "[data-lexical-editor] > :first-child",
-    ) as HTMLElement | null;
+      const firstLine = scrollContainer.querySelector(
+        "[data-lexical-editor] > :first-child",
+      ) as HTMLElement | null;
 
-    if (!firstLine) {
-      setShowHeaderTitle(false);
-      return;
-    }
+      if (!firstLine) {
+        setShowHeaderTitle(false);
+        return;
+      }
 
-    const scrollRect = scrollContainer.getBoundingClientRect();
-    const firstLineRect = firstLine.getBoundingClientRect();
-    setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
-  }, [noteId]);
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      const firstLineRect = firstLine.getBoundingClientRect();
+      setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
+    },
+    [noteId],
+  );
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -306,7 +309,7 @@ export function EditorPane({
       <div className="relative min-h-0 flex-1">
         <div
           className={cn(
-            "min-h-0 h-full overflow-y-scroll overscroll-y-contain",
+            "h-full min-h-0 overflow-y-scroll overscroll-y-contain",
             !isReadOnly && "cursor-text",
           )}
           data-editor-scroll-container
