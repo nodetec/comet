@@ -8,26 +8,20 @@ const HIGHLIGHT_STYLES = `
   background-color: rgb(253 224 71);
   color: var(--background);
 }
-
-[data-lexical-editor]:focus ::highlight(${HIGHLIGHT_NAME}) {
-  background-color: transparent;
-  color: unset;
-}
 `;
 
 function clearHighlight() {
   (CSS as CSSWithHighlights).highlights?.delete(HIGHLIGHT_NAME);
 }
 
-function ensureHighlightStyles() {
-  if (!document.head || document.getElementById(HIGHLIGHT_STYLE_ID)) {
-    return;
+function getOrCreateStyleElement() {
+  let style = document.getElementById(HIGHLIGHT_STYLE_ID) as HTMLStyleElement;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = HIGHLIGHT_STYLE_ID;
+    document.head.appendChild(style);
   }
-
-  const style = document.createElement("style");
-  style.id = HIGHLIGHT_STYLE_ID;
-  style.textContent = HIGHLIGHT_STYLES;
-  document.head.appendChild(style);
+  return style;
 }
 
 export default function SearchHighlightPlugin({
@@ -37,11 +31,42 @@ export default function SearchHighlightPlugin({
 }) {
   const [editor] = useLexicalComposerContext();
 
+  // Toggle highlight visibility by adding/removing the CSS rule.
+  // Highlight ranges stay registered — they're just invisible without the rule.
+  useEffect(() => {
+    return editor.registerRootListener((root, prevRoot) => {
+      if (prevRoot) {
+        prevRoot.removeEventListener("focusin", handleFocusIn);
+        prevRoot.removeEventListener("focusout", handleFocusOut);
+      }
+      if (root) {
+        root.addEventListener("focusin", handleFocusIn);
+        root.addEventListener("focusout", handleFocusOut);
+
+        // Sync to current state
+        if (root.contains(document.activeElement)) {
+          handleFocusIn();
+        } else {
+          handleFocusOut();
+        }
+      }
+    });
+
+    function handleFocusIn() {
+      getOrCreateStyleElement().textContent = "";
+    }
+
+    function handleFocusOut() {
+      getOrCreateStyleElement().textContent = HIGHLIGHT_STYLES;
+    }
+  }, [editor]);
+
+  // Maintain highlight ranges — always applied regardless of focus.
   useEffect(() => {
     const highlights = (CSS as CSSWithHighlights).highlights;
     if (!highlights) return;
 
-    ensureHighlightStyles();
+    getOrCreateStyleElement().textContent = HIGHLIGHT_STYLES;
 
     if (searchWords.length === 0) {
       highlights.delete(HIGHLIGHT_NAME);
