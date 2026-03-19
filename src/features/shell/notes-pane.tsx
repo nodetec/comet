@@ -244,6 +244,7 @@ export function NotesPane({
 
   const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
     rootMargin: "160px 0px",
@@ -427,9 +428,11 @@ export function NotesPane({
               <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
               <input
                 className="border-input/60 placeholder:text-muted-foreground focus:border-primary h-8 w-full rounded-md border bg-transparent py-1 pr-8 pl-9 text-sm outline-none"
+                onBlur={() => setIsSearchFocused(false)}
                 onChange={(event) =>
                   setDraftSearchQuery(event.currentTarget.value)
                 }
+                onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
                     if (draftSearchQuery) {
@@ -623,8 +626,10 @@ export function NotesPane({
                         className={[
                           "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
                           isActive ? "bg-accent/50" : "",
-                          isActive && focusedPane === "notes"
-                            ? "ring-primary/50 ring-2 ring-inset"
+                          isActive &&
+                          focusedPane === "notes" &&
+                          !isSearchFocused
+                            ? "before:bg-primary/60 before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
                             : "",
                         ].join(" ")}
                         onClick={() => onSelectNote(note.id)}

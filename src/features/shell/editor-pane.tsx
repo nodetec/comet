@@ -523,6 +523,7 @@ export function EditorPane({
                 onChange={onChange}
                 onEditorFocusChange={(focused) => {
                   if (focused) {
+                    setFocusedPane("editor");
                     setHidePanelSearchInEditor(true);
                   }
                 }}

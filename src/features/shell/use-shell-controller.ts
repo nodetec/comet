@@ -122,6 +122,7 @@ export function useShellController() {
   const setNotebookFilter = useShellStore((state) => state.setNotebookFilter);
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
   const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
+  const setFocusedPane = useShellStore((state) => state.setFocusedPane);
 
   const sortViewKey =
     noteFilter === "notebook" ? (activeNotebookId ?? "all") : noteFilter;
@@ -1204,8 +1205,10 @@ export function useShellController() {
         latestRef.current.handleRestoreNote(noteId),
       onTrashNote: (noteId: string) =>
         latestRef.current.handleTrashNote(noteId),
-      onSelectNote: (noteId: string) =>
-        latestRef.current.handleSelectNote(noteId),
+      onSelectNote: (noteId: string) => {
+        setFocusedPane("notes");
+        latestRef.current.handleSelectNote(noteId);
+      },
       onSetNotePinned: (noteId: string, pinned: boolean) =>
         latestRef.current.handleSetNotePinned(noteId, pinned),
       searchQuery,
@@ -1227,6 +1230,7 @@ export function useShellController() {
       notesQuery.hasNextPage,
       notesQuery.isFetchingNextPage,
       searchQuery,
+      setFocusedPane,
       setNoteSortPrefs,
       setSearchQuery,
       sortViewKey,
@@ -1254,14 +1258,31 @@ export function useShellController() {
         latestRef.current.handleDeleteNotebook(notebookId),
       onHideCreateNotebook: hideCreateNotebook,
       onHideRenameNotebook: hideRenameNotebook,
-      onSelectAll: () => latestRef.current.handleSelectAll(),
-      onSelectToday: () => latestRef.current.handleSelectToday(),
-      onSelectTodo: () => latestRef.current.handleSelectTodo(),
-      onSelectArchive: () => latestRef.current.handleSelectArchive(),
-      onSelectTrash: () => latestRef.current.handleSelectTrash(),
+      onSelectAll: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectAll();
+      },
+      onSelectToday: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectToday();
+      },
+      onSelectTodo: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectTodo();
+      },
+      onSelectArchive: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectArchive();
+      },
+      onSelectTrash: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectTrash();
+      },
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
-      onSelectNotebook: (notebookId: string) =>
-        latestRef.current.handleSelectNotebook(notebookId),
+      onSelectNotebook: (notebookId: string) => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectNotebook(notebookId);
+      },
       onShowCreateNotebook: showCreateNotebook,
       onShowRenameNotebook: (notebookId: string) =>
         showRenameNotebook(notebookId, notebooks),
@@ -1287,6 +1308,7 @@ export function useShellController() {
       notebooks,
       renameNotebookMutation.isPending,
       renamingNotebookName,
+      setFocusedPane,
       setNewNotebookName,
       setRenamingNotebookName,
       showCreateNotebook,
