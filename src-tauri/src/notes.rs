@@ -820,21 +820,27 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, A
 
 pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, AppError> {
     let conn = database_connection(app)?;
-    let pattern = format!(
-        "%{}%",
-        escape_like_pattern(&query.to_ascii_lowercase())
-    );
+    let escaped = escape_like_pattern(&query.to_ascii_lowercase());
+    let contains_pattern = format!("%{}%", escaped);
+    let prefix_pattern = format!("{}%", escaped);
 
+    // Rank: prefix matches first, then contains matches.
+    // Within each group, sort by frequency (most-used tags first).
     let mut statement = conn
         .prepare(
-            "SELECT DISTINCT tag FROM note_tags
-             WHERE tag LIKE ? ESCAPE '\\'
-             ORDER BY tag ASC
+            "SELECT tag, COUNT(*) AS freq,
+                    CASE WHEN tag LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
+             FROM note_tags
+             WHERE tag LIKE ?1 ESCAPE '\\'
+             GROUP BY tag
+             ORDER BY rank ASC, freq DESC, tag ASC
              LIMIT 20",
         )?;
 
     let rows = statement
-        .query_map(params![pattern], |row| row.get::<_, String>(0))?;
+        .query_map(params![contains_pattern, prefix_pattern], |row| {
+            row.get::<_, String>(0)
+        })?;
 
     let mut tags = Vec::new();
     for row in rows {

@@ -70,7 +70,7 @@ function TagMenuItem({
       ref={ref}
       role="option"
       aria-selected={isSelected}
-      className={`cursor-pointer px-3 py-1.5 text-sm ${
+      className={`cursor-pointer mx-1 rounded px-2 py-1.5 text-sm ${
         isSelected ? "bg-accent text-accent-foreground" : ""
       }`}
       onClick={onClick}
