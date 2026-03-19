@@ -8,9 +8,11 @@ import {
   Submenu,
 } from "@tauri-apps/api/menu";
 import { ChevronDown, PenBoxIcon, Pin, Search, X } from "lucide-react";
-import Highlighter from "react-highlight-words";
 import { LayoutGroup, motion } from "framer-motion";
 import {
+  Fragment,
+  useCallback,
+  useDeferredValue,
   memo,
   useEffect,
   useMemo,
@@ -93,25 +95,89 @@ function handleCreateButtonClick(
   onCreateNote("keyboard");
 }
 
+const HIGHLIGHT_CLASS_NAME =
+  "bg-yellow-300 text-background rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
+const MAX_HIGHLIGHT_MATCHES_PER_BLOCK = 24;
+
+function normalizeHighlightWords(searchWords: string[]) {
+  return [...searchWords]
+    .map((word) => word.toLocaleLowerCase())
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+}
+
 const HighlightedText = memo(function HighlightedText({
   text,
-  searchWords,
+  highlightWords,
 }: {
   text: string;
-  searchWords: string[];
+  highlightWords: string[];
 }) {
-  if (searchWords.length === 0 || text.length === 0) {
+  if (highlightWords.length === 0 || text.length === 0) {
     return <>{text}</>;
   }
 
-  return (
-    <Highlighter
-      autoEscape
-      highlightClassName="bg-yellow-300 text-background rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
-      searchWords={searchWords}
-      textToHighlight={text}
-    />
-  );
+  const lowerText = text.toLocaleLowerCase();
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+  let matchCount = 0;
+
+  while (cursor < text.length) {
+    let nextIndex = -1;
+    let nextLength = 0;
+
+    for (const word of highlightWords) {
+      const index = lowerText.indexOf(word, cursor);
+      if (index === -1) {
+        continue;
+      }
+
+      if (
+        nextIndex === -1 ||
+        index < nextIndex ||
+        (index === nextIndex && word.length > nextLength)
+      ) {
+        nextIndex = index;
+        nextLength = word.length;
+      }
+    }
+
+    if (nextIndex === -1) {
+      break;
+    }
+
+    if (nextIndex > cursor) {
+      parts.push(
+        <Fragment key={`text-${key++}`}>
+          {text.slice(cursor, nextIndex)}
+        </Fragment>,
+      );
+    }
+
+    const end = nextIndex + nextLength;
+    parts.push(
+      <mark className={HIGHLIGHT_CLASS_NAME} key={`mark-${key++}`}>
+        {text.slice(nextIndex, end)}
+      </mark>,
+    );
+    cursor = end;
+    matchCount += 1;
+
+    if (matchCount >= MAX_HIGHLIGHT_MATCHES_PER_BLOCK) {
+      break;
+    }
+  }
+
+  if (parts.length === 0) {
+    return <>{text}</>;
+  }
+
+  if (cursor < text.length) {
+    parts.push(<Fragment key={`text-${key++}`}>{text.slice(cursor)}</Fragment>);
+  }
+
+  return <>{parts}</>;
 });
 
 export function NotesPane({
@@ -152,8 +218,11 @@ export function NotesPane({
   const [isSearchOpen, setIsSearchOpen] = useState(
     () => searchQuery.length > 0,
   );
+  const [draftSearchQuery, setDraftSearchQuery] = useState(searchQuery);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [slideInNoteId, setSlideInNoteId] = useState<string | null>(null);
+  const deferredSearchQuery = useDeferredValue(draftSearchQuery);
+  const lastAppliedSearchRef = useRef(searchQuery);
 
   // When creatingNoteId changes to a new value, mark it for slide-in
   useEffect(() => {
@@ -183,6 +252,40 @@ export function NotesPane({
     () => searchWordsFromQuery(searchQuery),
     [searchQuery],
   );
+  const highlightWords = useMemo(
+    () => normalizeHighlightWords(searchWords),
+    [searchWords],
+  );
+
+  const applySearchQuery = useCallback(
+    (nextQuery: string) => {
+      lastAppliedSearchRef.current = nextQuery;
+      setDraftSearchQuery(nextQuery);
+      onChangeSearch(nextQuery);
+    },
+    [onChangeSearch],
+  );
+
+  useEffect(() => {
+    if (searchQuery !== lastAppliedSearchRef.current) {
+      lastAppliedSearchRef.current = searchQuery;
+      setDraftSearchQuery(searchQuery);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (deferredSearchQuery !== draftSearchQuery) {
+      return;
+    }
+
+    if (deferredSearchQuery === lastAppliedSearchRef.current) {
+      return;
+    }
+
+    lastAppliedSearchRef.current = deferredSearchQuery;
+    onChangeSearch(deferredSearchQuery);
+  }, [deferredSearchQuery, draftSearchQuery, onChangeSearch]);
+
   useEffect(() => {
     if (searchQuery) {
       setIsSearchOpen(true);
@@ -324,11 +427,13 @@ export function NotesPane({
               <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
               <input
                 className="border-input/60 placeholder:text-muted-foreground focus:border-primary h-8 w-full rounded-md border bg-transparent py-1 pr-8 pl-9 text-sm outline-none"
-                onChange={(event) => onChangeSearch(event.currentTarget.value)}
+                onChange={(event) =>
+                  setDraftSearchQuery(event.currentTarget.value)
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
-                    if (searchQuery) {
-                      onChangeSearch("");
+                    if (draftSearchQuery) {
+                      applySearchQuery("");
                     }
 
                     setIsSearchOpen(false);
@@ -336,12 +441,12 @@ export function NotesPane({
                 }}
                 placeholder="Search…"
                 ref={searchInputRef}
-                value={searchQuery}
+                value={draftSearchQuery}
               />
               <Button
                 className="text-muted-foreground hover:bg-accent hover:text-accent-foreground absolute top-1/2 right-1 z-10 -translate-y-1/2"
                 onClick={() => {
-                  onChangeSearch("");
+                  applySearchQuery("");
                   setIsSearchOpen(false);
                 }}
                 onMouseDown={(event) => event.preventDefault()}
@@ -540,8 +645,8 @@ export function NotesPane({
                               className={`min-w-0 truncate font-semibold ${note.title ? "text-[var(--heading-color)]" : "text-muted-foreground"}`}
                             >
                               <HighlightedText
+                                highlightWords={highlightWords}
                                 text={note.title || "Untitled"}
-                                searchWords={searchWords}
                               />
                             </h3>
                           ) : null}
@@ -550,8 +655,8 @@ export function NotesPane({
                               className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title || !note.preview ? "line-clamp-2" : "line-clamp-3"}`}
                             >
                               <HighlightedText
+                                highlightWords={highlightWords}
                                 text={cardPreview}
-                                searchWords={searchWords}
                               />
                             </p>
                           </div>

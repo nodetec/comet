@@ -6,12 +6,15 @@ import {
   type MouseEvent,
 } from "react";
 import { useUIStore } from "@/stores/use-ui-store";
+import { useShellStore } from "@/stores/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, Submenu } from "@tauri-apps/api/menu";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
 import {
+  ChevronDown,
+  ChevronUp,
   Ellipsis,
   Lock,
   PanelBottomOpen,
@@ -109,12 +112,26 @@ export function EditorPane({
   const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
+  const focusedPane = useShellStore((s) => s.focusedPane);
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
+  const [findMatchCount, setFindMatchCount] = useState(0);
   const [findQuery, setFindQuery] = useState("");
+  const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
+  const [hidePanelSearchInEditor, setHidePanelSearchInEditor] =
+    useState(false);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const noteTitle = firstLineH1Title(markdown);
+  const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
+  const editorSearchQuery = hasEditorFindQuery
+    ? findQuery
+    : findOpen
+      ? searchQuery
+      : hidePanelSearchInEditor
+        ? ""
+        : searchQuery;
   const updateHeaderState = useCallback(
     (scrollContainer: HTMLDivElement | null) => {
       const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
@@ -147,9 +164,78 @@ export function EditorPane({
   }, [noteId, updateHeaderState]);
 
   useEffect(() => {
+    setHidePanelSearchInEditor(false);
+  }, [noteId]);
+
+  useEffect(() => {
+    if (focusedPane !== "editor") {
+      setHidePanelSearchInEditor(false);
+    }
+  }, [focusedPane]);
+
+  useEffect(() => {
+    setActiveFindMatchIndex(0);
+  }, [findQuery, noteId]);
+
+  useEffect(() => {
+    if (!hasEditorFindQuery) {
+      setFindMatchCount(0);
+    }
+  }, [hasEditorFindQuery]);
+
+  useEffect(() => {
+    if (findMatchCount === 0) {
+      setActiveFindMatchIndex(0);
+      return;
+    }
+
+    setActiveFindMatchIndex((previousIndex) =>
+      Math.min(previousIndex, findMatchCount - 1),
+    );
+  }, [findMatchCount]);
+
+  const closeFind = useCallback((focusEditor: boolean) => {
+    setFocusedPane("editor");
+    setFindOpen(false);
+    setFindMatchCount(0);
+    setFindQuery("");
+    setActiveFindMatchIndex(0);
+    setHidePanelSearchInEditor(true);
+    if (!focusEditor) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+    });
+  }, [setFocusedPane]);
+
+  const stepActiveFindMatch = useCallback(
+    (direction: 1 | -1) => {
+      if (findMatchCount === 0) {
+        return;
+      }
+
+      setActiveFindMatchIndex((previousIndex) => {
+        const nextIndex = previousIndex + direction;
+        if (nextIndex < 0) {
+          return findMatchCount - 1;
+        }
+        if (nextIndex >= findMatchCount) {
+          return 0;
+        }
+        return nextIndex;
+      });
+    },
+    [findMatchCount],
+  );
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "f") {
         event.preventDefault();
+        setFocusedPane("editor");
+        setHidePanelSearchInEditor(true);
         setFindOpen(true);
         requestAnimationFrame(() => {
           findInputRef.current?.focus();
@@ -159,15 +245,13 @@ export function EditorPane({
 
       if (event.key === "Escape" && findOpen) {
         event.preventDefault();
-        setFindOpen(false);
-        setFindQuery("");
-        editorRef.current?.focus();
+        closeFind(true);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [findOpen]);
+  }, [closeFind, findOpen, setFocusedPane]);
 
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -238,6 +322,8 @@ export function EditorPane({
       return;
     }
 
+    setHidePanelSearchInEditor(true);
+
     const target = event.target as HTMLElement;
 
     if (target.closest("button, input, textarea, select, a, [role='button']")) {
@@ -269,7 +355,7 @@ export function EditorPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
-          showHeaderBorder && "border-divider border-b",
+          showHeaderBorder && !findOpen && "border-divider border-b",
         )}
       >
         <div className="min-w-0 flex-1">
@@ -342,23 +428,61 @@ export function EditorPane({
             className="bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-0 flex-1"
             placeholder="Find in note…"
             value={findQuery}
-            onChange={(e) => setFindQuery(e.target.value)}
+            onChange={(e) => {
+              setFindQuery(e.target.value);
+              setActiveFindMatchIndex(0);
+            }}
             onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                stepActiveFindMatch(e.shiftKey ? -1 : 1);
+                return;
+              }
+
               if (e.key === "Escape") {
                 e.preventDefault();
-                setFindOpen(false);
-                setFindQuery("");
-                editorRef.current?.focus();
+                closeFind(true);
               }
             }}
           />
+          <span className="text-muted-foreground min-w-[3rem] text-right text-xs tabular-nums">
+            {findQuery && findMatchCount > 0
+              ? `${activeFindMatchIndex + 1}/${findMatchCount}`
+              : findQuery
+                ? "0"
+                : ""}
+          </span>
+          <button
+            className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40"
+            disabled={findMatchCount === 0}
+            onClick={() => stepActiveFindMatch(-1)}
+            onMouseDown={(event) => event.preventDefault()}
+            type="button"
+          >
+            <ChevronUp className="size-3.5" />
+          </button>
+          <button
+            className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/40"
+            disabled={findMatchCount === 0}
+            onClick={() => stepActiveFindMatch(1)}
+            onMouseDown={(event) => event.preventDefault()}
+            type="button"
+          >
+            <ChevronDown className="size-3.5" />
+          </button>
           <button
             className="text-muted-foreground hover:text-foreground"
             onClick={() => {
-              setFindOpen(false);
-              setFindQuery("");
-              editorRef.current?.focus();
+              if (findQuery) {
+                setFindMatchCount(0);
+                setFindQuery("");
+                setActiveFindMatchIndex(0);
+                findInputRef.current?.focus();
+              } else {
+                closeFind(false);
+              }
             }}
+            onMouseDown={(event) => event.preventDefault()}
             type="button"
           >
             <X className="size-3.5" />
@@ -395,10 +519,22 @@ export function EditorPane({
                 key={editorKey ?? noteId}
                 markdown={markdown}
                 onChange={onChange}
+                onEditorFocusChange={(focused) => {
+                  if (focused) {
+                    setHidePanelSearchInEditor(true);
+                  }
+                }}
                 onFocusHandled={onFocusHandled}
+                onSearchMatchCountChange={
+                  hasEditorFindQuery ? setFindMatchCount : undefined
+                }
                 readOnly={isReadOnly}
                 ref={editorRef}
-                searchQuery={findOpen && findQuery ? findQuery : searchQuery}
+                searchHighlightAllMatchesYellow={!hasEditorFindQuery}
+                searchActiveMatchIndex={
+                  hasEditorFindQuery ? activeFindMatchIndex : null
+                }
+                searchQuery={editorSearchQuery}
                 toolbarContainer={toolbarContainer}
               />
             </div>

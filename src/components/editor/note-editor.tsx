@@ -61,7 +61,11 @@ type NoteEditorProps = {
   html: string | null;
   isNew: boolean;
   markdown: string;
+  onEditorFocusChange?(focused: boolean): void;
+  onSearchMatchCountChange?(count: number): void;
   readOnly: boolean;
+  searchHighlightAllMatchesYellow?: boolean;
+  searchActiveMatchIndex?: number | null;
   searchQuery: string;
   toolbarContainer: HTMLElement | null;
   onChange(markdown: string): void;
@@ -80,9 +84,13 @@ function EditorInner({
   isNew,
   markdown,
   readOnly,
+  searchHighlightAllMatchesYellow,
+  searchActiveMatchIndex,
   searchQuery,
   toolbarContainer,
   onChange,
+  onEditorFocusChange,
+  onSearchMatchCountChange,
   onFocusHandled,
   editorRef,
 }: NoteEditorProps & {
@@ -144,9 +152,42 @@ function EditorInner({
     onFocusHandled();
   }, [editor, focusMode, onFocusHandled, readOnly]);
 
+  useEffect(() => {
+    const handleFocusIn = () => {
+      onEditorFocusChange?.(true);
+    };
+
+    const handleFocusOut = (event: FocusEvent) => {
+      const root = editor.getRootElement();
+      const nextTarget = event.relatedTarget;
+
+      if (root && nextTarget instanceof Node && root.contains(nextTarget)) {
+        return;
+      }
+
+      onEditorFocusChange?.(false);
+    };
+
+    return editor.registerRootListener((root, prevRoot) => {
+      if (prevRoot) {
+        prevRoot.removeEventListener("focusin", handleFocusIn);
+        prevRoot.removeEventListener("focusout", handleFocusOut);
+      }
+
+      if (!root) {
+        onEditorFocusChange?.(false);
+        return;
+      }
+
+      root.addEventListener("focusin", handleFocusIn);
+      root.addEventListener("focusout", handleFocusOut);
+      onEditorFocusChange?.(root.contains(document.activeElement));
+    });
+  }, [editor, onEditorFocusChange]);
+
   return (
     <>
-      <div className="comet-editor-content-wrap">
+      <div className="comet-editor-content-wrap relative">
         <ContentEditable
           className="comet-editor-content"
           autoCapitalize="off"
@@ -174,7 +215,12 @@ function EditorInner({
       <MarkdownPastePlugin />
       <YouTubeEmbedPlugin />
       <ImageDropPlugin />
-      <SearchHighlightPlugin searchWords={searchWords} />
+      <SearchHighlightPlugin
+        activeMatchIndex={searchActiveMatchIndex}
+        highlightAllMatchesYellow={searchHighlightAllMatchesYellow}
+        onMatchCountChange={onSearchMatchCountChange}
+        searchWords={searchWords}
+      />
       <TableActionMenuPlugin />
 
       <TableClickOutsidePlugin />
