@@ -3,7 +3,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $createCodeNode, $isCodeNode } from "@lexical/code";
 import {
   PASTE_COMMAND,
-  COMMAND_PRIORITY_HIGH,
+  COMMAND_PRIORITY_CRITICAL,
   $createTextNode,
   $getSelection,
   $isRangeSelection,
@@ -256,14 +256,31 @@ export default function MarkdownPastePlugin() {
   useEffect(() => {
     return editor.registerCommand(
       PASTE_COMMAND,
-      (event: ClipboardEvent) => {
+      (event: ClipboardEvent | InputEvent | KeyboardEvent) => {
+        if (!(event instanceof ClipboardEvent)) {
+          return false;
+        }
+
         const clipboardData = event.clipboardData;
-        if (!clipboardData) return false;
+        if (!clipboardData) {
+          return false;
+        }
 
         const text = clipboardData.getData("text/plain");
-        if (!text) return false;
-        // If Lexical JSON is on the clipboard, let the built-in handler use it
-        if (clipboardData.getData("application/x-lexical-editor")) {
+        const lexicalJson = clipboardData.getData(
+          "application/x-lexical-editor",
+        );
+
+        if (!text) {
+          return false;
+        }
+
+        const markdownCandidate = !isLikelyJSON(text) && isLikelyMarkdown(text);
+
+        // Prefer markdown-looking plain text even if Lexical JSON is present.
+        // This matters when copying source markdown from another Lexical-based
+        // app/editor that also adds application/x-lexical-editor.
+        if (lexicalJson && !markdownCandidate) {
           return false;
         }
 
@@ -279,10 +296,14 @@ export default function MarkdownPastePlugin() {
         }
 
         // Skip if it looks like JSON
-        if (isLikelyJSON(text)) return false;
+        if (isLikelyJSON(text)) {
+          return false;
+        }
 
         // Only handle if it looks like markdown
-        if (!isLikelyMarkdown(text)) return false;
+        if (!markdownCandidate) {
+          return false;
+        }
 
         event.preventDefault();
 
@@ -314,7 +335,7 @@ export default function MarkdownPastePlugin() {
 
         return true;
       },
-      COMMAND_PRIORITY_HIGH,
+      COMMAND_PRIORITY_CRITICAL,
     );
   }, [editor]);
 
