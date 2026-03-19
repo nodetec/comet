@@ -87,8 +87,11 @@ export default function SearchHighlightPlugin({
 
     shouldScrollRef.current = true;
     const root = editor.getRootElement();
-    getOrCreateStyleElement().textContent =
-      root?.contains(document.activeElement) ? "" : HIGHLIGHT_STYLES;
+    getOrCreateStyleElement().textContent = root?.contains(
+      document.activeElement,
+    )
+      ? ""
+      : HIGHLIGHT_STYLES;
 
     if (searchWords.length === 0) {
       clearHighlights();
@@ -136,10 +139,10 @@ export default function SearchHighlightPlugin({
         highlights.delete(HIGHLIGHT_NAME);
         highlights.set(ACTIVE_HIGHLIGHT_NAME, new Highlight(...ranges));
       } else {
-      const hasActiveMatch =
-        activeMatchIndex !== null &&
-        activeMatchIndex >= 0 &&
-        activeMatchIndex < ranges.length;
+        const hasActiveMatch =
+          activeMatchIndex !== null &&
+          activeMatchIndex >= 0 &&
+          activeMatchIndex < ranges.length;
         const inactiveRanges = hasActiveMatch
           ? ranges.filter((_, index) => index !== activeMatchIndex)
           : ranges;
@@ -181,7 +184,8 @@ export default function SearchHighlightPlugin({
       const scrollRect = scrollContainer.getBoundingClientRect();
       const targetRect = targetRange.getBoundingClientRect();
       const hasVisibleMatch =
-        targetRect.bottom > scrollRect.top && targetRect.top < scrollRect.bottom;
+        targetRect.bottom > scrollRect.top &&
+        targetRect.top < scrollRect.bottom;
 
       if (hasVisibleMatch) {
         return;

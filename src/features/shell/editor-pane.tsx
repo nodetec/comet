@@ -120,8 +120,7 @@ export function EditorPane({
   const [findMatchCount, setFindMatchCount] = useState(0);
   const [findQuery, setFindQuery] = useState("");
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
-  const [hidePanelSearchInEditor, setHidePanelSearchInEditor] =
-    useState(false);
+  const [hidePanelSearchInEditor, setHidePanelSearchInEditor] = useState(false);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const noteTitle = firstLineH1Title(markdown);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
@@ -194,21 +193,24 @@ export function EditorPane({
     );
   }, [findMatchCount]);
 
-  const closeFind = useCallback((focusEditor: boolean) => {
-    setFocusedPane("editor");
-    setFindOpen(false);
-    setFindMatchCount(0);
-    setFindQuery("");
-    setActiveFindMatchIndex(0);
-    setHidePanelSearchInEditor(true);
-    if (!focusEditor) {
-      return;
-    }
+  const closeFind = useCallback(
+    (focusEditor: boolean) => {
+      setFocusedPane("editor");
+      setFindOpen(false);
+      setFindMatchCount(0);
+      setFindQuery("");
+      setActiveFindMatchIndex(0);
+      setHidePanelSearchInEditor(true);
+      if (!focusEditor) {
+        return;
+      }
 
-    requestAnimationFrame(() => {
-      editorRef.current?.focus();
-    });
-  }, [setFocusedPane]);
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+      });
+    },
+    [setFocusedPane],
+  );
 
   const stepActiveFindMatch = useCallback(
     (direction: 1 | -1) => {
@@ -425,7 +427,7 @@ export function EditorPane({
           <Search className="text-muted-foreground size-3.5 shrink-0" />
           <input
             ref={findInputRef}
-            className="bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-0 flex-1"
+            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
             placeholder="Find in note…"
             value={findQuery}
             onChange={(e) => {

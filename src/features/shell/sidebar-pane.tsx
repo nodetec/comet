@@ -304,7 +304,10 @@ export function SidebarPane({
                 All Notes
               </button>
               <button
-                className={sidebarItemClasses(noteFilter === "today", isFocused)}
+                className={sidebarItemClasses(
+                  noteFilter === "today",
+                  isFocused,
+                )}
                 onClick={onSelectToday}
                 type="button"
               >
@@ -325,7 +328,10 @@ export function SidebarPane({
               </button>
               {(archivedCount > 0 || noteFilter === "archive") && (
                 <button
-                  className={sidebarItemClasses(noteFilter === "archive", isFocused)}
+                  className={sidebarItemClasses(
+                    noteFilter === "archive",
+                    isFocused,
+                  )}
                   onClick={onSelectArchive}
                   type="button"
                 >
@@ -335,7 +341,10 @@ export function SidebarPane({
               )}
               {(trashedCount > 0 || noteFilter === "trash") && (
                 <button
-                  className={sidebarItemClasses(noteFilter === "trash", isFocused)}
+                  className={sidebarItemClasses(
+                    noteFilter === "trash",
+                    isFocused,
+                  )}
                   onClick={onSelectTrash}
                   onContextMenu={(event) => void handleTrashContextMenu(event)}
                   type="button"

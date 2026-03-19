@@ -33,9 +33,10 @@ function matchHashtag(textUpToCursor: string): {
   leadOffset: number;
   replaceableLength: number;
 } | null {
-  const match = /(?:^|\s|\()#([^\s#.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;]{1,75})$/.exec(
-    textUpToCursor,
-  );
+  const match =
+    /(?:^|\s|\()#([^\s#.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;]{1,75})$/.exec(
+      textUpToCursor,
+    );
   if (!match) return null;
   const matchingString = match[1];
   const leadOffset = match.index + match[0].length - matchingString.length - 1;
@@ -70,7 +71,7 @@ function TagMenuItem({
       ref={ref}
       role="option"
       aria-selected={isSelected}
-      className={`cursor-pointer mx-1 rounded px-2 py-1.5 text-sm ${
+      className={`mx-1 cursor-pointer rounded px-2 py-1.5 text-sm ${
         isSelected ? "bg-accent text-accent-foreground" : ""
       }`}
       onClick={onClick}
@@ -293,7 +294,7 @@ export default function TagCompletionPlugin() {
   return createPortal(
     <ul
       role="listbox"
-      className="fixed z-50 max-h-[200px] overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
+      className="border-border bg-popover fixed z-50 max-h-[200px] overflow-y-auto rounded-md border py-1 shadow-md"
       style={{
         top: menu.rect.bottom + 4,
         left: menu.rect.left,

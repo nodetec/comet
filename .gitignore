@@ -6,6 +6,7 @@ old/
 .agents/
 .claude/
 skills-lock.json
+.superpowers/
 
 comet.db
 comet.db-shm
