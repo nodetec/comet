@@ -22,11 +22,6 @@ export default function CodeHighlightPlugin() {
     const unregister = registerCodeHighlighting(editor, tokenizer);
     editor.update(() => {
       const codeNodes = $nodesOfType(CodeNode);
-      if (codeNodes.length > 0) {
-        console.log(
-          `[editor:code-highlight] marking ${codeNodes.length} code node(s) dirty`,
-        );
-      }
       for (const node of codeNodes) {
         node.getWritable();
       }

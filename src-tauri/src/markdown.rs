@@ -44,11 +44,15 @@ fn options<'a>() -> Options<'a> {
 fn postprocess_html(html: &str) -> String {
     let mut result = html.to_string();
 
-    // Code blocks: rewrite <pre><code class="language-X"> → <pre data-language="X"><code>
+    // Code blocks: rewrite nested <pre><code> into a bare <pre> so Lexical
+    // imports a single CodeNode instead of traversing both elements.
     result = regex_lite::Regex::new(r#"<pre><code class="language-([^"]+)">"#)
         .unwrap()
-        .replace_all(&result, r#"<pre data-language="$1"><code>"#)
+        .replace_all(&result, r#"<pre data-language="$1">"#)
         .to_string();
+
+    result = result.replace("<pre><code>", "<pre>");
+    result = result.replace("</code></pre>", "</pre>");
 
     // Strikethrough: comrak uses <del>, Lexical expects <s>
     result = result.replace("<del>", "<s>").replace("</del>", "</s>");
@@ -160,6 +164,7 @@ mod tests {
         let html = markdown_to_lexical_html("```rust\nfn main() {}\n```");
         assert!(html.contains("data-language=\"rust\""), "HTML: {html}");
         assert!(html.contains("fn main()"), "HTML: {html}");
+        assert!(!html.contains("<code>"), "HTML: {html}");
     }
 
     #[test]

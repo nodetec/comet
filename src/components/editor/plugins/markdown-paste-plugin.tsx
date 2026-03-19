@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { $createCodeNode, $isCodeNode } from "@lexical/code";
 import {
   PASTE_COMMAND,
-  COMMAND_PRIORITY_LOW,
+  COMMAND_PRIORITY_HIGH,
+  $createTextNode,
   $getSelection,
   $isRangeSelection,
   $getRoot,
@@ -14,9 +16,13 @@ import {
   type LexicalNode,
 } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
+import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { markdownToDOM } from "../lib/marked-import";
-import { normalizeImportedNodes } from "../lib/markdown";
+import {
+  normalizeImportedCodeBlocksFromMarkdown,
+  normalizeImportedNodes,
+} from "../lib/markdown";
 
 // Patterns that strongly indicate markdown content
 const MARKDOWN_PATTERNS = [
@@ -40,6 +46,90 @@ const MARKDOWN_PATTERNS = [
 const PLAIN_TEXT_INDICATORS = [
   /^https?:\/\/[^\s]+$/, // Single URL
 ];
+
+function parseSingleFencedCodeBlock(
+  markdown: string,
+): { language?: string; code: string } | null {
+  const normalized = markdown.replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n");
+
+  let start = 0;
+  while (start < lines.length && lines[start]?.trim() === "") {
+    start++;
+  }
+
+  let end = lines.length - 1;
+  while (end >= start && lines[end]?.trim() === "") {
+    end--;
+  }
+
+  if (start > end) {
+    return null;
+  }
+
+  const openingLine = lines[start]?.trimStart() ?? "";
+  const openingMatch = /^(`{3,}|~{3,})(.*)$/.exec(openingLine);
+  if (!openingMatch || /^(`{3,})[^`]+\1$/.test(openingLine)) {
+    return null;
+  }
+
+  const fence = openingMatch[1];
+  const fenceChar = fence[0];
+  const fenceLen = fence.length;
+  const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
+  const closingFenceRe = new RegExp(
+    `^[ \\t]*${escapedFenceChar}{${fenceLen},}[ \\t]*$`,
+  );
+
+  if (!closingFenceRe.test(lines[end] ?? "")) {
+    return null;
+  }
+
+  const info = openingMatch[2].trim();
+  const language = info.length > 0 ? info.split(/\s+/, 1)[0] : undefined;
+  const code = lines.slice(start + 1, end).join("\n");
+
+  return { language, code };
+}
+
+function insertBlockNodes(nodes: LexicalNode[]): void {
+  if (nodes.length === 0) return;
+
+  const selection = $getSelection();
+
+  if (!$isRangeSelection(selection)) {
+    const root = $getRoot();
+    for (const node of nodes) {
+      root.append(node);
+    }
+    return;
+  }
+
+  if (!selection.isCollapsed()) {
+    selection.removeText();
+  }
+
+  const anchorNode = selection.anchor.getNode();
+  const targetBlock = anchorNode.getTopLevelElementOrThrow();
+  const isEmptyBlock = isReplaceableEmptyBlockNode(targetBlock);
+
+  if (isEmptyBlock) {
+    targetBlock.replace(nodes[0]);
+    for (let i = 1; i < nodes.length; i++) {
+      nodes[i - 1].insertAfter(nodes[i]);
+    }
+  } else {
+    for (let i = 0; i < nodes.length; i++) {
+      const after = i === 0 ? targetBlock : nodes[i - 1];
+      after.insertAfter(nodes[i]);
+    }
+  }
+
+  const lastNode = nodes[nodes.length - 1];
+  if ($isElementNode(lastNode)) {
+    lastNode.selectEnd();
+  }
+}
 
 // Check if content looks like JSON or JSONC (JSON with comments)
 function isLikelyJSON(text: string): boolean {
@@ -172,10 +262,20 @@ export default function MarkdownPastePlugin() {
 
         const text = clipboardData.getData("text/plain");
         if (!text) return false;
-
         // If Lexical JSON is on the clipboard, let the built-in handler use it
         if (clipboardData.getData("application/x-lexical-editor")) {
           return false;
+        }
+
+        const selection = $getSelection();
+        if ($isRangeSelection(selection)) {
+          const parentCodeNode = $findMatchingParent(
+            selection.anchor.getNode(),
+            $isCodeNode,
+          );
+          if (parentCodeNode) {
+            return false;
+          }
         }
 
         // Skip if it looks like JSON
@@ -186,64 +286,35 @@ export default function MarkdownPastePlugin() {
 
         event.preventDefault();
 
-        const dom = markdownToDOM(text, { paste: true });
+        const singleFencedCodeBlock = parseSingleFencedCodeBlock(text);
 
         editor.update(() => {
+          if (singleFencedCodeBlock) {
+            const codeNode = $createCodeNode(singleFencedCodeBlock.language);
+            if (singleFencedCodeBlock.code.length > 0) {
+              codeNode.append($createTextNode(singleFencedCodeBlock.code));
+            }
+            insertBlockNodes([codeNode]);
+            return;
+          }
+
+          const dom = markdownToDOM(text, { paste: true });
           const allNodes = normalizeImportedNodes(
             $generateNodesFromDOM(editor, dom),
           );
+          normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
           // Filter to block-level nodes only — $generateNodesFromDOM may
           // produce stray TextNodes from whitespace between HTML tags
           const filteredNodes = allNodes.filter(
             (node) => $isElementNode(node) || $isDecoratorNode(node),
           );
           const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
-          if (nodes.length === 0) return;
-
-          const selection = $getSelection();
-
-          if (!$isRangeSelection(selection)) {
-            const root = $getRoot();
-            for (const node of nodes) {
-              root.append(node);
-            }
-            return;
-          }
-
-          // Delete selected content first
-          if (!selection.isCollapsed()) {
-            selection.removeText();
-          }
-
-          // Find the block element containing the cursor
-          const anchorNode = selection.anchor.getNode();
-          const targetBlock = anchorNode.getTopLevelElementOrThrow();
-
-          // If cursor is at the start of an empty paragraph, replace it
-          const isEmptyBlock = isReplaceableEmptyBlockNode(targetBlock);
-
-          if (isEmptyBlock) {
-            targetBlock.replace(nodes[0]);
-            for (let i = 1; i < nodes.length; i++) {
-              nodes[i - 1].insertAfter(nodes[i]);
-            }
-          } else {
-            for (let i = 0; i < nodes.length; i++) {
-              const after = i === 0 ? targetBlock : nodes[i - 1];
-              after.insertAfter(nodes[i]);
-            }
-          }
-
-          // Place cursor at end of last inserted node
-          const lastNode = nodes[nodes.length - 1];
-          if ($isElementNode(lastNode)) {
-            lastNode.selectEnd();
-          }
+          insertBlockNodes(nodes);
         });
 
         return true;
       },
-      COMMAND_PRIORITY_LOW, // Lower priority so URL plugins run first
+      COMMAND_PRIORITY_HIGH,
     );
   }, [editor]);
 

@@ -628,14 +628,6 @@ export function useShellController() {
       return;
     }
 
-    console.log(
-      "[save-debounce] draft diverged from stored, scheduling save —",
-      "stored length:",
-      currentNote.markdown.length,
-      "draft length:",
-      draftMarkdown.length,
-    );
-
     // Persist draft for crash recovery (survives app quit during debounce)
     try {
       localStorage.setItem(

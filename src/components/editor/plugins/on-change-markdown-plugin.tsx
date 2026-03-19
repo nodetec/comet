@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $getNodeByKey } from "lexical";
 import { TRANSFORMERS } from "../transformers";
 import { $exportMarkdown } from "../lib/markdown";
 
@@ -30,35 +29,17 @@ export default function OnChangeMarkdownPlugin({
       editor.getEditorState().read(() => {
         const markdown = $exportMarkdown(TRANSFORMERS);
         prevMarkdownRef.current = markdown;
-        console.log(
-          `[editor:update] init complete, baseline: ${markdown.length} chars`,
-        );
       });
     }
   }, [editor, initComplete]);
 
   useEffect(() => {
     return editor.registerUpdateListener(
-      ({ editorState, dirtyElements, dirtyLeaves, tags }) => {
+      ({ editorState, dirtyElements, dirtyLeaves }) => {
         if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
         editorState.read(() => {
-          const dirtyNodeSummary = Array.from(dirtyLeaves)
-            .slice(0, 5)
-            .map((key) => {
-              const node = $getNodeByKey(key);
-              return node
-                ? `${node.getType()}(${JSON.stringify(node.getTextContent().slice(0, 30))})`
-                : `?(${key})`;
-            });
-
-          console.log(
-            `[editor:update] dirty: ${dirtyElements.size} elements, ${dirtyLeaves.size} leaves, tags: [${Array.from(tags).join(",")}]`,
-            dirtyNodeSummary,
-          );
-
           if (!initCompleteRef.current) {
-            console.log("[editor:update] pre-init update, skipping onChange");
             return;
           }
 
@@ -68,18 +49,7 @@ export default function OnChangeMarkdownPlugin({
             prevMarkdownRef.current !== null &&
             prevMarkdownRef.current === markdown
           ) {
-            console.log(
-              "[editor:update] markdown unchanged, skipping onChange",
-            );
             return;
-          }
-
-          if (prevMarkdownRef.current !== null) {
-            const prevLen = prevMarkdownRef.current.length;
-            const nextLen = markdown.length;
-            console.log(
-              `[editor:update] markdown changed: ${prevLen} → ${nextLen} chars (${nextLen >= prevLen ? "+" : ""}${nextLen - prevLen})`,
-            );
           }
 
           prevMarkdownRef.current = markdown;

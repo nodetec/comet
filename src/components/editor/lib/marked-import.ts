@@ -90,8 +90,7 @@ const highlightExtension: MarkedExtension = {
 const rendererOverrides: MarkedExtension = {
   renderer: {
     // Code blocks: Lexical's CodeNode.importDOM reads `data-language` from
-    // <pre>, but marked outputs <pre><code class="language-js">. We rewrite
-    // to match Lexical's expectation.
+    // <pre>. Emitting a bare <pre> avoids the nested <code> conversion path.
     code({ text, lang }: Tokens.Code) {
       const escaped = text
         .replace(/&/g, "&amp;")
@@ -99,7 +98,7 @@ const rendererOverrides: MarkedExtension = {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
       const langAttr = lang ? ` data-language="${lang}"` : "";
-      return `<pre${langAttr}><code>${escaped}</code></pre>\n`;
+      return `<pre${langAttr}>${escaped}</pre>\n`;
     },
 
     // Strikethrough: marked outputs <del>, Lexical's TextNode.importDOM
@@ -318,8 +317,11 @@ export function markdownToDOM(
   options?: { paste?: boolean },
 ): Document {
   const instance = options?.paste ? markedInstanceForPaste : markedInstance;
-  const html = instance
-    .parse(markdown) as string;
+  const html = instance.parse(markdown) as string;
+  return htmlToDOM(html);
+}
+
+export function htmlToDOM(html: string): Document {
   const cleaned = html.replace(BLOCK_WS_RE, "><$1$2");
   return domParser.parseFromString(
     `<!DOCTYPE html><html><body>${cleaned}</body></html>`,

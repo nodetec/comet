@@ -209,7 +209,7 @@ function normalizeImportedCodeBlockText(
   }
 }
 
-function normalizeImportedCodeBlocksFromMarkdown(
+export function normalizeImportedCodeBlocksFromMarkdown(
   nodes: LexicalNode[],
   markdown: string,
 ): void {
