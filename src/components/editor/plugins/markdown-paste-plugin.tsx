@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $createCodeNode, $isCodeNode } from "@lexical/code";
+import { $isListItemNode, $isListNode } from "@lexical/list";
 import {
   PASTE_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
@@ -19,6 +20,7 @@ import { $isHeadingNode } from "@lexical/rich-text";
 import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { markdownToDOM } from "../lib/marked-import";
+import { parseSingleChecklistItemContent } from "../lib/checklist-paste";
 import {
   normalizeImportedCodeBlocksFromMarkdown,
   normalizeImportedNodes,
@@ -90,6 +92,25 @@ function parseSingleFencedCodeBlock(
   const code = lines.slice(start + 1, end).join("\n");
 
   return { language, code };
+}
+
+function isSelectionInsideChecklistItem(
+  selection: ReturnType<typeof $getSelection>,
+): boolean {
+  if (!$isRangeSelection(selection)) {
+    return false;
+  }
+
+  const listItemNode = $findMatchingParent(
+    selection.anchor.getNode(),
+    $isListItemNode,
+  );
+  if (!listItemNode) {
+    return false;
+  }
+
+  const parentList = listItemNode.getParent();
+  return $isListNode(parentList) && parentList.getListType() === "check";
 }
 
 function insertBlockNodes(nodes: LexicalNode[]): void {
@@ -305,7 +326,23 @@ export default function MarkdownPastePlugin() {
           return false;
         }
 
+        const checklistContent = isSelectionInsideChecklistItem(selection)
+          ? parseSingleChecklistItemContent(text)
+          : null;
+
         event.preventDefault();
+
+        if (checklistContent !== null) {
+          editor.update(() => {
+            const selection = $getSelection();
+            if (!$isRangeSelection(selection)) {
+              return;
+            }
+
+            selection.insertText(checklistContent);
+          });
+          return true;
+        }
 
         const singleFencedCodeBlock = parseSingleFencedCodeBlock(text);
 
