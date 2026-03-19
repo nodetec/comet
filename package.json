@@ -62,6 +62,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tanstack/eslint-plugin-query": "^5.91.5",
+    "@tanstack/react-query-devtools": "^5.91.3",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.4.0",
     "@types/react": "^19.1.8",
