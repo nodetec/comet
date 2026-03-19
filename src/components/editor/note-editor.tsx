@@ -48,11 +48,13 @@ import SearchHighlightPlugin from "./plugins/search-highlight-plugin";
 import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
+import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
 
 type NoteEditorProps = {
+  devtoolsContainer: HTMLElement | null;
   focusMode: "none" | "immediate" | "pointerup";
   html: string | null;
   isNew: boolean;
@@ -69,6 +71,7 @@ export type NoteEditorHandle = {
 };
 
 function EditorInner({
+  devtoolsContainer,
   focusMode,
   html,
   isNew,
@@ -156,6 +159,7 @@ function EditorInner({
 
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
+      <DevtoolsPlugin portalContainer={devtoolsContainer} />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
   );

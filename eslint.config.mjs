@@ -86,7 +86,7 @@ export default [
       "@tanstack/query/no-unstable-deps": "error",
       "@tanstack/query/no-void-query-fn": "error",
       "@tanstack/query/stable-query-client": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "error",
       "react-hooks/rules-of-hooks": "error",
       "react/prop-types": "off",
     },

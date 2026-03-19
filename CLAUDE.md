@@ -14,7 +14,8 @@ The `AGENTS.md` file has hard repo defaults for builders.
 npm install                          # Install dependencies
 npm run tauri:dev                    # Start app in dev mode (separate DB from production)
 npm run tauri build -- --bundles app # Production app bundle
-npm run build                       # Frontend only: tsc + Vite build
+npm run typecheck                   # Frontend only: TypeScript check
+npm run build                       # Frontend only: typecheck + Vite build
 npm run lint                        # ESLint (React + TypeScript + TanStack Query)
 npm run format                       # Prettier (with tailwindcss plugin)
 npm run format:check                 # Check formatting without modifying

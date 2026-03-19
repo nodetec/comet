@@ -10,6 +10,9 @@ dev:
 build:
   npm run build
 
+typecheck:
+  npm run typecheck
+
 lint:
   npm run lint
 
@@ -44,4 +47,4 @@ outdated-npm:
 outdated-crates:
   cargo upgrade --dry-run --manifest-path src-tauri/Cargo.toml --incompatible allow
 
-check: format-check lint test build
+check: format-check lint typecheck test build

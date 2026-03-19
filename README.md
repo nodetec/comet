@@ -14,6 +14,7 @@ Development:
 - Or with `just`: `just bundle`
 - Seed demo notebooks and notes: `npm run seed:db`
 - Lint frontend code: `npm run lint`
+- Type-check frontend code: `npm run typecheck`
 - Run checks: `just check`
 
 The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
@@ -24,8 +25,17 @@ This repo includes a project-local [`justfile`](/Users/chris/Repos/project/comet
 
 - Install `just` with `brew install just` or `cargo install just`
 - List available recipes with `just --list`
-- Run commands like `just dev`, `just lint`, `just test`, `just check`, `just outdated-npm`, and `just outdated-crates`
+- Run commands like `just dev`, `just lint`, `just typecheck`, `just test`, `just check`, `just outdated-npm`, and `just outdated-crates`
 - `just outdated-crates` requires [`cargo-edit`](https://github.com/killercup/cargo-edit): install it with `cargo install cargo-edit`
+
+## Git hooks
+
+This repo uses Husky + lint-staged for a pre-commit hook on staged files. After `npm install`, the hook is installed automatically via the `prepare` script.
+
+On commit, staged files run through:
+
+- `eslint --fix` and `prettier --write` for `*.ts` and `*.tsx`
+- `prettier --write` for `*.js`, `*.mjs`, `*.cjs`, `*.json`, `*.md`, `*.yml`, and `*.yaml`
 
 ### Zsh completion
 

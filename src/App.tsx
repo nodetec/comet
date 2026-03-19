@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 
 import { useTheme } from "@/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
@@ -42,10 +42,6 @@ function App() {
     sidebarPaneProps,
   } = useShellController();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const handleCommandSelect = useCallback(
-    (noteId: string) => notesPaneProps.onSelectNote(noteId),
-    [notesPaneProps.onSelectNote],
-  );
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
   useEffect(() => {
@@ -181,7 +177,7 @@ function App() {
         notebooks={notesPaneProps.notebooks}
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
-        onSelectNote={handleCommandSelect}
+        onSelectNote={notesPaneProps.onSelectNote}
         onSelectNotebook={sidebarPaneProps.onSelectNotebook}
         onToggleTag={sidebarPaneProps.onToggleTag}
       />

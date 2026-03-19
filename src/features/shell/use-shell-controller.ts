@@ -38,6 +38,7 @@ import {
 import {
   type LoadedNote,
   type NoteQueryInput,
+  type NotebookSummary,
   type NoteSortDirection,
   type NoteSortField,
   type PublishNoteInput,
@@ -46,6 +47,9 @@ import {
 import { useNotebookState } from "./use-notebook-state";
 import { usePublishState } from "./use-publish-state";
 import { flattenNotePages, nextSelectedNoteIdAfterRemoval } from "./utils";
+
+const EMPTY_NOTEBOOKS: NotebookSummary[] = [];
+const EMPTY_TAGS: string[] = [];
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
@@ -62,6 +66,40 @@ export function useShellController() {
 
   const notebook = useNotebookState();
   const publish = usePublishState();
+  const {
+    deleteNotebookMutation,
+    editingNotebookId,
+    handleDeleteNotebook,
+    hideCreateNotebook,
+    hideRenameNotebook,
+    isCreatingNotebook,
+    newNotebookName,
+    renameNotebookMutation,
+    renamingNotebookName,
+    setNewNotebookName,
+    setRenamingNotebookName,
+    showCreateNotebook,
+    showRenameNotebook,
+    submitNotebook,
+    submitRenameNotebook,
+  } = notebook;
+  const {
+    deletePublishDialogOpen,
+    deletePublishedNoteMutation,
+    publishDialogOpen,
+    publishNoteMutation,
+    publishShortNoteDialogOpen,
+    publishShortNoteMutation,
+    setDeletePublishDialogOpen,
+    setPublishDialogOpen,
+    setPublishShortNoteDialogOpen,
+  } = publish;
+  const { isPending: isDeletePublishedNotePending, mutate: mutateDeletePublishedNote } =
+    deletePublishedNoteMutation;
+  const { isPending: isPublishNotePending, mutate: mutatePublishNote } =
+    publishNoteMutation;
+  const { isPending: isPublishShortNotePending, mutate: mutatePublishShortNote } =
+    publishShortNoteMutation;
   const pendingSaveTimeoutRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 
@@ -107,7 +145,7 @@ export function useShellController() {
     enabled: bootstrapQuery.isSuccess,
   });
 
-  const notebooks = bootstrapQuery.data?.notebooks ?? [];
+  const notebooks = bootstrapQuery.data?.notebooks ?? EMPTY_NOTEBOOKS;
   const activeNotebook =
     notebooks.find((notebook) => notebook.id === activeNotebookId) ?? null;
   const initialSelectedNoteId = bootstrapQuery.data?.selectedNoteId ?? null;
@@ -185,7 +223,7 @@ export function useShellController() {
       noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
     ],
   });
-  const availableTags = contextualTagsQuery.data?.tags ?? [];
+  const availableTags = contextualTagsQuery.data?.tags ?? EMPTY_TAGS;
 
   useEffect(() => {
     if (activeTags.length === 0) {
@@ -915,7 +953,7 @@ export function useShellController() {
     handleArchiveNote,
     handleCopyNoteContent,
     handleCreateNote,
-    handleDeleteNotebook: notebook.handleDeleteNotebook,
+    handleDeleteNotebook,
     handleDeleteNotePermanently,
     handleEmptyTrash,
     handleExportNotes,
@@ -931,8 +969,8 @@ export function useShellController() {
     handleSelectTodo,
     handleSetNotePinned,
     handleToggleTag,
-    submitNotebook: notebook.submitNotebook,
-    submitRenameNotebook: notebook.submitRenameNotebook,
+    submitNotebook,
+    submitRenameNotebook,
   };
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
@@ -960,8 +998,7 @@ export function useShellController() {
       publishedAt: currentNote?.publishedAt ?? null,
       publishedKind: currentNote?.publishedKind ?? null,
       searchQuery,
-      isDeletePublishedNotePending:
-        publish.deletePublishedNoteMutation.isPending,
+      isDeletePublishedNotePending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           latestRef.current.handleAssignNoteNotebook(
@@ -973,32 +1010,32 @@ export function useShellController() {
       onDeletePublishedNote() {
         if (
           !currentNote ||
-          publish.deletePublishedNoteMutation.isPending ||
+          isDeletePublishedNotePending ||
           !currentNote.publishedAt
         ) {
           return;
         }
 
-        publish.setDeletePublishDialogOpen(true);
+        setDeletePublishDialogOpen(true);
       },
       onOpenPublishDialog() {
-        if (!currentNote || publish.publishNoteMutation.isPending) {
+        if (!currentNote || isPublishNotePending) {
           return;
         }
 
         void (async () => {
           await latestRef.current.flushCurrentDraftAsync();
-          publish.setPublishDialogOpen(true);
+          setPublishDialogOpen(true);
         })().catch(() => {});
       },
       onPublishShortNote() {
-        if (!currentNote || publish.publishShortNoteMutation.isPending) {
+        if (!currentNote || isPublishShortNotePending) {
           return;
         }
 
         void (async () => {
           await latestRef.current.flushCurrentDraftAsync();
-          publish.setPublishShortNoteDialogOpen(true);
+          setPublishShortNoteDialogOpen(true);
         })().catch(() => {});
       },
       onSetPinned(pinned: boolean) {
@@ -1019,14 +1056,20 @@ export function useShellController() {
       creatingSelectedNoteId,
       currentEditorMarkdown,
       currentNote,
-      publish.deletePublishedNoteMutation.isPending,
+      displayedSelectedNoteId,
       editorFocusMode,
+      isDeletePublishedNotePending,
+      isCreatingNote,
       notebooks,
-      publish.publishNoteMutation.isPending,
+      isPublishNotePending,
+      isPublishShortNotePending,
       searchQuery,
       selectedNoteId,
+      setDeletePublishDialogOpen,
       setDraft,
       setEditorFocusMode,
+      setPublishDialogOpen,
+      setPublishShortNoteDialogOpen,
       syncEditorRevision,
     ],
   );
@@ -1046,20 +1089,21 @@ export function useShellController() {
       initialTitle: currentNote?.title ?? "",
       initialTags: currentNote?.tags ?? [],
       noteId: currentNote?.id ?? "",
-      open: publish.publishDialogOpen,
-      pending: publish.publishNoteMutation.isPending,
-      onOpenChange: publish.setPublishDialogOpen,
+      open: publishDialogOpen,
+      pending: isPublishNotePending,
+      onOpenChange: setPublishDialogOpen,
       onSubmit(input: PublishNoteInput) {
-        publish.publishNoteMutation.mutate(input);
+        mutatePublishNote(input);
       },
     }),
     [
       currentNote?.id,
       currentNote?.tags,
       currentNote?.title,
-      publish.publishDialogOpen,
-      publish.publishNoteMutation.isPending,
-      publish.publishNoteMutation.mutate,
+      isPublishNotePending,
+      mutatePublishNote,
+      publishDialogOpen,
+      setPublishDialogOpen,
     ],
   );
 
@@ -1068,40 +1112,42 @@ export function useShellController() {
       content: currentEditorMarkdown.replace(/^#\s+.*\n*/, "").trim(),
       initialTags: currentNote?.tags ?? [],
       noteId: currentNote?.id ?? "",
-      open: publish.publishShortNoteDialogOpen,
-      pending: publish.publishShortNoteMutation.isPending,
-      onOpenChange: publish.setPublishShortNoteDialogOpen,
+      open: publishShortNoteDialogOpen,
+      pending: isPublishShortNotePending,
+      onOpenChange: setPublishShortNoteDialogOpen,
       onSubmit(input: PublishShortNoteInput) {
-        publish.publishShortNoteMutation.mutate(input);
+        mutatePublishShortNote(input);
       },
     }),
     [
       currentEditorMarkdown,
       currentNote?.id,
       currentNote?.tags,
-      publish.publishShortNoteDialogOpen,
-      publish.publishShortNoteMutation.isPending,
-      publish.publishShortNoteMutation.mutate,
+      isPublishShortNotePending,
+      mutatePublishShortNote,
+      publishShortNoteDialogOpen,
+      setPublishShortNoteDialogOpen,
     ],
   );
 
   const currentNoteId = currentNote?.id ?? null;
   const deletePublishDialogProps = useMemo(
     () => ({
-      open: publish.deletePublishDialogOpen,
-      pending: publish.deletePublishedNoteMutation.isPending,
-      onOpenChange: publish.setDeletePublishDialogOpen,
+      open: deletePublishDialogOpen,
+      pending: isDeletePublishedNotePending,
+      onOpenChange: setDeletePublishDialogOpen,
       onConfirm() {
         if (currentNoteId) {
-          publish.deletePublishedNoteMutation.mutate(currentNoteId);
+          mutateDeletePublishedNote(currentNoteId);
         }
       },
     }),
     [
       currentNoteId,
-      publish.deletePublishDialogOpen,
-      publish.deletePublishedNoteMutation.isPending,
-      publish.deletePublishedNoteMutation.mutate,
+      deletePublishDialogOpen,
+      isDeletePublishedNotePending,
+      mutateDeletePublishedNote,
+      setDeletePublishDialogOpen,
     ],
   );
 
@@ -1189,21 +1235,21 @@ export function useShellController() {
       activeNotebookId,
       activeTags,
       availableTags,
-      editingNotebookId: notebook.editingNotebookId,
-      isCreatingNotebook: notebook.isCreatingNotebook,
-      newNotebookName: notebook.newNotebookName,
+      editingNotebookId,
+      isCreatingNotebook,
+      newNotebookName,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
       todoCount: todoCountQuery.data ?? 0,
       trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
       noteFilter,
       notebooks,
-      onChangeNotebookName: notebook.setNewNotebookName,
-      onChangeRenamingNotebookName: notebook.setRenamingNotebookName,
+      onChangeNotebookName: setNewNotebookName,
+      onChangeRenamingNotebookName: setRenamingNotebookName,
       onCreateNotebook: () => latestRef.current.submitNotebook(),
       onDeleteNotebook: (notebookId: string) =>
         latestRef.current.handleDeleteNotebook(notebookId),
-      onHideCreateNotebook: notebook.hideCreateNotebook,
-      onHideRenameNotebook: notebook.hideRenameNotebook,
+      onHideCreateNotebook: hideCreateNotebook,
+      onHideRenameNotebook: hideRenameNotebook,
       onSelectAll: () => latestRef.current.handleSelectAll(),
       onSelectToday: () => latestRef.current.handleSelectToday(),
       onSelectTodo: () => latestRef.current.handleSelectTodo(),
@@ -1212,15 +1258,14 @@ export function useShellController() {
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
       onSelectNotebook: (notebookId: string) =>
         latestRef.current.handleSelectNotebook(notebookId),
-      onShowCreateNotebook: notebook.showCreateNotebook,
+      onShowCreateNotebook: showCreateNotebook,
       onShowRenameNotebook: (notebookId: string) =>
-        notebook.showRenameNotebook(notebookId, notebooks),
+        showRenameNotebook(notebookId, notebooks),
       onSubmitRenameNotebook: () => latestRef.current.submitRenameNotebook(),
       onToggleTag: (tag: string) => latestRef.current.handleToggleTag(tag),
       renameNotebookDisabled:
-        notebook.renameNotebookMutation.isPending ||
-        notebook.deleteNotebookMutation.isPending,
-      renamingNotebookName: notebook.renamingNotebookName,
+        renameNotebookMutation.isPending || deleteNotebookMutation.isPending,
+      renamingNotebookName,
     }),
     [
       activeNotebookId,
@@ -1228,15 +1273,21 @@ export function useShellController() {
       availableTags,
       bootstrapQuery.data?.archivedCount,
       bootstrapQuery.data?.trashedCount,
-      todoCountQuery.data,
-      notebook.deleteNotebookMutation.isPending,
-      notebook.editingNotebookId,
-      notebook.isCreatingNotebook,
-      notebook.newNotebookName,
+      deleteNotebookMutation.isPending,
+      editingNotebookId,
+      hideCreateNotebook,
+      hideRenameNotebook,
+      isCreatingNotebook,
+      newNotebookName,
       noteFilter,
       notebooks,
-      notebook.renameNotebookMutation.isPending,
-      notebook.renamingNotebookName,
+      renameNotebookMutation.isPending,
+      renamingNotebookName,
+      setNewNotebookName,
+      setRenamingNotebookName,
+      showCreateNotebook,
+      showRenameNotebook,
+      todoCountQuery.data,
     ],
   );
 

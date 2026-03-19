@@ -95,8 +95,13 @@ export function EditorPane({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
     useState<HTMLDivElement | null>(null);
+  const [devtoolsContainer, setDevtoolsContainer] =
+    useState<HTMLDivElement | null>(null);
   const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
     setToolbarContainer(node);
+  }, []);
+  const devtoolsContainerRef = useCallback((node: HTMLDivElement | null) => {
+    setDevtoolsContainer(node);
   }, []);
   const showToolbar = useUIStore((s) => s.showEditorToolbar);
   const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
@@ -105,13 +110,7 @@ export function EditorPane({
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
   const noteTitle = firstLineH1Title(markdown);
-
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    updateHeaderState(scrollContainer);
-  }, [noteId]);
-
-  const updateHeaderState = (scrollContainer: HTMLDivElement | null) => {
+  const updateHeaderState = useCallback((scrollContainer: HTMLDivElement | null) => {
     const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
     setShowHeaderBorder(scrolled);
 
@@ -132,7 +131,12 @@ export function EditorPane({
     const scrollRect = scrollContainer.getBoundingClientRect();
     const firstLineRect = firstLine.getBoundingClientRect();
     setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
-  };
+  }, [noteId]);
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    updateHeaderState(scrollContainer);
+  }, [noteId, updateHeaderState]);
 
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -299,48 +303,58 @@ export function EditorPane({
         ) : null}
       </header>
 
-      <div
-        className={cn(
-          "min-h-0 flex-1 overflow-y-scroll overscroll-y-contain",
-          !isReadOnly && "cursor-text",
-        )}
-        data-editor-scroll-container
-        onMouseDown={handleEditorSurfaceMouseDown}
-        onScroll={(event) => {
-          updateHeaderState(event.currentTarget);
-        }}
-        ref={scrollContainerRef}
-        style={
-          { "--editor-font-size": `${editorFontSize}px` } as React.CSSProperties
-        }
-        spellCheck={editorSpellCheck}
-      >
+      <div className="relative min-h-0 flex-1">
+        <div
+          className={cn(
+            "min-h-0 h-full overflow-y-scroll overscroll-y-contain",
+            !isReadOnly && "cursor-text",
+          )}
+          data-editor-scroll-container
+          onMouseDown={handleEditorSurfaceMouseDown}
+          onScroll={(event) => {
+            updateHeaderState(event.currentTarget);
+          }}
+          ref={scrollContainerRef}
+          style={
+            {
+              "--editor-font-size": `${editorFontSize}px`,
+            } as React.CSSProperties
+          }
+          spellCheck={editorSpellCheck}
+        >
+          {noteId ? (
+            <div className="relative flex min-h-full w-full flex-col">
+              <NoteEditor
+                devtoolsContainer={devtoolsContainer}
+                focusMode={focusMode}
+                html={html}
+                isNew={isNewNote}
+                key={editorKey ?? noteId}
+                markdown={markdown}
+                onChange={onChange}
+                onFocusHandled={onFocusHandled}
+                readOnly={isReadOnly}
+                ref={editorRef}
+                searchQuery={searchQuery}
+                toolbarContainer={toolbarContainer}
+              />
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <img
+                src={cometLogo}
+                alt=""
+                className="size-32 opacity-50"
+                draggable={false}
+              />
+            </div>
+          )}
+        </div>
         {noteId ? (
-          <div className="relative flex min-h-full w-full flex-col">
-            <NoteEditor
-              focusMode={focusMode}
-              html={html}
-              isNew={isNewNote}
-              key={editorKey ?? noteId}
-              markdown={markdown}
-              onChange={onChange}
-              onFocusHandled={onFocusHandled}
-              readOnly={isReadOnly}
-              ref={editorRef}
-              searchQuery={searchQuery}
-              toolbarContainer={toolbarContainer}
-            />
+          <div className="pointer-events-none absolute top-4 right-4 z-50">
+            <div className="pointer-events-auto" ref={devtoolsContainerRef} />
           </div>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <img
-              src={cometLogo}
-              alt=""
-              className="size-32 opacity-50"
-              draggable={false}
-            />
-          </div>
-        )}
+        ) : null}
       </div>
 
       {noteId && !isReadOnly && showToolbar && (

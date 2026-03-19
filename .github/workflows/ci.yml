@@ -41,6 +41,23 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Run TypeScript check
+        run: npm run typecheck
+
   test:
     runs-on: macos-latest
     steps:
@@ -69,11 +86,11 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: TypeScript & Vite build
+      - name: Vite build
         run: npm run build
 
   build:
-    needs: [format, lint, test]
+    needs: [format, lint, typecheck, test]
     strategy:
       fail-fast: false
       matrix:
