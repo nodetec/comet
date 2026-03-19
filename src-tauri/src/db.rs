@@ -219,6 +219,35 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
             continue;
         }
 
+        // Skip markdown link/image destinations: ](destination)
+        if bytes[index] == b']' && index + 1 < bytes.len() && bytes[index + 1] == b'(' {
+            index += 2;
+            let mut depth = 1usize;
+
+            while index < bytes.len() && depth > 0 {
+                match bytes[index] {
+                    b'\\' => {
+                        index += 1;
+                        if index < bytes.len() {
+                            index += 1;
+                        }
+                    }
+                    b'(' => {
+                        depth += 1;
+                        index += 1;
+                    }
+                    b')' => {
+                        depth -= 1;
+                        index += 1;
+                    }
+                    _ => {
+                        index += 1;
+                    }
+                }
+            }
+            continue;
+        }
+
         if bytes[index] != b'#' {
             index += 1;
             continue;
@@ -292,6 +321,23 @@ mod tests {
                 "tag".to_string(),
                 "tag-two".to_string(),
             ]
+        );
+    }
+
+    #[test]
+    fn extract_tags_ignores_markdown_link_destinations() {
+        let markdown = [
+            "- [ ] context: An anchor link to [the table section](#tables).",
+            "",
+            "Visible tag in prose: #trail",
+            "",
+            "[#visible-link-text](https://example.com/path#fragment)",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_tags(&markdown),
+            vec!["trail".to_string(), "visible-link-text".to_string(),]
         );
     }
 }
