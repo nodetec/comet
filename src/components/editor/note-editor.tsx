@@ -53,6 +53,7 @@ import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
+import TagCompletionPlugin from "./plugins/tag-completion-plugin";
 import { useShellStore } from "@/stores/use-shell-store";
 
 type NoteEditorProps = {
@@ -225,6 +226,7 @@ function EditorInner({
 
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
+      <TagCompletionPlugin />
       <DevtoolsPlugin portalContainer={devtoolsContainer} />
       {!readOnly && <ToolbarPlugin portalContainer={toolbarContainer} />}
     </>
