@@ -12,14 +12,19 @@ A single new Lexical plugin (`tag-completion-plugin.tsx`) that combines Lexical'
 
 **Trigger Detection**
 - Uses `useBasicTypeaheadTriggerMatch('#', { minLength: 1 })` from `@lexical/react/LexicalTypeaheadMenuPlugin`
-- This hook returns a `TriggerFn` that matches `#<chars>` at cursor position, returning the lead offset and matching string
+- This hook returns a `TriggerFn` with signature `(text: string, editor: LexicalEditor) => MenuTextMatch | null`
+- The `text` parameter is the text from the start of the current text node up to the cursor position
+- Returns `{ leadOffset, matchingString, replaceableString }` on match, or `null`
 - We use only the trigger detection utility — not the full `LexicalTypeaheadMenuPlugin` component, which is tightly coupled to DOM-based menu rendering and keyboard handling that would conflict with the native menu
 
 **Editor Update Listener**
 - Registers a Lexical update listener via `editor.registerUpdateListener`
-- On each text change, gets the text from the current text node up to the cursor position
-- Runs the trigger function on that text
-- Skips triggering when cursor is inside a `CodeNode` or `CodeHighlightNode`
+- On each update, reads the editor state to extract trigger context:
+  1. Get the current `$getSelection()` — bail if not a `RangeSelection` or if it's not collapsed
+  2. Get the anchor node — bail if it's not a `TextNode`
+  3. Bail if the node's parent is a `CodeNode` or the node itself is a `CodeHighlightNode`
+  4. Extract text from the start of the text node up to `selection.anchor.offset`
+  5. Call `triggerFn(textUpToCursor, editor)` — if it returns a match, proceed to tag search
 
 **Tag Search**
 - When a trigger match is found, calls `search_tags(matchingString)` via Tauri `invoke()`
@@ -34,7 +39,7 @@ A single new Lexical plugin (`tag-completion-plugin.tsx`) that combines Lexical'
 
 **Text Replacement**
 - On tag selection, inside `editor.update()`:
-  - Uses `spliceText(leadOffset, replaceLength, '#' + selectedTag)` on the text node for in-place replacement
+  - Uses `spliceText(leadOffset, replaceableString.length, '#' + selectedTag)` on the text node for in-place replacement (`replaceableString` is `#` + partial text, so its `.length` covers exactly the characters to replace)
   - Moves cursor to end of the inserted tag
 - No node creation/deletion needed — text node stays intact
 
@@ -60,7 +65,8 @@ User types "#pro"
 
 - **No results:** If `search_tags` returns empty, no menu is shown
 - **Fast typing:** 150ms debounce prevents hammering the backend; stale results are discarded by checking current match string against the one that initiated the request
-- **Menu already open:** `menu.popup()` is async and blocks — a new trigger can't fire while a menu is showing, so no concurrent menu issue
+- **Menu already open:** `menu.popup()` is async and blocks — the user cannot type in the editor while a native menu is showing, so no concurrent trigger issue
+- **Menu dismissed without selection:** When the user dismisses the menu (Escape or clicking away), track the dismissed match string. Suppress re-triggering for the same match string until the text changes (i.e., the user types or deletes a character). This prevents the menu from popping up in a loop after dismissal.
 - **Code blocks:** Trigger detection is skipped when the cursor is inside a `CodeNode` or `CodeHighlightNode`, since tags in code blocks are not meaningful
 - **Menu cleanup:** `menu.close()` always called in a `finally` block, matching existing codebase patterns
 
