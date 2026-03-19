@@ -16,6 +16,8 @@ import {
   Lock,
   PanelBottomOpen,
   PanelBottomClose,
+  Search,
+  X,
 } from "lucide-react";
 
 import {
@@ -109,6 +111,9 @@ export function EditorPane({
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const findInputRef = useRef<HTMLInputElement | null>(null);
   const noteTitle = firstLineH1Title(markdown);
   const updateHeaderState = useCallback(
     (scrollContainer: HTMLDivElement | null) => {
@@ -140,6 +145,29 @@ export function EditorPane({
     const scrollContainer = scrollContainerRef.current;
     updateHeaderState(scrollContainer);
   }, [noteId, updateHeaderState]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "f") {
+        event.preventDefault();
+        setFindOpen(true);
+        requestAnimationFrame(() => {
+          findInputRef.current?.focus();
+          findInputRef.current?.select();
+        });
+      }
+
+      if (event.key === "Escape" && findOpen) {
+        event.preventDefault();
+        setFindOpen(false);
+        setFindQuery("");
+        editorRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [findOpen]);
 
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -306,6 +334,38 @@ export function EditorPane({
         ) : null}
       </header>
 
+      {findOpen && noteId && (
+        <div className="border-divider flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+          <Search className="text-muted-foreground size-3.5 shrink-0" />
+          <input
+            ref={findInputRef}
+            className="bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-0 flex-1"
+            placeholder="Find in note…"
+            value={findQuery}
+            onChange={(e) => setFindQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setFindOpen(false);
+                setFindQuery("");
+                editorRef.current?.focus();
+              }
+            }}
+          />
+          <button
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setFindOpen(false);
+              setFindQuery("");
+              editorRef.current?.focus();
+            }}
+            type="button"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="relative min-h-0 flex-1">
         <div
           className={cn(
@@ -338,7 +398,7 @@ export function EditorPane({
                 onFocusHandled={onFocusHandled}
                 readOnly={isReadOnly}
                 ref={editorRef}
-                searchQuery={searchQuery}
+                searchQuery={findOpen && findQuery ? findQuery : searchQuery}
                 toolbarContainer={toolbarContainer}
               />
             </div>
