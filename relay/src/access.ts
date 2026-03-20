@@ -49,10 +49,16 @@ export async function initAccessControl(
   }
 
   function isAllowed(pubkey: string): boolean {
-    if (!privateMode) return true;
+    if (!privateMode) {
+      return true;
+    }
     const expiresAt = allowedSet.get(pubkey);
-    if (expiresAt === undefined) return false;
-    if (expiresAt === null) return true;
+    if (expiresAt === undefined) {
+      return false;
+    }
+    if (expiresAt === null) {
+      return true;
+    }
     return expiresAt > Math.floor(Date.now() / 1000);
   }
 

@@ -38,13 +38,13 @@ export function validateAuthEvent(
 
   // Check challenge tag
   const challengeTag = e.tags.find(([t]) => t === "challenge");
-  if (!challengeTag || challengeTag[1] !== challenge) {
+  if (challengeTag?.[1] !== challenge) {
     return { ok: false, reason: "invalid: AUTH challenge mismatch" };
   }
 
   // Check relay tag (just verify the domain matches)
   const relayTag = e.tags.find(([t]) => t === "relay");
-  if (!relayTag || !relayTag[1]) {
+  if (!relayTag?.[1]) {
     return { ok: false, reason: "invalid: AUTH event missing relay tag" };
   }
 

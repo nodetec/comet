@@ -5,21 +5,35 @@ import type { NostrEvent, Filter } from "../types";
  * Fields are ANDed across, values within a field are ORed.
  */
 export function matchFilter(event: NostrEvent, filter: Filter): boolean {
-  if (filter.ids && !filter.ids.includes(event.id)) return false;
-  if (filter.authors && !filter.authors.includes(event.pubkey)) return false;
-  if (filter.kinds && !filter.kinds.includes(event.kind)) return false;
-  if (filter.since && event.created_at < filter.since) return false;
-  if (filter.until && event.created_at > filter.until) return false;
+  if (filter.ids && !filter.ids.includes(event.id)) {
+    return false;
+  }
+  if (filter.authors && !filter.authors.includes(event.pubkey)) {
+    return false;
+  }
+  if (filter.kinds && !filter.kinds.includes(event.kind)) {
+    return false;
+  }
+  if (filter.since && event.created_at < filter.since) {
+    return false;
+  }
+  if (filter.until && event.created_at > filter.until) {
+    return false;
+  }
 
   for (const key of Object.keys(filter)) {
     if (key[0] === "#") {
       const tagName = key.slice(1);
       const values = filter[key as `#${string}`];
-      if (!Array.isArray(values)) continue;
+      if (!Array.isArray(values)) {
+        continue;
+      }
       const match = event.tags.some(
         ([t, v]) => t === tagName && values.includes(v),
       );
-      if (!match) return false;
+      if (!match) {
+        return false;
+      }
     }
   }
 

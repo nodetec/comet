@@ -32,14 +32,22 @@ export type AddressPointer = {
 };
 
 function parseAddressCoord(coord: string | undefined): AddressPointer | null {
-  if (!coord) return null;
+  if (!coord) {
+    return null;
+  }
   const parts = coord.split(":");
-  if (parts.length < 3) return null;
+  if (parts.length < 3) {
+    return null;
+  }
   const kind = parseInt(parts[0], 10);
-  if (isNaN(kind)) return null;
+  if (isNaN(kind)) {
+    return null;
+  }
   const pubkey = parts[1];
   const dTag = parts.slice(2).join(":");
-  if (!pubkey || pubkey.length !== 64) return null;
+  if (pubkey.length !== 64) {
+    return null;
+  }
   return { kind, pubkey, dTag };
 }
 
@@ -48,7 +56,9 @@ function parseAddressCoord(coord: string | undefined): AddressPointer | null {
  * Returns null if valid, or a rejection reason.
  */
 export function validateDeletionEvent(event: NostrEvent): string | null {
-  if (!isDeletionEvent(event)) return null;
+  if (!isDeletionEvent(event)) {
+    return null;
+  }
 
   const eTargets = getDeletionTargetIds(event);
   const aTargets = getDeletionTargetAddrs(event);

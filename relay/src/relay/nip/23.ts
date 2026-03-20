@@ -12,7 +12,9 @@ export function isLongFormEvent(event: NostrEvent): boolean {
  * Returns null if valid, or a rejection reason string.
  */
 export function validateLongFormEvent(event: NostrEvent): string | null {
-  if (!isLongFormEvent(event)) return null;
+  if (!isLongFormEvent(event)) {
+    return null;
+  }
 
   // Must have a d tag for addressability
   const dTag = event.tags.find(([t]) => t === "d");

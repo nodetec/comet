@@ -97,7 +97,7 @@ function parseEventTags(value: string[][] | string): string[][] {
 function parseChangeReason(
   value: string | ChangeEntry["reason"] | null,
 ): ChangeEntry["reason"] {
-  if (value == null) {
+  if (value === null) {
     return null;
   }
 
@@ -464,7 +464,9 @@ export function initStorage(db: DB): Storage {
   }
 
   async function queryEvents(filters: Filter[]): Promise<NostrEvent[]> {
-    if (filters.length === 0) return [];
+    if (filters.length === 0) {
+      return [];
+    }
 
     const results = new Map<string, NostrEvent>();
 
@@ -498,12 +500,12 @@ export function initStorage(db: DB): Storage {
         params.push(filter.kinds);
         paramIdx++;
       }
-      if (filter.since != null) {
+      if (filter.since !== undefined) {
         conditions.push(`e.created_at >= $${paramIdx}`);
         params.push(filter.since);
         paramIdx++;
       }
-      if (filter.until != null) {
+      if (filter.until !== undefined) {
         conditions.push(`e.created_at <= $${paramIdx}`);
         params.push(filter.until);
         paramIdx++;
@@ -513,7 +515,9 @@ export function initStorage(db: DB): Storage {
         if (key[0] === "#") {
           const tagName = key.slice(1);
           const values = filter[key as `#${string}`];
-          if (!Array.isArray(values) || values.length === 0) continue;
+          if (!Array.isArray(values) || values.length === 0) {
+            continue;
+          }
           conditions.push(
             `EXISTS (SELECT 1 FROM event_tags t WHERE t.event_id = e.id AND t.tag_name = $${paramIdx} AND t.tag_value = ANY($${paramIdx + 1}))`,
           );
@@ -524,7 +528,7 @@ export function initStorage(db: DB): Storage {
 
       const where = conditions.join(" AND ");
       const limitClause =
-        filter.limit != null ? `LIMIT ${Math.max(0, filter.limit)}` : "";
+        filter.limit !== undefined ? `LIMIT ${Math.max(0, filter.limit)}` : "";
 
       const rows = await rawSql.unsafe<EventRow[]>(
         `SELECT e.id, e.pubkey, e.created_at, e.kind, e.tags, e.content, e.sig FROM events e WHERE ${where} ORDER BY e.created_at DESC ${limitClause}`,
@@ -547,7 +551,9 @@ export function initStorage(db: DB): Storage {
     }
 
     return Array.from(results.values()).sort((a, b) => {
-      if (a.created_at !== b.created_at) return b.created_at - a.created_at;
+      if (a.created_at !== b.created_at) {
+        return b.created_at - a.created_at;
+      }
       return a.id.localeCompare(b.id);
     });
   }
@@ -563,7 +569,9 @@ export function initStorage(db: DB): Storage {
   async function processDeletionRequest(
     event: NostrEvent,
   ): Promise<{ deleted: number; changes: ChangeEntry[] }> {
-    if (!isDeletionEvent(event)) return { deleted: 0, changes: [] };
+    if (!isDeletionEvent(event)) {
+      return { deleted: 0, changes: [] };
+    }
 
     let deleted = 0;
     const allChanges: ChangeEntry[] = [];
@@ -623,7 +631,9 @@ export function initStorage(db: DB): Storage {
 
       const addrTargets = getDeletionTargetAddrs(event);
       for (const addr of addrTargets) {
-        if (addr.pubkey !== event.pubkey) continue;
+        if (addr.pubkey !== event.pubkey) {
+          continue;
+        }
 
         const affected = await tx
           .select({
@@ -693,7 +703,7 @@ export function initStorage(db: DB): Storage {
     params.push(since);
     paramIdx++;
 
-    if (filter.until_seq != null) {
+    if (filter.until_seq !== undefined) {
       conditions.push(`c.seq <= $${paramIdx}`);
       params.push(filter.until_seq);
       paramIdx++;
@@ -718,7 +728,9 @@ export function initStorage(db: DB): Storage {
       if (key[0] === "#") {
         const tagName = key.slice(1);
         const values = filter[key as `#${string}`];
-        if (!Array.isArray(values) || values.length === 0) continue;
+        if (!Array.isArray(values) || values.length === 0) {
+          continue;
+        }
         conditions.push(
           `EXISTS (SELECT 1 FROM change_tags ct WHERE ct.seq = c.seq AND ct.tag_name = $${paramIdx} AND ct.tag_value = ANY($${paramIdx + 1}))`,
         );
@@ -729,7 +741,7 @@ export function initStorage(db: DB): Storage {
 
     const where = conditions.join(" AND ");
     const limitClause =
-      filter.limit != null ? `LIMIT ${Math.max(0, filter.limit)}` : "";
+      filter.limit !== undefined ? `LIMIT ${Math.max(0, filter.limit)}` : "";
 
     const rows = await rawSql.unsafe<ChangeRow[]>(
       `SELECT c.seq, c.event_id, c.type, c.kind, c.pubkey, c.reason FROM changes c WHERE ${where} ORDER BY c.seq ASC ${limitClause}`,

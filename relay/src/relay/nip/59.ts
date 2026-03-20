@@ -16,7 +16,9 @@ export function isSeal(event: NostrEvent): boolean {
  * Returns null if valid, or a rejection reason.
  */
 export function validateGiftWrap(event: NostrEvent): string | null {
-  if (!isGiftWrap(event)) return null;
+  if (!isGiftWrap(event)) {
+    return null;
+  }
 
   // Must have at least one p tag (recipient)
   const pTags = event.tags.filter(([t]) => t === "p");
@@ -32,7 +34,9 @@ export function validateGiftWrap(event: NostrEvent): string | null {
  * Returns null if valid, or a rejection reason.
  */
 export function validateSeal(event: NostrEvent): string | null {
-  if (!isSeal(event)) return null;
+  if (!isSeal(event)) {
+    return null;
+  }
 
   // Seal tags MUST always be empty
   if (event.tags.length > 0) {

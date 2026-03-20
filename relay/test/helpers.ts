@@ -5,7 +5,7 @@ import type { initAccessControl } from "../src/access";
 import { createRelayServer } from "../src/server";
 
 const TEST_DB_URL =
-  process.env.TEST_DATABASE_URL || "postgres://localhost/comet_test";
+  process.env.TEST_DATABASE_URL ?? "postgres://localhost/comet_test";
 
 export type TestContext = {
   db: DB;
@@ -60,7 +60,9 @@ export async function connectWs(port: number): Promise<WebSocket> {
   await new Promise<void>((resolve) => {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data as string);
-      if (msg[0] === "AUTH") resolve();
+      if (msg[0] === "AUTH") {
+        resolve();
+      }
     };
   });
   return ws;
@@ -77,7 +79,9 @@ export async function connectRaw(
   const challenge = await new Promise<string>((resolve) => {
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data as string);
-      if (msg[0] === "AUTH") resolve(msg[1]);
+      if (msg[0] === "AUTH") {
+        resolve(msg[1]);
+      }
     };
   });
   return { ws, challenge };

@@ -45,6 +45,8 @@ export default [
       },
     },
     rules: {
+      curly: "error",
+      eqeqeq: "error",
       "no-undef": "off",
       "@typescript-eslint/consistent-type-imports": [
         "error",
@@ -70,6 +72,8 @@ export default [
           checksVoidReturn: true,
         },
       ],
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      "@typescript-eslint/prefer-optional-chain": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
         {

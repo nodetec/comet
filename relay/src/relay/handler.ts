@@ -77,7 +77,9 @@ function requirePrivateAuth(
   connections: ConnectionManager,
   access: AccessControl,
 ): string | null {
-  if (!access.privateMode) return null;
+  if (!access.privateMode) {
+    return null;
+  }
   if (connections.getAuthedPubkeys(connId).size === 0) {
     return "auth-required: this relay requires authentication";
   }
@@ -85,23 +87,31 @@ function requirePrivateAuth(
 }
 
 function isValidFilter(f: unknown): f is Filter {
-  if (!f || typeof f !== "object") return false;
+  if (!f || typeof f !== "object") {
+    return false;
+  }
   const filter = f as Record<string, unknown>;
   for (const [key, value] of Object.entries(filter)) {
     switch (key) {
       case "ids":
       case "authors":
       case "kinds":
-        if (!Array.isArray(value)) return false;
+        if (!Array.isArray(value)) {
+          return false;
+        }
         break;
       case "since":
       case "until":
       case "limit":
-        if (typeof value !== "number") return false;
+        if (typeof value !== "number") {
+          return false;
+        }
         break;
       default:
         if (key[0] === "#") {
-          if (!Array.isArray(value)) return false;
+          if (!Array.isArray(value)) {
+            return false;
+          }
         }
         break;
     }

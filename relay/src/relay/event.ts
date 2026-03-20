@@ -12,10 +12,15 @@ export type KindCategory =
   | "addressable";
 
 export function getEventKindCategory(kind: number): KindCategory {
-  if (kind === 0 || kind === 3 || (kind >= 10000 && kind < 20000))
+  if (kind === 0 || kind === 3 || (kind >= 10000 && kind < 20000)) {
     return "replaceable";
-  if (kind >= 20000 && kind < 30000) return "ephemeral";
-  if (kind >= 30000 && kind < 40000) return "addressable";
+  }
+  if (kind >= 20000 && kind < 30000) {
+    return "ephemeral";
+  }
+  if (kind >= 30000 && kind < 40000) {
+    return "addressable";
+  }
   return "regular";
 }
 

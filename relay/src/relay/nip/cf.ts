@@ -13,25 +13,35 @@ type ChangesSubscription = {
 const changesSubs = new Map<string, Map<string, ChangesSubscription>>();
 
 export function isValidChangesFilter(f: unknown): f is ChangesFilter {
-  if (!f || typeof f !== "object") return false;
+  if (!f || typeof f !== "object") {
+    return false;
+  }
   const filter = f as Record<string, unknown>;
   for (const [key, value] of Object.entries(filter)) {
     switch (key) {
       case "since":
       case "until_seq":
       case "limit":
-        if (typeof value !== "number") return false;
+        if (typeof value !== "number") {
+          return false;
+        }
         break;
       case "kinds":
       case "authors":
-        if (!Array.isArray(value)) return false;
+        if (!Array.isArray(value)) {
+          return false;
+        }
         break;
       case "live":
-        if (typeof value !== "boolean") return false;
+        if (typeof value !== "boolean") {
+          return false;
+        }
         break;
       default:
         if (key[0] === "#") {
-          if (!Array.isArray(value)) return false;
+          if (!Array.isArray(value)) {
+            return false;
+          }
         }
         break;
     }
@@ -132,18 +142,26 @@ function matchChangesFilter(
   change: ChangeEntry,
   filter: ChangesFilter,
 ): boolean {
-  if (filter.kinds && !filter.kinds.includes(change.kind)) return false;
-  if (filter.authors && !filter.authors.includes(change.pubkey)) return false;
+  if (filter.kinds && !filter.kinds.includes(change.kind)) {
+    return false;
+  }
+  if (filter.authors && !filter.authors.includes(change.pubkey)) {
+    return false;
+  }
 
   // Tag filters — check against denormalized tags on the change entry
   for (const key of Object.keys(filter)) {
     if (key[0] === "#") {
       const tagName = key.slice(1);
       const values = filter[key as `#${string}`];
-      if (!Array.isArray(values) || values.length === 0) continue;
+      if (!Array.isArray(values) || values.length === 0) {
+        continue;
+      }
       const tags = change.tags ?? [];
       const match = tags.some(([t, v]) => t === tagName && values.includes(v));
-      if (!match) return false;
+      if (!match) {
+        return false;
+      }
     }
   }
 
@@ -160,7 +178,9 @@ export async function broadcastChanges(
   connections: ConnectionManager,
   event?: NostrEvent,
 ): Promise<void> {
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    return;
+  }
 
   // Build a lookup for STORED events — use the passed event if available, else fetch
   const eventsMap = new Map<string, NostrEvent>();
@@ -175,9 +195,13 @@ export async function broadcastChanges(
       continue;
     }
     for (const [subId, sub] of subs) {
-      if (!sub.live) continue;
+      if (!sub.live) {
+        continue;
+      }
       for (const change of changes) {
-        if (!matchChangesFilter(change, sub.filter)) continue;
+        if (!matchChangesFilter(change, sub.filter)) {
+          continue;
+        }
         if (change.type === "STORED") {
           let ev = eventsMap.get(change.eventId);
           if (!ev) {
