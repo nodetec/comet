@@ -59,6 +59,27 @@ function isRelaySocketPath(pathname: string): boolean {
   return pathname === "/" || pathname === "/ws";
 }
 
+async function waitForShutdown(
+  promise: Promise<void>,
+  timeoutMs: number,
+): Promise<void> {
+  let timedOut = false;
+  await Promise.race([
+    promise.finally(() => {
+      timedOut = false;
+    }),
+    Bun.sleep(timeoutMs).then(() => {
+      timedOut = true;
+    }),
+  ]);
+
+  if (timedOut) {
+    console.warn(
+      `[SHUTDOWN] relay server stop timed out after ${timeoutMs}ms; continuing cleanup`,
+    );
+  }
+}
+
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
     rawSql`TRUNCATE events, event_tags, deleted_events, deleted_coords, changes, change_tags, users, invite_codes, blobs, blob_owners CASCADE`,
@@ -155,7 +176,7 @@ export async function createRelayServer(
     port,
     stop: async () => {
       connections.closeAll(1001, "server shutdown", true);
-      await server.stop(true);
+      await waitForShutdown(server.stop(true), 1000);
       await sql.end({ timeout: 1 });
     },
   };
