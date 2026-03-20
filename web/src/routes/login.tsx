@@ -9,11 +9,19 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { useNostr } from "~/lib/nostr/use-nostr";
+import { NostrProvider, useNostr } from "~/lib/nostr/use-nostr";
 
-export const Route = createFileRoute("/dashboard/login")({
-  component: LoginPage,
+export const Route = createFileRoute("/login")({
+  component: LoginWrapper,
 });
+
+function LoginWrapper() {
+  return (
+    <NostrProvider>
+      <LoginPage />
+    </NostrProvider>
+  );
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -21,9 +29,8 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // If already signed in, redirect
   if (pubkey) {
-    void navigate({ to: "/dashboard", replace: true });
+    void navigate({ to: "/", replace: true });
     return null;
   }
 
@@ -32,7 +39,7 @@ function LoginPage() {
     setLoading(true);
     try {
       await signIn();
-      void navigate({ to: "/dashboard" });
+      void navigate({ to: "/" });
     } catch {
       if (!window.nostr) {
         setError("Install a Nostr extension (Alby, nos2x) to sign in");

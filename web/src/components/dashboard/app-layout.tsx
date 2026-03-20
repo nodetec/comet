@@ -8,7 +8,7 @@ import { useNostr } from "~/lib/nostr/use-nostr";
 import { cn } from "~/lib/utils";
 
 const navItems = [
-  { to: "/dashboard", icon: FileText, label: "Notes", exact: true },
+  { to: "/", icon: FileText, label: "Notes", exact: true },
 ] as const;
 
 function truncatePubkey(pubkey: string): string {
