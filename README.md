@@ -15,38 +15,17 @@ Comet is a local-first notes app built with Tauri, React, TypeScript, and Rust.
 
 ## Commands
 
-Project-specific commands are prefixed by workspace so app, relay, and blossom workflows stay separate.
+The full command surface lives in [justfile](/Users/chris/Repos/project/comet/justfile). Use `just --list` to see everything.
 
-- `just app-dev`: run the app in development mode
-- `just app-build`: build the app frontend workspace
-- `just app-bundle`: build the packaged Tauri app
-- `just app-lint`: run app ESLint checks
-- `just app-lint-fix`: run app ESLint with fixes
-- `just app-typecheck`: run app TypeScript checks
-- `just app-test`: run frontend and Rust tests for the app
-- `just app-test-backend`: run the Rust test suite
-- `just app-test-frontend`: run the frontend test suite
+Common commands:
+
+- `just app-dev`: run the Comet app in development
 - `just app-check`: run the main app verification suite
-- `just relay-dev`: run the relay workspace in development
-- `just relay-deploy`: deploy the relay to Fly
-- `just relay-build`: build the relay workspace
-- `just relay-lint`: run relay ESLint checks
-- `just relay-lint-fix`: run relay ESLint with fixes
+- `just relay-dev`: run the relay in development
+- `just blossom-dev`: run the Blossom server in development
 - `just relay-test`: run the relay test suite
-- `just relay-typecheck`: run TypeScript checks for the relay workspace
-- `just relay-check`: run the relay verification suite
-- `just blossom-dev`: run the Blossom workspace in development
-- `just blossom-deploy`: deploy the Blossom workspace to Fly
-- `just blossom-build`: build the Blossom workspace
-- `just blossom-lint`: run Blossom ESLint checks
-- `just blossom-lint-fix`: run Blossom ESLint with fixes
 - `just blossom-test`: run the Blossom test suite
-- `just blossom-typecheck`: run TypeScript checks for the Blossom workspace
-- `just blossom-check`: run the Blossom verification suite
-- `just format`: format the repo
-- `just format-check`: check formatting
-- `just app-seed`: seed demo notebooks and notes
-- `just outdated-crates`: check for Rust dependency updates
+- `just format-check`: check formatting across the repo
 
 The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
 
