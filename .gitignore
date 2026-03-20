@@ -1,6 +1,8 @@
 node_modules/
 .turbo/
 dist/
+.astro/
+.wrangler/
 app/dist/
 app/src-tauri/target/
 /.webpack/
