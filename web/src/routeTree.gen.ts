@@ -12,7 +12,13 @@ import { Route as rootRouteImport } from "./routes/__root";
 import { Route as AdminRouteRouteImport } from "./routes/admin/route";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as AdminIndexRouteImport } from "./routes/admin/index";
+import { Route as AdminUsersRouteImport } from "./routes/admin/users";
 import { Route as AdminLoginRouteImport } from "./routes/admin.login";
+import { Route as AdminInviteCodesRouteImport } from "./routes/admin/invite-codes";
+import { Route as AdminEventsRouteImport } from "./routes/admin/events";
+import { Route as AdminConnectionsRouteImport } from "./routes/admin/connections";
+import { Route as AdminBlobsRouteImport } from "./routes/admin/blobs";
+import { Route as AdminAllowlistRouteImport } from "./routes/admin/allowlist";
 
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: "/admin",
@@ -29,36 +35,114 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: "/",
   getParentRoute: () => AdminRouteRoute,
 } as any);
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: "/users",
+  path: "/users",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: "/login",
   path: "/login",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
+const AdminInviteCodesRoute = AdminInviteCodesRouteImport.update({
+  id: "/invite-codes",
+  path: "/invite-codes",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
+const AdminEventsRoute = AdminEventsRouteImport.update({
+  id: "/events",
+  path: "/events",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
+const AdminConnectionsRoute = AdminConnectionsRouteImport.update({
+  id: "/connections",
+  path: "/connections",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
+const AdminBlobsRoute = AdminBlobsRouteImport.update({
+  id: "/blobs",
+  path: "/blobs",
+  getParentRoute: () => AdminRouteRoute,
+} as any);
+const AdminAllowlistRoute = AdminAllowlistRouteImport.update({
+  id: "/allowlist",
+  path: "/allowlist",
   getParentRoute: () => AdminRouteRoute,
 } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/admin": typeof AdminRouteRouteWithChildren;
+  "/admin/allowlist": typeof AdminAllowlistRoute;
+  "/admin/blobs": typeof AdminBlobsRoute;
+  "/admin/connections": typeof AdminConnectionsRoute;
+  "/admin/events": typeof AdminEventsRoute;
+  "/admin/invite-codes": typeof AdminInviteCodesRoute;
   "/admin/login": typeof AdminLoginRoute;
+  "/admin/users": typeof AdminUsersRoute;
   "/admin/": typeof AdminIndexRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/admin/allowlist": typeof AdminAllowlistRoute;
+  "/admin/blobs": typeof AdminBlobsRoute;
+  "/admin/connections": typeof AdminConnectionsRoute;
+  "/admin/events": typeof AdminEventsRoute;
+  "/admin/invite-codes": typeof AdminInviteCodesRoute;
   "/admin/login": typeof AdminLoginRoute;
+  "/admin/users": typeof AdminUsersRoute;
   "/admin": typeof AdminIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
   "/admin": typeof AdminRouteRouteWithChildren;
+  "/admin/allowlist": typeof AdminAllowlistRoute;
+  "/admin/blobs": typeof AdminBlobsRoute;
+  "/admin/connections": typeof AdminConnectionsRoute;
+  "/admin/events": typeof AdminEventsRoute;
+  "/admin/invite-codes": typeof AdminInviteCodesRoute;
   "/admin/login": typeof AdminLoginRoute;
+  "/admin/users": typeof AdminUsersRoute;
   "/admin/": typeof AdminIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/admin" | "/admin/login" | "/admin/";
+  fullPaths:
+    | "/"
+    | "/admin"
+    | "/admin/allowlist"
+    | "/admin/blobs"
+    | "/admin/connections"
+    | "/admin/events"
+    | "/admin/invite-codes"
+    | "/admin/login"
+    | "/admin/users"
+    | "/admin/";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/admin/login" | "/admin";
-  id: "__root__" | "/" | "/admin" | "/admin/login" | "/admin/";
+  to:
+    | "/"
+    | "/admin/allowlist"
+    | "/admin/blobs"
+    | "/admin/connections"
+    | "/admin/events"
+    | "/admin/invite-codes"
+    | "/admin/login"
+    | "/admin/users"
+    | "/admin";
+  id:
+    | "__root__"
+    | "/"
+    | "/admin"
+    | "/admin/allowlist"
+    | "/admin/blobs"
+    | "/admin/connections"
+    | "/admin/events"
+    | "/admin/invite-codes"
+    | "/admin/login"
+    | "/admin/users"
+    | "/admin/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -89,6 +173,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AdminIndexRouteImport;
       parentRoute: typeof AdminRouteRoute;
     };
+    "/admin/users": {
+      id: "/admin/users";
+      path: "/users";
+      fullPath: "/admin/users";
+      preLoaderRoute: typeof AdminUsersRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
     "/admin/login": {
       id: "/admin/login";
       path: "/login";
@@ -96,16 +187,63 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AdminLoginRouteImport;
       parentRoute: typeof AdminRouteRoute;
     };
+    "/admin/invite-codes": {
+      id: "/admin/invite-codes";
+      path: "/invite-codes";
+      fullPath: "/admin/invite-codes";
+      preLoaderRoute: typeof AdminInviteCodesRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
+    "/admin/events": {
+      id: "/admin/events";
+      path: "/events";
+      fullPath: "/admin/events";
+      preLoaderRoute: typeof AdminEventsRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
+    "/admin/connections": {
+      id: "/admin/connections";
+      path: "/connections";
+      fullPath: "/admin/connections";
+      preLoaderRoute: typeof AdminConnectionsRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
+    "/admin/blobs": {
+      id: "/admin/blobs";
+      path: "/blobs";
+      fullPath: "/admin/blobs";
+      preLoaderRoute: typeof AdminBlobsRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
+    "/admin/allowlist": {
+      id: "/admin/allowlist";
+      path: "/allowlist";
+      fullPath: "/admin/allowlist";
+      preLoaderRoute: typeof AdminAllowlistRouteImport;
+      parentRoute: typeof AdminRouteRoute;
+    };
   }
 }
 
 interface AdminRouteRouteChildren {
+  AdminAllowlistRoute: typeof AdminAllowlistRoute;
+  AdminBlobsRoute: typeof AdminBlobsRoute;
+  AdminConnectionsRoute: typeof AdminConnectionsRoute;
+  AdminEventsRoute: typeof AdminEventsRoute;
+  AdminInviteCodesRoute: typeof AdminInviteCodesRoute;
   AdminLoginRoute: typeof AdminLoginRoute;
+  AdminUsersRoute: typeof AdminUsersRoute;
   AdminIndexRoute: typeof AdminIndexRoute;
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminAllowlistRoute: AdminAllowlistRoute,
+  AdminBlobsRoute: AdminBlobsRoute,
+  AdminConnectionsRoute: AdminConnectionsRoute,
+  AdminEventsRoute: AdminEventsRoute,
+  AdminInviteCodesRoute: AdminInviteCodesRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 };
 

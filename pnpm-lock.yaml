@@ -381,6 +381,9 @@ importers:
       lucide-react:
         specifier: ^0.475.0
         version: 0.475.0(react@19.2.4)
+      nostr-tools:
+        specifier: ^2.23.3
+        version: 2.23.3(typescript@5.8.3)
       postgres:
         specifier: ^3.4.7
         version: 3.4.8

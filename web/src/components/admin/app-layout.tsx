@@ -48,9 +48,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Separator className="bg-sidebar-border" />
       <nav className="flex flex-1 flex-col gap-1 p-2">
         {navItems.map((item) => {
-          const isActive = item.exact
-            ? location.pathname === item.to
-            : location.pathname.startsWith(item.to);
+          const isActive =
+            "exact" in item && item.exact
+              ? location.pathname === item.to
+              : location.pathname.startsWith(item.to);
           return (
             <Link
               key={item.to}
