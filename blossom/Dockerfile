@@ -8,17 +8,17 @@ RUN corepack enable
 WORKDIR /repo
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY relay/package.json relay/package.json
+COPY blossom/package.json blossom/package.json
 COPY packages/data/package.json packages/data/package.json
 COPY packages/nostr/package.json packages/nostr/package.json
 
-RUN pnpm install --frozen-lockfile --ignore-scripts --filter @comet/relay...
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @comet/blossom...
 
-COPY relay/src relay/src
+COPY blossom/src blossom/src
 COPY packages/data packages/data
 COPY packages/nostr packages/nostr
 
-RUN pnpm --filter @comet/relay --prod deploy --legacy /prod/relay
+RUN pnpm --filter @comet/blossom --prod deploy --legacy /prod/blossom
 
 FROM oven/bun:1
 
@@ -26,7 +26,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=deploy /prod/relay ./
+COPY --from=deploy /prod/blossom ./
 
 EXPOSE 3000
 

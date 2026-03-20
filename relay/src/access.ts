@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
+import { inviteCodes, users } from "@comet/data";
 import type { DB } from "./db";
-import { users, inviteCodes } from "./schema";
 
 export interface AccessControl {
   isAllowed(pubkey: string): boolean;

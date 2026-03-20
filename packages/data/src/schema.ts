@@ -1,13 +1,13 @@
 import {
-  pgTable,
-  text,
   bigint,
+  boolean,
+  index,
   integer,
   jsonb,
+  pgTable,
   primaryKey,
-  index,
-  boolean,
   serial,
+  text,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -27,11 +27,15 @@ export const events = pgTable(
       .notNull()
       .default(sql`(EXTRACT(EPOCH FROM NOW())::BIGINT)`),
   },
-  (t) => [
-    index("idx_events_created_at").on(t.createdAt),
-    index("idx_events_kind_created_at").on(t.kind, t.createdAt),
-    index("idx_events_recipient").on(t.recipient),
-    index("idx_events_pubkey_kind_dtag").on(t.pubkey, t.kind, t.dTag),
+  (table) => [
+    index("idx_events_created_at").on(table.createdAt),
+    index("idx_events_kind_created_at").on(table.kind, table.createdAt),
+    index("idx_events_recipient").on(table.recipient),
+    index("idx_events_pubkey_kind_dtag").on(
+      table.pubkey,
+      table.kind,
+      table.dTag,
+    ),
   ],
 );
 
@@ -44,9 +48,9 @@ export const eventTags = pgTable(
     tagName: text("tag_name").notNull(),
     tagValue: text("tag_value").notNull(),
   },
-  (t) => [
-    index("idx_event_tags_event_id").on(t.eventId),
-    index("idx_tags_lookup").on(t.tagName, t.tagValue),
+  (table) => [
+    index("idx_event_tags_event_id").on(table.eventId),
+    index("idx_tags_lookup").on(table.tagName, table.tagValue),
   ],
 );
 
@@ -65,7 +69,7 @@ export const deletedCoords = pgTable(
     deletedUpTo: bigint("deleted_up_to", { mode: "number" }).notNull(),
     deletionId: text("deletion_id").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.kind, t.pubkey, t.dTag] })],
+  (table) => [primaryKey({ columns: [table.kind, table.pubkey, table.dTag] })],
 );
 
 export const changes = pgTable(
@@ -81,9 +85,9 @@ export const changes = pgTable(
     reason: text("reason"),
     tags: jsonb("tags").$type<[string, string][] | null>(),
   },
-  (t) => [
-    index("idx_changes_kind").on(t.kind),
-    index("idx_changes_pubkey").on(t.pubkey),
+  (table) => [
+    index("idx_changes_kind").on(table.kind),
+    index("idx_changes_pubkey").on(table.pubkey),
   ],
 );
 
@@ -96,9 +100,9 @@ export const changeTags = pgTable(
     tagName: text("tag_name").notNull(),
     tagValue: text("tag_value").notNull(),
   },
-  (t) => [
-    index("idx_change_tags_seq").on(t.seq),
-    index("idx_change_tags_lookup").on(t.tagName, t.tagValue),
+  (table) => [
+    index("idx_change_tags_seq").on(table.seq),
+    index("idx_change_tags_lookup").on(table.tagName, table.tagValue),
   ],
 );
 
@@ -146,8 +150,8 @@ export const blobOwners = pgTable(
       .notNull()
       .default(sql`(EXTRACT(EPOCH FROM NOW())::BIGINT)`),
   },
-  (t) => [
-    primaryKey({ columns: [t.sha256, t.pubkey] }),
-    index("idx_blob_owners_pubkey").on(t.pubkey),
+  (table) => [
+    primaryKey({ columns: [table.sha256, table.pubkey] }),
+    index("idx_blob_owners_pubkey").on(table.pubkey),
   ],
 );

@@ -1,12 +1,6 @@
-export type NostrEvent = {
-  id: string;
-  pubkey: string;
-  created_at: number;
-  kind: number;
-  tags: string[][];
-  content: string;
-  sig: string;
-};
+import type { NostrEvent } from "@comet/nostr";
+
+export type { NostrEvent };
 
 export type Filter = {
   ids?: string[];

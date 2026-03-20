@@ -1,14 +1,14 @@
 import { eq, and, lt, lte, desc, count, max, min } from "drizzle-orm";
-import type { NostrEvent, Filter, ChangeEntry, ChangesFilter } from "../types";
-import type { DB } from "../db";
 import {
+  changeTags,
+  changes,
+  deletedCoords,
+  deletedEvents,
   events,
   eventTags,
-  deletedEvents,
-  deletedCoords,
-  changes,
-  changeTags,
-} from "../schema";
+} from "@comet/data";
+import type { NostrEvent, Filter, ChangeEntry, ChangesFilter } from "../types";
+import type { DB } from "../db";
 import { getEventKindCategory } from "./event";
 import {
   isDeletionEvent,

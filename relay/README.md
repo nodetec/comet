@@ -21,10 +21,27 @@ Relay is the Bun-based Nostr relay workspace for Comet.
 
 On Fly, `RELAY_URL` is set in [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) to `wss://relay.comet.md`. If that value is removed, the relay falls back to `wss://$FLY_APP_NAME.fly.dev`. Local development and tests still use localhost URLs.
 
+## Local test setup
+
+Use a disposable Postgres database for relay tests. The suite runs migrations and truncates shared tables during setup, so do not point `TEST_DATABASE_URL` at a real app, staging, or production database.
+
+One working local setup on macOS is:
+
+```sh
+brew install postgresql@16
+brew services start postgresql@16
+createdb comet_test
+export TEST_DATABASE_URL=postgres://$USER@localhost:5432/comet_test
+just relay-test
+```
+
+If Postgres is already running, you usually only need `createdb comet_test` plus the `TEST_DATABASE_URL` export.
+
 ## Fly.io
 
 - [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) is the starting Fly config for the relay workspace
 - [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile) builds the relay from the monorepo root using the checked-in `pnpm-lock.yaml`
+- [`packages/data`](/Users/chris/Repos/project/comet/packages/data) owns the shared Postgres schema and migrations consumed by the relay
 - [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) deploys the relay on pushes to `master` after CI passes when relay runtime or deploy files changed
 - Set `DATABASE_URL` as a Fly app secret before deploy. Do not store it in GitHub Actions.
 - Set `FLY_API_TOKEN` as a GitHub Actions secret before enabling deploys

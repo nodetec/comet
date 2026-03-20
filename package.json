@@ -13,6 +13,12 @@
     "lint": "turbo run lint",
     "lint:fix": "pnpm --filter @comet/app lint:fix",
     "test": "turbo run test --filter=@comet/app",
+    "blossom:build": "pnpm --filter @comet/blossom build",
+    "blossom:dev": "pnpm --filter @comet/blossom dev",
+    "blossom:lint": "pnpm --filter @comet/blossom lint",
+    "blossom:lint:fix": "pnpm --filter @comet/blossom lint:fix",
+    "blossom:test": "pnpm --filter @comet/blossom test",
+    "blossom:typecheck": "pnpm --filter @comet/blossom typecheck",
     "relay:build": "pnpm --filter @comet/relay build",
     "relay:dev": "pnpm --filter @comet/relay dev",
     "relay:lint": "pnpm --filter @comet/relay lint",
@@ -40,6 +46,18 @@
     ],
     "relay/**/*.{ts,tsx}": [
       "pnpm --filter @comet/relay exec eslint --fix",
+      "prettier --write"
+    ],
+    "blossom/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/blossom exec eslint --fix",
+      "prettier --write"
+    ],
+    "packages/data/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/data exec eslint --fix",
+      "prettier --write"
+    ],
+    "packages/nostr/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/nostr exec eslint --fix",
       "prettier --write"
     ],
     "**/*.{js,mjs,cjs,json,md,yml,yaml}": [

@@ -69,6 +69,33 @@ relay-check:
   just relay-build
   just relay-test
 
+blossom-dev:
+  pnpm --filter @comet/blossom dev
+
+blossom-deploy:
+  flyctl deploy --config blossom/fly.toml --remote-only
+
+blossom-build:
+  pnpm --filter @comet/blossom build
+
+blossom-lint:
+  pnpm --filter @comet/blossom lint
+
+blossom-lint-fix:
+  pnpm --filter @comet/blossom lint:fix
+
+blossom-test:
+  pnpm --filter @comet/blossom test
+
+blossom-typecheck:
+  pnpm --filter @comet/blossom typecheck
+
+blossom-check:
+  just blossom-lint
+  just blossom-typecheck
+  just blossom-build
+  just blossom-test
+
 format:
   pnpm format
 

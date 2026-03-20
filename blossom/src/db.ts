@@ -1,5 +1,5 @@
-import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "@comet/data";
 
 export type DB = ReturnType<typeof createDB>["db"];
@@ -9,8 +9,9 @@ export function createDB(url?: string) {
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is required");
   }
+
   const sql = postgres(connectionString, {
-    max: 50,
+    max: 20,
     idle_timeout: 20,
     connect_timeout: 10,
     onnotice: () => {},

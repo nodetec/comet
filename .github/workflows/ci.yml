@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
+      blossom: ${{ steps.filter.outputs.blossom }}
+      blossom_deploy: ${{ steps.filter.outputs.blossom_deploy }}
       relay: ${{ steps.filter.outputs.relay }}
       relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
     steps:
@@ -18,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect app and relay changes
+      - name: Detect app, blossom, and relay changes
         id: filter
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -46,6 +48,8 @@ jobs:
           fi
 
           app=false
+          blossom=false
+          blossom_deploy=false
           relay=false
           relay_deploy=false
           while IFS= read -r file; do
@@ -56,18 +60,30 @@ jobs:
             esac
 
             case "$file" in
-              relay/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json)
+              blossom/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|packages/nostr/*|packages/data/*)
+                blossom=true
+                ;;
+            esac
+
+            case "$file" in
+              blossom/src/*|blossom/package.json|blossom/Dockerfile|blossom/.dockerignore|blossom/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|packages/nostr/*|packages/data/*)
+                blossom_deploy=true
+                ;;
+            esac
+
+            case "$file" in
+              relay/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|packages/nostr/*|packages/data/*)
                 relay=true
                 ;;
             esac
 
             case "$file" in
-              relay/src/*|relay/drizzle/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml)
+              relay/src/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|packages/nostr/*|packages/data/*)
                 relay_deploy=true
                 ;;
             esac
 
-            if [ "$app" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ]; then
+            if [ "$app" = true ] && [ "$blossom" = true ] && [ "$blossom_deploy" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ]; then
               break
             fi
           done <<EOF
@@ -75,6 +91,8 @@ jobs:
           EOF
 
           echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "blossom=$blossom" >> "$GITHUB_OUTPUT"
+          echo "blossom_deploy=$blossom_deploy" >> "$GITHUB_OUTPUT"
           echo "relay=$relay" >> "$GITHUB_OUTPUT"
           echo "relay_deploy=$relay_deploy" >> "$GITHUB_OUTPUT"
 
@@ -232,6 +250,73 @@ jobs:
 
       - name: Run relay tests
         run: pnpm relay:test
+
+  blossom:
+    if: needs.changes.outputs.blossom == 'true'
+    needs: changes
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: comet_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comet_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/comet_test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck blossom
+        run: pnpm blossom:typecheck
+
+      - name: Build blossom
+        run: pnpm blossom:build
+
+      - name: Run blossom tests
+        run: pnpm blossom:test
+
+  blossom_deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.blossom_deploy == 'true'
+    needs: [changes, format, lint, typecheck, blossom]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy blossom
+        run: flyctl deploy --config blossom/fly.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   build:
     if: needs.changes.outputs.app == 'true'

@@ -1,6 +1,6 @@
 import { sql as rawSql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
-import { fileURLToPath } from "node:url";
+import { migrationsFolder } from "@comet/data";
 import { initAccessControl } from "./access";
 import { ConnectionManager, type RelaySocketData } from "./connections";
 import { createDB, type DB } from "./db";
@@ -11,8 +11,6 @@ import {
 } from "./relay/handler";
 import { getRelayInfoDocument } from "./relay/nip/11";
 import { initStorage } from "./relay/storage";
-
-const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
 export type RelayServerOptions = {
   port?: number;

@@ -2,11 +2,11 @@
 !package.json
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
-!relay/package.json
-!relay/src
-!relay/src/**
-!relay/Dockerfile
-!relay/.dockerignore
+!blossom/package.json
+!blossom/src
+!blossom/src/**
+!blossom/Dockerfile
+!blossom/.dockerignore
 !packages/data/package.json
 !packages/data/src
 !packages/data/src/**
