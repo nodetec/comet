@@ -129,7 +129,7 @@ www-preview:
   pnpm --filter @comet/www preview
 
 www-deploy:
-  pnpm --filter @comet/www deploy
+  pnpm --filter @comet/www run deploy
 
 format:
   pnpm format
