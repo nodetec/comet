@@ -7,16 +7,18 @@ on:
     branches: [master]
 
 jobs:
-  relay_changes:
+  changes:
     runs-on: ubuntu-latest
     outputs:
+      app: ${{ steps.filter.outputs.app }}
       relay: ${{ steps.filter.outputs.relay }}
+      relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Detect relay deploy changes
+      - name: Detect app and relay changes
         id: filter
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -43,19 +45,38 @@ jobs:
             files=$(git diff --name-only "$base" "$head")
           fi
 
+          app=false
           relay=false
+          relay_deploy=false
           while IFS= read -r file; do
             case "$file" in
-              relay/src/*|relay/drizzle/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml)
-                relay=true
-                break
+              app/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json)
+                app=true
                 ;;
             esac
+
+            case "$file" in
+              relay/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json)
+                relay=true
+                ;;
+            esac
+
+            case "$file" in
+              relay/src/*|relay/drizzle/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml)
+                relay_deploy=true
+                ;;
+            esac
+
+            if [ "$app" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ]; then
+              break
+            fi
           done <<EOF
           $files
           EOF
 
+          echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "relay=$relay" >> "$GITHUB_OUTPUT"
+          echo "relay_deploy=$relay_deploy" >> "$GITHUB_OUTPUT"
 
   format:
     runs-on: ubuntu-latest
@@ -124,6 +145,8 @@ jobs:
         run: pnpm typecheck
 
   test:
+    if: needs.changes.outputs.app == 'true'
+    needs: changes
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -160,6 +183,8 @@ jobs:
         run: pnpm build
 
   relay:
+    if: needs.changes.outputs.relay == 'true'
+    needs: changes
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -209,7 +234,8 @@ jobs:
         run: pnpm relay:test
 
   build:
-    needs: [format, lint, typecheck, test, relay]
+    if: needs.changes.outputs.app == 'true'
+    needs: [changes, format, lint, typecheck, test]
     strategy:
       fail-fast: false
       matrix:
@@ -294,8 +320,8 @@ jobs:
             app/src-tauri/target/release/bundle/appimage/*.AppImage
 
   release:
-    if: github.event_name == 'push'
-    needs: build
+    if: github.event_name == 'push' && needs.changes.outputs.app == 'true'
+    needs: [changes, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -343,8 +369,8 @@ jobs:
           make_latest: true
 
   relay_deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.relay_changes.outputs.relay == 'true'
-    needs: [relay_changes, format, lint, typecheck, test, relay]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.relay_deploy == 'true'
+    needs: [changes, format, lint, typecheck, relay]
     runs-on: ubuntu-latest
     permissions:
       contents: read
