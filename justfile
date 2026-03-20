@@ -48,6 +48,9 @@ relay-dev:
 relay-deploy:
   flyctl deploy --config relay/fly.toml --remote-only
 
+relay-logs:
+  fly logs -a comet-relay
+
 relay-build:
   pnpm --filter @comet/relay build
 
@@ -74,6 +77,9 @@ blossom-dev:
 
 blossom-deploy:
   flyctl deploy --config blossom/fly.toml --remote-only
+
+blossom-logs:
+  fly logs -a comet-blossom
 
 blossom-build:
   pnpm --filter @comet/blossom build
