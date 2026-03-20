@@ -131,6 +131,9 @@ www-preview:
 www-deploy:
   pnpm --filter @comet/www run deploy
 
+www-deploy-preview:
+  pnpm --filter @comet/www run deploy:preview
+
 format:
   pnpm format
 

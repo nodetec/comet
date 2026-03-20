@@ -7,7 +7,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler pages deploy"
+    "deploy": "astro build && wrangler pages deploy --branch master",
+    "deploy:preview": "astro build && wrangler pages deploy"
   },
   "dependencies": {
     "astro": "^5.9.0"
