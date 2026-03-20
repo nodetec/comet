@@ -69,11 +69,10 @@ React UI → useShellController (React Query + Tauri invoke()) → Rust commands
 
 ## Product Constraints (from AGENTS.md)
 
-- v1 is desktop-first, single-user only
-- No collaboration, plugin system, mobile, or web features in v1
+- v1 is desktop-first
+- No collaboration, plugin system, or mobile in v1
 - No nested notebooks, graph-view, or overlapping organization systems
 - Prefer clean greenfield solutions over compatibility layers or migration hacks
-- Prefer small, product-aligned changes over broad refactors
 - Nostr SDK is included for future publishing — architecture should preserve that path
 
 ## Commit Style
