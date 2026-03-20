@@ -5,8 +5,8 @@ kill_signal = "SIGTERM"
 kill_timeout = "30s"
 
 [build]
-  dockerfile = "relay/Dockerfile"
-  ignorefile = "relay/.dockerignore"
+  dockerfile = "Dockerfile"
+  ignorefile = ".dockerignore"
 
 [env]
   PORT = "3000"
