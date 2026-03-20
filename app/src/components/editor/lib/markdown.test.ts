@@ -1,7 +1,12 @@
 import { $convertFromMarkdownString } from "@lexical/markdown";
 import { $createCodeNode, CodeNode } from "@lexical/code";
 import { HorizontalRuleNode } from "@lexical/extension";
-import { LinkNode, $createLinkNode } from "@lexical/link";
+import {
+  AutoLinkNode,
+  LinkNode,
+  $createAutoLinkNode,
+  $createLinkNode,
+} from "@lexical/link";
 import {
   $createListItemNode,
   $createListNode,
@@ -50,6 +55,7 @@ const TEST_NODES = [
   HorizontalRuleNode,
   ImageNode,
   LinkNode,
+  AutoLinkNode,
   ListItemNode,
   ListNode,
   QuoteNode,
@@ -320,6 +326,30 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe("user@example.com");
+  });
+
+  it("exports plain website autolinks as bare url text", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createAutoLinkNode("https://example.com");
+      link.append($createTextNode("https://example.com"));
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe("https://example.com");
+  });
+
+  it("exports normalized www autolinks using the original visible text", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createAutoLinkNode("https://www.example.com");
+      link.append($createTextNode("www.example.com"));
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe("www.example.com");
   });
 
   it("round-trips markdown links with titles", () => {

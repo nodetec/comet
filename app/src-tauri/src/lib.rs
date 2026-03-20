@@ -709,6 +709,7 @@ pub fn run() {
         .plugin(log_plugin.build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(notes::RenderedHtmlCache::default())
         .manage(sync::SyncManager::new())
         .setup(|app| {

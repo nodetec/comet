@@ -1,6 +1,11 @@
 import type { TextMatchTransformer } from "@lexical/markdown";
 import { $createTextNode } from "lexical";
-import { $createLinkNode, $isLinkNode, LinkNode } from "@lexical/link";
+import {
+  $createLinkNode,
+  $isAutoLinkNode,
+  $isLinkNode,
+  LinkNode,
+} from "@lexical/link";
 
 const MARKDOWN_LINK_IMPORT_RE =
   /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)/;
@@ -27,6 +32,19 @@ function isPlainEmailAutolink(
   );
 }
 
+function isPlainWebsiteAutolink(
+  displayText: string,
+  url: string,
+  title: string | null,
+) {
+  return (
+    title == null &&
+    displayText.length > 0 &&
+    (url.startsWith("http://") || url.startsWith("https://")) &&
+    displayText === url
+  );
+}
+
 export const LINK: TextMatchTransformer = {
   dependencies: [LinkNode],
   export: (node) => {
@@ -36,7 +54,11 @@ export const LINK: TextMatchTransformer = {
     const displayText = node.getTextContent();
     const url = node.getURL();
     const title = node.getTitle();
-    if (isPlainEmailAutolink(displayText, url, title)) {
+    if (
+      ($isAutoLinkNode(node) && title == null && displayText.length > 0) ||
+      isPlainEmailAutolink(displayText, url, title) ||
+      isPlainWebsiteAutolink(displayText, url, title)
+    ) {
       return displayText;
     }
     const titlePart = title ? ` "${title}"` : "";
