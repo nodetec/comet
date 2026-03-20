@@ -119,6 +119,15 @@ web-check:
   just web-typecheck
   just web-build
 
+www-dev:
+  pnpm --filter @comet/www dev
+
+www-build:
+  pnpm --filter @comet/www build
+
+www-preview:
+  pnpm --filter @comet/www preview
+
 format:
   pnpm format
 

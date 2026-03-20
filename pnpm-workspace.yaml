@@ -3,4 +3,5 @@ packages:
   - blossom
   - relay
   - web
+  - www
   - packages/*

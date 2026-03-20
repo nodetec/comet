@@ -17,12 +17,16 @@ export async function getLatestRelease(): Promise<Release | null> {
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return cached.release;
   }
+
   try {
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/releases/latest`,
-      { headers: { "User-Agent": "comet-web" } },
+      {
+        headers: { "User-Agent": "comet-www" },
+      },
     );
     if (!res.ok) return null;
+
     const data = await res.json();
     const release: Release = {
       tag: data.tag_name,
