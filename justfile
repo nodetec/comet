@@ -128,6 +128,9 @@ www-build:
 www-preview:
   pnpm --filter @comet/www preview
 
+www-deploy:
+  pnpm --filter @comet/www deploy
+
 format:
   pnpm format
 

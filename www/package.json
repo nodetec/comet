@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler pages deploy"
   },
   "dependencies": {
     "astro": "^5.9.0"
   },
   "devDependencies": {
+    "wrangler": "^4.20.0",
     "@tailwindcss/vite": "^4.2.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.8.3"
