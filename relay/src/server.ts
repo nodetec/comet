@@ -156,7 +156,7 @@ export async function createRelayServer(
     stop: async () => {
       connections.closeAll(1001, "server shutdown");
       await server.stop(true);
-      await sql.end();
+      await sql.end({ timeout: 1 });
     },
   };
 }
