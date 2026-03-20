@@ -2,4 +2,6 @@ packages:
   - app
   - blossom
   - relay
+  - web
+  - www
   - packages/*

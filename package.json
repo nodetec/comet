@@ -25,6 +25,14 @@
     "relay:lint:fix": "pnpm --filter @comet/relay lint:fix",
     "relay:test": "pnpm --filter @comet/relay test",
     "relay:typecheck": "pnpm --filter @comet/relay typecheck",
+    "web:dev": "pnpm --filter @comet/web dev",
+    "web:build": "pnpm --filter @comet/web build",
+    "web:typecheck": "pnpm --filter @comet/web typecheck",
+    "web:lint": "pnpm --filter @comet/web lint",
+    "web:lint:fix": "pnpm --filter @comet/web lint:fix",
+    "www:dev": "pnpm --filter @comet/www dev",
+    "www:build": "pnpm --filter @comet/www build",
+    "www:preview": "pnpm --filter @comet/www preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "turbo run preview --filter=@comet/app",
@@ -50,6 +58,10 @@
     ],
     "blossom/**/*.{ts,tsx}": [
       "pnpm --filter @comet/blossom exec eslint --fix",
+      "prettier --write"
+    ],
+    "web/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/web exec eslint --fix",
       "prettier --write"
     ],
     "packages/data/**/*.{ts,tsx}": [

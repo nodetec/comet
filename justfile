@@ -96,6 +96,44 @@ blossom-check:
   just blossom-build
   just blossom-test
 
+web-dev:
+  pnpm --filter @comet/web dev
+
+web-deploy:
+  flyctl deploy --config web/fly.toml --remote-only
+
+web-build:
+  pnpm --filter @comet/web build
+
+web-lint:
+  pnpm --filter @comet/web lint
+
+web-lint-fix:
+  pnpm --filter @comet/web lint:fix
+
+web-typecheck:
+  pnpm --filter @comet/web typecheck
+
+web-check:
+  just web-lint
+  just web-typecheck
+  just web-build
+
+www-dev:
+  pnpm --filter @comet/www dev
+
+www-build:
+  pnpm --filter @comet/www build
+
+www-preview:
+  pnpm --filter @comet/www preview
+
+www-deploy:
+  pnpm --filter @comet/www run deploy
+
+www-deploy-preview:
+  pnpm --filter @comet/www run deploy:preview
+
 format:
   pnpm format
 

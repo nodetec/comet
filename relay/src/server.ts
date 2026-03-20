@@ -141,6 +141,28 @@ export async function createRelayServer(
         return new Response("ok", { status: 200 });
       }
 
+      if (url.pathname === "/admin/connections" && req.method === "GET") {
+        const adminToken = process.env.ADMIN_TOKEN;
+        if (!adminToken) {
+          return Response.json(
+            { error: "admin not configured" },
+            { status: 503 },
+          );
+        }
+        const auth = req.headers.get("authorization");
+        if (auth !== `Bearer ${adminToken}`) {
+          return Response.json({ error: "unauthorized" }, { status: 401 });
+        }
+        const result = [];
+        for (const [id, state] of connections.entries()) {
+          result.push({
+            id,
+            authedPubkeys: Array.from(state.authedPubkeys),
+          });
+        }
+        return Response.json({ connections: result });
+      }
+
       return new Response("Not Found", { status: 404 });
     },
     websocket: {

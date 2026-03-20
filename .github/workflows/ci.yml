@@ -15,6 +15,7 @@ jobs:
       blossom_deploy: ${{ steps.filter.outputs.blossom_deploy }}
       relay: ${{ steps.filter.outputs.relay }}
       relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
+      www_deploy: ${{ steps.filter.outputs.www_deploy }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,6 +53,7 @@ jobs:
           blossom_deploy=false
           relay=false
           relay_deploy=false
+          www_deploy=false
           while IFS= read -r file; do
             case "$file" in
               app/*|turbo.json)
@@ -83,7 +85,13 @@ jobs:
                 ;;
             esac
 
-            if [ "$app" = true ] && [ "$blossom" = true ] && [ "$blossom_deploy" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ]; then
+            case "$file" in
+              www/*)
+                www_deploy=true
+                ;;
+            esac
+
+            if [ "$app" = true ] && [ "$blossom" = true ] && [ "$blossom_deploy" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ] && [ "$www_deploy" = true ]; then
               break
             fi
           done <<EOF
@@ -95,6 +103,7 @@ jobs:
           echo "blossom_deploy=$blossom_deploy" >> "$GITHUB_OUTPUT"
           echo "relay=$relay" >> "$GITHUB_OUTPUT"
           echo "relay_deploy=$relay_deploy" >> "$GITHUB_OUTPUT"
+          echo "www_deploy=$www_deploy" >> "$GITHUB_OUTPUT"
 
   format:
     runs-on: ubuntu-latest
@@ -468,3 +477,32 @@ jobs:
         run: flyctl deploy --config relay/fly.toml --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  www_deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.www_deploy == 'true'
+    needs: [changes, format]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter @comet/www
+
+      - name: Build and deploy www
+        run: pnpm --filter @comet/www run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
