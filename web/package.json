@@ -14,6 +14,7 @@
   "dependencies": {
     "@comet/data": "workspace:*",
     "@fontsource-variable/geist": "^5.2.8",
+    "@noble/ciphers": "^2.1.1",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-router": "^1.167.5",
     "@tanstack/react-router-ssr-query": "^1.166.9",
@@ -28,7 +29,9 @@
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^2.15.4",
+    "remark-gfm": "^4.0.1",
     "shadcn": "^4.1.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.0",
