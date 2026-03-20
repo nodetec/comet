@@ -72,8 +72,10 @@ export default [
           checksVoidReturn: true,
         },
       ],
+      "@typescript-eslint/no-unnecessary-template-expression": "error",
       "@typescript-eslint/prefer-nullish-coalescing": "error",
       "@typescript-eslint/prefer-optional-chain": "error",
+      "@typescript-eslint/require-await": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
