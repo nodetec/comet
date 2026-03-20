@@ -5,7 +5,7 @@ Relay is the Bun-based Nostr relay workspace for Comet.
 ## Commands
 
 - `bun run src/index.ts`: start the relay
-- `bun test`: run the relay test suite
+- `bun test --max-concurrency 1`: run the relay test suite serially
 - `bun --watch src/index.ts`: start the relay in watch mode
 - `just relay-deploy`: deploy the relay to Fly
 

@@ -10,7 +10,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "build": "bun build ./src/index.ts --target bun --outdir dist",
-    "test": "bun test"
+    "test": "bun test --max-concurrency 1"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.1",
