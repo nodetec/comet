@@ -27,10 +27,14 @@ export class ConnectionManager {
     this.connections.delete(id);
   }
 
-  closeAll(code?: number, reason?: string): void {
+  closeAll(code?: number, reason?: string, force = false): void {
     for (const [id, conn] of this.connections) {
       try {
-        conn.ws.close(code, reason);
+        if (force) {
+          conn.ws.terminate();
+        } else {
+          conn.ws.close(code, reason);
+        }
       } catch {
         conn.ws.terminate();
       }
