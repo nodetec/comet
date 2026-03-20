@@ -7,6 +7,56 @@ on:
     branches: [master]
 
 jobs:
+  relay_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relay: ${{ steps.filter.outputs.relay }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect relay deploy changes
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+
+          zero_sha="0000000000000000000000000000000000000000"
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE"
+            head="$PR_HEAD"
+          else
+            base="$PUSH_BEFORE"
+            head="$PUSH_AFTER"
+          fi
+
+          if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
+            files=$(git ls-tree -r --name-only "$head")
+          else
+            files=$(git diff --name-only "$base" "$head")
+          fi
+
+          relay=false
+          while IFS= read -r file; do
+            case "$file" in
+              relay/src/*|relay/drizzle/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml)
+                relay=true
+                break
+                ;;
+            esac
+          done <<EOF
+          $files
+          EOF
+
+          echo "relay=$relay" >> "$GITHUB_OUTPUT"
+
   format:
     runs-on: ubuntu-latest
     steps:
@@ -291,3 +341,19 @@ jobs:
             artifacts/**/*.rpm
             artifacts/**/*.AppImage
           make_latest: true
+
+  relay_deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.relay_changes.outputs.relay == 'true'
+    needs: [relay_changes, format, lint, typecheck, test, relay]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy relay
+        run: flyctl deploy --config relay/fly.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

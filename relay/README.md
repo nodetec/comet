@@ -25,7 +25,7 @@ On Fly, `RELAY_URL` is set in [`fly.toml`](/Users/chris/Repos/project/comet/rela
 
 - [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) is the starting Fly config for the relay workspace
 - [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile) builds the relay from the monorepo root using the checked-in `pnpm-lock.yaml`
-- [`.github/workflows/relay-deploy.yml`](/Users/chris/Repos/project/comet/.github/workflows/relay-deploy.yml) deploys the relay on pushes to `master` that touch relay runtime or deploy files
+- [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) deploys the relay on pushes to `master` after CI passes when relay runtime or deploy files changed
 - Set `DATABASE_URL` as a Fly app secret before deploy. Do not store it in GitHub Actions.
 - Set `FLY_API_TOKEN` as a GitHub Actions secret before enabling deploys
 - Keep `PRIVATE_MODE=true` unless you intentionally want an open relay
@@ -37,7 +37,7 @@ On Fly, `RELAY_URL` is set in [`fly.toml`](/Users/chris/Repos/project/comet/rela
 2. Set the database secret on Fly so the running relay has it at runtime:
    `fly secrets set DATABASE_URL=postgres://... --app <your-fly-app>`
 3. Point the `relay.comet.md` DNS record at the Fly app and provision TLS for that hostname.
-4. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/relay-deploy.yml`](/Users/chris/Repos/project/comet/.github/workflows/relay-deploy.yml) can deploy.
+4. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) can deploy the relay job.
 5. Run the first deploy manually:
    `flyctl deploy --config relay/fly.toml --remote-only`
 
