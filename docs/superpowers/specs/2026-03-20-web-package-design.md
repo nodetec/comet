@@ -44,7 +44,8 @@ comet/
 
 - **@comet/data** — No changes. Web app imports the same tables and queries Postgres directly.
 - **@comet/nostr** — No changes. Not directly used by the web app.
-- **@comet/relay** — Adds admin stats HTTP endpoint (`GET /admin/stats`, `GET /admin/connections`), protected by `ADMIN_TOKEN` Bearer auth.
+- **@comet/relay** — Adds `GET /admin/connections` endpoint (returns active WebSocket connections and authed pubkeys), protected by `ADMIN_TOKEN` Bearer auth. This is the only relay-specific data the web app cannot query via Drizzle.
+- **@comet/blossom** — Adds `DELETE /admin/{sha256}` endpoint for admin blob deletion (removes from both DB and S3), protected by `ADMIN_TOKEN` Bearer auth. The existing `DELETE /{sha256}` uses Nostr-auth (NIP-24242) which requires a signing key the web app does not have.
 - **pnpm-workspace.yaml** — Add `web` to workspace list.
 - **turbo.json** — Add `dev` and `build` tasks for `web`.
 
@@ -103,8 +104,9 @@ web/app/
 │   └── utils.ts                  # cn(), formatBytes, formatTimestamp
 └── server/
     ├── db.ts                     # Drizzle client initialization
-    ├── admin.ts                  # Admin query functions
-    ├── relay-stats.ts            # HTTP client for relay admin stats API
+    ├── admin.ts                  # Admin query functions (reimplements Drizzle queries from comet-server)
+    ├── github.ts                 # GitHub release fetcher (for landing page)
+    ├── relay-client.ts           # HTTP client for relay admin API (connections only)
     └── middleware.ts             # Auth validation helpers
 ```
 
@@ -132,27 +134,25 @@ Admin UI (React) → TanStack Router loader / server fn → Drizzle queries → 
                                                       → fetch() → Relay admin API
 ```
 
-Server functions in `web/app/server/admin.ts`:
+Server functions in `web/app/server/admin.ts` reimplement the Drizzle queries from comet-server's `src/admin/routes.tsx` and `src/blossom/db.ts`. These are not imported from a shared package — they are rewritten as server functions. Constants like `DEFAULT_STORAGE_LIMIT_BYTES` (1 GB) also live here.
 
-- **Stats:** `getStats()`, `getEventsByKind()`, `getEventsOverTime()`, `getStorageByUser()`
-- **Allowlist:** `listAllowedUsers()`, `allowUser()`, `revokeUser()`, `setStorageLimit()`
-- **Events:** `listEvents(kind?, pubkey?, cursor?)`, `deleteEvents(ids[])`
-- **Blobs:** `listBlobs(cursor?)`, `deleteBlob(sha256)` — also calls blossom service for S3 removal
-- **Invite codes:** `listInviteCodes()`, `createInviteCode()`, `revokeInviteCode()`
-- **Users:** `listUsers()` — joins users + blobs + events for per-user stats
+- **Stats:** `getStats()` (event/blob/user counts + total storage — all direct DB queries), `getEventsByKind()`, `getEventsOverTime()`, `getStorageByUser()` — chart data via Drizzle aggregations.
+- **Allowlist:** `listAllowedUsers()`, `allowUser()`, `revokeUser()`, `setStorageLimit()` — CRUD on `users` table.
+- **Events:** `listEvents(kind?, pubkey?, cursor?)`, `deleteEvents(ids[])` — cursor-paginated queries on `events` table.
+- **Blobs:** `listBlobs(cursor?)`, `deleteBlob(sha256)` — listing is a direct DB query; deletion calls `DELETE {BLOSSOM_URL}/admin/{sha256}` (the new blossom admin endpoint) to remove from both DB and S3.
+- **Invite codes:** `listInviteCodes()`, `createInviteCode()`, `revokeInviteCode()` — CRUD on `inviteCodes` table.
+- **Users:** `listUsers()` — joins users + blobs + events for per-user storage/event stats.
 
-Relay stats in `web/app/server/relay-stats.ts`:
+Relay connections in `web/app/server/relay-client.ts`:
 
-- `getRelayStats()` → `GET {RELAY_URL}/admin/stats`
 - `getRelayConnections()` → `GET {RELAY_URL}/admin/connections`
-- Both authenticated via `ADMIN_TOKEN` in Authorization header.
-
-Blob deletion crosses services: server function deletes from Postgres AND calls `DELETE {BLOSSOM_URL}/{sha256}` to remove from object storage.
+- Authenticated via `ADMIN_TOKEN` in Authorization header.
+- This is the only cross-service call for data the web app cannot query from the database. All other stats (event counts, blob storage, user counts) are direct Drizzle queries.
 
 ### Admin Auth
 
-1. **Login:** Token submitted → server function compares against `ADMIN_TOKEN` env var → sets `admin_session` httpOnly cookie (7-day expiry, sameSite=Lax, secure in production).
-2. **Route guard:** `_admin.tsx` layout `beforeLoad` checks cookie server-side. Invalid → redirect to `/admin/login`.
+1. **Login:** Token submitted → server function compares against `ADMIN_TOKEN` env var → sets `admin_session` httpOnly cookie (7-day expiry, sameSite=Lax, secure in production). Note: the cookie value is the raw admin token. This matches the existing monolith pattern and is acceptable for a single-admin tool.
+2. **Route guard:** `_admin.tsx` layout `beforeLoad` checks cookie server-side. Invalid → redirect to `/admin/login`. The login route itself is excluded from this check to avoid a redirect loop.
 3. **Server functions:** Each validates cookie via `assertAdmin(request)` helper.
 
 ### Dashboard Auth
@@ -160,7 +160,7 @@ Blob deletion crosses services: server function deletes from Postgres AND calls 
 Entirely client-side:
 
 1. **Sign in:** `window.nostr.getPublicKey()` (NIP-07) → pubkey in localStorage → RelayClient connects → NIP-42 AUTH handshake.
-2. **Route guard:** `_dashboard.tsx` layout checks localStorage on client. Missing → redirect to `/dashboard/login`.
+2. **Route guard:** `_dashboard.tsx` layout checks localStorage on client. Missing → redirect to `/dashboard/login`. The login route is excluded from this check.
 3. **Data:** All via WebSocket relay subscriptions (NIP-01). No server functions. React Query manages cache.
 
 ### Environment Variables
@@ -168,8 +168,8 @@ Entirely client-side:
 ```
 DATABASE_URL          # Postgres connection string
 ADMIN_TOKEN           # Admin auth token
-RELAY_URL             # Internal URL to relay service (for stats API)
-BLOSSOM_URL           # Internal URL to blossom service (for blob deletion)
+RELAY_URL             # Internal URL to relay service (for connections API)
+BLOSSOM_URL           # Internal URL to blossom service (for admin blob deletion)
 ```
 
 ---
@@ -201,9 +201,9 @@ BLOSSOM_URL           # Internal URL to blossom service (for blob deletion)
 
 ### New work (doesn't exist in comet-server)
 
-- **Relay admin stats endpoint** — new HTTP routes on `relay/` (`GET /admin/stats`, `GET /admin/connections`), protected by `ADMIN_TOKEN` Bearer auth.
-- **Blossom delete proxy** — web server function calls `DELETE {BLOSSOM_URL}/{sha256}` when admin deletes a blob.
-- **Dockerfile for web/** — Node-based (TanStack Start runs on Vinxi/Nitro). Deployed to Fly.io.
+- **Relay admin connections endpoint** — `GET /admin/connections` on `relay/`, protected by `ADMIN_TOKEN` Bearer auth. Returns active WebSocket connections and authed pubkeys. This is the only relay-specific data the web app cannot query from the database.
+- **Blossom admin delete endpoint** — `DELETE /admin/{sha256}` on `blossom/`, protected by `ADMIN_TOKEN` Bearer auth. Removes the blob from both Postgres and S3. The existing `DELETE /{sha256}` uses Nostr-auth (NIP-24242) which requires a signing key the web app does not possess.
+- **Dockerfile for web/** — Uses `node-server` Nitro preset. Deployed to Fly.io using Fly private networking for internal relay/blossom URLs.
 
 ### Intentionally not ported
 
