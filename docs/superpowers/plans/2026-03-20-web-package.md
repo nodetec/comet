@@ -93,7 +93,6 @@ relay/test/admin.test.ts                   # Tests for admin endpoint (NEW)
 blossom/src/server.ts                      # Add DELETE /admin/{sha256} route
 blossom/test/admin.test.ts                 # Tests for admin endpoint (NEW)
 pnpm-workspace.yaml                        # Add web entry
-turbo.json                                 # No changes needed (tasks already generic)
 package.json (root)                        # Add web:* convenience scripts, lint-staged for web/
 ```
 
@@ -434,7 +433,34 @@ export function usageColor(pct: number): string {
 export const DEFAULT_STORAGE_LIMIT_BYTES = 1_073_741_824; // 1 GB
 ```
 
-- [ ] **Step 10: Install dependencies and verify dev server starts**
+- [ ] **Step 10: Create web/eslint.config.js**
+
+ESLint flat config for React + TypeScript (matching the pattern from relay/blossom packages):
+
+```javascript
+import eslint from "@eslint/js";
+import tseslint from "typescript-eslint";
+import globals from "globals";
+
+export default tseslint.config(
+  eslint.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  { ignores: [".output/", "node_modules/"] },
+);
+```
+
+- [ ] **Step 11: Install dependencies and verify dev server starts**
 
 ```bash
 cd web && pnpm install
@@ -442,11 +468,27 @@ pnpm dev
 # Verify: http://localhost:3100 shows "Comet" heading
 ```
 
-- [ ] **Step 11: Initialize shadcn/ui**
+- [ ] **Step 12: Initialize shadcn/ui**
 
 Run shadcn init in `web/`, configure for Tailwind v4, default theme. Install base components needed across admin and dashboard: `button`, `card`, `input`, `label`, `dialog`, `badge`, `table`, `scroll-area`, `skeleton`, `separator`, `sheet`, `dropdown-menu`, `select`, `progress`, `tooltip`, `sonner`.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 13: Add turbo build output override for web package**
+
+TanStack Start/Vinxi outputs to `.output/` (not `dist/`). Add to `web/package.json`:
+
+```json
+"turbo": {
+  "tasks": {
+    "build": {
+      "outputs": [".output/**"]
+    }
+  }
+}
+```
+
+This overrides the root `turbo.json` `"outputs": ["dist/**"]` for this package only.
+
+- [ ] **Step 14: Commit**
 
 ```bash
 git add web/
@@ -466,36 +508,42 @@ Reference: `relay/src/connections.ts` — `ConnectionManager` has `.entries()` a
 
 - [ ] **Step 1: Write the test**
 
-Create `relay/test/admin.test.ts`:
+Create `relay/test/admin.test.ts`. Follow the existing relay test pattern: `startTestRelay(port)` in `beforeAll`, `ctx.cleanup()` in `afterAll`. Set `ADMIN_TOKEN` env var in setup.
 
 ```typescript
-import { describe, expect, it } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { startTestRelay, type TestContext } from "./helpers";
+
+const ADMIN_TOKEN = "test-admin-token";
+let ctx: TestContext;
+
+beforeAll(async () => {
+  process.env.ADMIN_TOKEN = ADMIN_TOKEN;
+  ctx = await startTestRelay(39200);
+});
+
+afterAll(async () => {
+  await ctx.cleanup();
+  delete process.env.ADMIN_TOKEN;
+});
 
 describe("GET /admin/connections", () => {
-  it("returns 401 without admin token", async () => {
-    const res = await fetch(
-      `http://localhost:${process.env.PORT}/admin/connections`,
-    );
+  test("returns 401 without admin token", async () => {
+    const res = await fetch(`http://localhost:${ctx.port}/admin/connections`);
     expect(res.status).toBe(401);
   });
 
-  it("returns 401 with wrong token", async () => {
-    const res = await fetch(
-      `http://localhost:${process.env.PORT}/admin/connections`,
-      {
-        headers: { Authorization: "Bearer wrong-token" },
-      },
-    );
+  test("returns 401 with wrong token", async () => {
+    const res = await fetch(`http://localhost:${ctx.port}/admin/connections`, {
+      headers: { Authorization: "Bearer wrong-token" },
+    });
     expect(res.status).toBe(401);
   });
 
-  it("returns connections array with valid token", async () => {
-    const res = await fetch(
-      `http://localhost:${process.env.PORT}/admin/connections`,
-      {
-        headers: { Authorization: `Bearer ${process.env.ADMIN_TOKEN}` },
-      },
-    );
+  test("returns connections array with valid token", async () => {
+    const res = await fetch(`http://localhost:${ctx.port}/admin/connections`, {
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("connections");
@@ -514,30 +562,28 @@ Expected: FAIL (endpoint doesn't exist yet, returns 404).
 
 - [ ] **Step 3: Add admin connections route to relay server**
 
-In `relay/src/server.ts`, add before the 404 fallback in the `fetch` handler:
+In `relay/src/server.ts`, add before the 404 fallback in the `fetch` handler. The handler uses `req` (not `request`) and `connections` is a local variable in `createRelayServer` scope (not `runtime.connections`):
 
 ```typescript
-if (url.pathname === "/admin/connections" && request.method === "GET") {
+if (url.pathname === "/admin/connections" && req.method === "GET") {
   const adminToken = process.env.ADMIN_TOKEN;
   if (!adminToken) {
     return Response.json({ error: "admin not configured" }, { status: 503 });
   }
-  const auth = request.headers.get("authorization");
+  const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${adminToken}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const connections = [];
-  for (const [id, state] of runtime.connections.entries()) {
-    connections.push({
+  const result = [];
+  for (const [id, state] of connections.entries()) {
+    result.push({
       id,
       authedPubkeys: Array.from(state.authedPubkeys),
     });
   }
-  return Response.json({ connections });
+  return Response.json({ connections: result });
 }
 ```
-
-Note: `runtime.connections` is the `ConnectionManager` instance — verify the exact variable name by reading how `connections` is referenced in `server.ts`. The connections manager is passed to `createRelayServer` and stored on the runtime object.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -545,7 +591,7 @@ Note: `runtime.connections` is the `ConnectionManager` instance — verify the e
 cd relay && bun test test/admin.test.ts
 ```
 
-Expected: PASS. Adjust test setup if the relay needs to be started in the test harness (follow existing test patterns in `relay/test/`).
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -567,32 +613,52 @@ Reference: Existing `DELETE /{sha256}` uses `validateBlossomAuth()` (Nostr-auth)
 
 - [ ] **Step 1: Write the test**
 
-Create `blossom/test/admin.test.ts`:
+Create `blossom/test/admin.test.ts`. Follow the existing blossom test pattern: `startTestBlossom()` in `beforeEach`, `ctx.cleanup()` in `afterEach`. Set `ADMIN_TOKEN` env var in setup.
 
 ```typescript
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { startTestBlossom, type BlossomTestContext } from "./helpers";
+
+const ADMIN_TOKEN = "test-admin-token";
+let ctx: BlossomTestContext | undefined;
 
 describe("DELETE /admin/:sha256", () => {
-  it("returns 401 without admin token", async () => {
+  beforeEach(async () => {
+    process.env.ADMIN_TOKEN = ADMIN_TOKEN;
+    ctx = await startTestBlossom();
+  });
+
+  afterEach(async () => {
+    if (ctx) {
+      await ctx.cleanup();
+      ctx = undefined;
+    }
+    delete process.env.ADMIN_TOKEN;
+  });
+
+  test("returns 401 without admin token", async () => {
     const fakeSha = "a".repeat(64);
-    const res = await fetch(
-      `http://localhost:${process.env.PORT}/admin/${fakeSha}`,
-      {
-        method: "DELETE",
-      },
-    );
+    const res = await fetch(`${ctx!.baseUrl}/admin/${fakeSha}`, {
+      method: "DELETE",
+    });
     expect(res.status).toBe(401);
   });
 
-  it("returns 404 for non-existent blob", async () => {
+  test("returns 401 with wrong token", async () => {
     const fakeSha = "a".repeat(64);
-    const res = await fetch(
-      `http://localhost:${process.env.PORT}/admin/${fakeSha}`,
-      {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${process.env.ADMIN_TOKEN}` },
-      },
-    );
+    const res = await fetch(`${ctx!.baseUrl}/admin/${fakeSha}`, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer wrong-token" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 404 for non-existent blob", async () => {
+    const fakeSha = "a".repeat(64);
+    const res = await fetch(`${ctx!.baseUrl}/admin/${fakeSha}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
     expect(res.status).toBe(404);
   });
 });
@@ -765,6 +831,8 @@ export function findAsset(
 - [ ] **Step 4: Create relay-client.ts — relay admin API client**
 
 ```typescript
+// RELAY_URL must be an HTTP URL (e.g., http://comet-relay.internal:3000),
+// NOT the public WebSocket URL (wss://...). On Fly.io, use private networking.
 export async function getRelayConnections(): Promise<{
   connections: { id: string; authedPubkeys: string[] }[];
 }> {
@@ -979,7 +1047,7 @@ export const getStorageByUser = createServerFn({ method: "GET" }).handler(
         storage: sql<number>`coalesce(sum(${blobs.size}), 0)`,
       })
       .from(blobOwners)
-      .innerJoin(blobs, eq(blobOwners.sha256, blobs.sha256))
+      .leftJoin(blobs, eq(blobOwners.sha256, blobs.sha256))
       .groupBy(blobOwners.pubkey)
       .orderBy(desc(sql`sum(${blobs.size})`))
       .limit(8);
@@ -989,6 +1057,8 @@ export const getStorageByUser = createServerFn({ method: "GET" }).handler(
 ```
 
 Adapt exact SQL to match what comet-server does. The queries above are derived from the comet-server admin routes — verify column names and join conditions match the `@comet/data` schema.
+
+Note: The original monolith's `getStats()` returned a `connections` count from the in-memory ConnectionManager. Since connections now come from the relay's admin API, this server function returns a `users` count instead. The dashboard page (Task 8) should show a "Users" stat card instead of "Connections" — connection count is shown on the dedicated connections page via the relay API.
 
 - [ ] **Step 2: Commit**
 
@@ -1102,7 +1172,7 @@ export const deleteBlob = createServerFn({ method: "POST" })
 
 - [ ] **Step 4: Create invite codes server functions**
 
-Port `GET /api/invite-codes`, `POST /api/invite-codes`, `DELETE /api/invite-codes/:id`. Code generation: random 8-char lowercase alphanumeric string.
+Port `GET /api/invite-codes`, `POST /api/invite-codes`, `DELETE /api/invite-codes/:id`. Code generation: random 12-char lowercase alphanumeric string (matching the existing monolith pattern from `comet-server/src/access.ts`).
 
 - [ ] **Step 5: Create users server function**
 
@@ -1554,8 +1624,11 @@ git commit -m "Add SSR landing page with GitHub release downloads"
 ```
 DATABASE_URL=postgres://user:pass@localhost:5432/comet
 ADMIN_TOKEN=your-admin-token
+# RELAY_URL is the HTTP URL for server-to-server calls (NOT the public wss:// URL)
 RELAY_URL=http://localhost:3000
+# BLOSSOM_URL is the HTTP URL for server-to-server calls
 BLOSSOM_URL=http://localhost:3001
+# VITE_RELAY_URL is the public WebSocket URL used by the dashboard client
 VITE_RELAY_URL=wss://relay.example.com
 ```
 
