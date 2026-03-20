@@ -54,7 +54,7 @@ jobs:
           relay_deploy=false
           while IFS= read -r file; do
             case "$file" in
-              app/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json)
+              app/*|turbo.json)
                 app=true
                 ;;
             esac
