@@ -27,6 +27,17 @@ export class ConnectionManager {
     this.connections.delete(id);
   }
 
+  closeAll(code?: number, reason?: string): void {
+    for (const [id, conn] of this.connections) {
+      try {
+        conn.ws.close(code, reason);
+      } catch {
+        conn.ws.terminate();
+      }
+      this.connections.delete(id);
+    }
+  }
+
   send(id: string, msg: string): void {
     const conn = this.connections.get(id);
     if (conn) {

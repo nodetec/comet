@@ -154,7 +154,8 @@ export async function createRelayServer(
     relayUrl,
     port,
     stop: async () => {
-      await server.stop();
+      connections.closeAll(1001, "server shutdown");
+      await server.stop(true);
       await sql.end();
     },
   };
