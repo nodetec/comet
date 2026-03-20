@@ -11,23 +11,34 @@ Comet is a local-first notes app built with Tauri, React, TypeScript, and Rust.
 
 1. Install `just`: `brew install just` or `cargo install just`
 2. Install dependencies: `just install`
-3. Start the app: `just dev`
+3. Start the app: `just app-dev`
 
 ## Commands
 
-- `just dev`: run the app in development mode
-- `just build`: build the frontend workspace
-- `just bundle`: build the packaged Tauri app
-- `just lint`: run ESLint
-- `just lint-fix`: run ESLint with fixes
-- `just typecheck`: run TypeScript checks
-- `just test`: run frontend and Rust tests
-- `just test-backend`: run the Rust test suite
+Project-specific commands are prefixed by workspace so app and relay workflows stay separate.
+
+- `just app-dev`: run the app in development mode
+- `just app-build`: build the app frontend workspace
+- `just app-bundle`: build the packaged Tauri app
+- `just app-lint`: run app ESLint checks
+- `just app-lint-fix`: run app ESLint with fixes
+- `just app-typecheck`: run app TypeScript checks
+- `just app-test`: run frontend and Rust tests for the app
+- `just app-test-backend`: run the Rust test suite
+- `just app-test-frontend`: run the frontend test suite
+- `just app-check`: run the main app verification suite
+- `just relay-dev`: run the relay workspace in development
+- `just relay-deploy`: deploy the relay to Fly
+- `just relay-build`: build the relay workspace
+- `just relay-lint`: run relay ESLint checks
+- `just relay-lint-fix`: run relay ESLint with fixes
+- `just relay-test`: run the relay test suite
+- `just relay-typecheck`: run TypeScript checks for the relay workspace
+- `just relay-check`: run the relay verification suite
 - `just format`: format the repo
 - `just format-check`: check formatting
-- `just seed`: seed demo notebooks and notes
+- `just app-seed`: seed demo notebooks and notes
 - `just outdated-crates`: check for Rust dependency updates
-- `just check`: run the main verification suite
 
 The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
 
@@ -36,6 +47,7 @@ The seed script resets the local app database by default. To seed a throwaway da
 - [`app`](/Users/chris/Repos/project/comet/app): the Comet app workspace
 - [`app/src`](/Users/chris/Repos/project/comet/app/src): React frontend
 - [`app/src-tauri`](/Users/chris/Repos/project/comet/app/src-tauri): Tauri + Rust backend
+- [`relay`](/Users/chris/Repos/project/comet/relay): Bun-based Nostr relay workspace
 - [`packages`](/Users/chris/Repos/project/comet/packages): shared packages when needed
 
 ## Workspace
@@ -45,9 +57,11 @@ The seed script resets the local app database by default. To seed a throwaway da
 
 ## Testing Notes
 
-- `just test-frontend` runs the frontend test suite
-- `just test-backend` runs the Rust test suite
-- `just test` runs both
+- `just app-test-frontend` runs the frontend test suite
+- `just app-test-backend` runs the Rust test suite
+- `just app-test` runs both
+
+Relay development uses Bun. Install Bun if you plan to run commands under [`relay`](/Users/chris/Repos/project/comet/relay). The default app workflows such as `just app-build` and `just app-check` do not require Bun.
 
 ## Git hooks
 

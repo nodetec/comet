@@ -4,3 +4,4 @@ dist
 app/dist
 app/src-tauri/gen/schemas
 app/src-tauri/target
+relay/dist

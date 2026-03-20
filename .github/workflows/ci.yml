@@ -109,8 +109,57 @@ jobs:
       - name: Vite build
         run: pnpm build
 
+  relay:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: comet_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d comet_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/comet_test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck relay
+        run: pnpm relay:typecheck
+
+      - name: Build relay
+        run: pnpm relay:build
+
+      - name: Run relay tests
+        run: pnpm relay:test
+
   build:
-    needs: [format, lint, typecheck, test]
+    needs: [format, lint, typecheck, test, relay]
     strategy:
       fail-fast: false
       matrix:

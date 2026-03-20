@@ -1,0 +1,12 @@
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!app/package.json
+!relay/package.json
+!relay/src
+!relay/src/**
+!relay/drizzle
+!relay/drizzle/**
+!relay/Dockerfile
+!relay/.dockerignore

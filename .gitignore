@@ -3,6 +3,8 @@ node_modules/
 dist/
 app/dist/
 app/src-tauri/target/
+/.webpack/
+relay/dist/
 references/
 old/
 .agents/

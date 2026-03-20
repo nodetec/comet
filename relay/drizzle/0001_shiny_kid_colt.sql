@@ -1,0 +1,1 @@
+ALTER TABLE "allowed_pubkeys" ADD COLUMN "storage_limit_bytes" bigint;

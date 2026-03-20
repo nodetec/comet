@@ -1,0 +1,69 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1773729660882,
+      "tag": "0000_daffy_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773741279983,
+      "tag": "0001_shiny_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773743335397,
+      "tag": "0002_sudden_network",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773769591793,
+      "tag": "0003_cynical_strong_guy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773770076847,
+      "tag": "0004_left_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773770710597,
+      "tag": "0005_mixed_valeria_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773770931941,
+      "tag": "0006_jazzy_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773771367859,
+      "tag": "0007_clumsy_black_widow",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773773777935,
+      "tag": "0008_silky_korath",
+      "breakpoints": true
+    }
+  ]
+}

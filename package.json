@@ -9,10 +9,16 @@
     "bundle": "pnpm tauri build --bundles app",
     "prepare": "husky",
     "typecheck": "turbo run typecheck",
-    "build": "turbo run build",
+    "build": "turbo run build --filter=@comet/app",
     "lint": "turbo run lint",
     "lint:fix": "pnpm --filter @comet/app lint:fix",
-    "test": "turbo run test",
+    "test": "turbo run test --filter=@comet/app",
+    "relay:build": "pnpm --filter @comet/relay build",
+    "relay:dev": "pnpm --filter @comet/relay dev",
+    "relay:lint": "pnpm --filter @comet/relay lint",
+    "relay:lint:fix": "pnpm --filter @comet/relay lint:fix",
+    "relay:test": "pnpm --filter @comet/relay test",
+    "relay:typecheck": "pnpm --filter @comet/relay typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "turbo run preview --filter=@comet/app",
@@ -30,6 +36,10 @@
   "lint-staged": {
     "app/**/*.{ts,tsx}": [
       "pnpm --filter @comet/app exec eslint --fix",
+      "prettier --write"
+    ],
+    "relay/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/relay exec eslint --fix",
       "prettier --write"
     ],
     "**/*.{js,mjs,cjs,json,md,yml,yaml}": [
