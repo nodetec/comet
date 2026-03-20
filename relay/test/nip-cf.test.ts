@@ -4,7 +4,7 @@ import {
   getPublicKey,
   finalizeEvent,
 } from "nostr-tools/pure";
-import type { NostrEvent } from "../src/types";
+import type { ChangeReason, NostrEvent } from "../src/types";
 import { isValidChangesFilter } from "../src/relay/nip/cf";
 import {
   startTestRelay,
@@ -16,6 +16,22 @@ import {
 
 const sk = generateSecretKey();
 const pubkey = getPublicKey(sk);
+type RelayInfo = {
+  supported_nips: Array<number | string>;
+  changes_feed: {
+    min_seq: number;
+  };
+};
+type ChangesEventMessage = ["CHANGES", string, "EVENT", number, NostrEvent];
+type ChangesDeletedMessage = [
+  "CHANGES",
+  string,
+  "DELETED",
+  number,
+  string,
+  ChangeReason | null,
+];
+type ChangesEoseMessage = ["CHANGES", string, "EOSE", number];
 
 function sign(
   key: Uint8Array,
@@ -215,7 +231,7 @@ describe("relay integration - NIP-CF", () => {
     const res = await fetch(`http://localhost:${ctx.port}`, {
       headers: { Accept: "application/nostr+json" },
     });
-    const info = (await res.json()) as any;
+    const info = (await res.json()) as RelayInfo;
     expect(info.supported_nips).toContain("CF");
     expect(info.changes_feed).toBeDefined();
     expect(typeof info.changes_feed.min_seq).toBe("number");
@@ -234,14 +250,18 @@ describe("relay integration - NIP-CF", () => {
     ws.send(JSON.stringify(["CHANGES", "sync1", { since: 0, kinds: [1] }]));
     const msgs = await waitForMessages(ws, 3, 2000);
 
-    const events = msgs.filter((m) => m[0] === "CHANGES" && m[2] === "EVENT");
-    const eose = msgs.find((m) => m[0] === "CHANGES" && m[2] === "EOSE");
+    const events = msgs.filter(
+      (m): m is ChangesEventMessage => m[0] === "CHANGES" && m[2] === "EVENT",
+    );
+    const eose = msgs.find(
+      (m): m is ChangesEoseMessage => m[0] === "CHANGES" && m[2] === "EOSE",
+    );
     expect(events.length).toBeGreaterThanOrEqual(2);
     expect(eose).toBeDefined();
 
     for (const evt of events) {
       expect(typeof evt[3]).toBe("number");
-      expect(evt[4] as any).toHaveProperty("id");
+      expect(evt[4]).toHaveProperty("id");
     }
 
     const seqs = events.map((e) => e[3] as number);
@@ -276,13 +296,14 @@ describe("relay integration - NIP-CF", () => {
     const msgs = await waitForMessages(ws, 5, 2000);
 
     const deleted = msgs.filter(
-      (m) => m[0] === "CHANGES" && m[2] === "DELETED",
+      (m): m is ChangesDeletedMessage =>
+        m[0] === "CHANGES" && m[2] === "DELETED",
     );
     expect(deleted.length).toBeGreaterThanOrEqual(1);
 
     const delEntry = deleted.find((m) => m[4] === note.id);
     expect(delEntry).toBeDefined();
-    expect((delEntry![5] as any).deletion_id).toBe(del.id);
+    expect(delEntry![5]?.deletion_id).toBe(del.id);
 
     ws.close();
   });
@@ -308,10 +329,10 @@ describe("relay integration - NIP-CF", () => {
     );
     const batch2 = await waitForMessages(ws, 2, 2000);
     const events2 = batch2.filter(
-      (m) => m[0] === "CHANGES" && m[2] === "EVENT",
+      (m): m is ChangesEventMessage => m[0] === "CHANGES" && m[2] === "EVENT",
     );
     expect(events2).toHaveLength(1);
-    expect((events2[0][4] as any).id).toBe(e2.id);
+    expect(events2[0][4].id).toBe(e2.id);
 
     ws.close();
   });
@@ -341,7 +362,7 @@ describe("relay integration - NIP-CF", () => {
     expect(liveMsg[1]).toBe("live1");
     expect(liveMsg[2]).toBe("EVENT");
     expect(typeof liveMsg[3]).toBe("number");
-    expect((liveMsg[4] as any).id).toBe(event.id);
+    expect((liveMsg[4] as NostrEvent).id).toBe(event.id);
 
     ws.close();
     ws2.close();

@@ -10,6 +10,8 @@ import {
 } from "./helpers";
 
 let ctx: TestContext;
+type EventMessage = ["EVENT", string, NostrEvent];
+type EoseMessage = ["EOSE", string];
 
 function createSignedEvent(
   sk: Uint8Array,
@@ -61,8 +63,8 @@ describe("relay integration", () => {
     ws.send(JSON.stringify(["REQ", "sub1", { kinds: [1] }]));
     const msgs = await waitForMessages(ws, 2);
 
-    const eventMsg = msgs.find((m: any) => m[0] === "EVENT") as unknown[];
-    const eoseMsg = msgs.find((m: any) => m[0] === "EOSE") as unknown[];
+    const eventMsg = msgs.find((m): m is EventMessage => m[0] === "EVENT");
+    const eoseMsg = msgs.find((m): m is EoseMessage => m[0] === "EOSE");
     expect(eventMsg).toBeDefined();
     expect(eventMsg![2]).toHaveProperty("id", event.id);
     expect(eoseMsg).toBeDefined();
@@ -89,7 +91,7 @@ describe("relay integration", () => {
     const liveMsg = (await livePromise) as unknown[];
     expect(liveMsg[0]).toBe("EVENT");
     expect(liveMsg[1]).toBe("live");
-    expect((liveMsg[2] as any).content).toBe("live event");
+    expect((liveMsg[2] as NostrEvent).content).toBe("live event");
 
     ws.close();
     ws2.close();
@@ -110,9 +112,7 @@ describe("relay integration", () => {
     await waitForMessage(ws2);
 
     const msgs = await waitForMessages(ws, 1, 500);
-    const tempMsgs = (msgs as any[]).filter(
-      (m) => m[0] === "EVENT" && m[1] === "temp",
-    );
+    const tempMsgs = msgs.filter((m) => m[0] === "EVENT" && m[1] === "temp");
     expect(tempMsgs.length).toBe(0);
 
     ws.close();

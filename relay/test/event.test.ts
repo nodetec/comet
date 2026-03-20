@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { generateSecretKey, finalizeEvent } from "nostr-tools/pure";
+import type { NostrEvent } from "../src/types";
 import {
   validateEventStructure,
   validateAndVerifyEvent,
@@ -21,6 +22,10 @@ function createSignedEvent(
   );
 }
 
+function setEventField(event: NostrEvent, key: string, value: unknown): void {
+  (event as Record<string, unknown>)[key] = value;
+}
+
 describe("validateEventStructure", () => {
   test("accepts a valid event", () => {
     const event = createSignedEvent();
@@ -34,31 +39,31 @@ describe("validateEventStructure", () => {
 
   test("rejects bad id", () => {
     const event = createSignedEvent();
-    (event as any).id = "short";
+    setEventField(event, "id", "short");
     expect(validateEventStructure(event).valid).toBe(false);
   });
 
   test("rejects bad pubkey", () => {
     const event = createSignedEvent();
-    (event as any).pubkey = "xyz";
+    setEventField(event, "pubkey", "xyz");
     expect(validateEventStructure(event).valid).toBe(false);
   });
 
   test("rejects bad sig", () => {
     const event = createSignedEvent();
-    (event as any).sig = "bad";
+    setEventField(event, "sig", "bad");
     expect(validateEventStructure(event).valid).toBe(false);
   });
 
   test("rejects non-integer kind", () => {
     const event = createSignedEvent();
-    (event as any).kind = 1.5;
+    setEventField(event, "kind", 1.5);
     expect(validateEventStructure(event).valid).toBe(false);
   });
 
   test("rejects tags with non-string elements", () => {
     const event = createSignedEvent();
-    (event as any).tags = [[1, 2]];
+    setEventField(event, "tags", [[1, 2]]);
     expect(validateEventStructure(event).valid).toBe(false);
   });
 });
@@ -72,14 +77,14 @@ describe("validateAndVerifyEvent", () => {
 
   test("rejects tampered content", () => {
     const event = createSignedEvent({ content: "original" });
-    (event as any).content = "tampered";
+    setEventField(event, "content", "tampered");
     const result = validateAndVerifyEvent(event);
     expect(result.ok).toBe(false);
   });
 
   test("rejects bad signature", () => {
     const event = createSignedEvent();
-    (event as any).sig = "a".repeat(128);
+    setEventField(event, "sig", "a".repeat(128));
     const result = validateAndVerifyEvent(event);
     expect(result.ok).toBe(false);
   });
