@@ -82,7 +82,7 @@ type EventRow = {
   sig: string;
 };
 type ChangeRow = {
-  seq: number;
+  seq: number | string;
   event_id: string;
   type: "STORED" | "DELETED";
   kind: number;
@@ -104,6 +104,10 @@ function parseChangeReason(
   return typeof value === "string"
     ? (JSON.parse(value) as ChangeEntry["reason"])
     : value;
+}
+
+function parseSeq(value: number | string): number {
+  return typeof value === "number" ? value : Number.parseInt(value, 10);
 }
 
 function toUnsafeQueryParams(params: QueryParam[]): UnsafeQueryParam[] {
@@ -749,7 +753,7 @@ export function initStorage(db: DB): Storage {
     );
 
     return rows.map((row) => ({
-      seq: row.seq,
+      seq: parseSeq(row.seq),
       eventId: row.event_id,
       type: row.type,
       kind: row.kind,
