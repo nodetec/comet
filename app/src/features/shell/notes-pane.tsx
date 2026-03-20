@@ -12,7 +12,6 @@ import { LayoutGroup, motion } from "framer-motion";
 import {
   Fragment,
   useCallback,
-  useDeferredValue,
   memo,
   useEffect,
   useMemo,
@@ -218,11 +217,8 @@ export function NotesPane({
   const [isSearchOpen, setIsSearchOpen] = useState(
     () => searchQuery.length > 0,
   );
-  const [draftSearchQuery, setDraftSearchQuery] = useState(searchQuery);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [slideInNoteId, setSlideInNoteId] = useState<string | null>(null);
-  const deferredSearchQuery = useDeferredValue(draftSearchQuery);
-  const lastAppliedSearchRef = useRef(searchQuery);
 
   // When creatingNoteId changes to a new value, mark it for slide-in
   useEffect(() => {
@@ -260,32 +256,10 @@ export function NotesPane({
 
   const applySearchQuery = useCallback(
     (nextQuery: string) => {
-      lastAppliedSearchRef.current = nextQuery;
-      setDraftSearchQuery(nextQuery);
       onChangeSearch(nextQuery);
     },
     [onChangeSearch],
   );
-
-  useEffect(() => {
-    if (searchQuery !== lastAppliedSearchRef.current) {
-      lastAppliedSearchRef.current = searchQuery;
-      setDraftSearchQuery(searchQuery);
-    }
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (deferredSearchQuery !== draftSearchQuery) {
-      return;
-    }
-
-    if (deferredSearchQuery === lastAppliedSearchRef.current) {
-      return;
-    }
-
-    lastAppliedSearchRef.current = deferredSearchQuery;
-    onChangeSearch(deferredSearchQuery);
-  }, [deferredSearchQuery, draftSearchQuery, onChangeSearch]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -433,13 +407,11 @@ export function NotesPane({
               <input
                 className="border-input/60 placeholder:text-muted-foreground focus:border-primary h-8 w-full rounded-md border bg-transparent py-1 pr-8 pl-9 text-sm outline-none"
                 onBlur={() => setIsSearchFocused(false)}
-                onChange={(event) =>
-                  setDraftSearchQuery(event.currentTarget.value)
-                }
+                onChange={(event) => onChangeSearch(event.currentTarget.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
-                    if (draftSearchQuery) {
+                    if (searchQuery) {
                       applySearchQuery("");
                     }
 
@@ -448,7 +420,7 @@ export function NotesPane({
                 }}
                 placeholder="Search…"
                 ref={searchInputRef}
-                value={draftSearchQuery}
+                value={searchQuery}
               />
               <Button
                 className="text-muted-foreground hover:bg-accent hover:text-accent-foreground absolute top-1/2 right-1 z-10 -translate-y-1/2"

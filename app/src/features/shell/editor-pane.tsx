@@ -33,6 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { resolveActiveEditorSearch } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { type NotebookRef, type NotebookSummary } from "./types";
 
@@ -112,7 +113,6 @@ export function EditorPane({
   const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
-  const focusedPane = useShellStore((s) => s.focusedPane);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
@@ -121,17 +121,16 @@ export function EditorPane({
   const [findQuery, setFindQuery] = useState("");
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
   const [findScrollRevision, setFindScrollRevision] = useState(0);
-  const [hidePanelSearchInEditor, setHidePanelSearchInEditor] = useState(false);
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const noteTitle = firstLineH1Title(markdown);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
-  const editorSearchQuery = hasEditorFindQuery
-    ? findQuery
-    : findOpen
-      ? searchQuery
-      : hidePanelSearchInEditor
-        ? ""
-        : searchQuery;
+
+  const activeEditorSearch = resolveActiveEditorSearch({
+    editorQuery: hasEditorFindQuery ? findQuery : "",
+    noteQuery: searchQuery,
+  });
+  const editorSearchQuery = activeEditorSearch.query;
+  const isUsingEditorFindSearch = activeEditorSearch.source === "editor";
   const updateHeaderState = useCallback(
     (scrollContainer: HTMLDivElement | null) => {
       const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
@@ -164,24 +163,14 @@ export function EditorPane({
   }, [noteId, updateHeaderState]);
 
   useEffect(() => {
-    setHidePanelSearchInEditor(false);
-  }, [noteId]);
-
-  useEffect(() => {
-    if (focusedPane !== "editor") {
-      setHidePanelSearchInEditor(false);
-    }
-  }, [focusedPane]);
-
-  useEffect(() => {
     setActiveFindMatchIndex(0);
   }, [findQuery, noteId]);
 
   useEffect(() => {
-    if (!hasEditorFindQuery) {
+    if (!isUsingEditorFindSearch) {
       setFindMatchCount(0);
     }
-  }, [hasEditorFindQuery]);
+  }, [isUsingEditorFindSearch]);
 
   useEffect(() => {
     if (findMatchCount === 0) {
@@ -201,7 +190,6 @@ export function EditorPane({
       setFindMatchCount(0);
       setFindQuery("");
       setActiveFindMatchIndex(0);
-      setHidePanelSearchInEditor(true);
       if (!focusEditor) {
         return;
       }
@@ -239,7 +227,6 @@ export function EditorPane({
       if ((event.metaKey || event.ctrlKey) && event.key === "f") {
         event.preventDefault();
         setFocusedPane("editor");
-        setHidePanelSearchInEditor(true);
         setFindOpen(true);
         requestAnimationFrame(() => {
           findInputRef.current?.focus();
@@ -325,8 +312,6 @@ export function EditorPane({
     if (isReadOnly) {
       return;
     }
-
-    setHidePanelSearchInEditor(true);
 
     const target = event.target as HTMLElement;
 
@@ -532,21 +517,22 @@ export function EditorPane({
                 onEditorFocusChange={(focused) => {
                   if (focused) {
                     setFocusedPane("editor");
-                    setHidePanelSearchInEditor(true);
                   }
                 }}
                 onFocusHandled={onFocusHandled}
                 onSearchMatchCountChange={
-                  hasEditorFindQuery ? setFindMatchCount : undefined
+                  isUsingEditorFindSearch ? setFindMatchCount : undefined
                 }
                 readOnly={isReadOnly}
                 ref={editorRef}
-                searchHighlightAllMatchesYellow={!hasEditorFindQuery}
+                searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
                 searchActiveMatchIndex={
-                  hasEditorFindQuery ? activeFindMatchIndex : null
+                  isUsingEditorFindSearch ? activeFindMatchIndex : null
                 }
                 searchQuery={editorSearchQuery}
-                searchScrollRevision={findScrollRevision}
+                searchScrollRevision={
+                  isUsingEditorFindSearch ? findScrollRevision : undefined
+                }
                 toolbarContainer={toolbarContainer}
               />
             </div>
