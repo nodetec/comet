@@ -220,6 +220,27 @@ export async function createBlossomServer(
         });
       }
 
+      // Admin blob deletion — ADMIN_TOKEN auth (no Nostr signing required)
+      const adminBlobMatch = url.pathname.match(/^\/admin\/([a-f0-9]{64})$/);
+      if (request.method === "DELETE" && adminBlobMatch) {
+        const adminToken = process.env.ADMIN_TOKEN;
+        if (!adminToken) {
+          return json({ error: "admin not configured" }, 503);
+        }
+        const auth = request.headers.get("authorization");
+        if (auth !== `Bearer ${adminToken}`) {
+          return json({ error: "unauthorized" }, 401);
+        }
+        const sha256 = adminBlobMatch[1];
+        const blob = await blobDb.getBlob(db, sha256);
+        if (!blob) {
+          return json({ error: "not found" }, 404);
+        }
+        await objectStorage.deleteBlob(sha256);
+        await blobDb.deleteBlob(db, sha256);
+        return json({ deleted: true });
+      }
+
       if (request.method === "DELETE" && blobSha256) {
         const auth = validateBlossomAuth(
           request.headers.get("authorization") ?? undefined,
