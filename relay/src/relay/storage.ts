@@ -24,7 +24,7 @@ import { KIND_GIFT_WRAP, canDeleteGiftWrap, isGiftWrap } from "./nip/59";
 function buildPrefixCondition(
   column: string,
   values: string[],
-  params: (string | number | string[])[],
+  params: QueryParam[],
   paramIdx: number,
 ): { sql: string; nextIdx: number } {
   const exact: string[] = [];
@@ -70,6 +70,45 @@ export interface Storage {
 }
 
 type SingleLetterTag = [string, string];
+type QueryParam = string | number | string[] | number[];
+type UnsafeQueryParam = string | number | string[];
+type EventRow = {
+  id: string;
+  pubkey: string;
+  created_at: number;
+  kind: number;
+  tags: string[][] | string;
+  content: string;
+  sig: string;
+};
+type ChangeRow = {
+  seq: number;
+  event_id: string;
+  type: "STORED" | "DELETED";
+  kind: number;
+  pubkey: string;
+  reason: string | ChangeEntry["reason"] | null;
+};
+
+function parseEventTags(value: string[][] | string): string[][] {
+  return typeof value === "string" ? (JSON.parse(value) as string[][]) : value;
+}
+
+function parseChangeReason(
+  value: string | ChangeEntry["reason"] | null,
+): ChangeEntry["reason"] {
+  if (value == null) {
+    return null;
+  }
+
+  return typeof value === "string"
+    ? (JSON.parse(value) as ChangeEntry["reason"])
+    : value;
+}
+
+function toUnsafeQueryParams(params: QueryParam[]): UnsafeQueryParam[] {
+  return params as unknown as UnsafeQueryParam[];
+}
 
 function extractSingleLetterTags(tags: string[][]): SingleLetterTag[] {
   return tags
@@ -214,7 +253,7 @@ export function initStorage(db: DB): Storage {
     // NIP-09: for addressable events, check if the coordinate has been deleted
     if (category === "addressable") {
       const dTag = event.tags.find(([t]) => t === "d")?.[1] ?? "";
-      const [deletedCoord] = await db
+      const deletedCoordRows = await db
         .select({ deletedUpTo: deletedCoords.deletedUpTo })
         .from(deletedCoords)
         .where(
@@ -224,7 +263,10 @@ export function initStorage(db: DB): Storage {
             eq(deletedCoords.dTag, dTag),
           ),
         );
-      if (deletedCoord && event.created_at <= deletedCoord.deletedUpTo) {
+      if (
+        deletedCoordRows.length > 0 &&
+        event.created_at <= deletedCoordRows[0].deletedUpTo
+      ) {
         return {
           saved: false,
           reason: "deleted: this addressable event has been deleted",
@@ -234,7 +276,7 @@ export function initStorage(db: DB): Storage {
     }
 
     if (category === "replaceable") {
-      const [existing] = await db
+      const existingRows = await db
         .select({ createdAt: events.createdAt })
         .from(events)
         .where(
@@ -243,7 +285,10 @@ export function initStorage(db: DB): Storage {
         .orderBy(desc(events.createdAt))
         .limit(1);
 
-      if (existing && existing.createdAt >= event.created_at) {
+      if (
+        existingRows.length > 0 &&
+        existingRows[0].createdAt >= event.created_at
+      ) {
         return {
           saved: false,
           reason: "duplicate: a newer replaceable event exists",
@@ -280,7 +325,7 @@ export function initStorage(db: DB): Storage {
           );
         await insertEventWithTags(tx as unknown as DB, event);
         for (const old of oldEvents) {
-          const oldTags = extractSingleLetterTags(old.tags as string[][]);
+          const oldTags = extractSingleLetterTags(old.tags);
           allChanges.push(
             await recordChange(
               tx as unknown as DB,
@@ -311,7 +356,7 @@ export function initStorage(db: DB): Storage {
     if (category === "addressable") {
       const dTag = event.tags.find(([t]) => t === "d")?.[1] ?? "";
 
-      const [existing] = await db
+      const existingRows = await db
         .select({ createdAt: events.createdAt })
         .from(events)
         .where(
@@ -324,7 +369,10 @@ export function initStorage(db: DB): Storage {
         .orderBy(desc(events.createdAt))
         .limit(1);
 
-      if (existing && existing.createdAt >= event.created_at) {
+      if (
+        existingRows.length > 0 &&
+        existingRows[0].createdAt >= event.created_at
+      ) {
         return {
           saved: false,
           reason: "duplicate: a newer addressable event exists",
@@ -356,7 +404,7 @@ export function initStorage(db: DB): Storage {
         }
         await insertEventWithTags(tx as unknown as DB, event);
         for (const old of oldEvents) {
-          const oldTags = extractSingleLetterTags(old.tags as string[][]);
+          const oldTags = extractSingleLetterTags(old.tags);
           allChanges.push(
             await recordChange(
               tx as unknown as DB,
@@ -385,11 +433,11 @@ export function initStorage(db: DB): Storage {
     }
 
     // Regular event
-    const [existing] = await db
+    const existingRows = await db
       .select({ id: events.id })
       .from(events)
       .where(eq(events.id, event.id));
-    if (existing) {
+    if (existingRows.length > 0) {
       return {
         saved: false,
         reason: "duplicate: event already exists",
@@ -427,7 +475,7 @@ export function initStorage(db: DB): Storage {
 
     for (const filter of filters) {
       const conditions: string[] = ["TRUE"];
-      const params: (string | number | string[])[] = [];
+      const params: QueryParam[] = [];
       let paramIdx = 1;
 
       if (filter.ids && filter.ids.length > 0) {
@@ -447,7 +495,7 @@ export function initStorage(db: DB): Storage {
       }
       if (filter.kinds && filter.kinds.length > 0) {
         conditions.push(`e.kind = ANY($${paramIdx})`);
-        params.push(filter.kinds as any);
+        params.push(filter.kinds);
         paramIdx++;
       }
       if (filter.since != null) {
@@ -478,21 +526,19 @@ export function initStorage(db: DB): Storage {
       const limitClause =
         filter.limit != null ? `LIMIT ${Math.max(0, filter.limit)}` : "";
 
-      const rows = await rawSql.unsafe(
+      const rows = await rawSql.unsafe<EventRow[]>(
         `SELECT e.id, e.pubkey, e.created_at, e.kind, e.tags, e.content, e.sig FROM events e WHERE ${where} ORDER BY e.created_at DESC ${limitClause}`,
-        params,
+        toUnsafeQueryParams(params),
       );
 
       for (const row of rows) {
         if (!results.has(row.id)) {
-          const tags =
-            typeof row.tags === "string" ? JSON.parse(row.tags) : row.tags;
           results.set(row.id, {
             id: row.id,
             pubkey: row.pubkey,
-            created_at: Number(row.created_at),
+            created_at: row.created_at,
             kind: row.kind,
-            tags,
+            tags: parseEventTags(row.tags),
             content: row.content,
             sig: row.sig,
           });
@@ -507,8 +553,11 @@ export function initStorage(db: DB): Storage {
   }
 
   async function deleteEvent(id: string): Promise<boolean> {
-    const result = await db.delete(events).where(eq(events.id, id));
-    return (result as any).count > 0;
+    const result = await db
+      .delete(events)
+      .where(eq(events.id, id))
+      .returning({ id: events.id });
+    return result.length > 0;
   }
 
   async function processDeletionRequest(
@@ -522,7 +571,7 @@ export function initStorage(db: DB): Storage {
     await db.transaction(async (tx) => {
       const targetIds = getDeletionTargetIds(event);
       for (const targetId of targetIds) {
-        const [targetEvent] = await tx
+        const targetEventRows = await tx
           .select({
             pubkey: events.pubkey,
             kind: events.kind,
@@ -530,12 +579,14 @@ export function initStorage(db: DB): Storage {
           })
           .from(events)
           .where(eq(events.id, targetId));
+        const targetEvent =
+          targetEventRows.length > 0 ? targetEventRows[0] : null;
 
         let authorized = false;
-        if (targetEvent) {
+        if (targetEvent !== null) {
           if (targetEvent.kind === KIND_GIFT_WRAP) {
             authorized = canDeleteGiftWrap(
-              { ...targetEvent, tags: targetEvent.tags as string[][] } as any,
+              { tags: targetEvent.tags },
               event.pubkey,
             );
           } else {
@@ -543,10 +594,8 @@ export function initStorage(db: DB): Storage {
           }
         }
 
-        if (targetEvent && authorized) {
-          const targetTags = extractSingleLetterTags(
-            targetEvent.tags as string[][],
-          );
+        if (targetEvent !== null && authorized) {
+          const targetTags = extractSingleLetterTags(targetEvent.tags);
           await tx.delete(events).where(eq(events.id, targetId));
           deleted++;
           allChanges.push(
@@ -595,7 +644,7 @@ export function initStorage(db: DB): Storage {
 
         for (const a of affected) {
           await tx.delete(events).where(eq(events.id, a.id));
-          const aTags = extractSingleLetterTags(a.tags as string[][]);
+          const aTags = extractSingleLetterTags(a.tags);
           allChanges.push(
             await recordChange(
               tx as unknown as DB,
@@ -625,18 +674,18 @@ export function initStorage(db: DB): Storage {
   }
 
   async function isEventDeleted(id: string): Promise<boolean> {
-    const [row] = await db
+    const rows = await db
       .select({ eventId: deletedEvents.eventId })
       .from(deletedEvents)
       .where(eq(deletedEvents.eventId, id));
-    return row != null;
+    return rows.length > 0;
   }
 
   async function queryChanges(filter: ChangesFilter): Promise<ChangeEntry[]> {
     // Dynamic query — same pattern as queryEvents
     const rawSql = db.$client;
     const conditions: string[] = ["TRUE"];
-    const params: (string | number | string[])[] = [];
+    const params: QueryParam[] = [];
     let paramIdx = 1;
 
     const since = filter.since ?? 0;
@@ -651,7 +700,7 @@ export function initStorage(db: DB): Storage {
     }
     if (filter.kinds && filter.kinds.length > 0) {
       conditions.push(`c.kind = ANY($${paramIdx})`);
-      params.push(filter.kinds as any);
+      params.push(filter.kinds);
       paramIdx++;
     }
     if (filter.authors && filter.authors.length > 0) {
@@ -682,33 +731,29 @@ export function initStorage(db: DB): Storage {
     const limitClause =
       filter.limit != null ? `LIMIT ${Math.max(0, filter.limit)}` : "";
 
-    const rows = await rawSql.unsafe(
+    const rows = await rawSql.unsafe<ChangeRow[]>(
       `SELECT c.seq, c.event_id, c.type, c.kind, c.pubkey, c.reason FROM changes c WHERE ${where} ORDER BY c.seq ASC ${limitClause}`,
-      params,
+      toUnsafeQueryParams(params),
     );
 
-    return rows.map((row: any) => ({
-      seq: Number(row.seq),
+    return rows.map((row) => ({
+      seq: row.seq,
       eventId: row.event_id,
-      type: row.type as "STORED" | "DELETED",
+      type: row.type,
       kind: row.kind,
       pubkey: row.pubkey,
-      reason: row.reason
-        ? typeof row.reason === "string"
-          ? JSON.parse(row.reason)
-          : row.reason
-        : null,
+      reason: parseChangeReason(row.reason),
     }));
   }
 
   async function getMaxSeq(): Promise<number> {
-    const [row] = await db.select({ val: max(changes.seq) }).from(changes);
-    return row?.val ?? 0;
+    const rows = await db.select({ val: max(changes.seq) }).from(changes);
+    return rows.length > 0 ? (rows[0].val ?? 0) : 0;
   }
 
   async function getMinSeq(): Promise<number> {
-    const [row] = await db.select({ val: min(changes.seq) }).from(changes);
-    return row?.val ?? 0;
+    const rows = await db.select({ val: min(changes.seq) }).from(changes);
+    return rows.length > 0 ? (rows[0].val ?? 0) : 0;
   }
 
   async function getEventCount(): Promise<number> {

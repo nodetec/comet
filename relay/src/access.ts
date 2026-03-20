@@ -77,9 +77,12 @@ export async function initAccessControl(
   }
 
   async function revoke(pubkey: string): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.pubkey, pubkey));
+    const result = await db
+      .delete(users)
+      .where(eq(users.pubkey, pubkey))
+      .returning({ pubkey: users.pubkey });
     allowedSet.delete(pubkey);
-    return (result as any).count > 0;
+    return result.length > 0;
   }
 
   async function list(): Promise<
@@ -119,11 +122,11 @@ export async function initAccessControl(
     code: string,
   ): Promise<{ ok: boolean; error?: string }> {
     // Check if pubkey already registered
-    const [existing] = await db
+    const existingRows = await db
       .select({ pubkey: users.pubkey })
       .from(users)
       .where(eq(users.pubkey, pubkey));
-    if (existing) {
+    if (existingRows.length > 0) {
       return { ok: false, error: "pubkey already registered" };
     }
 
@@ -131,7 +134,7 @@ export async function initAccessControl(
     const result = await db.transaction(async (tx) => {
       // Conditionally increment use_count only if the code is still valid
       const now = Math.floor(Date.now() / 1000);
-      const [updated] = await tx
+      const updatedRows = await tx
         .update(inviteCodes)
         .set({ useCount: sql`${inviteCodes.useCount} + 1` })
         .where(
@@ -144,10 +147,11 @@ export async function initAccessControl(
         )
         .returning({ id: inviteCodes.id });
 
-      if (!updated) {
+      if (updatedRows.length === 0) {
         return { ok: false as const, error: "invalid or expired invite code" };
       }
 
+      const [updated] = updatedRows;
       await tx.insert(users).values({ pubkey, inviteCodeId: updated.id });
       return { ok: true as const, id: updated.id };
     });

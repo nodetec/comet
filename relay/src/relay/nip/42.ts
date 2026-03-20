@@ -95,7 +95,7 @@ export function isAuthorizedForFilter(
 
   // All p-tag values must be authed pubkeys
   for (const p of pValues) {
-    if (!authedPubkeys.has(p as string)) {
+    if (!authedPubkeys.has(p)) {
       return {
         authorized: false,
         reason: "restricted: can only query gift wraps addressed to you",
@@ -133,7 +133,7 @@ export function isAuthorizedForChangesFilter(
   }
 
   for (const p of pValues) {
-    if (!authedPubkeys.has(p as string)) {
+    if (!authedPubkeys.has(p)) {
       return {
         authorized: false,
         reason: "restricted: can only query gift wraps addressed to you",

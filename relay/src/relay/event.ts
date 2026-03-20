@@ -1,6 +1,10 @@
 import { verifyEvent, validateEvent, getEventHash } from "nostr-tools/pure";
 import type { NostrEvent } from "../types";
 
+type HashableEvent = Parameters<typeof getEventHash>[0];
+type VerifiableEvent = Parameters<typeof verifyEvent>[0];
+type MutableEvent = NostrEvent & Record<PropertyKey, unknown>;
+
 export type KindCategory =
   | "regular"
   | "replaceable"
@@ -85,17 +89,18 @@ export function validateAndVerifyEvent(event: unknown): {
   }
 
   // Verify ID matches the serialized event hash
-  const expectedId = getEventHash(e as any);
+  const expectedId = getEventHash(e as HashableEvent);
   if (expectedId !== e.id) {
     return { ok: false, reason: "invalid: event id does not match hash" };
   }
 
   // Clear any cached verification so we always verify the signature fresh
-  for (const sym of Object.getOwnPropertySymbols(e)) {
-    (e as any)[sym] = undefined;
+  const mutableEvent = e as MutableEvent;
+  for (const sym of Object.getOwnPropertySymbols(mutableEvent)) {
+    mutableEvent[sym] = undefined;
   }
 
-  if (!verifyEvent(e as any)) {
+  if (!verifyEvent(e as VerifiableEvent)) {
     return {
       ok: false,
       reason: "invalid: event signature verification failed",

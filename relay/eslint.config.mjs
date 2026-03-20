@@ -22,9 +22,12 @@ function scopeConfigs(configs) {
 export default [
   {
     ignores: ["dist/**", "node_modules/**", "drizzle/**"],
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
   },
   scopeConfig(js.configs.recommended),
-  ...scopeConfigs(tseslint.configs.recommended),
+  ...scopeConfigs(tseslint.configs.recommendedTypeChecked),
   {
     files,
     languageOptions: {
@@ -43,6 +46,14 @@ export default [
     },
     rules: {
       "no-undef": "off",
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          prefer: "type-imports",
+          fixStyle: "separate-type-imports",
+        },
+      ],
+      "@typescript-eslint/consistent-type-exports": "error",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-floating-promises": [
         "error",
@@ -51,6 +62,8 @@ export default [
           ignoreIIFE: true,
         },
       ],
+      "@typescript-eslint/no-base-to-string": "error",
+      "@typescript-eslint/only-throw-error": "error",
       "@typescript-eslint/no-misused-promises": [
         "error",
         {
@@ -65,6 +78,23 @@ export default [
           varsIgnorePattern: "^_",
         },
       ],
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
+    },
+  },
+  {
+    files: ["test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/prefer-promise-reject-errors": "off",
+    },
+  },
+  {
+    files: ["src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unnecessary-condition": "error",
     },
   },
 ];

@@ -63,14 +63,9 @@ async function waitForShutdown(
   promise: Promise<void>,
   timeoutMs: number,
 ): Promise<void> {
-  let timedOut = false;
-  await Promise.race([
-    promise.finally(() => {
-      timedOut = false;
-    }),
-    Bun.sleep(timeoutMs).then(() => {
-      timedOut = true;
-    }),
+  const timedOut = await Promise.race([
+    promise.then(() => false),
+    Bun.sleep(timeoutMs).then(() => true),
   ]);
 
   if (timedOut) {

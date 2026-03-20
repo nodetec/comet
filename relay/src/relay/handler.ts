@@ -34,6 +34,8 @@ export type RelayDeps = {
   access: AccessControl;
 };
 
+type MessageType = "EVENT" | "AUTH" | "REQ" | "CHANGES" | "CLOSE";
+
 const textDecoder = new TextDecoder();
 
 function decodeMessage(raw: string | ArrayBuffer | Uint8Array): string {
@@ -48,6 +50,25 @@ function decodeMessage(raw: string | ArrayBuffer | Uint8Array): string {
 
 function send(connId: string, connections: ConnectionManager, msg: unknown) {
   connections.sendJSON(connId, msg);
+}
+
+function getEventId(event: unknown): string {
+  if (!event || typeof event !== "object") {
+    return "";
+  }
+
+  const { id } = event as { id?: unknown };
+  return typeof id === "string" ? id : "";
+}
+
+function isMessageType(value: unknown): value is MessageType {
+  return (
+    value === "EVENT" ||
+    value === "AUTH" ||
+    value === "REQ" ||
+    value === "CHANGES" ||
+    value === "CLOSE"
+  );
 }
 
 /** In private mode, require authentication for all operations. */
@@ -109,29 +130,33 @@ export async function handleMessage(
     return;
   }
 
-  const type = msg[0];
+  const message = msg as unknown[];
+  const type = message[0];
+
+  if (!isMessageType(type)) {
+    send(connId, deps.connections, [
+      "NOTICE",
+      `error: unknown message type: ${String(type)}`,
+    ]);
+    return;
+  }
 
   switch (type) {
     case "EVENT":
-      await handleEvent(connId, msg[1], deps);
+      await handleEvent(connId, message[1], deps);
       break;
     case "AUTH":
-      handleAuth(connId, msg[1], deps);
+      handleAuth(connId, message[1], deps);
       break;
     case "REQ":
-      await handleReq(connId, msg as [string, string, ...unknown[]], deps);
+      await handleReq(connId, message as [string, string, ...unknown[]], deps);
       break;
     case "CHANGES":
-      await handleChanges(connId, msg, deps);
+      await handleChanges(connId, message, deps);
       break;
     case "CLOSE":
-      handleClose(connId, msg[1], deps);
+      handleClose(connId, message[1], deps);
       break;
-    default:
-      send(connId, deps.connections, [
-        "NOTICE",
-        `error: unknown message type: ${type}`,
-      ]);
   }
 }
 
@@ -145,14 +170,14 @@ async function handleEvent(
   // Private mode: require auth for writes
   const privateCheck = requirePrivateAuth(connId, connections, access);
   if (privateCheck) {
-    const id = (event as any)?.id ?? "";
+    const id = getEventId(event);
     send(connId, connections, ["OK", id, false, privateCheck]);
     return;
   }
 
   const validation = validateAndVerifyEvent(event);
   if (!validation.ok) {
-    const id = (event as any)?.id ?? "";
+    const id = getEventId(event);
     console.log(
       `[EVENT] rejected id=${id.slice(0, 8)}… reason="${validation.reason}"`,
     );
@@ -261,7 +286,7 @@ function handleAuth(connId: string, event: unknown, deps: RelayDeps): void {
   const { connections, access } = deps;
   const challenge = connections.getChallenge(connId);
   const result = validateAuthEvent(event, challenge, deps.relayUrl);
-  const id = (event as any)?.id ?? "";
+  const id = getEventId(event);
 
   if (result.ok && result.pubkey) {
     // Check allowlist in private mode

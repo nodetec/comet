@@ -48,7 +48,7 @@ export function validateSeal(event: NostrEvent): string | null {
  * Instead, the deletion author must appear in the gift wrap's p-tags.
  */
 export function canDeleteGiftWrap(
-  giftWrap: NostrEvent,
+  giftWrap: Pick<NostrEvent, "tags">,
   deletionAuthorPubkey: string,
 ): boolean {
   return giftWrap.tags.some(
