@@ -1,4 +1,4 @@
-import { chacha20poly1305 } from "@noble/ciphers/chacha";
+import { chacha20poly1305 } from "@noble/ciphers/chacha.js";
 
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
