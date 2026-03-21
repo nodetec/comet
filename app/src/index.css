@@ -282,7 +282,7 @@ body {
   height: 16px;
   border: 1px solid var(--input);
   border-radius: 4px;
-  background-color: transparent;
+  background-color: var(--background);
   box-sizing: border-box;
   cursor: pointer;
   z-index: 1;
@@ -298,20 +298,6 @@ body {
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
-}
-
-.comet-list-item--check.comet-checklist-item--range-selected::before {
-  border-color: color-mix(in srgb, var(--editor-selection) 75%, var(--input));
-  background-color: var(--editor-selection);
-}
-
-.comet-list-item--check-checked.comet-checklist-item--range-selected::before {
-  border-color: color-mix(in srgb, var(--editor-selection) 40%, var(--primary));
-  background-color: color-mix(
-    in srgb,
-    var(--editor-selection) 45%,
-    var(--primary)
-  );
 }
 
 .comet-list-item--check.comet-checklist-item--range-selected::after {
