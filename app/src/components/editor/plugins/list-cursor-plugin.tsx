@@ -129,7 +129,7 @@ function getMarkerListTypeFromDom(
     return "number";
   }
 
-  if (parentList.classList.contains("comet-list--bullet")) {
+  if (parentList.classList.contains("comet-list--unordered")) {
     return "bullet";
   }
 

@@ -72,11 +72,11 @@ const theme: EditorThemeClasses = {
     },
     checklist: "comet-list comet-list--check",
     ol: "comet-list comet-list--ordered mb-1.5",
-    ul: "comet-list comet-list--bullet",
+    ul: "comet-list comet-list--unordered",
     listitem: "comet-list-item mb-1",
     listitemChecked:
-      "comet-list-item--check comet-list-item--check-checked line-through text-muted-foreground",
-    listitemUnchecked: "comet-list-item--check",
+      "comet-list-item mb-1 comet-list-item--check comet-list-item--check-checked line-through text-muted-foreground",
+    listitemUnchecked: "comet-list-item mb-1 comet-list-item--check",
   },
   link: "inline text-primary no-underline hover:underline cursor-pointer",
   text: {
