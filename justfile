@@ -102,6 +102,28 @@ blossom-check:
   just blossom-build
   just blossom-test
 
+docs-dev:
+  pnpm --filter @comet/docs dev
+
+docs-build:
+  pnpm --filter @comet/docs build
+
+docs-preview:
+  pnpm --filter @comet/docs preview
+
+docs-typecheck:
+  pnpm --filter @comet/docs typecheck
+
+docs-deploy:
+  pnpm --filter @comet/docs run deploy
+
+docs-deploy-preview:
+  pnpm --filter @comet/docs run deploy:preview
+
+docs-check:
+  just docs-typecheck
+  just docs-build
+
 web-dev:
   pnpm --filter @comet/web dev
 

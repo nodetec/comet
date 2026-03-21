@@ -1,0 +1,100 @@
+:root {
+  --sl-color-accent-low: #d8ebff;
+  --sl-color-accent-high: #0057a8;
+  --sl-color-white: #142339;
+  --sl-color-gray-1: #22344d;
+  --sl-color-gray-2: #38506c;
+  --sl-color-gray-3: #5c728d;
+  --sl-color-gray-4: #d5deea;
+  --sl-color-gray-5: #edf2f8;
+  --sl-color-gray-6: #f7f9fc;
+  --sl-color-black: #ffffff;
+  --sl-font: "Avenir Next", "Segoe UI", sans-serif;
+  --sl-font-mono: "SFMono-Regular", "JetBrains Mono", monospace;
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #0f2b47;
+  --sl-color-accent-high: #8fc9ff;
+  --sl-color-white: #f5f8fc;
+  --sl-color-gray-1: #d5e1ee;
+  --sl-color-gray-2: #a5b6ca;
+  --sl-color-gray-3: #7387a0;
+  --sl-color-gray-4: #31445d;
+  --sl-color-gray-5: #162131;
+  --sl-color-gray-6: #0c1420;
+  --sl-color-black: #050b14;
+}
+
+body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(110 191 255 / 0.18),
+      transparent 34%
+    ),
+    radial-gradient(circle at top right, rgb(0 87 168 / 0.1), transparent 26%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(247 249 252 / 0.98));
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(53 122 191 / 0.24),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgb(143 201 255 / 0.12),
+      transparent 22%
+    ),
+    linear-gradient(180deg, rgb(5 11 20 / 0.98), rgb(12 20 32 / 0.98));
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(0 87 168 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 87 168 / 0.06) 1px, transparent 1px);
+  background-size: 3.5rem 3.5rem;
+  mask-image: radial-gradient(circle at top, black 20%, transparent 78%);
+}
+
+h1,
+h2,
+h3,
+.site-title {
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", Baskerville, Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.hero {
+  border: 1px solid rgb(0 87 168 / 0.16);
+  border-radius: 1.5rem;
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.82),
+    rgb(235 243 252 / 0.72)
+  );
+  box-shadow: 0 1.5rem 4rem rgb(16 38 64 / 0.12);
+  backdrop-filter: blur(20px);
+}
+
+:root[data-theme="dark"] .hero {
+  border-color: rgb(143 201 255 / 0.18);
+  background: linear-gradient(
+    135deg,
+    rgb(15 24 38 / 0.9),
+    rgb(10 18 29 / 0.78)
+  );
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 0.35);
+}
+
+.sl-markdown-content a {
+  text-underline-offset: 0.2em;
+}

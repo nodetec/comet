@@ -1,4 +1,9 @@
-# NIP-CF: Changes Feed
+---
+title: Changes Feed
+description: Draft relay extension for sequence-based event synchronization with explicit deletion tracking.
+sidebar:
+  label: NIP-CF
+---
 
 `draft` `optional`
 

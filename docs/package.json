@@ -1,0 +1,23 @@
+{
+  "name": "@comet/docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "deploy": "astro build && wrangler pages deploy --branch master",
+    "deploy:preview": "astro build && wrangler pages deploy"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.31.0",
+    "astro": "^5.9.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.20.0"
+  }
+}

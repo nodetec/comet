@@ -1,6 +1,7 @@
 packages:
   - app
   - blossom
+  - docs
   - mcp
   - relay
   - web
