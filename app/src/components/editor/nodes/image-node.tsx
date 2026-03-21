@@ -204,14 +204,17 @@ function ImageComponent({
 
   return (
     <span
-      className="mb-2 inline-flex items-center align-middle"
-      style={{ maxWidth: "min(99%, 99%)" }}
+      className="inline-flex items-center py-2 align-middle"
+      style={
+        isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
+      }
     >
       <img
         ref={imageRef}
         src={cacheBust ? `${src}?t=${cacheBust}` : src}
         alt={altText}
-        className={`my-2 max-w-full cursor-default overflow-hidden border-2 ${isFocused ? "border-primary/30" : "border-transparent"}`}
+        className="max-w-full cursor-default overflow-hidden select-none"
+        style={{ opacity: isFocused ? 0.7 : 1 }}
         draggable="false"
         onError={onImageError}
       />
