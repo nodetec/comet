@@ -19,7 +19,7 @@ import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ListNode, ListItemNode } from "@lexical/list";
 import { CodeNode, CodeHighlightNode } from "@lexical/code";
 import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
-import { CheckboxNode } from "../nodes/checkbox-node";
+import { ListAnchorNode } from "../nodes/list-anchor-node";
 import { TableNode, TableRowNode, TableCellNode } from "@lexical/table";
 import { LinkNode } from "@lexical/link";
 import { HashtagNode } from "../nodes/hashtag-node";
@@ -36,7 +36,7 @@ const HEADLESS_NODES = [
   CodeNode,
   CodeHighlightNode,
   CometHorizontalRuleNode,
-  CheckboxNode,
+  ListAnchorNode,
   TableNode,
   TableRowNode,
   TableCellNode,

@@ -4,11 +4,12 @@ import {
   $getSelection,
   $isRangeSelection,
   $createParagraphNode,
+  $isTextNode,
   COMMAND_PRIORITY_HIGH,
   KEY_BACKSPACE_COMMAND,
 } from "lexical";
 import { $isListItemNode } from "@lexical/list";
-import { $isCheckboxNode } from "../nodes/checkbox-node";
+import { $isListAnchorNode } from "../nodes/list-anchor-node";
 
 export default function ListBackspacePlugin() {
   const [editor] = useLexicalComposerContext();
@@ -38,31 +39,21 @@ export default function ListBackspacePlugin() {
         }
 
         // Determine if cursor is at the "start" of the list item's content.
-        // With CheckboxNode as the first child, "start" can mean:
-        // 1. Element offset 0 in the ListItemNode (before checkbox)
-        // 2. Element offset 1 in the ListItemNode (after checkbox, before text)
-        // 3. Text offset 0 in the first text node after the checkbox
-        // 4. On the CheckboxNode itself
-        let atStart = false;
-
-        if ($isCheckboxNode(anchorNode)) {
-          atStart = true;
-        } else if ($isListItemNode(anchorNode)) {
-          // Element-level selection in the list item
-          const childAtOffset = anchorNode.getChildAtIndex(anchorOffset);
-          const childBefore =
-            anchorOffset > 0
-              ? anchorNode.getChildAtIndex(anchorOffset - 1)
-              : null;
-          atStart =
-            anchorOffset === 0 ||
-            $isCheckboxNode(childAtOffset) ||
-            (anchorOffset === 1 && $isCheckboxNode(childBefore));
-        } else if (anchorOffset === 0) {
-          // Text offset 0 — check if previous sibling is a checkbox
-          const prevSibling = anchorNode.getPreviousSibling();
-          atStart = prevSibling === null || $isCheckboxNode(prevSibling);
-        }
+        const firstChild = listItemNode.getFirstChild();
+        const prevSibling =
+          selection.anchor.type === "text" && $isTextNode(anchorNode)
+            ? anchorNode.getPreviousSibling()
+            : null;
+        const atStart =
+          ($isListItemNode(anchorNode) &&
+            selection.anchor.type === "element" &&
+            (anchorOffset === 0 ||
+              (anchorOffset === 1 && $isListAnchorNode(firstChild)))) ||
+          ($isListAnchorNode(anchorNode) && selection.anchor.type === "text") ||
+          (selection.anchor.type === "text" &&
+            anchorOffset === 0 &&
+            (listItemNode.getFirstDescendant() === anchorNode ||
+              $isListAnchorNode(prevSibling)));
 
         if (!atStart) {
           return false;
@@ -78,15 +69,14 @@ export default function ListBackspacePlugin() {
           return true;
         }
 
-        // Convert to paragraph with content (stripping CheckboxNode)
+        // Convert to paragraph with content.
         event?.preventDefault();
         const paragraph = $createParagraphNode();
 
         const children = listItemNode.getChildren();
         children.forEach((child) => {
-          if (!$isCheckboxNode(child)) {
-            paragraph.append(child);
-          }
+          if ($isListAnchorNode(child)) return;
+          paragraph.append(child);
         });
 
         listItemNode.replace(paragraph);

@@ -16,6 +16,7 @@ import {
   type ElementNode,
   type LexicalNode,
 } from "lexical";
+import { $isListAnchorNode } from "../nodes/list-anchor-node";
 
 type BulletMarker = "-" | "*";
 
@@ -69,7 +70,9 @@ function exportListItemContent(
 ): string {
   const contentNode = {
     getChildren: () =>
-      listItemNode.getChildren().filter((child) => !$isListNode(child)),
+      listItemNode
+        .getChildren()
+        .filter((child) => !$isListNode(child) && !$isListAnchorNode(child)),
   } as unknown as ElementNode;
 
   return exportChildren(contentNode);

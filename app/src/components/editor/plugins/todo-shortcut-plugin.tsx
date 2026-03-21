@@ -13,6 +13,7 @@ import {
   $isListNode,
   INSERT_CHECK_LIST_COMMAND,
 } from "@lexical/list";
+import { $isListAnchorNode } from "../nodes/list-anchor-node";
 
 /**
  * Cmd+T toggles a todo checkbox:
@@ -58,6 +59,7 @@ export default function TodoShortcutPlugin() {
             // Checklist item → plain paragraph
             const paragraph = $createParagraphNode();
             for (const child of listItem.getChildren()) {
+              if ($isListAnchorNode(child)) continue;
               paragraph.append(child);
             }
             listItem.replace(paragraph);
@@ -73,6 +75,10 @@ export default function TodoShortcutPlugin() {
             .getChildren()
             .some((c) => c.getType() === "linebreak");
           if (hasLineBreak) return;
+
+          // Ensure text-level selection for INSERT_CHECK_LIST_COMMAND
+          // (it may not work with element-level selections on empty paragraphs)
+          topBlock.selectStart();
 
           // Insert checklist
           editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined);

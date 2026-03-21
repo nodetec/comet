@@ -68,15 +68,15 @@ const theme: EditorThemeClasses = {
   },
   list: {
     nested: {
-      listitem: "list-none",
+      listitem: "comet-list-item--nested",
     },
-    checklist: "comet-checklist",
-    ol: "list-decimal ml-6 mb-1.5",
-    ul: "list-disc ml-6",
-    listitem: "mb-1",
+    checklist: "comet-list comet-list--check",
+    ol: "comet-list comet-list--ordered mb-1.5",
+    ul: "comet-list comet-list--bullet",
+    listitem: "comet-list-item mb-1",
     listitemChecked:
-      "comet-check-item comet-check-item--checked line-through text-muted-foreground",
-    listitemUnchecked: "comet-check-item",
+      "comet-list-item--check comet-list-item--check-checked line-through text-muted-foreground",
+    listitemUnchecked: "comet-list-item--check",
   },
   link: "inline text-primary no-underline hover:underline cursor-pointer",
   text: {

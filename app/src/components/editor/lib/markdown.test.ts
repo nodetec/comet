@@ -2,6 +2,10 @@ import { $convertFromMarkdownString } from "@lexical/markdown";
 import { $createCodeNode, CodeNode } from "@lexical/code";
 import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import {
+  $createListAnchorNode,
+  ListAnchorNode,
+} from "../nodes/list-anchor-node";
+import {
   AutoLinkNode,
   LinkNode,
   $createAutoLinkNode,
@@ -53,6 +57,7 @@ const TEST_NODES = [
   CodeNode,
   HeadingNode,
   CometHorizontalRuleNode,
+  ListAnchorNode,
   ImageNode,
   LinkNode,
   AutoLinkNode,
@@ -230,6 +235,18 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("does not export list cursor anchors", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const bulletList = $createListNode("bullet");
+      const item = $createListItemNode(false);
+      item.append($createListAnchorNode(), $createTextNode("Task"));
+      bulletList.append(item);
+      root.append(bulletList);
+    });
+
+    expect(markdown).toBe("- Task");
   });
 
   it("preserves separate top-level bullet lists after a checklist", () => {

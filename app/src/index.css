@@ -148,18 +148,6 @@ body {
   padding-top: 0.25rem;
 }
 
-.comet-editor-content ol,
-.comet-editor-content ul {
-  &::marker,
-  & li::marker {
-    color: var(--primary);
-  }
-}
-
-.comet-editor-content ul li::marker {
-  font-size: 1.3em;
-}
-
 .comet-table-wrapper {
   display: block;
   overflow: auto;
@@ -215,59 +203,126 @@ body {
 
 /* Horizontal rule — no custom CSS needed, styled with Tailwind in the component */
 
-/* Checklist items */
-/* Checklist — override inherited ul theme classes (list-disc ml-6) */
-.comet-checklist {
+.comet-list {
   list-style-type: none !important;
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
 
-.comet-check-item {
+.comet-list-item {
+  --comet-list-caret-before: 3px;
+  --comet-list-marker-gap: 8px;
+  --comet-list-marker-width: 10px;
+  --comet-list-gutter: calc(
+    var(--comet-list-caret-before) + var(--comet-list-marker-width) +
+      var(--comet-list-marker-gap)
+  );
+  position: relative;
   list-style-type: none;
   outline: none;
   margin-left: 0 !important;
-  padding-left: calc(16px + 0.35em) !important;
-  text-indent: calc(-16px - 0.35em);
+  padding-left: var(--comet-list-gutter) !important;
   overflow-wrap: anywhere;
-  white-space: nowrap;
-}
-
-.comet-check-item > span {
   white-space: pre-wrap;
 }
 
-/* Checkbox TextNode — hide the Unicode char, draw a styled box.
-   Uses display:inline (not inline-block) so it doesn't break text flow. */
-.comet-checkbox {
-  font-size: 0;
-  display: inline;
-  padding: 7px;
-  margin-right: 0.35em;
-  vertical-align: middle;
+.comet-list-item--nested {
+  list-style-type: none;
+}
+
+.comet-list-item > .comet-list {
+  margin-top: 0.25rem;
+  margin-left: 1.75rem !important;
+}
+
+.comet-list-anchor {
+  display: inline-block;
+  width: var(--comet-list-gutter);
+  margin-left: calc(-1 * var(--comet-list-gutter));
+  white-space: pre;
+  color: transparent;
+  vertical-align: top;
+}
+
+.comet-list-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--comet-list-caret-before);
+  width: var(--comet-list-marker-width);
+  color: var(--primary);
+  user-select: none;
+}
+
+.comet-list--bullet > .comet-list-item::before {
+  content: "•";
+  top: -0.08em;
+  font-size: 1.15em;
+  line-height: 1.4;
+}
+
+.comet-list--ordered {
+  counter-reset: comet-list-ordinal;
+}
+
+.comet-list--ordered > .comet-list-item {
+  --comet-list-marker-width: 24px;
+  counter-increment: comet-list-ordinal;
+}
+
+.comet-list--ordered > .comet-list-item::before {
+  content: counter(comet-list-ordinal) ".";
+  top: 0.02em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.comet-list-item--check {
+  --comet-list-marker-gap: 6px;
+  --comet-list-marker-width: 16px;
+}
+
+.comet-list-item--check::before {
+  top: 0.38em;
+  width: 16px;
+  height: 16px;
   border: 1px solid var(--input);
   border-radius: 4px;
   background-color: transparent;
+  box-sizing: border-box;
   cursor: pointer;
-  user-select: none;
   transition:
     background-color 0.1s,
     border-color 0.1s;
 }
 
-.comet-checkbox--checked {
+.comet-list-item--check-checked::before {
   border-color: var(--primary);
   background-color: var(--primary);
-  /* Lucide CheckIcon path as SVG */
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 6 9 17l-5-5'/%3e%3c/svg%3e");
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
 }
 
-.comet-check-item.list-none {
-  padding-left: 0;
-  margin-left: 0;
+.comet-list-item--range-selected::before {
+  background-color: color-mix(
+    in srgb,
+    var(--editor-selection) 60%,
+    transparent
+  );
+  border-radius: 0.35rem;
+  color: var(--foreground);
+}
+
+.comet-list-item--check.comet-list-item--range-selected::before {
+  border-color: var(--editor-selection);
+  background-color: var(--editor-selection);
+}
+
+.comet-list-item--check[role="checkbox"]:focus-visible::before {
+  outline: 2px solid color-mix(in srgb, var(--primary) 60%, transparent);
+  outline-offset: 2px;
 }
 
 .comet-editor-placeholder {
