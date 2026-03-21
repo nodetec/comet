@@ -26,8 +26,40 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import { mergeRegister } from "@lexical/utils";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
-import { XIcon } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { CheckIcon, CopyIcon, ExternalLinkIcon, XIcon } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+function CopyUrlButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      className="hover:text-foreground flex min-w-0 flex-1 items-center gap-1.5 truncate text-left transition-colors"
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      title="Copy URL"
+      type="button"
+    >
+      {copied ? (
+        <CheckIcon className="h-3 w-3 flex-none text-green-500" />
+      ) : (
+        <CopyIcon className="h-3 w-3 flex-none" />
+      )}
+      <span className="truncate">{url}</span>
+    </button>
+  );
+}
 
 type YouTubeComponentProps = Readonly<{
   nodeKey: NodeKey;
@@ -141,7 +173,19 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
       <span ref={containerRef} className="block">
         {isEditable && (
           <span className="bg-muted/90 text-muted-foreground flex items-center gap-2 rounded-t-lg px-3 py-1.5 text-xs">
-            <span className="min-w-0 flex-1 truncate">{url}</span>
+            <CopyUrlButton url={url} />
+            <button
+              className="text-muted-foreground hover:text-foreground flex-none transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openUrl(url);
+              }}
+              aria-label="Open in browser"
+              title="Open in browser"
+              type="button"
+            >
+              <ExternalLinkIcon className="h-3.5 w-3.5" />
+            </button>
             <button
               className="text-muted-foreground hover:text-foreground flex-none transition-colors"
               onClick={(e) => {
@@ -149,6 +193,7 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
                 deleteNode();
               }}
               aria-label="Remove YouTube embed"
+              title="Remove"
               type="button"
             >
               <XIcon className="h-3.5 w-3.5" />
