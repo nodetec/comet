@@ -209,10 +209,6 @@ body {
   margin-left: 0 !important;
 }
 
-/*li::marker {
-  content: "";
-}*/
-
 .comet-list--unordered:not(.comet-list--check) {
   list-style-type: disc;
 }
@@ -306,11 +302,6 @@ body {
 
 .comet-list-item--nested {
   list-style-type: none;
-}
-
-.comet-list-item--check[role="checkbox"]:focus-visible::before {
-  outline: 2px solid color-mix(in srgb, var(--primary) 60%, transparent);
-  outline-offset: 2px;
 }
 
 .comet-editor-placeholder {
