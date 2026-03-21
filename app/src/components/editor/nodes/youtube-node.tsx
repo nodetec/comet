@@ -165,7 +165,7 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
 
   return (
     <span
-      className="inline-block w-full py-2 align-bottom"
+      className="inline-block w-full px-1 py-2 align-bottom"
       style={
         isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
       }
