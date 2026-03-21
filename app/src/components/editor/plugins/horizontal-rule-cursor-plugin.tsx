@@ -24,10 +24,13 @@ import { $isYouTubeNode, YouTubeNode } from "../nodes/youtube-node";
 /** Zero-width space used as cursor anchor beside the HR. */
 const ZWSP = "\u200B";
 
+/** Matches text nodes that contain only ZWSP cursor anchors (one or more). */
+const ZWSP_ONLY_RE = /^\u200B+$/;
+
 function isAnchorText(
   node: ReturnType<typeof import("lexical").$getNodeByKey>,
 ): boolean {
-  return $isTextNode(node) && node.getTextContent() === ZWSP;
+  return $isTextNode(node) && ZWSP_ONLY_RE.test(node.getTextContent());
 }
 
 /**
@@ -159,7 +162,7 @@ export default function HorizontalRuleCursorPlugin(): null {
           if (
             !hasDecorator &&
             children.length > 0 &&
-            children.every((c) => $isTextNode(c) && c.getTextContent() === ZWSP)
+            children.every((c) => isAnchorText(c))
           ) {
             // Replace all zwsps with a single empty paragraph content
             for (const child of children) {
@@ -278,9 +281,7 @@ export default function HorizontalRuleCursorPlugin(): null {
         // Clean up: if the paragraph only has zwsp anchors left, clear it.
         if (parent) {
           const remaining = parent.getChildren();
-          const allZwsp = remaining.every(
-            (c) => $isTextNode(c) && c.getTextContent() === ZWSP,
-          );
+          const allZwsp = remaining.every((c) => isAnchorText(c));
           if (allZwsp) {
             parent.clear();
             parent.selectStart();

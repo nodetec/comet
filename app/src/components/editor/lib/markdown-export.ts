@@ -179,7 +179,10 @@ function exportTextFormat(
   unclosedTags: Array<UnclosedTag>,
   unclosableTags?: Array<UnclosedTag>,
 ): string {
-  let output = textContent;
+  // Strip ZWSP cursor anchors — they're inserted beside inline decorator
+  // nodes (HR, images, YouTube) for cursor placement and must not leak into
+  // the stored markdown.
+  let output = textContent.replace(/\u200B/g, "");
   if (!node.hasFormat("code")) {
     output = output.replace(/([*_`~\\])/g, "\\$1");
   }
