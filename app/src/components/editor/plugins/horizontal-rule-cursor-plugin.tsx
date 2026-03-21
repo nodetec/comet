@@ -13,13 +13,13 @@ import {
   ParagraphNode,
   TextNode,
 } from "lexical";
-import { $isImageNode } from "../nodes/image-node";
 import {
   $createCometHorizontalRuleNode,
   $isCometHorizontalRuleNode,
   CometHorizontalRuleNode,
 } from "../nodes/comet-horizontal-rule-node";
-import { ImageNode } from "../nodes/image-node";
+import { $isImageNode, ImageNode } from "../nodes/image-node";
+import { $isYouTubeNode, YouTubeNode } from "../nodes/youtube-node";
 
 /** Zero-width space used as cursor anchor beside the HR. */
 const ZWSP = "\u200B";
@@ -77,6 +77,22 @@ export default function HorizontalRuleCursorPlugin(): null {
     // Ensure images have zwsp cursor anchors when at the edge of a paragraph.
     const removeImageTransform = editor.registerNodeTransform(
       ImageNode,
+      (node) => {
+        const prev = node.getPreviousSibling();
+        if (!prev) {
+          node.insertBefore($createTextNode(ZWSP));
+        }
+
+        const next = node.getNextSibling();
+        if (!next) {
+          node.insertAfter($createTextNode(ZWSP));
+        }
+      },
+    );
+
+    // Ensure YouTube embeds have zwsp cursor anchors at paragraph edges.
+    const removeYouTubeTransform = editor.registerNodeTransform(
+      YouTubeNode,
       (node) => {
         const prev = node.getPreviousSibling();
         if (!prev) {
@@ -227,7 +243,8 @@ export default function HorizontalRuleCursorPlugin(): null {
         if (
           !prevSibling ||
           (!$isCometHorizontalRuleNode(prevSibling) &&
-            !$isImageNode(prevSibling))
+            !$isImageNode(prevSibling) &&
+            !$isYouTubeNode(prevSibling))
         ) {
           return false;
         }
@@ -256,6 +273,7 @@ export default function HorizontalRuleCursorPlugin(): null {
     return () => {
       removeHrTransform();
       removeImageTransform();
+      removeYouTubeTransform();
       removeTextTransform();
       removeParagraphTransform();
       removeBackspace();

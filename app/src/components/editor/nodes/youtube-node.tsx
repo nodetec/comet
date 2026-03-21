@@ -129,42 +129,46 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
 
   const isFocused = isSelected && isEditable;
 
+  const url = `https://www.youtube.com/watch?v=${videoID}`;
+
   return (
-    <span className="my-2 inline-block w-full align-bottom">
-      <span
-        ref={containerRef}
-        className={`relative block rounded-lg border-2 p-1 transition-colors ${
-          isFocused
-            ? "border-primary"
-            : "border-border hover:border-muted-foreground/30"
-        }`}
-      >
+    <span
+      className="inline-block w-full py-2 align-bottom"
+      style={
+        isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
+      }
+    >
+      <span ref={containerRef} className="block">
+        {isEditable && (
+          <span className="bg-muted/90 text-muted-foreground flex items-center gap-2 rounded-t-lg px-3 py-1.5 text-xs">
+            <span className="min-w-0 flex-1 truncate">{url}</span>
+            <button
+              className="text-muted-foreground hover:text-foreground flex-none transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteNode();
+              }}
+              aria-label="Remove YouTube embed"
+              type="button"
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        )}
+
         <span
-          className="relative block w-full overflow-hidden rounded"
-          style={{ paddingBottom: "56.25%" }}
+          className="block w-full overflow-hidden rounded-b-lg"
+          style={{ aspectRatio: "16/9" }}
         >
           <iframe
-            className="absolute inset-0 h-full w-full"
+            className="h-full w-full select-none"
             src={`https://www.youtube-nocookie.com/embed/${videoID}`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             title="YouTube video"
+            style={{ opacity: isFocused ? 0.7 : 1 }}
           />
         </span>
-
-        {isEditable && (
-          <button
-            className="bg-muted-foreground text-background hover:bg-foreground absolute top-3 right-3 z-20 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteNode();
-            }}
-            aria-label="Remove YouTube embed"
-            type="button"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
-        )}
       </span>
     </span>
   );
