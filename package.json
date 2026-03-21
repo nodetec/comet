@@ -19,6 +19,13 @@
     "blossom:lint:fix": "pnpm --filter @comet/blossom lint:fix",
     "blossom:test": "pnpm --filter @comet/blossom test",
     "blossom:typecheck": "pnpm --filter @comet/blossom typecheck",
+    "mcp:dev": "pnpm --filter @comet/mcp dev",
+    "mcp:start": "pnpm --filter @comet/mcp start",
+    "mcp:build": "pnpm --filter @comet/mcp build",
+    "mcp:lint": "pnpm --filter @comet/mcp lint",
+    "mcp:lint:fix": "pnpm --filter @comet/mcp lint:fix",
+    "mcp:test": "pnpm --filter @comet/mcp test",
+    "mcp:typecheck": "pnpm --filter @comet/mcp typecheck",
     "relay:build": "pnpm --filter @comet/relay build",
     "relay:dev": "pnpm --filter @comet/relay dev",
     "relay:lint": "pnpm --filter @comet/relay lint",
@@ -58,6 +65,10 @@
     ],
     "blossom/**/*.{ts,tsx}": [
       "pnpm --filter @comet/blossom exec eslint --fix",
+      "prettier --write"
+    ],
+    "mcp/**/*.{ts,tsx}": [
+      "pnpm --filter @comet/mcp exec eslint --fix",
       "prettier --write"
     ],
     "web/**/*.{ts,tsx}": [

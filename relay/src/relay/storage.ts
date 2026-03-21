@@ -544,7 +544,7 @@ export function initStorage(db: DB): Storage {
           results.set(row.id, {
             id: row.id,
             pubkey: row.pubkey,
-            created_at: row.created_at,
+            created_at: Number(row.created_at),
             kind: row.kind,
             tags: parseEventTags(row.tags),
             content: row.content,

@@ -18,92 +18,54 @@ jobs:
       www_deploy: ${{ steps.filter.outputs.www_deploy }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
-      - name: Detect app, blossom, and relay changes
+      - uses: dorny/paths-filter@v3
         id: filter
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PUSH_BEFORE: ${{ github.event.before }}
-          PUSH_AFTER: ${{ github.sha }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -eu
-
-          zero_sha="0000000000000000000000000000000000000000"
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            base="$PR_BASE"
-            head="$PR_HEAD"
-          else
-            base="$PUSH_BEFORE"
-            head="$PUSH_AFTER"
-          fi
-
-          if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
-            files=$(git ls-tree -r --name-only "$head")
-          else
-            files=$(git diff --name-only "$base" "$head")
-          fi
-
-          app=false
-          blossom=false
-          blossom_deploy=false
-          relay=false
-          relay_deploy=false
-          www_deploy=false
-          while IFS= read -r file; do
-            case "$file" in
-              app/*|turbo.json)
-                app=true
-                ;;
-            esac
-
-            case "$file" in
-              blossom/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|packages/nostr/*|packages/data/*)
-                blossom=true
-                ;;
-            esac
-
-            case "$file" in
-              blossom/src/*|blossom/package.json|blossom/Dockerfile|blossom/.dockerignore|blossom/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|packages/nostr/*|packages/data/*)
-                blossom_deploy=true
-                ;;
-            esac
-
-            case "$file" in
-              relay/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|packages/nostr/*|packages/data/*)
-                relay=true
-                ;;
-            esac
-
-            case "$file" in
-              relay/src/*|relay/package.json|relay/Dockerfile|relay/.dockerignore|relay/fly.toml|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|packages/nostr/*|packages/data/*)
-                relay_deploy=true
-                ;;
-            esac
-
-            case "$file" in
-              www/*)
-                www_deploy=true
-                ;;
-            esac
-
-            if [ "$app" = true ] && [ "$blossom" = true ] && [ "$blossom_deploy" = true ] && [ "$relay" = true ] && [ "$relay_deploy" = true ] && [ "$www_deploy" = true ]; then
-              break
-            fi
-          done <<EOF
-          $files
-          EOF
-
-          echo "app=$app" >> "$GITHUB_OUTPUT"
-          echo "blossom=$blossom" >> "$GITHUB_OUTPUT"
-          echo "blossom_deploy=$blossom_deploy" >> "$GITHUB_OUTPUT"
-          echo "relay=$relay" >> "$GITHUB_OUTPUT"
-          echo "relay_deploy=$relay_deploy" >> "$GITHUB_OUTPUT"
-          echo "www_deploy=$www_deploy" >> "$GITHUB_OUTPUT"
+        with:
+          filters: |
+            app:
+              - 'app/**'
+              - 'turbo.json'
+            blossom:
+              - 'blossom/**'
+              - 'packages/nostr/**'
+              - 'packages/data/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            blossom_deploy:
+              - 'blossom/src/**'
+              - 'blossom/package.json'
+              - 'blossom/Dockerfile'
+              - 'blossom/.dockerignore'
+              - 'blossom/fly.toml'
+              - 'packages/nostr/**'
+              - 'packages/data/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            relay:
+              - 'relay/**'
+              - 'packages/nostr/**'
+              - 'packages/data/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+            relay_deploy:
+              - 'relay/src/**'
+              - 'relay/package.json'
+              - 'relay/Dockerfile'
+              - 'relay/.dockerignore'
+              - 'relay/fly.toml'
+              - 'packages/nostr/**'
+              - 'packages/data/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            www_deploy:
+              - 'www/**'
 
   format:
     runs-on: ubuntu-latest
@@ -127,10 +89,12 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
-  lint:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -146,30 +110,8 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: pnpm lint
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
-          cache: pnpm
-
-      - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run TypeScript check
-        run: pnpm typecheck
+      - name: Lint and typecheck affected packages
+        run: pnpm turbo run lint typecheck --affected
 
   test:
     if: needs.changes.outputs.app == 'true'
@@ -251,9 +193,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck relay
-        run: pnpm relay:typecheck
-
       - name: Build relay
         run: pnpm relay:build
 
@@ -302,9 +241,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck blossom
-        run: pnpm blossom:typecheck
-
       - name: Build blossom
         run: pnpm blossom:build
 
@@ -313,7 +249,7 @@ jobs:
 
   blossom_deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.blossom_deploy == 'true'
-    needs: [changes, format, lint, typecheck, blossom]
+    needs: [changes, format, checks, blossom]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -329,7 +265,7 @@ jobs:
 
   build:
     if: needs.changes.outputs.app == 'true'
-    needs: [changes, format, lint, typecheck, test]
+    needs: [changes, format, checks, test]
     strategy:
       fail-fast: false
       matrix:
@@ -464,7 +400,7 @@ jobs:
 
   relay_deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.relay_deploy == 'true'
-    needs: [changes, format, lint, typecheck, relay]
+    needs: [changes, format, checks, relay]
     runs-on: ubuntu-latest
     permissions:
       contents: read
