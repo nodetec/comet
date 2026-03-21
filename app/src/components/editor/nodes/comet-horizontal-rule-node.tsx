@@ -126,7 +126,7 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
     >
       <span
         ref={lineRef as React.RefObject<HTMLSpanElement>}
-        className="bg-border h-px w-full cursor-default"
+        className="bg-border h-px w-full cursor-text"
       />
     </span>
   );

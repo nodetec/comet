@@ -3,12 +3,17 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import {
   $createParagraphNode,
   $createTextNode,
+  $getSelection,
   $isParagraphNode,
+  $isRangeSelection,
   $isRootNode,
   $isTextNode,
+  COMMAND_PRIORITY_LOW,
+  KEY_BACKSPACE_COMMAND,
   ParagraphNode,
   TextNode,
 } from "lexical";
+import { $isImageNode } from "../nodes/image-node";
 import {
   $createCometHorizontalRuleNode,
   $isCometHorizontalRuleNode,
@@ -199,11 +204,61 @@ export default function HorizontalRuleCursorPlugin(): null {
       },
     );
 
+    // Backspace when cursor is right after an HR or image (in the right
+    // zwsp anchor) should delete the node.
+    const removeBackspace = editor.registerCommand(
+      KEY_BACKSPACE_COMMAND,
+      (event) => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+          return false;
+        }
+
+        const { anchor } = selection;
+        if (anchor.type !== "text") return false;
+
+        const textNode = anchor.getNode();
+        if (!$isTextNode(textNode) || textNode.getTextContent() !== ZWSP) {
+          return false;
+        }
+
+        // Check if the previous sibling is an HR or image.
+        const prevSibling = textNode.getPreviousSibling();
+        if (
+          !prevSibling ||
+          (!$isCometHorizontalRuleNode(prevSibling) &&
+            !$isImageNode(prevSibling))
+        ) {
+          return false;
+        }
+
+        event.preventDefault();
+        const parent = prevSibling.getParent();
+        prevSibling.remove();
+
+        // Clean up: if the paragraph only has zwsp anchors left, clear it.
+        if (parent) {
+          const remaining = parent.getChildren();
+          const allZwsp = remaining.every(
+            (c) => $isTextNode(c) && c.getTextContent() === ZWSP,
+          );
+          if (allZwsp) {
+            parent.clear();
+            parent.selectStart();
+          }
+        }
+
+        return true;
+      },
+      COMMAND_PRIORITY_LOW,
+    );
+
     return () => {
       removeHrTransform();
       removeImageTransform();
       removeTextTransform();
       removeParagraphTransform();
+      removeBackspace();
     };
   }, [editor]);
 
