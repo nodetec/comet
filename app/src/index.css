@@ -204,88 +204,68 @@ body {
 /* Horizontal rule — no custom CSS needed, styled with Tailwind in the component */
 
 .comet-list {
-  --comet-list-indent-step: 1.75rem;
-  list-style-type: none !important;
+  --comet-list-indent-step: 1.25rem;
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
 
-.comet-list-item,
-.comet-list-item--check {
-  --comet-list-marker-gap: 8px;
-  --comet-list-marker-width: 10px;
-  --comet-list-gutter: var(--comet-list-indent-step);
-  --comet-list-marker-left: calc(
-    var(--comet-list-gutter) - var(--comet-list-marker-width) -
-      var(--comet-list-marker-gap)
-  );
-  position: relative;
-  list-style-type: none;
-  outline: none;
-  margin-left: 0 !important;
-  padding-left: var(--comet-list-gutter) !important;
+.comet-list--unordered:not(.comet-list--check),
+.comet-list--ordered {
+  list-style-position: outside;
+}
+
+.comet-list--unordered:not(.comet-list--check) {
+  list-style-type: disc;
+}
+
+.comet-list--ordered {
+  list-style-type: decimal;
+}
+
+.comet-list--check {
+  list-style-type: none !important;
+}
+
+.comet-list-item {
+  margin: 0 0 0 var(--comet-list-indent-step) !important;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.comet-list-item--nested {
-  list-style-type: none;
+.comet-list-item::marker {
+  color: var(--primary);
 }
 
 .comet-list-item > .comet-list,
 .comet-list-item--check > .comet-list {
   margin-top: 0.25rem;
-  margin-left: var(--comet-list-indent-step) !important;
+  margin-left: 0 !important;
 }
 
 .comet-list-anchor {
-  display: inline-block;
-  width: var(--comet-list-gutter);
-  margin-left: calc(-1 * var(--comet-list-gutter));
-  white-space: pre;
-  color: transparent;
-  vertical-align: top;
+  display: none;
 }
 
-.comet-list-item::before,
-.comet-list-item--check::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: var(--comet-list-marker-left);
-  width: var(--comet-list-marker-width);
-  color: var(--primary);
-  user-select: none;
-}
-
-.comet-list--unordered:not(.comet-list--check) > .comet-list-item::before {
-  content: "•";
-  top: -0.08em;
-  font-size: 1.15em;
-  line-height: 1.4;
-}
-
-.comet-list--ordered {
-  counter-reset: comet-list-ordinal;
-}
-
-.comet-list--ordered > .comet-list-item {
-  --comet-list-marker-width: 2ch;
-  --comet-list-marker-gap: 6px;
-  counter-increment: comet-list-ordinal;
-}
-
-.comet-list--ordered > .comet-list-item::before {
-  content: counter(comet-list-ordinal) ".";
-  top: 0.02em;
-  text-align: right;
+.comet-list--ordered > .comet-list-item::marker {
+  content: counter(list-item) ". ";
   font-variant-numeric: tabular-nums;
 }
 
 .comet-list-item--check {
   --comet-list-marker-gap: 6px;
   --comet-list-marker-width: 16px;
+  --comet-list-gutter: var(--comet-list-indent-step);
+  --comet-list-marker-left: calc(
+    var(--comet-list-gutter) - var(--comet-list-marker-width) -
+      var(--comet-list-marker-gap)
+  );
+  position: relative;
   list-style: none !important;
+  margin-left: 0 !important;
+  padding-left: var(--comet-list-gutter) !important;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
 }
 
 .comet-list-item--check::marker {
@@ -295,7 +275,9 @@ body {
 
 .comet-list-item--check::before {
   content: "";
+  position: absolute;
   top: calc((1lh - 16px) / 2);
+  left: var(--comet-list-marker-left);
   width: 16px;
   height: 16px;
   border: 1px solid var(--input);
@@ -303,6 +285,7 @@ body {
   background-color: transparent;
   box-sizing: border-box;
   cursor: pointer;
+  z-index: 1;
   transition:
     background-color 0.1s,
     border-color 0.1s;
@@ -317,42 +300,33 @@ body {
   background-repeat: no-repeat;
 }
 
-.comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list))) {
-  padding-left: 0 !important;
-  margin-bottom: 0 !important;
+.comet-list-item--check.comet-checklist-item--range-selected::before {
+  border-color: color-mix(in srgb, var(--editor-selection) 75%, var(--input));
+  background-color: var(--editor-selection);
 }
 
-.comet-list--ordered
-  > .comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list))) {
-  counter-increment: none;
-}
-
-.comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list)))
-  > .comet-list {
-  margin-top: 0;
-}
-
-.comet-list-item--nested:has(> .comet-list):not(
-    :has(> :not(.comet-list))
-  )::before {
-  content: none;
-  border: 0;
-  background: none;
-}
-
-.comet-list-item--range-selected::before {
+.comet-list-item--check-checked.comet-checklist-item--range-selected::before {
+  border-color: color-mix(in srgb, var(--editor-selection) 40%, var(--primary));
   background-color: color-mix(
     in srgb,
-    var(--editor-selection) 60%,
-    transparent
+    var(--editor-selection) 45%,
+    var(--primary)
   );
-  border-radius: 0.35rem;
-  color: var(--foreground);
 }
 
-.comet-list-item--check.comet-list-item--range-selected::before {
-  border-color: var(--editor-selection);
+.comet-list-item--check.comet-checklist-item--range-selected::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--comet-list-gutter);
   background-color: var(--editor-selection);
+  pointer-events: none;
+}
+
+.comet-list-item--nested {
+  list-style-type: none;
 }
 
 .comet-list-item--check[role="checkbox"]:focus-visible::before {

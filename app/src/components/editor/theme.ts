@@ -71,7 +71,7 @@ const theme: EditorThemeClasses = {
       listitem: "comet-list-item--nested",
     },
     checklist: "comet-list comet-list--check",
-    ol: "comet-list comet-list--ordered mb-1.5",
+    ol: "comet-list comet-list--ordered",
     ul: "comet-list comet-list--unordered",
     listitem: "comet-list-item mb-1",
     listitemChecked:
