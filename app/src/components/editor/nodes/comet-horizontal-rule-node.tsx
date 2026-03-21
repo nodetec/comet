@@ -32,15 +32,15 @@ import {
 
 function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
   const [editor] = useLexicalComposerContext();
-  const lineRef = useRef<HTMLHRElement>(null);
+  const wrapperRef = useRef<HTMLSpanElement>(null);
   const [isSelected, setSelected, clearSelection] =
     useLexicalNodeSelection(nodeKey);
   const isEditable = useLexicalEditable();
 
   const onClick = useCallback(
     (event: MouseEvent) => {
-      if (event.target === lineRef.current) {
-        console.log("[HR] Click on line → node selection");
+      if (wrapperRef.current?.contains(event.target as Node)) {
+        console.log("[HR] Click on HR area → node selection");
         if (event.shiftKey) {
           setSelected(!isSelected);
         } else {
@@ -119,15 +119,13 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
 
   return (
     <span
-      className="inline-flex w-full items-center py-3 align-middle"
+      ref={wrapperRef}
+      className="inline-flex w-full cursor-text items-center py-3 align-middle"
       style={
         isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
       }
     >
-      <span
-        ref={lineRef as React.RefObject<HTMLSpanElement>}
-        className="bg-border h-px w-full cursor-text"
-      />
+      <span className="bg-border h-px w-full" />
     </span>
   );
 }
