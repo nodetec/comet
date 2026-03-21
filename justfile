@@ -36,11 +36,9 @@ app-seed:
   pnpm --filter @comet/app seed:db
 
 app-check:
-  just format-check
-  just app-lint
-  just app-typecheck
-  just app-test
-  just app-build
+  pnpm format:check
+  turbo run lint typecheck test build --filter=@comet/app
+  cargo test --manifest-path app/src-tauri/Cargo.toml
 
 relay-dev:
   pnpm --filter @comet/relay dev
@@ -67,10 +65,7 @@ relay-typecheck:
   pnpm --filter @comet/relay typecheck
 
 relay-check:
-  just relay-lint
-  just relay-typecheck
-  just relay-build
-  just relay-test
+  turbo run lint typecheck build test --filter=@comet/relay
 
 blossom-dev:
   pnpm --filter @comet/blossom dev
@@ -97,10 +92,7 @@ blossom-typecheck:
   pnpm --filter @comet/blossom typecheck
 
 blossom-check:
-  just blossom-lint
-  just blossom-typecheck
-  just blossom-build
-  just blossom-test
+  turbo run lint typecheck build test --filter=@comet/blossom
 
 docs-dev:
   pnpm --filter @comet/docs dev
@@ -121,8 +113,7 @@ docs-deploy-preview:
   pnpm --filter @comet/docs run deploy:preview
 
 docs-check:
-  just docs-typecheck
-  just docs-build
+  turbo run typecheck build --filter=@comet/docs
 
 web-dev:
   pnpm --filter @comet/web dev
@@ -143,9 +134,7 @@ web-typecheck:
   pnpm --filter @comet/web typecheck
 
 web-check:
-  just web-lint
-  just web-typecheck
-  just web-build
+  turbo run lint typecheck build --filter=@comet/web
 
 www-dev:
   pnpm --filter @comet/www dev
