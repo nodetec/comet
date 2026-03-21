@@ -16,10 +16,8 @@ import { RichTextExtension } from "@lexical/rich-text";
 import { HistoryExtension } from "@lexical/history";
 import { CheckListExtension, ListExtension } from "@lexical/list";
 import { configExtension } from "lexical";
-import {
-  HorizontalRuleExtension,
-  TabIndentationExtension,
-} from "@lexical/extension";
+import { TabIndentationExtension } from "@lexical/extension";
+import { CometHorizontalRuleNode } from "./nodes/comet-horizontal-rule-node";
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "./extensions/hashtag-extension";
 import { TableExtension } from "@lexical/table";
@@ -49,6 +47,7 @@ import SearchHighlightPlugin from "./plugins/search-highlight-plugin";
 import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
+import HorizontalRuleCursorPlugin from "./plugins/horizontal-rule-cursor-plugin";
 import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
@@ -238,6 +237,7 @@ function EditorInner({
       />
       <TableActionMenuPlugin loadKey={loadKey} />
 
+      <HorizontalRuleCursorPlugin />
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
       <TagCompletionPlugin loadKey={loadKey} />
@@ -257,7 +257,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           name: "CometEditor",
           namespace: "CometEditor",
           theme,
-          nodes: [AutoLinkNode, LinkNode, ImageNode, YouTubeNode],
+          nodes: [
+            AutoLinkNode,
+            LinkNode,
+            ImageNode,
+            YouTubeNode,
+            CometHorizontalRuleNode,
+          ],
           onError: (error: Error) => console.error("Lexical error:", error),
           dependencies: [
             RichTextExtension,
@@ -266,7 +272,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             configExtension(CheckListExtension, {
               disableTakeFocusOnClick: true,
             }),
-            HorizontalRuleExtension,
+
             TabIndentationExtension,
             TableExtension,
             CodeExtension,

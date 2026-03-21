@@ -1,6 +1,6 @@
 import { $convertFromMarkdownString } from "@lexical/markdown";
 import { $createCodeNode, CodeNode } from "@lexical/code";
-import { HorizontalRuleNode } from "@lexical/extension";
+import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import {
   AutoLinkNode,
   LinkNode,
@@ -52,7 +52,7 @@ import {
 const TEST_NODES = [
   CodeNode,
   HeadingNode,
-  HorizontalRuleNode,
+  CometHorizontalRuleNode,
   ImageNode,
   LinkNode,
   AutoLinkNode,

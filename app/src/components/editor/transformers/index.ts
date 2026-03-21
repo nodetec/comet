@@ -6,7 +6,11 @@ import {
   UNORDERED_LIST,
   type ElementTransformer,
 } from "@lexical/markdown";
-import { $isHorizontalRuleNode, HorizontalRuleNode } from "@lexical/extension";
+import {
+  $isCometHorizontalRuleNode,
+  CometHorizontalRuleNode,
+  $createCometHorizontalRuleNode,
+} from "../nodes/comet-horizontal-rule-node";
 import { $isQuoteNode, QuoteNode } from "@lexical/rich-text";
 import { $isElementNode, $isParagraphNode, $isTextNode } from "lexical";
 
@@ -22,12 +26,24 @@ import { YOUTUBE } from "./youtube-transformer";
 import { TABLE, setTableTransformers } from "./table-transformer";
 
 const HORIZONTAL_RULE: ElementTransformer = {
-  dependencies: [HorizontalRuleNode],
+  dependencies: [CometHorizontalRuleNode],
   export: (node) => {
-    return $isHorizontalRuleNode(node) ? "---" : null;
+    if ($isCometHorizontalRuleNode(node)) return "---";
+    // Inline HR lives inside a paragraph
+    if ($isParagraphNode(node)) {
+      const children = node.getChildren();
+      if (children.length === 1 && $isCometHorizontalRuleNode(children[0])) {
+        return "---";
+      }
+    }
+    return null;
   },
   regExp: /^---\s*$/,
-  replace: () => {},
+  replace: (parentNode) => {
+    const hr = $createCometHorizontalRuleNode();
+    parentNode.clear();
+    parentNode.append(hr);
+  },
   type: "element",
 };
 

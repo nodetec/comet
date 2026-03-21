@@ -213,6 +213,8 @@ body {
   border-left: 1px solid var(--accent);
 }
 
+/* Horizontal rule — no custom CSS needed, styled with Tailwind in the component */
+
 /* Checklist items */
 .comet-check-item {
   position: relative;
