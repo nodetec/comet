@@ -204,6 +204,7 @@ body {
 /* Horizontal rule — no custom CSS needed, styled with Tailwind in the component */
 
 .comet-list {
+  --comet-list-indent-step: 1.75rem;
   list-style-type: none !important;
   padding-left: 0 !important;
   margin-left: 0 !important;
@@ -211,11 +212,11 @@ body {
 
 .comet-list-item,
 .comet-list-item--check {
-  --comet-list-caret-before: 3px;
   --comet-list-marker-gap: 8px;
   --comet-list-marker-width: 10px;
-  --comet-list-gutter: calc(
-    var(--comet-list-caret-before) + var(--comet-list-marker-width) +
+  --comet-list-gutter: var(--comet-list-indent-step);
+  --comet-list-marker-left: calc(
+    var(--comet-list-gutter) - var(--comet-list-marker-width) -
       var(--comet-list-marker-gap)
   );
   position: relative;
@@ -234,7 +235,7 @@ body {
 .comet-list-item > .comet-list,
 .comet-list-item--check > .comet-list {
   margin-top: 0.25rem;
-  margin-left: 1.75rem !important;
+  margin-left: var(--comet-list-indent-step) !important;
 }
 
 .comet-list-anchor {
@@ -251,7 +252,7 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  left: var(--comet-list-caret-before);
+  left: var(--comet-list-marker-left);
   width: var(--comet-list-marker-width);
   color: var(--primary);
   user-select: none;
@@ -269,7 +270,8 @@ body {
 }
 
 .comet-list--ordered > .comet-list-item {
-  --comet-list-marker-width: 24px;
+  --comet-list-marker-width: 2ch;
+  --comet-list-marker-gap: 6px;
   counter-increment: comet-list-ordinal;
 }
 
@@ -313,6 +315,29 @@ body {
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list))) {
+  padding-left: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.comet-list--ordered
+  > .comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list))) {
+  counter-increment: none;
+}
+
+.comet-list-item--nested:has(> .comet-list):not(:has(> :not(.comet-list)))
+  > .comet-list {
+  margin-top: 0;
+}
+
+.comet-list-item--nested:has(> .comet-list):not(
+    :has(> :not(.comet-list))
+  )::before {
+  content: none;
+  border: 0;
+  background: none;
 }
 
 .comet-list-item--range-selected::before {
