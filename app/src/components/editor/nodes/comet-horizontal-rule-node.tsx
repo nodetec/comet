@@ -117,20 +117,20 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
 
   const isFocused = isSelected && isEditable;
 
-  // Same wrapper pattern as ImageComponent:
-  // inline-flex span slightly under 100% so the browser can place a caret after it.
+  // No `position: relative` — that creates a stacking context that paints
+  // over the caret in the adjacent zwsp anchors. Selection is shown via
+  // background color instead of an absolutely-positioned overlay.
   return (
-    <span className="relative my-3 inline-flex w-full items-center align-middle">
+    <span
+      className="my-3 inline-flex w-full items-center align-middle"
+      style={
+        isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
+      }
+    >
       <span
         ref={lineRef as React.RefObject<HTMLSpanElement>}
         className="bg-border h-px w-full cursor-default"
       />
-      {isFocused && (
-        <span
-          className="pointer-events-none absolute inset-0"
-          style={{ backgroundColor: "var(--editor-selection)" }}
-        />
-      )}
     </span>
   );
 }
