@@ -5,6 +5,7 @@ import {
   $createListAnchorNode,
   ListAnchorNode,
 } from "../nodes/list-anchor-node";
+import { CHECKLIST_PLACEHOLDER } from "./todo-shortcut";
 import {
   AutoLinkNode,
   LinkNode,
@@ -247,6 +248,18 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe("- Task");
+  });
+
+  it("does not export checklist placeholder text", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const item = $createListItemNode(false);
+      item.append($createTextNode(CHECKLIST_PLACEHOLDER));
+      checklist.append(item);
+      root.append(checklist);
+    });
+
+    expect(markdown).toBe("- [ ] ");
   });
 
   it("preserves separate top-level bullet lists after a checklist", () => {

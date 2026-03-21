@@ -17,6 +17,7 @@ import {
   type LexicalNode,
 } from "lexical";
 import { $isListAnchorNode } from "../nodes/list-anchor-node";
+import { CHECKLIST_PLACEHOLDER } from "../lib/todo-shortcut";
 
 type BulletMarker = "-" | "*";
 
@@ -72,7 +73,15 @@ function exportListItemContent(
     getChildren: () =>
       listItemNode
         .getChildren()
-        .filter((child) => !$isListNode(child) && !$isListAnchorNode(child)),
+        .filter(
+          (child) =>
+            !$isListNode(child) &&
+            !$isListAnchorNode(child) &&
+            !(
+              $isTextNode(child) &&
+              child.getTextContent() === CHECKLIST_PLACEHOLDER
+            ),
+        ),
   } as unknown as ElementNode;
 
   return exportChildren(contentNode);
