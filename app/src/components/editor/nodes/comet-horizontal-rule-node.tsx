@@ -117,12 +117,9 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
 
   const isFocused = isSelected && isEditable;
 
-  // No `position: relative` — that creates a stacking context that paints
-  // over the caret in the adjacent zwsp anchors. Selection is shown via
-  // background color instead of an absolutely-positioned overlay.
   return (
     <span
-      className="my-3 inline-flex w-full items-center align-middle"
+      className="inline-flex w-full items-center py-3 align-middle"
       style={
         isFocused ? { backgroundColor: "var(--editor-selection)" } : undefined
       }
