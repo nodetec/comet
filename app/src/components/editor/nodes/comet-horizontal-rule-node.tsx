@@ -40,6 +40,7 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
   const onClick = useCallback(
     (event: MouseEvent) => {
       if (event.target === lineRef.current) {
+        console.log("[HR] Click on line → node selection");
         if (event.shiftKey) {
           setSelected(!isSelected);
         } else {
@@ -117,12 +118,9 @@ function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
   const isFocused = isSelected && isEditable;
 
   // Same wrapper pattern as ImageComponent:
-  // inline-flex span with maxWidth <100% so the browser can place a caret after it
+  // inline-flex span slightly under 100% so the browser can place a caret after it.
   return (
-    <span
-      className="relative my-3 inline-flex w-full items-center align-middle"
-      style={{ maxWidth: "min(99%, 99%)" }}
-    >
+    <span className="relative my-3 inline-flex w-full items-center align-middle">
       <span
         ref={lineRef as React.RefObject<HTMLSpanElement>}
         className="bg-border h-px w-full cursor-default"

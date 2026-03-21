@@ -29,16 +29,24 @@ const HORIZONTAL_RULE: ElementTransformer = {
   dependencies: [CometHorizontalRuleNode],
   export: (node) => {
     if ($isCometHorizontalRuleNode(node)) return "---";
-    // Inline HR lives inside a paragraph
+    // Inline HR lives inside a paragraph with zwsp cursor anchors:
+    // [zwsp, HR, zwsp] — check that all non-HR children are just anchors.
     if ($isParagraphNode(node)) {
       const children = node.getChildren();
-      if (children.length === 1 && $isCometHorizontalRuleNode(children[0])) {
-        return "---";
+      if (children.some($isCometHorizontalRuleNode)) {
+        const allAnchorsOrHR = children.every(
+          (c) =>
+            $isCometHorizontalRuleNode(c) ||
+            ($isTextNode(c) && c.getTextContent() === "\u200B"),
+        );
+        if (allAnchorsOrHR) return "---";
       }
     }
     return null;
   },
-  regExp: /^---\s*$/,
+  // Match --- and common OS auto-substitution variants:
+  // macOS converts -- to — (em dash), so typing --- may produce —- or —
+  regExp: /^(---|\u2014-?|\u2013-{1,2})\s*$/,
   replace: (parentNode) => {
     const hr = $createCometHorizontalRuleNode();
     parentNode.clear();
