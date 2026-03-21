@@ -50,7 +50,6 @@ export class CheckboxNode extends TextNode {
 
   createDOM(config: EditorConfig): HTMLElement {
     const dom = super.createDOM(config);
-    dom.contentEditable = "false";
     dom.classList.add("comet-checkbox");
     if (this.__checked) {
       dom.classList.add("comet-checkbox--checked");

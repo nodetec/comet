@@ -2,15 +2,14 @@ import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $isListItemNode, $isListNode, ListItemNode } from "@lexical/list";
 import {
-  $createRangeSelection,
   $getSelection,
   $getNearestNodeFromDOMNode,
   $isRangeSelection,
-  $setSelection,
   CLICK_COMMAND,
   COMMAND_PRIORITY_HIGH,
   SELECTION_CHANGE_COMMAND,
 } from "lexical";
+
 import {
   $createCheckboxNode,
   $isCheckboxNode,
@@ -106,7 +105,7 @@ export default function CheckboxPlugin(): null {
     );
 
     // If the caret lands inside a CheckboxNode (e.g. gutter click),
-    // snap it to right before the checkbox in the parent.
+    // snap it to the start of the text after the checkbox.
     const removeSelectionNorm = editor.registerCommand(
       SELECTION_CHANGE_COMMAND,
       () => {
@@ -118,14 +117,11 @@ export default function CheckboxPlugin(): null {
         const node = selection.anchor.getNode();
         if (!$isCheckboxNode(node)) return false;
 
-        const parent = node.getParent();
-        if (!parent) return false;
-
-        // Create a fresh selection at element offset 0 (before checkbox)
-        const newSelection = $createRangeSelection();
-        newSelection.anchor.set(parent.getKey(), 0, "element");
-        newSelection.focus.set(parent.getKey(), 0, "element");
-        $setSelection(newSelection);
+        const next = node.getNextSibling();
+        if (next) {
+          selection.anchor.set(next.getKey(), 0, "text");
+          selection.focus.set(next.getKey(), 0, "text");
+        }
 
         return false;
       },

@@ -239,6 +239,7 @@ body {
   display: inline;
   padding: 7px;
   margin-right: 0.35em;
+  vertical-align: middle;
   border: 1px solid var(--input);
   border-radius: 4px;
   background-color: transparent;
