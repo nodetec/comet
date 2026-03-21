@@ -5,9 +5,11 @@ import {
   $getSelection,
   $getNearestNodeFromDOMNode,
   $isRangeSelection,
+  $isTextNode,
   CLICK_COMMAND,
   COMMAND_PRIORITY_HIGH,
   SELECTION_CHANGE_COMMAND,
+  TextNode,
 } from "lexical";
 
 import {
@@ -52,6 +54,18 @@ export default function CheckboxPlugin(): null {
           } else if (firstChild && $isCheckboxNode(firstChild)) {
             if (firstChild.getChecked() !== checked) {
               firstChild.setChecked(checked);
+            }
+          }
+          // Strip leading whitespace/zwsp from text after checkbox
+          // to prevent line-break opportunities at the boundary.
+          const afterCheckbox = hasCheckbox
+            ? firstChild.getNextSibling()
+            : null;
+          if (afterCheckbox && $isTextNode(afterCheckbox)) {
+            const text = afterCheckbox.getTextContent();
+            const stripped = text.replace(/^[\s\u200B]+/, "");
+            if (stripped !== text) {
+              afterCheckbox.setTextContent(stripped);
             }
           }
         } else if (hasCheckbox) {
@@ -104,6 +118,22 @@ export default function CheckboxPlugin(): null {
       COMMAND_PRIORITY_HIGH,
     );
 
+    // Strip leading whitespace from text right after a checkbox
+    // to prevent line-break opportunities at the boundary.
+    const removeTextTransform = editor.registerNodeTransform(
+      TextNode,
+      (textNode) => {
+        const prev = textNode.getPreviousSibling();
+        if (!prev || !$isCheckboxNode(prev)) return;
+
+        const text = textNode.getTextContent();
+        const stripped = text.replace(/^[\s\u200B]+/, "");
+        if (stripped !== text) {
+          textNode.setTextContent(stripped);
+        }
+      },
+    );
+
     // If the caret lands inside a CheckboxNode (e.g. gutter click),
     // snap it to the start of the text after the checkbox.
     const removeSelectionNorm = editor.registerCommand(
@@ -132,6 +162,7 @@ export default function CheckboxPlugin(): null {
       removeListItemTransform();
       removeCheckboxTransform();
       removeClick();
+      removeTextTransform();
       removeSelectionNorm();
     };
   }, [editor]);

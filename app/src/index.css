@@ -227,9 +227,14 @@ body {
   list-style-type: none;
   outline: none;
   margin-left: 0 !important;
-  padding-left: calc(16px + 0.35em + 2px) !important;
-  text-indent: calc(-16px - 0.35em - 2px);
+  padding-left: calc(16px + 0.35em) !important;
+  text-indent: calc(-16px - 0.35em);
   overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.comet-check-item > span {
+  white-space: pre-wrap;
 }
 
 /* Checkbox TextNode — hide the Unicode char, draw a styled box.
