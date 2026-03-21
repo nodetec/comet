@@ -37,7 +37,7 @@ app-seed:
 
 app-check:
   pnpm format:check
-  turbo run lint typecheck test build --filter=@comet/app
+  pnpm exec turbo run lint typecheck test build --filter=@comet/app
   cargo test --manifest-path app/src-tauri/Cargo.toml
 
 relay-dev:
@@ -65,7 +65,7 @@ relay-typecheck:
   pnpm --filter @comet/relay typecheck
 
 relay-check:
-  turbo run lint typecheck build test --filter=@comet/relay
+  pnpm exec turbo run lint typecheck build test --filter=@comet/relay
 
 blossom-dev:
   pnpm --filter @comet/blossom dev
@@ -92,7 +92,7 @@ blossom-typecheck:
   pnpm --filter @comet/blossom typecheck
 
 blossom-check:
-  turbo run lint typecheck build test --filter=@comet/blossom
+  pnpm exec turbo run lint typecheck build test --filter=@comet/blossom
 
 docs-dev:
   pnpm --filter @comet/docs dev
@@ -113,7 +113,7 @@ docs-deploy-preview:
   pnpm --filter @comet/docs run deploy:preview
 
 docs-check:
-  turbo run typecheck build --filter=@comet/docs
+  pnpm exec turbo run typecheck build --filter=@comet/docs
 
 web-dev:
   pnpm --filter @comet/web dev
@@ -134,7 +134,7 @@ web-typecheck:
   pnpm --filter @comet/web typecheck
 
 web-check:
-  turbo run lint typecheck build --filter=@comet/web
+  pnpm exec turbo run lint typecheck build --filter=@comet/web
 
 www-dev:
   pnpm --filter @comet/www dev
@@ -158,7 +158,7 @@ format-check:
   pnpm format:check
 
 outdated-js:
-  -pnpm outdated
+  -pnpm outdated -r
 
 outdated-crates:
   cargo upgrade --dry-run --manifest-path app/src-tauri/Cargo.toml --incompatible allow

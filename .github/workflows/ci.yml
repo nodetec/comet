@@ -13,7 +13,6 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       blossom: ${{ steps.filter.outputs.blossom }}
       blossom_deploy: ${{ steps.filter.outputs.blossom_deploy }}
-      docs: ${{ steps.filter.outputs.docs }}
       docs_deploy: ${{ steps.filter.outputs.docs_deploy }}
       relay: ${{ steps.filter.outputs.relay }}
       relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
@@ -47,12 +46,6 @@ jobs:
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-            docs:
-              - 'docs/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - 'turbo.json'
             docs_deploy:
               - 'docs/**'
               - 'package.json'
@@ -123,32 +116,8 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint and typecheck affected packages
-        run: pnpm turbo run lint typecheck --affected
-
-  docs:
-    if: needs.changes.outputs.docs == 'true'
-    needs: changes
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
-          cache: pnpm
-
-      - name: Install docs dependencies
-        run: pnpm install --frozen-lockfile --filter @comet/docs
-
-      - name: Build docs site
-        run: pnpm docs:build
+      - name: Lint, typecheck, and build affected packages
+        run: pnpm turbo run lint typecheck build --affected
 
   test:
     if: needs.changes.outputs.app == 'true'
@@ -482,7 +451,7 @@ jobs:
 
   docs_deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.docs_deploy == 'true'
-    needs: [changes, format, checks, docs]
+    needs: [changes, format, checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
