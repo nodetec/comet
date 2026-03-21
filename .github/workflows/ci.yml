@@ -113,7 +113,12 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
-      - name: Install frontend dependencies
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Lint, typecheck, and build affected packages
