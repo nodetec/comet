@@ -31,7 +31,6 @@ import theme from "./theme";
 import { TRANSFORMERS } from "./transformers";
 import InitialContentPlugin from "./plugins/initial-content-plugin";
 import OnChangeMarkdownPlugin from "./plugins/on-change-markdown-plugin";
-import ChecklistSelectionPlugin from "./plugins/checklist-selection-plugin";
 import ListIndentPlugin from "./plugins/list-indent-plugin";
 import ListOutdentPlugin from "./plugins/list-outdent-plugin";
 import CodeHighlightPlugin from "./plugins/code-highlight-plugin";
@@ -215,7 +214,6 @@ function EditorInner({
         onInitComplete={handleInitComplete}
       />
       <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-      <ChecklistSelectionPlugin />
       <ListIndentPlugin />
       <ListOutdentPlugin />
       <CodeHighlightPlugin />

@@ -209,6 +209,10 @@ body {
   margin-left: 0 !important;
 }
 
+/*li::marker {
+  content: "";
+}*/
+
 .comet-list--unordered:not(.comet-list--check) {
   list-style-type: disc;
 }
@@ -298,17 +302,6 @@ body {
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
-}
-
-.comet-list-item--check.comet-checklist-item--range-selected::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: var(--comet-list-gutter);
-  background-color: var(--editor-selection);
-  pointer-events: none;
 }
 
 .comet-list-item--nested {
