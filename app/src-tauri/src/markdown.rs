@@ -57,6 +57,21 @@ fn postprocess_html(html: &str) -> String {
     // Strikethrough: comrak uses <del>, Lexical expects <s>
     result = result.replace("<del>", "<s>").replace("</del>", "</s>");
 
+    // YouTube: convert autolinked YouTube URLs into <iframe data-lexical-youtube="...">
+    // so Lexical's YouTubeNode.importDOM can reconstruct embedded videos.
+    // The markdown transformer exports YouTubeNodes as bare URLs, which comrak
+    // autolinks into <a href="URL">URL</a>. We detect these self-links (text
+    // starts with https://) and produce the iframe format YouTubeNode expects.
+    result = regex_lite::Regex::new(
+        r#"<a href="https://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})[^"]*">https?://[^<]+</a>"#,
+    )
+    .unwrap()
+    .replace_all(
+        &result,
+        r#"<iframe data-lexical-youtube="$1" width="560" height="315" src="https://www.youtube-nocookie.com/embed/$1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="true" title="YouTube video"></iframe>"#,
+    )
+    .to_string();
+
     // Comrak 0.51+ adds contains-task-list, task-list-item, and
     // task-list-item-checkbox classes automatically. No post-processing needed.
 
@@ -280,6 +295,41 @@ mod tests {
             html.matches("contains-task-list").count(),
             1,
             "Expected only the checklist UL to have checklist classes. HTML: {html}"
+        );
+    }
+
+    #[test]
+    fn test_youtube_url_becomes_iframe() {
+        let html = markdown_to_lexical_html("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+        assert!(
+            html.contains(r#"data-lexical-youtube="dQw4w9WgXcQ""#),
+            "YouTube URL should become iframe with data-lexical-youtube. HTML: {html}"
+        );
+        assert!(
+            !html.contains("<a href="),
+            "YouTube URL should not remain as a link. HTML: {html}"
+        );
+    }
+
+    #[test]
+    fn test_youtube_short_url_becomes_iframe() {
+        let html = markdown_to_lexical_html("https://youtu.be/dQw4w9WgXcQ");
+        assert!(
+            html.contains(r#"data-lexical-youtube="dQw4w9WgXcQ""#),
+            "Short YouTube URL should become iframe. HTML: {html}"
+        );
+    }
+
+    #[test]
+    fn test_youtube_named_link_stays_link() {
+        let html = markdown_to_lexical_html("[My Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
+        assert!(
+            html.contains("<a href="),
+            "Named YouTube link should stay as link. HTML: {html}"
+        );
+        assert!(
+            !html.contains("data-lexical-youtube"),
+            "Named YouTube link should not become iframe. HTML: {html}"
         );
     }
 
