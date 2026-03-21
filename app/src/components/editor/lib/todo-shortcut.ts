@@ -25,6 +25,22 @@ export function stripChecklistPlaceholders(text: string): string {
   return text.split(CHECKLIST_PLACEHOLDER).join("");
 }
 
+function getOffsetAfterStrippingChecklistPlaceholders(
+  text: string,
+  offset: number,
+): number {
+  const boundedOffset = Math.max(0, Math.min(offset, text.length));
+  let removedCount = 0;
+
+  for (let i = 0; i < boundedOffset; i++) {
+    if (text[i] === CHECKLIST_PLACEHOLDER) {
+      removedCount++;
+    }
+  }
+
+  return boundedOffset - removedCount;
+}
+
 export function $isChecklistPlaceholderText(
   node: LexicalNode | null | undefined,
 ): boolean {
@@ -342,6 +358,34 @@ export function $normalizeChecklistPlaceholderTextNode(
     return false;
   }
 
+  const selection = $getSelection();
+  const shouldRestoreSelection =
+    $isRangeSelection(selection) &&
+    selection.anchor.type === "text" &&
+    selection.focus.type === "text" &&
+    selection.anchor.key === textNode.getKey() &&
+    selection.focus.key === textNode.getKey();
+  const nextAnchorOffset = shouldRestoreSelection
+    ? getOffsetAfterStrippingChecklistPlaceholders(
+        text,
+        selection.anchor.offset,
+      )
+    : 0;
+  const nextFocusOffset = shouldRestoreSelection
+    ? getOffsetAfterStrippingChecklistPlaceholders(text, selection.focus.offset)
+    : 0;
+
   textNode.setTextContent(normalizedText);
+
+  if (shouldRestoreSelection) {
+    const size = textNode.getTextContentSize();
+    selection.setTextNodeRange(
+      textNode,
+      Math.min(nextAnchorOffset, size),
+      textNode,
+      Math.min(nextFocusOffset, size),
+    );
+  }
+
   return true;
 }

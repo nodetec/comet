@@ -182,6 +182,11 @@ describe("todo shortcut", () => {
   it("strips placeholder text once real checklist content is typed", () => {
     const editor = createTestEditor();
     let textContent = "";
+    let selectionShape: {
+      anchorOffset: number;
+      focusOffset: number;
+      isCollapsed: boolean;
+    } | null = null;
 
     editor.update(
       () => {
@@ -210,13 +215,31 @@ describe("todo shortcut", () => {
         }
 
         textNode.setTextContent("\u200Bhello");
+        textNode.select(6, 6);
         expect($normalizeChecklistPlaceholderTextNode(textNode)).toBe(true);
         textContent = textNode.getTextContent();
+
+        const selection = $getSelection();
+        expect($isRangeSelection(selection)).toBe(true);
+        if (!$isRangeSelection(selection)) {
+          return;
+        }
+
+        selectionShape = {
+          anchorOffset: selection.anchor.offset,
+          focusOffset: selection.focus.offset,
+          isCollapsed: selection.isCollapsed(),
+        };
       },
       { discrete: true },
     );
 
     expect(textContent).toBe("hello");
+    expect(selectionShape).toEqual({
+      anchorOffset: 5,
+      focusOffset: 5,
+      isCollapsed: true,
+    });
   });
 
   it("keeps the parent checklist item when converting a nested child to a paragraph", () => {
