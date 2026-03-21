@@ -18,6 +18,7 @@ import { CheckListExtension, ListExtension } from "@lexical/list";
 import { configExtension } from "lexical";
 import { TabIndentationExtension } from "@lexical/extension";
 import { CometHorizontalRuleNode } from "./nodes/comet-horizontal-rule-node";
+import { CheckboxNode } from "./nodes/checkbox-node";
 import { CodeExtension } from "@lexical/code";
 import { HashtagExtension } from "./extensions/hashtag-extension";
 import { TableExtension } from "@lexical/table";
@@ -48,6 +49,7 @@ import ToolbarPlugin from "./plugins/toolbar-plugin";
 import YouTubeEmbedPlugin from "./plugins/youtube-embed-plugin";
 import TableActionMenuPlugin from "./plugins/table-action-menu-plugin";
 import HorizontalRuleCursorPlugin from "./plugins/horizontal-rule-cursor-plugin";
+import CheckboxPlugin from "./plugins/checkbox-plugin";
 import DevtoolsPlugin from "./plugins/devtools-plugin";
 
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
@@ -238,6 +240,7 @@ function EditorInner({
       <TableActionMenuPlugin loadKey={loadKey} />
 
       <HorizontalRuleCursorPlugin />
+      <CheckboxPlugin />
       <TableClickOutsidePlugin />
       <TodoShortcutPlugin />
       <TagCompletionPlugin loadKey={loadKey} />
@@ -263,6 +266,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             ImageNode,
             YouTubeNode,
             CometHorizontalRuleNode,
+            CheckboxNode,
           ],
           onError: (error: Error) => console.error("Lexical error:", error),
           dependencies: [
