@@ -209,11 +209,6 @@ body {
   margin-left: 0 !important;
 }
 
-/*.comet-list--unordered:not(.comet-list--check),
-.comet-list--ordered {
-  list-style-position: outside;
-}*/
-
 .comet-list--unordered:not(.comet-list--check) {
   list-style-type: disc;
 }
@@ -249,10 +244,6 @@ body {
 
 .comet-list-item--check.comet-list-item--nested {
   margin-bottom: 0 !important;
-}
-
-.comet-list-anchor {
-  display: none;
 }
 
 .comet-list--ordered > .comet-list-item::marker {
