@@ -198,7 +198,8 @@ export async function createBlossomServer(
         if (!existingBlob) {
           try {
             await objectStorage.uploadBlob(sha256, data, contentType);
-          } catch {
+          } catch (e) {
+            console.error("[blossom] S3 upload failed:", e);
             return json({ error: "storage upload failed" }, 500);
           }
         }

@@ -11,7 +11,7 @@ export function createDB(url?: string) {
   }
 
   const sql = postgres(connectionString, {
-    max: 20,
+    max: 100,
     idle_timeout: 20,
     connect_timeout: 10,
     onnotice: () => {},
