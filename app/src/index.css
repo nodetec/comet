@@ -227,7 +227,7 @@ body {
 }
 
 .comet-list-item {
-  margin: 0 0 0 var(--comet-list-indent-step) !important;
+  margin-left: var(--comet-list-indent-step) !important;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -237,7 +237,6 @@ body {
 }
 
 .comet-list-item:not(.comet-list-item--check) > .comet-list {
-  margin-top: 0.25rem;
   margin-left: 0 !important;
 }
 
@@ -258,7 +257,7 @@ body {
 .comet-list-item--check {
   --comet-list-marker-gap: 6px;
   --comet-list-marker-width: 16px;
-  --comet-list-gutter: var(--comet-list-indent-step);
+  --comet-list-gutter: 1.4rem;
   --comet-list-marker-left: calc(
     var(--comet-list-gutter) - var(--comet-list-marker-width) -
       var(--comet-list-marker-gap)
