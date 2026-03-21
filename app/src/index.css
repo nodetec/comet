@@ -227,14 +227,36 @@ body {
   list-style-type: none;
   outline: none;
   margin-left: 0 !important;
-  padding-left: 1.5em !important;
+  padding-left: calc(16px + 0.35em + 2px) !important;
+  text-indent: calc(-16px - 0.35em - 2px);
+  overflow-wrap: anywhere;
 }
 
-/* Float the checkbox into the padding area so all lines stay indented */
-.comet-check-item > [data-lexical-decorator] {
-  float: left;
-  margin-left: -1.5em;
+/* Checkbox TextNode — hide the Unicode char, draw a styled box.
+   Uses display:inline (not inline-block) so it doesn't break text flow. */
+.comet-checkbox {
+  font-size: 0;
+  display: inline;
+  padding: 7px;
   margin-right: 0.35em;
+  border: 1px solid var(--input);
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
+}
+
+.comet-checkbox--checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  /* Lucide CheckIcon path as SVG */
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 6 9 17l-5-5'/%3e%3c/svg%3e");
+  background-size: 12px 12px;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .comet-check-item.list-none {

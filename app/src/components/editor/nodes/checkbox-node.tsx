@@ -1,111 +1,20 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
-import { $isListItemNode } from "@lexical/list";
 import type {
+  DOMConversionMap,
   EditorConfig,
   LexicalNode,
   NodeKey,
-  SerializedLexicalNode,
-  Spread,
+  SerializedTextNode,
 } from "lexical";
-import {
-  $getNodeByKey,
-  CLICK_COMMAND,
-  COMMAND_PRIORITY_HIGH,
-  DecoratorNode,
-} from "lexical";
+import { TextNode } from "lexical";
 
-// ---------------------------------------------------------------------------
-// Checkmark SVG (same as the old ::before background-image)
-// ---------------------------------------------------------------------------
+/** Unchecked checkbox character */
+const UNCHECKED = "\u2610"; // ☐
+/** Checked checkbox character */
+const CHECKED = "\u2611"; // ☑
 
-const CHECKMARK_SVG = `url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e")`;
+export type SerializedCheckboxNode = SerializedTextNode;
 
-// ---------------------------------------------------------------------------
-// React component
-// ---------------------------------------------------------------------------
-
-function CheckboxComponent({
-  nodeKey,
-  checked,
-}: {
-  nodeKey: NodeKey;
-  checked: boolean;
-}) {
-  const [editor] = useLexicalComposerContext();
-  const isEditable = useLexicalEditable();
-  const spanRef = useRef<HTMLSpanElement>(null);
-
-  const onClick = useCallback(
-    (event: MouseEvent) => {
-      if (!spanRef.current?.contains(event.target as Node)) return false;
-      if (!isEditable) return false;
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      editor.update(() => {
-        const checkboxNode = $getNodeByKey(nodeKey);
-        if (!checkboxNode || !$isCheckboxNode(checkboxNode)) return;
-
-        const newChecked = !checkboxNode.__checked;
-        checkboxNode.setChecked(newChecked);
-
-        // Sync to parent ListItemNode
-        const parent = checkboxNode.getParent();
-        if (parent && $isListItemNode(parent)) {
-          parent.setChecked(newChecked);
-        }
-      });
-
-      return true;
-    },
-    [editor, nodeKey, isEditable],
-  );
-
-  useEffect(() => {
-    return editor.registerCommand<MouseEvent>(
-      CLICK_COMMAND,
-      onClick,
-      COMMAND_PRIORITY_HIGH,
-    );
-  }, [editor, onClick]);
-
-  return (
-    <span
-      ref={spanRef}
-      role="checkbox"
-      aria-checked={checked}
-      className="mr-2 inline-flex cursor-pointer items-center justify-center align-middle select-none"
-      style={{
-        width: "1.15em",
-        height: "1.15em",
-        borderRadius: "0.25em",
-        border: checked
-          ? "1.5px solid var(--primary)"
-          : "1.5px solid var(--muted-foreground)",
-        backgroundColor: checked ? "var(--primary)" : "transparent",
-        backgroundImage: checked ? CHECKMARK_SVG : "none",
-        backgroundSize: "100% 100%",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Lexical node
-// ---------------------------------------------------------------------------
-
-export type SerializedCheckboxNode = Spread<
-  { checked: boolean },
-  SerializedLexicalNode
->;
-
-export class CheckboxNode extends DecoratorNode<React.ReactNode> {
+export class CheckboxNode extends TextNode {
   __checked: boolean;
 
   static getType(): string {
@@ -117,43 +26,55 @@ export class CheckboxNode extends DecoratorNode<React.ReactNode> {
   }
 
   static importJSON(serializedNode: SerializedCheckboxNode): CheckboxNode {
-    return new CheckboxNode(serializedNode.checked);
+    const checked = serializedNode.text === CHECKED;
+    return $createCheckboxNode(checked);
+  }
+
+  static importDOM(): DOMConversionMap | null {
+    return null;
   }
 
   constructor(checked: boolean = false, key?: NodeKey) {
-    super(key);
+    super(checked ? CHECKED : UNCHECKED, key);
     this.__checked = checked;
+    // Token mode: atomic unit, can't be partially selected or edited
+    this.__mode = 1; // 1 = token mode in Lexical
   }
 
   exportJSON(): SerializedCheckboxNode {
     return {
+      ...super.exportJSON(),
       type: "checkbox",
-      version: 1,
-      checked: this.__checked,
     };
   }
 
-  createDOM(_config: EditorConfig): HTMLElement {
-    const span = document.createElement("span");
-    span.style.display = "inline";
-    return span;
+  createDOM(config: EditorConfig): HTMLElement {
+    const dom = super.createDOM(config);
+    dom.contentEditable = "false";
+    dom.classList.add("comet-checkbox");
+    if (this.__checked) {
+      dom.classList.add("comet-checkbox--checked");
+    }
+    return dom;
   }
 
-  updateDOM(): boolean {
-    return false;
-  }
-
-  getTextContent(): string {
-    return "";
-  }
-
-  isInline(): true {
-    return true;
+  updateDOM(
+    prevNode: CheckboxNode,
+    dom: HTMLElement,
+    config: EditorConfig,
+  ): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updated = (super.updateDOM as any)(prevNode, dom, config);
+    if (prevNode.__checked !== this.__checked) {
+      dom.classList.toggle("comet-checkbox--checked", this.__checked);
+    }
+    return updated;
   }
 
   setChecked(checked: boolean): this {
     const self = this.getWritable();
     self.__checked = checked;
+    self.__text = checked ? CHECKED : UNCHECKED;
     return self;
   }
 
@@ -161,8 +82,22 @@ export class CheckboxNode extends DecoratorNode<React.ReactNode> {
     return this.__checked;
   }
 
-  decorate(): React.ReactNode {
-    return <CheckboxComponent nodeKey={this.__key} checked={this.__checked} />;
+  // Don't contribute to markdown export — the ListItemNode.__checked
+  // property is the source of truth for "- [ ]" / "- [x]".
+  getTextContent(): string {
+    return "";
+  }
+
+  isToken(): boolean {
+    return true;
+  }
+
+  canInsertTextBefore(): boolean {
+    return false;
+  }
+
+  canInsertTextAfter(): boolean {
+    return false;
   }
 }
 
