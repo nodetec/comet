@@ -140,12 +140,34 @@ export default function HorizontalRuleCursorPlugin(): null {
 
     // Keep the HR isolated: only allow [zwsp, HR, zwsp] in the paragraph.
     // Any real content typed into the anchors is moved to a new paragraph.
+    // Also clean up orphaned zwsp anchors when the HR/image/YouTube is deleted.
     const removeParagraphTransform = editor.registerNodeTransform(
       ParagraphNode,
       (paragraphNode) => {
         const children = paragraphNode.getChildren();
         const hrIndex = children.findIndex($isCometHorizontalRuleNode);
-        if (hrIndex === -1) return;
+
+        // Clean up orphaned zwsp anchors — if paragraph has only zwsp text
+        // nodes and no decorator (HR/image/YouTube), remove the zwsps.
+        if (hrIndex === -1) {
+          const hasDecorator = children.some(
+            (c) =>
+              $isCometHorizontalRuleNode(c) ||
+              $isImageNode(c) ||
+              $isYouTubeNode(c),
+          );
+          if (
+            !hasDecorator &&
+            children.length > 0 &&
+            children.every((c) => $isTextNode(c) && c.getTextContent() === ZWSP)
+          ) {
+            // Replace all zwsps with a single empty paragraph content
+            for (const child of children) {
+              child.remove();
+            }
+          }
+          return;
+        }
 
         // Check if the paragraph is already in the correct shape.
         const isCorrect =
