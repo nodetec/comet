@@ -14,6 +14,7 @@ import {
   $isCometHorizontalRuleNode,
   CometHorizontalRuleNode,
 } from "../nodes/comet-horizontal-rule-node";
+import { ImageNode } from "../nodes/image-node";
 
 /** Zero-width space used as cursor anchor beside the HR. */
 const ZWSP = "\u200B";
@@ -63,6 +64,22 @@ export default function HorizontalRuleCursorPlugin(): null {
         const next = node.getNextSibling();
         if (!next || !isAnchorText(next)) {
           console.log("[HR] Adding right cursor anchor (zwsp TextNode)");
+          node.insertAfter($createTextNode(ZWSP));
+        }
+      },
+    );
+
+    // Ensure images have zwsp cursor anchors when at the edge of a paragraph.
+    const removeImageTransform = editor.registerNodeTransform(
+      ImageNode,
+      (node) => {
+        const prev = node.getPreviousSibling();
+        if (!prev) {
+          node.insertBefore($createTextNode(ZWSP));
+        }
+
+        const next = node.getNextSibling();
+        if (!next) {
           node.insertAfter($createTextNode(ZWSP));
         }
       },
@@ -184,6 +201,7 @@ export default function HorizontalRuleCursorPlugin(): null {
 
     return () => {
       removeHrTransform();
+      removeImageTransform();
       removeTextTransform();
       removeParagraphTransform();
     };
