@@ -458,4 +458,20 @@ describe("markdown editor pipeline", () => {
 
     expect(markdown).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   });
+
+  it("treats # without space as literal text", () => {
+    expect(roundtripMarkdown("#Hello")).toBe("#Hello");
+  });
+
+  it("treats ## without space as literal text", () => {
+    expect(roundtripMarkdown("##Hello")).toBe("##Hello");
+  });
+
+  it("treats bare # as literal text, not an empty heading", () => {
+    expect(roundtripMarkdown("#")).toBe("#");
+  });
+
+  it("treats bare ## as literal text, not an empty heading", () => {
+    expect(roundtripMarkdown("##")).toBe("##");
+  });
 });

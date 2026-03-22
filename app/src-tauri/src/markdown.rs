@@ -5,6 +5,7 @@
 
 use comrak::options::{Extension, Options, Parse, Render};
 use comrak::Arena;
+use std::borrow::Cow;
 
 /// Full pipeline: preprocess → parse → render → postprocess.
 pub fn markdown_to_lexical_html(markdown: &str) -> String {
@@ -88,14 +89,26 @@ fn postprocess_html(html: &str) -> String {
     result
 }
 
+/// Returns true if the line is only 1–6 `#` characters (with no trailing
+/// content). Comrak treats these as empty ATX headings, but we want them
+/// rendered as literal text so they survive editor round-trips.
+fn is_bare_heading_line(line: &str) -> bool {
+    let bytes = line.as_bytes();
+    let len = bytes.len();
+    len >= 1 && len <= 6 && bytes.iter().all(|&b| b == b'#')
+}
+
 /// Preprocess blank lines into `<p><br></p>` markers, matching the frontend's
 /// `emptyParagraphPreprocess` hook.
+///
+/// Also escapes bare hash lines (`#`, `##`, …) so comrak treats them as
+/// literal text instead of empty headings.
 ///
 /// First blank line in a group = standard block separator.
 /// Each additional blank = empty paragraph marker.
 fn preprocess_blank_lines(markdown: &str) -> String {
     let lines: Vec<&str> = markdown.split('\n').collect();
-    let mut result: Vec<&str> = Vec::with_capacity(lines.len());
+    let mut result: Vec<Cow<'_, str>> = Vec::with_capacity(lines.len());
     let mut fence_char: Option<u8> = None;
     let mut fence_len: usize = 0;
     let mut i = 0;
@@ -127,7 +140,7 @@ fn preprocess_blank_lines(markdown: &str) -> String {
                         fence_char = Some(ch);
                         fence_len = len;
                     }
-                    result.push(line);
+                    result.push(Cow::Borrowed(line));
                     i += 1;
                     continue;
                 }
@@ -136,7 +149,7 @@ fn preprocess_blank_lines(markdown: &str) -> String {
 
         // Inside code fence — preserve as-is
         if fence_char.is_some() {
-            result.push(line);
+            result.push(Cow::Borrowed(line));
             i += 1;
             continue;
         }
@@ -149,14 +162,18 @@ fn preprocess_blank_lines(markdown: &str) -> String {
                 i += 1;
             }
             // First blank = standard separator
-            result.push("");
+            result.push(Cow::Borrowed(""));
             // Additional blanks = empty paragraphs
             for _ in 1..blank_count {
-                result.push("<p><br></p>");
-                result.push("");
+                result.push(Cow::Borrowed("<p><br></p>"));
+                result.push(Cow::Borrowed(""));
             }
+        } else if is_bare_heading_line(line) {
+            // Escape bare hash lines so comrak renders them as text
+            result.push(Cow::Owned(format!(r"\{}", line)));
+            i += 1;
         } else {
-            result.push(line);
+            result.push(Cow::Borrowed(line));
             i += 1;
         }
     }
@@ -167,6 +184,31 @@ fn preprocess_blank_lines(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bare_hashes_stay_as_text() {
+        // A lone "#" or "##" etc. without trailing text or space should be text, not headings
+        let html = markdown_to_lexical_html("#");
+        assert!(html.contains("<p>"), "Bare # should be paragraph. HTML: {html}");
+        assert!(html.contains("#"), "HTML: {html}");
+        assert!(!html.contains("<h1>"), "Bare # should NOT be heading. HTML: {html}");
+
+        let html = markdown_to_lexical_html("##");
+        assert!(!html.contains("<h2>"), "Bare ## should NOT be heading. HTML: {html}");
+        assert!(html.contains("<p>"), "HTML: {html}");
+
+        let html = markdown_to_lexical_html("######");
+        assert!(!html.contains("<h6>"), "Bare ###### should NOT be heading. HTML: {html}");
+        assert!(html.contains("<p>"), "HTML: {html}");
+
+        // But "# " with space IS a valid heading (used by the heading export)
+        let html = markdown_to_lexical_html("# ");
+        assert!(html.contains("<h1>"), "# with space should remain heading. HTML: {html}");
+
+        // And "# text" is obviously a heading
+        let html = markdown_to_lexical_html("# Hello");
+        assert!(html.contains("<h1>"), "# Hello should be heading. HTML: {html}");
+    }
 
     #[test]
     fn test_basic_markdown() {

@@ -146,6 +146,13 @@ const rendererOverrides: MarkedExtension = {
 };
 
 /**
+ * A line of only 1–6 `#` characters (no trailing space or text) is treated by
+ * marked as an empty ATX heading. We escape the leading `#` so it renders as
+ * literal text, matching CommonMark intent and surviving editor round-trips.
+ */
+const BARE_HEADING_RE = /^#{1,6}$/;
+
+/**
  * Preprocess hook to preserve blank lines as empty paragraphs. Marked treats
  * blank lines as paragraph separators and collapses them. We convert each
  * blank line into a <p><br></p> marker surrounded by blank lines so marked
@@ -204,6 +211,9 @@ const emptyParagraphPreprocess: MarkedExtension = {
             result.push("<p><br></p>");
             result.push("");
           }
+        } else if (BARE_HEADING_RE.test(line)) {
+          result.push(`\\${line}`);
+          i++;
         } else {
           result.push(line);
           i++;
@@ -266,6 +276,9 @@ const pastePreprocess: MarkedExtension = {
             result.push("<p><br></p>");
           }
           result.push("");
+        } else if (BARE_HEADING_RE.test(line)) {
+          result.push(`\\${line}`);
+          i++;
         } else {
           result.push(line);
           i++;
