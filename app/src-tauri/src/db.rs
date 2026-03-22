@@ -1,6 +1,6 @@
 use crate::{
     error::{now_millis, AppError},
-    nostr,
+    nostr, secure_storage,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
@@ -102,11 +102,12 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
     fs::create_dir_all(&staged_dir)?;
     let staged_db_path = staged_dir.join(ACCOUNT_DATABASE_FILE);
     let mut moved_target_dir: Option<PathBuf> = None;
+    let mut stored_key_public_key: Option<String> = None;
 
     let creation_result = (|| -> Result<AccountSummary, AppError> {
         let mut account_conn = Connection::open(&staged_db_path)?;
         account_migrations().to_latest(&mut account_conn)?;
-        let npub = nostr::import_nsec(&account_conn, nsec)?;
+        let identity = nostr::import_nsec(&account_conn, nsec)?;
         nostr::ensure_default_settings(&account_conn)?;
 
         let mut account = account_identity_record(&account_conn, &staged_db_path)?
@@ -114,7 +115,7 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
         drop(account_conn);
 
         let mut app_conn = app_database_connection(app)?;
-        ensure_account_not_registered(&app_conn, &account.public_key, &npub)?;
+        ensure_account_not_registered(&app_conn, &identity.public_key, &identity.npub)?;
 
         let target_dir = account_dir_for_npub(app, &account.npub)?;
         if target_dir.exists() {
@@ -126,6 +127,8 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
+        secure_storage::store_account_nsec(app, &account.public_key, &identity.nsec)?;
+        stored_key_public_key = Some(account.public_key.clone());
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
         register_account(&mut app_conn, &account, None, true)?;
 
@@ -142,6 +145,9 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
     if creation_result.is_err() {
         if let Some(target_dir) = moved_target_dir.filter(|dir| dir.exists()) {
             let _ = fs::remove_dir_all(target_dir);
+        }
+        if let Some(public_key) = stored_key_public_key.as_deref() {
+            secure_storage::remove_account_nsec(app, public_key);
         }
     }
 
@@ -236,7 +242,6 @@ fn account_migrations() -> Migrations<'static> {
            PRIMARY KEY (url, kind)
          );
          CREATE TABLE nostr_identity (
-           secret_key TEXT NOT NULL,
            public_key TEXT NOT NULL,
            npub       TEXT NOT NULL,
            created_at INTEGER NOT NULL
@@ -505,28 +510,50 @@ fn create_initial_account(
 ) -> Result<AccountRecord, AppError> {
     let staged_dir = staged_account_dir(app)?;
     fs::create_dir_all(&staged_dir)?;
+    let mut moved_target_dir: Option<PathBuf> = None;
+    let mut stored_key_public_key: Option<String> = None;
 
-    let staged_db_path = staged_dir.join(ACCOUNT_DATABASE_FILE);
-    let mut account_conn = Connection::open(&staged_db_path)?;
-    account_migrations().to_latest(&mut account_conn)?;
-    nostr::ensure_identity(&account_conn)?;
+    let creation_result = (|| -> Result<AccountRecord, AppError> {
+        let staged_db_path = staged_dir.join(ACCOUNT_DATABASE_FILE);
+        let mut account_conn = Connection::open(&staged_db_path)?;
+        account_migrations().to_latest(&mut account_conn)?;
+        let identity = nostr::create_identity(&account_conn)?;
 
-    let mut account = account_identity_record(&account_conn, &staged_db_path)?
-        .ok_or_else(|| AppError::custom("Failed to initialize account identity"))?;
-    drop(account_conn);
+        let mut account = account_identity_record(&account_conn, &staged_db_path)?
+            .ok_or_else(|| AppError::custom("Failed to initialize account identity"))?;
+        drop(account_conn);
 
-    let target_dir = account_dir_for_npub(app, &account.npub)?;
-    if target_dir.exists() {
-        return Err(AppError::custom(format!(
-            "Cannot create account in existing directory: {}",
-            target_dir.display()
-        )));
+        let target_dir = account_dir_for_npub(app, &account.npub)?;
+        if target_dir.exists() {
+            return Err(AppError::custom(format!(
+                "Cannot create account in existing directory: {}",
+                target_dir.display()
+            )));
+        }
+        fs::rename(&staged_dir, &target_dir)?;
+        moved_target_dir = Some(target_dir.clone());
+
+        secure_storage::store_account_nsec(app, &account.public_key, &identity.nsec)?;
+        stored_key_public_key = Some(account.public_key.clone());
+
+        account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
+        register_account(app_conn, &account, None, true)?;
+        Ok(account)
+    })();
+
+    if creation_result.is_err() && staged_dir.exists() {
+        let _ = fs::remove_dir_all(&staged_dir);
     }
-    fs::rename(&staged_dir, &target_dir)?;
+    if creation_result.is_err() {
+        if let Some(target_dir) = moved_target_dir.filter(|dir| dir.exists()) {
+            let _ = fs::remove_dir_all(target_dir);
+        }
+        if let Some(public_key) = stored_key_public_key.as_deref() {
+            secure_storage::remove_account_nsec(app, public_key);
+        }
+    }
 
-    account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
-    register_account(app_conn, &account, None, true)?;
-    Ok(account)
+    creation_result
 }
 
 fn account_identity_record(

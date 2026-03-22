@@ -4,6 +4,7 @@ set -eu
 
 APP_DIR="${HOME}/Library/Application Support/md.comet-alpha.dev"
 APP_DB_PATH="${APP_DIR}/app.db"
+KEYCHAIN_SERVICE="comet"
 
 if [ ! -f "$APP_DB_PATH" ]; then
   echo "No app database found at: $APP_DB_PATH"
@@ -26,15 +27,22 @@ if [ ! -f "$DB_PATH" ]; then
   exit 1
 fi
 
-IDENTITY_ROW="$(sqlite3 -separator '|' "$DB_PATH" "SELECT secret_key, public_key, npub FROM nostr_identity LIMIT 1;")"
+IDENTITY_ROW="$(sqlite3 -separator '|' "$DB_PATH" "SELECT public_key, npub FROM nostr_identity LIMIT 1;")"
 if [ -z "$IDENTITY_ROW" ]; then
   echo "No nostr identity found in: $DB_PATH"
   exit 1
 fi
 
-SECRET_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f1)"
-PUBLIC_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f2)"
-NPUB="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f3)"
+PUBLIC_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f1)"
+NPUB="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f2)"
+KEYCHAIN_ACCOUNT="nostr-nsec:${PUBLIC_KEY}"
+NSEC="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null || true)"
+
+if [ -z "$NSEC" ]; then
+  echo "No secure-storage nsec found for active account: $PUBLIC_KEY"
+  exit 1
+fi
+
 ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
 
 NOW_MS="$(($(date +%s) * 1000))"
@@ -135,7 +143,6 @@ CREATE TABLE pending_deletions (
 );
 
 CREATE TABLE nostr_identity (
-  secret_key TEXT NOT NULL,
   public_key TEXT NOT NULL,
   npub       TEXT NOT NULL,
   created_at INTEGER NOT NULL
@@ -380,8 +387,7 @@ INSERT INTO note_tags (note_id, tag) VALUES
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
 
-INSERT INTO nostr_identity (secret_key, public_key, npub, created_at) VALUES (
-  '$SECRET_KEY',
+INSERT INTO nostr_identity (public_key, npub, created_at) VALUES (
   '$PUBLIC_KEY',
   '$NPUB',
   $NOW_MS
@@ -398,6 +404,13 @@ PRAGMA user_version = 13;
 
 PRAGMA foreign_keys = ON;
 SQL
+
+security add-generic-password \
+  -U \
+  -s "$KEYCHAIN_SERVICE" \
+  -a "$KEYCHAIN_ACCOUNT" \
+  -w "$NSEC" \
+  >/dev/null
 
 rm -rf "$ATTACHMENTS_DIR"
 mkdir -p "$ATTACHMENTS_DIR"

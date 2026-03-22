@@ -10,6 +10,7 @@
     "clipboard-manager:allow-write-text",
     "dialog:allow-open",
     "log:default",
-    "opener:default"
+    "opener:default",
+    "secure-storage:default"
   ]
 }

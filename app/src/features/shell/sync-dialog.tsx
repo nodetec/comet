@@ -25,7 +25,8 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { cn, errorMessage } from "@/lib/utils";
 
 type SyncInfo = {
   state: string | { error: { message: string } };
@@ -56,6 +57,11 @@ function stateLabel(state: SyncInfo["state"]): {
       return {
         label: "Connected",
         icon: <CloudCheck className="size-4" />,
+      };
+    case "needsUnlock":
+      return {
+        label: "Needs Unlock",
+        icon: <Key className="size-4" />,
       };
     case "syncing":
       return {
@@ -119,18 +125,22 @@ export function SyncDialog({
   const [info, setInfo] = useState<SyncInfo | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  const refreshInfo = () => invoke<SyncInfo>("get_sync_info").then(setInfo);
 
   useEffect(() => {
     if (!open) return;
-    void invoke<SyncInfo>("get_sync_info").then(setInfo);
+    void refreshInfo();
   }, [open]);
 
   // Refresh on sync status changes while dialog is open
   useEffect(() => {
     if (!open) return;
     const unlisten = listen("sync-status", () => {
-      void invoke<SyncInfo>("get_sync_info").then(setInfo);
+      void refreshInfo();
     });
     return () => {
       void unlisten.then((fn) => fn());
@@ -160,6 +170,23 @@ export function SyncDialog({
   const { label, icon } = info
     ? stateLabel(info.state)
     : { label: "Loading", icon: <Cloud className="size-4" /> };
+  const needsUnlock =
+    info !== null &&
+    typeof info.state === "string" &&
+    info.state === "needsUnlock";
+
+  const handleUnlock = async () => {
+    setUnlocking(true);
+    setUnlockError(null);
+    try {
+      await invoke("unlock_sync");
+      await refreshInfo();
+    } catch (error) {
+      setUnlockError(errorMessage(error, "Failed to unlock sync."));
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -245,6 +272,33 @@ export function SyncDialog({
           ) : (
             <p className="text-muted-foreground text-xs">Loading…</p>
           )}
+
+          {needsUnlock ? (
+            <div className="border-accent/30 mt-3 border-t pt-3">
+              <p className="text-muted-foreground text-xs">
+                Sync is configured, but this session has not unlocked the active
+                account&apos;s Nostr key yet.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={unlocking}
+                  onClick={() => void handleUnlock()}
+                >
+                  <Key
+                    className={cn("size-3.5", unlocking && "animate-pulse")}
+                  />
+                  {unlocking ? "Unlocking..." : "Unlock Sync"}
+                </Button>
+                {unlockError ? (
+                  <span className="text-destructive text-xs">
+                    {unlockError}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {/* Collapsible sync log */}
           <div className="border-accent/30 mt-3 border-t pt-2">

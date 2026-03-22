@@ -7,6 +7,7 @@ mod nip44_ext;
 mod nip59_ext;
 mod nostr;
 mod notes;
+mod secure_storage;
 mod sync;
 mod themes;
 
@@ -15,7 +16,6 @@ use db::{
     database_connection,
 };
 use error::AppError;
-use nostr_sdk::prelude::Keys;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, ExportNotesInput, LoadedNote, NotePagePayload, NoteQueryInput,
@@ -292,18 +292,11 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
         Ok(c) => c,
         Err(_) => return,
     };
-    let keys = match conn
-        .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
-            row.get::<_, String>(0)
-        })
-        .optional()
-    {
-        Ok(Some(secret_hex)) => match Keys::parse(&secret_hex) {
-            Ok(k) => k,
-            Err(_) => return,
-        },
-        _ => return,
+    let (keys, _) = match crate::secure_storage::keys_for_current_identity(app, &conn) {
+        Ok(identity) => identity,
+        Err(_) => return,
     };
+    drop(conn);
 
     tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::new();
@@ -344,8 +337,7 @@ fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
 fn restart_sync_async(app: &AppHandle) {
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
-        let manager = app_clone.state::<sync::SyncManager>();
-        manager.start(app_clone.clone()).await;
+        let _ = sync::start_if_ready(&app_clone).await;
     });
 }
 
@@ -450,14 +442,7 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
     };
 
     // Get keys for decryption and Blossom auth
-    let (secret_hex, pubkey_hex): (String, String) = conn
-        .query_row(
-            "SELECT secret_key, public_key FROM nostr_identity LIMIT 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?
-        .ok_or_else(|| AppError::custom("No identity configured"))?;
+    let (keys, pubkey_hex) = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
 
     // Look up blob metadata for the current server + identity
     let meta: Option<(String, String)> = conn
@@ -474,10 +459,6 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
     };
 
     drop(conn); // release before async work
-
-    let secret_key = nostr_sdk::prelude::SecretKey::parse(&secret_hex)
-        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
-    let keys = nostr_sdk::prelude::Keys::new(secret_key);
 
     // Download from Blossom
     let http_client = reqwest::Client::new();
@@ -652,7 +633,7 @@ async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppError>
 
     let manager = app.state::<sync::SyncManager>();
     if enabled {
-        manager.start(app.clone()).await;
+        sync::start_if_ready(&app).await?;
     } else {
         manager.stop().await;
     }
@@ -684,14 +665,22 @@ async fn resync(app: AppHandle) -> Result<(), AppError> {
     )?;
 
     // Restart sync — will pull everything fresh from the relay
-    manager.start(app.clone()).await;
+    sync::start_if_ready(&app).await?;
     Ok(())
 }
 
 #[tauri::command]
 async fn restart_sync(app: AppHandle) -> Result<(), AppError> {
-    let manager = app.state::<sync::SyncManager>();
-    manager.start(app.clone()).await;
+    sync::start_if_ready(&app).await?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn unlock_sync(app: AppHandle) -> Result<(), AppError> {
+    let conn = database_connection(&app)?;
+    let _ = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
+    drop(conn);
+    sync::start_if_ready(&app).await?;
     Ok(())
 }
 
@@ -721,7 +710,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_secure_storage::init())
         .manage(notes::RenderedHtmlCache::default())
+        .manage(secure_storage::UnlockedNostrKeys::default())
         .manage(sync::SyncManager::new())
         .setup(|app| {
             db::init_database(app.handle())?;
@@ -775,6 +766,7 @@ pub fn run() {
             set_sync_enabled,
             get_sync_status,
             restart_sync,
+            unlock_sync,
             resync,
             search_notes,
             search_tags,

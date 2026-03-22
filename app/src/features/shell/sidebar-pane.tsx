@@ -14,6 +14,7 @@ import {
   CloudOff,
   CloudSync,
   CloudCheck,
+  Key,
   FileTextIcon,
   PlusCircleIcon,
   Settings2,
@@ -239,6 +240,7 @@ export function SidebarPane({
             {syncState === "connected" && (
               <CloudCheck className="size-[1.2rem]" />
             )}
+            {syncState === "needsUnlock" && <Key className="size-[1.2rem]" />}
             {(syncState === "syncing" ||
               syncState === "connecting" ||
               syncState === "authenticating") && (

@@ -25,35 +25,53 @@ pub fn ensure_default_settings(conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Returns the npub for the stored identity,
-/// generating a new keypair if one does not exist yet.
-/// On first launch, also sets up default relay and blossom server.
-pub fn ensure_identity(conn: &Connection) -> Result<String, AppError> {
-    if let Some(npub) = get_npub(conn)? {
-        return Ok(npub);
-    }
+#[derive(Debug, Clone)]
+pub struct IdentityCredentials {
+    pub public_key: String,
+    pub npub: String,
+    pub nsec: String,
+}
 
-    let keys = Keys::generate();
+fn insert_identity(conn: &Connection, keys: &Keys) -> Result<IdentityCredentials, AppError> {
     let npub = keys
         .public_key()
         .to_bech32()
         .map_err(|e| AppError::custom(e.to_string()))?;
+    let nsec = keys
+        .secret_key()
+        .to_bech32()
+        .map_err(|e| AppError::custom(e.to_string()))?;
+    let public_key = keys.public_key().to_hex();
     let now = now_millis();
 
     conn.execute(
-        "INSERT INTO nostr_identity (secret_key, public_key, npub, created_at)
-         VALUES (?1, ?2, ?3, ?4)",
-        params![
-            keys.secret_key().to_secret_hex(),
-            keys.public_key().to_hex(),
-            npub,
-            now,
-        ],
+        "INSERT INTO nostr_identity (public_key, npub, created_at)
+         VALUES (?1, ?2, ?3)",
+        params![public_key, npub, now],
     )?;
+
+    Ok(IdentityCredentials {
+        public_key,
+        npub,
+        nsec,
+    })
+}
+
+/// Generates a fresh keypair and stores only the public identity in SQLite.
+/// On first launch, also sets up default relay and blossom server.
+pub fn create_identity(conn: &Connection) -> Result<IdentityCredentials, AppError> {
+    if let Some(npub) = get_npub(conn)? {
+        return Err(AppError::custom(format!(
+            "Nostr identity already configured for {npub}."
+        )));
+    }
+
+    let keys = Keys::generate();
+    let identity = insert_identity(conn, &keys)?;
 
     ensure_default_settings(conn)?;
 
-    Ok(npub)
+    Ok(identity)
 }
 
 fn get_npub(conn: &Connection) -> Result<Option<String>, AppError> {
@@ -168,8 +186,9 @@ pub async fn publish_note(
     let note_id = &input.note_id;
 
     // Synchronous DB block — Connection is not Send, must drop before any .await
-    let (secret_hex, d_tag, content, relay_urls) = {
+    let (keys, d_tag, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
+        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
 
         let (id, markdown, existing_d_tag): (String, String, Option<String>) = conn
             .query_row(
@@ -179,13 +198,6 @@ pub async fn publish_note(
             )
             .optional()?
             .ok_or_else(|| AppError::custom("Note not found."))?;
-
-        let secret_hex: String = conn
-            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
-                row.get(0)
-            })
-            .optional()?
-            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
         let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
@@ -211,13 +223,8 @@ pub async fn publish_note(
 
         let content = strip_title_line(&markdown);
 
-        (secret_hex, d_tag, content, relay_urls)
+        (keys, d_tag, content, relay_urls)
     };
-
-    // Async relay block
-    let secret_key = SecretKey::parse(&secret_hex)
-        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
-    let keys = Keys::new(secret_key);
 
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
@@ -313,8 +320,9 @@ pub async fn publish_short_note(
 ) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
 
-    let (secret_hex, content, relay_urls) = {
+    let (keys, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
+        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
 
         let markdown: String = conn
             .query_row(
@@ -324,13 +332,6 @@ pub async fn publish_short_note(
             )
             .optional()?
             .ok_or_else(|| AppError::custom("Note not found."))?;
-
-        let secret_hex: String = conn
-            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
-                row.get(0)
-            })
-            .optional()?
-            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
 
         let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
@@ -345,12 +346,8 @@ pub async fn publish_short_note(
 
         let content = strip_title_line(&markdown);
 
-        (secret_hex, content, relay_urls)
+        (keys, content, relay_urls)
     };
-
-    let secret_key = SecretKey::parse(&secret_hex)
-        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
-    let keys = Keys::new(secret_key);
 
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
@@ -418,8 +415,9 @@ pub async fn delete_published_note(
     note_id: &str,
 ) -> Result<PublishResult, AppError> {
     // Synchronous DB block
-    let (secret_hex, d_tag, published_event_id, relay_urls) = {
+    let (keys, d_tag, published_event_id, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
+        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
 
         let (existing_d_tag, published_event_id): (Option<String>, Option<String>) = conn
             .query_row(
@@ -436,13 +434,6 @@ pub async fn delete_published_note(
             ));
         }
 
-        let secret_hex: String = conn
-            .query_row("SELECT secret_key FROM nostr_identity LIMIT 1", [], |row| {
-                row.get(0)
-            })
-            .optional()?
-            .ok_or_else(|| AppError::custom("No Nostr identity configured."))?;
-
         let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
@@ -454,13 +445,8 @@ pub async fn delete_published_note(
             ));
         }
 
-        (secret_hex, existing_d_tag, published_event_id, relay_urls)
+        (keys, existing_d_tag, published_event_id, relay_urls)
     };
-
-    // Async relay block
-    let secret_key = SecretKey::parse(&secret_hex)
-        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
-    let keys = Keys::new(secret_key);
 
     // Build deletion request — target by coordinate (article) or event ID (note)
     let mut deletion_request = EventDeletionRequest::new();
@@ -529,31 +515,11 @@ pub(crate) fn strip_title_line(markdown: &str) -> String {
 }
 
 /// Imports an nsec (bech32 or hex), replacing the existing identity.
-/// Returns the new npub.
-pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<String, AppError> {
-    let secret_key =
-        SecretKey::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
-    let keys = Keys::new(secret_key);
-    let npub = keys
-        .public_key()
-        .to_bech32()
-        .map_err(|e| AppError::custom(e.to_string()))?;
-    let now = now_millis();
-
+/// Returns the normalized imported identity.
+pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<IdentityCredentials, AppError> {
+    let keys = Keys::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;
     conn.execute("DELETE FROM nostr_identity", [])?;
-
-    conn.execute(
-        "INSERT INTO nostr_identity (secret_key, public_key, npub, created_at)
-         VALUES (?1, ?2, ?3, ?4)",
-        params![
-            keys.secret_key().to_secret_hex(),
-            keys.public_key().to_hex(),
-            npub,
-            now,
-        ],
-    )?;
-
-    Ok(npub)
+    insert_identity(conn, &keys)
 }
 
 #[cfg(test)]

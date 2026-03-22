@@ -19,6 +19,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 #[serde(rename_all = "camelCase")]
 pub enum SyncState {
     Disconnected,
+    NeedsUnlock,
     Connecting,
     Authenticating,
     Syncing,
@@ -140,10 +141,16 @@ impl SyncManager {
 // ── Auto-start ─────────────────────────────────────────────────────────
 
 pub async fn auto_start(app: &AppHandle) {
-    let should_start = {
+    if let Err(error) = start_if_ready(app).await {
+        sync_log(app, &format!("failed to initialize sync: {error}"));
+    }
+}
+
+pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
+    let readiness = {
         let conn = match crate::db::database_connection(app) {
             Ok(c) => c,
-            Err(_) => return,
+            Err(error) => return Err(error),
         };
         let has_relay = get_sync_relay_url(&conn).is_some();
         let enabled = conn
@@ -157,13 +164,30 @@ pub async fn auto_start(app: &AppHandle) {
             .flatten()
             .as_deref()
             == Some("true");
-        has_relay && enabled
+        let unlocked = if has_relay && enabled {
+            crate::secure_storage::is_current_identity_unlocked(app, &conn)?
+        } else {
+            false
+        };
+        (has_relay, enabled, unlocked)
     };
 
-    if should_start {
-        let manager = app.state::<SyncManager>();
-        manager.start(app.clone()).await;
+    let manager = app.state::<SyncManager>();
+    let (has_relay, enabled, unlocked) = readiness;
+
+    if !has_relay || !enabled {
+        manager.stop().await;
+        return Ok(());
     }
+
+    if !unlocked {
+        manager.stop().await;
+        set_state(&manager.state, SyncState::NeedsUnlock, app).await;
+        return Ok(());
+    }
+
+    manager.start(app.clone()).await;
+    Ok(())
 }
 
 // ── DB helpers ──────────────────────────────────────────────────────────
@@ -184,17 +208,6 @@ pub(crate) fn get_sync_relay_url(conn: &Connection) -> Option<String> {
         "SELECT url FROM relays WHERE kind = 'sync' LIMIT 1",
         [],
         |row| row.get(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
-}
-
-fn get_identity(conn: &Connection) -> Option<(String, String)> {
-    conn.query_row(
-        "SELECT secret_key, public_key FROM nostr_identity LIMIT 1",
-        [],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
     )
     .optional()
     .ok()
@@ -702,18 +715,13 @@ async fn run_sync_connection(
     push_rx: &mut mpsc::Receiver<SyncCommand>,
 ) -> Result<(), AppError> {
     // Read config from DB
-    let (relay_url, secret_hex, _public_hex) = {
+    let (relay_url, keys) = {
         let conn = crate::db::database_connection(app)?;
         let relay_url = get_sync_relay_url(&conn)
             .ok_or_else(|| AppError::custom("No sync relay configured"))?;
-        let (secret_hex, public_hex) =
-            get_identity(&conn).ok_or_else(|| AppError::custom("No Nostr identity configured"))?;
-        (relay_url, secret_hex, public_hex)
+        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
+        (relay_url, keys)
     };
-
-    let secret_key = SecretKey::parse(&secret_hex)
-        .map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
-    let keys = Keys::new(secret_key);
     let pubkey = keys.public_key();
 
     // Connect WebSocket
