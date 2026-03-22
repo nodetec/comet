@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
@@ -20,10 +20,7 @@ pub struct ImportedImage {
 }
 
 fn attachments_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
-    let config_dir = app.path().app_config_dir()?;
-    let dir = config_dir.join("attachments");
-    fs::create_dir_all(&dir)?;
-    Ok(dir)
+    crate::db::active_account_attachments_dir(app)
 }
 
 pub fn get_attachments_dir(app: &AppHandle) -> Result<String, AppError> {

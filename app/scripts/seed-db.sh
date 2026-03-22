@@ -3,10 +3,39 @@
 set -eu
 
 APP_DIR="${HOME}/Library/Application Support/md.comet-alpha.dev"
-DEFAULT_DB_PATH="${APP_DIR}/comet.db"
-DB_PATH="${COMET_DB_PATH:-$DEFAULT_DB_PATH}"
+APP_DB_PATH="${APP_DIR}/app.db"
+
+if [ ! -f "$APP_DB_PATH" ]; then
+  echo "No app database found at: $APP_DB_PATH"
+  exit 1
+fi
+
+ACTIVE_NPUB="$(sqlite3 "$APP_DB_PATH" "SELECT npub FROM accounts WHERE is_active = 1 LIMIT 1;")"
+if [ -z "$ACTIVE_NPUB" ]; then
+  echo "No active account configured in: $APP_DB_PATH"
+  exit 1
+fi
+
+ACCOUNT_DIR="${APP_DIR}/accounts/${ACTIVE_NPUB}"
+DB_PATH="${ACCOUNT_DIR}/comet.db"
 
 mkdir -p "$(dirname "$DB_PATH")"
+
+if [ ! -f "$DB_PATH" ]; then
+  echo "No database found at: $DB_PATH"
+  exit 1
+fi
+
+IDENTITY_ROW="$(sqlite3 -separator '|' "$DB_PATH" "SELECT secret_key, public_key, npub FROM nostr_identity LIMIT 1;")"
+if [ -z "$IDENTITY_ROW" ]; then
+  echo "No nostr identity found in: $DB_PATH"
+  exit 1
+fi
+
+SECRET_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f1)"
+PUBLIC_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f2)"
+NPUB="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f3)"
+ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
 
 NOW_MS="$(($(date +%s) * 1000))"
 MINUTE_MS=60000
@@ -36,6 +65,10 @@ DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS relays;
 DROP TABLE IF EXISTS nostr_identity;
+DROP TABLE IF EXISTS blob_meta;
+DROP TABLE IF EXISTS blob_uploads;
+DROP TABLE IF EXISTS pending_deletions;
+DROP TABLE IF EXISTS _rusqlite_migration;
 DROP TABLE IF EXISTS _rusqlite_migration_version;
 
 CREATE TABLE app_settings (
@@ -48,7 +81,8 @@ CREATE TABLE notebooks (
   name TEXT NOT NULL UNIQUE,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  sync_event_id TEXT
+  sync_event_id TEXT,
+  locally_modified INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE relays (
@@ -65,20 +99,34 @@ CREATE TABLE notes (
   notebook_id TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
   created_at INTEGER NOT NULL,
   modified_at INTEGER NOT NULL,
-  edited_at INTEGER,
   archived_at INTEGER,
-  deleted_at INTEGER,
   pinned_at INTEGER,
   nostr_d_tag TEXT,
   published_at INTEGER,
   sync_event_id TEXT,
-  locally_modified INTEGER NOT NULL DEFAULT 0
+  edited_at INTEGER,
+  locally_modified INTEGER NOT NULL DEFAULT 0,
+  deleted_at INTEGER,
+  published_event_id TEXT,
+  published_kind INTEGER
+);
+
+CREATE TABLE blob_uploads (
+  hash TEXT NOT NULL,
+  server_url TEXT NOT NULL,
+  encrypted INTEGER NOT NULL DEFAULT 0,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  uploaded_at INTEGER NOT NULL,
+  PRIMARY KEY (hash, server_url)
 );
 
 CREATE TABLE blob_meta (
-  plaintext_hash  TEXT PRIMARY KEY,
+  plaintext_hash  TEXT NOT NULL,
+  server_url      TEXT NOT NULL,
+  pubkey          TEXT NOT NULL,
   ciphertext_hash TEXT NOT NULL,
-  encryption_key  TEXT NOT NULL
+  encryption_key  TEXT NOT NULL,
+  PRIMARY KEY (plaintext_hash, server_url, pubkey)
 );
 
 CREATE TABLE pending_deletions (
@@ -112,6 +160,7 @@ CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
   WHERE archived_at IS NULL;
 CREATE INDEX idx_notes_archived_at ON notes(archived_at);
 CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
+CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);
 CREATE INDEX idx_note_tags_tag ON note_tags(tag);
 
 INSERT INTO notebooks (id, name, created_at, updated_at) VALUES
@@ -308,7 +357,7 @@ This one exists to exercise archive and restore flows.
 
 INSERT INTO app_settings (key, value) VALUES
   ('last_open_note_id', 'note-writing-draft'),
-  ('blossom_url', 'https://blossom.comet.md');
+  ('blossom_url', 'https://comet.md');
 
 INSERT INTO note_tags (note_id, tag) VALUES
   ('note-pinned-trail', 'design'),
@@ -331,17 +380,16 @@ INSERT INTO note_tags (note_id, tag) VALUES
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
 
--- Stable test identity
 INSERT INTO nostr_identity (secret_key, public_key, npub, created_at) VALUES (
-  '34ad98b1403b2e0cb48b6caf7591988c6bb8c2a1844c6e908b2e91b2c2f973b1',
-  '55e9e957162a1ec52a453f0a7112a2d3e55ee86d964365f5cbf4fd7054db5fa2',
-  'npub12h57j4ck9g0v22j98u98zy4z60j4a6rdjepktawt7n7hq4xmt73qgze79r',
+  '$SECRET_KEY',
+  '$PUBLIC_KEY',
+  '$NPUB',
   $NOW_MS
 );
 
 INSERT INTO relays (url, kind, created_at) VALUES
   ('wss://comet.md', 'sync', $NOW_MS),
-  ('wss://comet.md', 'publish', $NOW_MS);
+  ('wss://relay.damus.io', 'publish', $NOW_MS);
 
 COMMIT;
 
@@ -350,5 +398,8 @@ PRAGMA user_version = 13;
 
 PRAGMA foreign_keys = ON;
 SQL
+
+rm -rf "$ATTACHMENTS_DIR"
+mkdir -p "$ATTACHMENTS_DIR"
 
 echo "Seeded Comet database at: $DB_PATH"

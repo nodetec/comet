@@ -10,7 +10,10 @@ mod notes;
 mod sync;
 mod themes;
 
-use db::database_connection;
+use db::{
+    active_account, active_account_attachments_dir, active_account_dir, app_database_path,
+    database_connection,
+};
 use error::AppError;
 use nostr_sdk::prelude::Keys;
 use notes::{
@@ -27,16 +30,21 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 #[serde(rename_all = "camelCase")]
 struct AppStatus {
     version: String,
+    app_database_path: String,
+    account_path: String,
     database_path: String,
     attachments_path: String,
     themes_path: String,
+    active_npub: String,
 }
 
 #[tauri::command]
 fn app_status(app: AppHandle) -> Result<AppStatus, AppError> {
     let config_dir = app.path().app_config_dir()?;
-    let database_path = config_dir.join("comet.db");
-    let attachments_path = config_dir.join("attachments");
+    let app_database_path = app_database_path(&app)?;
+    let account = active_account(&app)?;
+    let account_path = active_account_dir(&app)?;
+    let attachments_path = active_account_attachments_dir(&app)?;
     let themes_path = config_dir.join("themes");
 
     Ok(AppStatus {
@@ -45,9 +53,12 @@ fn app_status(app: AppHandle) -> Result<AppStatus, AppError> {
             .version
             .clone()
             .unwrap_or_else(|| "unknown".into()),
-        database_path: database_path.to_string_lossy().into_owned(),
+        app_database_path: app_database_path.to_string_lossy().into_owned(),
+        account_path: account_path.to_string_lossy().into_owned(),
+        database_path: account.db_path.to_string_lossy().into_owned(),
         attachments_path: attachments_path.to_string_lossy().into_owned(),
         themes_path: themes_path.to_string_lossy().into_owned(),
+        active_npub: account.npub,
     })
 }
 
@@ -339,36 +350,36 @@ fn restart_sync_async(app: &AppHandle) {
 }
 
 #[tauri::command]
-fn import_nsec(app: AppHandle, nsec: String) -> Result<String, AppError> {
-    let conn = database_connection(&app)?;
-    let npub = nostr::import_nsec(&conn, &nsec)?;
-    reset_sync_state(&conn)?;
+fn list_accounts(app: AppHandle) -> Result<Vec<db::AccountSummary>, AppError> {
+    db::list_accounts(&app)
+}
 
-    // Collect all note and notebook IDs to re-push under the new key
-    let mut stmt = conn.prepare("SELECT id FROM notes WHERE archived_at IS NULL")?;
-    let note_ids: Vec<String> = stmt
-        .query_map([], |row| row.get(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    drop(stmt);
-    let mut stmt2 = conn.prepare("SELECT id FROM notebooks")?;
-    let notebook_ids: Vec<String> = stmt2
-        .query_map([], |row| row.get(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    drop(stmt2);
-    drop(conn);
+async fn run_account_change<T>(
+    app: &AppHandle,
+    change: impl FnOnce() -> Result<T, AppError>,
+) -> Result<T, AppError> {
+    let manager = app.state::<sync::SyncManager>();
+    manager.stop().await;
 
-    let manager = app.state::<sync::SyncManager>().inner().clone();
-    tauri::async_runtime::spawn(async move {
-        manager.start(app.clone()).await;
-        for nb_id in notebook_ids {
-            manager.push(sync::SyncCommand::PushNotebook(nb_id)).await;
-        }
-        for note_id in note_ids {
-            manager.push(sync::SyncCommand::PushNote(note_id)).await;
-        }
-    });
+    let result = change();
+    if result.is_ok() {
+        notes::clear_rendered_html_cache(app);
+    }
+    sync::auto_start(app).await;
+    result
+}
 
-    Ok(npub)
+#[tauri::command]
+async fn add_account(app: AppHandle, nsec: String) -> Result<db::AccountSummary, AppError> {
+    run_account_change(&app, || db::add_account(&app, &nsec)).await
+}
+
+#[tauri::command]
+async fn switch_account(
+    app: AppHandle,
+    public_key: String,
+) -> Result<db::AccountSummary, AppError> {
+    run_account_change(&app, || db::switch_account(&app, &public_key)).await
 }
 
 #[tauri::command]
@@ -744,7 +755,9 @@ pub fn run() {
             assign_note_notebook,
             pin_note,
             unpin_note,
-            import_nsec,
+            list_accounts,
+            add_account,
+            switch_account,
             list_relays,
             set_sync_relay,
             remove_sync_relay,

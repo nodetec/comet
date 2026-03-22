@@ -1,20 +1,25 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { closeDatabase, openDatabase } from "./db";
-import { resolveDatabasePath } from "./lib/paths";
+import { resolveAppDatabasePath } from "./lib/paths";
 import { createServer } from "./server";
 
 const args = process.argv.slice(2);
 const dev = args.includes("--dev");
 
-let dbPath: string;
+let appDbPath: string;
 try {
-  dbPath = resolveDatabasePath(dev);
+  appDbPath = resolveAppDatabasePath(dev);
 } catch (e) {
   console.error(e instanceof Error ? e.message : String(e));
   process.exit(1);
 }
 
-await openDatabase(dbPath);
+try {
+  await openDatabase(appDbPath);
+} catch (e) {
+  console.error(e instanceof Error ? e.message : String(e));
+  process.exit(1);
+}
 
 const server = createServer();
 const transport = new StdioServerTransport();

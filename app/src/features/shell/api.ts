@@ -18,7 +18,11 @@ import {
 } from "./types";
 
 export const NOTE_PAGE_SIZE = 40;
-export const PENDING_DRAFT_KEY = "comet-pending-draft";
+const PENDING_DRAFT_KEY_PREFIX = "comet-pending-draft";
+
+export function pendingDraftStorageKey(npub: string): string {
+  return `${PENDING_DRAFT_KEY_PREFIX}:${npub}`;
+}
 
 export type PublishResult = {
   successCount: number;

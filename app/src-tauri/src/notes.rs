@@ -271,7 +271,7 @@ pub struct AssignNoteNotebookInput {
 
 pub fn bootstrap(app: &AppHandle) -> Result<BootstrapPayload, AppError> {
     let conn = database_connection(app)?;
-    let npub = nostr::ensure_identity(&conn)?;
+    let npub = nostr::current_npub(&conn)?;
 
     let notebooks = list_notebooks(&conn)?;
     let selected_note_id = last_open_note_id(&conn)?
@@ -1259,6 +1259,13 @@ pub(crate) fn invalidate_rendered_html_cache(app: &AppHandle, note_id: &str) {
     let cache = app.state::<RenderedHtmlCache>();
     if let Ok(mut state) = cache.state.lock() {
         state.remove(note_id);
+    };
+}
+
+pub(crate) fn clear_rendered_html_cache(app: &AppHandle) {
+    let cache = app.state::<RenderedHtmlCache>();
+    if let Ok(mut state) = cache.state.lock() {
+        *state = RenderedHtmlCacheState::default();
     };
 }
 

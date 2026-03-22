@@ -30,7 +30,7 @@ Common commands:
 - `just blossom-test`: run the Blossom test suite
 - `just format-check`: check formatting across the repo
 
-The seed script resets the local app database by default. To seed a throwaway database instead, pass `COMET_DB_PATH=/tmp/comet.db`.
+Comet keeps a root `app.db` plus per-account databases under `accounts/<npub>/comet.db`. The maintenance scripts and MCP server always resolve the active account through `app.db`.
 
 ## Repo Layout
 

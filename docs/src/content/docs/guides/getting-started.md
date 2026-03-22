@@ -55,5 +55,6 @@ just app-check
 
 - `just app-build` and `just app-check` do not require Bun.
 - Relay and Blossom tests use Postgres through `TEST_DATABASE_URL`.
-- The seed script resets the local app database by default, so point
-  `COMET_DB_PATH` at a disposable path if needed.
+- Comet stores a root `app.db` plus per-account databases under
+  `accounts/<npub>/comet.db`. The maintenance scripts and MCP server resolve
+  the active account through `app.db`.

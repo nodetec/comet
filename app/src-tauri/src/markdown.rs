@@ -189,25 +189,43 @@ mod tests {
     fn test_bare_hashes_stay_as_text() {
         // A lone "#" or "##" etc. without trailing text or space should be text, not headings
         let html = markdown_to_lexical_html("#");
-        assert!(html.contains("<p>"), "Bare # should be paragraph. HTML: {html}");
+        assert!(
+            html.contains("<p>"),
+            "Bare # should be paragraph. HTML: {html}"
+        );
         assert!(html.contains("#"), "HTML: {html}");
-        assert!(!html.contains("<h1>"), "Bare # should NOT be heading. HTML: {html}");
+        assert!(
+            !html.contains("<h1>"),
+            "Bare # should NOT be heading. HTML: {html}"
+        );
 
         let html = markdown_to_lexical_html("##");
-        assert!(!html.contains("<h2>"), "Bare ## should NOT be heading. HTML: {html}");
+        assert!(
+            !html.contains("<h2>"),
+            "Bare ## should NOT be heading. HTML: {html}"
+        );
         assert!(html.contains("<p>"), "HTML: {html}");
 
         let html = markdown_to_lexical_html("######");
-        assert!(!html.contains("<h6>"), "Bare ###### should NOT be heading. HTML: {html}");
+        assert!(
+            !html.contains("<h6>"),
+            "Bare ###### should NOT be heading. HTML: {html}"
+        );
         assert!(html.contains("<p>"), "HTML: {html}");
 
         // But "# " with space IS a valid heading (used by the heading export)
         let html = markdown_to_lexical_html("# ");
-        assert!(html.contains("<h1>"), "# with space should remain heading. HTML: {html}");
+        assert!(
+            html.contains("<h1>"),
+            "# with space should remain heading. HTML: {html}"
+        );
 
         // And "# text" is obviously a heading
         let html = markdown_to_lexical_html("# Hello");
-        assert!(html.contains("<h1>"), "# Hello should be heading. HTML: {html}");
+        assert!(
+            html.contains("<h1>"),
+            "# Hello should be heading. HTML: {html}"
+        );
     }
 
     #[test]
@@ -364,7 +382,8 @@ mod tests {
 
     #[test]
     fn test_youtube_named_link_stays_link() {
-        let html = markdown_to_lexical_html("[My Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
+        let html =
+            markdown_to_lexical_html("[My Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
         assert!(
             html.contains("<a href="),
             "Named YouTube link should stay as link. HTML: {html}"

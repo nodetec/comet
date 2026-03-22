@@ -1,4 +1,4 @@
-import { getDatabase } from "../db";
+import type { DB } from "../db";
 import { previewFromMarkdown } from "../lib/markdown";
 import type {
   LoadedNote,
@@ -186,17 +186,19 @@ function appendNoteViewClauses(
 
 // --- Tool implementations ---
 
-export function listNotes(input: {
-  filter?: NoteFilter;
-  notebookId?: string;
-  search?: string;
-  tags?: string[];
-  limit?: number;
-  offset?: number;
-  sort?: NoteSortField;
-  direction?: NoteSortDirection;
-}): NotePagePayload {
-  const db = getDatabase();
+export function listNotes(
+  db: DB,
+  input: {
+    filter?: NoteFilter;
+    notebookId?: string;
+    search?: string;
+    tags?: string[];
+    limit?: number;
+    offset?: number;
+    sort?: NoteSortField;
+    direction?: NoteSortDirection;
+  },
+): NotePagePayload {
   const filter: NoteFilter = input.filter ?? "all";
   const limit = Math.min(Math.max(input.limit ?? 40, 1), MAX_PAGE_SIZE);
   const offset = input.offset ?? 0;
@@ -318,8 +320,7 @@ export function listNotes(input: {
   };
 }
 
-export function readNote(noteId: string): LoadedNote | null {
-  const db = getDatabase();
+export function readNote(db: DB, noteId: string): LoadedNote | null {
   const row = db
     .prepare(
       `SELECT n.id, n.title, n.markdown, n.modified_at, n.archived_at, n.deleted_at, n.pinned_at,
@@ -357,8 +358,7 @@ export function readNote(noteId: string): LoadedNote | null {
   };
 }
 
-export function searchNotes(query: string): SearchResult[] {
-  const db = getDatabase();
+export function searchNotes(db: DB, query: string): SearchResult[] {
   const searchTokens = searchTokensFromQuery(query);
   const searchMode = searchModeFromTokens(searchTokens);
   if (!searchMode) {
@@ -416,8 +416,7 @@ export function searchNotes(query: string): SearchResult[] {
   });
 }
 
-export function listNotebooks(): NotebookSummary[] {
-  const db = getDatabase();
+export function listNotebooks(db: DB): NotebookSummary[] {
   const rows = db
     .prepare(
       `SELECT b.id, b.name, COUNT(n.id) AS note_count
@@ -435,8 +434,7 @@ export function listNotebooks(): NotebookSummary[] {
   }));
 }
 
-export function listTags(query?: string): string[] {
-  const db = getDatabase();
+export function listTags(db: DB, query?: string): string[] {
   if (!query || query.trim().length === 0) {
     const rows = db
       .prepare(
@@ -465,7 +463,7 @@ export function listTags(query?: string): string[] {
   return rows.map((r) => r.tag);
 }
 
-export function getStats(): {
+export function getStats(db: DB): {
   totalNotes: number;
   activeNotes: number;
   archivedNotes: number;
@@ -474,7 +472,6 @@ export function getStats(): {
   notebooks: number;
   tags: number;
 } {
-  const db = getDatabase();
   const total =
     (
       db.prepare("SELECT COUNT(*) AS c FROM notes").get() as {

@@ -25,7 +25,7 @@ import {
   getTodoCount,
   loadNote,
   NOTE_PAGE_SIZE,
-  PENDING_DRAFT_KEY,
+  pendingDraftStorageKey,
   pinNote,
   queryNotes,
   restoreNote,
@@ -143,6 +143,7 @@ export function useShellController() {
     queryKey: ["bootstrap"],
     queryFn: getBootstrap,
   });
+  const activeNpub = bootstrapQuery.data?.npub ?? null;
 
   const todoCountQuery = useQuery({
     queryKey: ["todo-count"],
@@ -367,7 +368,9 @@ export function useShellController() {
         queryClient.invalidateQueries({ queryKey: ["todo-count"] }),
       ]);
       try {
-        localStorage.removeItem(PENDING_DRAFT_KEY);
+        if (activeNpub) {
+          localStorage.removeItem(pendingDraftStorageKey(activeNpub));
+        }
       } catch {
         // Ignore
       }
@@ -569,8 +572,9 @@ export function useShellController() {
   // Recover any draft that was pending when the app quit
   useEffect(() => {
     if (!bootstrapQuery.isSuccess) return;
+    const draftKey = pendingDraftStorageKey(bootstrapQuery.data.npub);
     try {
-      const raw = localStorage.getItem(PENDING_DRAFT_KEY);
+      const raw = localStorage.getItem(draftKey);
       if (!raw) return;
       const { noteId, markdown } = JSON.parse(raw) as {
         noteId: string;
@@ -579,16 +583,16 @@ export function useShellController() {
       if (noteId && markdown) {
         void saveNote({ id: noteId, markdown })
           .then(() => {
-            localStorage.removeItem(PENDING_DRAFT_KEY);
+            localStorage.removeItem(draftKey);
             void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
             void queryClient.invalidateQueries({ queryKey: ["notes"] });
           })
           .catch(() => {});
       }
     } catch {
-      localStorage.removeItem(PENDING_DRAFT_KEY);
+      localStorage.removeItem(draftKey);
     }
-  }, [bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bootstrapQuery.data?.npub, bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Invalidate queries when a remote sync change arrives
   useEffect(() => {
@@ -663,8 +667,11 @@ export function useShellController() {
 
     // Persist draft for crash recovery (survives app quit during debounce)
     try {
+      if (!activeNpub) {
+        return;
+      }
       localStorage.setItem(
-        PENDING_DRAFT_KEY,
+        pendingDraftStorageKey(activeNpub),
         JSON.stringify({ noteId: currentNote.id, markdown: draftMarkdown }),
       );
     } catch {
@@ -685,12 +692,51 @@ export function useShellController() {
       }
     };
   }, [
+    activeNpub,
     currentNote,
     draftMarkdown,
     draftNoteId,
     mutateSaveNote,
     saveNotePending,
   ]);
+
+  useEffect(() => {
+    const handlePrepareAccountChange = () => {
+      void (async () => {
+        try {
+          await latestRef.current.flushCurrentDraftAsync();
+          window.dispatchEvent(
+            new CustomEvent("comet:account-change-prepared", {
+              detail: { ok: true },
+            }),
+          );
+        } catch (error) {
+          window.dispatchEvent(
+            new CustomEvent("comet:account-change-prepared", {
+              detail: {
+                ok: false,
+                message: errorMessage(
+                  error,
+                  "Couldn't save the current draft.",
+                ),
+              },
+            }),
+          );
+        }
+      })();
+    };
+
+    window.addEventListener(
+      "comet:prepare-account-change",
+      handlePrepareAccountChange,
+    );
+    return () => {
+      window.removeEventListener(
+        "comet:prepare-account-change",
+        handlePrepareAccountChange,
+      );
+    };
+  }, []);
 
   const handleCreateNote = (source: "keyboard" | "pointer") => {
     if (isCreatingNote) {
