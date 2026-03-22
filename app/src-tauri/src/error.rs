@@ -1,3 +1,4 @@
+use crate::domain::notes::error::NoteError;
 use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
@@ -36,12 +37,11 @@ impl AppError {
     }
 }
 
-/// Current time as milliseconds since Unix epoch.
-pub fn now_millis() -> i64 {
-    chrono::Utc::now().timestamp_millis()
+impl From<NoteError> for AppError {
+    fn from(e: NoteError) -> Self {
+        AppError::Custom(e.to_string())
+    }
 }
 
-/// Current time as seconds since Unix epoch.
-pub fn now_secs() -> i64 {
-    chrono::Utc::now().timestamp()
-}
+// Re-exports for backward compatibility during transition.
+pub use crate::domain::common::time::{now_millis, now_secs};

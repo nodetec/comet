@@ -1036,7 +1036,7 @@ async fn process_relay_message(
                         find_orphaned_blob_hashes(&conn, &[entity_id.clone()]).unwrap_or_default();
                     // Permanently delete the note
                     delete_note_from_sync(&conn, &entity_id, |note_id| {
-                        crate::notes::invalidate_rendered_html_cache(app, note_id);
+                        app.state::<crate::infra::cache::RenderedHtmlCache>().invalidate(note_id);
                     })?;
                     // Clean up orphaned blobs (local + metadata)
                     let blossom_deletions = cleanup_orphaned_blobs(app, &conn, &orphaned);

@@ -1,12 +1,17 @@
+mod adapters;
 mod attachments;
 mod blossom;
+mod commands;
 mod db;
+mod domain;
 mod error;
+mod infra;
 mod markdown;
 mod nip44_ext;
 mod nip59_ext;
 mod nostr;
 mod notes;
+mod ports;
 mod secure_storage;
 mod sync;
 mod themes;
@@ -16,11 +21,6 @@ use db::{
     database_connection,
 };
 use error::AppError;
-use notes::{
-    AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
-    CreateNotebookInput, ExportNotesInput, LoadedNote, NotePagePayload, NoteQueryInput,
-    NotebookSummary, RenameNotebookInput, SaveNoteInput, SearchResult, SetNoteReadonlyInput,
-};
 use rusqlite::OptionalExtension;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
@@ -76,21 +76,6 @@ fn list_themes(app: AppHandle) -> Result<Vec<themes::ThemeSummary>, AppError> {
 }
 
 #[tauri::command]
-fn search_notes(app: AppHandle, query: String) -> Result<Vec<SearchResult>, AppError> {
-    notes::search_notes(&app, &query)
-}
-
-#[tauri::command]
-fn export_notes(app: AppHandle, input: ExportNotesInput) -> Result<usize, AppError> {
-    notes::export_notes(&app, input)
-}
-
-#[tauri::command]
-fn search_tags(app: AppHandle, query: String) -> Result<Vec<String>, AppError> {
-    notes::search_tags(&app, &query)
-}
-
-#[tauri::command]
 fn read_theme(app: AppHandle, theme_id: String) -> Result<themes::ThemeData, AppError> {
     themes::read_theme(&app, &theme_id)
 }
@@ -120,216 +105,6 @@ fn import_image(
     source_path: String,
 ) -> Result<attachments::ImportedImage, AppError> {
     attachments::import_image(&app, &source_path)
-}
-
-#[tauri::command]
-fn bootstrap(app: AppHandle) -> Result<BootstrapPayload, AppError> {
-    notes::bootstrap(&app)
-}
-
-#[tauri::command]
-fn todo_count(app: AppHandle) -> Result<i64, AppError> {
-    notes::todo_count(&app)
-}
-
-#[tauri::command]
-fn query_notes(app: AppHandle, input: NoteQueryInput) -> Result<NotePagePayload, AppError> {
-    notes::query_notes(&app, input)
-}
-
-#[tauri::command]
-fn contextual_tags(
-    app: AppHandle,
-    input: ContextualTagsInput,
-) -> Result<ContextualTagsPayload, AppError> {
-    notes::contextual_tags(&app, input)
-}
-
-#[tauri::command]
-fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    notes::load_note(&app, &note_id)
-}
-
-#[tauri::command]
-fn create_note(
-    app: AppHandle,
-    notebook_id: Option<String>,
-    tags: Vec<String>,
-    markdown: Option<String>,
-) -> Result<LoadedNote, AppError> {
-    notes::create_note(&app, notebook_id.as_deref(), &tags, markdown.as_deref())
-}
-
-#[tauri::command]
-fn duplicate_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::duplicate_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
-    let note = notes::save_note(&app, input)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn set_note_readonly(app: AppHandle, input: SetNoteReadonlyInput) -> Result<LoadedNote, AppError> {
-    let note = notes::set_note_readonly(&app, input)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn archive_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::archive_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::restore_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn trash_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::trash_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn restore_from_trash(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::restore_from_trash(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), AppError> {
-    let blossom_deletions = notes::delete_note_permanently(&app, &note_id)?;
-    spawn_blossom_deletions(&app, blossom_deletions);
-    // Always queue deletion — covers the race where sync pushes the note
-    // between creation and deletion, and is a harmless no-op if never synced.
-    let conn = database_connection(&app)?;
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-        rusqlite::params![note_id, error::now_millis()],
-    );
-    sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
-    Ok(())
-}
-
-#[tauri::command]
-fn empty_trash(app: AppHandle) -> Result<(), AppError> {
-    let (note_ids, blossom_deletions) = notes::empty_trash(&app)?;
-    spawn_blossom_deletions(&app, blossom_deletions);
-    let conn = database_connection(&app)?;
-    for note_id in &note_ids {
-        let _ = conn.execute(
-            "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-            rusqlite::params![note_id, error::now_millis()],
-        );
-        sync_push(&app, sync::SyncCommand::PushDeletion(note_id.clone()));
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn create_notebook(
-    app: AppHandle,
-    input: CreateNotebookInput,
-) -> Result<NotebookSummary, AppError> {
-    let notebook = notes::create_notebook(&app, input)?;
-    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
-    Ok(notebook)
-}
-
-#[tauri::command]
-fn rename_notebook(
-    app: AppHandle,
-    input: RenameNotebookInput,
-) -> Result<NotebookSummary, AppError> {
-    let notebook = notes::rename_notebook(&app, input)?;
-    sync_push(&app, sync::SyncCommand::PushNotebook(notebook.id.clone()));
-    Ok(notebook)
-}
-
-#[tauri::command]
-fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), AppError> {
-    notes::delete_notebook(&app, &notebook_id)?;
-    let conn = database_connection(&app)?;
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-        rusqlite::params![notebook_id, error::now_millis()],
-    );
-    sync_push(&app, sync::SyncCommand::PushDeletion(notebook_id.clone()));
-    Ok(())
-}
-
-#[tauri::command]
-fn assign_note_notebook(
-    app: AppHandle,
-    input: AssignNoteNotebookInput,
-) -> Result<LoadedNote, AppError> {
-    let note_id = input.note_id.clone();
-    let note = notes::assign_note_notebook(&app, input)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn pin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::pin_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-#[tauri::command]
-fn unpin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
-    let note = notes::unpin_note(&app, &note_id)?;
-    sync_push(&app, sync::SyncCommand::PushNote(note_id.clone()));
-    Ok(note)
-}
-
-fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
-    let manager = app.state::<sync::SyncManager>().inner().clone();
-    tauri::async_runtime::spawn(async move {
-        manager.push(cmd).await;
-    });
-}
-
-/// Spawn async Blossom blob deletions for orphaned blobs.
-/// `blossom_deletions` is a list of (`server_url`, `ciphertext_hash`) pairs.
-fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, String)>) {
-    if blossom_deletions.is_empty() {
-        return;
-    }
-
-    let conn = match database_connection(app) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-    let (keys, _) = match crate::secure_storage::keys_for_current_identity(app, &conn) {
-        Ok(identity) => identity,
-        Err(_) => return,
-    };
-    drop(conn);
-
-    tauri::async_runtime::spawn(async move {
-        let client = reqwest::Client::new();
-        for (server_url, ciphertext_hash) in blossom_deletions {
-            if let Err(e) =
-                crate::blossom::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await
-            {
-                eprintln!("[blob-gc] failed to delete from Blossom: {e}");
-            }
-        }
-    });
 }
 
 fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
@@ -389,7 +164,8 @@ async fn run_account_change<T>(
 
     let result = change();
     if result.is_ok() {
-        notes::clear_rendered_html_cache(app);
+        let cache = app.state::<infra::cache::RenderedHtmlCache>();
+        cache.clear();
     }
     sync::auto_start(app).await;
     result
@@ -465,7 +241,6 @@ fn set_blossom_url(app: AppHandle, url: String) -> Result<(), AppError> {
 async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, AppError> {
     log::info!("[blob] fetch requested plaintext_hash={hash}");
 
-    // Check if already local
     if crate::attachments::has_local_blob(&app, &hash)? {
         log::info!("[blob] already local plaintext_hash={hash}");
         return Ok(BlobFetchStatus::Downloaded);
@@ -482,14 +257,11 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         return Ok(BlobFetchStatus::NeedsUnlock);
     }
 
-    // Get keys for decryption and Blossom auth
     let (keys, pubkey_hex) = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
     log::info!(
         "[blob] resolved account plaintext_hash={hash} pubkey={pubkey_hex}"
     );
 
-    // Look up blob metadata for this identity, preferring the currently
-    // configured Blossom server when one is set.
     let meta: Option<(String, String, String)> =
         if let Some(ref blossom_url) = preferred_blossom_url {
             conn.query_row(
@@ -522,7 +294,7 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
                 "[blob] missing metadata plaintext_hash={hash} pubkey={pubkey_hex}"
             );
             return Ok(BlobFetchStatus::Missing);
-        } // no metadata for this identity, can't download
+        }
     };
 
     log::info!(
@@ -533,9 +305,8 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         key_hex.len()
     );
 
-    drop(conn); // release before async work
+    drop(conn);
 
-    // Download from Blossom
     let http_client = reqwest::Client::new();
     let ciphertext =
         crate::blossom::download_blob(&http_client, &server_url, &ciphertext_hash, &keys).await?;
@@ -546,7 +317,6 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         ciphertext.len()
     );
 
-    // Decrypt
     let plaintext = crate::blossom::decrypt_blob(&ciphertext, &key_hex)?;
     log::info!(
         "[blob] decrypted plaintext_hash={} size={}",
@@ -554,7 +324,6 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         plaintext.len()
     );
 
-    // Determine extension from local notes referencing this hash
     let conn2 = database_connection(&app)?;
     let ext: String = conn2
         .query_row(
@@ -708,7 +477,6 @@ fn is_sync_enabled(app: AppHandle) -> Result<bool, AppError> {
             |row| row.get(0),
         )
         .optional()?;
-    // Default to false if not set
     Ok(val.as_deref() == Some("true"))
 }
 
@@ -738,11 +506,9 @@ async fn get_sync_status(app: AppHandle) -> Result<sync::SyncState, AppError> {
 
 #[tauri::command]
 async fn resync(app: AppHandle) -> Result<(), AppError> {
-    // Stop sync first
     let manager = app.state::<sync::SyncManager>();
     manager.stop().await;
 
-    // Wipe all local data except identity, relays, and app_settings
     let conn = database_connection(&app)?;
     conn.execute_batch(
         "DELETE FROM notes_fts;
@@ -754,7 +520,6 @@ async fn resync(app: AppHandle) -> Result<(), AppError> {
          DELETE FROM app_settings WHERE key = 'sync_checkpoint';",
     )?;
 
-    // Restart sync — will pull everything fresh from the relay
     sync::start_if_ready(&app).await?;
     Ok(())
 }
@@ -806,7 +571,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_secure_storage::init())
-        .manage(notes::RenderedHtmlCache::default())
+        .manage(infra::cache::RenderedHtmlCache::default())
         .manage(secure_storage::UnlockedNostrKeys::default())
         .manage(sync::SyncManager::new())
         .setup(|app| {
@@ -822,27 +587,30 @@ pub fn run() {
             reveal_main_window,
             get_attachments_dir,
             import_image,
-            bootstrap,
-            todo_count,
-            query_notes,
-            contextual_tags,
-            load_note,
-            create_note,
-            duplicate_note,
-            save_note,
-            set_note_readonly,
-            archive_note,
-            restore_note,
-            trash_note,
-            restore_from_trash,
-            delete_note_permanently,
-            empty_trash,
-            create_notebook,
-            rename_notebook,
-            delete_notebook,
-            assign_note_notebook,
-            pin_note,
-            unpin_note,
+            commands::notes::bootstrap,
+            commands::notes::todo_count,
+            commands::notes::query_notes,
+            commands::notes::contextual_tags,
+            commands::notes::load_note,
+            commands::notes::create_note,
+            commands::notes::duplicate_note,
+            commands::notes::save_note,
+            commands::notes::set_note_readonly,
+            commands::notes::archive_note,
+            commands::notes::restore_note,
+            commands::notes::trash_note,
+            commands::notes::restore_from_trash,
+            commands::notes::delete_note_permanently,
+            commands::notes::empty_trash,
+            commands::notes::create_notebook,
+            commands::notes::rename_notebook,
+            commands::notes::delete_notebook,
+            commands::notes::assign_note_notebook,
+            commands::notes::pin_note,
+            commands::notes::unpin_note,
+            commands::notes::search_notes,
+            commands::notes::search_tags,
+            commands::notes::export_notes,
             list_accounts,
             get_account_nsec,
             add_account,
@@ -867,9 +635,6 @@ pub fn run() {
             unlock_current_account,
             unlock_sync,
             resync,
-            search_notes,
-            search_tags,
-            export_notes,
             list_themes,
             read_theme
         ])
@@ -882,7 +647,6 @@ pub fn run() {
                     event: WindowEvent::CloseRequested { api, .. },
                     ..
                 } => {
-                    // Hide the window instead of quitting (standard macOS behavior)
                     api.prevent_close();
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.hide();
@@ -891,7 +655,6 @@ pub fn run() {
                 }
                 #[cfg(target_os = "macos")]
                 RunEvent::Reopen { .. } => {
-                    // Re-show when the dock icon is clicked
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.show();
                         let _ = window.set_focus();

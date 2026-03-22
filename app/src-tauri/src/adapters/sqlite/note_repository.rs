@@ -1,0 +1,1266 @@
+use std::collections::BTreeSet;
+
+use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
+
+use crate::domain::common::text::{extract_tags, preview_from_markdown};
+use crate::domain::common::time::now_millis;
+use crate::domain::notes::error::NoteError;
+use crate::domain::notes::model::{
+    ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NoteFilterInput, NotePagePayload,
+    NoteQueryInput, NoteSortDirection, NoteSortField, NotebookRef, NoteSummary, NotebookSummary,
+    SearchResult,
+};
+use crate::ports::note_repository::{NoteRecord, NoteRepository};
+
+const LAST_OPEN_NOTE_KEY: &str = "last_open_note_id";
+const MAX_NOTES_PAGE_SIZE: usize = 100;
+const SEARCH_RESULTS_LIMIT: usize = 20;
+
+// ── Error helper ──────────────────────────────────────────────────────
+
+#[allow(clippy::needless_pass_by_value)]
+fn map_err(e: rusqlite::Error) -> NoteError {
+    NoteError::Storage(e.to_string())
+}
+
+// ── Search helpers ────────────────────────────────────────────────────
+
+enum SearchMode {
+    Match(String),
+    Like(Vec<String>),
+}
+
+fn search_tokens_from_query(search_query: &str) -> Vec<String> {
+    search_query
+        .split_whitespace()
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn search_mode_from_tokens(tokens: &[String]) -> Option<SearchMode> {
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if tokens.iter().any(|token| token.chars().count() < 3) {
+        return Some(SearchMode::Like(
+            tokens
+                .iter()
+                .map(|token| format!("%{}%", escape_like_pattern(token)))
+                .collect(),
+        ));
+    }
+
+    Some(SearchMode::Match(
+        tokens
+            .iter()
+            .map(|token| format!("\"{}\"", token.replace('"', "\"\"")))
+            .collect::<Vec<_>>()
+            .join(" AND "),
+    ))
+}
+
+fn escape_like_pattern(token: &str) -> String {
+    let mut escaped = String::with_capacity(token.len());
+
+    for character in token.chars() {
+        match character {
+            '%' | '_' | '\\' => {
+                escaped.push('\\');
+                escaped.push(character);
+            }
+            _ => escaped.push(character),
+        }
+    }
+
+    escaped
+}
+
+fn normalized_active_tags(tags: &[String]) -> Vec<String> {
+    let mut unique_tags = BTreeSet::new();
+    for tag in tags {
+        let trimmed = tag.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        unique_tags.insert(trimmed.to_ascii_lowercase());
+    }
+    unique_tags.into_iter().collect()
+}
+
+fn sanitize_filename(title: &str) -> String {
+    let sanitized: String = title
+        .chars()
+        .filter(|c| !c.is_control())
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+
+    let trimmed = sanitized.trim().trim_matches('-').to_string();
+
+    // Collapse consecutive dashes
+    let mut result = String::with_capacity(trimmed.len());
+    let mut prev_dash = false;
+    for c in trimmed.chars() {
+        if c == '-' {
+            if !prev_dash {
+                result.push(c);
+            }
+            prev_dash = true;
+        } else {
+            result.push(c);
+            prev_dash = false;
+        }
+    }
+
+    if result.is_empty() {
+        "Untitled".to_string()
+    } else if result.len() > 200 {
+        result.chars().take(200).collect()
+    } else {
+        result
+    }
+}
+
+// ── Search snippet helpers ────────────────────────────────────────────
+
+fn searchable_markdown_text(markdown: &str) -> String {
+    markdown
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("```"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn search_snippet_for_summary(markdown: &str, search_tokens: &[String]) -> Option<String> {
+    if search_tokens.is_empty() {
+        return None;
+    }
+    search_snippet_from_markdown(markdown, search_tokens).filter(|snippet| !snippet.is_empty())
+}
+
+fn previous_word_boundary(text: &str, index: usize) -> usize {
+    let mut boundary = 0;
+
+    for (char_index, character) in text.char_indices() {
+        if char_index >= index {
+            break;
+        }
+        if character.is_whitespace() {
+            boundary = char_index + character.len_utf8();
+        }
+    }
+
+    boundary
+}
+
+fn next_word_boundary(text: &str, index: usize) -> usize {
+    for (char_index, character) in text.char_indices() {
+        if char_index < index {
+            continue;
+        }
+        if character.is_whitespace() {
+            return char_index;
+        }
+    }
+    text.len()
+}
+
+fn trim_snippet_boundary(snippet: &str) -> String {
+    snippet
+        .trim_matches(|character: char| {
+            character.is_whitespace()
+                || matches!(
+                    character,
+                    '.' | ',' | ';' | ':' | '!' | '?' | ')' | '(' | '[' | ']' | '{' | '}'
+                )
+        })
+        .to_string()
+}
+
+fn search_snippet_from_markdown(markdown: &str, search_tokens: &[String]) -> Option<String> {
+    let text = searchable_markdown_text(markdown);
+    if text.is_empty() {
+        return None;
+    }
+
+    let normalized_text = text.to_ascii_lowercase();
+    let first_match = search_tokens
+        .iter()
+        .filter_map(|token| {
+            let normalized_token = token.trim().to_ascii_lowercase();
+            if normalized_token.is_empty() {
+                return None;
+            }
+            normalized_text
+                .find(&normalized_token)
+                .map(|index| (index, index + normalized_token.len()))
+        })
+        .min_by_key(|(index, _)| *index)?;
+
+    let prefix_target = 52;
+    let suffix_target = 84;
+    let window_start = first_match.0.saturating_sub(prefix_target);
+    let window_end = (first_match.1 + suffix_target).min(text.len());
+
+    let start = previous_word_boundary(&text, window_start);
+    let end = next_word_boundary(&text, window_end);
+
+    let mut snippet = trim_snippet_boundary(&text[start..end]);
+    if snippet.is_empty() {
+        return None;
+    }
+
+    if start > 0 {
+        snippet = format!("\u{2026}{snippet}");
+    }
+    if end < text.len() {
+        snippet.push('\u{2026}');
+    }
+
+    Some(snippet)
+}
+
+// ── SQL clause builder ────────────────────────────────────────────────
+
+fn append_note_view_clauses(
+    clauses: &mut Vec<String>,
+    values: &mut Vec<Value>,
+    note_filter: NoteFilterInput,
+    active_notebook_id: Option<&str>,
+) {
+    match note_filter {
+        NoteFilterInput::All => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+        }
+        NoteFilterInput::Today => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+            clauses.push("n.edited_at >= ?".to_string());
+            values.push(Value::from(now_millis() - 24 * 60 * 60 * 1000));
+        }
+        NoteFilterInput::Todo => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+            clauses.push("n.markdown LIKE '%- [ ] %'".to_string());
+        }
+        NoteFilterInput::Archive => {
+            clauses.push("n.archived_at IS NOT NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+        }
+        NoteFilterInput::Trash => {
+            clauses.push("n.deleted_at IS NOT NULL".to_string());
+        }
+        NoteFilterInput::Notebook => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+            clauses.push("n.notebook_id = ?".to_string());
+            values.push(Value::from(
+                active_notebook_id.unwrap_or_default().to_string(),
+            ));
+        }
+    }
+}
+
+// ── Row mappers ─────────────────────────────────────────────────────
+
+fn row_to_note_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<NoteRecord> {
+    let notebook_id: Option<String> = row.get(4)?;
+    let notebook_name: Option<String> = row.get(5)?;
+
+    Ok(NoteRecord {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        markdown: row.get(2)?,
+        modified_at: row.get(3)?,
+        notebook_id,
+        notebook_name,
+        archived_at: row.get(6)?,
+        deleted_at: row.get(7)?,
+        pinned_at: row.get(8)?,
+        readonly: row.get::<_, i64>(9)? != 0,
+        nostr_d_tag: row.get(10)?,
+        published_at: row.get(11)?,
+        published_kind: row.get(12)?,
+    })
+}
+
+fn row_to_note_summary(
+    row: &rusqlite::Row<'_>,
+    search_tokens: &[String],
+) -> rusqlite::Result<NoteSummary> {
+    let markdown: String = row.get(2)?;
+    let notebook_id: Option<String> = row.get(4)?;
+    let notebook_name: Option<String> = row.get(5)?;
+
+    Ok(NoteSummary {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        notebook: notebook_id
+            .zip(notebook_name)
+            .map(|(id, name)| NotebookRef { id, name }),
+        edited_at: row.get(3)?,
+        preview: preview_from_markdown(&markdown),
+        search_snippet: search_snippet_for_summary(&markdown, search_tokens),
+        archived_at: row.get(6)?,
+        deleted_at: row.get(7)?,
+        pinned_at: row.get(8)?,
+        readonly: row.get::<_, i64>(9)? != 0,
+    })
+}
+
+// ── Notebook name validation helper ─────────────────────────────────
+
+fn handle_notebook_write_error(error: rusqlite::Error) -> NoteError {
+    match error {
+        rusqlite::Error::SqliteFailure(inner, _) if inner.extended_code == 2067 => {
+            NoteError::DuplicateNotebookName
+        }
+        other => NoteError::Storage(other.to_string()),
+    }
+}
+
+// ── SqliteNoteRepository ────────────────────────────────────────────
+
+pub struct SqliteNoteRepository<'a> {
+    conn: &'a Connection,
+}
+
+impl<'a> SqliteNoteRepository<'a> {
+    pub fn new(conn: &'a Connection) -> Self {
+        Self { conn }
+    }
+}
+
+impl NoteRepository for SqliteNoteRepository<'_> {
+    // ── Note reads ────────────────────────────────────────────────────
+
+    fn note_by_id(&self, note_id: &str) -> Result<Option<NoteRecord>, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name,
+                        n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
+                        n.nostr_d_tag, n.published_at, n.published_kind
+                 FROM notes n
+                 LEFT JOIN notebooks b ON b.id = n.notebook_id
+                 WHERE n.id = ?1",
+                params![note_id],
+                row_to_note_record,
+            )
+            .optional()
+            .map_err(map_err)
+    }
+
+    fn note_is_active(&self, note_id: &str) -> Result<bool, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT archived_at IS NULL AND deleted_at IS NULL FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| row.get::<_, bool>(0),
+            )
+            .optional()
+            .map_err(map_err)
+            .map(|value| value.unwrap_or(false))
+    }
+
+    fn next_active_note_id(&self, excluding: Option<&str>) -> Result<Option<String>, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT id
+                 FROM notes
+                 WHERE archived_at IS NULL AND deleted_at IS NULL
+                   AND (?1 IS NULL OR id != ?1)
+                 ORDER BY pinned_at IS NULL ASC, pinned_at DESC, edited_at DESC, created_at DESC
+                 LIMIT 1",
+                params![excluding],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_err)
+    }
+
+    fn note_markdown_and_notebook(
+        &self,
+        note_id: &str,
+    ) -> Result<(String, Option<String>), NoteError> {
+        self.conn
+            .query_row(
+                "SELECT markdown, notebook_id
+                 FROM notes
+                 WHERE id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(map_err)?
+            .ok_or(NoteError::NotFound)
+    }
+
+    fn note_markdown_and_readonly(
+        &self,
+        note_id: &str,
+    ) -> Result<(String, bool), NoteError> {
+        self.conn
+            .query_row(
+                "SELECT markdown, readonly FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get::<_, i64>(1)? != 0)),
+            )
+            .optional()
+            .map_err(map_err)?
+            .ok_or(NoteError::NotFound)
+    }
+
+    fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")
+            .map_err(map_err)?;
+
+        let rows = statement
+            .query_map(params![note_id], |row| row.get::<_, String>(0))
+            .map_err(map_err)?;
+
+        let mut tags = Vec::new();
+        for row in rows {
+            tags.push(row.map_err(map_err)?);
+        }
+
+        Ok(tags)
+    }
+
+    fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> {
+        self.conn
+            .query_row(
+                "SELECT
+                   SUM(CASE WHEN archived_at IS NOT NULL AND deleted_at IS NULL THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END)
+                 FROM notes",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<i64>>(0)?.unwrap_or(0),
+                        row.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                    ))
+                },
+            )
+            .map_err(map_err)
+    }
+
+    // ── Note writes ───────────────────────────────────────────────────
+
+    fn insert_note(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+        notebook_id: Option<&str>,
+        now: i64,
+    ) -> Result<(), NoteError> {
+        self.conn
+            .execute(
+                "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, locally_modified)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5, 1)",
+                params![note_id, title, markdown, notebook_id, now],
+            )
+            .map_err(map_err)?;
+
+        Ok(())
+    }
+
+    fn update_note_content(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+        now: i64,
+    ) -> Result<(), NoteError> {
+        let updated = self
+            .conn
+            .execute(
+                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3, locally_modified = 1 WHERE id = ?4",
+                params![title, markdown, now, note_id],
+            )
+            .map_err(map_err)?;
+
+        if updated == 0 {
+            return Err(NoteError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    fn update_note_title_only(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+    ) -> Result<(), NoteError> {
+        let updated = self
+            .conn
+            .execute(
+                "UPDATE notes SET title = ?1, markdown = ?2 WHERE id = ?3",
+                params![title, markdown, note_id],
+            )
+            .map_err(map_err)?;
+
+        if updated == 0 {
+            return Err(NoteError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    fn set_readonly(
+        &self,
+        note_id: &str,
+        readonly: bool,
+        now: i64,
+    ) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET readonly = ?1, modified_at = ?2, locally_modified = 1
+                 WHERE id = ?3",
+                params![i32::from(readonly), now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn archive_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET archived_at = ?1, modified_at = ?1, locally_modified = 1
+                 WHERE id = ?2 AND archived_at IS NULL",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn restore_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET archived_at = NULL, modified_at = ?1, locally_modified = 1
+                 WHERE id = ?2 AND archived_at IS NOT NULL",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn trash_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET deleted_at = ?1, modified_at = ?1, locally_modified = 1
+                 WHERE id = ?2 AND deleted_at IS NULL",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn restore_from_trash(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET deleted_at = NULL, modified_at = ?1, locally_modified = 1
+                 WHERE id = ?2 AND deleted_at IS NOT NULL",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn pin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes
+                 SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
+                 WHERE id = ?2",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn unpin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
+                params![now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn assign_notebook(
+        &self,
+        note_id: &str,
+        notebook_id: Option<&str>,
+        now: i64,
+    ) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
+                params![notebook_id, now, note_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn delete_note(&self, note_id: &str) -> Result<usize, NoteError> {
+        self.conn
+            .execute("DELETE FROM notes WHERE id = ?1", params![note_id])
+            .map_err(map_err)
+    }
+
+    fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")
+            .map_err(map_err)?;
+        let rows = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(map_err)?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(row.map_err(map_err)?);
+        }
+        Ok(ids)
+    }
+
+    fn delete_trashed_notes(&self) -> Result<(), NoteError> {
+        self.conn
+            .execute_batch(
+                "DELETE FROM notes_fts WHERE note_id IN (SELECT id FROM notes WHERE deleted_at IS NOT NULL);
+                 DELETE FROM notes WHERE deleted_at IS NOT NULL;",
+            )
+            .map_err(map_err)?;
+
+        Ok(())
+    }
+
+    // ── FTS / tags ────────────────────────────────────────────────────
+
+    fn upsert_search_document(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+    ) -> Result<(), NoteError> {
+        self.conn
+            .execute(
+                "DELETE FROM notes_fts WHERE note_id = ?1",
+                params![note_id],
+            )
+            .map_err(map_err)?;
+        self.conn
+            .execute(
+                "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+                params![note_id, title, markdown],
+            )
+            .map_err(map_err)?;
+        Ok(())
+    }
+
+    fn delete_search_document(&self, note_id: &str) -> Result<(), NoteError> {
+        self.conn
+            .execute(
+                "DELETE FROM notes_fts WHERE note_id = ?1",
+                params![note_id],
+            )
+            .map_err(map_err)?;
+        Ok(())
+    }
+
+    fn replace_tags(&self, note_id: &str, markdown: &str) -> Result<(), NoteError> {
+        let next_tags = extract_tags(markdown);
+        let current_tags = self.tags_for_note(note_id)?;
+
+        if current_tags == next_tags {
+            return Ok(());
+        }
+
+        // Both vecs are sorted and unique -- linear scan to find diffs
+        let mut ci = 0;
+        let mut ni = 0;
+
+        while ci < current_tags.len() && ni < next_tags.len() {
+            match current_tags[ci].cmp(&next_tags[ni]) {
+                std::cmp::Ordering::Less => {
+                    // In current but not next -- remove
+                    self.conn
+                        .execute(
+                            "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
+                            params![note_id, &current_tags[ci]],
+                        )
+                        .map_err(map_err)?;
+                    ci += 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    // In next but not current -- add
+                    self.conn
+                        .execute(
+                            "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
+                            params![note_id, &next_tags[ni]],
+                        )
+                        .map_err(map_err)?;
+                    ni += 1;
+                }
+                std::cmp::Ordering::Equal => {
+                    ci += 1;
+                    ni += 1;
+                }
+            }
+        }
+
+        // Remaining current tags were removed
+        while ci < current_tags.len() {
+            self.conn
+                .execute(
+                    "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
+                    params![note_id, &current_tags[ci]],
+                )
+                .map_err(map_err)?;
+            ci += 1;
+        }
+
+        // Remaining next tags are new
+        while ni < next_tags.len() {
+            self.conn
+                .execute(
+                    "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
+                    params![note_id, &next_tags[ni]],
+                )
+                .map_err(map_err)?;
+            ni += 1;
+        }
+
+        Ok(())
+    }
+
+    // ── Queries ───────────────────────────────────────────────────────
+
+    fn query_note_page(&self, input: &NoteQueryInput) -> Result<NotePagePayload, NoteError> {
+        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
+            return Ok(NotePagePayload {
+                notes: Vec::new(),
+                has_more: false,
+                next_offset: None,
+                total_count: 0,
+            });
+        }
+
+        let limit = input.limit.clamp(1, MAX_NOTES_PAGE_SIZE);
+        let search_tokens = search_tokens_from_query(&input.search_query);
+        let search_mode = search_mode_from_tokens(&search_tokens);
+        let active_tags = normalized_active_tags(&input.active_tags);
+
+        let mut sql = String::from(
+            "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
+             FROM notes n
+             LEFT JOIN notebooks b ON b.id = n.notebook_id",
+        );
+        let mut clauses = Vec::new();
+        let mut values = Vec::new();
+
+        if let Some(search_mode) = &search_mode {
+            match search_mode {
+                SearchMode::Match(search_query) => {
+                    sql = String::from(
+                        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
+                         FROM notes n
+                         LEFT JOIN notebooks b ON b.id = n.notebook_id
+                         JOIN notes_fts ON notes_fts.note_id = n.id",
+                    );
+                    clauses.push("notes_fts MATCH ?".to_string());
+                    values.push(Value::from(search_query.clone()));
+                }
+                SearchMode::Like(patterns) => {
+                    sql.push_str(" JOIN notes_fts ON notes_fts.note_id = n.id");
+                    for pattern in patterns {
+                        clauses.push(
+                            "(notes_fts.title LIKE ? ESCAPE '\\' OR notes_fts.markdown LIKE ? ESCAPE '\\')"
+                                .to_string(),
+                        );
+                        values.push(Value::from(pattern.clone()));
+                        values.push(Value::from(pattern.clone()));
+                    }
+                }
+            }
+        }
+
+        append_note_view_clauses(
+            &mut clauses,
+            &mut values,
+            input.note_filter,
+            input.active_notebook_id.as_deref(),
+        );
+
+        for tag in &active_tags {
+            clauses.push(
+                "EXISTS (
+                   SELECT 1
+                   FROM note_tags nt_filter
+                   WHERE nt_filter.note_id = n.id
+                     AND nt_filter.tag = ?
+                 )"
+                .to_string(),
+            );
+            values.push(Value::from(tag.clone()));
+        }
+
+        let where_clause = if clauses.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", clauses.join(" AND "))
+        };
+
+        // Only run the count query on the first page -- the frontend reads
+        // totalCount from pages[0] and ignores it on subsequent pages.
+        let total_count = if input.offset == 0 {
+            let count_sql = if search_mode.is_some() {
+                format!(
+                    "SELECT COUNT(*) FROM notes n JOIN notes_fts ON notes_fts.note_id = n.id{where_clause}"
+                )
+            } else {
+                format!("SELECT COUNT(*) FROM notes n{where_clause}")
+            };
+            self.conn
+                .query_row(&count_sql, params_from_iter(values.iter()), |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(map_err)? as usize
+        } else {
+            0
+        };
+
+        sql.push_str(&where_clause);
+
+        let sort_column = match input.sort_field {
+            NoteSortField::ModifiedAt => "n.edited_at",
+            NoteSortField::CreatedAt => "n.created_at",
+            NoteSortField::Title => "n.title",
+        };
+        let sort_dir = match (&input.sort_field, &input.sort_direction) {
+            (NoteSortField::Title, NoteSortDirection::Newest) => "ASC",
+            (NoteSortField::Title, NoteSortDirection::Oldest) => "DESC",
+            (_, NoteSortDirection::Newest) => "DESC",
+            (_, NoteSortDirection::Oldest) => "ASC",
+        };
+        sql.push_str(&format!(
+            " ORDER BY n.pinned_at IS NULL ASC, n.pinned_at DESC, {sort_column} {sort_dir}, n.created_at DESC
+              LIMIT ? OFFSET ?",
+        ));
+        values.push(Value::from((limit + 1) as i64));
+        values.push(Value::from(input.offset as i64));
+
+        let mut statement = self
+            .conn
+            .prepare(&sql)
+            .map_err(map_err)?;
+        let rows = statement
+            .query_map(params_from_iter(values.iter()), |row| {
+                row_to_note_summary(row, &search_tokens)
+            })
+            .map_err(map_err)?;
+
+        let mut notes = Vec::new();
+        for row in rows {
+            notes.push(row.map_err(map_err)?);
+        }
+
+        let has_more = notes.len() > limit;
+        if has_more {
+            notes.truncate(limit);
+        }
+
+        Ok(NotePagePayload {
+            next_offset: has_more.then_some(input.offset + limit),
+            has_more,
+            notes,
+            total_count,
+        })
+    }
+
+    fn search_notes(&self, query: &str) -> Result<Vec<SearchResult>, NoteError> {
+        let search_tokens = search_tokens_from_query(query);
+        let search_mode = match search_mode_from_tokens(&search_tokens) {
+            Some(mode) => mode,
+            None => return Ok(Vec::new()),
+        };
+
+        let (sql, values): (String, Vec<Value>) = match &search_mode {
+            SearchMode::Match(search_query) => (
+                "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+                 FROM notes n
+                 LEFT JOIN notebooks b ON b.id = n.notebook_id
+                 JOIN notes_fts ON notes_fts.note_id = n.id
+                 WHERE notes_fts MATCH ?
+                 ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC
+                 LIMIT ?"
+                    .to_string(),
+                vec![
+                    Value::from(search_query.clone()),
+                    Value::from((SEARCH_RESULTS_LIMIT + 1) as i64),
+                ],
+            ),
+            SearchMode::Like(patterns) => {
+                let mut sql = String::from(
+                    "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+                     FROM notes n
+                     LEFT JOIN notebooks b ON b.id = n.notebook_id
+                     JOIN notes_fts ON notes_fts.note_id = n.id
+                     WHERE ",
+                );
+                let mut vals = Vec::new();
+                let mut like_clauses = Vec::new();
+                for pattern in patterns {
+                    like_clauses.push(
+                        "(notes_fts.title LIKE ? ESCAPE '\\' OR notes_fts.markdown LIKE ? ESCAPE '\\')"
+                            .to_string(),
+                    );
+                    vals.push(Value::from(pattern.clone()));
+                    vals.push(Value::from(pattern.clone()));
+                }
+                sql.push_str(&like_clauses.join(" AND "));
+                sql.push_str(" ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC LIMIT ?");
+                vals.push(Value::from((SEARCH_RESULTS_LIMIT + 1) as i64));
+                (sql, vals)
+            }
+        };
+
+        let mut statement = self
+            .conn
+            .prepare(&sql)
+            .map_err(map_err)?;
+        let rows = statement
+            .query_map(params_from_iter(values.iter()), |row| {
+                let markdown: String = row.get(2)?;
+                let notebook_id: Option<String> = row.get(3)?;
+                let notebook_name: Option<String> = row.get(4)?;
+
+                Ok(SearchResult {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    notebook: notebook_id
+                        .zip(notebook_name)
+                        .map(|(id, name)| NotebookRef { id, name }),
+                    preview: search_snippet_for_summary(&markdown, &search_tokens)
+                        .unwrap_or_else(|| preview_from_markdown(&markdown)),
+                    archived_at: row.get(5)?,
+                })
+            })
+            .map_err(map_err)?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(map_err)?);
+            if results.len() >= SEARCH_RESULTS_LIMIT {
+                break;
+            }
+        }
+
+        Ok(results)
+    }
+
+    fn search_tags(&self, query: &str) -> Result<Vec<String>, NoteError> {
+        let escaped = escape_like_pattern(&query.to_ascii_lowercase());
+        let contains_pattern = format!("%{escaped}%");
+        let prefix_pattern = format!("{escaped}%");
+
+        // Rank: prefix matches first, then contains matches.
+        // Within each group, sort by frequency (most-used tags first).
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT tag, COUNT(*) AS freq,
+                        CASE WHEN tag LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
+                 FROM note_tags
+                 WHERE tag LIKE ?1 ESCAPE '\\'
+                 GROUP BY tag
+                 ORDER BY rank ASC, freq DESC, tag ASC
+                 LIMIT 20",
+            )
+            .map_err(map_err)?;
+
+        let rows = statement
+            .query_map(params![contains_pattern, prefix_pattern], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(map_err)?;
+
+        let mut tags = Vec::new();
+        for row in rows {
+            tags.push(row.map_err(map_err)?);
+        }
+
+        Ok(tags)
+    }
+
+    fn query_contextual_tags(
+        &self,
+        input: &ContextualTagsInput,
+    ) -> Result<ContextualTagsPayload, NoteError> {
+        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
+            return Ok(ContextualTagsPayload { tags: Vec::new() });
+        }
+
+        let mut sql = String::from(
+            "SELECT DISTINCT nt.tag
+             FROM notes n
+             JOIN note_tags nt ON nt.note_id = n.id",
+        );
+        let mut clauses = Vec::new();
+        let mut values = Vec::new();
+
+        append_note_view_clauses(
+            &mut clauses,
+            &mut values,
+            input.note_filter,
+            input.active_notebook_id.as_deref(),
+        );
+
+        if !clauses.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&clauses.join(" AND "));
+        }
+
+        sql.push_str(" ORDER BY nt.tag ASC");
+
+        let mut statement = self
+            .conn
+            .prepare(&sql)
+            .map_err(map_err)?;
+        let rows = statement
+            .query_map(params_from_iter(values.iter()), |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(map_err)?;
+
+        let mut tags = Vec::new();
+        for row in rows {
+            tags.push(row.map_err(map_err)?);
+        }
+
+        Ok(ContextualTagsPayload { tags })
+    }
+
+    fn todo_count(&self) -> Result<i64, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM notes WHERE archived_at IS NULL AND deleted_at IS NULL AND markdown LIKE '%- [ ] %'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(map_err)
+    }
+
+    fn export_notes(&self, input: &ExportNotesInput) -> Result<usize, NoteError> {
+        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
+            return Ok(0);
+        }
+
+        let mut sql = String::from("SELECT n.title, n.markdown FROM notes n WHERE ");
+        let mut clauses = Vec::new();
+        let mut values = Vec::new();
+
+        append_note_view_clauses(
+            &mut clauses,
+            &mut values,
+            input.note_filter,
+            input.active_notebook_id.as_deref(),
+        );
+
+        sql.push_str(&clauses.join(" AND "));
+        sql.push_str(" ORDER BY n.edited_at DESC");
+
+        let mut statement = self
+            .conn
+            .prepare(&sql)
+            .map_err(map_err)?;
+        let rows = statement
+            .query_map(params_from_iter(values.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(map_err)?;
+
+        let export_dir = std::path::PathBuf::from(&input.export_dir);
+        let mut used_names: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut count = 0;
+
+        for row in rows {
+            let (title, markdown) = row.map_err(map_err)?;
+            let base = sanitize_filename(&title);
+
+            let entry = used_names.entry(base.clone()).or_insert(0);
+            *entry += 1;
+            let filename = if *entry == 1 {
+                format!("{base}.md")
+            } else {
+                format!("{base} {entry}.md")
+            };
+
+            std::fs::write(export_dir.join(&filename), &markdown)
+                .map_err(|e| NoteError::Storage(format!("Failed to write {filename}: {e}")))?;
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
+    // ── Notebooks ─────────────────────────────────────────────────────
+
+    fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT b.id, b.name, COUNT(n.id) AS note_count
+                 FROM notebooks b
+                 LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
+                 GROUP BY b.id, b.name, b.created_at
+                 ORDER BY LOWER(b.name) ASC, b.created_at ASC",
+            )
+            .map_err(map_err)?;
+
+        let rows = statement
+            .query_map([], |row| {
+                Ok(NotebookSummary {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    note_count: row.get::<_, i64>(2)? as usize,
+                })
+            })
+            .map_err(map_err)?;
+
+        let mut notebooks = Vec::new();
+        for row in rows {
+            notebooks.push(row.map_err(map_err)?);
+        }
+
+        Ok(notebooks)
+    }
+
+    fn insert_notebook(&self, id: &str, name: &str, now: i64) -> Result<(), NoteError> {
+        self.conn
+            .execute(
+                "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
+                 VALUES (?1, ?2, ?3, ?3, 1)",
+                params![id, name, now],
+            )
+            .map_err(handle_notebook_write_error)?;
+
+        Ok(())
+    }
+
+    fn notebook_by_id(&self, notebook_id: &str) -> Result<Option<NotebookSummary>, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT b.id, b.name, COUNT(n.id) AS note_count
+                 FROM notebooks b
+                 LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
+                 WHERE b.id = ?1
+                 GROUP BY b.id, b.name",
+                params![notebook_id],
+                |row| {
+                    Ok(NotebookSummary {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        note_count: row.get::<_, i64>(2)? as usize,
+                    })
+                },
+            )
+            .optional()
+            .map_err(map_err)
+    }
+
+    fn rename_notebook(
+        &self,
+        notebook_id: &str,
+        name: &str,
+        now: i64,
+    ) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE notebooks SET name = ?1, updated_at = ?2, locally_modified = 1 WHERE id = ?3",
+                params![name, now, notebook_id],
+            )
+            .map_err(handle_notebook_write_error)
+    }
+
+    fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "DELETE FROM notebooks WHERE id = ?1",
+                params![notebook_id],
+            )
+            .map_err(map_err)
+    }
+
+    fn notebook_exists(&self, notebook_id: &str) -> Result<bool, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT 1 FROM notebooks WHERE id = ?1 LIMIT 1",
+                params![notebook_id],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(map_err)
+            .map(|v| v.is_some())
+    }
+
+    // ── App settings ──────────────────────────────────────────────────
+
+    fn last_open_note_id(&self) -> Result<Option<String>, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                params![LAST_OPEN_NOTE_KEY],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_err)
+    }
+
+    fn set_last_open_note_id(&self, note_id: Option<&str>) -> Result<(), NoteError> {
+        if let Some(note_id) = note_id {
+            self.conn
+                .execute(
+                    "INSERT INTO app_settings (key, value)
+                     VALUES (?1, ?2)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    params![LAST_OPEN_NOTE_KEY, note_id],
+                )
+                .map_err(map_err)?;
+        } else {
+            self.conn
+                .execute(
+                    "DELETE FROM app_settings WHERE key = ?1",
+                    params![LAST_OPEN_NOTE_KEY],
+                )
+                .map_err(map_err)?;
+        }
+        Ok(())
+    }
+
+    // ── Nostr identity ────────────────────────────────────────────────
+
+    fn current_npub(&self) -> Result<String, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT npub FROM nostr_identity LIMIT 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(map_err)?
+            .ok_or_else(|| NoteError::Storage("No Nostr identity configured.".to_string()))
+    }
+}
