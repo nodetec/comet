@@ -39,4 +39,6 @@ default experience is fast capture, fast resume, and clear retrieval.
   site locally.
 - Read [Foundation](/product/foundation/) before changing information
   architecture or product scope.
+- Use [Blossom Blob Storage API](/specs/blossom-api/) for the current blob
+  service routes and auth model.
 - Review [Changes Feed](/specs/changes-feed/) for the current relay sync draft.

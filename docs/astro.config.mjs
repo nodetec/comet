@@ -32,7 +32,10 @@ export default defineConfig({
         },
         {
           label: "Specifications",
-          items: [{ label: "Changes Feed", slug: "specs/changes-feed" }],
+          items: [
+            { label: "Blossom API", slug: "specs/blossom-api" },
+            { label: "Changes Feed", slug: "specs/changes-feed" },
+          ],
         },
       ],
     }),
