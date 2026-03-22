@@ -44,7 +44,7 @@ relay-dev:
   pnpm --filter @comet/relay dev
 
 relay-deploy:
-  flyctl deploy --config relay/fly.toml --remote-only
+  flyctl deploy --config relay/fly.toml --local-only
 
 relay-logs:
   fly logs -a comet-relay
@@ -71,7 +71,7 @@ blossom-dev:
   pnpm --filter @comet/blossom dev
 
 blossom-deploy:
-  flyctl deploy --config blossom/fly.toml --remote-only
+  flyctl deploy --config blossom/fly.toml --local-only
 
 blossom-logs:
   fly logs -a comet-blossom
@@ -119,7 +119,7 @@ web-dev:
   pnpm --filter @comet/web dev
 
 web-deploy:
-  flyctl deploy --config web/fly.toml --remote-only
+  flyctl deploy --config web/fly.toml --local-only
 
 web-build:
   pnpm --filter @comet/web build

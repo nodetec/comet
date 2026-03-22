@@ -77,4 +77,4 @@ If Postgres is already running, you usually only need `createdb comet_test` plus
 4. Optionally set `BLOSSOM_PUBLIC_URL` on Fly if you want returned blob URLs to use a custom public hostname instead of the bucket URL.
 5. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) can deploy Blossom.
 6. Run the first deploy manually:
-   `flyctl deploy --config blossom/fly.toml --remote-only`
+   `flyctl deploy --config blossom/fly.toml --local-only`

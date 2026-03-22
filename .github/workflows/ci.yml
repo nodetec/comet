@@ -270,7 +270,7 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy blossom
-        run: flyctl deploy --config blossom/fly.toml --remote-only
+        run: flyctl deploy --config blossom/fly.toml --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -421,7 +421,7 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy relay
-        run: flyctl deploy --config relay/fly.toml --remote-only
+        run: flyctl deploy --config relay/fly.toml --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
