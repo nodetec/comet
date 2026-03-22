@@ -138,51 +138,6 @@ fn restart_sync_async(app: &AppHandle) {
     });
 }
 
-#[tauri::command]
-fn list_accounts(app: AppHandle) -> Result<Vec<db::AccountSummary>, AppError> {
-    db::list_accounts(&app)
-}
-
-#[tauri::command]
-fn get_account_nsec(app: AppHandle, public_key: String) -> Result<String, AppError> {
-    let account_exists = db::list_accounts(&app)?
-        .into_iter()
-        .any(|account| account.public_key == public_key);
-    if !account_exists {
-        return Err(AppError::custom(format!("Unknown account: {public_key}")));
-    }
-
-    secure_storage::load_account_nsec(&app, &public_key)
-}
-
-async fn run_account_change<T>(
-    app: &AppHandle,
-    change: impl FnOnce() -> Result<T, AppError>,
-) -> Result<T, AppError> {
-    let manager = app.state::<sync::SyncManager>();
-    manager.stop().await;
-
-    let result = change();
-    if result.is_ok() {
-        let cache = app.state::<infra::cache::RenderedHtmlCache>();
-        cache.clear();
-    }
-    sync::auto_start(app).await;
-    result
-}
-
-#[tauri::command]
-async fn add_account(app: AppHandle, nsec: String) -> Result<db::AccountSummary, AppError> {
-    run_account_change(&app, || db::add_account(&app, &nsec)).await
-}
-
-#[tauri::command]
-async fn switch_account(
-    app: AppHandle,
-    public_key: String,
-) -> Result<db::AccountSummary, AppError> {
-    run_account_change(&app, || db::switch_account(&app, &public_key)).await
-}
 
 #[tauri::command]
 fn list_relays(app: AppHandle) -> Result<Vec<nostr::Relay>, AppError> {
@@ -611,10 +566,10 @@ pub fn run() {
             commands::notes::search_notes,
             commands::notes::search_tags,
             commands::notes::export_notes,
-            list_accounts,
-            get_account_nsec,
-            add_account,
-            switch_account,
+            commands::accounts::list_accounts,
+            commands::accounts::get_account_nsec,
+            commands::accounts::add_account,
+            commands::accounts::switch_account,
             list_relays,
             set_sync_relay,
             remove_sync_relay,
