@@ -149,6 +149,7 @@ pub struct NoteSummary {
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
+    pub readonly: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -751,7 +752,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     let active_tags = normalized_active_tags(&input.active_tags);
 
     let mut sql = String::from(
-        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at
+        "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
          FROM notes n
          LEFT JOIN notebooks b ON b.id = n.notebook_id",
     );
@@ -762,7 +763,7 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         match search_mode {
             SearchMode::Match(search_query) => {
                 sql = String::from(
-                    "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at
+                    "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
                      FROM notes n
                      LEFT JOIN notebooks b ON b.id = n.notebook_id
                      JOIN notes_fts ON notes_fts.note_id = n.id",
@@ -1353,6 +1354,7 @@ fn row_to_note_summary(
         archived_at: row.get(6)?,
         deleted_at: row.get(7)?,
         pinned_at: row.get(8)?,
+        readonly: row.get::<_, i64>(9)? != 0,
     })
 }
 

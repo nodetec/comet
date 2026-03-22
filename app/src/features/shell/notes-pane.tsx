@@ -63,6 +63,7 @@ type NotesPaneProps = {
   onLoadMore(): void;
   onRestoreFromTrash(noteId: string): void;
   onSetNotePinned(noteId: string, pinned: boolean): void;
+  onSetNoteReadonly(noteId: string, readonly: boolean): void;
   onExportNotes(): void;
   onRestoreNote(noteId: string): void;
   onTrashNote(noteId: string): void;
@@ -206,6 +207,7 @@ export function NotesPane({
   onLoadMore,
   onRestoreFromTrash,
   onSetNotePinned,
+  onSetNoteReadonly,
   onRestoreNote,
   onSelectNote,
   onTrashNote,
@@ -321,6 +323,12 @@ export function NotesPane({
           text: note.pinnedAt ? "Unpin" : "Pin To Top",
           action: () => onSetNotePinned(note.id, !note.pinnedAt),
         },
+        await CheckMenuItem.new({
+          id: `readonly-${note.id}`,
+          text: "Read-only",
+          checked: note.readonly,
+          action: () => onSetNoteReadonly(note.id, !note.readonly),
+        }),
         {
           id: `copy-${note.id}`,
           text: "Copy",

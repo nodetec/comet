@@ -19,6 +19,7 @@ export type NoteSummary = {
   notebook: NotebookRef | null;
   pinnedAt: number | null;
   preview: string;
+  readonly: boolean;
   searchSnippet: string | null;
   title: string;
 };

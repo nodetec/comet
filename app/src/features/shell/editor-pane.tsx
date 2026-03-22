@@ -17,6 +17,7 @@ import {
   ChevronUp,
   Ellipsis,
   Lock,
+  PencilOff,
   PanelBottomOpen,
   PanelBottomClose,
   Search,
@@ -402,11 +403,6 @@ export function EditorPane({
         </TooltipContent>
       </Tooltip>
     </>
-  ) : readonly ? (
-    <span className="text-muted-foreground pointer-events-auto flex items-center gap-1 text-xs">
-      <Lock className="size-3.5" />
-      Read-only
-    </span>
   ) : publishedAt != null ? (
     modifiedAt <= publishedAt ? (
       <span className="text-muted-foreground pointer-events-auto text-xs">
@@ -421,6 +417,34 @@ export function EditorPane({
         Update
       </button>
     )
+  ) : null;
+
+  const toolbarSlot = readonly ? (
+    <Tooltip>
+      <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
+        <span aria-label="Read-only" title="Read-only">
+          <PencilOff className="size-[1.2rem]" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Read-only</TooltipContent>
+    </Tooltip>
+  ) : !isReadOnly ? (
+    <Button
+      className={cn(
+        "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
+        showToolbar && "bg-accent text-accent-foreground",
+      )}
+      onClick={() => setShowToolbar(!showToolbar)}
+      size="icon-sm"
+      variant="ghost"
+      title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+    >
+      {showToolbar ? (
+        <PanelBottomClose className="size-[1.2rem]" />
+      ) : (
+        <PanelBottomOpen className="size-[1.2rem]" />
+      )}
+    </Button>
   ) : null;
 
   return (
@@ -444,24 +468,7 @@ export function EditorPane({
         {noteId ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
             {statusContent}
-            {!isReadOnly ? (
-              <Button
-                className={cn(
-                  "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
-                  showToolbar && "bg-accent text-accent-foreground",
-                )}
-                onClick={() => setShowToolbar(!showToolbar)}
-                size="icon-sm"
-                variant="ghost"
-                title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-              >
-                {showToolbar ? (
-                  <PanelBottomClose className="size-[1.2rem]" />
-                ) : (
-                  <PanelBottomOpen className="size-[1.2rem]" />
-                )}
-              </Button>
-            ) : null}
+            {toolbarSlot}
             {menuButton}
           </div>
         ) : null}

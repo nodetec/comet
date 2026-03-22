@@ -1310,6 +1310,8 @@ export function useShellController() {
       },
       onSetNotePinned: (noteId: string, pinned: boolean) =>
         latestRef.current.handleSetNotePinned(noteId, pinned),
+      onSetNoteReadonly: (noteId: string, readonly: boolean) =>
+        latestRef.current.handleSetNoteReadonly(noteId, readonly),
       searchQuery,
       selectedNoteId: displayedSelectedNoteId,
       totalNoteCount,
