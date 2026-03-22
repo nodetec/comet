@@ -7,7 +7,7 @@ app/dist/
 app/src-tauri/target/
 /.webpack/
 relay/dist/
-references/
+reports/
 old/
 .agents/
 .claude/
