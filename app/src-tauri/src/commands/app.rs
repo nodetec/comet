@@ -69,11 +69,11 @@ pub fn import_image(
 }
 
 #[tauri::command]
-pub fn list_themes(app: AppHandle) -> Result<Vec<crate::themes::ThemeSummary>, AppError> {
-    crate::themes::list_themes(&app)
+pub fn list_themes(app: AppHandle) -> Result<Vec<crate::infra::themes::ThemeSummary>, AppError> {
+    crate::infra::themes::list_themes(&app)
 }
 
 #[tauri::command]
-pub fn read_theme(app: AppHandle, theme_id: String) -> Result<crate::themes::ThemeData, AppError> {
-    crate::themes::read_theme(&app, &theme_id)
+pub fn read_theme(app: AppHandle, theme_id: String) -> Result<crate::infra::themes::ThemeData, AppError> {
+    crate::infra::themes::read_theme(&app, &theme_id)
 }
