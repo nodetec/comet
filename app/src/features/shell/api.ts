@@ -74,6 +74,10 @@ export async function createNote(input: {
   return invoke<LoadedNote>("create_note", input);
 }
 
+export async function duplicateNote(noteId: string) {
+  return invoke<LoadedNote>("duplicate_note", { noteId });
+}
+
 export async function saveNote(input: { id: string; markdown: string }) {
   return invoke<LoadedNote>("save_note", { input });
 }

@@ -60,6 +60,7 @@ type NotesPaneProps = {
   onCopyNoteContent(noteId: string): void;
   onCreateNote(source: "keyboard" | "pointer"): void;
   onDeleteNotePermanently(noteId: string): void;
+  onDuplicateNote(noteId: string): void;
   onLoadMore(): void;
   onRestoreFromTrash(noteId: string): void;
   onSetNotePinned(noteId: string, pinned: boolean): void;
@@ -203,6 +204,7 @@ export function NotesPane({
   onCopyNoteContent,
   onCreateNote,
   onDeleteNotePermanently,
+  onDuplicateNote,
   onExportNotes,
   onLoadMore,
   onRestoreFromTrash,
@@ -329,6 +331,11 @@ export function NotesPane({
           checked: note.readonly,
           action: () => onSetNoteReadonly(note.id, !note.readonly),
         }),
+        {
+          id: `duplicate-${note.id}`,
+          text: "Duplicate",
+          action: () => onDuplicateNote(note.id),
+        },
         {
           id: `copy-${note.id}`,
           text: "Copy",

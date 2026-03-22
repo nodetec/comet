@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent,
@@ -58,6 +59,7 @@ type EditorPaneProps = {
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
+  onDuplicateNote(): void;
   onOpenPublishDialog(): void;
   onPublishShortNote(): void;
   onSetPinned(pinned: boolean): void;
@@ -92,6 +94,7 @@ export function EditorPane({
   searchQuery,
   onAssignNotebook,
   onDeletePublishedNote,
+  onDuplicateNote,
   onOpenPublishDialog,
   onPublishShortNote,
   onSetPinned,
@@ -128,6 +131,7 @@ export function EditorPane({
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
   const [findScrollRevision, setFindScrollRevision] = useState(0);
   const findInputRef = useRef<HTMLInputElement | null>(null);
+  const noteScrollPositionsRef = useRef<Map<string, number>>(new Map());
   const noteTitle = firstLineH1Title(markdown);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
 
@@ -163,9 +167,24 @@ export function EditorPane({
     [noteId],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const scrollContainer = scrollContainerRef.current;
-    updateHeaderState(scrollContainer);
+    if (!scrollContainer) {
+      updateHeaderState(null);
+      return;
+    }
+
+    const nextScrollTop = noteId
+      ? (noteScrollPositionsRef.current.get(noteId) ?? 0)
+      : 0;
+    scrollContainer.scrollTop = nextScrollTop;
+    setShowHeaderBorder(nextScrollTop > 0);
+
+    const frame = window.requestAnimationFrame(() => {
+      updateHeaderState(scrollContainer);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [noteId, updateHeaderState]);
 
   useEffect(() => {
@@ -312,6 +331,11 @@ export function EditorPane({
             },
           },
           readonlyMenuItem,
+          {
+            id: "editor-menu-duplicate",
+            text: "Duplicate",
+            action: onDuplicateNote,
+          },
           moveToNotebookSubmenu,
           ...publishItems,
         ],
@@ -331,6 +355,7 @@ export function EditorPane({
       noteId,
       onAssignNotebook,
       onDeletePublishedNote,
+      onDuplicateNote,
       onOpenPublishDialog,
       onPublishShortNote,
       onSetPinned,
@@ -560,6 +585,12 @@ export function EditorPane({
           onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
           onScroll={(event) => {
+            if (noteId) {
+              noteScrollPositionsRef.current.set(
+                noteId,
+                event.currentTarget.scrollTop,
+              );
+            }
             updateHeaderState(event.currentTarget);
           }}
           ref={scrollContainerRef}

@@ -18,6 +18,7 @@ import {
   archiveNote,
   assignNoteNotebook,
   createNote,
+  duplicateNote,
   deleteNotePermanently,
   emptyTrash,
   getBootstrap,
@@ -384,6 +385,27 @@ export function useShellController() {
     onSettled: () => {
       isSavingRef.current = false;
     },
+  });
+
+  const duplicateNoteMutation = useMutation({
+    mutationFn: duplicateNote,
+    onSuccess: (duplicatedNote) => {
+      queryClient.setQueryData(["note", duplicatedNote.id], duplicatedNote);
+      setCreatingSelectedNoteId(null);
+      setSelectedNoteId(duplicatedNote.id);
+      setDraft(duplicatedNote.id, duplicatedNote.markdown);
+      setEditorFocusMode("immediate");
+
+      if (noteFilter === "archive" || noteFilter === "trash") {
+        setNoteFilter("all");
+      }
+
+      void invalidateShellData();
+    },
+    onError: toastErrorHandler(
+      "Couldn't duplicate note",
+      "duplicate-note-error",
+    ),
   });
 
   const archiveNoteMutation = useMutation({
@@ -942,6 +964,7 @@ export function useShellController() {
       assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
+      duplicateNoteMutation.isPending ||
       setNoteReadonlyMutation.isPending
     ) {
       return;
@@ -967,6 +990,7 @@ export function useShellController() {
       assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
+      duplicateNoteMutation.isPending ||
       setNoteReadonlyMutation.isPending
     ) {
       return;
@@ -984,6 +1008,7 @@ export function useShellController() {
       assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
+      duplicateNoteMutation.isPending ||
       setNoteReadonlyMutation.isPending
     ) {
       return;
@@ -998,6 +1023,29 @@ export function useShellController() {
         noteId,
         readonly,
       });
+    })().catch(() => {});
+  };
+
+  const handleDuplicateNote = (noteId: string) => {
+    if (
+      archiveNoteMutation.isPending ||
+      restoreNoteMutation.isPending ||
+      deleteNotePermanentlyMutation.isPending ||
+      assignNoteNotebookMutation.isPending ||
+      pinNoteMutation.isPending ||
+      unpinNoteMutation.isPending ||
+      duplicateNoteMutation.isPending ||
+      setNoteReadonlyMutation.isPending
+    ) {
+      return;
+    }
+
+    void (async () => {
+      if (noteId === selectedNoteId) {
+        await flushCurrentDraftAsync();
+      }
+
+      await duplicateNoteMutation.mutateAsync(noteId);
     })().catch(() => {});
   };
 
@@ -1050,6 +1098,7 @@ export function useShellController() {
     handleCopyNoteContent,
     handleCreateNote,
     handleDeleteNotebook,
+    handleDuplicateNote,
     handleDeleteNotePermanently,
     handleEmptyTrash,
     handleExportNotes,
@@ -1115,6 +1164,11 @@ export function useShellController() {
         }
 
         setDeletePublishDialogOpen(true);
+      },
+      onDuplicateNote() {
+        if (currentNote) {
+          latestRef.current.handleDuplicateNote(currentNote.id);
+        }
       },
       onOpenPublishDialog() {
         if (!currentNote || isPublishNotePending) {
@@ -1261,6 +1315,7 @@ export function useShellController() {
     assignNoteNotebookMutation.isPending ||
     pinNoteMutation.isPending ||
     unpinNoteMutation.isPending ||
+    duplicateNoteMutation.isPending ||
     setNoteReadonlyMutation.isPending;
 
   const notesPaneProps = useMemo(
@@ -1292,6 +1347,8 @@ export function useShellController() {
         latestRef.current.handleCreateNote(source),
       onDeleteNotePermanently: (noteId: string) =>
         latestRef.current.handleDeleteNotePermanently(noteId),
+      onDuplicateNote: (noteId: string) =>
+        latestRef.current.handleDuplicateNote(noteId),
       onExportNotes: () => latestRef.current.handleExportNotes(),
       onLoadMore() {
         if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {

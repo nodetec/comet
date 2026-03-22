@@ -153,6 +153,13 @@ fn create_note(
 }
 
 #[tauri::command]
+fn duplicate_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError> {
+    let note = notes::duplicate_note(&app, &note_id)?;
+    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
+    Ok(note)
+}
+
+#[tauri::command]
 fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
     let note = notes::save_note(&app, input)?;
     sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
@@ -740,6 +747,7 @@ pub fn run() {
             contextual_tags,
             load_note,
             create_note,
+            duplicate_note,
             save_note,
             set_note_readonly,
             archive_note,

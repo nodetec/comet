@@ -400,6 +400,23 @@ pub fn create_note(
     note_by_id(app, &conn, &note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
+pub fn duplicate_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
+    validate_note_id(note_id)?;
+    let conn = database_connection(app)?;
+    let (markdown, notebook_id): (String, Option<String>) = conn
+        .query_row(
+            "SELECT markdown, notebook_id
+             FROM notes
+             WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| AppError::custom("Note not found."))?;
+
+    create_note(app, notebook_id.as_deref(), &[], Some(&markdown))
+}
+
 pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
     validate_note_id(&input.id)?;
     let mut conn = database_connection(app)?;
