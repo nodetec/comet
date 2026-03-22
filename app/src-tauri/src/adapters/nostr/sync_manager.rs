@@ -166,7 +166,7 @@ pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
             .as_deref()
             == Some("true");
         let unlocked = if has_relay && enabled {
-            crate::secure_storage::is_current_identity_unlocked(app, &conn)?
+            crate::adapters::tauri::key_store::is_current_identity_unlocked(app, &conn)?
         } else {
             false
         };
@@ -237,7 +237,7 @@ fn save_checkpoint(conn: &Connection, seq: i64) {
 
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
-use crate::nostr::strip_title_line;
+use crate::adapters::nostr::protocol::strip_title_line;
 
 const COMET_EVENT_KIND: Kind = Kind::ApplicationSpecificData; // 30078
 const COMET_SCHEMA_VERSION: &str = "1";
@@ -392,7 +392,7 @@ fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-use crate::attachments::{
+use crate::adapters::filesystem::attachments::{
     cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes,
 };
 
@@ -737,7 +737,7 @@ async fn run_sync_connection(
         let conn = crate::db::database_connection(app)?;
         let relay_url = get_sync_relay_url(&conn)
             .ok_or_else(|| AppError::custom("No sync relay configured"))?;
-        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
+        let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
         (relay_url, keys)
     };
     let pubkey = keys.public_key();
@@ -1006,7 +1006,7 @@ async fn process_relay_message(
             sync_log(app, &format!("received event seq={seq}"));
 
             // Unwrap gift wrap (skip events we can't decrypt, e.g. from a previous key)
-            let unwrapped = match crate::nip59_ext::extract_rumor(keys, &event) {
+            let unwrapped = match crate::adapters::nostr::nip59_ext::extract_rumor(keys, &event) {
                 Ok(u) => u,
                 Err(e) => {
                     sync_log(app, &format!("skip undecryptable event: {e}"));
@@ -1046,7 +1046,7 @@ async fn process_relay_message(
                         tokio::spawn(async move {
                             let http_client = reqwest::Client::new();
                             for (server_url, ciphertext_hash) in blossom_deletions {
-                                if let Err(e) = crate::blossom::delete_blob(
+                                if let Err(e) = crate::adapters::blossom::client::delete_blob(
                                     &http_client,
                                     &server_url,
                                     &ciphertext_hash,
@@ -1347,7 +1347,7 @@ async fn push_note(
             }
 
             // Read the local blob
-            let blob_data = if let Some((data, _ext)) = crate::attachments::read_blob(app, hash)? {
+            let blob_data = if let Some((data, _ext)) = crate::adapters::filesystem::attachments::read_blob(app, hash)? {
                 eprintln!(
                     "[sync] attachment hash={} read {} bytes locally",
                     &hash[..8],
@@ -1363,11 +1363,11 @@ async fn push_note(
             };
 
             // Encrypt with ChaCha20-Poly1305
-            let (ciphertext_bytes, key_hex) = crate::blossom::encrypt_blob(&blob_data)?;
+            let (ciphertext_bytes, key_hex) = crate::adapters::blossom::client::encrypt_blob(&blob_data)?;
 
             // Upload to Blossom
             let ciphertext_hash =
-                crate::blossom::upload_blob(&http_client, blossom_url, ciphertext_bytes, keys)
+                crate::adapters::blossom::client::upload_blob(&http_client, blossom_url, ciphertext_bytes, keys)
                     .await?;
 
             // Save blob metadata keyed to this server + identity
@@ -1406,7 +1406,7 @@ async fn push_note(
     // Gift wrap to self with HMAC'd d-tag for relay-side replacement
     let d_tag = gift_wrap_d_tag(keys.secret_key(), note_id);
     let gift_wrap =
-        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
+        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
 
@@ -1463,7 +1463,7 @@ async fn push_deletion(
     };
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &d_tag_input);
     let gift_wrap =
-        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
+        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
@@ -1519,7 +1519,7 @@ async fn push_notebook(
 
     let d_tag = gift_wrap_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
     let gift_wrap =
-        crate::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
+        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &keys.public_key(), rumor, [Tag::identifier(&d_tag)])?;
 
     let event_id = gift_wrap.id.to_hex();
     recent_pushes.insert(event_id.clone(), std::time::Instant::now());
@@ -1578,7 +1578,7 @@ async fn download_missing_blobs(
         }
 
         // Check if we already have it locally
-        match crate::attachments::has_local_blob(app, plaintext_hash) {
+        match crate::adapters::filesystem::attachments::has_local_blob(app, plaintext_hash) {
             Ok(true) => continue,
             Ok(false) => {}
             Err(e) => {
@@ -1592,7 +1592,7 @@ async fn download_missing_blobs(
 
         // Download from Blossom
         let ciphertext_bytes =
-            match crate::blossom::download_blob(&http_client, blossom_url, ciphertext_hash, keys)
+            match crate::adapters::blossom::client::download_blob(&http_client, blossom_url, ciphertext_hash, keys)
                 .await
             {
                 Ok(data) => data,
@@ -1606,7 +1606,7 @@ async fn download_missing_blobs(
             };
 
         // Decrypt with ChaCha20-Poly1305
-        let plaintext = match crate::blossom::decrypt_blob(&ciphertext_bytes, key_hex) {
+        let plaintext = match crate::adapters::blossom::client::decrypt_blob(&ciphertext_bytes, key_hex) {
             Ok(p) => p,
             Err(e) => {
                 sync_log(app, &format!("failed to decrypt blob: {e}"));
@@ -1620,7 +1620,7 @@ async fn download_missing_blobs(
             .unwrap_or_else(|| "bin".to_string());
 
         // Save locally
-        if let Err(e) = crate::attachments::save_blob(app, plaintext_hash, &ext, &plaintext) {
+        if let Err(e) = crate::adapters::filesystem::attachments::save_blob(app, plaintext_hash, &ext, &plaintext) {
             log::error!("[sync] failed to save blob {}: {e}", &plaintext_hash[..8]);
         } else {
             log::info!("[sync] downloaded blob {}.{ext}", &plaintext_hash[..8]);

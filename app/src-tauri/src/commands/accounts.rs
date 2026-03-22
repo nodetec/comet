@@ -1,15 +1,15 @@
+use crate::adapters::nostr::sync_manager::SyncManager;
 use crate::db;
 use crate::domain::accounts::model::AccountSummary;
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
-use crate::sync;
 use tauri::{AppHandle, Manager};
 
 async fn run_account_change<T>(
     app: &AppHandle,
     change: impl FnOnce() -> Result<T, AppError>,
 ) -> Result<T, AppError> {
-    let manager = app.state::<sync::SyncManager>();
+    let manager = app.state::<SyncManager>();
     manager.stop().await;
 
     let result = change();
@@ -17,7 +17,7 @@ async fn run_account_change<T>(
         let cache = app.state::<RenderedHtmlCache>();
         cache.clear();
     }
-    sync::auto_start(app).await;
+    crate::adapters::nostr::sync_manager::auto_start(app).await;
     result
 }
 
@@ -35,7 +35,7 @@ pub fn get_account_nsec(app: AppHandle, public_key: String) -> Result<String, Ap
         return Err(AppError::custom(format!("Unknown account: {public_key}")));
     }
 
-    crate::secure_storage::load_account_nsec(&app, &public_key)
+    crate::adapters::tauri::key_store::load_account_nsec(&app, &public_key)
 }
 
 #[tauri::command]

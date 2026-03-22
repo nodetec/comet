@@ -1,20 +1,10 @@
 mod adapters;
-mod attachments;
-mod blossom;
 mod commands;
 mod db;
 mod domain;
 mod error;
 mod infra;
-mod markdown;
-mod nip44_ext;
-mod nip59_ext;
-mod nostr;
-mod notes;
 mod ports;
-mod secure_storage;
-mod sync;
-mod themes;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
@@ -31,7 +21,7 @@ pub fn run() {
             file_name: Some("comet".to_string()),
         }))
         .level(log::LevelFilter::Info)
-        .level_for("comet_lib::sync", log::LevelFilter::Debug)
+        .level_for("comet_lib::adapters::nostr::sync_manager", log::LevelFilter::Debug)
         .rotation_strategy(RotationStrategy::KeepSome(5))
         .timezone_strategy(TimezoneStrategy::UseLocal);
 
@@ -47,13 +37,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_secure_storage::init())
         .manage(infra::cache::RenderedHtmlCache::default())
-        .manage(secure_storage::UnlockedNostrKeys::default())
-        .manage(sync::SyncManager::new())
+        .manage(crate::adapters::tauri::key_store::UnlockedNostrKeys::default())
+        .manage(crate::adapters::nostr::sync_manager::SyncManager::new())
         .setup(|app| {
             db::init_database(app.handle())?;
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                sync::auto_start(&handle).await;
+                crate::adapters::nostr::sync_manager::auto_start(&handle).await;
             });
             Ok(())
         })

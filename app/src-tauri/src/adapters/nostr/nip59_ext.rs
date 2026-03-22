@@ -8,7 +8,7 @@ use nostr_sdk::prelude::nip59::RANGE_RANDOM_TIMESTAMP_TWEAK;
 use nostr_sdk::prelude::*;
 
 use crate::error::AppError;
-use crate::nip44_ext;
+use crate::adapters::nostr::nip44_ext;
 
 /// Unwrapped gift wrap result.
 pub struct UnwrappedGift {

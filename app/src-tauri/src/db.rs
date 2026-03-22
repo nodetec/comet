@@ -1,9 +1,7 @@
 use crate::adapters::sqlite::migrations::{account_migrations, app_migrations};
 use crate::domain::accounts::model::{AccountRecord, AccountSummary};
-use crate::{
-    error::{now_millis, AppError},
-    nostr, secure_storage,
-};
+use crate::adapters::nostr::protocol as nostr;
+use crate::error::{now_millis, AppError};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{
     fs,
@@ -112,7 +110,7 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
-        secure_storage::store_account_nsec(app, &account.public_key, &identity.nsec)?;
+        crate::adapters::tauri::key_store::store_account_nsec(app, &account.public_key, &identity.nsec)?;
         stored_key_public_key = Some(account.public_key.clone());
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
         register_account(&mut app_conn, &account, None, true)?;
@@ -132,7 +130,7 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
             let _ = fs::remove_dir_all(target_dir);
         }
         if let Some(public_key) = stored_key_public_key.as_deref() {
-            secure_storage::remove_account_nsec(app, public_key);
+            crate::adapters::tauri::key_store::remove_account_nsec(app, public_key);
         }
     }
 
@@ -360,7 +358,7 @@ fn create_initial_account(
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
 
-        secure_storage::store_account_nsec(app, &account.public_key, &identity.nsec)?;
+        crate::adapters::tauri::key_store::store_account_nsec(app, &account.public_key, &identity.nsec)?;
         stored_key_public_key = Some(account.public_key.clone());
 
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
@@ -376,7 +374,7 @@ fn create_initial_account(
             let _ = fs::remove_dir_all(target_dir);
         }
         if let Some(public_key) = stored_key_public_key.as_deref() {
-            secure_storage::remove_account_nsec(app, public_key);
+            crate::adapters::tauri::key_store::remove_account_nsec(app, public_key);
         }
     }
 

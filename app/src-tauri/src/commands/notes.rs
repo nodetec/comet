@@ -6,7 +6,7 @@ use crate::domain::notes::service::NoteService;
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
-use crate::sync::SyncCommand;
+use crate::adapters::nostr::sync_manager::SyncCommand;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 // ---------------------------------------------------------------------------
 
 fn sync_push(app: &AppHandle, cmd: SyncCommand) {
-    let manager = app.state::<crate::sync::SyncManager>().inner().clone();
+    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>().inner().clone();
     tauri::async_runtime::spawn(async move {
         manager.push(cmd).await;
     });
@@ -25,7 +25,7 @@ fn render_html(app: &AppHandle, note_id: &str, modified_at: i64, markdown: &str)
     if let Some(html) = cache.get(note_id, modified_at) {
         return html;
     }
-    let html = crate::markdown::markdown_to_lexical_html(markdown);
+    let html = crate::adapters::markdown::renderer::markdown_to_lexical_html(markdown);
     cache.insert(note_id.to_string(), modified_at, html.clone());
     html
 }
@@ -62,7 +62,7 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
         Ok(c) => c,
         Err(_) => return,
     };
-    let (keys, _) = match crate::secure_storage::keys_for_current_identity(app, &conn) {
+    let (keys, _) = match crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn) {
         Ok(identity) => identity,
         Err(_) => return,
     };
@@ -72,7 +72,7 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
         let client = reqwest::Client::new();
         for (server_url, ciphertext_hash) in blossom_deletions {
             if let Err(e) =
-                crate::blossom::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await
+                crate::adapters::blossom::client::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await
             {
                 eprintln!("[blob-gc] failed to delete from Blossom: {e}");
             }
@@ -215,13 +215,13 @@ pub fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), Ap
     let conn = database_connection(&app)?;
 
     // Find orphaned blobs before deleting the note.
-    let orphaned = crate::attachments::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
+    let orphaned = crate::adapters::filesystem::attachments::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
 
     let repo = SqliteNoteRepository::new(&conn);
     NoteService::delete_permanently(&repo, &note_id)?;
 
     // Blob cleanup (needs AppHandle).
-    let blossom_deletions = crate::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions = crate::adapters::filesystem::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML.
@@ -245,12 +245,12 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
     // Collect trashed note IDs and find orphaned blobs before deleting.
     let repo = SqliteNoteRepository::new(&conn);
     let trashed_ids: Vec<String> = repo.trashed_note_ids()?;
-    let orphaned = crate::attachments::find_orphaned_blob_hashes(&conn, &trashed_ids)?;
+    let orphaned = crate::adapters::filesystem::attachments::find_orphaned_blob_hashes(&conn, &trashed_ids)?;
 
     let note_ids = NoteService::empty_trash(&repo)?;
 
     // Blob cleanup.
-    let blossom_deletions = crate::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions = crate::adapters::filesystem::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML and record pending deletions.

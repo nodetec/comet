@@ -188,7 +188,7 @@ pub async fn publish_note(
     // Synchronous DB block — Connection is not Send, must drop before any .await
     let (keys, d_tag, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
-        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
+        let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
 
         let (id, markdown, existing_d_tag): (String, String, Option<String>) = conn
             .query_row(
@@ -226,10 +226,10 @@ pub async fn publish_note(
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
         let conn = crate::db::database_connection(app)?;
-        crate::sync::get_blossom_url(&conn)
+        crate::adapters::nostr::sync_manager::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
-        crate::blossom::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+        crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
     } else {
         content
     };
@@ -319,7 +319,7 @@ pub async fn publish_short_note(
 
     let (keys, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
-        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
+        let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
 
         let markdown: String = conn
             .query_row(
@@ -349,10 +349,10 @@ pub async fn publish_short_note(
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
         let conn = crate::db::database_connection(app)?;
-        crate::sync::get_blossom_url(&conn)
+        crate::adapters::nostr::sync_manager::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
-        crate::blossom::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+        crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
     } else {
         content
     };
@@ -414,7 +414,7 @@ pub async fn delete_published_note(
     // Synchronous DB block
     let (keys, d_tag, published_event_id, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
-        let (keys, _) = crate::secure_storage::keys_for_current_identity(app, &conn)?;
+        let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
 
         let (existing_d_tag, published_event_id): (Option<String>, Option<String>) = conn
             .query_row(

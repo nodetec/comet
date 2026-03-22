@@ -150,7 +150,7 @@ pub async fn upload_and_rewrite_attachments(
         let hash = caps.get(1).unwrap().as_str();
         let ext = caps.get(2).unwrap().as_str();
 
-        let (data, _) = crate::attachments::read_blob(app, hash)?
+        let (data, _) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
             .ok_or_else(|| AppError::custom(format!("Local image not found: {hash}.{ext}")))?;
 
         let size_bytes = data.len() as i64;

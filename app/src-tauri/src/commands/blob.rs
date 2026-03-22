@@ -15,7 +15,7 @@ pub enum BlobFetchStatus {
 #[tauri::command]
 pub fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
     let conn = database_connection(&app)?;
-    Ok(crate::sync::get_blossom_url(&conn))
+    Ok(crate::adapters::nostr::sync_manager::get_blossom_url(&conn))
 }
 
 #[tauri::command]
@@ -50,23 +50,23 @@ pub fn remove_blossom_url(app: AppHandle) -> Result<(), AppError> {
 pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, AppError> {
     log::info!("[blob] fetch requested plaintext_hash={hash}");
 
-    if crate::attachments::has_local_blob(&app, &hash)? {
+    if crate::adapters::filesystem::attachments::has_local_blob(&app, &hash)? {
         log::info!("[blob] already local plaintext_hash={hash}");
         return Ok(BlobFetchStatus::Downloaded);
     }
 
     let conn = database_connection(&app)?;
-    let preferred_blossom_url = crate::sync::get_blossom_url(&conn);
+    let preferred_blossom_url = crate::adapters::nostr::sync_manager::get_blossom_url(&conn);
     log::info!(
         "[blob] lookup plaintext_hash={hash} preferred_blossom_url={preferred_blossom_url:?}"
     );
 
-    if !crate::secure_storage::is_current_identity_unlocked(&app, &conn)? {
+    if !crate::adapters::tauri::key_store::is_current_identity_unlocked(&app, &conn)? {
         log::info!("[blob] needs unlock plaintext_hash={hash}");
         return Ok(BlobFetchStatus::NeedsUnlock);
     }
 
-    let (keys, pubkey_hex) = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
+    let (keys, pubkey_hex) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
     log::info!(
         "[blob] resolved account plaintext_hash={hash} pubkey={pubkey_hex}"
     );
@@ -118,7 +118,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
 
     let http_client = reqwest::Client::new();
     let ciphertext =
-        crate::blossom::download_blob(&http_client, &server_url, &ciphertext_hash, &keys).await?;
+        crate::adapters::blossom::client::download_blob(&http_client, &server_url, &ciphertext_hash, &keys).await?;
     log::info!(
         "[blob] downloaded ciphertext plaintext_hash={} ciphertext_hash={} size={}",
         hash,
@@ -126,7 +126,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
         ciphertext.len()
     );
 
-    let plaintext = crate::blossom::decrypt_blob(&ciphertext, &key_hex)?;
+    let plaintext = crate::adapters::blossom::client::decrypt_blob(&ciphertext, &key_hex)?;
     log::info!(
         "[blob] decrypted plaintext_hash={} size={}",
         hash,
@@ -141,13 +141,13 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
             |row| row.get::<_, String>(0),
         )
         .optional()?
-        .and_then(|md| crate::sync::extract_blob_extension(&md, &hash))
+        .and_then(|md| crate::adapters::nostr::sync_manager::extract_blob_extension(&md, &hash))
         .unwrap_or_else(|| "bin".to_string());
     log::info!(
         "[blob] resolved extension plaintext_hash={hash} ext={ext}"
     );
 
-    crate::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
+    crate::adapters::filesystem::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
     log::info!("[blob] saved locally plaintext_hash={hash} ext={ext}");
     Ok(BlobFetchStatus::Downloaded)
 }

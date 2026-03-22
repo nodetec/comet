@@ -31,33 +31,33 @@ fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
 fn restart_sync_async(app: &AppHandle) {
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = crate::sync::start_if_ready(&app_clone).await;
+        let _ = crate::adapters::nostr::sync_manager::start_if_ready(&app_clone).await;
     });
 }
 
 #[tauri::command]
-pub fn list_relays(app: AppHandle) -> Result<Vec<crate::nostr::Relay>, AppError> {
+pub fn list_relays(app: AppHandle) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::nostr::list_relays(&conn)
+    crate::adapters::nostr::protocol::list_relays(&conn)
 }
 
 #[tauri::command]
-pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::nostr::Relay>, AppError> {
+pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::nostr::set_sync_relay(&conn, &url)?;
+    let relays = crate::adapters::nostr::protocol::set_sync_relay(&conn, &url)?;
     reset_sync_state(&conn)?;
     restart_sync_async(&app);
     Ok(relays)
 }
 
 #[tauri::command]
-pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::nostr::Relay>, AppError> {
+pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::nostr::remove_sync_relay(&conn)?;
+    let relays = crate::adapters::nostr::protocol::remove_sync_relay(&conn)?;
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         app_clone
-            .state::<crate::sync::SyncManager>()
+            .state::<crate::adapters::nostr::sync_manager::SyncManager>()
             .stop()
             .await;
     });
@@ -68,9 +68,9 @@ pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::nostr::Relay>, App
 pub fn add_publish_relay(
     app: AppHandle,
     url: String,
-) -> Result<Vec<crate::nostr::Relay>, AppError> {
+) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::nostr::add_publish_relay(&conn, &url)
+    crate::adapters::nostr::protocol::add_publish_relay(&conn, &url)
 }
 
 #[tauri::command]
@@ -78,39 +78,39 @@ pub fn remove_relay(
     app: AppHandle,
     url: String,
     kind: String,
-) -> Result<Vec<crate::nostr::Relay>, AppError> {
+) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::nostr::remove_relay(&conn, &url, &kind)
+    crate::adapters::nostr::protocol::remove_relay(&conn, &url, &kind)
 }
 
 #[tauri::command]
 pub async fn publish_note(
     app: AppHandle,
-    input: crate::nostr::PublishNoteInput,
-) -> Result<crate::nostr::PublishResult, AppError> {
-    crate::nostr::publish_note(&app, input).await
+    input: crate::adapters::nostr::protocol::PublishNoteInput,
+) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+    crate::adapters::nostr::protocol::publish_note(&app, input).await
 }
 
 #[tauri::command]
 pub async fn publish_short_note(
     app: AppHandle,
-    input: crate::nostr::PublishShortNoteInput,
-) -> Result<crate::nostr::PublishResult, AppError> {
-    crate::nostr::publish_short_note(&app, input).await
+    input: crate::adapters::nostr::protocol::PublishShortNoteInput,
+) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+    crate::adapters::nostr::protocol::publish_short_note(&app, input).await
 }
 
 #[tauri::command]
 pub async fn delete_published_note(
     app: AppHandle,
     note_id: String,
-) -> Result<crate::nostr::PublishResult, AppError> {
-    crate::nostr::delete_published_note(&app, &note_id).await
+) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+    crate::adapters::nostr::protocol::delete_published_note(&app, &note_id).await
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
-    state: crate::sync::SyncState,
+    state: crate::adapters::nostr::sync_manager::SyncState,
     relay_url: Option<String>,
     blossom_url: Option<String>,
     npub: Option<String>,
@@ -125,13 +125,13 @@ pub struct SyncInfo {
 
 #[tauri::command]
 pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
-    let manager = app.state::<crate::sync::SyncManager>();
+    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     let state = manager.state().await;
 
     let conn = database_connection(&app)?;
 
-    let relay_url = crate::sync::get_sync_relay_url(&conn);
-    let blossom_url = crate::sync::get_blossom_url(&conn);
+    let relay_url = crate::adapters::nostr::sync_manager::get_sync_relay_url(&conn);
+    let blossom_url = crate::adapters::nostr::sync_manager::get_blossom_url(&conn);
     let npub: Option<String> = conn
         .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
             row.get(0)
@@ -168,7 +168,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         |row| row.get(0),
     )?;
 
-    let checkpoint: i64 = crate::sync::get_checkpoint(&conn);
+    let checkpoint: i64 = crate::adapters::nostr::sync_manager::get_checkpoint(&conn);
 
     let blobs_stored: i64 =
         conn.query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;
@@ -210,9 +210,9 @@ pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppEr
     )?;
     drop(conn);
 
-    let manager = app.state::<crate::sync::SyncManager>();
+    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     if enabled {
-        crate::sync::start_if_ready(&app).await?;
+        crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;
     } else {
         manager.stop().await;
     }
@@ -220,14 +220,14 @@ pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppEr
 }
 
 #[tauri::command]
-pub async fn get_sync_status(app: AppHandle) -> Result<crate::sync::SyncState, AppError> {
-    let manager = app.state::<crate::sync::SyncManager>();
+pub async fn get_sync_status(app: AppHandle) -> Result<crate::adapters::nostr::sync_manager::SyncState, AppError> {
+    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     Ok(manager.state().await)
 }
 
 #[tauri::command]
 pub async fn resync(app: AppHandle) -> Result<(), AppError> {
-    let manager = app.state::<crate::sync::SyncManager>();
+    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     manager.stop().await;
 
     let conn = database_connection(&app)?;
@@ -241,22 +241,22 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
          DELETE FROM app_settings WHERE key = 'sync_checkpoint';",
     )?;
 
-    crate::sync::start_if_ready(&app).await?;
+    crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn restart_sync(app: AppHandle) -> Result<(), AppError> {
-    crate::sync::start_if_ready(&app).await?;
+    crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn unlock_current_account(app: AppHandle) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
-    let _ = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
+    let _ = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
     drop(conn);
-    crate::sync::start_if_ready(&app).await?;
+    crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;
     Ok(())
 }
 

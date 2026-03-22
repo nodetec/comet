@@ -57,15 +57,15 @@ pub fn reveal_main_window(app: AppHandle) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn get_attachments_dir(app: AppHandle) -> Result<String, AppError> {
-    crate::attachments::get_attachments_dir(&app)
+    crate::adapters::filesystem::attachments::get_attachments_dir(&app)
 }
 
 #[tauri::command]
 pub fn import_image(
     app: AppHandle,
     source_path: String,
-) -> Result<crate::attachments::ImportedImage, AppError> {
-    crate::attachments::import_image(&app, &source_path)
+) -> Result<crate::adapters::filesystem::attachments::ImportedImage, AppError> {
+    crate::adapters::filesystem::attachments::import_image(&app, &source_path)
 }
 
 #[tauri::command]
