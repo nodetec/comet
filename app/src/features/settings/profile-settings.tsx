@@ -7,6 +7,9 @@ import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/utils";
 
+const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
+  "comet:reopen-settings-after-account-change";
+
 type AccountSummary = {
   publicKey: string;
   npub: string;
@@ -57,6 +60,17 @@ async function prepareForAccountChange(): Promise<void> {
   });
 }
 
+function preserveSettingsAcrossReload() {
+  try {
+    window.sessionStorage.setItem(
+      REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY,
+      "profile",
+    );
+  } catch {
+    // Ignore session storage failures and fall back to a normal reload.
+  }
+}
+
 export function ProfileSettings() {
   const [addingAccount, setAddingAccount] = useState(false);
   const [nsec, setNsec] = useState("");
@@ -78,6 +92,7 @@ export function ProfileSettings() {
       return invoke<AccountSummary>("add_account", { nsec: value });
     },
     onSuccess: () => {
+      preserveSettingsAcrossReload();
       window.location.reload();
     },
     onSettled: () => {
@@ -92,6 +107,7 @@ export function ProfileSettings() {
       return invoke<AccountSummary>("switch_account", { publicKey });
     },
     onSuccess: () => {
+      preserveSettingsAcrossReload();
       window.location.reload();
     },
     onSettled: () => {
