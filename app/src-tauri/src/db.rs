@@ -206,9 +206,8 @@ fn app_migrations() -> Migrations<'static> {
 }
 
 fn account_migrations() -> Migrations<'static> {
-    Migrations::new(vec![
-        M::up(
-            "CREATE TABLE app_settings (
+    Migrations::new(vec![M::up(
+        "CREATE TABLE app_settings (
            key TEXT PRIMARY KEY,
            value TEXT NOT NULL
          );
@@ -216,7 +215,9 @@ fn account_migrations() -> Migrations<'static> {
            id TEXT PRIMARY KEY,
            name TEXT NOT NULL UNIQUE,
            created_at INTEGER NOT NULL,
-           updated_at INTEGER NOT NULL
+           updated_at INTEGER NOT NULL,
+           sync_event_id TEXT,
+           locally_modified INTEGER NOT NULL DEFAULT 0
          );
          CREATE TABLE notes (
            id TEXT PRIMARY KEY,
@@ -228,7 +229,13 @@ fn account_migrations() -> Migrations<'static> {
            archived_at INTEGER,
            pinned_at INTEGER,
            nostr_d_tag TEXT,
-           published_at INTEGER
+           published_at INTEGER,
+           sync_event_id TEXT,
+           edited_at INTEGER,
+           locally_modified INTEGER NOT NULL DEFAULT 0,
+           deleted_at INTEGER,
+           published_event_id TEXT,
+           published_kind INTEGER
          );
          CREATE TABLE note_tags (
            note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
@@ -246,6 +253,26 @@ fn account_migrations() -> Migrations<'static> {
            npub       TEXT NOT NULL,
            created_at INTEGER NOT NULL
          );
+         CREATE TABLE blob_uploads (
+           hash TEXT NOT NULL,
+           server_url TEXT NOT NULL,
+           encrypted INTEGER NOT NULL DEFAULT 0,
+           size_bytes INTEGER NOT NULL DEFAULT 0,
+           uploaded_at INTEGER NOT NULL,
+           PRIMARY KEY (hash, server_url)
+         );
+         CREATE TABLE blob_meta (
+           plaintext_hash  TEXT NOT NULL,
+           server_url      TEXT NOT NULL,
+           pubkey          TEXT NOT NULL,
+           ciphertext_hash TEXT NOT NULL,
+           encryption_key  TEXT NOT NULL,
+           PRIMARY KEY (plaintext_hash, server_url, pubkey)
+         );
+         CREATE TABLE pending_deletions (
+           entity_id TEXT PRIMARY KEY,
+           created_at INTEGER NOT NULL
+         );
          CREATE VIRTUAL TABLE notes_fts USING fts5(
            note_id UNINDEXED,
            title,
@@ -253,77 +280,14 @@ fn account_migrations() -> Migrations<'static> {
            tokenize = 'trigram'
          );
          CREATE INDEX idx_notes_modified_at ON notes(modified_at DESC);
+         CREATE INDEX idx_notes_edited_at ON notes(edited_at DESC);
          CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
            WHERE archived_at IS NULL;
          CREATE INDEX idx_notes_archived_at ON notes(archived_at);
          CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
+         CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);
          CREATE INDEX idx_note_tags_tag ON note_tags(tag);",
-        ),
-        M::up("ALTER TABLE notes ADD COLUMN sync_event_id TEXT;"),
-        M::up(
-            "CREATE TABLE IF NOT EXISTS blob_meta (
-               plaintext_hash  TEXT PRIMARY KEY,
-               ciphertext_hash TEXT NOT NULL,
-               encryption_key  TEXT NOT NULL
-             );",
-        ),
-        M::up("ALTER TABLE notebooks ADD COLUMN sync_event_id TEXT;"),
-        M::up(
-            "ALTER TABLE notes ADD COLUMN edited_at INTEGER;
-             UPDATE notes SET edited_at = modified_at;
-             CREATE INDEX IF NOT EXISTS idx_notes_edited_at ON notes(edited_at DESC);",
-        ),
-        M::up(
-            "CREATE TABLE IF NOT EXISTS pending_deletions (
-               sync_event_id TEXT PRIMARY KEY,
-               created_at INTEGER NOT NULL
-             );",
-        ),
-        M::up("ALTER TABLE pending_deletions RENAME COLUMN sync_event_id TO entity_id;"),
-        M::up(
-            "ALTER TABLE notes ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;
-             ALTER TABLE notebooks ADD COLUMN locally_modified INTEGER NOT NULL DEFAULT 0;",
-        ),
-        M::up(
-            "ALTER TABLE notes ADD COLUMN deleted_at INTEGER;
-             CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);",
-        ),
-        M::up(
-            "ALTER TABLE notes ADD COLUMN published_event_id TEXT;
-             ALTER TABLE notes ADD COLUMN published_kind INTEGER;",
-        ),
-        M::up(
-            "CREATE TABLE IF NOT EXISTS blob_uploads (
-                hash TEXT NOT NULL,
-                server_url TEXT NOT NULL,
-                encrypted INTEGER NOT NULL DEFAULT 0,
-                size_bytes INTEGER NOT NULL DEFAULT 0,
-                uploaded_at INTEGER NOT NULL,
-                PRIMARY KEY (hash, server_url)
-            );",
-        ),
-        M::up(
-            "DROP TABLE IF EXISTS blob_meta;
-             CREATE TABLE blob_meta (
-               plaintext_hash  TEXT NOT NULL,
-               server_url      TEXT NOT NULL,
-               ciphertext_hash TEXT NOT NULL,
-               encryption_key  TEXT NOT NULL,
-               PRIMARY KEY (plaintext_hash, server_url)
-             );",
-        ),
-        M::up(
-            "DROP TABLE IF EXISTS blob_meta;
-             CREATE TABLE blob_meta (
-               plaintext_hash  TEXT NOT NULL,
-               server_url      TEXT NOT NULL,
-               pubkey          TEXT NOT NULL,
-               ciphertext_hash TEXT NOT NULL,
-               encryption_key  TEXT NOT NULL,
-               PRIMARY KEY (plaintext_hash, server_url, pubkey)
-             );",
-        ),
-    ])
+    )])
 }
 
 fn ensure_active_account(app: &AppHandle) -> Result<AccountRecord, AppError> {

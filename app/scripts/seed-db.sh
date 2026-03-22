@@ -399,8 +399,8 @@ INSERT INTO relays (url, kind, created_at) VALUES
 
 COMMIT;
 
--- Tell rusqlite_migration that both migrations have been applied
-PRAGMA user_version = 13;
+-- Tell rusqlite_migration that the canonical account schema has been applied
+PRAGMA user_version = 1;
 
 PRAGMA foreign_keys = ON;
 SQL
