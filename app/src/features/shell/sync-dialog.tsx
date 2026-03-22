@@ -61,7 +61,7 @@ function stateLabel(state: SyncInfo["state"]): {
     case "needsUnlock":
       return {
         label: "Needs Unlock",
-        icon: <Key className="size-4" />,
+        icon: <CloudAlert className="size-4 text-amber-500" />,
       };
     case "syncing":
       return {

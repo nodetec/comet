@@ -386,6 +386,7 @@ export function NotesPane({
                 enabled: false,
               },
             ]),
+        { item: "Separator" as const },
         await CheckMenuItem.new({
           id: `readonly-${note.id}`,
           text: "Read-only",
