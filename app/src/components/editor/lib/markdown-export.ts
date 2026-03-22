@@ -37,18 +37,22 @@ function transformersByType(transformers: Array<Transformer>): {
 
   for (const transformer of transformers) {
     switch (transformer.type) {
-      case "element":
+      case "element": {
         byType.element.push(transformer);
         break;
-      case "multiline-element":
+      }
+      case "multiline-element": {
         byType.multilineElement.push(transformer);
         break;
-      case "text-format":
+      }
+      case "text-format": {
         byType.textFormat.push(transformer);
         break;
-      case "text-match":
+      }
+      case "text-match": {
         byType.textMatch.push(transformer);
         break;
+      }
     }
   }
 
@@ -184,7 +188,7 @@ function exportTextFormat(
   // the stored markdown.
   let output = textContent.replace(/\u200B/g, "");
   if (!node.hasFormat("code")) {
-    output = output.replace(/([*_`~\\])/g, "\\$1");
+    output = output.replace(/([*_`~\\])/g, String.raw`\$1`);
   }
 
   const match = output.match(/^(\s*)(.*?)(\s*)$/s) ?? ["", "", output, ""];

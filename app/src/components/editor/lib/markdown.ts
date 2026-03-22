@@ -82,7 +82,7 @@ function normalizeImportedQuoteSpacing(node: LexicalNode): void {
   }
 
   let previousNonEmptyParagraph: LexicalNode | null = null;
-  for (const child of [...node.getChildren()]) {
+  for (const child of node.getChildren()) {
     if ($isParagraphNode(child)) {
       if (isEmptyParagraph(child)) {
         previousNonEmptyParagraph = null;
@@ -124,7 +124,7 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
 
   let previousItem: LexicalNode | null = null;
 
-  for (const child of [...node.getChildren()]) {
+  for (const child of node.getChildren()) {
     if (!$isListItemNode(child)) {
       previousItem = child;
       continue;
@@ -215,7 +215,7 @@ function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
     const fenceLen = match[1].length;
     const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
     const closeFenceRe = new RegExp(
-      `^[ \\t]*${escapedFenceChar}{${fenceLen},}[ \\t]*$`,
+      String.raw`^[ \t]*${escapedFenceChar}{${fenceLen},}[ \t]*$`,
     );
 
     let end = i + 1;
@@ -454,9 +454,9 @@ export function $exportMarkdownForClipboard(
   const flushBlankRun = (insideFence: boolean) => {
     const output = insideFence
       ? blankRun
-      : blankRun <= 1
+      : (blankRun <= 1
         ? blankRun
-        : blankRun - 1;
+        : blankRun - 1);
     for (let j = 0; j < output; j++) {
       result.push("");
     }

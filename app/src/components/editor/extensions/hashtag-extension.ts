@@ -22,22 +22,22 @@ import {
 
 function getHashtagRegexStringChars() {
   const latinAccents =
-    "\xc0-\xd6\xd8-\xf6\xf8-\xff" +
-    "\u0100-\u024f\u0253-\u0254\u0256-\u0257\u0259\u025b\u0263\u0268" +
-    "\u026f\u0272\u0289\u028b\u02bb\u0300-\u036f\u1e00-\u1eff";
+    "\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF" +
+    "\u0100-\u024F\u0253-\u0254\u0256-\u0257\u0259\u025B\u0263\u0268" +
+    "\u026F\u0272\u0289\u028B\u02BB\u0300-\u036F\u1E00-\u1EFF";
 
   const nonLatinChars =
-    "\u0400-\u04ff\u0500-\u0527\u2de0-\u2dff\ua640-\ua69f" +
-    "\u0591-\u05bf\u05c1-\u05c2\u05c4-\u05c5\u05c7\u05d0-\u05ea" +
-    "\u05f0-\u05f4\ufb12-\ufb28\ufb2a-\ufb36\ufb38-\ufb3c\ufb3e" +
-    "\ufb40-\ufb41\ufb43-\ufb44\ufb46-\ufb4f" +
-    "\u0610-\u061a\u0620-\u065f\u066e-\u06d3\u06d5-\u06dc" +
-    "\u06de-\u06e8\u06ea-\u06ef\u06fa-\u06fc\u06ff" +
-    "\u0750-\u077f\u08a0\u08a2-\u08ac\u08e4-\u08fe" +
-    "\ufb50-\ufbb1\ufbd3-\ufd3d\ufd50-\ufd8f\ufd92-\ufdc7\ufdf0-\ufdfb" +
-    "\ufe70-\ufe74\ufe76-\ufefc\u200c-\u200c" +
-    "\u0e01-\u0e3a\u0e40-\u0e4e" +
-    "\u1100-\u11ff\u3130-\u3185\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF" +
+    "\u0400-\u04FF\u0500-\u0527\u2DE0-\u2DFF\uA640-\uA69F" +
+    "\u0591-\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7\u05D0-\u05EA" +
+    "\u05F0-\u05F4\uFB12-\uFB28\uFB2A-\uFB36\uFB38-\uFB3C\uFB3E" +
+    "\uFB40-\uFB41\uFB43-\uFB44\uFB46-\uFB4F" +
+    "\u0610-\u061A\u0620-\u065F\u066E-\u06D3\u06D5-\u06DC" +
+    "\u06DE-\u06E8\u06EA-\u06EF\u06FA-\u06FC\u06FF" +
+    "\u0750-\u077F\u08A0\u08A2-\u08AC\u08E4-\u08FE" +
+    "\uFB50-\uFBB1\uFBD3-\uFD3D\uFD50-\uFD8F\uFD92-\uFDC7\uFDF0-\uFDFB" +
+    "\uFE70-\uFE74\uFE76-\uFEFC\u200C-\u200C" +
+    "\u0E01-\u0E3A\u0E40-\u0E4E" +
+    "\u1100-\u11FF\u3130-\u3185\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF" +
     "\uFFA1-\uFFDC";
 
   const charCode = String.fromCharCode;
@@ -46,15 +46,15 @@ function getHashtagRegexStringChars() {
     "\u30A1-\u30FA\u30FC-\u30FE\uFF66-\uFF9F" +
     "\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A" +
     "\u3041-\u3096\u3099-\u309E\u3400-\u4DBF\u4E00-\u9FFF" +
-    charCode(0x2a700) +
+    charCode(0x2_A7_00) +
     "-" +
-    charCode(0x2b73f) +
-    charCode(0x2b740) +
+    charCode(0x2_B7_3F) +
+    charCode(0x2_B7_40) +
     "-" +
-    charCode(0x2b81f) +
-    charCode(0x2f800) +
+    charCode(0x2_B8_1F) +
+    charCode(0x2_F8_00) +
     "-" +
-    charCode(0x2fa1f) +
+    charCode(0x2_FA_1F) +
     "\u3003\u3005\u303B";
 
   const unicodeLetters =
@@ -143,7 +143,7 @@ function getHashtagRegexStringChars() {
   const alpha = unicodeLetters + latinAccents + nonLatinChars + cjkChars;
   const numeric = unicodeDigits + "_";
   const alphanumeric = alpha + unicodeAccents + numeric;
-  const hashChars = "#\\uFF03";
+  const hashChars = String.raw`#\uFF03`;
 
   return { alpha, alphanumeric, hashChars };
 }

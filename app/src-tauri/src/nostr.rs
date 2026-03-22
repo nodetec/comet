@@ -57,7 +57,7 @@ fn insert_identity(conn: &Connection, keys: &Keys) -> Result<IdentityCredentials
     })
 }
 
-/// Generates a fresh keypair and stores only the public identity in SQLite.
+/// Generates a fresh keypair and stores only the public identity in `SQLite`.
 /// On first launch, also sets up default relay and blossom server.
 pub fn create_identity(conn: &Connection) -> Result<IdentityCredentials, AppError> {
     if let Some(npub) = get_npub(conn)? {
@@ -210,15 +210,12 @@ pub async fn publish_note(
             ));
         }
 
-        let d_tag = match existing_d_tag {
-            Some(d) => d,
-            None => {
-                conn.execute(
-                    "UPDATE notes SET nostr_d_tag = ?1 WHERE id = ?1",
-                    params![id],
-                )?;
-                id.clone()
-            }
+        let d_tag = if let Some(d) = existing_d_tag { d } else {
+            conn.execute(
+                "UPDATE notes SET nostr_d_tag = ?1 WHERE id = ?1",
+                params![id],
+            )?;
+            id.clone()
         };
 
         let content = strip_title_line(&markdown);

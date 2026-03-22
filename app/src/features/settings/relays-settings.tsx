@@ -122,11 +122,7 @@ function SyncRelaySection({
             Remove
           </Button>
         </div>
-      ) : !editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Set sync relay
-        </Button>
-      ) : (
+      ) : (editor.editing ? (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -143,7 +139,11 @@ function SyncRelaySection({
           }
           submitLabel="Save"
         />
-      )}
+      ) : (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Set sync relay
+        </Button>
+      ))}
     </div>
   );
 }
@@ -203,11 +203,7 @@ function BlossomSection({
             Remove
           </Button>
         </div>
-      ) : !editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Set Blossom server
-        </Button>
-      ) : (
+      ) : (editor.editing ? (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -225,7 +221,11 @@ function BlossomSection({
           submitLabel="Save"
           placeholder="https://..."
         />
-      )}
+      ) : (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Set Blossom server
+        </Button>
+      ))}
     </div>
   );
 }
@@ -315,11 +315,7 @@ function PublishRelaysSection({
         </ul>
       )}
 
-      {!editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Add relay
-        </Button>
-      ) : (
+      {editor.editing ? (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -336,6 +332,10 @@ function PublishRelaysSection({
           }
           submitLabel="Add"
         />
+      ) : (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Add relay
+        </Button>
       )}
     </div>
   );

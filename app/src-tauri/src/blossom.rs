@@ -282,7 +282,7 @@ pub async fn download_blob(
 // ── Blob encryption ────────────────────────────────────────────────────
 
 /// Encrypt a blob with a random ChaCha20-Poly1305 key.
-/// Returns (nonce + ciphertext, key_hex).
+/// Returns (nonce + ciphertext, `key_hex`).
 pub fn encrypt_blob(plaintext: &[u8]) -> Result<(Vec<u8>, String), AppError> {
     let key = ChaCha20Poly1305::generate_key(&mut OsRng);
     let cipher = ChaCha20Poly1305::new(&key);
@@ -341,7 +341,7 @@ fn sign_blossom_auth(
             Tag::custom(TagKind::custom("t"), vec![action.to_string()]),
             Tag::custom(TagKind::custom("x"), vec![blob_hash.to_string()]),
             Tag::custom(TagKind::custom("expiration"), vec![expiration.to_string()]),
-            Tag::custom(TagKind::custom("server"), vec![domain.to_string()]),
+            Tag::custom(TagKind::custom("server"), vec![domain.clone()]),
         ])
         .sign_with_keys(keys)
         .map_err(|e| AppError::custom(format!("Failed to sign Blossom auth: {e}")))?;

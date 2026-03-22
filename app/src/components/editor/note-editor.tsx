@@ -11,11 +11,10 @@ import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionCompose
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
-import { defineExtension } from "lexical";
+import { defineExtension, configExtension  } from "lexical";
 import { RichTextExtension } from "@lexical/rich-text";
 import { HistoryExtension } from "@lexical/history";
 import { CheckListExtension, ListExtension } from "@lexical/list";
-import { configExtension } from "lexical";
 import { TabIndentationExtension } from "@lexical/extension";
 import { CometHorizontalRuleNode } from "./nodes/comet-horizontal-rule-node";
 import { CodeExtension } from "@lexical/code";

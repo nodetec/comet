@@ -34,7 +34,7 @@ export default function InitialContentPlugin({
     }
     lastLoadKeyRef.current = loadKey;
 
-    const mode = isNew ? "new" : !markdown.trim() ? "empty" : "existing";
+    const mode = isNew ? "new" : (markdown.trim() ? "existing" : "empty");
     if (import.meta.env.DEV) {
       console.log(
         `[editor:init] mode=${mode} markdown=${markdown.length} chars`,
@@ -82,7 +82,7 @@ export default function InitialContentPlugin({
       // post-import state, not the pre-import state.
       { discrete: true },
     );
-    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND);
 
     onInitComplete();
   }, [editor, html, isNew, loadKey, markdown, onInitComplete]);

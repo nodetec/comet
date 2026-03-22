@@ -229,7 +229,7 @@ export function ProfileSettings() {
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-sm font-medium">Accounts</h3>
-          {!addingAccount ? (
+          {addingAccount ? null : (
             <Button
               variant="link"
               size="xs"
@@ -238,7 +238,7 @@ export function ProfileSettings() {
             >
               Add Account
             </Button>
-          ) : null}
+          )}
         </div>
 
         <div className="space-y-3">

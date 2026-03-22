@@ -12,7 +12,7 @@ import { IMAGE_EXTENSIONS, importImage } from "@/lib/attachments";
 import { $createImageNode } from "../nodes/image-node";
 
 const IMAGE_EXTENSIONS_RE = new RegExp(
-  `\\.(${IMAGE_EXTENSIONS.join("|")})$`,
+  String.raw`\.(${IMAGE_EXTENSIONS.join("|")})$`,
   "i",
 );
 
@@ -113,7 +113,7 @@ export default function ImageDropPlugin() {
                 const selection = $getSelection();
                 if ($isNodeSelection(selection)) {
                   const nodes = selection.getNodes();
-                  const lastNode = nodes[nodes.length - 1];
+                  const lastNode = nodes.at(-1);
                   lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
                 } else if (selection) {
                   selection.insertNodes([imageNode]);

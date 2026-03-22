@@ -22,7 +22,7 @@ function isValidUrl(text: string): boolean {
 
 function getLinkAttributes(url: string) {
   if (url.startsWith("#")) {
-    return undefined;
+    return;
   }
   return { target: "_blank", rel: "noopener noreferrer" };
 }

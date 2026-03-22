@@ -67,7 +67,7 @@ export const TABLE: ElementTransformer = {
           rowOutput.push(
             $convertToMarkdownString(ALL_TRANSFORMERS, cell, false)
               .replace(/\n+/g, "\n")
-              .replace(/\n/g, "\\n")
+              .replace(/\n/g, String.raw`\n`)
               .trim(),
           );
           if (cell.__headerState === TableCellHeaderStates.ROW) {
@@ -93,20 +93,20 @@ export const TABLE: ElementTransformer = {
       }
 
       const rows = table.getChildren();
-      const lastRow = rows[rows.length - 1];
+      const lastRow = rows.at(-1);
       if (!lastRow || !$isTableRowNode(lastRow)) {
         return;
       }
 
-      lastRow.getChildren().forEach((cell) => {
+      for (const cell of lastRow.getChildren()) {
         if (!$isTableCellNode(cell)) {
-          return;
+          continue;
         }
         cell.setHeaderStyles(
           TableCellHeaderStates.ROW,
           TableCellHeaderStates.ROW,
         );
-      });
+      }
 
       parentNode.remove();
       return;
@@ -166,7 +166,7 @@ export const TABLE: ElementTransformer = {
       ? getTableColumnsSize(previousSibling)
       : 0;
     const targetColumns =
-      previousColumns >= maxCells ? previousColumns : maxCells;
+      Math.max(previousColumns, maxCells);
 
     if (targetColumns > maxCells) {
       for (const row of table.getChildren()) {

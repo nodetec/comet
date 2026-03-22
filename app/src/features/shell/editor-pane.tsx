@@ -428,7 +428,7 @@ export function EditorPane({
         </TooltipContent>
       </Tooltip>
     </>
-  ) : publishedAt != null ? (
+  ) : publishedAt == null ? null : (
     modifiedAt <= publishedAt ? (
       <span className="text-muted-foreground pointer-events-auto text-xs">
         Published
@@ -442,7 +442,7 @@ export function EditorPane({
         Update
       </button>
     )
-  ) : null;
+  );
 
   const toolbarSlot = readonly ? (
     <Tooltip>
@@ -453,7 +453,7 @@ export function EditorPane({
       </TooltipTrigger>
       <TooltipContent side="bottom">Read-only</TooltipContent>
     </Tooltip>
-  ) : !isReadOnly ? (
+  ) : (isReadOnly ? null : (
     <Button
       className={cn(
         "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
@@ -470,7 +470,7 @@ export function EditorPane({
         <PanelBottomOpen className="size-[1.2rem]" />
       )}
     </Button>
-  ) : null;
+  ));
 
   return (
     <section className="bg-background relative flex h-full min-h-0 flex-col">
@@ -528,9 +528,9 @@ export function EditorPane({
             <span className="text-muted-foreground min-w-12 text-right text-xs tabular-nums">
               {findQuery && findMatchCount > 0
                 ? `${activeFindMatchIndex + 1}/${findMatchCount}`
-                : findQuery
+                : (findQuery
                   ? "0"
-                  : ""}
+                  : "")}
             </span>
           </label>
           <Button

@@ -80,7 +80,7 @@ fn postprocess_html(html: &str) -> String {
     // tags (e.g. `</p>\n<pre>`, `</li>\n<li>`) into text nodes that Lexical wraps
     // in phantom empty paragraphs or list items.
     result = regex_lite::Regex::new(
-        r#">\s+<(/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)"#,
+        r">\s+<(/?)(p|h[1-6]|ul|ol|li|pre|blockquote|table|thead|tbody|tr|th|td|hr|div|section)",
     )
     .unwrap()
     .replace_all(&result, "><$1$2")
@@ -95,7 +95,7 @@ fn postprocess_html(html: &str) -> String {
 fn is_bare_heading_line(line: &str) -> bool {
     let bytes = line.as_bytes();
     let len = bytes.len();
-    len >= 1 && len <= 6 && bytes.iter().all(|&b| b == b'#')
+    (1..=6).contains(&len) && bytes.iter().all(|&b| b == b'#')
 }
 
 /// Preprocess blank lines into `<p><br></p>` markers, matching the frontend's
@@ -126,7 +126,7 @@ fn preprocess_blank_lines(markdown: &str) -> String {
                 let is_single_line = ch == b'`' && {
                     let rest = &line.trim_start()[len..];
                     rest.contains('`')
-                        && rest.rfind('`').map_or(false, |p| {
+                        && rest.rfind('`').is_some_and(|p| {
                             let trailing = rest[p..].bytes().take_while(|&b| b == b'`').count();
                             trailing >= len && p > 0
                         })
@@ -170,7 +170,7 @@ fn preprocess_blank_lines(markdown: &str) -> String {
             }
         } else if is_bare_heading_line(line) {
             // Escape bare hash lines so comrak renders them as text
-            result.push(Cow::Owned(format!(r"\{}", line)));
+            result.push(Cow::Owned(format!(r"\{line}")));
             i += 1;
         } else {
             result.push(Cow::Borrowed(line));

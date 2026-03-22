@@ -282,14 +282,14 @@ fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, App
         .tags
         .find(TagKind::d())
         .and_then(|t| t.content())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Missing d tag in notebook event"))?;
 
     let name = rumor
         .tags
         .find(TagKind::Title)
         .and_then(|t| t.content())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Missing title tag in notebook event"))?;
 
     let updated_at = rumor
@@ -487,14 +487,14 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
         .tags
         .find(TagKind::d())
         .and_then(|t| t.content())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Missing d tag in synced event"))?;
 
     let title = rumor
         .tags
         .find(TagKind::Title)
         .and_then(|t| t.content())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .unwrap_or_default();
 
     let modified_at = rumor
@@ -522,7 +522,7 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
         .tags
         .find(TagKind::custom("notebook_id"))
         .and_then(|t| t.content())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     let archived_at = rumor
         .tags
@@ -546,13 +546,12 @@ fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppError> {
         .tags
         .find(TagKind::custom("readonly"))
         .and_then(|t| t.content())
-        .map(|value| value == "true")
-        .unwrap_or(false);
+        .is_some_and(|value| value == "true");
 
     let tags: Vec<String> = rumor
         .tags
         .filter(TagKind::t())
-        .filter_map(|t: &Tag| t.content().map(|s| s.to_string()))
+        .filter_map(|t: &Tag| t.content().map(std::string::ToString::to_string))
         .collect();
 
     // Reconstruct full markdown with title line
@@ -632,7 +631,7 @@ fn upsert_from_sync(
                 note.archived_at,
                 note.deleted_at,
                 note.pinned_at,
-                if note.readonly { 1 } else { 0 },
+                i32::from(note.readonly),
                 sync_event_id,
                 note.id,
             ],
@@ -653,7 +652,7 @@ fn upsert_from_sync(
                 note.archived_at,
                 note.deleted_at,
                 note.pinned_at,
-                if note.readonly { 1 } else { 0 },
+                i32::from(note.readonly),
                 sync_event_id,
             ],
         )?;
@@ -716,7 +715,7 @@ async fn run_sync_loop(
 
                 // Backoff before reconnect
                 tokio::select! {
-                    _ = tokio::time::sleep(backoff) => {},
+                    () = tokio::time::sleep(backoff) => {},
                     _ = shutdown_rx.changed() => break,
                 }
                 backoff = (backoff * 2).min(max_backoff);
@@ -869,13 +868,12 @@ async fn run_sync_connection(
             .values()
             .min()
             .copied()
-            .map(|d| d.min(next_ping))
-            .unwrap_or(next_ping);
+            .map_or(next_ping, |d| d.min(next_ping));
         let debounce_sleep = tokio::time::sleep_until(next_wake);
         tokio::pin!(debounce_sleep);
 
         tokio::select! {
-            _ = &mut debounce_sleep => {
+            () = &mut debounce_sleep => {
                 // Loop will fire ready pushes at the top
             }
 
@@ -948,7 +946,7 @@ async fn wait_for_ok(
                             .map_err(|e| AppError::custom(format!("Invalid JSON: {e}")))?;
                         if let Some(arr) = parsed.as_array() {
                             if arr.first().and_then(|v| v.as_str()) == Some("OK") {
-                                return Ok(arr.get(2).and_then(|v| v.as_bool()).unwrap_or(false));
+                                return Ok(arr.get(2).and_then(serde_json::Value::as_bool).unwrap_or(false));
                             }
                         }
                     }
@@ -990,7 +988,7 @@ async fn process_relay_message(
 
     match sub_type {
         "EVENT" => {
-            let seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
+            let seq = arr.get(3).and_then(serde_json::Value::as_i64).unwrap_or(0);
             let event_json = arr
                 .get(4)
                 .ok_or_else(|| AppError::custom("Missing event in CHANGES EVENT"))?;
@@ -1140,7 +1138,7 @@ async fn process_relay_message(
             }
         }
         "EOSE" => {
-            let max_seq = arr.get(3).and_then(|v| v.as_i64()).unwrap_or(0);
+            let max_seq = arr.get(3).and_then(serde_json::Value::as_i64).unwrap_or(0);
             sync_log(app, &format!("synced to seq={max_seq}"));
             let conn = crate::db::database_connection(app)?;
             save_checkpoint(&conn, max_seq);
@@ -1349,22 +1347,19 @@ async fn push_note(
             }
 
             // Read the local blob
-            let blob_data = match crate::attachments::read_blob(app, hash)? {
-                Some((data, _ext)) => {
-                    eprintln!(
-                        "[sync] attachment hash={} read {} bytes locally",
-                        &hash[..8],
-                        data.len()
-                    );
-                    data
-                }
-                None => {
-                    eprintln!(
-                        "[sync] attachment hash={} NOT found locally, skipping",
-                        &hash[..8]
-                    );
-                    continue;
-                }
+            let blob_data = if let Some((data, _ext)) = crate::attachments::read_blob(app, hash)? {
+                eprintln!(
+                    "[sync] attachment hash={} read {} bytes locally",
+                    &hash[..8],
+                    data.len()
+                );
+                data
+            } else {
+                eprintln!(
+                    "[sync] attachment hash={} NOT found locally, skipping",
+                    &hash[..8]
+                );
+                continue;
             };
 
             // Encrypt with ChaCha20-Poly1305

@@ -14,7 +14,7 @@ const MARKDOWN_LINK_END_RE =
 
 function getLinkAttributes(url: string) {
   if (url.startsWith("#")) {
-    return undefined;
+    return;
   }
   return { target: "_blank", rel: "noopener noreferrer" };
 }
@@ -80,7 +80,7 @@ export const LINK: TextMatchTransformer = {
     }
     const title = rawTitle?.replace(/\\"/g, '"');
     const attributes = {
-      ...(getLinkAttributes(normalizedUrl) ?? {}),
+      ...getLinkAttributes(normalizedUrl),
       ...(title ? { title } : {}),
     };
     const linkNode = $createLinkNode(

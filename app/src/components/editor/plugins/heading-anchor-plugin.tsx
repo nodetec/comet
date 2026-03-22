@@ -21,7 +21,7 @@ export default function HeadingAnchorPlugin() {
         const headings = $nodesOfType(HeadingNode);
         const slugCounts = new Map<string, number>();
 
-        headings.forEach((heading) => {
+        for (const heading of headings) {
           const text = heading.getTextContent();
           const base = slugify(text || "section");
           const count = (slugCounts.get(base) ?? 0) + 1;
@@ -32,7 +32,7 @@ export default function HeadingAnchorPlugin() {
           if (element && element.id !== slug) {
             element.id = slug;
           }
-        });
+        }
       });
     });
   }, [editor]);

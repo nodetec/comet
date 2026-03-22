@@ -3,7 +3,7 @@ import {
   $createListNode,
   $isListItemNode,
   $isListNode,
-  type ListNode,
+  type ListNode, ListItemNode 
 } from "@lexical/list";
 import {
   $createParagraphNode,
@@ -17,7 +17,6 @@ import {
   type LexicalNode,
   type ParagraphNode,
 } from "lexical";
-import type { ListItemNode } from "@lexical/list";
 
 export const CHECKLIST_PLACEHOLDER = "\u200B";
 
@@ -101,7 +100,7 @@ function $moveChecklistItemContentToParagraph(
 ): boolean {
   let hasVisibleContent = false;
 
-  for (const child of [...listItemNode.getChildren()]) {
+  for (const child of listItemNode.getChildren()) {
     if ($isListNode(child) || child.getType() === "list-anchor") {
       continue;
     }
@@ -154,7 +153,7 @@ export function $convertNestedChecklistItemToParagraph(
 
   let insertAfterNode: LexicalNode = paragraph;
 
-  for (const child of [...listItemNode.getChildren()]) {
+  for (const child of listItemNode.getChildren()) {
     if (!$isListNode(child)) {
       continue;
     }
@@ -203,7 +202,7 @@ export function $convertChecklistParagraphToNestedItem(
   const nestedItem = $createListItemNode(false);
   let hasVisibleContent = false;
 
-  for (const child of [...paragraphNode.getChildren()]) {
+  for (const child of paragraphNode.getChildren()) {
     if ($isTextNode(child)) {
       const text = stripChecklistPlaceholders(child.getTextContent());
       if (text.length === 0) {
@@ -278,7 +277,7 @@ export function $replaceEmptyParagraphWithChecklist(
     paragraphNode
       .getChildren()
       .some((child) => child.getType() === "linebreak") ||
-    textContent.length !== 0
+    textContent.length > 0
   ) {
     return false;
   }

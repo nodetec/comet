@@ -31,7 +31,7 @@ function getOrCreateStyleElement() {
   if (!style) {
     style = document.createElement("style");
     style.id = HIGHLIGHT_STYLE_ID;
-    document.head.appendChild(style);
+    document.head.append(style);
   }
   return style;
 }
@@ -116,7 +116,7 @@ export default function SearchHighlightPlugin({
       }
 
       const escaped = searchWords.map((word) =>
-        word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        word.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`),
       );
       const regex = new RegExp(`(${escaped.join("|")})`, "gi");
       const ranges: Range[] = [];

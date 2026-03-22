@@ -304,7 +304,7 @@ fn sync_push(app: &AppHandle, cmd: sync::SyncCommand) {
 }
 
 /// Spawn async Blossom blob deletions for orphaned blobs.
-/// blossom_deletions is a list of (server_url, ciphertext_hash) pairs.
+/// `blossom_deletions` is a list of (`server_url`, `ciphertext_hash`) pairs.
 fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, String)>) {
     if blossom_deletions.is_empty() {
         return;
@@ -474,9 +474,7 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
     let conn = database_connection(&app)?;
     let preferred_blossom_url = sync::get_blossom_url(&conn);
     log::info!(
-        "[blob] lookup plaintext_hash={} preferred_blossom_url={:?}",
-        hash,
-        preferred_blossom_url
+        "[blob] lookup plaintext_hash={hash} preferred_blossom_url={preferred_blossom_url:?}"
     );
 
     if !crate::secure_storage::is_current_identity_unlocked(&app, &conn)? {
@@ -487,9 +485,7 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
     // Get keys for decryption and Blossom auth
     let (keys, pubkey_hex) = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
     log::info!(
-        "[blob] resolved account plaintext_hash={} pubkey={}",
-        hash,
-        pubkey_hex
+        "[blob] resolved account plaintext_hash={hash} pubkey={pubkey_hex}"
     );
 
     // Look up blob metadata for this identity, preferring the currently
@@ -523,9 +519,7 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         Some(m) => m,
         None => {
             log::warn!(
-                "[blob] missing metadata plaintext_hash={} pubkey={}",
-                hash,
-                pubkey_hex
+                "[blob] missing metadata plaintext_hash={hash} pubkey={pubkey_hex}"
             );
             return Ok(BlobFetchStatus::Missing);
         } // no metadata for this identity, can't download
@@ -572,13 +566,11 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, App
         .and_then(|md| sync::extract_blob_extension(&md, &hash))
         .unwrap_or_else(|| "bin".to_string());
     log::info!(
-        "[blob] resolved extension plaintext_hash={} ext={}",
-        hash,
-        ext
+        "[blob] resolved extension plaintext_hash={hash} ext={ext}"
     );
 
     crate::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
-    log::info!("[blob] saved locally plaintext_hash={} ext={}", hash, ext);
+    log::info!("[blob] saved locally plaintext_hash={hash} ext={ext}");
     Ok(BlobFetchStatus::Downloaded)
 }
 

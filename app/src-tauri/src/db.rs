@@ -418,7 +418,7 @@ fn register_account(
             label,
             db_path,
             now,
-            if active { 1 } else { 0 },
+            i32::from(active),
         ],
     )?;
     tx.commit()?;
@@ -694,7 +694,7 @@ pub(crate) fn extract_tags(markdown: &str) -> Vec<String> {
         // Skip tags that are purely numeric (e.g. #2, #123)
         if bytes[tag_start..tag_end]
             .iter()
-            .any(|b| b.is_ascii_alphabetic())
+            .any(u8::is_ascii_alphabetic)
         {
             let mut tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]).into_owned();
             tag.make_ascii_lowercase();

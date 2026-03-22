@@ -87,11 +87,11 @@ function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
       const deleteSelection = $getSelection();
       if (isSelected && $isNodeSelection(deleteSelection)) {
         event.preventDefault();
-        deleteSelection.getNodes().forEach((node) => {
+        for (const node of deleteSelection.getNodes()) {
           if ($isYouTubeNode(node)) {
             node.remove();
           }
-        });
+        }
         return true;
       }
       return false;
@@ -227,7 +227,7 @@ export type SerializedYouTubeNode = Spread<
 function $convertYoutubeElement(
   domNode: HTMLElement,
 ): null | DOMConversionOutput {
-  const videoID = domNode.getAttribute("data-lexical-youtube");
+  const videoID = domNode.dataset.lexicalYoutube;
   if (videoID) {
     const node = $createYouTubeNode(videoID);
     return { node };
@@ -265,7 +265,7 @@ export class YouTubeNode extends DecoratorNode<ReactNode> {
 
   exportDOM(): DOMExportOutput {
     const element = document.createElement("iframe");
-    element.setAttribute("data-lexical-youtube", this.__id);
+    element.dataset.lexicalYoutube = this.__id;
     element.setAttribute("width", "560");
     element.setAttribute("height", "315");
     element.setAttribute(
@@ -285,7 +285,7 @@ export class YouTubeNode extends DecoratorNode<ReactNode> {
   static importDOM(): DOMConversionMap | null {
     return {
       iframe: (domNode: HTMLElement) => {
-        if (!domNode.hasAttribute("data-lexical-youtube")) {
+        if (!Object.hasOwn(domNode.dataset, "lexicalYoutube")) {
           return null;
         }
         return {

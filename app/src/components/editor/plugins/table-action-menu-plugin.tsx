@@ -183,11 +183,11 @@ function TableActionMenu({
 
       const newStyle =
         tableCellNode.getHeaderStyles() ^ TableCellHeaderStates.ROW;
-      tableRow.getChildren().forEach((cell) => {
+      for (const cell of tableRow.getChildren()) {
         if ($isTableCellNode(cell)) {
           cell.setHeaderStyles(newStyle, TableCellHeaderStates.ROW);
         }
-      });
+      }
 
       clearTableSelection();
       onClose();

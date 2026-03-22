@@ -144,7 +144,7 @@ export default function TodoShortcutPlugin() {
             }
 
             // Insert checklist
-            editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined);
+            editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND);
           });
 
           return true;

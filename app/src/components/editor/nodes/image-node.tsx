@@ -107,19 +107,22 @@ function ImageComponent({
         result,
       });
       switch (result) {
-        case "downloaded":
+        case "downloaded": {
           setReloadToken(Date.now());
           fetchAttempted.current = true;
           break;
-        case "needsUnlock":
+        }
+        case "needsUnlock": {
           fetchAttempted.current = false;
           setNeedsUnlock(true);
           break;
+        }
         case "missing":
-        default:
+        default: {
           fetchAttempted.current = true;
           setIsLoadError(true);
           break;
+        }
       }
     } catch (error) {
       console.error("[image-node] fetch failed", {
@@ -197,11 +200,11 @@ function ImageComponent({
       const deleteSelection = $getSelection();
       if (isSelected && $isNodeSelection(deleteSelection)) {
         event.preventDefault();
-        deleteSelection.getNodes().forEach((node) => {
+        for (const node of deleteSelection.getNodes()) {
           if ($isImageNode(node)) {
             node.remove();
           }
-        });
+        }
         return true;
       }
       return false;

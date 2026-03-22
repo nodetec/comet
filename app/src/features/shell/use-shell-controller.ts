@@ -600,9 +600,9 @@ export function useShellController() {
     ? creatingSelectedNoteId
     : selectedNoteId;
   const currentEditorMarkdown = currentNote
-    ? draftNoteId === currentNote.id
+    ? (draftNoteId === currentNote.id
       ? draftMarkdown
-      : currentNote.markdown
+      : currentNote.markdown)
     : "";
 
   // Recover any draft that was pending when the app quit

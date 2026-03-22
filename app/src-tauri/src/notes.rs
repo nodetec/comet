@@ -476,7 +476,7 @@ pub fn set_note_readonly(
          SET readonly = ?1, modified_at = ?2, locally_modified = 1
          WHERE id = ?3",
         params![
-            if input.readonly { 1 } else { 0 },
+            i32::from(input.readonly),
             now_millis(),
             input.note_id
         ],
@@ -833,11 +833,10 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
     let total_count = if input.offset == 0 {
         let count_sql = if search_mode.is_some() {
             format!(
-                "SELECT COUNT(*) FROM notes n JOIN notes_fts ON notes_fts.note_id = n.id{}",
-                where_clause
+                "SELECT COUNT(*) FROM notes n JOIN notes_fts ON notes_fts.note_id = n.id{where_clause}"
             )
         } else {
-            format!("SELECT COUNT(*) FROM notes n{}", where_clause)
+            format!("SELECT COUNT(*) FROM notes n{where_clause}")
         };
         conn.query_row(&count_sql, params_from_iter(values.iter()), |row| {
             row.get::<_, i64>(0)
@@ -860,9 +859,8 @@ fn query_note_page(conn: &Connection, input: &NoteQueryInput) -> Result<NotePage
         (_, NoteSortDirection::Oldest) => "ASC",
     };
     sql.push_str(&format!(
-        " ORDER BY n.pinned_at IS NULL ASC, n.pinned_at DESC, {} {}, n.created_at DESC
+        " ORDER BY n.pinned_at IS NULL ASC, n.pinned_at DESC, {sort_column} {sort_dir}, n.created_at DESC
           LIMIT ? OFFSET ?",
-        sort_column, sort_dir,
     ));
     values.push(Value::from((limit + 1) as i64));
     values.push(Value::from(input.offset as i64));
@@ -982,8 +980,8 @@ pub fn search_notes(app: &AppHandle, query: &str) -> Result<Vec<SearchResult>, A
 pub fn search_tags(app: &AppHandle, query: &str) -> Result<Vec<String>, AppError> {
     let conn = database_connection(app)?;
     let escaped = escape_like_pattern(&query.to_ascii_lowercase());
-    let contains_pattern = format!("%{}%", escaped);
-    let prefix_pattern = format!("{}%", escaped);
+    let contains_pattern = format!("%{escaped}%");
+    let prefix_pattern = format!("{escaped}%");
 
     // Rank: prefix matches first, then contains matches.
     // Within each group, sort by frequency (most-used tags first).
@@ -1054,13 +1052,13 @@ pub fn export_notes(app: &AppHandle, input: ExportNotesInput) -> Result<usize, A
         let entry = used_names.entry(base.clone()).or_insert(0);
         *entry += 1;
         let filename = if *entry == 1 {
-            format!("{}.md", base)
+            format!("{base}.md")
         } else {
-            format!("{} {}.md", base, entry)
+            format!("{base} {entry}.md")
         };
 
         std::fs::write(export_dir.join(&filename), &markdown)
-            .map_err(|e| AppError::custom(format!("Failed to write {}: {}", filename, e)))?;
+            .map_err(|e| AppError::custom(format!("Failed to write {filename}: {e}")))?;
         count += 1;
     }
 
@@ -1463,7 +1461,7 @@ fn preview_from_markdown(markdown: &str) -> String {
             break;
         }
     }
-    preview.truncate(preview.chars().take(140).map(|c| c.len_utf8()).sum());
+    preview.truncate(preview.chars().take(140).map(char::len_utf8).sum());
     preview
 }
 

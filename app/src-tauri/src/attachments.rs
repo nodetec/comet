@@ -13,7 +13,7 @@ const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg"
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedImage {
-    /// Content-addressed URI: attachment://{sha256}.{ext}
+    /// Content-addressed URI: <attachment://{sha256}.{ext>}
     pub uri: String,
     /// Full SHA-256 hash of the file content
     pub hash: String,
@@ -26,7 +26,7 @@ fn attachments_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
 pub fn get_attachments_dir(app: &AppHandle) -> Result<String, AppError> {
     let dir = attachments_dir(app)?;
     dir.to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Attachments path is not valid UTF-8"))
 }
 
@@ -36,7 +36,7 @@ pub fn import_image(app: &AppHandle, source_path: &str) -> Result<ImportedImage,
     let ext = source
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase())
+        .map(str::to_lowercase)
         .ok_or_else(|| AppError::custom("File has no extension"))?;
 
     if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
@@ -130,7 +130,7 @@ pub fn find_orphaned_blob_hashes(
 
     // Collect all hashes referenced by notes being deleted
     let placeholders: String = note_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("SELECT markdown FROM notes WHERE id IN ({})", placeholders);
+    let sql = format!("SELECT markdown FROM notes WHERE id IN ({placeholders})");
     let mut stmt = conn.prepare(&sql)?;
     let id_params: Vec<Value> = note_ids.iter().map(|id| Value::from(id.clone())).collect();
     let rows = stmt.query_map(params_from_iter(id_params.iter()), |row| {
@@ -151,8 +151,7 @@ pub fn find_orphaned_blob_hashes(
     // Check which hashes are still referenced by other notes using SQL
     // to avoid pulling all markdown into memory
     let excluded = format!(
-        "SELECT markdown FROM notes WHERE id NOT IN ({})",
-        placeholders
+        "SELECT markdown FROM notes WHERE id NOT IN ({placeholders})"
     );
     let mut remaining_stmt = conn.prepare(&excluded)?;
     let excluded_params: Vec<Value> = note_ids.iter().map(|id| Value::from(id.clone())).collect();
@@ -173,8 +172,8 @@ pub fn find_orphaned_blob_hashes(
     Ok(candidate_hashes)
 }
 
-/// Clean up orphaned blobs: delete local files, remove blob_meta/blob_uploads entries.
-/// Returns (server_url, ciphertext_hash) pairs for Blossom server deletion.
+/// Clean up orphaned blobs: delete local files, remove `blob_meta/blob_uploads` entries.
+/// Returns (`server_url`, `ciphertext_hash`) pairs for Blossom server deletion.
 pub fn cleanup_orphaned_blobs(
     app: &AppHandle,
     conn: &Connection,

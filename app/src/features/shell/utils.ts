@@ -19,7 +19,7 @@ export function nextSelectedNoteIdAfterRemoval(
     return null;
   }
 
-  if (removedIndex < 0) {
+  if (removedIndex === -1) {
     return remainingNotes[0]?.id ?? null;
   }
 

@@ -80,7 +80,7 @@ function parseSingleFencedCodeBlock(
   const fenceLen = fence.length;
   const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
   const closingFenceRe = new RegExp(
-    `^[ \\t]*${escapedFenceChar}{${fenceLen},}[ \\t]*$`,
+    String.raw`^[ \t]*${escapedFenceChar}{${fenceLen},}[ \t]*$`,
   );
 
   if (!closingFenceRe.test(lines[end] ?? "")) {
@@ -146,7 +146,7 @@ function insertBlockNodes(nodes: LexicalNode[]): void {
     }
   }
 
-  const lastNode = nodes[nodes.length - 1];
+  const lastNode = nodes.at(-1);
   if ($isElementNode(lastNode)) {
     lastNode.selectEnd();
   }
@@ -251,7 +251,7 @@ function trimBoundaryEmptyParagraphs(
   const lines = sourceMarkdown.split("\n");
   const hasLeadingBlankLine = lines.length > 0 && lines[0]?.trim().length === 0;
   const hasTrailingBlankLine =
-    lines.length > 0 && lines[lines.length - 1]?.trim().length === 0;
+    lines.length > 0 && lines.at(-1)?.trim().length === 0;
 
   let start = 0;
   let end = nodes.length;

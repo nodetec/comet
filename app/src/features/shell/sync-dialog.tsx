@@ -53,41 +53,48 @@ function stateLabel(state: SyncInfo["state"]): {
     };
   }
   switch (state) {
-    case "connected":
+    case "connected": {
       return {
         label: "Connected",
         icon: <CloudCheck className="size-4" />,
       };
-    case "needsUnlock":
+    }
+    case "needsUnlock": {
       return {
         label: "Needs Unlock",
         icon: <CloudAlert className="size-4 text-amber-500" />,
       };
-    case "syncing":
+    }
+    case "syncing": {
       return {
         label: "Syncing",
         icon: <CloudSync className="size-4 animate-pulse" />,
       };
-    case "connecting":
+    }
+    case "connecting": {
       return {
         label: "Connecting",
         icon: <CloudSync className="size-4 animate-pulse" />,
       };
-    case "authenticating":
+    }
+    case "authenticating": {
       return {
         label: "Authenticating",
         icon: <CloudSync className="size-4 animate-pulse" />,
       };
-    case "disconnected":
+    }
+    case "disconnected": {
       return {
         label: "Disconnected",
         icon: <CloudOff className="size-4" />,
       };
-    default:
+    }
+    default: {
       return {
         label: state,
         icon: <Cloud className="size-4" />,
       };
+    }
   }
 }
 

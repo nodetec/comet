@@ -36,7 +36,7 @@ const youtubeExtension: MarkedExtension = {
             return { type: "youtube", raw: match[0], videoId };
           }
         }
-        return undefined;
+        return;
       },
       renderer(token) {
         const { videoId } = token as Tokens.Generic & { videoId: string };
@@ -60,7 +60,7 @@ const highlightExtension: MarkedExtension = {
         return src.indexOf("==");
       },
       tokenizer(src) {
-        if (!src.startsWith("==")) return undefined;
+        if (!src.startsWith("==")) return;
         const content = src.slice(2);
         const endIdx = content.indexOf("==");
         if (endIdx > 0) {
@@ -72,7 +72,7 @@ const highlightExtension: MarkedExtension = {
             tokens: this.lexer.inlineTokens(text),
           };
         }
-        return undefined;
+        return;
       },
       renderer(token) {
         const t = token as Tokens.Generic & { tokens: unknown[] };
@@ -208,8 +208,7 @@ const emptyParagraphPreprocess: MarkedExtension = {
           result.push("");
           // Additional blanks = empty paragraphs
           for (let j = 1; j < blankCount; j++) {
-            result.push("<p><br></p>");
-            result.push("");
+            result.push("<p><br></p>", "");
           }
         } else if (BARE_HEADING_RE.test(line)) {
           result.push(`\\${line}`);
@@ -272,8 +271,7 @@ const pastePreprocess: MarkedExtension = {
           // Every blank becomes an empty paragraph (Bear/Obsidian convention:
           // each blank line is a visible, clickable spacer in the editor)
           for (let j = 0; j < blankCount; j++) {
-            result.push("");
-            result.push("<p><br></p>");
+            result.push("", "<p><br></p>");
           }
           result.push("");
         } else if (BARE_HEADING_RE.test(line)) {

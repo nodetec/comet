@@ -19,8 +19,8 @@ pub struct UnwrappedGift {
 ///
 /// Steps:
 /// 1. Serialize rumor as JSON
-/// 2. Build kind 13 seal encrypted with nip44_ext, signed by `keys`
-/// 3. Build kind 1059 gift wrap encrypted with nip44_ext using ephemeral key
+/// 2. Build kind 13 seal encrypted with `nip44_ext`, signed by `keys`
+/// 3. Build kind 1059 gift wrap encrypted with `nip44_ext` using ephemeral key
 pub fn gift_wrap<I>(
     keys: &Keys,
     receiver: &PublicKey,

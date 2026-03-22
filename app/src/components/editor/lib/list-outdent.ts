@@ -103,7 +103,7 @@ export function $outdentListItemPreservingOrder(
       listItemNode.append(nestedList);
     }
 
-    nextSiblings.forEach((sibling) => nestedList.append(sibling));
+    for (const sibling of nextSiblings) nestedList.append(sibling);
   }
 
   grandparentListItem.insertAfter(listItemNode);

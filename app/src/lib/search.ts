@@ -1,12 +1,10 @@
 export function searchWordsFromQuery(searchQuery: string) {
-  return Array.from(
-    new Set(
+  return [...new Set(
       searchQuery
         .split(/\s+/)
         .map((word) => word.trim())
         .filter(Boolean),
-    ),
-  );
+    )];
 }
 
 export type ActiveEditorSearchSource = "notes" | "editor" | null;

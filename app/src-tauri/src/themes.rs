@@ -168,7 +168,7 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     ),
     (
         "light",
-        r##"{
+        r#"{
   "name": "Light",
   "colors": {
     "background": "oklch(97% 0.004 265)",
@@ -201,11 +201,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(50% 0.2 252)",
     "editor-selection": "rgba(80, 140, 220, 0.18)"
   }
-}"##,
+}"#,
     ),
     (
         "paper",
-        r##"{
+        r#"{
   "name": "Paper",
   "colors": {
     "background": "oklch(95.5% 0.01 80)",
@@ -238,11 +238,11 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(48% 0.12 30)",
     "editor-selection": "rgba(160, 100, 60, 0.15)"
   }
-}"##,
+}"#,
     ),
     (
         "sol-light",
-        r##"{
+        r#"{
   "name": "Solarized Light",
   "colors": {
     "background": "oklch(96% 0.015 90)",
@@ -275,7 +275,7 @@ const BUNDLED_THEMES: &[(&str, &str)] = &[
     "editor-caret": "oklch(55% 0.12 235)",
     "editor-selection": "rgba(70, 130, 180, 0.15)"
   }
-}"##,
+}"#,
     ),
 ];
 
@@ -288,7 +288,7 @@ fn themes_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 fn seed_bundled_themes(dir: &PathBuf) {
     for (id, json) in BUNDLED_THEMES {
-        let path = dir.join(format!("{}.json", id));
+        let path = dir.join(format!("{id}.json"));
         // Always overwrite bundled themes so users get updated colors
         let _ = fs::write(&path, json);
     }
@@ -341,9 +341,9 @@ pub fn list_themes(app: &AppHandle) -> Result<Vec<ThemeSummary>, AppError> {
 
 pub fn read_theme(app: &AppHandle, theme_id: &str) -> Result<ThemeData, AppError> {
     let dir = themes_dir(app)?;
-    let path = dir.join(format!("{}.json", theme_id));
+    let path = dir.join(format!("{theme_id}.json"));
     let contents = fs::read_to_string(&path)
-        .map_err(|_| AppError::custom(format!("Theme '{}' not found", theme_id)))?;
+        .map_err(|_| AppError::custom(format!("Theme '{theme_id}' not found")))?;
     serde_json::from_str(&contents)
-        .map_err(|e| AppError::custom(format!("Invalid theme file: {}", e)))
+        .map_err(|e| AppError::custom(format!("Invalid theme file: {e}")))
 }

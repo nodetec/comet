@@ -450,9 +450,9 @@ export function SidebarPane({
                             "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                             noteFilter === "notebook" &&
                               activeNotebookId === notebook.id
-                              ? isFocused
+                              ? (isFocused
                                 ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
-                                : "bg-accent/80 text-secondary-foreground"
+                                : "bg-accent/80 text-secondary-foreground")
                               : "text-secondary-foreground",
                           )}
                           disabled={renameNotebookDisabled}

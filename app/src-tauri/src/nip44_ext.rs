@@ -96,7 +96,7 @@ fn pad(plaintext: &[u8]) -> Result<Vec<u8>, AppError> {
     }
 }
 
-/// Validate padding and return (prefix_len, plaintext_len) so the caller
+/// Validate padding and return (`prefix_len`, `plaintext_len`) so the caller
 /// can truncate the buffer in-place without an extra allocation.
 fn unpad_params(padded: &[u8]) -> Result<(usize, usize), AppError> {
     if padded.len() < 2 {

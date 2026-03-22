@@ -135,8 +135,8 @@ export function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
     "flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
     isActive && isFocused
       ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
-      : isActive
+      : (isActive
         ? "bg-accent/80 text-secondary-foreground"
-        : "text-secondary-foreground",
+        : "text-secondary-foreground"),
   ].join(" ");
 }

@@ -43,9 +43,9 @@ export function getToolbarStateFromSelection(): ToolbarState {
   return {
     blockType: $isHeadingNode(element)
       ? (element.getTag() as BlockType)
-      : $isCodeNode(element)
+      : ($isCodeNode(element)
         ? "code"
-        : "paragraph",
+        : "paragraph"),
     isBold: selection.hasFormat("bold"),
     isCode: selection.hasFormat("code"),
     isItalic: selection.hasFormat("italic"),

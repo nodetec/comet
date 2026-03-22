@@ -50,9 +50,9 @@ export function CommandPalette({
 
   const mode: SearchMode = query.startsWith("#")
     ? "tags"
-    : query.startsWith("@")
+    : (query.startsWith("@")
       ? "notebooks"
-      : "notes";
+      : "notes");
 
   const searchTerm =
     mode === "notes" ? query.trim() : query.trim().slice(1).trim();
@@ -70,9 +70,9 @@ export function CommandPalette({
   const hasResults =
     mode === "tags"
       ? displayedTags.length > 0
-      : mode === "notebooks"
+      : (mode === "notebooks"
         ? filteredNotebooks.length > 0
-        : noteResults.length > 0;
+        : noteResults.length > 0);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -137,9 +137,9 @@ export function CommandPalette({
   const showList =
     mode === "notebooks"
       ? searchTerm !== "" || notebooks.length > 0
-      : mode === "tags"
+      : (mode === "tags"
         ? displayedTags.length > 0 || (searchTerm && !searching)
-        : searchTerm && !(searching && !hasResults);
+        : searchTerm && !(searching && !hasResults));
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -166,9 +166,9 @@ export function CommandPalette({
                 <CommandPrimitive.Empty className="text-muted-foreground py-6 text-center text-sm">
                   {mode === "tags"
                     ? "No tags found."
-                    : mode === "notebooks"
+                    : (mode === "notebooks"
                       ? "No notebooks found."
-                      : "No notes found."}
+                      : "No notes found.")}
                 </CommandPrimitive.Empty>
               )}
 
