@@ -3,10 +3,13 @@ import { fileURLToPath } from "node:url";
 
 import js from "@eslint/js";
 import queryPlugin from "@tanstack/eslint-plugin-query";
-import globals from "globals";
+import importX from "eslint-plugin-import-x";
 import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
+import sonarjs from "eslint-plugin-sonarjs";
+import unicorn from "eslint-plugin-unicorn";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 
 const tsconfigRootDir = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +35,20 @@ export default [
   scopeConfig(reactPlugin.configs.flat.recommended),
   scopeConfig(reactPlugin.configs.flat["jsx-runtime"]),
   scopeConfig(reactRefresh.configs.vite),
+  scopeConfig(sonarjs.configs.recommended),
+  scopeConfig(unicorn.configs["flat/recommended"]),
+  scopeConfig(importX.flatConfigs.recommended),
+  scopeConfig(importX.flatConfigs.typescript),
+  {
+    files: srcFiles,
+    settings: {
+      "import-x/resolver": {
+        typescript: {
+          project: path.resolve(tsconfigRootDir, "tsconfig.app.json"),
+        },
+      },
+    },
+  },
   {
     files: srcFiles,
     plugins: {
@@ -89,6 +106,13 @@ export default [
       "react-hooks/exhaustive-deps": "error",
       "react-hooks/rules-of-hooks": "error",
       "react/prop-types": "off",
+      "unicorn/no-null": "off",
+      "unicorn/prevent-abbreviations": "off",
+      "unicorn/prefer-global-this": "off",
+      "unicorn/no-array-callback-reference": "off",
+      "unicorn/prefer-string-replace-all": "off",
+      "sonarjs/prefer-read-only-props": "off",
+      "import-x/default": "off",
     },
   },
   {

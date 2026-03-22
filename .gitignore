@@ -20,3 +20,5 @@ comet.db-wal
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+coverage/
