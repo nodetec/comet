@@ -199,7 +199,10 @@ export async function createBlossomServer(
           try {
             await objectStorage.uploadBlob(sha256, data, contentType);
           } catch (e) {
-            console.error("[blossom] S3 upload failed:", e);
+            const err = e instanceof Error ? e : new Error(String(e));
+            console.error(
+              `[blossom] S3 upload failed: ${err.name}: ${err.message}`,
+            );
             return json({ error: "storage upload failed" }, 500);
           }
         }
