@@ -35,6 +35,7 @@ export type LoadedNote = {
   pinnedAt: number | null;
   publishedAt: number | null;
   publishedKind: number | null;
+  readonly: boolean;
   tags: string[];
   title: string;
 };

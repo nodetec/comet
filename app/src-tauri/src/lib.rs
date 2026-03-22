@@ -19,7 +19,7 @@ use error::AppError;
 use notes::{
     AssignNoteNotebookInput, BootstrapPayload, ContextualTagsInput, ContextualTagsPayload,
     CreateNotebookInput, ExportNotesInput, LoadedNote, NotePagePayload, NoteQueryInput,
-    NotebookSummary, RenameNotebookInput, SaveNoteInput, SearchResult,
+    NotebookSummary, RenameNotebookInput, SaveNoteInput, SearchResult, SetNoteReadonlyInput,
 };
 use rusqlite::OptionalExtension;
 use serde::Serialize;
@@ -155,6 +155,13 @@ fn create_note(
 #[tauri::command]
 fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
     let note = notes::save_note(&app, input)?;
+    sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
+    Ok(note)
+}
+
+#[tauri::command]
+fn set_note_readonly(app: AppHandle, input: SetNoteReadonlyInput) -> Result<LoadedNote, AppError> {
+    let note = notes::set_note_readonly(&app, input)?;
     sync_push(&app, sync::SyncCommand::PushNote(note.id.clone()));
     Ok(note)
 }
@@ -734,6 +741,7 @@ pub fn run() {
             load_note,
             create_note,
             save_note,
+            set_note_readonly,
             archive_note,
             restore_note,
             trash_note,

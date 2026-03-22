@@ -36,6 +36,7 @@ capture thoughts, resume context, connect notes, and publish when they choose.
 - Keep notebooks flat.
 - Derive tags from `#tag` text inside notes.
 - Allow a note to belong to at most one notebook.
+- Allow a note to be marked read-only without moving it out of the main library.
 
 ## Avoid
 

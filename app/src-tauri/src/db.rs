@@ -228,6 +228,7 @@ fn account_migrations() -> Migrations<'static> {
            modified_at INTEGER NOT NULL,
            archived_at INTEGER,
            pinned_at INTEGER,
+           readonly INTEGER NOT NULL DEFAULT 0 CHECK (readonly IN (0, 1)),
            nostr_d_tag TEXT,
            published_at INTEGER,
            sync_event_id TEXT,

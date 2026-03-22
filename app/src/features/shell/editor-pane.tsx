@@ -9,7 +9,7 @@ import { useUIStore } from "@/stores/use-ui-store";
 import { useShellStore } from "@/stores/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu, Submenu } from "@tauri-apps/api/menu";
+import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";
 import {
@@ -53,12 +53,14 @@ type EditorPaneProps = {
   pinnedAt: number | null;
   publishedAt: number | null;
   publishedKind: number | null;
+  readonly: boolean;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
   onOpenPublishDialog(): void;
   onPublishShortNote(): void;
   onSetPinned(pinned: boolean): void;
+  onSetReadonly(readonly: boolean): void;
   onFocusHandled(): void;
   onChange(markdown: string): void;
 };
@@ -85,18 +87,21 @@ export function EditorPane({
   pinnedAt,
   publishedAt,
   publishedKind,
+  readonly,
   searchQuery,
   onAssignNotebook,
   onDeletePublishedNote,
   onOpenPublishDialog,
   onPublishShortNote,
   onSetPinned,
+  onSetReadonly,
   onFocusHandled,
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
   const isPublishedNote = publishedKind === 1;
-  const isReadOnly = isArchived || deletedAt !== null || isPublishedNote;
+  const isSystemReadOnly = isArchived || deletedAt !== null || isPublishedNote;
+  const isReadOnly = readonly || isSystemReadOnly;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
@@ -244,68 +249,112 @@ export function EditorPane({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeFind, findOpen, setFocusedPane]);
 
+  const openEditorMenu = useCallback(
+    async (position: LogicalPosition) => {
+      if (!noteId) {
+        return;
+      }
+
+      const readonlyMenuItem = await CheckMenuItem.new({
+        id: "editor-menu-readonly",
+        text: "Read-only",
+        checked: readonly,
+        enabled: !isPublishedNote,
+        action: () => onSetReadonly(!readonly),
+      });
+
+      const moveToNotebookSubmenu = await buildNotebookSubmenu({
+        currentNotebook: notebook,
+        notebooks,
+        idPrefix: "editor-menu-notebook",
+        onAssign: (notebookId) => onAssignNotebook(notebookId),
+      });
+
+      const deletePublishedItem = {
+        id: "editor-menu-delete-published",
+        text: "Delete from Nostr",
+        enabled: !isDeletePublishedNotePending,
+        action: onDeletePublishedNote,
+      };
+
+      let publishItems;
+      if (isPublishedNote) {
+        publishItems = [deletePublishedItem];
+      } else {
+        const publishAsSubmenu = await Submenu.new({
+          text: publishedAt ? "Update on Nostr" : "Publish As",
+          items: [
+            {
+              id: "editor-menu-publish-note",
+              text: "Note",
+              action: () => onPublishShortNote(),
+            },
+            {
+              id: "editor-menu-publish-article",
+              text: "Article",
+              action: () => onOpenPublishDialog(),
+            },
+          ],
+        });
+        publishItems = publishedAt
+          ? [publishAsSubmenu, deletePublishedItem]
+          : [publishAsSubmenu];
+      }
+
+      const menu = await Menu.new({
+        items: [
+          {
+            id: pinnedAt ? "editor-menu-unpin" : "editor-menu-pin",
+            text: pinnedAt ? "Unpin" : "Pin To Top",
+            action: () => {
+              onSetPinned(!pinnedAt);
+            },
+          },
+          readonlyMenuItem,
+          moveToNotebookSubmenu,
+          ...publishItems,
+        ],
+      });
+
+      try {
+        await menu.popup(position);
+      } finally {
+        await menu.close();
+      }
+    },
+    [
+      isDeletePublishedNotePending,
+      isPublishedNote,
+      notebook,
+      notebooks,
+      noteId,
+      onAssignNotebook,
+      onDeletePublishedNote,
+      onOpenPublishDialog,
+      onPublishShortNote,
+      onSetPinned,
+      onSetReadonly,
+      pinnedAt,
+      publishedAt,
+      readonly,
+    ],
+  );
+
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     const buttonRect = event.currentTarget.getBoundingClientRect();
-    const moveToNotebookSubmenu = await buildNotebookSubmenu({
-      currentNotebook: notebook,
-      notebooks,
-      idPrefix: "editor-menu-notebook",
-      onAssign: (notebookId) => onAssignNotebook(notebookId),
-    });
+    await openEditorMenu(
+      new LogicalPosition(buttonRect.right - 170, buttonRect.bottom + 6),
+    );
+  };
 
-    const deletePublishedItem = {
-      id: "editor-menu-delete-published",
-      text: "Delete from Nostr",
-      enabled: !isDeletePublishedNotePending,
-      action: onDeletePublishedNote,
-    };
-
-    let publishItems;
-    if (isPublishedNote) {
-      publishItems = [deletePublishedItem];
-    } else {
-      const publishAsSubmenu = await Submenu.new({
-        text: publishedAt ? "Update on Nostr" : "Publish As",
-        items: [
-          {
-            id: "editor-menu-publish-note",
-            text: "Note",
-            action: () => onPublishShortNote(),
-          },
-          {
-            id: "editor-menu-publish-article",
-            text: "Article",
-            action: () => onOpenPublishDialog(),
-          },
-        ],
-      });
-      publishItems = publishedAt
-        ? [publishAsSubmenu, deletePublishedItem]
-        : [publishAsSubmenu];
+  const handleEditorContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    if (!noteId) {
+      return;
     }
 
-    const menu = await Menu.new({
-      items: [
-        {
-          id: pinnedAt ? "editor-menu-unpin" : "editor-menu-pin",
-          text: pinnedAt ? "Unpin" : "Pin To Top",
-          action: () => {
-            onSetPinned(!pinnedAt);
-          },
-        },
-        moveToNotebookSubmenu,
-        ...publishItems,
-      ],
-    });
-
-    try {
-      await menu.popup(
-        new LogicalPosition(buttonRect.right - 170, buttonRect.bottom + 6),
-      );
-    } finally {
-      await menu.close();
-    }
+    event.preventDefault();
+    void openEditorMenu(new LogicalPosition(event.clientX, event.clientY));
   };
 
   const handleEditorSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
@@ -339,6 +388,41 @@ export function EditorPane({
     </Button>
   );
 
+  const statusContent = isPublishedNote ? (
+    <>
+      <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
+        Published
+      </span>
+      <Tooltip>
+        <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
+          <Lock className="size-[1.2rem]" />
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          Short notes are immutable on Nostr and can&apos;t be updated.
+        </TooltipContent>
+      </Tooltip>
+    </>
+  ) : readonly ? (
+    <span className="text-muted-foreground pointer-events-auto flex items-center gap-1 text-xs">
+      <Lock className="size-3.5" />
+      Read-only
+    </span>
+  ) : publishedAt != null ? (
+    modifiedAt <= publishedAt ? (
+      <span className="text-muted-foreground pointer-events-auto text-xs">
+        Published
+      </span>
+    ) : (
+      <button
+        className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
+        onClick={onOpenPublishDialog}
+        type="button"
+      >
+        Update
+      </button>
+    )
+  ) : null;
+
   return (
     <section className="bg-background relative flex h-full min-h-0 flex-col">
       <header
@@ -357,53 +441,27 @@ export function EditorPane({
             {noteTitle ?? ""}
           </p>
         </div>
-        {noteId && isPublishedNote ? (
+        {noteId ? (
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
-            <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
-              Published
-            </span>
-            <Tooltip>
-              <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
-                <Lock className="size-[1.2rem]" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                Short notes are immutable on Nostr and can&apos;t be updated.
-              </TooltipContent>
-            </Tooltip>
-            {menuButton}
-          </div>
-        ) : noteId && !isReadOnly ? (
-          <div className="pointer-events-none relative z-40 flex items-center gap-1">
-            {publishedAt != null &&
-              (modifiedAt <= publishedAt ? (
-                <span className="text-muted-foreground pointer-events-auto text-xs">
-                  Published
-                </span>
-              ) : (
-                <button
-                  className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
-                  onClick={onOpenPublishDialog}
-                  type="button"
-                >
-                  Update
-                </button>
-              ))}
-            <Button
-              className={cn(
-                "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
-                showToolbar && "bg-accent text-accent-foreground",
-              )}
-              onClick={() => setShowToolbar(!showToolbar)}
-              size="icon-sm"
-              variant="ghost"
-              title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-            >
-              {showToolbar ? (
-                <PanelBottomClose className="size-[1.2rem]" />
-              ) : (
-                <PanelBottomOpen className="size-[1.2rem]" />
-              )}
-            </Button>
+            {statusContent}
+            {!isReadOnly ? (
+              <Button
+                className={cn(
+                  "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
+                  showToolbar && "bg-accent text-accent-foreground",
+                )}
+                onClick={() => setShowToolbar(!showToolbar)}
+                size="icon-sm"
+                variant="ghost"
+                title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+              >
+                {showToolbar ? (
+                  <PanelBottomClose className="size-[1.2rem]" />
+                ) : (
+                  <PanelBottomOpen className="size-[1.2rem]" />
+                )}
+              </Button>
+            ) : null}
             {menuButton}
           </div>
         ) : null}
@@ -492,6 +550,7 @@ export function EditorPane({
             findOpen && "pt-2",
           )}
           data-editor-scroll-container
+          onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
           onScroll={(event) => {
             updateHeaderState(event.currentTarget);

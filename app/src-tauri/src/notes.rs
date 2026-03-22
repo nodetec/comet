@@ -163,6 +163,7 @@ pub struct LoadedNote {
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
+    pub readonly: bool,
     pub tags: Vec<String>,
     pub nostr_d_tag: Option<String>,
     pub published_at: Option<i64>,
@@ -247,6 +248,13 @@ pub struct ContextualTagsInput {
 pub struct SaveNoteInput {
     pub id: String,
     pub markdown: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetNoteReadonlyInput {
+    pub note_id: String,
+    pub readonly: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -401,11 +409,15 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
     // Only update modified_at when the markdown content actually changed.
     // The editor may re-serialize markdown with minor normalization differences,
     // which triggers a save even though the user made no real edits.
-    let existing_markdown: String = transaction.query_row(
-        "SELECT markdown FROM notes WHERE id = ?1",
+    let (existing_markdown, is_readonly): (String, bool) = transaction.query_row(
+        "SELECT markdown, readonly FROM notes WHERE id = ?1",
         params![input.id],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get::<_, i64>(1)? != 0)),
     )?;
+
+    if is_readonly {
+        return Err(AppError::custom("Note is read-only."));
+    }
 
     let content_changed = existing_markdown != input.markdown;
 
@@ -433,6 +445,30 @@ pub fn save_note(app: &AppHandle, input: SaveNoteInput) -> Result<LoadedNote, Ap
     set_last_open_note_id(&conn, Some(&input.id))?;
 
     note_by_id(app, &conn, &input.id)?.ok_or_else(|| AppError::custom("Note not found."))
+}
+
+pub fn set_note_readonly(
+    app: &AppHandle,
+    input: SetNoteReadonlyInput,
+) -> Result<LoadedNote, AppError> {
+    validate_note_id(&input.note_id)?;
+    let conn = database_connection(app)?;
+    let updated = conn.execute(
+        "UPDATE notes
+         SET readonly = ?1, modified_at = ?2, locally_modified = 1
+         WHERE id = ?3",
+        params![
+            if input.readonly { 1 } else { 0 },
+            now_millis(),
+            input.note_id
+        ],
+    )?;
+
+    if updated == 0 {
+        return Err(AppError::custom("Note not found."));
+    }
+
+    note_by_id(app, &conn, &input.note_id)?.ok_or_else(|| AppError::custom("Note not found."))
 }
 
 pub fn archive_note(app: &AppHandle, note_id: &str) -> Result<LoadedNote, AppError> {
@@ -1289,10 +1325,11 @@ fn row_to_loaded_note(app: &AppHandle, row: &rusqlite::Row<'_>) -> rusqlite::Res
         archived_at: row.get(6)?,
         deleted_at: row.get(7)?,
         pinned_at: row.get(8)?,
+        readonly: row.get::<_, i64>(9)? != 0,
         tags: Vec::new(),
-        nostr_d_tag: row.get(9)?,
-        published_at: row.get(10)?,
-        published_kind: row.get(11)?,
+        nostr_d_tag: row.get(10)?,
+        published_at: row.get(11)?,
+        published_kind: row.get(12)?,
     })
 }
 
@@ -1326,7 +1363,7 @@ fn note_by_id(
 ) -> Result<Option<LoadedNote>, AppError> {
     let note = conn
         .query_row(
-            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.nostr_d_tag, n.published_at, n.published_kind
+            "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly, n.nostr_d_tag, n.published_at, n.published_kind
              FROM notes n
              LEFT JOIN notebooks b ON b.id = n.notebook_id
              WHERE n.id = ?1",

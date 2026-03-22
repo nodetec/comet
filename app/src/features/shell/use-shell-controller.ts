@@ -32,6 +32,7 @@ import {
   restoreFromTrash,
   saveNote,
   exportNotes,
+  setNoteReadonly,
   trashNote,
   unpinNote,
 } from "./api";
@@ -524,6 +525,19 @@ export function useShellController() {
     onError: toastErrorHandler("Couldn't unpin note", "unpin-note-error"),
   });
 
+  const setNoteReadonlyMutation = useMutation({
+    mutationFn: setNoteReadonly,
+    onSuccess: (updatedNote) => {
+      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
+      setDraft(updatedNote.id, updatedNote.markdown);
+      void invalidateNotes();
+    },
+    onError: toastErrorHandler(
+      "Couldn't update note access",
+      "set-note-readonly-error",
+    ),
+  });
+
   useEffect(() => {
     if (
       hasHydratedInitialSelection ||
@@ -658,6 +672,10 @@ export function useShellController() {
 
   useEffect(() => {
     if (!currentNote || draftNoteId !== currentNote.id) {
+      return;
+    }
+
+    if (currentNote.readonly) {
       return;
     }
 
@@ -923,7 +941,8 @@ export function useShellController() {
       deleteNotePermanentlyMutation.isPending ||
       assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending
+      unpinNoteMutation.isPending ||
+      setNoteReadonlyMutation.isPending
     ) {
       return;
     }
@@ -947,13 +966,39 @@ export function useShellController() {
       deleteNotePermanentlyMutation.isPending ||
       assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending
+      unpinNoteMutation.isPending ||
+      setNoteReadonlyMutation.isPending
     ) {
       return;
     }
 
     const mutation = pinned ? pinNoteMutation : unpinNoteMutation;
     void mutation.mutateAsync(noteId).catch(() => {});
+  };
+
+  const handleSetNoteReadonly = (noteId: string, readonly: boolean) => {
+    if (
+      archiveNoteMutation.isPending ||
+      restoreNoteMutation.isPending ||
+      deleteNotePermanentlyMutation.isPending ||
+      assignNoteNotebookMutation.isPending ||
+      pinNoteMutation.isPending ||
+      unpinNoteMutation.isPending ||
+      setNoteReadonlyMutation.isPending
+    ) {
+      return;
+    }
+
+    void (async () => {
+      if (noteId === selectedNoteId) {
+        await flushCurrentDraftAsync();
+      }
+
+      await setNoteReadonlyMutation.mutateAsync({
+        noteId,
+        readonly,
+      });
+    })().catch(() => {});
   };
 
   const handleCopyNoteContent = (noteId: string) => {
@@ -1019,6 +1064,7 @@ export function useShellController() {
     handleSelectToday,
     handleSelectTodo,
     handleSetNotePinned,
+    handleSetNoteReadonly,
     handleToggleTag,
     submitNotebook,
     submitRenameNotebook,
@@ -1048,6 +1094,7 @@ export function useShellController() {
       pinnedAt: currentNote?.pinnedAt ?? null,
       publishedAt: currentNote?.publishedAt ?? null,
       publishedKind: currentNote?.publishedKind ?? null,
+      readonly: currentNote?.readonly ?? false,
       searchQuery,
       isDeletePublishedNotePending,
       onAssignNotebook(notebookId: string | null) {
@@ -1094,8 +1141,13 @@ export function useShellController() {
           latestRef.current.handleSetNotePinned(currentNote.id, pinned);
         }
       },
+      onSetReadonly(readonly: boolean) {
+        if (currentNote) {
+          latestRef.current.handleSetNoteReadonly(currentNote.id, readonly);
+        }
+      },
       onChange(markdown: string) {
-        if (currentNote && !currentNote.archivedAt) {
+        if (currentNote && !currentNote.archivedAt && !currentNote.readonly) {
           setDraft(currentNote.id, markdown);
         }
       },
@@ -1208,7 +1260,8 @@ export function useShellController() {
     deleteNotePermanentlyMutation.isPending ||
     assignNoteNotebookMutation.isPending ||
     pinNoteMutation.isPending ||
-    unpinNoteMutation.isPending;
+    unpinNoteMutation.isPending ||
+    setNoteReadonlyMutation.isPending;
 
   const notesPaneProps = useMemo(
     () => ({

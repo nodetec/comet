@@ -78,6 +78,13 @@ export async function saveNote(input: { id: string; markdown: string }) {
   return invoke<LoadedNote>("save_note", { input });
 }
 
+export async function setNoteReadonly(input: {
+  noteId: string;
+  readonly: boolean;
+}) {
+  return invoke<LoadedNote>("set_note_readonly", { input });
+}
+
 export async function archiveNote(noteId: string) {
   return invoke<LoadedNote>("archive_note", { noteId });
 }
