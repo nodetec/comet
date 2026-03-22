@@ -25,6 +25,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import { mergeRegister } from "@lexical/utils";
+import { listen } from "@tauri-apps/api/event";
 import {
   useCallback,
   useEffect,
@@ -34,6 +35,8 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { resolveImageSrc } from "@/lib/attachments";
+
+type BlobFetchStatus = "downloaded" | "missing" | "needsUnlock";
 
 export interface ImagePayload {
   src: string;
@@ -70,34 +73,124 @@ function ImageComponent({
     useLexicalNodeSelection(nodeKey);
   const [isLoadError, setIsLoadError] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [cacheBust, setCacheBust] = useState(0);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const fetchAttempted = useRef(false);
   const isEditable = useLexicalEditable();
 
+  const fetchImage = useCallback(async () => {
+    const hashMatch = src.match(/([a-f0-9]{64})\.\w+/);
+    if (!hashMatch) {
+      console.warn("[image-node] missing attachment hash", { src, nodeKey });
+      setIsLoadError(true);
+      setNeedsUnlock(false);
+      return;
+    }
+
+    console.debug("[image-node] fetch start", {
+      src,
+      nodeKey,
+      hash: hashMatch[1],
+    });
+    setIsFetching(true);
+    setIsLoadError(false);
+    setNeedsUnlock(false);
+
+    try {
+      const result = await invoke<BlobFetchStatus>("fetch_blob", {
+        hash: hashMatch[1],
+      });
+      console.debug("[image-node] fetch result", {
+        src,
+        nodeKey,
+        hash: hashMatch[1],
+        result,
+      });
+      switch (result) {
+        case "downloaded":
+          setReloadToken(Date.now());
+          fetchAttempted.current = true;
+          break;
+        case "needsUnlock":
+          fetchAttempted.current = false;
+          setNeedsUnlock(true);
+          break;
+        case "missing":
+        default:
+          fetchAttempted.current = true;
+          setIsLoadError(true);
+          break;
+      }
+    } catch (error) {
+      console.error("[image-node] fetch failed", {
+        src,
+        nodeKey,
+        hash: hashMatch[1],
+        error,
+      });
+      fetchAttempted.current = true;
+      setIsLoadError(true);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [nodeKey, src]);
+
   const onImageError = useCallback(() => {
+    if (isFetching || needsUnlock) {
+      console.debug("[image-node] img error ignored", {
+        src,
+        nodeKey,
+        isFetching,
+        needsUnlock,
+      });
+      return;
+    }
     if (fetchAttempted.current) {
+      console.warn("[image-node] img failed after fetch attempt", {
+        src,
+        nodeKey,
+      });
       setIsLoadError(true);
       return;
     }
-    const hashMatch = src.match(/([a-f0-9]{64})\.\w+/);
-    if (hashMatch) {
-      fetchAttempted.current = true;
-      setIsFetching(true);
-      invoke<boolean>("fetch_blob", { hash: hashMatch[1] })
-        .then((found) => {
-          if (found) {
-            setCacheBust(Date.now());
-            setIsLoadError(false);
-          } else {
-            setIsLoadError(true);
-          }
-        })
-        .catch(() => setIsLoadError(true))
-        .finally(() => setIsFetching(false));
-    } else {
-      setIsLoadError(true);
-    }
+    console.debug("[image-node] img error triggering fetch", { src, nodeKey });
+    fetchAttempted.current = true;
+    void fetchImage();
+  }, [fetchImage, isFetching, needsUnlock, nodeKey, src]);
+
+  useEffect(() => {
+    fetchAttempted.current = false;
+    setIsLoadError(false);
+    setIsFetching(false);
+    setNeedsUnlock(false);
+    setReloadToken(0);
   }, [src]);
+
+  useEffect(() => {
+    const unlisten = listen<{ state: string | { error: { message: string } } }>(
+      "sync-status",
+      (event) => {
+        if (!needsUnlock || isFetching) {
+          return;
+        }
+        const state = event.payload.state;
+        if (typeof state !== "string" || state === "needsUnlock") {
+          return;
+        }
+        console.debug("[image-node] retrying after unlock", {
+          src,
+          nodeKey,
+          state,
+        });
+        fetchAttempted.current = false;
+        void fetchImage();
+      },
+    );
+
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [fetchImage, isFetching, needsUnlock, nodeKey, src]);
 
   const $onDelete = useCallback(
     (event: KeyboardEvent) => {
@@ -194,6 +287,14 @@ function ImageComponent({
     );
   }
 
+  if (needsUnlock) {
+    return (
+      <span className="bg-muted text-muted-foreground inline rounded p-2 text-sm">
+        Protected image. Unlock sync to load.
+      </span>
+    );
+  }
+
   if (isLoadError) {
     return (
       <span className="bg-muted text-muted-foreground inline rounded p-2 text-sm">
@@ -210,12 +311,20 @@ function ImageComponent({
       }
     >
       <img
+        key={reloadToken}
         ref={imageRef}
-        src={cacheBust ? `${src}?t=${cacheBust}` : src}
+        src={reloadToken ? `${src}#t=${reloadToken}` : src}
         alt={altText}
         className="max-w-full cursor-default overflow-hidden select-none"
         style={{ opacity: isFocused ? 0.7 : 1 }}
         draggable="false"
+        onLoad={() => {
+          console.debug("[image-node] img loaded", {
+            src,
+            nodeKey,
+            renderedSrc: reloadToken ? `${src}#t=${reloadToken}` : src,
+          });
+        }}
         onError={onImageError}
       />
     </span>

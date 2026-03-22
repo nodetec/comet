@@ -84,6 +84,13 @@ pub fn save_blob(app: &AppHandle, hash: &str, ext: &str, data: &[u8]) -> Result<
     let dir = attachments_dir(app)?;
     let filename = format!("{hash}.{ext}");
     let path = dir.join(filename);
+    log::info!(
+        "[blob] writing local file plaintext_hash={} ext={} bytes={} path={}",
+        hash,
+        ext,
+        data.len(),
+        path.display()
+    );
     fs::write(&path, data)?;
     Ok(())
 }

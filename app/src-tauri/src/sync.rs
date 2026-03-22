@@ -1116,11 +1116,9 @@ async fn process_relay_message(
                     sync_log(app, &format!("updated note {note_id}"));
                 }
 
-                if updated.is_some() {
-                    let blossom_url = get_blossom_url(&conn);
-                    if let Some(blossom_url) = blossom_url {
-                        download_missing_blobs(app, keys, &unwrapped.rumor, &blossom_url).await;
-                    }
+                let blossom_url = get_blossom_url(&conn);
+                if let Some(blossom_url) = blossom_url {
+                    download_missing_blobs(app, keys, &unwrapped.rumor, &blossom_url).await;
                 }
 
                 if updated.is_some() {

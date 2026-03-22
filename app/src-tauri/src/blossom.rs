@@ -5,6 +5,7 @@ use chacha20poly1305::{
 };
 use nostr_sdk::prelude::*;
 use regex_lite::Regex;
+use reqwest::{header::LOCATION, redirect::Policy, Url};
 use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
@@ -228,7 +229,12 @@ pub async fn download_blob(
     let auth_header = sign_blossom_auth(keys, "get", ciphertext_hash, blossom_url)?;
 
     let url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
-    let resp = client
+    let request_client = reqwest::Client::builder()
+        .redirect(Policy::none())
+        .build()
+        .map_err(|e| AppError::custom(format!("Failed to prepare Blossom client: {e}")))?;
+
+    let resp = request_client
         .get(&url)
         .header("Authorization", auth_header)
         .send()
@@ -237,6 +243,24 @@ pub async fn download_blob(
             eprintln!("[blossom] download request failed: {e}");
             AppError::custom(format!("Blossom download failed: {e}"))
         })?;
+
+    let resp = if resp.status().is_redirection() {
+        let location = resp
+            .headers()
+            .get(LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| AppError::custom("Blossom download redirect missing location."))?;
+        let redirect_url = Url::parse(location)
+            .or_else(|_| Url::parse(&url).and_then(|base| base.join(location)))
+            .map_err(|e| AppError::custom(format!("Invalid Blossom redirect URL: {e}")))?;
+
+        client.get(redirect_url).send().await.map_err(|e| {
+            eprintln!("[blossom] redirected download request failed: {e}");
+            AppError::custom(format!("Blossom download failed: {e}"))
+        })?
+    } else {
+        resp
+    };
 
     if !resp.status().is_success() {
         let status = resp.status();

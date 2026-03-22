@@ -38,6 +38,14 @@ struct AppStatus {
     active_npub: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+enum BlobFetchStatus {
+    Downloaded,
+    Missing,
+    NeedsUnlock,
+}
+
 #[tauri::command]
 fn app_status(app: AppHandle) -> Result<AppStatus, AppError> {
     let config_dir = app.path().app_config_dir()?;
@@ -454,45 +462,103 @@ fn set_blossom_url(app: AppHandle, url: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
+async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus, AppError> {
+    log::info!("[blob] fetch requested plaintext_hash={hash}");
+
     // Check if already local
     if crate::attachments::has_local_blob(&app, &hash)? {
-        return Ok(true);
+        log::info!("[blob] already local plaintext_hash={hash}");
+        return Ok(BlobFetchStatus::Downloaded);
     }
 
     let conn = database_connection(&app)?;
+    let preferred_blossom_url = sync::get_blossom_url(&conn);
+    log::info!(
+        "[blob] lookup plaintext_hash={} preferred_blossom_url={:?}",
+        hash,
+        preferred_blossom_url
+    );
 
-    let blossom_url = match sync::get_blossom_url(&conn) {
-        Some(u) => u,
-        None => return Ok(false),
-    };
+    if !crate::secure_storage::is_current_identity_unlocked(&app, &conn)? {
+        log::info!("[blob] needs unlock plaintext_hash={hash}");
+        return Ok(BlobFetchStatus::NeedsUnlock);
+    }
 
     // Get keys for decryption and Blossom auth
     let (keys, pubkey_hex) = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
+    log::info!(
+        "[blob] resolved account plaintext_hash={} pubkey={}",
+        hash,
+        pubkey_hex
+    );
 
-    // Look up blob metadata for the current server + identity
-    let meta: Option<(String, String)> = conn
-        .query_row(
-            "SELECT ciphertext_hash, encryption_key FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
-            rusqlite::params![hash, blossom_url, pubkey_hex],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?;
+    // Look up blob metadata for this identity, preferring the currently
+    // configured Blossom server when one is set.
+    let meta: Option<(String, String, String)> =
+        if let Some(ref blossom_url) = preferred_blossom_url {
+            conn.query_row(
+                "SELECT server_url, ciphertext_hash, encryption_key
+             FROM blob_meta
+             WHERE plaintext_hash = ?1 AND pubkey = ?2
+             ORDER BY CASE WHEN server_url = ?3 THEN 0 ELSE 1 END, rowid DESC
+             LIMIT 1",
+                rusqlite::params![hash, pubkey_hex, blossom_url],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?
+        } else {
+            conn.query_row(
+                "SELECT server_url, ciphertext_hash, encryption_key
+             FROM blob_meta
+             WHERE plaintext_hash = ?1 AND pubkey = ?2
+             ORDER BY rowid DESC
+             LIMIT 1",
+                rusqlite::params![hash, pubkey_hex],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?
+        };
 
-    let (ciphertext_hash, key_hex) = match meta {
+    let (server_url, ciphertext_hash, key_hex) = match meta {
         Some(m) => m,
-        None => return Ok(false), // no metadata for this server+identity, can't download
+        None => {
+            log::warn!(
+                "[blob] missing metadata plaintext_hash={} pubkey={}",
+                hash,
+                pubkey_hex
+            );
+            return Ok(BlobFetchStatus::Missing);
+        } // no metadata for this identity, can't download
     };
+
+    log::info!(
+        "[blob] metadata found plaintext_hash={} ciphertext_hash={} server_url={} key_len={}",
+        hash,
+        ciphertext_hash,
+        server_url,
+        key_hex.len()
+    );
 
     drop(conn); // release before async work
 
     // Download from Blossom
     let http_client = reqwest::Client::new();
     let ciphertext =
-        crate::blossom::download_blob(&http_client, &blossom_url, &ciphertext_hash, &keys).await?;
+        crate::blossom::download_blob(&http_client, &server_url, &ciphertext_hash, &keys).await?;
+    log::info!(
+        "[blob] downloaded ciphertext plaintext_hash={} ciphertext_hash={} size={}",
+        hash,
+        ciphertext_hash,
+        ciphertext.len()
+    );
 
     // Decrypt
     let plaintext = crate::blossom::decrypt_blob(&ciphertext, &key_hex)?;
+    log::info!(
+        "[blob] decrypted plaintext_hash={} size={}",
+        hash,
+        plaintext.len()
+    );
 
     // Determine extension from local notes referencing this hash
     let conn2 = database_connection(&app)?;
@@ -505,9 +571,15 @@ async fn fetch_blob(app: AppHandle, hash: String) -> Result<bool, AppError> {
         .optional()?
         .and_then(|md| sync::extract_blob_extension(&md, &hash))
         .unwrap_or_else(|| "bin".to_string());
+    log::info!(
+        "[blob] resolved extension plaintext_hash={} ext={}",
+        hash,
+        ext
+    );
 
     crate::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
-    Ok(true)
+    log::info!("[blob] saved locally plaintext_hash={} ext={}", hash, ext);
+    Ok(BlobFetchStatus::Downloaded)
 }
 
 #[tauri::command]
@@ -702,12 +774,17 @@ async fn restart_sync(app: AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-async fn unlock_sync(app: AppHandle) -> Result<(), AppError> {
+async fn unlock_current_account(app: AppHandle) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
     let _ = crate::secure_storage::keys_for_current_identity(&app, &conn)?;
     drop(conn);
     sync::start_if_ready(&app).await?;
     Ok(())
+}
+
+#[tauri::command]
+async fn unlock_sync(app: AppHandle) -> Result<(), AppError> {
+    unlock_current_account(app).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -795,6 +872,7 @@ pub fn run() {
             set_sync_enabled,
             get_sync_status,
             restart_sync,
+            unlock_current_account,
             unlock_sync,
             resync,
             search_notes,

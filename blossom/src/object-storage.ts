@@ -1,5 +1,6 @@
 import {
   S3Client,
+  GetObjectCommand,
   PutObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
@@ -11,6 +12,9 @@ type ObjectStorageOptions = {
 export type ObjectStorage = {
   publicBaseUrl: string;
   getPublicUrl: (sha256: string) => string;
+  downloadBlob: (
+    sha256: string,
+  ) => Promise<{ data: Uint8Array; contentType?: string }>;
   uploadBlob: (
     sha256: string,
     data: Uint8Array,
@@ -72,6 +76,30 @@ export function createObjectStorage(
     publicBaseUrl,
     getPublicUrl(sha256: string): string {
       return `${publicBaseUrl}/${sha256}`;
+    },
+    async downloadBlob(
+      sha256: string,
+    ): Promise<{ data: Uint8Array; contentType?: string }> {
+      const response = await client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: sha256,
+        }),
+      );
+
+      const body = response.Body;
+      if (!body || typeof body !== "object") {
+        throw new Error(`missing object body for blob ${sha256}`);
+      }
+
+      const bytes = await (
+        body as { transformToByteArray: () => Promise<Uint8Array> }
+      ).transformToByteArray();
+
+      return {
+        data: bytes,
+        contentType: response.ContentType,
+      };
     },
     async uploadBlob(
       sha256: string,

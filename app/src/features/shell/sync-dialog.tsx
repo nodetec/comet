@@ -179,7 +179,7 @@ export function SyncDialog({
     setUnlocking(true);
     setUnlockError(null);
     try {
-      await invoke("unlock_sync");
+      await invoke("unlock_current_account");
       await refreshInfo();
     } catch (error) {
       setUnlockError(errorMessage(error, "Failed to unlock sync."));

@@ -33,7 +33,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPCONFIG/attachments/**"]
+        "scope": ["$APPDATA/accounts/**/attachments/**"]
       }
     }
   },
