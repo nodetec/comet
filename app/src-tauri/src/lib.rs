@@ -360,6 +360,18 @@ fn list_accounts(app: AppHandle) -> Result<Vec<db::AccountSummary>, AppError> {
     db::list_accounts(&app)
 }
 
+#[tauri::command]
+fn get_account_nsec(app: AppHandle, public_key: String) -> Result<String, AppError> {
+    let account_exists = db::list_accounts(&app)?
+        .into_iter()
+        .any(|account| account.public_key == public_key);
+    if !account_exists {
+        return Err(AppError::custom(format!("Unknown account: {public_key}")));
+    }
+
+    secure_storage::load_account_nsec(&app, &public_key)
+}
+
 async fn run_account_change<T>(
     app: &AppHandle,
     change: impl FnOnce() -> Result<T, AppError>,
@@ -763,6 +775,7 @@ pub fn run() {
             pin_note,
             unpin_note,
             list_accounts,
+            get_account_nsec,
             add_account,
             switch_account,
             list_relays,

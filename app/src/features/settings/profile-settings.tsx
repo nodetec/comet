@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { toast } from "sonner";
 import { Check, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,9 @@ export function ProfileSettings() {
   const [addingAccount, setAddingAccount] = useState(false);
   const [nsec, setNsec] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedNsecPublicKey, setCopiedNsecPublicKey] = useState<string | null>(
+    null,
+  );
   const [accountChangePending, setAccountChangePending] = useState(false);
   const accountChangeLockRef = useRef(false);
 
@@ -116,6 +120,25 @@ export function ProfileSettings() {
     },
   });
 
+  const copyNsecMutation = useMutation({
+    mutationFn: async (publicKey: string) => {
+      const nsec = await invoke<string>("get_account_nsec", { publicKey });
+      await writeText(nsec);
+      return publicKey;
+    },
+    onSuccess: (publicKey) => {
+      setCopiedNsecPublicKey(publicKey);
+      window.setTimeout(() => {
+        setCopiedNsecPublicKey((currentPublicKey) =>
+          currentPublicKey === publicKey ? null : currentPublicKey,
+        );
+      }, 2000);
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Couldn't copy nsec"));
+    },
+  });
+
   const isAccountChangePending =
     accountChangePending ||
     addAccountMutation.isPending ||
@@ -152,6 +175,14 @@ export function ProfileSettings() {
     await writeText(npub);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyNsec = (publicKey: string) => {
+    if (copyNsecMutation.isPending) {
+      return;
+    }
+
+    copyNsecMutation.mutate(publicKey);
   };
 
   const truncated =
@@ -215,6 +246,10 @@ export function ProfileSettings() {
             const isSwitching =
               switchAccountMutation.isPending &&
               switchAccountMutation.variables === account.publicKey;
+            const isCopyingNsec =
+              copyNsecMutation.isPending &&
+              copyNsecMutation.variables === account.publicKey;
+            const hasCopiedNsec = copiedNsecPublicKey === account.publicKey;
 
             return (
               <div
@@ -236,20 +271,30 @@ export function ProfileSettings() {
                   </div>
                 </div>
 
-                {account.isActive ? (
-                  <Button size="xs" variant="ghost" disabled>
-                    Current
-                  </Button>
-                ) : (
+                <div className="flex items-center gap-2">
                   <Button
                     size="xs"
-                    variant="outline"
-                    onClick={() => handleSwitchAccount(account.publicKey)}
-                    disabled={isAccountChangePending}
+                    variant="ghost"
+                    onClick={() => handleCopyNsec(account.publicKey)}
+                    disabled={isAccountChangePending || isCopyingNsec}
                   >
-                    {isSwitching ? "Switching..." : "Switch"}
+                    {hasCopiedNsec ? "Copied" : "Copy nsec"}
                   </Button>
-                )}
+                  {account.isActive ? (
+                    <Button size="xs" variant="ghost" disabled>
+                      Current
+                    </Button>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => handleSwitchAccount(account.publicKey)}
+                      disabled={isAccountChangePending}
+                    >
+                      {isSwitching ? "Switching..." : "Switch"}
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
