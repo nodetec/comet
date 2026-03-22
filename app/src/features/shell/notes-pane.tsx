@@ -325,17 +325,6 @@ export function NotesPane({
           text: note.pinnedAt ? "Unpin" : "Pin To Top",
           action: () => onSetNotePinned(note.id, !note.pinnedAt),
         },
-        await CheckMenuItem.new({
-          id: `readonly-${note.id}`,
-          text: "Read-only",
-          checked: note.readonly,
-          action: () => onSetNoteReadonly(note.id, !note.readonly),
-        }),
-        {
-          id: `duplicate-${note.id}`,
-          text: "Duplicate",
-          action: () => onDuplicateNote(note.id),
-        },
         {
           id: `copy-${note.id}`,
           text: "Copy",
@@ -397,6 +386,17 @@ export function NotesPane({
                 enabled: false,
               },
             ]),
+        await CheckMenuItem.new({
+          id: `readonly-${note.id}`,
+          text: "Read-only",
+          checked: note.readonly,
+          action: () => onSetNoteReadonly(note.id, !note.readonly),
+        }),
+        {
+          id: `duplicate-${note.id}`,
+          text: "Duplicate",
+          action: () => onDuplicateNote(note.id),
+        },
       ],
     });
 
