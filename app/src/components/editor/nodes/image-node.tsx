@@ -290,7 +290,7 @@ function ImageComponent({
   if (needsUnlock) {
     return (
       <span className="bg-muted text-muted-foreground inline rounded p-2 text-sm">
-        Protected image. Unlock sync to load.
+        Image not downloaded. Unlock sync to load.
       </span>
     );
   }
