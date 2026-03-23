@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3100",
-    "generate-routes": "tsr generate",
+    "generate-routes": "node ./scripts/generate-routes.mjs",
     "build": "pnpm run generate-routes && vite build",
     "start": "node .output/server/index.mjs",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint .",
@@ -42,6 +42,7 @@
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/router-cli": "1.166.13",
+    "@tanstack/router-generator": "1.166.13",
     "@types/node": "^22.5.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

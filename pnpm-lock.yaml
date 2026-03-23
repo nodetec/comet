@@ -508,6 +508,9 @@ importers:
       "@tanstack/router-cli":
         specifier: 1.166.13
         version: 1.166.13
+      "@tanstack/router-generator":
+        specifier: 1.166.13
+        version: 1.166.13
       "@types/node":
         specifier: ^22.5.4
         version: 22.19.15
