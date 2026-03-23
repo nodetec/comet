@@ -4,6 +4,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { TreeView } from "@lexical/react/LexicalTreeView";
 import {
   Check,
+  ChevronDown,
   Copy,
   Maximize2,
   Minimize2,
@@ -23,7 +24,7 @@ type DevtoolsPluginProps = {
   portalContainer: HTMLElement | null;
 };
 
-type DebugPane = "structure" | "markdown";
+type DebugPane = "tree" | "dom" | "markdown";
 
 function formatDebugHtml(html: string): string {
   if (html.trim() === "") {
@@ -104,7 +105,17 @@ function getCopyButtonLabel(
     return copiedAction === "markdown" ? "Copied Markdown" : "Copy Markdown";
   }
 
-  return copiedAction === "structure" ? "Copied AST + DOM" : "Copy AST + DOM";
+  return copiedAction === "tree" || copiedAction === "dom"
+    ? "Copied AST + DOM"
+    : "Copy AST + DOM";
+}
+
+function getTreePaneTarget(activePane: DebugPane): "tree" | "markdown" {
+  return activePane === "markdown" ? "markdown" : "tree";
+}
+
+function shouldShowExportDom(activePane: DebugPane) {
+  return activePane === "dom";
 }
 
 function copyDebugData(params: {
@@ -149,7 +160,7 @@ function selectPreContent(
   viewRef: React.RefObject<HTMLDivElement | null>,
 ) {
   const pre = viewRef.current?.querySelector(
-    `[data-debug-pane="${activePane}"] pre`,
+    `[data-debug-pane="${getTreePaneTarget(activePane)}"] pre`,
   );
   if (!pre) {
     return;
@@ -256,20 +267,22 @@ function DebugPanel({
       <div className="border-divider flex items-center justify-between gap-2 border-b px-3 py-2">
         <div className="text-sm font-medium">Lexical Debugger</div>
         <div className="flex items-center gap-1">
-          <Button
-            onClick={() => onSetActivePane("structure")}
-            size="xs"
-            variant={activePane === "structure" ? "secondary" : "ghost"}
-          >
-            Structure
-          </Button>
-          <Button
-            onClick={() => onSetActivePane("markdown")}
-            size="xs"
-            variant={activePane === "markdown" ? "secondary" : "ghost"}
-          >
-            Markdown
-          </Button>
+          <label className="border-border bg-background/80 text-foreground focus-within:border-ring focus-within:ring-ring/50 relative flex h-6 items-center rounded-md border px-2 text-xs focus-within:ring-3">
+            <span className="text-muted-foreground mr-1.5">View</span>
+            <select
+              aria-label="Debugger view"
+              className="text-foreground h-full appearance-none bg-transparent pr-5 outline-none"
+              onChange={(event) =>
+                onSetActivePane(event.target.value as DebugPane)
+              }
+              value={activePane}
+            >
+              <option value="tree">Tree</option>
+              <option value="dom">Export DOM</option>
+              <option value="markdown">Markdown</option>
+            </select>
+            <ChevronDown className="text-muted-foreground pointer-events-none absolute right-2 size-3.5" />
+          </label>
           <Button
             aria-label={expanded ? "Collapse debugger" : "Expand debugger"}
             onClick={onToggleExpanded}
@@ -306,9 +319,9 @@ function DebugPanel({
         <div
           className={cn(
             "flex min-h-0 flex-1 flex-col",
-            activePane !== "structure" && "hidden",
+            activePane === "markdown" && "hidden",
           )}
-          data-debug-pane="structure"
+          data-debug-pane="tree"
         >
           <TreeView
             editor={editor}
@@ -316,7 +329,7 @@ function DebugPanel({
             timeTravelPanelButtonClassName="comet-lexical-tree-button mb-0 mr-0"
             timeTravelPanelClassName="comet-lexical-tree-panel order-5 mt-2"
             timeTravelPanelSliderClassName="comet-lexical-tree-slider"
-            treeTypeButtonClassName="comet-lexical-tree-button order-1 self-start"
+            treeTypeButtonClassName="comet-lexical-tree-mode-button hidden"
             viewClassName={treeViewClassName}
           />
           <Button
@@ -431,6 +444,31 @@ function useLiveMarkdown(
   }, [editor, enabled, setMarkdown]);
 }
 
+function useTreeViewMode(
+  activePane: DebugPane,
+  viewRef: React.RefObject<HTMLDivElement | null>,
+) {
+  useEffect(() => {
+    if (activePane === "markdown") {
+      return;
+    }
+
+    const modeButton = viewRef.current?.querySelector(
+      ".comet-lexical-tree-mode-button",
+    );
+    if (!(modeButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const isExportDomVisible = modeButton.textContent?.trim() === "Tree";
+    const shouldExportDomBeVisible = shouldShowExportDom(activePane);
+
+    if (isExportDomVisible !== shouldExportDomBeVisible) {
+      modeButton.click();
+    }
+  }, [activePane, viewRef]);
+}
+
 function useTimeTravelActive(
   viewRef: React.RefObject<HTMLDivElement | null>,
   setTimeTravelActive: React.Dispatch<React.SetStateAction<boolean>>,
@@ -471,7 +509,7 @@ export default function DevtoolsPlugin({
 }: DevtoolsPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [open, setOpen] = useState(false);
-  const [activePane, setActivePane] = useState<DebugPane>("structure");
+  const [activePane, setActivePane] = useState<DebugPane>("tree");
   const [copiedAction, setCopiedAction] = useState<DebugPane | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [markdown, setMarkdown] = useState("(empty)");
@@ -484,6 +522,7 @@ export default function DevtoolsPlugin({
   useDevtoolsDismiss(isDev, open, setOpen);
   useCopyResetTimeout(copyResetTimeoutRef);
   useLiveMarkdown(editor, markdownPaneOpen, setMarkdown);
+  useTreeViewMode(activePane, viewRef);
   useTimeTravelActive(viewRef, setTimeTravelActive);
 
   if (!isDev) {
