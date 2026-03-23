@@ -1,46 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { listen } from "@tauri-apps/api/event";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { defaultNoteSortPrefs, useUIStore } from "@/features/settings/store/use-ui-store";
 
 import {
-  archiveNote,
-  assignNoteNotebook,
-  createNote,
-  duplicateNote,
-  deleteNotePermanently,
-  emptyTrash,
-  getBootstrap,
-  getContextualTags,
-  getTodoCount,
-  loadNote,
-  NOTE_PAGE_SIZE,
-  pendingDraftStorageKey,
-  pinNote,
-  queryNotes,
-  restoreNote,
-  restoreFromTrash,
-  saveNote,
   exportNotes,
-  setNoteReadonly,
-  trashNote,
-  unpinNote,
+  loadNote,
 } from "@/shared/api/invoke";
 import {
   type LoadedNote,
-  type NoteQueryInput,
-  type NotebookSummary,
   type NoteSortDirection,
   type NoteSortField,
   type PublishNoteInput,
@@ -48,10 +21,11 @@ import {
 } from "@/shared/api/types";
 import { useNotebookState } from "./use-notebook-state";
 import { usePublishState } from "@/features/publishing";
-import { flattenNotePages, nextSelectedNoteIdAfterRemoval } from "./utils";
 
-const EMPTY_NOTEBOOKS: NotebookSummary[] = [];
-const EMPTY_TAGS: string[] = [];
+import { useNoteQueries } from "@/features/notes/hooks/use-note-queries";
+import { useNoteMutations } from "@/features/notes/hooks/use-note-mutations";
+import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
+import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
@@ -135,104 +109,76 @@ export function useShellController() {
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
-  const normalizedQuery = searchQuery.trim();
-  const normalizedActiveTags = useMemo(
-    () => [...activeTags].sort((left, right) => left.localeCompare(right)),
-    [activeTags],
-  );
-
-  const bootstrapQuery = useQuery({
-    queryKey: ["bootstrap"],
-    queryFn: getBootstrap,
+  // --- Queries ---
+  const {
+    bootstrapQuery,
+    todoCountQuery,
+    notesQuery,
+    noteQuery,
+    currentNotes,
+    notebooks,
+    activeNotebook,
+    availableTags,
+    totalNoteCount,
+    activeNpub,
+    initialSelectedNoteId,
+  } = useNoteQueries({
+    noteFilter,
+    activeNotebookId,
+    activeTags,
+    searchQuery,
+    sortField: noteSortField,
+    sortDirection: noteSortDirection,
+    selectedNoteId,
   });
-  const activeNpub = bootstrapQuery.data?.npub ?? null;
 
-  const todoCountQuery = useQuery({
-    queryKey: ["todo-count"],
-    queryFn: getTodoCount,
-    enabled: bootstrapQuery.isSuccess,
+  // --- Mutations ---
+  const {
+    createNoteMutation,
+    saveNoteMutation,
+    duplicateNoteMutation,
+    archiveNoteMutation,
+    restoreNoteMutation,
+    trashNoteMutation,
+    restoreFromTrashMutation,
+    deleteNotePermanentlyMutation,
+    emptyTrashMutation,
+    assignNoteNotebookMutation,
+    pinNoteMutation,
+    unpinNoteMutation,
+    setNoteReadonlyMutation,
+    invalidateNotes,
+    invalidateContextualTags,
+  } = useNoteMutations({
+    queryClient,
+    currentNotes,
+    selectedNoteId,
+    draftNoteId,
+    draftMarkdown,
+    noteFilter,
+    activeNotebookId,
+    activeNpub,
+    isSavingRef,
+    setSelectedNoteId,
+    setDraft,
+    setCreatingSelectedNoteId,
+    setIsCreatingNoteTransition,
+    setEditorFocusMode,
+    setNoteFilter,
   });
 
-  const notebooks = bootstrapQuery.data?.notebooks ?? EMPTY_NOTEBOOKS;
-  const activeNotebook =
-    notebooks.find((notebook) => notebook.id === activeNotebookId) ?? null;
-  const initialSelectedNoteId = bootstrapQuery.data?.selectedNoteId ?? null;
-  const isDefaultNotesView =
-    noteFilter === "all" &&
-    activeNotebookId === null &&
-    normalizedQuery === "" &&
-    normalizedActiveTags.length === 0 &&
-    noteSortField === "modified_at" &&
-    noteSortDirection === "newest";
-  const notesQueryInput = useMemo<NoteQueryInput>(
-    () => ({
-      activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
-      activeTags: normalizedActiveTags,
-      limit: NOTE_PAGE_SIZE,
-      noteFilter,
-      offset: 0,
-      searchQuery: normalizedQuery,
-      sortField: noteSortField,
-      sortDirection: noteSortDirection,
-    }),
-    [
-      activeNotebookId,
-      normalizedActiveTags,
-      normalizedQuery,
-      noteFilter,
-      noteSortField,
-      noteSortDirection,
-    ],
-  );
-  const notesQueryKey = useMemo(
-    () => ["notes", notesQueryInput] as const,
-    [notesQueryInput],
-  );
-  const notesQuery = useInfiniteQuery({
-    queryKey: notesQueryKey,
-    queryFn: ({ pageParam }) =>
-      queryNotes({
-        ...notesQueryInput,
-        offset: pageParam,
-      }),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
-    initialData:
-      isDefaultNotesView && bootstrapQuery.data
-        ? {
-            pageParams: [0],
-            pages: [bootstrapQuery.data.initialNotes],
-          }
-        : undefined,
-    placeholderData: (previousData) => previousData,
-    enabled: bootstrapQuery.isSuccess,
-  });
-  const currentNotes = useMemo(
-    () => flattenNotePages(notesQuery.data),
-    [notesQuery.data],
-  );
-  const totalNoteCount = notesQuery.data?.pages[0]?.totalCount ?? 0;
+  const { isPending: saveNotePending, mutate: mutateSaveNote } =
+    saveNoteMutation;
 
-  const contextualTagsQuery = useQuery({
-    enabled: bootstrapQuery.isSuccess,
-    initialData:
-      noteFilter === "all" && activeNotebookId === null && bootstrapQuery.data
-        ? bootstrapQuery.data.initialTags
-        : undefined,
-    placeholderData: (previousData) => previousData,
-    queryFn: () =>
-      getContextualTags({
-        activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
-        noteFilter,
-      }),
-    queryKey: [
-      "contextual-tags",
-      noteFilter,
-      noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
-    ],
+  // --- Sync listener ---
+  useSyncListener({
+    queryClient,
+    pendingSaveTimeoutRef,
+    isSavingRef,
+    setSyncEditorRevision,
   });
-  const availableTags = contextualTagsQuery.data?.tags ?? EMPTY_TAGS;
 
+  // --- Active tags cleanup when available tags change ---
   useEffect(() => {
     if (activeTags.length === 0) {
       return;
@@ -246,13 +192,7 @@ export function useShellController() {
     }
   }, [activeTags, availableTags, setActiveTags]);
 
-  const noteQuery = useQuery({
-    enabled: Boolean(selectedNoteId),
-    placeholderData: (previousData) => previousData,
-    queryFn: () => loadNote(selectedNoteId!),
-    queryKey: ["note", selectedNoteId],
-  });
-
+  // --- Notebook filter cleanup ---
   useEffect(() => {
     if (noteFilter !== "notebook") {
       return;
@@ -270,28 +210,74 @@ export function useShellController() {
     setNoteFilter,
   ]);
 
+  // --- Sync draft from loaded note ---
   useEffect(() => {
     if (noteQuery.data && noteQuery.data.id !== draftNoteId) {
       setDraft(noteQuery.data.id, noteQuery.data.markdown);
     }
   }, [draftNoteId, noteQuery.data, setDraft]);
 
-  const invalidateNotes = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["notes"] });
-  };
+  // --- Hydrate initial selection ---
+  useEffect(() => {
+    if (
+      hasHydratedInitialSelection ||
+      createNoteMutation.isPending ||
+      isCreatingNoteTransition
+    ) {
+      return;
+    }
 
-  const invalidateContextualTags = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
-  };
+    if (initialSelectedNoteId && !selectedNoteId) {
+      setSelectedNoteId(initialSelectedNoteId);
+      setHasHydratedInitialSelection(true);
+      return;
+    }
 
-  const invalidateShellData = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-      invalidateNotes(),
-      invalidateContextualTags(),
-    ]);
-  };
+    if (bootstrapQuery.isSuccess) {
+      setHasHydratedInitialSelection(true);
+    }
+  }, [
+    bootstrapQuery.isSuccess,
+    createNoteMutation.isPending,
+    hasHydratedInitialSelection,
+    initialSelectedNoteId,
+    isCreatingNoteTransition,
+    selectedNoteId,
+    setSelectedNoteId,
+  ]);
 
+  const currentNote = noteQuery.data;
+  const readyToRevealWindow =
+    bootstrapQuery.isError ||
+    (bootstrapQuery.isSuccess &&
+      hasHydratedInitialSelection &&
+      (!selectedNoteId || currentNote?.id === selectedNoteId));
+  const isCreatingNote =
+    isCreatingNoteTransition || createNoteMutation.isPending;
+  const displayedSelectedNoteId = isCreatingNote
+    ? creatingSelectedNoteId
+    : selectedNoteId;
+  const currentEditorMarkdown = currentNote
+    ? (draftNoteId === currentNote.id
+      ? draftMarkdown
+      : currentNote.markdown)
+    : "";
+
+  // --- Draft persistence ---
+  useDraftPersistence({
+    activeNpub,
+    bootstrapNpub: bootstrapQuery.data?.npub,
+    bootstrapReady: bootstrapQuery.isSuccess,
+    currentNote,
+    draftNoteId,
+    draftMarkdown,
+    saveNotePending,
+    mutateSaveNote,
+    pendingSaveTimeoutRef,
+    queryClient,
+  });
+
+  // --- Flush / discard helpers ---
   const flushCurrentDraft = () => {
     if (!currentNote || draftNoteId !== currentNote.id) {
       return;
@@ -339,407 +325,7 @@ export function useShellController() {
     }
   };
 
-  const createNoteMutation = useMutation({
-    mutationFn: createNote,
-    onSuccess: (note) => {
-      queryClient.setQueryData(["note", note.id], note);
-      setCreatingSelectedNoteId(note.id);
-      setSelectedNoteId(note.id);
-      setDraft(note.id, note.markdown);
-      setIsCreatingNoteTransition(false);
-      void Promise.all([invalidateNotes(), invalidateContextualTags()]);
-    },
-    onError: (error) => {
-      setCreatingSelectedNoteId(null);
-      setIsCreatingNoteTransition(false);
-      setEditorFocusMode("none");
-      toastErrorHandler("Couldn't create note", "create-note-error")(error);
-    },
-  });
-
-  const saveNoteMutation = useMutation({
-    mutationFn: saveNote,
-    onMutate: () => {
-      isSavingRef.current = true;
-    },
-    onSuccess: (savedNote) => {
-      queryClient.setQueryData(["note", savedNote.id], savedNote);
-      void Promise.all([
-        invalidateNotes(),
-        invalidateContextualTags(),
-        queryClient.invalidateQueries({ queryKey: ["todo-count"] }),
-      ]);
-      try {
-        if (activeNpub) {
-          localStorage.removeItem(pendingDraftStorageKey(activeNpub));
-        }
-      } catch {
-        // Ignore
-      }
-    },
-    onError: toastErrorHandler(
-      "Couldn't save note",
-      "save-note-error",
-      "Your latest changes were not saved.",
-    ),
-    onSettled: () => {
-      isSavingRef.current = false;
-    },
-  });
-
-  const duplicateNoteMutation = useMutation({
-    mutationFn: duplicateNote,
-    onSuccess: (duplicatedNote) => {
-      queryClient.setQueryData(["note", duplicatedNote.id], duplicatedNote);
-      setCreatingSelectedNoteId(null);
-      setSelectedNoteId(duplicatedNote.id);
-      setDraft(duplicatedNote.id, duplicatedNote.markdown);
-      setEditorFocusMode("immediate");
-
-      if (noteFilter === "archive" || noteFilter === "trash") {
-        setNoteFilter("all");
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler(
-      "Couldn't duplicate note",
-      "duplicate-note-error",
-    ),
-  });
-
-  const archiveNoteMutation = useMutation({
-    mutationFn: archiveNote,
-    onSuccess: (archivedNote) => {
-      queryClient.setQueryData(["note", archivedNote.id], archivedNote);
-
-      if (selectedNoteId === archivedNote.id && noteFilter !== "archive") {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, archivedNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler("Couldn't archive note", "archive-note-error"),
-  });
-
-  const restoreNoteMutation = useMutation({
-    mutationFn: restoreNote,
-    onSuccess: (restoredNote) => {
-      queryClient.setQueryData(["note", restoredNote.id], restoredNote);
-
-      if (selectedNoteId === restoredNote.id && noteFilter === "archive") {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, restoredNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler("Couldn't restore note", "restore-note-error"),
-  });
-
-  const trashNoteMutation = useMutation({
-    mutationFn: trashNote,
-    onSuccess: (trashedNote) => {
-      queryClient.setQueryData(["note", trashedNote.id], trashedNote);
-
-      if (selectedNoteId === trashedNote.id && noteFilter !== "trash") {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, trashedNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler("Couldn't delete note", "trash-note-error"),
-  });
-
-  const restoreFromTrashMutation = useMutation({
-    mutationFn: restoreFromTrash,
-    onSuccess: (restoredNote) => {
-      queryClient.setQueryData(["note", restoredNote.id], restoredNote);
-
-      if (selectedNoteId === restoredNote.id && noteFilter === "trash") {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, restoredNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler(
-      "Couldn't restore note",
-      "restore-from-trash-error",
-    ),
-  });
-  const { isPending: saveNotePending, mutate: mutateSaveNote } =
-    saveNoteMutation;
-
-  const deleteNotePermanentlyMutation = useMutation({
-    mutationFn: deleteNotePermanently,
-    onSuccess: (_, noteId) => {
-      queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
-
-      if (draftNoteId === noteId) {
-        setDraft("", "");
-      }
-
-      if (selectedNoteId === noteId) {
-        setSelectedNoteId(nextSelectedNoteIdAfterRemoval(currentNotes, noteId));
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler("Couldn't delete note", "delete-note-error"),
-  });
-
-  const emptyTrashMutation = useMutation({
-    mutationFn: emptyTrash,
-    onSuccess: () => {
-      setSelectedNoteId(null);
-      setDraft("", "");
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler("Couldn't empty trash", "empty-trash-error"),
-  });
-
-  const assignNoteNotebookMutation = useMutation({
-    mutationFn: assignNoteNotebook,
-    onSuccess: (updatedNote) => {
-      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-
-      if (
-        selectedNoteId === updatedNote.id &&
-        noteFilter === "notebook" &&
-        activeNotebookId &&
-        updatedNote.notebook?.id !== activeNotebookId
-      ) {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, updatedNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler(
-      "Couldn't move note",
-      "assign-note-notebook-error",
-    ),
-  });
-
-  const pinNoteMutation = useMutation({
-    mutationFn: pinNote,
-    onSuccess: (updatedNote) => {
-      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-      void invalidateNotes();
-    },
-    onError: toastErrorHandler("Couldn't pin note", "pin-note-error"),
-  });
-
-  const unpinNoteMutation = useMutation({
-    mutationFn: unpinNote,
-    onSuccess: (updatedNote) => {
-      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-      void invalidateNotes();
-    },
-    onError: toastErrorHandler("Couldn't unpin note", "unpin-note-error"),
-  });
-
-  const setNoteReadonlyMutation = useMutation({
-    mutationFn: setNoteReadonly,
-    onSuccess: (updatedNote) => {
-      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-      setDraft(updatedNote.id, updatedNote.markdown);
-      void invalidateNotes();
-    },
-    onError: toastErrorHandler(
-      "Couldn't update note access",
-      "set-note-readonly-error",
-    ),
-  });
-
-  useEffect(() => {
-    if (
-      hasHydratedInitialSelection ||
-      createNoteMutation.isPending ||
-      isCreatingNoteTransition
-    ) {
-      return;
-    }
-
-    if (initialSelectedNoteId && !selectedNoteId) {
-      setSelectedNoteId(initialSelectedNoteId);
-      setHasHydratedInitialSelection(true);
-      return;
-    }
-
-    if (bootstrapQuery.isSuccess) {
-      setHasHydratedInitialSelection(true);
-    }
-  }, [
-    bootstrapQuery.isSuccess,
-    createNoteMutation.isPending,
-    hasHydratedInitialSelection,
-    initialSelectedNoteId,
-    isCreatingNoteTransition,
-    selectedNoteId,
-    setSelectedNoteId,
-  ]);
-
-  const currentNote = noteQuery.data;
-  const readyToRevealWindow =
-    bootstrapQuery.isError ||
-    (bootstrapQuery.isSuccess &&
-      hasHydratedInitialSelection &&
-      (!selectedNoteId || currentNote?.id === selectedNoteId));
-  const isCreatingNote =
-    isCreatingNoteTransition || createNoteMutation.isPending;
-  const displayedSelectedNoteId = isCreatingNote
-    ? creatingSelectedNoteId
-    : selectedNoteId;
-  const currentEditorMarkdown = currentNote
-    ? (draftNoteId === currentNote.id
-      ? draftMarkdown
-      : currentNote.markdown)
-    : "";
-
-  // Recover any draft that was pending when the app quit
-  useEffect(() => {
-    if (!bootstrapQuery.isSuccess) return;
-    const draftKey = pendingDraftStorageKey(bootstrapQuery.data.npub);
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (!raw) return;
-      const { noteId, markdown } = JSON.parse(raw) as {
-        noteId: string;
-        markdown: string;
-      };
-      if (noteId && markdown) {
-        void saveNote({ id: noteId, markdown })
-          .then(() => {
-            localStorage.removeItem(draftKey);
-            void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-            void queryClient.invalidateQueries({ queryKey: ["notes"] });
-          })
-          .catch(() => {});
-      }
-    } catch {
-      localStorage.removeItem(draftKey);
-    }
-  }, [bootstrapQuery.data?.npub, bootstrapQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Invalidate queries when a remote sync change arrives
-  useEffect(() => {
-    const unlisten = listen<{ noteId: string; action: string }>(
-      "sync-remote-change",
-      (event) => {
-        const { noteId, action } = event.payload;
-        void queryClient.invalidateQueries({ queryKey: ["notes"] });
-        void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-        void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
-        void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
-        // If the updated note is currently open, refetch then remount editor
-        // — but only if the user isn't actively editing (unsaved draft)
-        const { draftNoteId: currentDraftId } = useShellStore.getState();
-        const hasPendingSave =
-          Boolean(pendingSaveTimeoutRef.current) || isSavingRef.current;
-
-        // If the currently open note was deleted remotely, close the editor
-        if (action === "delete") {
-          const { selectedNoteId: currentSelectedId } =
-            useShellStore.getState();
-          if (currentDraftId === noteId || currentSelectedId === noteId) {
-            queryClient.removeQueries({
-              exact: true,
-              queryKey: ["note", noteId],
-            });
-            useShellStore.getState().setDraft("", "");
-            useShellStore.getState().setSelectedNoteId(null);
-            setSyncEditorRevision((r) => r + 1);
-          }
-          return;
-        }
-
-        if (
-          currentDraftId === noteId &&
-          action === "upsert" &&
-          !hasPendingSave
-        ) {
-          void queryClient
-            .fetchQuery({
-              queryKey: ["note", noteId],
-              queryFn: () => loadNote(noteId),
-            })
-            .then((freshNote) => {
-              if (freshNote) {
-                queryClient.setQueryData(["note", noteId], freshNote);
-                const { draftMarkdown: currentDraft } =
-                  useShellStore.getState();
-                if (freshNote.markdown !== currentDraft) {
-                  useShellStore.getState().setDraft("", "");
-                  setSyncEditorRevision((r) => r + 1);
-                }
-              }
-            })
-            .catch(() => {});
-        }
-      },
-    );
-    return () => {
-      void unlisten.then((fn) => fn());
-    };
-  }, [queryClient]);
-
-  useEffect(() => {
-    if (!currentNote || draftNoteId !== currentNote.id) {
-      return;
-    }
-
-    if (currentNote.readonly) {
-      return;
-    }
-
-    if (saveNotePending || draftMarkdown === currentNote.markdown) {
-      return;
-    }
-
-    // Persist draft for crash recovery (survives app quit during debounce)
-    try {
-      if (!activeNpub) {
-        return;
-      }
-      localStorage.setItem(
-        pendingDraftStorageKey(activeNpub),
-        JSON.stringify({ noteId: currentNote.id, markdown: draftMarkdown }),
-      );
-    } catch {
-      // Ignore storage errors
-    }
-
-    pendingSaveTimeoutRef.current = window.setTimeout(() => {
-      mutateSaveNote({
-        id: currentNote.id,
-        markdown: draftMarkdown,
-      });
-    }, 3000);
-
-    return () => {
-      if (pendingSaveTimeoutRef.current !== null) {
-        window.clearTimeout(pendingSaveTimeoutRef.current);
-        pendingSaveTimeoutRef.current = null;
-      }
-    };
-  }, [
-    activeNpub,
-    currentNote,
-    draftMarkdown,
-    draftNoteId,
-    mutateSaveNote,
-    saveNotePending,
-  ]);
-
+  // --- Account change listener ---
   useEffect(() => {
     const handlePrepareAccountChange = () => {
       void (async () => {
@@ -778,6 +364,7 @@ export function useShellController() {
     };
   }, []);
 
+  // --- Handlers ---
   const handleCreateNote = (source: "keyboard" | "pointer") => {
     if (isCreatingNote) {
       return;
@@ -1121,6 +708,7 @@ export function useShellController() {
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
 
+  // --- Props assembly ---
   const nextEditorPaneProps = useMemo(
     () => ({
       archivedAt: currentNote?.archivedAt ?? null,
