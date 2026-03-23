@@ -314,12 +314,15 @@ body {
 
 .comet-lexical-tree-view > pre,
 .comet-lexical-debug-text-view {
+  background: color-mix(in oklab, var(--muted) 28%, transparent);
   order: 2;
   min-height: 0;
   flex: 1;
   max-height: min(24rem, 45vh);
   overflow: auto;
   margin: 0;
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
   white-space: pre-wrap;
   word-break: break-word;
   font-family:
