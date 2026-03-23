@@ -414,3 +414,396 @@ impl NoteService {
         repo.todo_count()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+
+    // ── Pure validation / normalization tests ────────────────────────────
+
+    #[test]
+    fn validate_note_id_accepts_valid_ids() {
+        assert!(validate_note_id("note-1234").is_ok());
+        assert!(validate_note_id("abc").is_ok());
+        assert!(validate_note_id("note_with_underscores").is_ok());
+    }
+
+    #[test]
+    fn validate_note_id_rejects_empty() {
+        assert!(matches!(
+            validate_note_id(""),
+            Err(NoteError::InvalidNoteId)
+        ));
+    }
+
+    #[test]
+    fn validate_note_id_rejects_slash() {
+        assert!(matches!(
+            validate_note_id("a/b"),
+            Err(NoteError::InvalidNoteId)
+        ));
+        assert!(matches!(
+            validate_note_id("a\\b"),
+            Err(NoteError::InvalidNoteId)
+        ));
+    }
+
+    #[test]
+    fn validate_note_id_rejects_dotdot() {
+        assert!(matches!(
+            validate_note_id("a..b"),
+            Err(NoteError::InvalidNoteId)
+        ));
+    }
+
+    #[test]
+    fn normalize_notebook_name_trims_whitespace() {
+        assert_eq!(
+            normalize_notebook_name("  Field Notes  ").unwrap(),
+            "Field Notes"
+        );
+    }
+
+    #[test]
+    fn normalize_notebook_name_rejects_empty() {
+        assert!(matches!(
+            normalize_notebook_name(""),
+            Err(NoteError::EmptyNotebookName)
+        ));
+        assert!(matches!(
+            normalize_notebook_name("   "),
+            Err(NoteError::EmptyNotebookName)
+        ));
+    }
+
+    #[test]
+    fn normalize_notebook_name_rejects_too_long() {
+        let long_name = "a".repeat(81);
+        assert!(matches!(
+            normalize_notebook_name(&long_name),
+            Err(NoteError::NotebookNameTooLong)
+        ));
+    }
+
+    #[test]
+    fn normalize_notebook_name_accepts_max_length() {
+        let name = "a".repeat(80);
+        assert_eq!(normalize_notebook_name(&name).unwrap(), name);
+    }
+
+    // ── Mock repository ─────────────────────────────────────────────────
+
+    struct MockNoteRepository {
+        notes: RefCell<HashMap<String, NoteRecord>>,
+        last_open_note_id: RefCell<Option<String>>,
+    }
+
+    impl MockNoteRepository {
+        fn new() -> Self {
+            Self {
+                notes: RefCell::new(HashMap::new()),
+                last_open_note_id: RefCell::new(None),
+            }
+        }
+
+        fn with_note(self, record: NoteRecord) -> Self {
+            self.notes.borrow_mut().insert(record.id.clone(), record);
+            self
+        }
+    }
+
+    impl NoteRepository for MockNoteRepository {
+        fn note_by_id(&self, note_id: &str) -> Result<Option<NoteRecord>, NoteError> {
+            Ok(self.notes.borrow().get(note_id).cloned())
+        }
+
+        fn insert_note(
+            &self,
+            note_id: &str,
+            title: &str,
+            markdown: &str,
+            notebook_id: Option<&str>,
+            now: i64,
+        ) -> Result<(), NoteError> {
+            let record = NoteRecord {
+                id: note_id.to_string(),
+                title: title.to_string(),
+                markdown: markdown.to_string(),
+                modified_at: now,
+                notebook_id: notebook_id.map(str::to_string),
+                notebook_name: None,
+                archived_at: None,
+                deleted_at: None,
+                pinned_at: None,
+                readonly: false,
+                nostr_d_tag: None,
+                published_at: None,
+                published_kind: None,
+            };
+            self.notes.borrow_mut().insert(note_id.to_string(), record);
+            Ok(())
+        }
+
+        fn upsert_search_document(
+            &self,
+            _note_id: &str,
+            _title: &str,
+            _markdown: &str,
+        ) -> Result<(), NoteError> {
+            Ok(())
+        }
+
+        fn replace_tags(&self, _note_id: &str, _markdown: &str) -> Result<(), NoteError> {
+            Ok(())
+        }
+
+        fn set_last_open_note_id(&self, note_id: Option<&str>) -> Result<(), NoteError> {
+            *self.last_open_note_id.borrow_mut() = note_id.map(str::to_string);
+            Ok(())
+        }
+
+        fn last_open_note_id(&self) -> Result<Option<String>, NoteError> {
+            Ok(self.last_open_note_id.borrow().clone())
+        }
+
+        fn note_markdown_and_readonly(
+            &self,
+            note_id: &str,
+        ) -> Result<(String, bool), NoteError> {
+            let notes = self.notes.borrow();
+            let record = notes
+                .get(note_id)
+                .ok_or(NoteError::NotFound)?;
+            Ok((record.markdown.clone(), record.readonly))
+        }
+
+        fn update_note_content(
+            &self,
+            note_id: &str,
+            title: &str,
+            markdown: &str,
+            now: i64,
+        ) -> Result<(), NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            if let Some(record) = notes.get_mut(note_id) {
+                record.title = title.to_string();
+                record.markdown = markdown.to_string();
+                record.modified_at = now;
+            }
+            Ok(())
+        }
+
+        fn update_note_title_only(
+            &self,
+            note_id: &str,
+            title: &str,
+            markdown: &str,
+        ) -> Result<(), NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            if let Some(record) = notes.get_mut(note_id) {
+                record.title = title.to_string();
+                record.markdown = markdown.to_string();
+            }
+            Ok(())
+        }
+
+        // Remaining trait methods are not needed for the tests below.
+        fn note_is_active(&self, _: &str) -> Result<bool, NoteError> { unimplemented!() }
+        fn next_active_note_id(&self, _: Option<&str>) -> Result<Option<String>, NoteError> { unimplemented!() }
+        fn note_markdown_and_notebook(&self, _: &str) -> Result<(String, Option<String>), NoteError> { unimplemented!() }
+        fn tags_for_note(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
+        fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> { unimplemented!() }
+        fn set_readonly(&self, _: &str, _: bool, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn archive_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn restore_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn trash_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn restore_from_trash(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn pin_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn unpin_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn assign_notebook(&self, _: &str, _: Option<&str>, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn delete_note(&self, _: &str) -> Result<usize, NoteError> { unimplemented!() }
+        fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError> { unimplemented!() }
+        fn delete_trashed_notes(&self) -> Result<(), NoteError> { unimplemented!() }
+        fn delete_search_document(&self, _: &str) -> Result<(), NoteError> { unimplemented!() }
+        fn query_note_page(&self, _: &NoteQueryInput) -> Result<NotePagePayload, NoteError> { unimplemented!() }
+        fn search_notes(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> { unimplemented!() }
+        fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
+        fn query_contextual_tags(&self, _: &ContextualTagsInput) -> Result<ContextualTagsPayload, NoteError> { unimplemented!() }
+        fn todo_count(&self) -> Result<i64, NoteError> { unimplemented!() }
+        fn export_notes(&self, _: &ExportNotesInput) -> Result<usize, NoteError> { unimplemented!() }
+        fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> { unimplemented!() }
+        fn insert_notebook(&self, _: &str, _: &str, _: i64) -> Result<(), NoteError> { unimplemented!() }
+        fn notebook_by_id(&self, _: &str) -> Result<Option<NotebookSummary>, NoteError> { unimplemented!() }
+        fn rename_notebook(&self, _: &str, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
+        fn delete_notebook(&self, _: &str) -> Result<usize, NoteError> { unimplemented!() }
+        fn notebook_exists(&self, _: &str) -> Result<bool, NoteError> { unimplemented!() }
+        fn current_npub(&self) -> Result<String, NoteError> { unimplemented!() }
+    }
+
+    // ── create_note ─────────────────────────────────────────────────────
+
+    #[test]
+    fn create_note_inserts_and_returns_record() {
+        let repo = MockNoteRepository::new();
+
+        let record = NoteService::create_note(&repo, None, &[], None)
+            .expect("create_note should succeed");
+
+        assert!(record.id.starts_with("note-"));
+        assert!(record.markdown.starts_with("# "));
+        assert!(!record.readonly);
+        assert!(record.notebook_id.is_none());
+        // Verify it was stored
+        assert!(repo.notes.borrow().contains_key(&record.id));
+    }
+
+    #[test]
+    fn create_note_with_notebook() {
+        let repo = MockNoteRepository::new();
+
+        let record = NoteService::create_note(&repo, Some("nb-1"), &[], None)
+            .expect("create_note should succeed");
+
+        assert_eq!(record.notebook_id.as_deref(), Some("nb-1"));
+    }
+
+    #[test]
+    fn create_note_with_initial_markdown() {
+        let repo = MockNoteRepository::new();
+
+        let record = NoteService::create_note(
+            &repo,
+            None,
+            &[],
+            Some("# Imported\n\nContent here"),
+        )
+        .expect("create_note should succeed");
+
+        assert_eq!(record.title, "Imported");
+        assert!(record.markdown.contains("Content here"));
+    }
+
+    #[test]
+    fn create_note_sets_last_open_note_id() {
+        let repo = MockNoteRepository::new();
+
+        let record = NoteService::create_note(&repo, None, &[], None).unwrap();
+
+        assert_eq!(
+            repo.last_open_note_id.borrow().as_deref(),
+            Some(record.id.as_str())
+        );
+    }
+
+    // ── save_note ───────────────────────────────────────────────────────
+
+    #[test]
+    fn save_note_rejects_readonly_note() {
+        let record = NoteRecord {
+            id: "note-ro".to_string(),
+            title: "Locked".to_string(),
+            markdown: "# Locked".to_string(),
+            modified_at: 1000,
+            notebook_id: None,
+            notebook_name: None,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: true,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new().with_note(record);
+
+        let result = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "note-ro".to_string(),
+                markdown: "# Changed".to_string(),
+            },
+        );
+
+        assert!(matches!(result, Err(NoteError::ReadOnly)));
+    }
+
+    #[test]
+    fn save_note_detects_content_changed() {
+        let record = NoteRecord {
+            id: "note-1".to_string(),
+            title: "Original".to_string(),
+            markdown: "# Original\n\nOld body".to_string(),
+            modified_at: 1000,
+            notebook_id: None,
+            notebook_name: None,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new().with_note(record);
+
+        let (_, changed) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "note-1".to_string(),
+                markdown: "# Original\n\nNew body".to_string(),
+            },
+        )
+        .expect("save should succeed");
+
+        assert!(changed);
+    }
+
+    #[test]
+    fn save_note_detects_no_content_change() {
+        let markdown = "# Same\n\nSame body".to_string();
+        let record = NoteRecord {
+            id: "note-2".to_string(),
+            title: "Same".to_string(),
+            markdown: markdown.clone(),
+            modified_at: 1000,
+            notebook_id: None,
+            notebook_name: None,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new().with_note(record);
+
+        let (_, changed) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "note-2".to_string(),
+                markdown,
+            },
+        )
+        .expect("save should succeed");
+
+        assert!(!changed);
+    }
+
+    #[test]
+    fn save_note_rejects_invalid_id() {
+        let repo = MockNoteRepository::new();
+
+        let result = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "../escape".to_string(),
+                markdown: "# Hack".to_string(),
+            },
+        );
+
+        assert!(matches!(result, Err(NoteError::InvalidNoteId)));
+    }
+}

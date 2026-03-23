@@ -289,3 +289,199 @@ pub fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedE
         .tags(tags)
         .build(pubkey)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_pubkey() -> PublicKey {
+        Keys::generate().public_key()
+    }
+
+    // ── Note roundtrip ──────────────────────────────────────────────────
+
+    #[test]
+    fn note_roundtrip_preserves_all_fields() {
+        let pubkey = test_pubkey();
+        let note_id = "note-1234";
+        let title = "Trail Report";
+        let markdown = "# Trail Report\n\nSaw a bear.";
+        let modified_at: i64 = 1_700_000_000_000;
+        let edited_at: i64 = 1_700_000_001_000;
+        let created_at: i64 = 1_699_999_000_000;
+        let notebook_id = Some("notebook-42");
+        let archived_at = Some(1_700_000_100_000_i64);
+        let deleted_at = None;
+        let pinned_at = Some(1_700_000_200_000_i64);
+        let readonly = true;
+        let tags = vec!["hiking".to_string(), "wildlife".to_string()];
+
+        let rumor = note_to_rumor(
+            note_id,
+            title,
+            markdown,
+            modified_at,
+            edited_at,
+            created_at,
+            notebook_id,
+            archived_at,
+            deleted_at,
+            pinned_at,
+            readonly,
+            &tags,
+            &[],
+            pubkey,
+        );
+
+        let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+
+        assert_eq!(parsed.id, note_id);
+        assert_eq!(parsed.title, title);
+        // Content is reconstructed with title prefix
+        assert!(parsed.markdown.starts_with("# Trail Report"));
+        assert!(parsed.markdown.contains("Saw a bear."));
+        assert_eq!(parsed.modified_at, modified_at);
+        assert_eq!(parsed.edited_at, edited_at);
+        assert_eq!(parsed.created_at, created_at);
+        assert_eq!(parsed.notebook_id.as_deref(), notebook_id);
+        assert_eq!(parsed.archived_at, archived_at);
+        assert_eq!(parsed.deleted_at, deleted_at);
+        assert_eq!(parsed.pinned_at, pinned_at);
+        assert!(parsed.readonly);
+        assert_eq!(parsed.tags, tags);
+    }
+
+    #[test]
+    fn note_roundtrip_minimal_fields() {
+        let pubkey = test_pubkey();
+        let rumor = note_to_rumor(
+            "note-min",
+            "",
+            "",
+            1_000,
+            1_000,
+            1_000,
+            None,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
+        );
+
+        let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+        assert_eq!(parsed.id, "note-min");
+        assert_eq!(parsed.title, "");
+        assert!(!parsed.readonly);
+        assert!(parsed.notebook_id.is_none());
+        assert!(parsed.archived_at.is_none());
+        assert!(parsed.deleted_at.is_none());
+        assert!(parsed.pinned_at.is_none());
+        assert!(parsed.tags.is_empty());
+    }
+
+    // ── Notebook roundtrip ──────────────────────────────────────────────
+
+    #[test]
+    fn notebook_roundtrip_preserves_all_fields() {
+        let pubkey = test_pubkey();
+        let notebook_id = "notebook-99";
+        let name = "Field Notes";
+        let updated_at: i64 = 1_700_000_000_000;
+
+        let rumor = notebook_to_rumor(notebook_id, name, updated_at, pubkey);
+        let parsed = rumor_to_synced_notebook(&rumor).expect("parse should succeed");
+
+        assert_eq!(parsed.id, notebook_id);
+        assert_eq!(parsed.name, name);
+        assert_eq!(parsed.updated_at, updated_at);
+    }
+
+    // ── is_notebook_rumor ───────────────────────────────────────────────
+
+    #[test]
+    fn is_notebook_rumor_true_for_notebooks() {
+        let pubkey = test_pubkey();
+        let rumor = notebook_to_rumor("nb-1", "Name", 1000, pubkey);
+        assert!(is_notebook_rumor(&rumor));
+    }
+
+    #[test]
+    fn is_notebook_rumor_false_for_notes() {
+        let pubkey = test_pubkey();
+        let rumor = note_to_rumor(
+            "note-1", "Title", "# Title\n\nBody", 1000, 1000, 1000,
+            None, None, None, None, false, &[], &[], pubkey,
+        );
+        assert!(!is_notebook_rumor(&rumor));
+    }
+
+    // ── is_deleted_rumor ────────────────────────────────────────────────
+
+    #[test]
+    fn is_deleted_rumor_true_for_deletion_tombstones() {
+        let pubkey = test_pubkey();
+        let rumor = deleted_note_rumor("note-del", pubkey);
+        assert!(is_deleted_rumor(&rumor));
+    }
+
+    #[test]
+    fn is_deleted_rumor_false_for_normal_notes() {
+        let pubkey = test_pubkey();
+        let rumor = note_to_rumor(
+            "note-1", "Title", "# Title", 1000, 1000, 1000,
+            None, None, None, None, false, &[], &[], pubkey,
+        );
+        assert!(!is_deleted_rumor(&rumor));
+    }
+
+    #[test]
+    fn is_deleted_rumor_true_for_notebook_deletion() {
+        let pubkey = test_pubkey();
+        let rumor = deleted_notebook_rumor("nb-del", pubkey);
+        assert!(is_deleted_rumor(&rumor));
+    }
+
+    // ── deleted_note_rumor ──────────────────────────────────────────────
+
+    #[test]
+    fn deleted_note_rumor_has_correct_d_tag() {
+        let pubkey = test_pubkey();
+        let rumor = deleted_note_rumor("note-xyz", pubkey);
+
+        let d_tag = rumor
+            .tags
+            .find(TagKind::d())
+            .and_then(|t| t.content())
+            .map(str::to_string);
+        assert_eq!(d_tag, Some("note-xyz".to_string()));
+    }
+
+    #[test]
+    fn deleted_note_rumor_has_deleted_true_tag() {
+        let pubkey = test_pubkey();
+        let rumor = deleted_note_rumor("note-xyz", pubkey);
+
+        let deleted_val = rumor
+            .tags
+            .find(TagKind::custom("deleted"))
+            .and_then(|t| t.content())
+            .map(str::to_string);
+        assert_eq!(deleted_val, Some("true".to_string()));
+    }
+
+    #[test]
+    fn deleted_note_rumor_has_note_type_tag() {
+        let pubkey = test_pubkey();
+        let rumor = deleted_note_rumor("note-xyz", pubkey);
+
+        let type_val = rumor
+            .tags
+            .find(TagKind::custom("type"))
+            .and_then(|t| t.content())
+            .map(str::to_string);
+        assert_eq!(type_val, Some("note".to_string()));
+    }
+}
