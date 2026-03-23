@@ -34,7 +34,7 @@ const $createTableCell = (textContent: string): TableCellNode => {
 };
 
 const mapToTableCells = (textContent: string): Array<TableCellNode> | null => {
-  const match = textContent.match(TABLE_ROW_REG_EXP);
+  const match = TABLE_ROW_REG_EXP.exec(textContent);
   if (!match || !match[1]) {
     return null;
   }
@@ -44,6 +44,96 @@ const mapToTableCells = (textContent: string): Array<TableCellNode> | null => {
 function getTableColumnsSize(table: TableNode) {
   const row = table.getFirstChild();
   return $isTableRowNode(row) ? row.getChildrenSize() : 0;
+}
+
+function handleTableDividerRow(parentNode: LexicalNode): boolean {
+  const table = parentNode.getPreviousSibling();
+  if (!table || !$isTableNode(table)) return false;
+
+  const rows = table.getChildren();
+  const lastRow = rows.at(-1);
+  if (!lastRow || !$isTableRowNode(lastRow)) return false;
+
+  for (const cell of lastRow.getChildren()) {
+    if (!$isTableCellNode(cell)) continue;
+    cell.setHeaderStyles(
+      TableCellHeaderStates.ROW,
+      TableCellHeaderStates.ROW,
+    );
+  }
+
+  parentNode.remove();
+  return true;
+}
+
+function collectPrecedingTableRows(
+  parentNode: LexicalNode,
+  initialCells: TableCellNode[],
+): { rows: TableCellNode[][]; maxCells: number } {
+  const rows = [initialCells];
+  let sibling = parentNode.getPreviousSibling();
+  let maxCells = initialCells.length;
+
+  while (sibling) {
+    if (!$isParagraphNode(sibling) || sibling.getChildrenSize() !== 1) break;
+
+    const firstChild = sibling.getFirstChild();
+    if (!$isTextNode(firstChild)) break;
+
+    const cells = mapToTableCells(firstChild.getTextContent());
+    if (cells == null) break;
+
+    maxCells = Math.max(maxCells, cells.length);
+    rows.unshift(cells);
+    const previousSibling = sibling.getPreviousSibling();
+    sibling.remove();
+    sibling = previousSibling;
+  }
+
+  return { rows, maxCells };
+}
+
+function buildTableNode(
+  rows: TableCellNode[][],
+  maxCells: number,
+): TableNode {
+  const table = $createTableNode();
+  for (const cells of rows) {
+    const tableRow = $createTableRowNode();
+    table.append(tableRow);
+    for (let i = 0; i < maxCells; i++) {
+      tableRow.append(i < cells.length ? cells[i] : $createTableCell(""));
+    }
+  }
+  return table;
+}
+
+function padTableColumnsAndMerge(
+  table: TableNode,
+  parentNode: LexicalNode,
+  maxCells: number,
+): void {
+  const previousSibling = parentNode.getPreviousSibling();
+  const previousColumns = $isTableNode(previousSibling)
+    ? getTableColumnsSize(previousSibling)
+    : 0;
+  const targetColumns = Math.max(previousColumns, maxCells);
+
+  if (targetColumns > maxCells) {
+    for (const row of table.getChildren()) {
+      if (!$isTableRowNode(row)) continue;
+      for (let i = row.getChildrenSize(); i < targetColumns; i++) {
+        row.append($createTableCell(""));
+      }
+    }
+  }
+
+  if ($isTableNode(previousSibling) && previousColumns === targetColumns) {
+    previousSibling.append(...table.getChildren());
+    parentNode.remove();
+  } else {
+    parentNode.replace(table);
+  }
 }
 
 export const TABLE: ElementTransformer = {
@@ -87,105 +177,20 @@ export const TABLE: ElementTransformer = {
   regExp: TABLE_ROW_REG_EXP,
   replace: (parentNode, _1, match) => {
     if (TABLE_ROW_DIVIDER_REG_EXP.test(match[0])) {
-      const table = parentNode.getPreviousSibling();
-      if (!table || !$isTableNode(table)) {
-        return;
-      }
-
-      const rows = table.getChildren();
-      const lastRow = rows.at(-1);
-      if (!lastRow || !$isTableRowNode(lastRow)) {
-        return;
-      }
-
-      for (const cell of lastRow.getChildren()) {
-        if (!$isTableCellNode(cell)) {
-          continue;
-        }
-        cell.setHeaderStyles(
-          TableCellHeaderStates.ROW,
-          TableCellHeaderStates.ROW,
-        );
-      }
-
-      parentNode.remove();
+      handleTableDividerRow(parentNode);
       return;
     }
 
     const matchCells = mapToTableCells(match[0]);
+    if (matchCells == null) return;
 
-    if (matchCells == null) {
-      return;
-    }
+    const { rows, maxCells } = collectPrecedingTableRows(
+      parentNode,
+      matchCells,
+    );
 
-    const rows = [matchCells];
-    let sibling = parentNode.getPreviousSibling();
-    let maxCells = matchCells.length;
-
-    while (sibling) {
-      if (!$isParagraphNode(sibling)) {
-        break;
-      }
-
-      if (sibling.getChildrenSize() !== 1) {
-        break;
-      }
-
-      const firstChild = sibling.getFirstChild();
-
-      if (!$isTextNode(firstChild)) {
-        break;
-      }
-
-      const cells = mapToTableCells(firstChild.getTextContent());
-
-      if (cells == null) {
-        break;
-      }
-
-      maxCells = Math.max(maxCells, cells.length);
-      rows.unshift(cells);
-      const previousSibling = sibling.getPreviousSibling();
-      sibling.remove();
-      sibling = previousSibling;
-    }
-
-    const table = $createTableNode();
-
-    for (const cells of rows) {
-      const tableRow = $createTableRowNode();
-      table.append(tableRow);
-
-      for (let i = 0; i < maxCells; i++) {
-        tableRow.append(i < cells.length ? cells[i] : $createTableCell(""));
-      }
-    }
-
-    const previousSibling = parentNode.getPreviousSibling();
-    const previousColumns = $isTableNode(previousSibling)
-      ? getTableColumnsSize(previousSibling)
-      : 0;
-    const targetColumns =
-      Math.max(previousColumns, maxCells);
-
-    if (targetColumns > maxCells) {
-      for (const row of table.getChildren()) {
-        if (!$isTableRowNode(row)) {
-          continue;
-        }
-        for (let i = row.getChildrenSize(); i < targetColumns; i++) {
-          row.append($createTableCell(""));
-        }
-      }
-    }
-
-    if ($isTableNode(previousSibling) && previousColumns === targetColumns) {
-      previousSibling.append(...table.getChildren());
-      parentNode.remove();
-    } else {
-      parentNode.replace(table);
-    }
-
+    const table = buildTableNode(rows, maxCells);
+    padTableColumnsAndMerge(table, parentNode, maxCells);
     table.selectEnd();
   },
   type: "element",

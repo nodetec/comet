@@ -18,6 +18,6 @@ export function parseSingleChecklistItemContent(
     return null;
   }
 
-  const match = /^\s*[-*+]\s+\[(?: |x|X)\]\s?(.*)$/.exec(lines[start] ?? "");
+  const match = /^\s*[-*+]\s+\[(?: |[xX])\]\s?(.*)$/.exec(lines[start] ?? "");
   return match ? match[1] : null;
 }

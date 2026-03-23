@@ -1,7 +1,61 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $createParagraphNode, $getRoot, RootNode } from "lexical";
+import {
+  $createParagraphNode,
+  $getRoot,
+  type LexicalEditor,
+  type LexicalNode,
+  RootNode,
+} from "lexical";
 import { $isTableNode } from "@lexical/table";
+
+function $selectAfterTable(tableChild: LexicalNode): void {
+  const next = tableChild.getNextSibling();
+  if (next) {
+    next.selectStart();
+  } else {
+    const p = $createParagraphNode();
+    tableChild.insertAfter(p);
+    p.select();
+  }
+}
+
+function $selectBeforeTable(tableChild: LexicalNode): void {
+  const prev = tableChild.getPreviousSibling();
+  if (prev) {
+    prev.selectEnd();
+  } else {
+    const p = $createParagraphNode();
+    tableChild.insertBefore(p);
+    p.select();
+  }
+}
+
+function $findAndSelectTableSibling(
+  editor: LexicalEditor,
+  table: HTMLTableElement,
+  scrollWrapper: HTMLElement,
+  isRight: boolean,
+): void {
+  const root = $getRoot();
+  for (const child of root.getChildren()) {
+    if (!$isTableNode(child)) continue;
+
+    const domElement = editor.getElementByKey(child.getKey());
+    if (
+      domElement === table ||
+      domElement?.querySelector("table") === table ||
+      domElement === scrollWrapper
+    ) {
+      if (isRight) {
+        $selectAfterTable(child);
+      } else {
+        $selectBeforeTable(child);
+      }
+      return;
+    }
+  }
+}
 
 export default function TableClickOutsidePlugin(): null {
   const [editor] = useLexicalComposerContext();
@@ -49,53 +103,27 @@ export default function TableClickOutsidePlugin(): null {
         if (!scrollWrapper) continue;
 
         const wrapperRect = scrollWrapper.getBoundingClientRect();
+        const isInVerticalRange =
+          clickY >= wrapperRect.top && clickY <= wrapperRect.bottom;
+        if (!isInVerticalRange) continue;
 
-        if (clickY >= wrapperRect.top && clickY <= wrapperRect.bottom) {
-          const isClickToRight = clickX > wrapperRect.right;
-          const isClickToLeft = clickX < wrapperRect.left;
+        const isClickToRight = clickX > wrapperRect.right;
+        const isClickToLeft = clickX < wrapperRect.left;
+        if (!isClickToRight && !isClickToLeft) continue;
 
-          if (isClickToRight || isClickToLeft) {
-            event.preventDefault();
-            event.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
 
-            editor.update(() => {
-              const root = $getRoot();
-              for (const child of root.getChildren()) {
-                if (!$isTableNode(child)) continue;
+        editor.update(() => {
+          $findAndSelectTableSibling(
+            editor,
+            table,
+            scrollWrapper,
+            isClickToRight,
+          );
+        });
 
-                const domElement = editor.getElementByKey(child.getKey());
-                if (
-                  domElement === table ||
-                  domElement?.querySelector("table") === table ||
-                  domElement === scrollWrapper
-                ) {
-                  if (isClickToRight) {
-                    const next = child.getNextSibling();
-                    if (next) {
-                      next.selectStart();
-                    } else {
-                      const p = $createParagraphNode();
-                      child.insertAfter(p);
-                      p.select();
-                    }
-                  } else {
-                    const prev = child.getPreviousSibling();
-                    if (prev) {
-                      prev.selectEnd();
-                    } else {
-                      const p = $createParagraphNode();
-                      child.insertBefore(p);
-                      p.select();
-                    }
-                  }
-                  return;
-                }
-              }
-            });
-
-            return;
-          }
-        }
+        return;
       }
     };
 

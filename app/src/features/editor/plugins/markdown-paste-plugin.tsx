@@ -26,6 +26,7 @@ import {
   normalizeImportedNodes,
 } from "../lib/markdown";
 
+/* eslint-disable sonarjs/slow-regex -- patterns are tested against bounded clipboard content */
 // Patterns that strongly indicate markdown content
 const MARKDOWN_PATTERNS = [
   /^#{1,6}\s+\S/m, // Headings: # Heading
@@ -43,11 +44,16 @@ const MARKDOWN_PATTERNS = [
   /^\s*\*\*\*\s*$/m, // Horizontal rule (asterisks)
   /\|.+\|.+\|/, // Table row: | cell | cell |
 ];
+/* eslint-enable sonarjs/slow-regex */
 
 // Patterns that indicate it's probably NOT markdown (just plain text)
 const PLAIN_TEXT_INDICATORS = [
   /^https?:\/\/[^\s]+$/, // Single URL
 ];
+
+function isBlockLevelNode(node: LexicalNode): boolean {
+  return $isElementNode(node) || $isDecoratorNode(node);
+}
 
 function parseSingleFencedCodeBlock(
   markdown: string,
@@ -70,6 +76,7 @@ function parseSingleFencedCodeBlock(
   }
 
   const openingLine = lines[start]?.trimStart() ?? "";
+  // eslint-disable-next-line sonarjs/slow-regex -- bounded to a single line
   const openingMatch = /^(`{3,}|~{3,})(.*)$/.exec(openingLine);
   if (!openingMatch || /^(`{3,})[^`]+\1$/.test(openingLine)) {
     return null;
@@ -167,18 +174,15 @@ function isLikelyJSON(text: string): boolean {
     } catch {
       // Try stripping comments (JSONC support)
       const withoutComments = trimmed
-        .replace(/\/\/.*$/gm, "") // Remove single-line comments
-        .replace(/\/\*[\s\S]*?\*\//g, ""); // Remove multi-line comments
+        .replace(/\/\/.*$/gm, "") // eslint-disable-line sonarjs/slow-regex -- bounded clipboard content
+        .replace(/\/\*[\s\S]*?\*\//g, "");
       try {
         JSON.parse(withoutComments);
         return true;
       } catch {
         // Still not valid JSON, but if it has JSON-like structure, skip markdown
         // Check for typical JSON patterns: "key": value
-        if (/"[^"]+"\s*:\s*/.test(trimmed)) {
-          return true;
-        }
-        return false;
+        return /"[^"]+"\s*:\s*/.test(trimmed);
       }
     }
   }
@@ -363,9 +367,7 @@ export default function MarkdownPastePlugin() {
           normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
           // Filter to block-level nodes only — $generateNodesFromDOM may
           // produce stray TextNodes from whitespace between HTML tags
-          const filteredNodes = allNodes.filter(
-            (node) => $isElementNode(node) || $isDecoratorNode(node),
-          );
+          const filteredNodes = allNodes.filter(isBlockLevelNode);
           const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
           insertBlockNodes(nodes);
         });

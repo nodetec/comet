@@ -54,7 +54,7 @@ export default function LinkClickPlugin() {
         return;
       }
 
-      const targetElement = document.getElementById(targetId);
+      const targetElement = document.querySelector(`#${CSS.escape(targetId)}`);
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
       }

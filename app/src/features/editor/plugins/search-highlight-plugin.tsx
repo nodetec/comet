@@ -27,13 +27,108 @@ function clearHighlights() {
 }
 
 function getOrCreateStyleElement() {
-  let style = document.getElementById(HIGHLIGHT_STYLE_ID) as HTMLStyleElement;
+  let style = document.querySelector(`#${HIGHLIGHT_STYLE_ID}`) as HTMLStyleElement;
   if (!style) {
     style = document.createElement("style");
     style.id = HIGHLIGHT_STYLE_ID;
     document.head.append(style);
   }
   return style;
+}
+
+function collectSearchRanges(
+  root: HTMLElement,
+  searchWords: string[],
+): Range[] {
+  const escaped = searchWords.map((word) =>
+    word.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`),
+  );
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+  const ranges: Range[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+
+  let textNode: Text | null;
+  while ((textNode = walker.nextNode() as Text | null)) {
+    const text = textNode.textContent || "";
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      const range = document.createRange();
+      range.setStart(textNode, match.index);
+      range.setEnd(textNode, match.index + match[0].length);
+      ranges.push(range);
+    }
+  }
+
+  return ranges;
+}
+
+function applyHighlightRanges(
+  highlights: Map<string, Highlight>,
+  ranges: Range[],
+  highlightAllMatchesYellow: boolean,
+  activeMatchIndex: number | null | undefined,
+): void {
+  if (highlightAllMatchesYellow) {
+    highlights.delete(HIGHLIGHT_NAME);
+    highlights.set(ACTIVE_HIGHLIGHT_NAME, new Highlight(...ranges));
+    return;
+  }
+
+  const hasActiveMatch =
+    activeMatchIndex != null &&
+    activeMatchIndex >= 0 &&
+    activeMatchIndex < ranges.length;
+  const inactiveRanges = hasActiveMatch
+    ? ranges.filter((_, index) => index !== activeMatchIndex)
+    : ranges;
+
+  if (inactiveRanges.length > 0) {
+    highlights.set(HIGHLIGHT_NAME, new Highlight(...inactiveRanges));
+  } else {
+    highlights.delete(HIGHLIGHT_NAME);
+  }
+
+  if (hasActiveMatch) {
+    highlights.set(
+      ACTIVE_HIGHLIGHT_NAME,
+      new Highlight(ranges[activeMatchIndex]),
+    );
+  } else {
+    highlights.delete(ACTIVE_HIGHLIGHT_NAME);
+  }
+}
+
+function scrollToMatch(
+  currentRoot: HTMLElement,
+  ranges: Range[],
+  highlightAllMatchesYellow: boolean,
+  activeMatchIndex: number | null | undefined,
+): void {
+  const hasActiveMatch =
+    !highlightAllMatchesYellow &&
+    activeMatchIndex != null &&
+    activeMatchIndex >= 0 &&
+    activeMatchIndex < ranges.length;
+  const targetRange = hasActiveMatch ? ranges[activeMatchIndex] : ranges[0];
+  const scrollContainer = currentRoot.closest(
+    "[data-editor-scroll-container]",
+  );
+  if (!scrollContainer) return;
+
+  const scrollRect = scrollContainer.getBoundingClientRect();
+  const targetRect = targetRange.getBoundingClientRect();
+  const hasVisibleMatch =
+    targetRect.bottom > scrollRect.top &&
+    targetRect.top < scrollRect.bottom;
+
+  if (hasVisibleMatch) return;
+
+  const scrollTop =
+    scrollContainer.scrollTop +
+    targetRect.top -
+    scrollRect.top -
+    scrollRect.height / 3;
+  scrollContainer.scrollTo({ top: scrollTop, behavior: "instant" });
 }
 
 export default function SearchHighlightPlugin({
@@ -115,27 +210,7 @@ export default function SearchHighlightPlugin({
         return;
       }
 
-      const escaped = searchWords.map((word) =>
-        word.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`),
-      );
-      const regex = new RegExp(`(${escaped.join("|")})`, "gi");
-      const ranges: Range[] = [];
-      const walker = document.createTreeWalker(
-        currentRoot,
-        NodeFilter.SHOW_TEXT,
-      );
-
-      let textNode: Text | null;
-      while ((textNode = walker.nextNode() as Text | null)) {
-        const text = textNode.textContent || "";
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(text)) !== null) {
-          const range = document.createRange();
-          range.setStart(textNode, match.index);
-          range.setEnd(textNode, match.index + match[0].length);
-          ranges.push(range);
-        }
-      }
+      const ranges = collectSearchRanges(currentRoot, searchWords);
 
       onMatchCountChange?.(ranges.length);
       if (ranges.length === 0) {
@@ -143,68 +218,24 @@ export default function SearchHighlightPlugin({
         return;
       }
 
-      if (highlightAllMatchesYellow) {
-        highlights.delete(HIGHLIGHT_NAME);
-        highlights.set(ACTIVE_HIGHLIGHT_NAME, new Highlight(...ranges));
-      } else {
-        const hasActiveMatch =
-          activeMatchIndex !== null &&
-          activeMatchIndex >= 0 &&
-          activeMatchIndex < ranges.length;
-        const inactiveRanges = hasActiveMatch
-          ? ranges.filter((_, index) => index !== activeMatchIndex)
-          : ranges;
-
-        if (inactiveRanges.length > 0) {
-          highlights.set(HIGHLIGHT_NAME, new Highlight(...inactiveRanges));
-        } else {
-          highlights.delete(HIGHLIGHT_NAME);
-        }
-
-        if (hasActiveMatch) {
-          highlights.set(
-            ACTIVE_HIGHLIGHT_NAME,
-            new Highlight(ranges[activeMatchIndex]),
-          );
-        } else {
-          highlights.delete(ACTIVE_HIGHLIGHT_NAME);
-        }
-      }
+      applyHighlightRanges(
+        highlights,
+        ranges,
+        highlightAllMatchesYellow,
+        activeMatchIndex,
+      );
 
       if (!shouldScrollRef.current) {
         return;
       }
 
       shouldScrollRef.current = false;
-      const hasActiveMatch =
-        !highlightAllMatchesYellow &&
-        activeMatchIndex !== null &&
-        activeMatchIndex >= 0 &&
-        activeMatchIndex < ranges.length;
-      const targetRange = hasActiveMatch ? ranges[activeMatchIndex] : ranges[0];
-      const scrollContainer = currentRoot.closest(
-        "[data-editor-scroll-container]",
+      scrollToMatch(
+        currentRoot,
+        ranges,
+        highlightAllMatchesYellow,
+        activeMatchIndex,
       );
-      if (!scrollContainer) {
-        return;
-      }
-
-      const scrollRect = scrollContainer.getBoundingClientRect();
-      const targetRect = targetRange.getBoundingClientRect();
-      const hasVisibleMatch =
-        targetRect.bottom > scrollRect.top &&
-        targetRect.top < scrollRect.bottom;
-
-      if (hasVisibleMatch) {
-        return;
-      }
-
-      const scrollTop =
-        scrollContainer.scrollTop +
-        targetRect.top -
-        scrollRect.top -
-        scrollRect.height / 3;
-      scrollContainer.scrollTo({ top: scrollTop, behavior: "instant" });
     };
 
     apply();

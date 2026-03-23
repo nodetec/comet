@@ -13,6 +13,38 @@ import {
 
 import type { PublishNoteInput, PublishShortNoteInput } from "@/shared/api/types";
 
+function useTagEditor(initialTags: string[]) {
+  const [tags, setTags] = useState<string[]>(initialTags);
+  const [tagInput, setTagInput] = useState("");
+
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, "").trim();
+    if (tag && !tags.includes(tag)) {
+      setTags([...tags, tag]);
+    }
+    setTagInput("");
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag));
+  };
+
+  const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addTag(tagInput);
+    } else if (
+      event.key === "Backspace" &&
+      tagInput === "" &&
+      tags.length > 0
+    ) {
+      setTags(tags.slice(0, -1));
+    }
+  };
+
+  return { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown };
+}
+
 type PublishDialogProps = {
   initialTitle: string;
   initialTags: string[];
@@ -58,33 +90,8 @@ function PublishDialogContent({
 }: Omit<PublishDialogProps, "open" | "onOpenChange">) {
   const [title, setTitle] = useState(initialTitle);
   const [image, setImage] = useState("");
-  const [tags, setTags] = useState<string[]>(initialTags);
-  const [tagInput, setTagInput] = useState("");
-
-  const addTag = (raw: string) => {
-    const tag = raw.trim().replace(/^#/, "").trim();
-    if (tag && !tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setTagInput("");
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
-
-  const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault();
-      addTag(tagInput);
-    } else if (
-      event.key === "Backspace" &&
-      tagInput === "" &&
-      tags.length > 0
-    ) {
-      setTags(tags.slice(0, -1));
-    }
-  };
+  const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
+    useTagEditor(initialTags);
 
   const handleSubmit = () => {
     onSubmit({
@@ -219,33 +226,8 @@ function PublishShortNoteDialogContent({
   pending,
   onSubmit,
 }: Omit<PublishShortNoteDialogProps, "open" | "onOpenChange">) {
-  const [tags, setTags] = useState<string[]>(initialTags);
-  const [tagInput, setTagInput] = useState("");
-
-  const addTag = (raw: string) => {
-    const tag = raw.trim().replace(/^#/, "").trim();
-    if (tag && !tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setTagInput("");
-  };
-
-  const removeTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
-
-  const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" || event.key === ",") {
-      event.preventDefault();
-      addTag(tagInput);
-    } else if (
-      event.key === "Backspace" &&
-      tagInput === "" &&
-      tags.length > 0
-    ) {
-      setTags(tags.slice(0, -1));
-    }
-  };
+  const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
+    useTagEditor(initialTags);
 
   const handleSubmit = () => {
     onSubmit({ noteId, tags });

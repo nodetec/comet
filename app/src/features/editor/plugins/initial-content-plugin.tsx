@@ -34,7 +34,12 @@ export default function InitialContentPlugin({
     }
     lastLoadKeyRef.current = loadKey;
 
-    const mode = isNew ? "new" : (markdown.trim() ? "existing" : "empty");
+    let mode: string;
+    if (isNew) {
+      mode = "new";
+    } else {
+      mode = markdown.trim() ? "existing" : "empty";
+    }
     if (import.meta.env.DEV) {
       console.log(
         `[editor:init] mode=${mode} markdown=${markdown.length} chars`,
@@ -44,7 +49,7 @@ export default function InitialContentPlugin({
     editor.update(
       () => {
         if (isNew && markdown === "- [ ] ") {
-          // Todo mode: create an empty checklist item directly
+          // Checklist mode: create an empty checklist item directly
           const root = $getRoot();
           root.clear();
           const checkList = $createListNode("check");

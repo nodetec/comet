@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/deprecation -- $nodesOfType, registerCodeHighlighting, and PrismTokenizer have no non-deprecated replacements in Lexical */
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $nodesOfType } from "lexical";

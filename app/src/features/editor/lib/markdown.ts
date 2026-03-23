@@ -111,6 +111,20 @@ function isIgnorableChecklistWrapperChild(node: LexicalNode): boolean {
   return false;
 }
 
+function isWrapperOnlyListItem(child: LexicalNode): boolean {
+  if (!$isListItemNode(child)) return false;
+
+  const children = child.getChildren();
+  const hasNestedList = children.some((grandchild) => $isListNode(grandchild));
+  if (!hasNestedList) return false;
+
+  return children.every(
+    (grandchild) =>
+      $isListNode(grandchild) ||
+      isIgnorableChecklistWrapperChild(grandchild),
+  );
+}
+
 function normalizeImportedChecklistNesting(node: LexicalNode): void {
   if ($isElementNode(node)) {
     for (const child of node.getChildren()) {
@@ -130,38 +144,17 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
       continue;
     }
 
-    const nestedLists = child
-      .getChildren()
-      .filter((grandchild): grandchild is ListNode => $isListNode(grandchild));
-    const hasOnlyNestedListContent =
-      nestedLists.length > 0 &&
-      child
-        .getChildren()
-        .every(
-          (grandchild) =>
-            $isListNode(grandchild) ||
-            isIgnorableChecklistWrapperChild(grandchild),
-        );
-
     if (
       previousItem &&
       $isListItemNode(previousItem) &&
-      hasOnlyNestedListContent
+      isWrapperOnlyListItem(child)
     ) {
+      const nestedLists = child
+        .getChildren()
+        .filter((grandchild): grandchild is ListNode => $isListNode(grandchild));
+
       for (const nestedList of nestedLists) {
         previousItem.append(nestedList);
-      }
-
-      if (import.meta.env.DEV) {
-        console.log("[editor:list-roundtrip] merged-checklist-wrapper", {
-          previousText: previousItem.getTextContent(),
-          nestedListTypes: nestedLists.map((nestedList) =>
-            nestedList.getListType(),
-          ),
-          wrapperChildren: child
-            .getChildren()
-            .map((grandchild) => grandchild.getType()),
-        });
       }
 
       child.remove();
@@ -187,14 +180,60 @@ function getCodeBlockSignature(
   language: string | null | undefined,
   text: string,
 ): string {
+  // eslint-disable-next-line sonarjs/slow-regex -- input is bounded to a single code block's text content
   return `${normalizeCodeBlockLanguage(language)}\u0000${text.replace(/\n+$/, "")}`;
+}
+
+function parseFencedCodeBlock(
+  lines: string[],
+  startIndex: number,
+  fenceMatch: RegExpExecArray,
+  trimmed: string,
+): { block: FencedCodeBlock; endIndex: number } {
+  const fenceChar = fenceMatch[1][0];
+  const fenceLen = fenceMatch[1].length;
+  const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
+  const closeFenceRe = new RegExp(
+    String.raw`^[ \t]*${escapedFenceChar}{${fenceLen},}[ \t]*$`,
+  );
+
+  let end = startIndex + 1;
+  while (end < lines.length && !closeFenceRe.test(lines[end])) {
+    end++;
+  }
+
+  const contentLines = lines.slice(startIndex + 1, end);
+  let trailingBlankLines = 0;
+  for (let j = contentLines.length - 1; j >= 0; j--) {
+    if (contentLines[j].trim() !== "") {
+      break;
+    }
+    trailingBlankLines++;
+  }
+
+  const baseLines =
+    trailingBlankLines > 0
+      ? contentLines.slice(0, contentLines.length - trailingBlankLines)
+      : contentLines;
+  const text = baseLines.join("\n") + "\n".repeat(trailingBlankLines);
+  const info = trimmed.slice(fenceMatch[1].length).trim();
+  const language =
+    info.length > 0
+      ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0])
+      : "";
+
+  return {
+    block: { signature: getCodeBlockSignature(language, text), text },
+    endIndex: end,
+  };
 }
 
 function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
   const lines = markdown.split("\n");
   const blocks: FencedCodeBlock[] = [];
+  let i = 0;
 
-  for (let i = 0; i < lines.length; i++) {
+  while (i < lines.length) {
     const line = lines[i];
     const trimmed = line.trimStart();
 
@@ -203,50 +242,24 @@ function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
         signature: getCodeBlockSignature("", ""),
         text: "",
       });
+      i++;
       continue;
     }
 
     const match = CODE_FENCE_RE.exec(trimmed);
     if (!match) {
+      i++;
       continue;
     }
 
-    const fenceChar = match[1][0];
-    const fenceLen = match[1].length;
-    const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
-    const closeFenceRe = new RegExp(
-      String.raw`^[ \t]*${escapedFenceChar}{${fenceLen},}[ \t]*$`,
+    const { block, endIndex } = parseFencedCodeBlock(
+      lines,
+      i,
+      match,
+      trimmed,
     );
-
-    let end = i + 1;
-    while (end < lines.length && !closeFenceRe.test(lines[end])) {
-      end++;
-    }
-
-    const contentLines = lines.slice(i + 1, end);
-    let trailingBlankLines = 0;
-    for (let j = contentLines.length - 1; j >= 0; j--) {
-      if (contentLines[j].trim() !== "") {
-        break;
-      }
-      trailingBlankLines++;
-    }
-
-    const baseLines =
-      trailingBlankLines > 0
-        ? contentLines.slice(0, contentLines.length - trailingBlankLines)
-        : contentLines;
-    const text = baseLines.join("\n") + "\n".repeat(trailingBlankLines);
-    const info = trimmed.slice(match[1].length).trim();
-    const language =
-      info.length > 0
-        ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0])
-        : "";
-    blocks.push({
-      signature: getCodeBlockSignature(language, text),
-      text,
-    });
-    i = end;
+    blocks.push(block);
+    i = endIndex + 1;
   }
 
   return blocks;
@@ -352,6 +365,44 @@ export function $importMarkdownFromHTML(
  * are separated by `\n` (no extra blank line — the empty paragraph nodes
  * provide the visual spacing, matching Bear/Obsidian behavior).
  */
+/**
+ * Split Lexical's exported markdown string into content blocks,
+ * respecting code fences (uses \n\n between them).
+ */
+function splitExportedIntoBlocks(exported: string): string[] {
+  const exportedBlocks: string[] = [];
+  const exportedLines = exported.split("\n");
+  let currentBlock: string[] = [];
+  let exportFence: FenceState = null;
+  let i = 0;
+
+  while (i < exportedLines.length) {
+    const line = exportedLines[i];
+    exportFence = updateFenceState(line, exportFence);
+
+    if (exportFence === null && line.trim() === "" && currentBlock.length > 0) {
+      // Skip consecutive blank lines outside fences
+      while (
+        i + 1 < exportedLines.length &&
+        exportedLines[i + 1].trim() === ""
+      ) {
+        i++;
+      }
+      exportedBlocks.push(currentBlock.join("\n"));
+      currentBlock = [];
+    } else {
+      currentBlock.push(line);
+    }
+    i++;
+  }
+
+  if (currentBlock.length > 0) {
+    exportedBlocks.push(currentBlock.join("\n"));
+  }
+
+  return exportedBlocks;
+}
+
 export function $exportMarkdown(transformers: Array<Transformer>): string {
   const root = $getRoot();
   const children = root.getChildren();
@@ -365,61 +416,26 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
     if (!empty) contentCount++;
   }
 
-  // Export content blocks via Lexical (loses empties, but gives correct
-  // markdown for content blocks).
   const exported = $convertToMarkdownStringNormalized(
     transformers,
     undefined,
     false,
   );
 
-  // Split Lexical's export into blocks (it uses \n\n between them),
-  // respecting code fences.
-  const exportedBlocks: string[] = [];
-  const exportedLines = exported.split("\n");
-  let currentBlock: string[] = [];
-  let exportFence: FenceState = null;
-
-  for (let i = 0; i < exportedLines.length; i++) {
-    const line = exportedLines[i];
-    exportFence = updateFenceState(line, exportFence);
-
-    if (exportFence === null && line.trim() === "" && currentBlock.length > 0) {
-      while (
-        i + 1 < exportedLines.length &&
-        exportedLines[i + 1].trim() === ""
-      ) {
-        i++;
-      }
-      exportedBlocks.push(currentBlock.join("\n"));
-      currentBlock = [];
-    } else {
-      currentBlock.push(line);
-    }
-  }
-  if (currentBlock.length > 0) {
-    exportedBlocks.push(currentBlock.join("\n"));
-  }
+  const exportedBlocks = splitExportedIntoBlocks(exported);
 
   if (exportedBlocks.length !== contentCount) {
     return exported;
   }
 
-  // Assemble: content blocks are separated by \n\n (standard markdown).
-  // Empty paragraphs add an extra \n per empty paragraph.
-  // So [content, content] → "A\n\nB"
-  //    [content, empty, content] → "A\n\n\nB"
-  //    [content, empty, empty, content] → "A\n\n\n\nB"
   let result = "";
   let blockIdx = 0;
 
   for (let i = 0; i < children.length; i++) {
     if (isEmpty[i]) {
-      // Each empty paragraph adds one \n beyond the standard separator
       result += "\n";
     } else {
       if (blockIdx > 0) {
-        // Standard \n\n separator between content blocks
         result += "\n\n";
       }
       result += exportedBlocks[blockIdx];
@@ -452,11 +468,12 @@ export function $exportMarkdownForClipboard(
   let blankRun = 0;
 
   const flushBlankRun = (insideFence: boolean) => {
-    const output = insideFence
-      ? blankRun
-      : (blankRun <= 1
-        ? blankRun
-        : blankRun - 1);
+    let output: number;
+    if (insideFence) {
+      output = blankRun;
+    } else {
+      output = blankRun <= 1 ? blankRun : blankRun - 1;
+    }
     for (let j = 0; j < output; j++) {
       result.push("");
     }

@@ -176,6 +176,97 @@ function exportChildren(
   return output.join("");
 }
 
+function computeOpeningTags(
+  node: TextNode,
+  prevNode: TextNode | null,
+  textTransformers: Array<TextFormatTransformer>,
+  unclosedTags: Array<UnclosedTag>,
+): string {
+  let openingTags = "";
+  const applied = new Set<TextFormatType>();
+
+  for (const transformer of textTransformers) {
+    const format = transformer.format[0];
+    const tag = transformer.tag;
+
+    if (checkHasFormat(node, format) && !applied.has(format)) {
+      applied.add(format);
+
+      if (
+        !checkHasFormat(prevNode, format) ||
+        !unclosedTags.some((element) => element.tag === tag)
+      ) {
+        unclosedTags.push({ format, tag });
+        openingTags += tag;
+      }
+    }
+  }
+
+  return openingTags;
+}
+
+function popClosingTags(
+  unclosedTags: Array<UnclosedTag>,
+  unclosableTags: Array<UnclosedTag> | undefined,
+  startIndex: number,
+  nodeHasFormat: boolean,
+  nextNodeHasFormat: boolean,
+): { closingTagsBefore: string; closingTagsAfter: string } {
+  let closingTagsBefore = "";
+  let closingTagsAfter = "";
+  const unhandledUnclosedTags = [...unclosedTags];
+
+  while (unhandledUnclosedTags.length > startIndex) {
+    const unclosedTag = unhandledUnclosedTags.pop();
+
+    if (
+      unclosableTags &&
+      unclosedTag &&
+      unclosableTags.some((element) => element.tag === unclosedTag.tag)
+    ) {
+      continue;
+    }
+
+    if (unclosedTag) {
+      if (!nodeHasFormat) {
+        closingTagsBefore += unclosedTag.tag;
+      } else if (!nextNodeHasFormat) {
+        closingTagsAfter += unclosedTag.tag;
+      }
+    }
+
+    unclosedTags.pop();
+  }
+
+  return { closingTagsBefore, closingTagsAfter };
+}
+
+function computeClosingTags(
+  node: TextNode,
+  nextNode: TextNode | null,
+  unclosedTags: Array<UnclosedTag>,
+  unclosableTags: Array<UnclosedTag> | undefined,
+): { closingTagsBefore: string; closingTagsAfter: string } {
+  for (let i = 0; i < unclosedTags.length; i++) {
+    const nodeHasFormat = hasFormat(node, unclosedTags[i].format);
+    const nextNodeHasFormat = hasFormat(nextNode, unclosedTags[i].format);
+
+    if (nodeHasFormat && nextNodeHasFormat) {
+      continue;
+    }
+
+    return popClosingTags(
+      unclosedTags,
+      unclosableTags,
+      i,
+      nodeHasFormat,
+      nextNodeHasFormat,
+    );
+  }
+
+  return { closingTagsBefore: "", closingTagsAfter: "" };
+}
+
 function exportTextFormat(
   node: TextNode,
   textContent: string,
@@ -191,71 +282,31 @@ function exportTextFormat(
     output = output.replace(/([*_`~\\])/g, String.raw`\$1`);
   }
 
-  const match = output.match(/^(\s*)(.*?)(\s*)$/s) ?? ["", "", output, ""];
-  const leadingSpace = match[1];
-  const trimmedOutput = match[2];
-  const trailingSpace = match[3];
+  // Extract leading/trailing whitespace without regex (avoids slow-regex lint)
+  let leadStart = 0;
+  while (leadStart < output.length && /\s/.test(output[leadStart])) leadStart++;
+  let trailEnd = output.length;
+  while (trailEnd > leadStart && /\s/.test(output[trailEnd - 1])) trailEnd--;
+  const leadingSpace = output.slice(0, leadStart);
+  const trimmedOutput = output.slice(leadStart, trailEnd);
+  const trailingSpace = output.slice(trailEnd);
   const isWhitespaceOnly = trimmedOutput === "";
-
-  let openingTags = "";
-  let closingTagsBefore = "";
-  let closingTagsAfter = "";
 
   const prevNode = getTextSibling(node, true);
   const nextNode = getTextSibling(node, false);
-  const applied = new Set<TextFormatType>();
 
-  for (const transformer of textTransformers) {
-    const format = transformer.format[0];
-    const tag = transformer.tag;
-
-    if (checkHasFormat(node, format) && !applied.has(format)) {
-      applied.add(format);
-
-      if (
-        !checkHasFormat(prevNode, format) ||
-        !unclosedTags.find((element) => element.tag === tag)
-      ) {
-        unclosedTags.push({ format, tag });
-        openingTags += tag;
-      }
-    }
-  }
-
-  for (let i = 0; i < unclosedTags.length; i++) {
-    const nodeHasFormat = hasFormat(node, unclosedTags[i].format);
-    const nextNodeHasFormat = hasFormat(nextNode, unclosedTags[i].format);
-
-    if (nodeHasFormat && nextNodeHasFormat) {
-      continue;
-    }
-
-    const unhandledUnclosedTags = [...unclosedTags];
-
-    while (unhandledUnclosedTags.length > i) {
-      const unclosedTag = unhandledUnclosedTags.pop();
-
-      if (
-        unclosableTags &&
-        unclosedTag &&
-        unclosableTags.find((element) => element.tag === unclosedTag.tag)
-      ) {
-        continue;
-      }
-
-      if (unclosedTag) {
-        if (!nodeHasFormat) {
-          closingTagsBefore += unclosedTag.tag;
-        } else if (!nextNodeHasFormat) {
-          closingTagsAfter += unclosedTag.tag;
-        }
-      }
-
-      unclosedTags.pop();
-    }
-
-    break;
-  }
+  const openingTags = computeOpeningTags(
+    node,
+    prevNode,
+    textTransformers,
+    unclosedTags,
+  );
+  const { closingTagsBefore, closingTagsAfter } = computeClosingTags(
+    node,
+    nextNode,
+    unclosedTags,
+    unclosableTags,
+  );
 
   if (isWhitespaceOnly && !node.hasFormat("code")) {
     return closingTagsBefore + output;
@@ -309,7 +360,7 @@ export function $convertToMarkdownStringNormalized(
   const elementTransformers = [...byType.multilineElement, ...byType.element];
   const textTransformers = byType.textFormat
     .filter((transformer) => transformer.format.length === 1)
-    .sort(
+    .toSorted(
       (a, b) =>
         Number(a.format.includes("code")) - Number(b.format.includes("code")),
     );

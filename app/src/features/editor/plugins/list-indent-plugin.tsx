@@ -77,11 +77,7 @@ export default function ListIndentPlugin(): null {
       editor.registerCommand(
         INDENT_CONTENT_COMMAND,
         () => {
-          const handled = handleChecklistIndent();
-          if (handled === null) {
-            return false;
-          }
-          return true;
+          return handleChecklistIndent() !== null;
         },
         COMMAND_PRIORITY_CRITICAL,
       ),

@@ -1,4 +1,4 @@
-import { type MutableRefObject, useEffect } from "react";
+import { type RefObject, useEffect } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 
 import { pendingDraftStorageKey, saveNote } from "@/shared/api/invoke";
@@ -13,7 +13,7 @@ export interface DraftPersistenceDeps {
   draftMarkdown: string;
   saveNotePending: boolean;
   mutateSaveNote: (input: { id: string; markdown: string }) => void;
-  pendingSaveTimeoutRef: MutableRefObject<number | null>;
+  pendingSaveTimeoutRef: RefObject<number | null>;
   queryClient: QueryClient;
 }
 

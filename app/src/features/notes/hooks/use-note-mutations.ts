@@ -1,4 +1,4 @@
-import { type MutableRefObject } from "react";
+import type { RefObject } from "react";
 import { type QueryClient, useMutation } from "@tanstack/react-query";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
@@ -30,7 +30,7 @@ export interface NoteMutationDeps {
   noteFilter: NoteFilter;
   activeNotebookId: string | null;
   activeNpub: string | null;
-  isSavingRef: MutableRefObject<boolean>;
+  isSavingRef: RefObject<boolean>;
   setSelectedNoteId: (id: string | null) => void;
   setDraft: (id: string, markdown: string) => void;
   setCreatingSelectedNoteId: (id: string | null) => void;

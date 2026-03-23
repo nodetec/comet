@@ -6,6 +6,7 @@ import {
   $getSelection,
   $isNodeSelection,
   $setSelection,
+  type LexicalEditor,
 } from "lexical";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { IMAGE_EXTENSIONS, importImage } from "@/shared/lib/attachments";
@@ -16,8 +17,80 @@ const IMAGE_EXTENSIONS_RE = new RegExp(
   "i",
 );
 
+function isImagePath(p: string): boolean {
+  return IMAGE_EXTENSIONS_RE.test(p);
+}
+
 function isInsideRect(x: number, y: number, rect: DOMRect): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+function focusCaretAtPoint(
+  rootElement: HTMLElement,
+  x: number,
+  y: number,
+): void {
+  rootElement.focus();
+  // eslint-disable-next-line sonarjs/deprecation -- caretRangeFromPoint needed for browser compat
+  const range = document.caretRangeFromPoint(x, y);
+  if (range) {
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+}
+
+function $insertImportedImages(
+  results: (Awaited<ReturnType<typeof importImage>> | null)[],
+): void {
+  for (const result of results) {
+    if (!result) continue;
+    const imageNode = $createImageNode({
+      src: result.assetUrl,
+      altText: result.altText,
+    });
+    const selection = $getSelection();
+    if ($isNodeSelection(selection)) {
+      const nodes = selection.getNodes();
+      const lastNode = nodes.at(-1);
+      lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
+    } else if (selection) {
+      selection.insertNodes([imageNode]);
+    } else {
+      $getRoot().append(imageNode);
+    }
+    const nodeSelection = $createNodeSelection();
+    nodeSelection.add(imageNode.getKey());
+    $setSelection(nodeSelection);
+  }
+}
+
+async function handleDrop(
+  editor: LexicalEditor,
+  rootElement: HTMLElement,
+  payload: { position: { x: number; y: number }; paths: string[] },
+): Promise<void> {
+  const { x, y } = payload.position;
+  const rect = getEditorRect(rootElement);
+  if (!isInsideRect(x, y, rect)) return;
+
+  const imagePaths = payload.paths.filter((p) => isImagePath(p));
+  if (imagePaths.length === 0) return;
+
+  const results = await Promise.all(
+    imagePaths.map((p) => importImage(p).catch(() => null)),
+  );
+
+  editor.update(() => {
+    $insertImportedImages(results);
+  });
+}
+
+function getEditorRect(rootElement: HTMLElement): DOMRect {
+  const scrollContainer = rootElement.closest(".comet-editor-shell");
+  return (scrollContainer ?? rootElement).getBoundingClientRect();
 }
 
 export default function ImageDropPlugin() {
@@ -29,6 +102,13 @@ export default function ImageDropPlugin() {
     let hasImageFiles = false;
     let rafId: number | null = null;
 
+    const handleOverRAF = (root: HTMLElement, x: number, y: number) => {
+      rafId = null;
+      const rect = getEditorRect(root);
+      if (!isInsideRect(x, y, rect)) return;
+      focusCaretAtPoint(root, x, y);
+    };
+
     void getCurrentWebview()
       .onDragDropEvent((event) => {
         void (async () => {
@@ -38,9 +118,7 @@ export default function ImageDropPlugin() {
           if (!rootElement || !editor.isEditable()) return;
 
           if (event.payload.type === "enter") {
-            hasImageFiles = event.payload.paths.some((p) =>
-              IMAGE_EXTENSIONS_RE.test(p),
-            );
+            hasImageFiles = event.payload.paths.some(isImagePath);
             return;
           }
 
@@ -58,26 +136,9 @@ export default function ImageDropPlugin() {
           if (event.payload.type === "over") {
             const { x, y } = event.payload.position;
             if (rafId !== null) return;
-            rafId = requestAnimationFrame(() => {
-              rafId = null;
-              const scrollContainer = rootElement.closest(
-                ".comet-editor-shell",
-              );
-              const rect = (
-                scrollContainer ?? rootElement
-              ).getBoundingClientRect();
-              if (!isInsideRect(x, y, rect)) return;
-
-              rootElement.focus();
-              const range = document.caretRangeFromPoint(x, y);
-              if (range) {
-                const sel = window.getSelection();
-                if (sel) {
-                  sel.removeAllRanges();
-                  sel.addRange(range);
-                }
-              }
-            });
+            rafId = requestAnimationFrame(
+              handleOverRAF.bind(null, rootElement, x, y),
+            );
             return;
           }
 
@@ -86,45 +147,7 @@ export default function ImageDropPlugin() {
               cancelAnimationFrame(rafId);
               rafId = null;
             }
-
-            const { x, y } = event.payload.position;
-            const scrollContainer = rootElement.closest(".comet-editor-shell");
-            const rect = (
-              scrollContainer ?? rootElement
-            ).getBoundingClientRect();
-            if (!isInsideRect(x, y, rect)) return;
-
-            const imagePaths = event.payload.paths.filter((p) =>
-              IMAGE_EXTENSIONS_RE.test(p),
-            );
-            if (imagePaths.length === 0) return;
-
-            const results = await Promise.all(
-              imagePaths.map((p) => importImage(p).catch(() => null)),
-            );
-
-            editor.update(() => {
-              for (const result of results) {
-                if (!result) continue;
-                const imageNode = $createImageNode({
-                  src: result.assetUrl,
-                  altText: result.altText,
-                });
-                const selection = $getSelection();
-                if ($isNodeSelection(selection)) {
-                  const nodes = selection.getNodes();
-                  const lastNode = nodes.at(-1);
-                  lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
-                } else if (selection) {
-                  selection.insertNodes([imageNode]);
-                } else {
-                  $getRoot().append(imageNode);
-                }
-                const nodeSelection = $createNodeSelection();
-                nodeSelection.add(imageNode.getKey());
-                $setSelection(nodeSelection);
-              }
-            });
+            await handleDrop(editor, rootElement, event.payload);
           }
         })();
       })

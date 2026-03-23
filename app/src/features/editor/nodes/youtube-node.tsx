@@ -36,6 +36,7 @@ import {
 import { CheckIcon, CopyIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lexical node + component co-location is standard
 function CopyUrlButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -66,6 +67,7 @@ type YouTubeComponentProps = Readonly<{
   videoID: string;
 }>;
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lexical node + component co-location is standard
 function YouTubeComponent({ nodeKey, videoID }: YouTubeComponentProps) {
   const [editor] = useLexicalComposerContext();
   const containerRef = useRef<HTMLDivElement>(null);

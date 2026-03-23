@@ -56,6 +56,7 @@ export type SerializedImageNode = Spread<
   SerializedLexicalNode
 >;
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lexical node + component co-location is standard
 function ImageComponent({
   src,
   altText,
@@ -79,7 +80,7 @@ function ImageComponent({
   const isEditable = useLexicalEditable();
 
   const fetchImage = useCallback(async () => {
-    const hashMatch = src.match(/([a-f0-9]{64})\.\w+/);
+    const hashMatch = /([a-f0-9]{64})\.\w+/.exec(src);
     if (!hashMatch) {
       console.warn("[image-node] missing attachment hash", { src, nodeKey });
       setIsLoadError(true);
@@ -117,7 +118,6 @@ function ImageComponent({
           setNeedsUnlock(true);
           break;
         }
-        case "missing":
         default: {
           fetchAttempted.current = true;
           setIsLoadError(true);

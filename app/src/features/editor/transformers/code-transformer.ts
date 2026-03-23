@@ -57,7 +57,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     // Single-line code block: ```code```
     const singleLineEndRegex = new RegExp(`\`{${fenceLength},}$`);
     if (singleLineEndRegex.test(afterFence)) {
-      const endMatch = afterFence.match(singleLineEndRegex)!;
+      const endMatch = singleLineEndRegex.exec(afterFence)!;
       const content = afterFence.slice(0, afterFence.lastIndexOf(endMatch[0]));
       const fakeStartMatch = [...startMatch];
       fakeStartMatch[2] = "";
@@ -76,7 +76,7 @@ export const CODE_BLOCK: MultilineElementTransformer = {
     const multilineEndRegex = new RegExp(`^[ \\t]*\`{${fenceLength},}$`);
     for (let i = startLineIndex + 1; i < lines.length; i++) {
       if (multilineEndRegex.test(lines[i])) {
-        const endMatch = lines[i].match(multilineEndRegex);
+        const endMatch = multilineEndRegex.exec(lines[i]);
         const linesInBetween = lines.slice(startLineIndex + 1, i);
         const afterFullMatch = currentLine.slice(startMatch[0].length);
         if (afterFullMatch.length > 0) {

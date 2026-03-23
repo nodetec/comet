@@ -201,6 +201,81 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
     );
   }, [editor, menu, selectedIndex, selectTag, closeMenu]);
 
+  const handleTagSearchResult = useCallback(
+    (
+      tags: string[],
+      requestVersion: number,
+      match: NonNullable<ReturnType<typeof matchHashtag>>,
+      anchorKey: string,
+    ) => {
+      if (!requestGateRef.current.isCurrent(requestVersion)) {
+        return;
+      }
+
+      const filtered = tags.filter(
+        (t) => t !== match.matchingString.toLowerCase(),
+      );
+      if (filtered.length === 0) {
+        closeMenu();
+        return;
+      }
+
+      editor.getEditorState().read(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+          closeMenu();
+          return;
+        }
+
+        const currentAnchorNode = selection.anchor.getNode();
+        if (
+          !$isTextNode(currentAnchorNode) ||
+          currentAnchorNode.getKey() !== anchorKey
+        ) {
+          closeMenu();
+          return;
+        }
+
+        const domSelection = window.getSelection();
+        if (!domSelection || domSelection.rangeCount === 0) {
+          closeMenu();
+          return;
+        }
+
+        const range = domSelection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        setMenu({
+          query: match.matchingString,
+          tags: filtered,
+          rect,
+          anchorKey,
+          leadOffset: match.leadOffset,
+          replaceableLength: match.replaceableLength,
+        });
+      });
+    },
+    [closeMenu, editor],
+  );
+
+  const searchAndShowMenu = useCallback(
+    async (
+      requestVersion: number,
+      match: NonNullable<ReturnType<typeof matchHashtag>>,
+      anchorKey: string,
+    ) => {
+      try {
+        const tags = await invoke<string[]>("search_tags", {
+          query: match.matchingString,
+        });
+        handleTagSearchResult(tags, requestVersion, match, anchorKey);
+      } catch {
+        closeMenu();
+      }
+    },
+    [closeMenu, handleTagSearchResult],
+  );
+
   // Trigger detection on editor updates
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState }) => {
@@ -234,9 +309,9 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
         const match = matchHashtag(textUpToCursor);
 
         // Only show menu when caret is at the end of the tag
-        const charAfterCursor = fullText[anchor.offset];
+        const charAfterCursor = fullText[anchor.offset] as string | undefined;
         if (
-          charAfterCursor !== undefined &&
+          charAfterCursor != null &&
           /[^\s.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;#]/.test(charAfterCursor)
         ) {
           closeMenu();
@@ -255,67 +330,14 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
         // Debounce the search
         if (debounceRef.current) clearTimeout(debounceRef.current);
         const requestVersion = requestGateRef.current.issue();
-        debounceRef.current = setTimeout(() => {
-          void invoke<string[]>("search_tags", {
-            query: match.matchingString,
-          }).then(
-            (tags) => {
-              if (!requestGateRef.current.isCurrent(requestVersion)) {
-                return;
-              }
-
-              // Filter out exact matches (user already typed this)
-              const filtered = tags.filter(
-                (t) => t !== match.matchingString.toLowerCase(),
-              );
-              if (filtered.length === 0) {
-                closeMenu();
-                return;
-              }
-
-              editor.getEditorState().read(() => {
-                const selection = $getSelection();
-                if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
-                  closeMenu();
-                  return;
-                }
-
-                const currentAnchorNode = selection.anchor.getNode();
-                if (
-                  !$isTextNode(currentAnchorNode) ||
-                  currentAnchorNode.getKey() !== anchorKey
-                ) {
-                  closeMenu();
-                  return;
-                }
-
-                // Get cursor rect for positioning only if the caret is still on
-                // the same text node that triggered this request.
-                const domSelection = window.getSelection();
-                if (!domSelection || domSelection.rangeCount === 0) {
-                  closeMenu();
-                  return;
-                }
-
-                const range = domSelection.getRangeAt(0);
-                const rect = range.getBoundingClientRect();
-
-                setMenu({
-                  query: match.matchingString,
-                  tags: filtered,
-                  rect,
-                  anchorKey,
-                  leadOffset: match.leadOffset,
-                  replaceableLength: match.replaceableLength,
-                });
-              });
-            },
-            () => closeMenu(),
-          );
-        }, 150);
+        debounceRef.current = setTimeout(
+          // eslint-disable-next-line sonarjs/no-nested-functions -- minimal wrapper for setTimeout
+          () => void searchAndShowMenu(requestVersion, match, anchorKey),
+          150,
+        );
       });
     });
-  }, [editor, closeMenu]);
+  }, [editor, closeMenu, searchAndShowMenu]);
 
   // Cleanup debounce on unmount
   useEffect(() => {

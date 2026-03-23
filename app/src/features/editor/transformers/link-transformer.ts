@@ -8,9 +8,9 @@ import {
 } from "@lexical/link";
 
 const MARKDOWN_LINK_IMPORT_RE =
-  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)/;
+  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)/; // eslint-disable-line sonarjs/slow-regex -- bounded by [^\]] and [^)\s]
 const MARKDOWN_LINK_END_RE =
-  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)$/;
+  /(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)$/; // eslint-disable-line sonarjs/slow-regex -- same as above
 
 function getLinkAttributes(url: string) {
   if (url.startsWith("#")) {

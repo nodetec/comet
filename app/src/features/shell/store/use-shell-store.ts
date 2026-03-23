@@ -1,8 +1,6 @@
 import { create } from "zustand";
 
-import { type NoteFilter } from "@/shared/api/types";
-
-export type { NoteFilter };
+export type { NoteFilter } from "@/shared/api/types";
 
 export type FocusedPane = "sidebar" | "notes" | "editor";
 

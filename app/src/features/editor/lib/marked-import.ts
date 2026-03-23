@@ -21,8 +21,8 @@ const youtubeExtension: MarkedExtension = {
       name: "youtube",
       level: "block",
       start(src) {
-        return src.match(
-          /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)/m,
+        return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)/m.exec(
+          src,
         )?.index;
       },
       tokenizer(src) {
@@ -36,7 +36,6 @@ const youtubeExtension: MarkedExtension = {
             return { type: "youtube", raw: match[0], videoId };
           }
         }
-        return;
       },
       renderer(token) {
         const { videoId } = token as Tokens.Generic & { videoId: string };
@@ -72,7 +71,6 @@ const highlightExtension: MarkedExtension = {
             tokens: this.lexer.inlineTokens(text),
           };
         }
-        return;
       },
       renderer(token) {
         const t = token as Tokens.Generic & { tokens: unknown[] };
@@ -152,6 +150,37 @@ const rendererOverrides: MarkedExtension = {
  */
 const BARE_HEADING_RE = /^#{1,6}$/;
 
+type FenceTracker = { char: string | null; len: number };
+
+function updateFenceTracker(
+  line: string,
+  trimmed: string,
+  fence: FenceTracker,
+): boolean {
+  const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
+  if (!fenceMatch || /^(`{3,})[^`]+\1$/.test(line)) return false;
+
+  const char = fenceMatch[1][0];
+  const len = fenceMatch[1].length;
+  if (fence.char === null) {
+    fence.char = char;
+    fence.len = len;
+  } else if (char === fence.char && len >= fence.len) {
+    fence.char = null;
+  }
+  return true;
+}
+
+function consumeBlankLines(lines: string[], startIndex: number): number {
+  let count = 0;
+  let i = startIndex;
+  while (i < lines.length && lines[i].trim() === "") {
+    count++;
+    i++;
+  }
+  return count;
+}
+
 /**
  * Preprocess hook to preserve blank lines as empty paragraphs. Marked treats
  * blank lines as paragraph separators and collapses them. We convert each
@@ -164,49 +193,29 @@ const emptyParagraphPreprocess: MarkedExtension = {
     preprocess(markdown: string) {
       const lines = markdown.split("\n");
       const result: string[] = [];
-      let fenceChar: string | null = null;
-      let fenceLen = 0;
+      const fence: FenceTracker = { char: null, len: 0 };
 
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
         const trimmed = line.trimStart();
 
-        // Track code fence state (proper fence matching)
-        const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
-        if (fenceMatch && !/^(`{3,})[^`]+\1$/.test(line)) {
-          const char = fenceMatch[1][0];
-          const len = fenceMatch[1].length;
-          if (fenceChar === null) {
-            fenceChar = char;
-            fenceLen = len;
-          } else if (char === fenceChar && len >= fenceLen) {
-            fenceChar = null;
-          }
+        if (updateFenceTracker(line, trimmed, fence)) {
           result.push(line);
           i++;
           continue;
         }
 
-        // Inside code fence — preserve as-is
-        if (fenceChar !== null) {
+        if (fence.char !== null) {
           result.push(line);
           i++;
           continue;
         }
 
-        // Blank line group: first blank is the standard block separator
-        // (needed for marked to recognize block boundaries). Each
-        // additional blank becomes an empty paragraph marker.
         if (line.trim() === "") {
-          let blankCount = 0;
-          while (i < lines.length && lines[i].trim() === "") {
-            blankCount++;
-            i++;
-          }
-          // First blank = standard separator
+          const blankCount = consumeBlankLines(lines, i);
+          i += blankCount;
           result.push("");
-          // Additional blanks = empty paragraphs
           for (let j = 1; j < blankCount; j++) {
             result.push("<p><br></p>", "");
           }
@@ -233,43 +242,28 @@ const pastePreprocess: MarkedExtension = {
     preprocess(markdown: string) {
       const lines = markdown.split("\n");
       const result: string[] = [];
-      let fenceChar: string | null = null;
-      let fenceLen = 0;
+      const fence: FenceTracker = { char: null, len: 0 };
 
       let i = 0;
       while (i < lines.length) {
         const line = lines[i];
         const trimmed = line.trimStart();
 
-        const fenceMatch = /^(`{3,}|~{3,})/.exec(trimmed);
-        if (fenceMatch && !/^(`{3,})[^`]+\1$/.test(line)) {
-          const char = fenceMatch[1][0];
-          const len = fenceMatch[1].length;
-          if (fenceChar === null) {
-            fenceChar = char;
-            fenceLen = len;
-          } else if (char === fenceChar && len >= fenceLen) {
-            fenceChar = null;
-          }
+        if (updateFenceTracker(line, trimmed, fence)) {
           result.push(line);
           i++;
           continue;
         }
 
-        if (fenceChar !== null) {
+        if (fence.char !== null) {
           result.push(line);
           i++;
           continue;
         }
 
         if (line.trim() === "") {
-          let blankCount = 0;
-          while (i < lines.length && lines[i].trim() === "") {
-            blankCount++;
-            i++;
-          }
-          // Every blank becomes an empty paragraph (Bear/Obsidian convention:
-          // each blank line is a visible, clickable spacer in the editor)
+          const blankCount = consumeBlankLines(lines, i);
+          i += blankCount;
           for (let j = 0; j < blankCount; j++) {
             result.push("", "<p><br></p>");
           }

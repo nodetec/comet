@@ -349,33 +349,39 @@ function TableCellActionMenuContainer({
       setTableMenuCellNode(null);
     };
 
+    const $readAndShowCellMenu = (cellElem: HTMLElement) => {
+      const cellNode = $getNearestNodeFromDOMNode(cellElem);
+      if ($isTableCellNode(cellNode)) {
+        setTableMenuCellNode(cellNode);
+        moveMenu(cellElem);
+      }
+    };
+
     let rafId: number | null = null;
+
+    const handlePointerMoveRAF = (target: HTMLElement) => {
+      if (!target.closest) return;
+      if (isMenuOpenRef.current) return;
+      if (menuButtonRef.current?.contains(target)) return;
+
+      const cellElem = target.closest("td, th") as HTMLElement | null;
+      if (cellElem) {
+        editor.getEditorState().read(
+          () => $readAndShowCellMenu(cellElem),
+          { editor },
+        );
+      } else {
+        hideMenu();
+      }
+    };
 
     const onPointerMove = (event: PointerEvent) => {
       if (rafId !== null) return;
+      const target = event.target as HTMLElement;
+      if (!target) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        const target = event.target as HTMLElement;
-        if (!target || !target.closest) return;
-
-        if (isMenuOpenRef.current) return;
-        if (menuButtonRef.current?.contains(target)) return;
-
-        const cellElem = target.closest("td, th") as HTMLElement | null;
-        if (cellElem) {
-          editor.getEditorState().read(
-            () => {
-              const cellNode = $getNearestNodeFromDOMNode(cellElem);
-              if ($isTableCellNode(cellNode)) {
-                setTableMenuCellNode(cellNode);
-                moveMenu(cellElem);
-              }
-            },
-            { editor },
-          );
-        } else {
-          hideMenu();
-        }
+        handlePointerMoveRAF(target);
       });
     };
 

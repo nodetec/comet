@@ -124,10 +124,227 @@ const HIGHLIGHT_CLASS_NAME =
 const MAX_HIGHLIGHT_MATCHES_PER_BLOCK = 24;
 
 function normalizeHighlightWords(searchWords: string[]) {
-  return [...searchWords]
+  return searchWords
     .map((word) => word.toLocaleLowerCase())
     .filter(Boolean)
-    .sort((left, right) => right.length - left.length);
+    .toSorted((left, right) => right.length - left.length);
+}
+
+async function showNoteSortMenu(
+  event: React.MouseEvent<HTMLButtonElement>,
+  ctx: {
+    sortField: NoteSortField;
+    sortDirection: NoteSortDirection;
+    totalNoteCount: number;
+    onChangeSortField: (field: NoteSortField) => void;
+    onChangeSortDirection: (direction: NoteSortDirection) => void;
+    onExportNotes: () => void;
+  },
+) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const isDateField = ctx.sortField !== "title";
+  const newestLabel = isDateField ? "Newest First" : "A to Z";
+  const oldestLabel = isDateField ? "Oldest First" : "Z to A";
+
+  const sortSubmenu = await Submenu.new({
+    text: "Sort By",
+    items: [
+      await CheckMenuItem.new({
+        id: "sort-modified_at",
+        text: "Modification Date",
+        checked: ctx.sortField === "modified_at",
+        action: () => ctx.onChangeSortField("modified_at"),
+      }),
+      await CheckMenuItem.new({
+        id: "sort-created_at",
+        text: "Creation Date",
+        checked: ctx.sortField === "created_at",
+        action: () => ctx.onChangeSortField("created_at"),
+      }),
+      await CheckMenuItem.new({
+        id: "sort-title",
+        text: "Title",
+        checked: ctx.sortField === "title",
+        action: () => ctx.onChangeSortField("title"),
+      }),
+      await PredefinedMenuItem.new({ item: "Separator" }),
+      await CheckMenuItem.new({
+        id: "dir-newest",
+        text: newestLabel,
+        checked: ctx.sortDirection === "newest",
+        action: () => ctx.onChangeSortDirection("newest"),
+      }),
+      await CheckMenuItem.new({
+        id: "dir-oldest",
+        text: oldestLabel,
+        checked: ctx.sortDirection === "oldest",
+        action: () => ctx.onChangeSortDirection("oldest"),
+      }),
+    ],
+  });
+
+  const noteCountLabel = `${ctx.totalNoteCount} ${ctx.totalNoteCount === 1 ? "note" : "notes"}`;
+  const menu = await Menu.new({
+    items: [
+      { id: "note-count", text: noteCountLabel, enabled: false },
+      await PredefinedMenuItem.new({ item: "Separator" }),
+      sortSubmenu,
+      await PredefinedMenuItem.new({ item: "Separator" }),
+      {
+        id: "export-notes",
+        text: "Export as Markdown\u2026",
+        action: () => ctx.onExportNotes(),
+      },
+    ],
+  });
+
+  try {
+    await menu.popup(new LogicalPosition(rect.left, rect.bottom));
+  } finally {
+    await menu.close();
+  }
+}
+
+async function showNoteContextMenu(
+  event: MouseEvent<HTMLButtonElement>,
+  note: NoteSummary,
+  ctx: {
+    isArchive: boolean;
+    isTrash: boolean;
+    notebooks: NotebookSummary[];
+    onAssignNoteNotebook: (noteId: string, notebookId: string | null) => void;
+    onSetNotePinned: (noteId: string, pinned: boolean) => void;
+    onCopyNoteContent: (noteId: string) => void;
+    onDeleteNotePermanently: (noteId: string) => void;
+    onRestoreFromTrash: (noteId: string) => void;
+    onTrashNote: (noteId: string) => void;
+    onArchiveNote: (noteId: string) => void;
+    onRestoreNote: (noteId: string) => void;
+    onSetNoteReadonly: (noteId: string, readonly: boolean) => void;
+    onDuplicateNote: (noteId: string) => void;
+  },
+) {
+  event.preventDefault();
+  const moveToNotebookSubmenu =
+    !ctx.isArchive &&
+    !ctx.isTrash &&
+    (await buildNotebookSubmenu({
+      currentNotebook: note.notebook,
+      notebooks: ctx.notebooks,
+      idPrefix: `note-menu-notebook-${note.id}`,
+      onAssign: (notebookId) => ctx.onAssignNoteNotebook(note.id, notebookId),
+    }));
+
+  const menu = await Menu.new({
+    items: [
+      {
+        id: `${note.pinnedAt ? "unpin" : "pin"}-${note.id}`,
+        text: note.pinnedAt ? "Unpin" : "Pin To Top",
+        action: () => ctx.onSetNotePinned(note.id, !note.pinnedAt),
+      },
+      {
+        id: `copy-${note.id}`,
+        text: "Copy",
+        action: () => ctx.onCopyNoteContent(note.id),
+      },
+      ...(moveToNotebookSubmenu
+        ? [{ item: "Separator" as const }, moveToNotebookSubmenu]
+        : []),
+      { item: "Separator" as const },
+      ...(ctx.isTrash
+        ? [
+            {
+              id: `delete-forever-${note.id}`,
+              text: "Delete",
+              action: () => ctx.onDeleteNotePermanently(note.id),
+            },
+            {
+              id: `restore-trash-${note.id}`,
+              text: "Restore",
+              action: () => ctx.onRestoreFromTrash(note.id),
+            },
+          ]
+        : [
+            {
+              id: `delete-${note.id}`,
+              text: "Delete",
+              action: () => ctx.onTrashNote(note.id),
+            },
+            {
+              id: `restore-trash-${note.id}`,
+              text: "Restore",
+              enabled: false,
+            },
+          ]),
+      { item: "Separator" as const },
+      ...(ctx.isArchive
+        ? [
+            {
+              id: `archive-${note.id}`,
+              text: "Archive",
+              enabled: false,
+            },
+            {
+              id: `unarchive-${note.id}`,
+              text: "Unarchive",
+              action: () => ctx.onRestoreNote(note.id),
+            },
+          ]
+        : [
+            {
+              id: `archive-${note.id}`,
+              text: "Archive",
+              enabled: !ctx.isTrash,
+              action: () => ctx.onArchiveNote(note.id),
+            },
+            {
+              id: `unarchive-${note.id}`,
+              text: "Unarchive",
+              enabled: false,
+            },
+          ]),
+      { item: "Separator" as const },
+      await CheckMenuItem.new({
+        id: `readonly-${note.id}`,
+        text: "Read-only",
+        checked: note.readonly,
+        action: () => ctx.onSetNoteReadonly(note.id, !note.readonly),
+      }),
+      {
+        id: `duplicate-${note.id}`,
+        text: "Duplicate",
+        action: () => ctx.onDuplicateNote(note.id),
+      },
+    ],
+  });
+
+  try {
+    await menu.popup(new LogicalPosition(event.clientX, event.clientY));
+  } finally {
+    await menu.close();
+  }
+}
+
+function findNextHighlightMatch(
+  lowerText: string,
+  cursor: number,
+  highlightWords: string[],
+): { index: number; length: number } {
+  let nextIndex = -1;
+  let nextLength = 0;
+  for (const word of highlightWords) {
+    const index = lowerText.indexOf(word, cursor);
+    if (index === -1) continue;
+    if (
+      nextIndex === -1 ||
+      index < nextIndex ||
+      (index === nextIndex && word.length > nextLength)
+    ) {
+      nextIndex = index;
+      nextLength = word.length;
+    }
+  }
+  return { index: nextIndex, length: nextLength };
 }
 
 const HighlightedText = memo(function HighlightedText({
@@ -148,59 +365,33 @@ const HighlightedText = memo(function HighlightedText({
   let matchCount = 0;
 
   while (cursor < text.length) {
-    let nextIndex = -1;
-    let nextLength = 0;
+    const match = findNextHighlightMatch(lowerText, cursor, highlightWords);
+    if (match.index === -1) break;
 
-    for (const word of highlightWords) {
-      const index = lowerText.indexOf(word, cursor);
-      if (index === -1) {
-        continue;
-      }
-
-      if (
-        nextIndex === -1 ||
-        index < nextIndex ||
-        (index === nextIndex && word.length > nextLength)
-      ) {
-        nextIndex = index;
-        nextLength = word.length;
-      }
-    }
-
-    if (nextIndex === -1) {
-      break;
-    }
-
-    if (nextIndex > cursor) {
+    if (match.index > cursor) {
       parts.push(
         <Fragment key={`text-${key++}`}>
-          {text.slice(cursor, nextIndex)}
+          {text.slice(cursor, match.index)}
         </Fragment>,
       );
     }
 
-    const end = nextIndex + nextLength;
+    const end = match.index + match.length;
     parts.push(
       <mark className={HIGHLIGHT_CLASS_NAME} key={`mark-${key++}`}>
-        {text.slice(nextIndex, end)}
+        {text.slice(match.index, end)}
       </mark>,
     );
     cursor = end;
     matchCount += 1;
 
-    if (matchCount >= MAX_HIGHLIGHT_MATCHES_PER_BLOCK) {
-      break;
-    }
+    if (matchCount >= MAX_HIGHLIGHT_MATCHES_PER_BLOCK) break;
   }
 
-  if (parts.length === 0) {
-    return <>{text}</>;
-  }
-
+  if (parts.length === 0) return <>{text}</>;
   if (cursor < text.length) {
     parts.push(<Fragment key={`text-${key++}`}>{text.slice(cursor)}</Fragment>);
   }
-
   return <>{parts}</>;
 });
 
@@ -326,109 +517,25 @@ export function NotesPane({
     onLoadMore();
   }, [hasMoreNotes, inView, onLoadMore]);
 
-  const handleNoteContextMenu = async (
+  const handleNoteContextMenu = (
     event: MouseEvent<HTMLButtonElement>,
     note: NoteSummary,
   ) => {
-    event.preventDefault();
-    const moveToNotebookSubmenu =
-      !isArchive &&
-      !isTrash &&
-      (await buildNotebookSubmenu({
-        currentNotebook: note.notebook,
-        notebooks,
-        idPrefix: `note-menu-notebook-${note.id}`,
-        onAssign: (notebookId) => onAssignNoteNotebook(note.id, notebookId),
-      }));
-
-    const menu = await Menu.new({
-      items: [
-        {
-          id: `${note.pinnedAt ? "unpin" : "pin"}-${note.id}`,
-          text: note.pinnedAt ? "Unpin" : "Pin To Top",
-          action: () => onSetNotePinned(note.id, !note.pinnedAt),
-        },
-        {
-          id: `copy-${note.id}`,
-          text: "Copy",
-          action: () => onCopyNoteContent(note.id),
-        },
-        ...(moveToNotebookSubmenu
-          ? [{ item: "Separator" as const }, moveToNotebookSubmenu]
-          : []),
-        { item: "Separator" as const },
-        ...(isTrash
-          ? [
-              {
-                id: `delete-forever-${note.id}`,
-                text: "Delete",
-                action: () => onDeleteNotePermanently(note.id),
-              },
-              {
-                id: `restore-trash-${note.id}`,
-                text: "Restore",
-                action: () => onRestoreFromTrash(note.id),
-              },
-            ]
-          : [
-              {
-                id: `delete-${note.id}`,
-                text: "Delete",
-                action: () => onTrashNote(note.id),
-              },
-              {
-                id: `restore-trash-${note.id}`,
-                text: "Restore",
-                enabled: false,
-              },
-            ]),
-        { item: "Separator" as const },
-        ...(isArchive
-          ? [
-              {
-                id: `archive-${note.id}`,
-                text: "Archive",
-                enabled: false,
-              },
-              {
-                id: `unarchive-${note.id}`,
-                text: "Unarchive",
-                action: () => onRestoreNote(note.id),
-              },
-            ]
-          : [
-              {
-                id: `archive-${note.id}`,
-                text: "Archive",
-                enabled: !isTrash,
-                action: () => onArchiveNote(note.id),
-              },
-              {
-                id: `unarchive-${note.id}`,
-                text: "Unarchive",
-                enabled: false,
-              },
-            ]),
-        { item: "Separator" as const },
-        await CheckMenuItem.new({
-          id: `readonly-${note.id}`,
-          text: "Read-only",
-          checked: note.readonly,
-          action: () => onSetNoteReadonly(note.id, !note.readonly),
-        }),
-        {
-          id: `duplicate-${note.id}`,
-          text: "Duplicate",
-          action: () => onDuplicateNote(note.id),
-        },
-      ],
-    });
-
-    try {
-      await menu.popup(new LogicalPosition(event.clientX, event.clientY));
-    } finally {
-      await menu.close();
-    }
+    showNoteContextMenu(event, note, {
+      isArchive,
+      isTrash,
+      notebooks,
+      onAssignNoteNotebook,
+      onSetNotePinned,
+      onCopyNoteContent,
+      onDeleteNotePermanently,
+      onRestoreFromTrash,
+      onTrashNote,
+      onArchiveNote,
+      onRestoreNote,
+      onSetNoteReadonly,
+      onDuplicateNote,
+    }).catch(() => {});
   };
 
   return (
@@ -480,76 +587,15 @@ export function NotesPane({
               <div className="relative z-40 flex min-w-0 items-center gap-1">
                 <button
                   className="flex max-w-full min-w-0 cursor-default items-center gap-0.5 rounded-md px-1.5 py-0.5"
-                  onClick={async (event) => {
-                    const button = event.currentTarget;
-                    const rect = button.getBoundingClientRect();
-
-                    const isDateField = sortField !== "title";
-                    const newestLabel = isDateField ? "Newest First" : "A to Z";
-                    const oldestLabel = isDateField ? "Oldest First" : "Z to A";
-
-                    const sortSubmenu = await Submenu.new({
-                      text: "Sort By",
-                      items: [
-                        await CheckMenuItem.new({
-                          id: "sort-modified_at",
-                          text: "Modification Date",
-                          checked: sortField === "modified_at",
-                          action: () => onChangeSortField("modified_at"),
-                        }),
-                        await CheckMenuItem.new({
-                          id: "sort-created_at",
-                          text: "Creation Date",
-                          checked: sortField === "created_at",
-                          action: () => onChangeSortField("created_at"),
-                        }),
-                        await CheckMenuItem.new({
-                          id: "sort-title",
-                          text: "Title",
-                          checked: sortField === "title",
-                          action: () => onChangeSortField("title"),
-                        }),
-                        await PredefinedMenuItem.new({ item: "Separator" }),
-                        await CheckMenuItem.new({
-                          id: "dir-newest",
-                          text: newestLabel,
-                          checked: sortDirection === "newest",
-                          action: () => onChangeSortDirection("newest"),
-                        }),
-                        await CheckMenuItem.new({
-                          id: "dir-oldest",
-                          text: oldestLabel,
-                          checked: sortDirection === "oldest",
-                          action: () => onChangeSortDirection("oldest"),
-                        }),
-                      ],
-                    });
-
-                    const noteCountLabel = `${totalNoteCount} ${totalNoteCount === 1 ? "note" : "notes"}`;
-                    const menu = await Menu.new({
-                      items: [
-                        {
-                          id: "note-count",
-                          text: noteCountLabel,
-                          enabled: false,
-                        },
-                        await PredefinedMenuItem.new({ item: "Separator" }),
-                        sortSubmenu,
-                        await PredefinedMenuItem.new({ item: "Separator" }),
-                        {
-                          id: "export-notes",
-                          text: "Export as Markdown…",
-                          action: () => onExportNotes(),
-                        },
-                      ],
-                    });
-                    try {
-                      await menu.popup(
-                        new LogicalPosition(rect.left, rect.bottom),
-                      );
-                    } finally {
-                      await menu.close();
-                    }
+                  onClick={(event) => {
+                    showNoteSortMenu(event, {
+                      sortField,
+                      sortDirection,
+                      totalNoteCount,
+                      onChangeSortField,
+                      onChangeSortDirection,
+                      onExportNotes,
+                    }).catch(() => {});
                   }}
                   type="button"
                 >
@@ -649,7 +695,7 @@ export function NotesPane({
                         ].join(" ")}
                         onClick={() => onSelectNote(note.id)}
                         onContextMenu={(event) =>
-                          void handleNoteContextMenu(event, note)
+                          handleNoteContextMenu(event, note)
                         }
                         onMouseDown={(event) => {
                           if (event.button === 2) {

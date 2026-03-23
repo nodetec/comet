@@ -30,6 +30,7 @@ import {
 // React component — modeled exactly on ImageComponent
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lexical node + component co-location is standard
 function HorizontalRuleComponent({ nodeKey }: { nodeKey: NodeKey }) {
   const [editor] = useLexicalComposerContext();
   const wrapperRef = useRef<HTMLSpanElement>(null);

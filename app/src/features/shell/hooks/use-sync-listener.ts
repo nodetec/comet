@@ -1,4 +1,4 @@
-import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect } from "react";
+import { type Dispatch, type RefObject, type SetStateAction, useEffect } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 
@@ -7,9 +7,23 @@ import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 export interface SyncListenerDeps {
   queryClient: QueryClient;
-  pendingSaveTimeoutRef: MutableRefObject<number | null>;
-  isSavingRef: MutableRefObject<boolean>;
+  pendingSaveTimeoutRef: RefObject<number | null>;
+  isSavingRef: RefObject<boolean>;
   setSyncEditorRevision: Dispatch<SetStateAction<number>>;
+}
+
+function handleFreshNote(
+  freshNote: { id: string; markdown: string } | undefined,
+  queryClient: SyncListenerDeps["queryClient"],
+  setSyncEditorRevision: SyncListenerDeps["setSyncEditorRevision"],
+) {
+  if (!freshNote) return;
+  queryClient.setQueryData(["note", freshNote.id], freshNote);
+  const { draftMarkdown: currentDraft } = useShellStore.getState();
+  if (freshNote.markdown !== currentDraft) {
+    useShellStore.getState().setDraft("", "");
+    setSyncEditorRevision((r) => r + 1);
+  }
 }
 
 export function useSyncListener(deps: SyncListenerDeps) {
@@ -56,17 +70,7 @@ export function useSyncListener(deps: SyncListenerDeps) {
               queryKey: ["note", noteId],
               queryFn: () => loadNote(noteId),
             })
-            .then((freshNote) => {
-              if (freshNote) {
-                queryClient.setQueryData(["note", noteId], freshNote);
-                const { draftMarkdown: currentDraft } =
-                  useShellStore.getState();
-                if (freshNote.markdown !== currentDraft) {
-                  useShellStore.getState().setDraft("", "");
-                  setSyncEditorRevision((r) => r + 1);
-                }
-              }
-            })
+            .then((freshNote) => handleFreshNote(freshNote, queryClient, setSyncEditorRevision))
             .catch(() => {});
         }
       },

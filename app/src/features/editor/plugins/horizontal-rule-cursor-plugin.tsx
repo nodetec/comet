@@ -10,6 +10,7 @@ import {
   $isTextNode,
   COMMAND_PRIORITY_LOW,
   KEY_BACKSPACE_COMMAND,
+  type LexicalNode,
   ParagraphNode,
   TextNode,
 } from "lexical";
@@ -31,6 +32,95 @@ function isAnchorText(
   node: ReturnType<typeof import("lexical").$getNodeByKey>,
 ): boolean {
   return $isTextNode(node) && ZWSP_ONLY_RE.test(node.getTextContent());
+}
+
+function $cleanupOrphanedAnchors(children: LexicalNode[]): boolean {
+  const hasDecorator = children.some(
+    (c) =>
+      $isCometHorizontalRuleNode(c) ||
+      $isImageNode(c) ||
+      $isYouTubeNode(c),
+  );
+  if (
+    !hasDecorator &&
+    children.length > 0 &&
+    children.every((c) => isAnchorText(c))
+  ) {
+    for (const child of children) {
+      child.remove();
+    }
+    return true;
+  }
+  return false;
+}
+
+function $collectSpillContent(
+  children: LexicalNode[],
+): { spillBefore: LexicalNode[]; spillAfter: LexicalNode[] } {
+  const spillBefore: LexicalNode[] = [];
+  const spillAfter: LexicalNode[] = [];
+  let seenHR = false;
+
+  for (const child of children) {
+    if ($isCometHorizontalRuleNode(child)) {
+      seenHR = true;
+      continue;
+    }
+    if (isAnchorText(child)) continue;
+
+    if ($isTextNode(child)) {
+      const text = child.getTextContent().replace(/\u200B/g, "");
+      if (text.length === 0) {
+        child.remove();
+        continue;
+      }
+      child.setTextContent(text);
+    }
+
+    if (seenHR) {
+      spillAfter.push(child);
+    } else {
+      spillBefore.push(child);
+    }
+  }
+
+  return { spillBefore, spillAfter };
+}
+
+function $normalizeHRParagraph(paragraphNode: ParagraphNode): void {
+  const children = paragraphNode.getChildren();
+  const hrIndex = children.findIndex($isCometHorizontalRuleNode);
+
+  if (hrIndex === -1) {
+    $cleanupOrphanedAnchors(children);
+    return;
+  }
+
+  const isCorrect =
+    children.length === 3 &&
+    hrIndex === 1 &&
+    isAnchorText(children[0]) &&
+    isAnchorText(children[2]);
+  if (isCorrect) return;
+
+  const { spillBefore, spillAfter } = $collectSpillContent(children);
+
+  if (spillAfter.length > 0) {
+    const p = $createParagraphNode();
+    for (const child of spillAfter) {
+      p.append(child);
+    }
+    paragraphNode.insertAfter(p);
+    p.selectEnd();
+  }
+
+  if (spillBefore.length > 0) {
+    const p = $createParagraphNode();
+    for (const child of spillBefore) {
+      p.append(child);
+    }
+    paragraphNode.insertBefore(p);
+  }
 }
 
 /**
@@ -146,103 +236,7 @@ export default function HorizontalRuleCursorPlugin(): null {
     // Also clean up orphaned zwsp anchors when the HR/image/YouTube is deleted.
     const removeParagraphTransform = editor.registerNodeTransform(
       ParagraphNode,
-      (paragraphNode) => {
-        const children = paragraphNode.getChildren();
-        const hrIndex = children.findIndex($isCometHorizontalRuleNode);
-
-        // Clean up orphaned zwsp anchors — if paragraph has only zwsp text
-        // nodes and no decorator (HR/image/YouTube), remove the zwsps.
-        if (hrIndex === -1) {
-          const hasDecorator = children.some(
-            (c) =>
-              $isCometHorizontalRuleNode(c) ||
-              $isImageNode(c) ||
-              $isYouTubeNode(c),
-          );
-          if (
-            !hasDecorator &&
-            children.length > 0 &&
-            children.every((c) => isAnchorText(c))
-          ) {
-            // Replace all zwsps with a single empty paragraph content
-            for (const child of children) {
-              child.remove();
-            }
-          }
-          return;
-        }
-
-        // Check if the paragraph is already in the correct shape.
-        const isCorrect =
-          children.length === 3 &&
-          hrIndex === 1 &&
-          isAnchorText(children[0]) &&
-          isAnchorText(children[2]);
-        if (isCorrect) return;
-
-        console.log(
-          "[HR] Paragraph not in correct shape, normalizing:",
-          children.map((c) =>
-            $isCometHorizontalRuleNode(c)
-              ? "HR"
-              : JSON.stringify(c.getTextContent()),
-          ),
-        );
-
-        // Collect non-anchor, non-HR children as "spill" content.
-        const spillBefore: typeof children = [];
-        const spillAfter: typeof children = [];
-        let seenHR = false;
-
-        for (const child of children) {
-          if ($isCometHorizontalRuleNode(child)) {
-            seenHR = true;
-            continue;
-          }
-          if (isAnchorText(child)) continue;
-
-          // Strip zwsp from text nodes that have mixed content.
-          if ($isTextNode(child)) {
-            const text = child.getTextContent().replace(/\u200B/g, "");
-            if (text.length === 0) {
-              child.remove();
-              continue;
-            }
-            child.setTextContent(text);
-          }
-
-          if (seenHR) {
-            spillAfter.push(child);
-          } else {
-            spillBefore.push(child);
-          }
-        }
-
-        if (spillAfter.length > 0) {
-          console.log(
-            "[HR] Moving spill-after content to new paragraph:",
-            spillAfter.map((c) => JSON.stringify(c.getTextContent())),
-          );
-          const p = $createParagraphNode();
-          for (const child of spillAfter) {
-            p.append(child);
-          }
-          paragraphNode.insertAfter(p);
-          p.selectEnd();
-        }
-
-        if (spillBefore.length > 0) {
-          console.log(
-            "[HR] Moving spill-before content to new paragraph:",
-            spillBefore.map((c) => JSON.stringify(c.getTextContent())),
-          );
-          const p = $createParagraphNode();
-          for (const child of spillBefore) {
-            p.append(child);
-          }
-          paragraphNode.insertBefore(p);
-        }
-      },
+      $normalizeHRParagraph,
     );
 
     // Backspace when cursor is right after an HR or image (in the right

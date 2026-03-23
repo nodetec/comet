@@ -44,7 +44,7 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const normalizedQuery = searchQuery.trim();
   const normalizedActiveTags = useMemo(
-    () => [...activeTags].sort((left, right) => left.localeCompare(right)),
+    () => activeTags.toSorted((left, right) => left.localeCompare(right)),
     [activeTags],
   );
 

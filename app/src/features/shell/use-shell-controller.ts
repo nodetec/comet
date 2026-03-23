@@ -257,11 +257,11 @@ export function useShellController() {
   const displayedSelectedNoteId = isCreatingNote
     ? creatingSelectedNoteId
     : selectedNoteId;
-  const currentEditorMarkdown = currentNote
-    ? (draftNoteId === currentNote.id
-      ? draftMarkdown
-      : currentNote.markdown)
-    : "";
+  let currentEditorMarkdown = "";
+  if (currentNote) {
+    currentEditorMarkdown =
+      draftNoteId === currentNote.id ? draftMarkdown : currentNote.markdown;
+  }
 
   // --- Draft persistence ---
   useDraftPersistence({
@@ -718,7 +718,7 @@ export function useShellController() {
           ? editorFocusMode
           : ("none" as const),
       html: currentNote?.html ?? null,
-      isNewNote: currentNote?.id === creatingSelectedNoteId,
+      isNewNote: currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,

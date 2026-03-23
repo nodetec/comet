@@ -19,6 +19,13 @@ export default function ScrollCenterCurrentLinePlugin({
   const currentLineRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const scrollBlockIntoView = () => {
+      currentLineRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    };
+
     return editor.registerCommand<string>(
       KEY_ENTER_COMMAND,
       () => {
@@ -46,14 +53,10 @@ export default function ScrollCenterCurrentLinePlugin({
                 const cursorPosition = rect.top + focusOffset;
                 const threshold = viewportHeight * (viewportPercentage / 100);
 
-                if (cursorPosition > viewportHeight - threshold) {
-                  requestAnimationFrame(() => {
-                    currentLineRef.current = blockElement as HTMLDivElement;
-                    currentLineRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "center",
-                    });
-                  });
+                if (cursorPosition > viewportHeight - threshold && blockElement) {
+                  const el = blockElement as HTMLDivElement;
+                  currentLineRef.current = el;
+                  requestAnimationFrame(scrollBlockIntoView);
                 }
               }
             }

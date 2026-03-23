@@ -120,6 +120,76 @@ function InfoRow({
   );
 }
 
+function SyncInfoPanel({ info }: { info: SyncInfo }) {
+  return (
+    <div className="divide-accent/30 divide-y">
+      {info.relayUrl ? (
+        <InfoRow
+          icon={<Database className="size-3.5" />}
+          label="Relay"
+          value={info.relayUrl.replace(/^wss?:\/\//, "")}
+        />
+      ) : (
+        <InfoRow
+          icon={<Database className="size-3.5" />}
+          label="Relay"
+          value={
+            <span className="text-muted-foreground">Not configured</span>
+          }
+        />
+      )}
+
+      <InfoRow
+        icon={<HardDrive className="size-3.5" />}
+        label="Notes synced"
+        value={`${info.syncedNotes} / ${info.totalNotes}`}
+      />
+
+      <InfoRow
+        icon={<Notebook className="size-3.5" />}
+        label="Notebooks synced"
+        value={info.syncedNotebooks}
+      />
+
+      {info.pendingNotes + info.pendingNotebooks > 0 ? (
+        <InfoRow
+          icon={<CloudSync className="size-3.5" />}
+          label="Pending sync"
+          value={
+            <span className="text-amber-400">
+              {info.pendingNotes + info.pendingNotebooks} unsynced
+            </span>
+          }
+        />
+      ) : null}
+
+      {info.blossomUrl ? (
+        <InfoRow
+          icon={<Image className="size-3.5" />}
+          label="Blobs"
+          value={`${info.blobsStored} on ${info.blossomUrl.replace(/^https?:\/\//, "")}`}
+        />
+      ) : null}
+
+      {info.npub ? (
+        <InfoRow
+          icon={<Key className="size-3.5" />}
+          label="Identity"
+          value={`${info.npub.slice(0, 16)}…`}
+        />
+      ) : null}
+
+      {info.checkpoint > 0 ? (
+        <InfoRow
+          icon={<CloudSync className="size-3.5" />}
+          label="Checkpoint"
+          value={info.checkpoint}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 const MAX_LOGS = 100;
 
 export function SyncDialog({
@@ -209,73 +279,7 @@ export function SyncDialog({
           </DialogTitle>
 
           {info ? (
-            <div className="divide-accent/30 divide-y">
-              {info.relayUrl ? (
-                <InfoRow
-                  icon={<Database className="size-3.5" />}
-                  label="Relay"
-                  value={info.relayUrl.replace(/^wss?:\/\//, "")}
-                />
-              ) : (
-                <InfoRow
-                  icon={<Database className="size-3.5" />}
-                  label="Relay"
-                  value={
-                    <span className="text-muted-foreground">
-                      Not configured
-                    </span>
-                  }
-                />
-              )}
-
-              <InfoRow
-                icon={<HardDrive className="size-3.5" />}
-                label="Notes synced"
-                value={`${info.syncedNotes} / ${info.totalNotes}`}
-              />
-
-              <InfoRow
-                icon={<Notebook className="size-3.5" />}
-                label="Notebooks synced"
-                value={info.syncedNotebooks}
-              />
-
-              {info.pendingNotes + info.pendingNotebooks > 0 ? (
-                <InfoRow
-                  icon={<CloudSync className="size-3.5" />}
-                  label="Pending sync"
-                  value={
-                    <span className="text-amber-400">
-                      {info.pendingNotes + info.pendingNotebooks} unsynced
-                    </span>
-                  }
-                />
-              ) : null}
-
-              {info.blossomUrl ? (
-                <InfoRow
-                  icon={<Image className="size-3.5" />}
-                  label="Blobs"
-                  value={`${info.blobsStored} on ${info.blossomUrl.replace(/^https?:\/\//, "")}`}
-                />
-              ) : null}
-
-              {info.npub ? (
-                <InfoRow
-                  icon={<Key className="size-3.5" />}
-                  label="Identity"
-                  value={`${info.npub.slice(0, 16)}…`}
-                />
-              ) : null}
-
-              {info.checkpoint > 0 ? (
-                <InfoRow
-                  icon={<CloudSync className="size-3.5" />}
-                  label="Checkpoint"
-                  value={info.checkpoint}
-                />
-              ) : null}
-            </div>
+            <SyncInfoPanel info={info} />
           ) : (
             <p className="text-muted-foreground text-xs">Loading…</p>
           )}

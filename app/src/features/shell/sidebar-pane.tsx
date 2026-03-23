@@ -27,15 +27,26 @@ import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { type NoteFilter, type NotebookSummary } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
+function notebookItemStateClass(isActive: boolean, isFocused: boolean) {
+  if (isActive && isFocused) {
+    return "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
+  }
+  if (isActive) {
+    return "bg-accent/80 text-secondary-foreground";
+  }
+  return "text-secondary-foreground";
+}
+
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
-  return [
-    "flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-    isActive && isFocused
-      ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
-      : (isActive
-        ? "bg-accent/80 text-secondary-foreground"
-        : "text-secondary-foreground"),
-  ].join(" ");
+  let stateClass: string;
+  if (isActive && isFocused) {
+    stateClass = "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
+  } else if (isActive) {
+    stateClass = "bg-accent/80 text-secondary-foreground";
+  } else {
+    stateClass = "text-secondary-foreground";
+  }
+  return `flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors ${stateClass}`;
 }
 
 type SidebarPaneProps = {
@@ -71,6 +82,76 @@ type SidebarPaneProps = {
   renamingNotebookName: string;
 };
 
+async function showTrashContextMenu(
+  event: MouseEvent<HTMLButtonElement>,
+  onEmptyTrash: () => void,
+) {
+  event.preventDefault();
+  const menu = await Menu.new({
+    items: [
+      { id: "empty-trash", text: "Empty Trash", action: () => onEmptyTrash() },
+    ],
+  });
+  try {
+    await menu.popup(new LogicalPosition(event.clientX, event.clientY));
+  } finally {
+    await menu.close();
+  }
+}
+
+async function showNotebookContextMenu(
+  event: MouseEvent<HTMLButtonElement>,
+  notebookId: string,
+  onShowRename: (id: string) => void,
+  onDelete: (id: string) => void,
+) {
+  event.preventDefault();
+  const menu = await Menu.new({
+    items: [
+      {
+        id: `rename-notebook-${notebookId}`,
+        text: "Rename",
+        action: () => onShowRename(notebookId),
+      },
+      {
+        id: `delete-notebook-${notebookId}`,
+        text: "Delete",
+        action: () => onDelete(notebookId),
+      },
+    ],
+  });
+  try {
+    await menu.popup(new LogicalPosition(event.clientX, event.clientY));
+  } finally {
+    await menu.close();
+  }
+}
+
+function useSyncState() {
+  const [syncState, setSyncState] = useState<string>("disconnected");
+
+  useEffect(() => {
+    invoke<string | { error: { message: string } }>(
+      "get_sync_status",
+    ).then((s) => {
+      setSyncState(typeof s === "string" ? s : "error");
+    }).catch(() => {});
+    const unlisten = listen<{ state: string | { error: { message: string } } }>(
+      "sync-status",
+      (event) => {
+        const s = event.payload.state;
+        setSyncState(typeof s === "string" ? s : "error");
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn()).catch(() => {});
+    };
+  }, []);
+
+  return syncState;
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export function SidebarPane({
   activeNotebookId,
   activeTags,
@@ -105,25 +186,7 @@ export function SidebarPane({
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
-  const [syncState, setSyncState] = useState<string>("disconnected");
-
-  useEffect(() => {
-    void invoke<string | { error: { message: string } }>(
-      "get_sync_status",
-    ).then((s) => {
-      setSyncState(typeof s === "string" ? s : "error");
-    });
-    const unlisten = listen<{ state: string | { error: { message: string } } }>(
-      "sync-status",
-      (event) => {
-        const s = event.payload.state;
-        setSyncState(typeof s === "string" ? s : "error");
-      },
-    );
-    return () => {
-      void unlisten.then((fn) => fn());
-    };
-  }, []);
+  const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
@@ -176,58 +239,15 @@ export function SidebarPane({
     notebooks.length,
   ]);
 
-  const handleTrashContextMenu = async (
-    event: MouseEvent<HTMLButtonElement>,
-  ) => {
-    event.preventDefault();
-
-    const menu = await Menu.new({
-      items: [
-        {
-          id: "empty-trash",
-          text: "Empty Trash",
-          action: () => onEmptyTrash(),
-        },
-      ],
-    });
-
-    try {
-      await menu.popup(new LogicalPosition(event.clientX, event.clientY));
-    } finally {
-      await menu.close();
-    }
+  const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
+    showTrashContextMenu(event, onEmptyTrash).catch(() => {});
   };
 
-  const handleNotebookContextMenu = async (
+  const handleNotebookContextMenu = (
     event: MouseEvent<HTMLButtonElement>,
     notebookId: string,
   ) => {
-    event.preventDefault();
-
-    const menu = await Menu.new({
-      items: [
-        {
-          id: `rename-notebook-${notebookId}`,
-          text: "Rename",
-          action: () => {
-            onShowRenameNotebook(notebookId);
-          },
-        },
-        {
-          id: `delete-notebook-${notebookId}`,
-          text: "Delete",
-          action: () => {
-            onDeleteNotebook(notebookId);
-          },
-        },
-      ],
-    });
-
-    try {
-      await menu.popup(new LogicalPosition(event.clientX, event.clientY));
-    } finally {
-      await menu.close();
-    }
+    showNotebookContextMenu(event, notebookId, onShowRenameNotebook, onDeleteNotebook).catch(() => {});
   };
 
   return (
@@ -359,7 +379,7 @@ export function SidebarPane({
                     isFocused,
                   )}
                   onClick={onSelectTrash}
-                  onContextMenu={(event) => void handleTrashContextMenu(event)}
+                  onContextMenu={(event) => handleTrashContextMenu(event)}
                   type="button"
                 >
                   <Trash2 className="text-primary size-4 shrink-0" />
@@ -458,18 +478,16 @@ export function SidebarPane({
                         <button
                           className={cn(
                             "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-                            noteFilter === "notebook" &&
-                              activeNotebookId === notebook.id
-                              ? (isFocused
-                                ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
-                                : "bg-accent/80 text-secondary-foreground")
-                              : "text-secondary-foreground",
+                            notebookItemStateClass(
+                              noteFilter === "notebook" && activeNotebookId === notebook.id,
+                              isFocused,
+                            ),
                           )}
                           disabled={renameNotebookDisabled}
                           key={notebook.id}
                           onClick={() => onSelectNotebook(notebook.id)}
                           onContextMenu={(event) =>
-                            void handleNotebookContextMenu(event, notebook.id)
+                            handleNotebookContextMenu(event, notebook.id)
                           }
                           type="button"
                         >

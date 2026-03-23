@@ -60,6 +60,19 @@ function isChecklistTextNode(node: LexicalNode | null | undefined): boolean {
   return isChecklist(parentList);
 }
 
+function isMeaningfulChild(child: LexicalNode): boolean {
+  if ($isTextNode(child)) {
+    return stripChecklistPlaceholders(child.getTextContent()).length > 0;
+  }
+  if ($isListNode(child)) {
+    return child.getChildrenSize() > 0;
+  }
+  if ($isElementNode(child) && child.getChildrenSize() > 0) {
+    return true;
+  }
+  return child.getTextContent().trim().length > 0;
+}
+
 function hasMeaningfulSiblingContent(
   ownerItem: ListItemNode,
   excludeNode: LexicalNode,
@@ -68,25 +81,7 @@ function hasMeaningfulSiblingContent(
     if (child.is(excludeNode) || child.getType() === "list-anchor") {
       continue;
     }
-
-    if ($isTextNode(child)) {
-      if (stripChecklistPlaceholders(child.getTextContent()).length > 0) {
-        return true;
-      }
-      continue;
-    }
-
-    if ($isListNode(child)) {
-      if (child.getChildrenSize() > 0) {
-        return true;
-      }
-      continue;
-    }
-
-    if (
-      ($isElementNode(child) && child.getChildrenSize() > 0) ||
-      child.getTextContent().trim().length > 0
-    ) {
+    if (isMeaningfulChild(child)) {
       return true;
     }
   }
@@ -183,23 +178,10 @@ export function $convertNestedChecklistItemToParagraph(
   return true;
 }
 
-export function $convertChecklistParagraphToNestedItem(
+function $moveChildrenToListItem(
   paragraphNode: ParagraphNode,
+  nestedItem: ListItemNode,
 ): boolean {
-  const ownerItem = paragraphNode.getParent();
-  const ownerList = ownerItem?.getParent();
-
-  if (
-    !$isParagraphNode(paragraphNode) ||
-    !$isListItemNode(ownerItem) ||
-    !$isListNode(ownerList) ||
-    ownerList.getListType() !== "check" ||
-    !hasMeaningfulSiblingContent(ownerItem, paragraphNode)
-  ) {
-    return false;
-  }
-
-  const nestedItem = $createListItemNode(false);
   let hasVisibleContent = false;
 
   for (const child of paragraphNode.getChildren()) {
@@ -208,24 +190,23 @@ export function $convertChecklistParagraphToNestedItem(
       if (text.length === 0) {
         continue;
       }
-
       if (text !== child.getTextContent()) {
         child.setTextContent(text);
       }
     }
-
     nestedItem.append(child);
     hasVisibleContent = true;
   }
 
-  if (!hasVisibleContent) {
-    const placeholder = $createTextNode(CHECKLIST_PLACEHOLDER);
-    nestedItem.append(placeholder);
-    placeholder.select(0, 1);
-  }
+  return hasVisibleContent;
+}
 
+function $insertNestedItemIntoChecklist(
+  paragraphNode: ParagraphNode,
+  nestedItem: ListItemNode,
+): void {
   const previousChecklist = [...paragraphNode.getPreviousSiblings()]
-    .reverse()
+    .toReversed()
     .find(
       (sibling): sibling is ListNode =>
         $isListNode(sibling) && sibling.getListType() === "check",
@@ -257,6 +238,34 @@ export function $convertChecklistParagraphToNestedItem(
     nestedChecklist.append(nestedItem);
     paragraphNode.replace(nestedChecklist);
   }
+}
+
+export function $convertChecklistParagraphToNestedItem(
+  paragraphNode: ParagraphNode,
+): boolean {
+  const ownerItem = paragraphNode.getParent();
+  const ownerList = ownerItem?.getParent();
+
+  if (
+    !$isParagraphNode(paragraphNode) ||
+    !$isListItemNode(ownerItem) ||
+    !$isListNode(ownerList) ||
+    ownerList.getListType() !== "check" ||
+    !hasMeaningfulSiblingContent(ownerItem, paragraphNode)
+  ) {
+    return false;
+  }
+
+  const nestedItem = $createListItemNode(false);
+  const hasVisibleContent = $moveChildrenToListItem(paragraphNode, nestedItem);
+
+  if (!hasVisibleContent) {
+    const placeholder = $createTextNode(CHECKLIST_PLACEHOLDER);
+    nestedItem.append(placeholder);
+    placeholder.select(0, 1);
+  }
+
+  $insertNestedItemIntoChecklist(paragraphNode, nestedItem);
 
   if (hasVisibleContent) {
     nestedItem.selectEnd();

@@ -40,7 +40,7 @@ function getHashtagRegexStringChars() {
     "\u1100-\u11FF\u3130-\u3185\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF" +
     "\uFFA1-\uFFDC";
 
-  const charCode = String.fromCharCode;
+  const charCode = String.fromCodePoint;
 
   const cjkChars =
     "\u30A1-\u30FA\u30FC-\u30FE\uFF66-\uFF9F" +
@@ -210,12 +210,73 @@ function $replaceWithSimpleText(node: TextNode): void {
   node.replace(textNode);
 }
 
+/**
+ * Handle the case where the previous sibling is a text/hashtag node.
+ * Returns null if the caller should continue, otherwise returns early.
+ */
+function handlePrevSiblingHashtag(
+  prevSibling: TextNode,
+  text: string,
+  node: TextNode,
+  getMode: (node: TextNode) => number,
+): "handled" | null {
+  const previousText = prevSibling.getTextContent();
+  const combinedText = previousText + text;
+  const prevMatch = getHashtagMatch(combinedText);
+
+  if ($isHashtagNode(prevSibling)) {
+    if (prevMatch === null || getMode(prevSibling) !== 0) {
+      $replaceWithSimpleText(prevSibling);
+      return "handled";
+    }
+    const diff = prevMatch.end - previousText.length;
+    if (diff > 0) {
+      const newTextContent = previousText + text.slice(0, diff);
+      prevSibling.select();
+      prevSibling.setTextContent(newTextContent);
+      if (diff === text.length) {
+        node.remove();
+      } else {
+        node.setTextContent(text.slice(diff));
+      }
+      return "handled";
+    }
+  } else if (prevMatch === null || prevMatch.start < previousText.length) {
+    return "handled";
+  }
+
+  return null;
+}
+
+/**
+ * When the next text after the current match is empty, check the next sibling
+ * to determine if we should stop. Returns true if the caller should return.
+ */
+function handleEmptyNextText(currentNode: TextNode): boolean {
+  const nextSibling = currentNode.getNextSibling();
+  if (!$isTextNode(nextSibling)) return false;
+
+  const nextText =
+    currentNode.getTextContent() + nextSibling.getTextContent();
+  const nextMatch = getHashtagMatch(nextText);
+  if (nextMatch === null) {
+    if ($isHashtagNode(nextSibling)) {
+      $replaceWithSimpleText(nextSibling);
+    } else {
+      nextSibling.markDirty();
+    }
+    return true;
+  }
+  return nextMatch.start !== 0;
+}
+
 function registerHashtag(editor: LexicalEditor) {
   // Mirrors upstream registerLexicalTextEntity — no public API for __mode
   const getMode = (node: TextNode): number =>
     (node.getLatest() as unknown as { __mode: number }).__mode;
 
   // Forward transform: TextNode → HashtagNode (skips code contexts)
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- fork of Lexical's registerLexicalTextEntity; complexity is inherent
   const removeTextTransform = editor.registerNodeTransform(TextNode, (node) => {
     if (!node.isSimpleText() || $isInsideCode(node)) {
       return;
@@ -224,60 +285,26 @@ function registerHashtag(editor: LexicalEditor) {
     let prevSibling = node.getPreviousSibling();
     let text = node.getTextContent();
     let currentNode: TextNode | undefined = node;
-    let match;
 
     if ($isTextNode(prevSibling)) {
-      const previousText = prevSibling.getTextContent();
-      const combinedText = previousText + text;
-      const prevMatch = getHashtagMatch(combinedText);
-
-      if ($isHashtagNode(prevSibling)) {
-        if (prevMatch === null || getMode(prevSibling) !== 0) {
-          $replaceWithSimpleText(prevSibling);
-          return;
-        } else {
-          const diff = prevMatch.end - previousText.length;
-          if (diff > 0) {
-            const newTextContent = previousText + text.slice(0, diff);
-            prevSibling.select();
-            prevSibling.setTextContent(newTextContent);
-            if (diff === text.length) {
-              node.remove();
-            } else {
-              node.setTextContent(text.slice(diff));
-            }
-            return;
-          }
-        }
-      } else if (prevMatch === null || prevMatch.start < previousText.length) {
-        return;
-      }
+      const handled = handlePrevSiblingHashtag(
+        prevSibling,
+        text,
+        node,
+        getMode,
+      );
+      if (handled !== null) return;
     }
 
     let prevMatchLengthToSkip = 0;
 
     while (true) {
-      match = getHashtagMatch(text);
-      let nextText = match === null ? "" : text.slice(match.end);
+      const match = getHashtagMatch(text);
+      const nextText = match === null ? "" : text.slice(match.end);
       text = nextText;
 
-      if (nextText === "") {
-        const nextSibling = currentNode!.getNextSibling();
-        if ($isTextNode(nextSibling)) {
-          nextText =
-            currentNode!.getTextContent() + nextSibling.getTextContent();
-          const nextMatch = getHashtagMatch(nextText);
-          if (nextMatch === null) {
-            if ($isHashtagNode(nextSibling)) {
-              $replaceWithSimpleText(nextSibling);
-            } else {
-              nextSibling.markDirty();
-            }
-            return;
-          } else if (nextMatch.start !== 0) {
-            return;
-          }
-        }
+      if (nextText === "" && handleEmptyNextText(currentNode!)) {
+        return;
       }
 
       if (match === null) {
@@ -293,17 +320,16 @@ function registerHashtag(editor: LexicalEditor) {
         continue;
       }
 
-      let nodeToReplace: TextNode | undefined;
-      if (match.start === 0) {
-        [nodeToReplace, currentNode] = currentNode!.splitText(match.end);
-      } else {
-        [, nodeToReplace, currentNode] = currentNode!.splitText(
-          match.start + prevMatchLengthToSkip,
-          match.end + prevMatchLengthToSkip,
-        );
-      }
+      const splitResult = match.start === 0
+        ? currentNode!.splitText(match.end)
+        : currentNode!.splitText(
+            match.start + prevMatchLengthToSkip,
+            match.end + prevMatchLengthToSkip,
+          );
+      const nodeToReplace = match.start === 0 ? splitResult[0] : splitResult[1];
+      currentNode = match.start === 0 ? splitResult[1] : splitResult[2];
 
-      if (nodeToReplace === undefined) {
+      if (nodeToReplace == null) {
         return;
       }
 

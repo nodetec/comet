@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+// eslint-disable-next-line sonarjs/deprecation -- $nodesOfType has no non-deprecated replacement in Lexical
 import { $nodesOfType } from "lexical";
 import { HeadingNode } from "@lexical/rich-text";
 
@@ -18,6 +19,7 @@ export default function HeadingAnchorPlugin() {
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState }) => {
       editorState.read(() => {
+        // eslint-disable-next-line sonarjs/deprecation -- $nodesOfType has no non-deprecated replacement
         const headings = $nodesOfType(HeadingNode);
         const slugCounts = new Map<string, number>();
 

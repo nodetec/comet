@@ -6,7 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { queryClient } from "@/shared/config/query-client";
 
-import App from "./App";
+import App from "./app";
 import "./index.css";
 
 declare global {

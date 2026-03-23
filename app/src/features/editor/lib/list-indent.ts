@@ -82,6 +82,32 @@ function $getPreviousMeaningfulSibling(
   return null;
 }
 
+function $mergeNestedListsIntoOwner(
+  sibling: ListItemNode,
+  ownerItem: ListItemNode,
+  listType: ListType,
+): void {
+  const nestedLists = sibling
+    .getChildren()
+    .filter(
+      (child): child is ListNode =>
+        $isListNode(child) && child.getListType() === listType,
+    );
+
+  if (nestedLists.length === 0) return;
+
+  let targetNestedList = $getNestedListChild(ownerItem, listType);
+  if (!targetNestedList) {
+    targetNestedList = $createListNode(listType);
+    ownerItem.append(targetNestedList);
+  }
+
+  for (const nestedList of nestedLists) {
+    targetNestedList.append(...nestedList.getChildren());
+    nestedList.remove();
+  }
+}
+
 function $mergeWrapperSiblingsIntoOwner(
   ownerItem: ListItemNode,
   stopBefore: ListItemNode,
@@ -93,26 +119,7 @@ function $mergeWrapperSiblingsIntoOwner(
     const nextSibling = sibling.getNextSibling();
 
     if ($isListItemNode(sibling) && !$hasMeaningfulNonListContent(sibling)) {
-      const nestedLists = sibling
-        .getChildren()
-        .filter(
-          (child): child is ListNode =>
-            $isListNode(child) && child.getListType() === listType,
-        );
-
-      if (nestedLists.length > 0) {
-        let targetNestedList = $getNestedListChild(ownerItem, listType);
-        if (!targetNestedList) {
-          targetNestedList = $createListNode(listType);
-          ownerItem.append(targetNestedList);
-        }
-
-        for (const nestedList of nestedLists) {
-          targetNestedList.append(...nestedList.getChildren());
-          nestedList.remove();
-        }
-      }
-
+      $mergeNestedListsIntoOwner(sibling, ownerItem, listType);
       sibling.remove();
     }
 

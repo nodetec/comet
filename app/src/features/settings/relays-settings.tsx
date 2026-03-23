@@ -101,7 +101,7 @@ function SyncRelaySection({
         A single relay used to sync notes between your devices.
       </p>
 
-      {relay && !editor.editing ? (
+      {relay && !editor.editing && (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {relay.url}
@@ -122,7 +122,8 @@ function SyncRelaySection({
             Remove
           </Button>
         </div>
-      ) : (editor.editing ? (
+      )}
+      {editor.editing && (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -139,11 +140,12 @@ function SyncRelaySection({
           }
           submitLabel="Save"
         />
-      ) : (
+      )}
+      {!relay && !editor.editing && (
         <Button variant="link" size="xs" onClick={() => editor.open()}>
           Set sync relay
         </Button>
-      ))}
+      )}
     </div>
   );
 }
@@ -182,7 +184,7 @@ function BlossomSection({
         A Blossom server used to sync image attachments between devices.
       </p>
 
-      {blossomUrl && !editor.editing ? (
+      {blossomUrl && !editor.editing && (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {blossomUrl}
@@ -203,7 +205,8 @@ function BlossomSection({
             Remove
           </Button>
         </div>
-      ) : (editor.editing ? (
+      )}
+      {editor.editing && (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -221,11 +224,12 @@ function BlossomSection({
           submitLabel="Save"
           placeholder="https://..."
         />
-      ) : (
+      )}
+      {!blossomUrl && !editor.editing && (
         <Button variant="link" size="xs" onClick={() => editor.open()}>
           Set Blossom server
         </Button>
-      ))}
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { createLinkMatcherWithRegExp, type LinkMatcher } from "@lexical/link";
 
 const URL_REG_EXP = /((https?:\/\/)|(www\.))[^\s<]+[^<.,:;"')\]\s]/i;
 const EMAIL_REG_EXP =
-  /[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
+  /[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/; // eslint-disable-line sonarjs/slow-regex -- bounded user text
 const IPV4_REG_EXP = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 type LinkMatcherResult = NonNullable<ReturnType<LinkMatcher>>;
@@ -48,29 +48,27 @@ function isValidAutolinkUrl(urlText: string) {
   }
 }
 
-function createValidatedUrlMatcher(): LinkMatcher {
-  return (text: string): LinkMatcherResult | null => {
-    const match = URL_REG_EXP.exec(text);
-    if (!match) {
-      return null;
-    }
+function validateUrlMatch(text: string): LinkMatcherResult | null {
+  const match = URL_REG_EXP.exec(text);
+  if (!match) {
+    return null;
+  }
 
-    const matchedText = match[0];
-    const normalizedUrl = normalizeAutolinkUrl(matchedText);
-    if (!isValidAutolinkUrl(normalizedUrl)) {
-      return null;
-    }
+  const matchedText = match[0];
+  const normalizedUrl = normalizeAutolinkUrl(matchedText);
+  if (!isValidAutolinkUrl(normalizedUrl)) {
+    return null;
+  }
 
-    return {
-      index: match.index,
-      length: matchedText.length,
-      text: matchedText,
-      url: normalizedUrl,
-    };
+  return {
+    index: match.index,
+    length: matchedText.length,
+    text: matchedText,
+    url: normalizedUrl,
   };
 }
 
-export const URL_LINK_MATCHER = createValidatedUrlMatcher();
+export const URL_LINK_MATCHER: LinkMatcher = validateUrlMatch;
 
 export const EMAIL_LINK_MATCHER = createLinkMatcherWithRegExp(
   EMAIL_REG_EXP,

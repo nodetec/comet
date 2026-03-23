@@ -33,58 +33,14 @@ type CommandPaletteProps = {
   onToggleTag(tag: string): void;
 };
 
-export function CommandPalette({
-  availableTags,
-  notebooks,
-  open,
-  onOpenChange,
-  onSelectNote,
-  onSelectNotebook,
-  onToggleTag,
-}: CommandPaletteProps) {
-  const [query, setQuery] = useState("");
-  const [noteResults, setNoteResults] = useState<SearchResult[]>([]);
-  const [tagResults, setTagResults] = useState<string[]>([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef<number | null>(null);
-
-  const mode: SearchMode = query.startsWith("#")
-    ? "tags"
-    : (query.startsWith("@")
-      ? "notebooks"
-      : "notes");
-
-  const searchTerm =
-    mode === "notes" ? query.trim() : query.trim().slice(1).trim();
-
-  const filteredNotebooks = useMemo(() => {
-    if (mode !== "notebooks") return [];
-    if (!searchTerm) return notebooks;
-    const lower = searchTerm.toLowerCase();
-    return notebooks.filter((nb) => nb.name.toLowerCase().includes(lower));
-  }, [mode, searchTerm, notebooks]);
-
-  const displayedTags =
-    mode === "tags" && !searchTerm ? availableTags : tagResults;
-
-  const hasResults =
-    mode === "tags"
-      ? displayedTags.length > 0
-      : (mode === "notebooks"
-        ? filteredNotebooks.length > 0
-        : noteResults.length > 0);
-
-  // Reset state when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setNoteResults([]);
-      setTagResults([]);
-      setSearching(false);
-    }
-  }, [open]);
-
-  // Debounced search for notes and tags (notebooks are filtered client-side)
+function useDebouncedSearch(
+  searchTerm: string,
+  mode: SearchMode,
+  debounceRef: React.RefObject<number | null>,
+  setNoteResults: (results: SearchResult[]) => void,
+  setTagResults: (results: string[]) => void,
+  setSearching: (searching: boolean) => void,
+) {
   useEffect(() => {
     if (debounceRef.current !== null) {
       clearTimeout(debounceRef.current);
@@ -117,7 +73,68 @@ export function CommandPalette({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [searchTerm, mode]);
+  }, [searchTerm, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
+export function CommandPalette({
+  availableTags,
+  notebooks,
+  open,
+  onOpenChange,
+  onSelectNote,
+  onSelectNotebook,
+  onToggleTag,
+}: CommandPaletteProps) {
+  const [query, setQuery] = useState("");
+  const [noteResults, setNoteResults] = useState<SearchResult[]>([]);
+  const [tagResults, setTagResults] = useState<string[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+
+  let mode: SearchMode;
+  if (query.startsWith("#")) {
+    mode = "tags";
+  } else if (query.startsWith("@")) {
+    mode = "notebooks";
+  } else {
+    mode = "notes";
+  }
+
+  const searchTerm =
+    mode === "notes" ? query.trim() : query.trim().slice(1).trim();
+
+  const filteredNotebooks = useMemo(() => {
+    if (mode !== "notebooks") return [];
+    if (!searchTerm) return notebooks;
+    const lower = searchTerm.toLowerCase();
+    return notebooks.filter((nb) => nb.name.toLowerCase().includes(lower));
+  }, [mode, searchTerm, notebooks]);
+
+  const displayedTags =
+    mode === "tags" && !searchTerm ? availableTags : tagResults;
+
+  let hasResults: boolean;
+  if (mode === "tags") {
+    hasResults = displayedTags.length > 0;
+  } else if (mode === "notebooks") {
+    hasResults = filteredNotebooks.length > 0;
+  } else {
+    hasResults = noteResults.length > 0;
+  }
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setNoteResults([]);
+      setTagResults([]);
+      setSearching(false);
+    }
+  }, [open]);
+
+  // Debounced search for notes and tags (notebooks are filtered client-side)
+  useDebouncedSearch(searchTerm, mode, debounceRef, setNoteResults, setTagResults, setSearching);
 
   const handleSelectNote = (noteId: string) => {
     onSelectNote(noteId);
@@ -134,12 +151,14 @@ export function CommandPalette({
     onOpenChange(false);
   };
 
-  const showList =
-    mode === "notebooks"
-      ? searchTerm !== "" || notebooks.length > 0
-      : (mode === "tags"
-        ? displayedTags.length > 0 || (searchTerm && !searching)
-        : searchTerm && !(searching && !hasResults));
+  let showList: boolean | string;
+  if (mode === "notebooks") {
+    showList = searchTerm !== "" || notebooks.length > 0;
+  } else if (mode === "tags") {
+    showList = displayedTags.length > 0 || (searchTerm && !searching);
+  } else {
+    showList = searchTerm && !(searching && !hasResults);
+  }
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -164,11 +183,9 @@ export function CommandPalette({
             >
               {searchTerm && !searching && !hasResults && (
                 <CommandPrimitive.Empty className="text-muted-foreground py-6 text-center text-sm">
-                  {mode === "tags"
-                    ? "No tags found."
-                    : (mode === "notebooks"
-                      ? "No notebooks found."
-                      : "No notes found.")}
+                  {mode === "tags" && "No tags found."}
+                  {mode === "notebooks" && "No notebooks found."}
+                  {mode === "notes" && "No notes found."}
                 </CommandPrimitive.Empty>
               )}
 
