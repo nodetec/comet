@@ -15,7 +15,7 @@ pub enum BlobFetchStatus {
 #[tauri::command]
 pub fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
     let conn = database_connection(&app)?;
-    Ok(crate::adapters::nostr::sync_manager::get_blossom_url(&conn))
+    Ok(crate::adapters::sqlite::sync_repository::get_blossom_url(&conn))
 }
 
 #[tauri::command]
@@ -56,7 +56,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
     }
 
     let conn = database_connection(&app)?;
-    let preferred_blossom_url = crate::adapters::nostr::sync_manager::get_blossom_url(&conn);
+    let preferred_blossom_url = crate::adapters::sqlite::sync_repository::get_blossom_url(&conn);
     log::info!(
         "[blob] lookup plaintext_hash={hash} preferred_blossom_url={preferred_blossom_url:?}"
     );
@@ -141,7 +141,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
             |row| row.get::<_, String>(0),
         )
         .optional()?
-        .and_then(|md| crate::adapters::nostr::sync_manager::extract_blob_extension(&md, &hash))
+        .and_then(|md| crate::domain::blob::service::extract_blob_extension(&md, &hash))
         .unwrap_or_else(|| "bin".to_string());
     log::info!(
         "[blob] resolved extension plaintext_hash={hash} ext={ext}"

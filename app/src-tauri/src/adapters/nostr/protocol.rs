@@ -196,7 +196,7 @@ pub async fn publish_note(
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
         let conn = crate::db::database_connection(app)?;
-        crate::adapters::nostr::sync_manager::get_blossom_url(&conn)
+        crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
         crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
@@ -312,7 +312,7 @@ pub async fn publish_short_note(
     // Upload attachment images to Blossom and rewrite URIs to public URLs
     let blossom_url = {
         let conn = crate::db::database_connection(app)?;
-        crate::adapters::nostr::sync_manager::get_blossom_url(&conn)
+        crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
         crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?

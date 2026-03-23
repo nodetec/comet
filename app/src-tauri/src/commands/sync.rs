@@ -130,8 +130,8 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
 
     let conn = database_connection(&app)?;
 
-    let relay_url = crate::adapters::nostr::sync_manager::get_sync_relay_url(&conn);
-    let blossom_url = crate::adapters::nostr::sync_manager::get_blossom_url(&conn);
+    let relay_url = crate::adapters::sqlite::sync_repository::get_sync_relay_url(&conn);
+    let blossom_url = crate::adapters::sqlite::sync_repository::get_blossom_url(&conn);
     let npub: Option<String> = conn
         .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
             row.get(0)
@@ -168,7 +168,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         |row| row.get(0),
     )?;
 
-    let checkpoint: i64 = crate::adapters::nostr::sync_manager::get_checkpoint(&conn);
+    let checkpoint: i64 = crate::adapters::sqlite::sync_repository::get_checkpoint(&conn);
 
     let blobs_stored: i64 =
         conn.query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;

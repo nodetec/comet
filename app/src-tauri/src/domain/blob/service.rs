@@ -5,6 +5,36 @@ use tauri::AppHandle;
 
 use crate::error::AppError;
 
+/// Detect image format from magic bytes.
+pub fn detect_image_extension(data: &[u8]) -> Option<String> {
+    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        Some("png".to_string())
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg".to_string())
+    } else if data.starts_with(b"GIF8") {
+        Some("gif".to_string())
+    } else if data.starts_with(b"RIFF") && data.len() > 11 && &data[8..12] == b"WEBP" {
+        Some("webp".to_string())
+    } else if data.starts_with(b"<svg") || data.starts_with(b"<?xml") {
+        Some("svg".to_string())
+    } else {
+        None
+    }
+}
+
+/// Extract the file extension for a blob hash from markdown content.
+pub fn extract_blob_extension(content: &str, hash: &str) -> Option<String> {
+    let pattern = format!("attachment://{hash}.");
+    if let Some(pos) = content.find(&pattern) {
+        let after = &content[pos + pattern.len()..];
+        let ext: String = after.chars().take_while(|c| c.is_alphanumeric()).collect();
+        if !ext.is_empty() {
+            return Some(ext);
+        }
+    }
+    None
+}
+
 /// Extract `attachment://` hashes from markdown content.
 pub fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
     static RE: std::sync::LazyLock<Regex> =

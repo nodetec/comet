@@ -1,11 +1,18 @@
-use crate::domain::sync::model::{
-    SyncChangePayload, SyncCommand, SyncState, SyncStatusPayload, SyncedNote, SyncedNotebook,
+use crate::adapters::sqlite::sync_repository::{
+    get_blossom_url, get_checkpoint, get_sync_relay_url, save_checkpoint,
 };
-use crate::error::{now_millis, AppError};
+use crate::domain::blob::service::{detect_image_extension, extract_blob_extension};
+use crate::domain::sync::model::{
+    SyncChangePayload, SyncCommand, SyncState, SyncStatusPayload,
+};
+use crate::domain::sync::service::{
+    delete_note_from_sync, upsert_from_sync, upsert_notebook_from_sync,
+};
+use crate::error::AppError;
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, OptionalExtension};
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,17 +26,6 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 fn sync_log(app: &AppHandle, msg: &str) {
     eprintln!("[sync] {msg}");
     let _ = app.emit("sync-log", msg.to_string());
-}
-
-fn delete_note_from_sync(
-    conn: &Connection,
-    note_id: &str,
-    mut invalidate_cache: impl FnMut(&str),
-) -> Result<(), AppError> {
-    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
-    conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
-    invalidate_cache(note_id);
-    Ok(())
 }
 
 // ── SyncManager ────────────────────────────────────────────────────────
@@ -143,92 +139,12 @@ pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
     Ok(())
 }
 
-// ── DB helpers ──────────────────────────────────────────────────────────
-
-pub(crate) fn get_blossom_url(conn: &Connection) -> Option<String> {
-    conn.query_row(
-        "SELECT value FROM app_settings WHERE key = 'blossom_url'",
-        [],
-        |row| row.get(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
-}
-
-pub(crate) fn get_sync_relay_url(conn: &Connection) -> Option<String> {
-    conn.query_row(
-        "SELECT url FROM relays WHERE kind = 'sync' LIMIT 1",
-        [],
-        |row| row.get(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
-}
-
-pub(crate) fn get_checkpoint(conn: &Connection) -> i64 {
-    conn.query_row(
-        "SELECT value FROM app_settings WHERE key = 'sync_checkpoint'",
-        [],
-        |row| row.get::<_, String>(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
-    .and_then(|v| v.parse::<i64>().ok())
-    .unwrap_or(0)
-}
-
-fn save_checkpoint(conn: &Connection, seq: i64) {
-    let _ = conn.execute(
-        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_checkpoint', ?1)",
-        params![seq.to_string()],
-    );
-}
-
 // ── Note ↔ Event mapping ───────────────────────────────────────────────
 
 use crate::domain::sync::event_codec::{
     deleted_note_rumor, deleted_notebook_rumor, is_deleted_rumor, is_notebook_rumor,
     note_to_rumor, notebook_to_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
 };
-
-fn upsert_notebook_from_sync(
-    conn: &Connection,
-    notebook: &SyncedNotebook,
-    sync_event_id: &str,
-) -> Result<(), AppError> {
-    let existing: Option<i64> = conn
-        .query_row(
-            "SELECT updated_at FROM notebooks WHERE id = ?1",
-            params![notebook.id],
-            |row| row.get(0),
-        )
-        .optional()?;
-
-    if let Some(local_updated) = existing {
-        if local_updated >= notebook.updated_at {
-            // Local version is same or newer — just update sync_event_id
-            conn.execute(
-                "UPDATE notebooks SET sync_event_id = ?1 WHERE id = ?2",
-                params![sync_event_id, notebook.id],
-            )?;
-            return Ok(());
-        }
-        conn.execute(
-            "UPDATE notebooks SET name = ?1, updated_at = ?2, sync_event_id = ?3, locally_modified = 0 WHERE id = ?4",
-            params![notebook.name, notebook.updated_at, sync_event_id, notebook.id],
-        )?;
-    } else {
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
-             VALUES (?1, ?2, ?3, ?3, ?4, 0)",
-            params![notebook.id, notebook.name, notebook.updated_at, sync_event_id],
-        )?;
-    }
-    Ok(())
-}
 
 /// Compute a deterministic d-tag for a gift wrap using HMAC-SHA256.
 /// This allows the relay to replace old versions without leaking the note ID.
@@ -242,106 +158,6 @@ fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
 use crate::domain::blob::service::{
     cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes,
 };
-
-// ── Upsert from sync ───────────────────────────────────────────────────
-
-fn upsert_from_sync(
-    conn: &Connection,
-    note: &SyncedNote,
-    sync_event_id: &str,
-) -> Result<Option<String>, AppError> {
-    let existing: Option<(String, i64)> = conn
-        .query_row(
-            "SELECT id, modified_at FROM notes WHERE id = ?1",
-            params![note.id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?;
-
-    if let Some((_, local_modified)) = &existing {
-        if *local_modified >= note.modified_at {
-            eprintln!(
-                "[sync] skip upsert note={} local_modified={} remote_modified={}",
-                note.id, local_modified, note.modified_at
-            );
-            // Local version is same or newer — just update sync_event_id
-            conn.execute(
-                "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
-                params![sync_event_id, note.id],
-            )?;
-            return Ok(None);
-        }
-    }
-
-    // Ensure referenced notebook exists (it may arrive after the note in the sync stream).
-    // Stub gets updated_at = 0 so the real notebook event always wins LWW.
-    if let Some(ref nb_id) = note.notebook_id {
-        let now = now_millis();
-        conn.execute(
-            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, 0, 0)",
-            params![nb_id, now],
-        )?;
-    }
-
-    if existing.is_some() {
-        // Update existing note
-        conn.execute(
-            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?5, \
-             archived_at = ?6, deleted_at = ?7, pinned_at = ?8, readonly = ?9, sync_event_id = ?10, locally_modified = 0 WHERE id = ?11",
-            params![
-                note.title,
-                note.markdown,
-                note.notebook_id,
-                note.modified_at,
-                note.edited_at,
-                note.archived_at,
-                note.deleted_at,
-                note.pinned_at,
-                i32::from(note.readonly),
-                sync_event_id,
-                note.id,
-            ],
-        )?;
-    } else {
-        // Insert new note
-        conn.execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
-             archived_at, deleted_at, pinned_at, readonly, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0)",
-            params![
-                note.id,
-                note.title,
-                note.markdown,
-                note.notebook_id,
-                note.created_at,
-                note.modified_at,
-                note.edited_at,
-                note.archived_at,
-                note.deleted_at,
-                note.pinned_at,
-                i32::from(note.readonly),
-                sync_event_id,
-            ],
-        )?;
-    }
-
-    // Update tags
-    conn.execute("DELETE FROM note_tags WHERE note_id = ?1", params![note.id])?;
-    for tag in &note.tags {
-        conn.execute(
-            "INSERT OR IGNORE INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-            params![note.id, tag],
-        )?;
-    }
-
-    // Update FTS
-    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note.id])?;
-    conn.execute(
-        "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
-        params![note.id, note.title, note.markdown],
-    )?;
-
-    Ok(Some(note.id.clone()))
-}
 
 // ── Sync loop ──────────────────────────────────────────────────────────
 
@@ -1294,83 +1110,3 @@ async fn download_missing_blobs(
     }
 }
 
-/// Detect image format from magic bytes.
-fn detect_image_extension(data: &[u8]) -> Option<String> {
-    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-        Some("png".to_string())
-    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        Some("jpg".to_string())
-    } else if data.starts_with(b"GIF8") {
-        Some("gif".to_string())
-    } else if data.starts_with(b"RIFF") && data.len() > 11 && &data[8..12] == b"WEBP" {
-        Some("webp".to_string())
-    } else if data.starts_with(b"<svg") || data.starts_with(b"<?xml") {
-        Some("svg".to_string())
-    } else {
-        None
-    }
-}
-
-/// Extract the file extension for a blob hash from markdown content.
-pub(crate) fn extract_blob_extension(content: &str, hash: &str) -> Option<String> {
-    let pattern = format!("attachment://{hash}.");
-    if let Some(pos) = content.find(&pattern) {
-        let after = &content[pos + pattern.len()..];
-        let ext: String = after.chars().take_while(|c| c.is_alphanumeric()).collect();
-        if !ext.is_empty() {
-            return Some(ext);
-        }
-    }
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::delete_note_from_sync;
-    use rusqlite::{params, Connection};
-
-    #[test]
-    fn sync_delete_removes_note_and_invalidates_cache() {
-        let conn = Connection::open_in_memory().expect("open sqlite");
-        conn.execute_batch(
-            "CREATE TABLE notes (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                markdown TEXT NOT NULL
-            );
-            CREATE TABLE notes_fts (
-                note_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                markdown TEXT NOT NULL
-            );",
-        )
-        .expect("create schema");
-        conn.execute(
-            "INSERT INTO notes (id, title, markdown) VALUES (?1, ?2, ?3)",
-            params!["note-1", "Title", "Body"],
-        )
-        .expect("insert note");
-        conn.execute(
-            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
-            params!["note-1", "Title", "Body"],
-        )
-        .expect("insert fts");
-
-        let mut invalidated_note_id: Option<String> = None;
-        delete_note_from_sync(&conn, "note-1", |note_id| {
-            invalidated_note_id = Some(note_id.to_string());
-        })
-        .expect("delete note from sync");
-
-        let notes_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
-            .expect("count notes");
-        let fts_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
-            .expect("count notes_fts");
-
-        assert_eq!(notes_count, 0);
-        assert_eq!(fts_count, 0);
-        assert_eq!(invalidated_note_id.as_deref(), Some("note-1"));
-    }
-}
