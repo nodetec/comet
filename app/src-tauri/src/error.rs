@@ -57,5 +57,11 @@ impl From<BlobError> for AppError {
     }
 }
 
+impl From<crate::domain::sync::error::SyncError> for AppError {
+    fn from(e: crate::domain::sync::error::SyncError) -> Self {
+        AppError::Custom(e.to_string())
+    }
+}
+
 // Re-exports for backward compatibility during transition.
 pub use crate::domain::common::time::{now_millis, now_secs};
