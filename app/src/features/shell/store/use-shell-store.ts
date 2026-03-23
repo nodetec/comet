@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { type NoteFilter } from "@/shared/api/types";
 
 export type { NoteFilter } from "@/shared/api/types";
 

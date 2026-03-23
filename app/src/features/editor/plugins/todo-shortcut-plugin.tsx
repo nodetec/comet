@@ -81,9 +81,7 @@ function $findAncestorChecklistItem(
   return $isListItemNode(current) ? current : null;
 }
 
-function $handleToggleChecklist(
-  editor: import("lexical").LexicalEditor,
-): void {
+function $handleToggleChecklist(editor: import("lexical").LexicalEditor): void {
   const selection = $getSelection();
   if (!$isRangeSelection(selection)) return;
 
@@ -91,10 +89,7 @@ function $handleToggleChecklist(
 
   // Try converting paragraph to nested checklist item
   const paragraphNode = $findAncestorParagraph(anchorNode);
-  if (
-    paragraphNode &&
-    $convertChecklistParagraphToNestedItem(paragraphNode)
-  ) {
+  if (paragraphNode && $convertChecklistParagraphToNestedItem(paragraphNode)) {
     return;
   }
 
@@ -137,7 +132,7 @@ function $handleToggleChecklist(
     return;
   }
 
-  editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND);
+  editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, void 0);
 }
 
 export default function TodoShortcutPlugin() {

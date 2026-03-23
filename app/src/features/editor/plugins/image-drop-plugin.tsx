@@ -54,7 +54,7 @@ function $insertImportedImages(
     const selection = $getSelection();
     if ($isNodeSelection(selection)) {
       const nodes = selection.getNodes();
-      const lastNode = nodes.at(-1);
+      const [lastNode] = nodes.slice(-1);
       lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
     } else if (selection) {
       selection.insertNodes([imageNode]);

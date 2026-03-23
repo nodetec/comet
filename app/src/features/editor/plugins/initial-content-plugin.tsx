@@ -87,7 +87,7 @@ export default function InitialContentPlugin({
       // post-import state, not the pre-import state.
       { discrete: true },
     );
-    editor.dispatchCommand(CLEAR_HISTORY_COMMAND);
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, void 0);
 
     onInitComplete();
   }, [editor, html, isNew, loadKey, markdown, onInitComplete]);

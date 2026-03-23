@@ -47,15 +47,15 @@ function getHashtagRegexStringChars() {
     "\u30A1-\u30FA\u30FC-\u30FE\uFF66-\uFF9F" +
     "\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A" +
     "\u3041-\u3096\u3099-\u309E\u3400-\u4DBF\u4E00-\u9FFF" +
-    charCode(0x2_A7_00) +
+    charCode(0x2_a7_00) +
     "-" +
-    charCode(0x2_B7_3F) +
-    charCode(0x2_B7_40) +
+    charCode(0x2_b7_3f) +
+    charCode(0x2_b7_40) +
     "-" +
-    charCode(0x2_B8_1F) +
-    charCode(0x2_F8_00) +
+    charCode(0x2_b8_1f) +
+    charCode(0x2_f8_00) +
     "-" +
-    charCode(0x2_FA_1F) +
+    charCode(0x2_fa_1f) +
     "\u3003\u3005\u303B";
 
   const unicodeLetters =
@@ -257,8 +257,7 @@ function handleEmptyNextText(currentNode: TextNode): boolean {
   const nextSibling = currentNode.getNextSibling();
   if (!$isTextNode(nextSibling)) return false;
 
-  const nextText =
-    currentNode.getTextContent() + nextSibling.getTextContent();
+  const nextText = currentNode.getTextContent() + nextSibling.getTextContent();
   const nextMatch = getHashtagMatch(nextText);
   if (nextMatch === null) {
     if ($isHashtagNode(nextSibling)) {
@@ -321,12 +320,13 @@ function registerHashtag(editor: LexicalEditor) {
         continue;
       }
 
-      const splitResult = match.start === 0
-        ? currentNode!.splitText(match.end)
-        : currentNode!.splitText(
-            match.start + prevMatchLengthToSkip,
-            match.end + prevMatchLengthToSkip,
-          );
+      const splitResult: TextNode[] =
+        match.start === 0
+          ? currentNode!.splitText(match.end)
+          : currentNode!.splitText(
+              match.start + prevMatchLengthToSkip,
+              match.end + prevMatchLengthToSkip,
+            );
       const nodeToReplace = match.start === 0 ? splitResult[0] : splitResult[1];
       currentNode = match.start === 0 ? splitResult[1] : splitResult[2];
 

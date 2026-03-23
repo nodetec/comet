@@ -51,15 +51,12 @@ function handleTableDividerRow(parentNode: LexicalNode): boolean {
   if (!table || !$isTableNode(table)) return false;
 
   const rows = table.getChildren();
-  const lastRow = rows.at(-1);
+  const [lastRow] = rows.slice(-1);
   if (!lastRow || !$isTableRowNode(lastRow)) return false;
 
   for (const cell of lastRow.getChildren()) {
     if (!$isTableCellNode(cell)) continue;
-    cell.setHeaderStyles(
-      TableCellHeaderStates.ROW,
-      TableCellHeaderStates.ROW,
-    );
+    cell.setHeaderStyles(TableCellHeaderStates.ROW, TableCellHeaderStates.ROW);
   }
 
   parentNode.remove();
@@ -93,10 +90,7 @@ function collectPrecedingTableRows(
   return { rows, maxCells };
 }
 
-function buildTableNode(
-  rows: TableCellNode[][],
-  maxCells: number,
-): TableNode {
+function buildTableNode(rows: TableCellNode[][], maxCells: number): TableNode {
   const table = $createTableNode();
   for (const cells of rows) {
     const tableRow = $createTableRowNode();

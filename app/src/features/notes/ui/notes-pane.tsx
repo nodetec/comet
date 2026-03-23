@@ -124,10 +124,13 @@ const HIGHLIGHT_CLASS_NAME =
 const MAX_HIGHLIGHT_MATCHES_PER_BLOCK = 24;
 
 function normalizeHighlightWords(searchWords: string[]) {
-  return searchWords
-    .map((word) => word.toLocaleLowerCase())
-    .filter(Boolean)
-    .toSorted((left, right) => right.length - left.length);
+  return (
+    searchWords
+      .map((word) => word.toLocaleLowerCase())
+      .filter(Boolean)
+      // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig targets ES2020, so toSorted() is unavailable here
+      .sort((left, right) => right.length - left.length)
+  );
 }
 
 async function showNoteSortMenu(

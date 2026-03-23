@@ -44,7 +44,8 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const normalizedQuery = searchQuery.trim();
   const normalizedActiveTags = useMemo(
-    () => activeTags.toSorted((left, right) => left.localeCompare(right)),
+    // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig targets ES2020, so toSorted() is unavailable here
+    () => [...activeTags].sort((left, right) => left.localeCompare(right)),
     [activeTags],
   );
 

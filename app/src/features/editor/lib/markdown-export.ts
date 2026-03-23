@@ -360,7 +360,8 @@ export function $convertToMarkdownStringNormalized(
   const elementTransformers = [...byType.multilineElement, ...byType.element];
   const textTransformers = byType.textFormat
     .filter((transformer) => transformer.format.length === 1)
-    .toSorted(
+    // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig targets ES2020, so toSorted() is unavailable here
+    .sort(
       (a, b) =>
         Number(a.format.includes("code")) - Number(b.format.includes("code")),
     );

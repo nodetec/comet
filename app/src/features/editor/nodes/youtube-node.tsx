@@ -287,7 +287,12 @@ export class YouTubeNode extends DecoratorNode<ReactNode> {
   static importDOM(): DOMConversionMap | null {
     return {
       iframe: (domNode: HTMLElement) => {
-        if (!Object.hasOwn(domNode.dataset, "lexicalYoutube")) {
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            domNode.dataset,
+            "lexicalYoutube",
+          )
+        ) {
           return null;
         }
         return {

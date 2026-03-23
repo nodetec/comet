@@ -153,7 +153,7 @@ function insertBlockNodes(nodes: LexicalNode[]): void {
     }
   }
 
-  const lastNode = nodes.at(-1);
+  const [lastNode] = nodes.slice(-1);
   if ($isElementNode(lastNode)) {
     lastNode.selectEnd();
   }
@@ -254,8 +254,9 @@ function trimBoundaryEmptyParagraphs(
 
   const lines = sourceMarkdown.split("\n");
   const hasLeadingBlankLine = lines.length > 0 && lines[0]?.trim().length === 0;
+  const [lastLine] = lines.slice(-1);
   const hasTrailingBlankLine =
-    lines.length > 0 && lines.at(-1)?.trim().length === 0;
+    lines.length > 0 && lastLine?.trim().length === 0;
 
   let start = 0;
   let end = nodes.length;

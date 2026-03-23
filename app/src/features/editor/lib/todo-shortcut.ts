@@ -3,7 +3,8 @@ import {
   $createListNode,
   $isListItemNode,
   $isListNode,
-  type ListNode, ListItemNode 
+  type ListNode,
+  ListItemNode,
 } from "@lexical/list";
 import {
   $createParagraphNode,
@@ -206,7 +207,8 @@ function $insertNestedItemIntoChecklist(
   nestedItem: ListItemNode,
 ): void {
   const previousChecklist = [...paragraphNode.getPreviousSiblings()]
-    .toReversed()
+    // eslint-disable-next-line unicorn/no-array-reverse -- app tsconfig targets ES2020, so toReversed() is unavailable here
+    .reverse()
     .find(
       (sibling): sibling is ListNode =>
         $isListNode(sibling) && sibling.getListType() === "check",
