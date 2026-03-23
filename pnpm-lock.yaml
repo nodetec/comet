@@ -278,10 +278,10 @@ importers:
     dependencies:
       "@astrojs/starlight":
         specifier: ^0.31.0
-        version: 0.31.1(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
+        version: 0.31.1(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
       astro:
         specifier: ^5.9.0
-        version: 5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
+        version: 5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
     devDependencies:
       "@astrojs/check":
         specifier: ^0.9.6
@@ -446,7 +446,7 @@ importers:
         version: 1.166.9(@tanstack/query-core@5.91.2)(@tanstack/react-query@5.91.2(react@19.2.4))(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@tanstack/router-core@1.167.5)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       "@tanstack/react-start":
         specifier: ^1.166.18
-        version: 1.166.18(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+        version: 1.166.18(crossws@0.4.4(srvx@0.11.12))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
       "@tanstack/react-table":
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -523,6 +523,9 @@ importers:
       globals:
         specifier: ^17.2.3
         version: 17.4.0
+      nitro:
+        specifier: 3.0.260311-beta
+        version: 3.0.260311-beta(better-sqlite3@11.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))(jiti@2.6.1)(lru-cache@11.2.7)(miniflare@4.20260317.1)(rollup@4.59.0)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
@@ -540,7 +543,7 @@ importers:
     dependencies:
       astro:
         specifier: ^5.9.0
-        version: 5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
+        version: 5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
     devDependencies:
       "@tailwindcss/vite":
         specifier: ^4.2.1
@@ -6918,6 +6921,13 @@ packages:
         integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==,
       }
 
+  consola@3.4.2:
+    resolution:
+      {
+        integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==,
+      }
+    engines: { node: ^14.18.0 || >=16.10.0 }
+
   content-disposition@1.0.1:
     resolution:
       {
@@ -7008,6 +7018,17 @@ packages:
       {
         integrity: sha512-ojKiDvcmByhwa8YYqbQI/hg7MEU0NC03+pSdEq4ZUnZR9xXpwk7E43SMNGkn+JxJGPFtNvQ48+vV2p+P1ml5PA==,
       }
+
+  crossws@0.4.4:
+    resolution:
+      {
+        integrity: sha512-w6c4OdpRNnudVmcgr7brb/+/HmYjMQvYToO/oTrprTwxRUiom3LYWU1PMWuD006okbUWpII1Ea9/+kwpUfmyRg==,
+      }
+    peerDependencies:
+      srvx: ">=0.7.1"
+    peerDependenciesMeta:
+      srvx:
+        optional: true
 
   css-select@5.2.2:
     resolution:
@@ -7173,6 +7194,32 @@ packages:
       {
         integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==,
       }
+
+  db0@0.3.4:
+    resolution:
+      {
+        integrity: sha512-RiXXi4WaNzPTHEOu8UPQKMooIbqOEyqA1t7Z6MsdxSCeb8iUC9ko3LcmsLmeUt2SM5bctfArZKkRQggKZz7JNw==,
+      }
+    peerDependencies:
+      "@electric-sql/pglite": "*"
+      "@libsql/client": "*"
+      better-sqlite3: "*"
+      drizzle-orm: "*"
+      mysql2: "*"
+      sqlite3: "*"
+    peerDependenciesMeta:
+      "@electric-sql/pglite":
+        optional: true
+      "@libsql/client":
+        optional: true
+      better-sqlite3:
+        optional: true
+      drizzle-orm:
+        optional: true
+      mysql2:
+        optional: true
+      sqlite3:
+        optional: true
 
   debug@4.4.3:
     resolution:
@@ -7606,6 +7653,18 @@ packages:
         integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==,
       }
     engines: { node: ">=6" }
+
+  env-runner@0.1.6:
+    resolution:
+      {
+        integrity: sha512-fSb7X1zdda8k6611a6/SdSQpDe7a/bqMz2UWdbHjk9YWzpUR4/fn9YtE/hqgGQ2nhvVN0zUtcL1SRMKwIsDbAA==,
+      }
+    hasBin: true
+    peerDependencies:
+      miniflare: ^4.0.0
+    peerDependenciesMeta:
+      miniflare:
+        optional: true
 
   environment@1.1.0:
     resolution:
@@ -8715,6 +8774,12 @@ packages:
       }
     engines: { node: ">=16.9.0" }
 
+  hookable@6.1.0:
+    resolution:
+      {
+        integrity: sha512-ZoKZSJgu8voGK2geJS+6YtYjvIzu9AOM/KZXsBxr83uhLL++e9pEv/dlgwgy3dvHg06kTz6JOh1hk3C8Ceiymw==,
+      }
+
   html-escaper@2.0.2:
     resolution:
       {
@@ -8770,6 +8835,12 @@ packages:
         integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==,
       }
     engines: { node: ">= 14" }
+
+  httpxy@0.3.1:
+    resolution:
+      {
+        integrity: sha512-XjG/CEoofEisMrnFr0D6U6xOZ4mRfnwcYQ9qvvnT4lvnX8BoeA3x3WofB75D+vZwpaobFVkBIHrZzoK40w8XSw==,
+      }
 
   human-signals@2.1.0:
     resolution:
@@ -10262,6 +10333,43 @@ packages:
       }
     engines: { node: ">= 10" }
 
+  nf3@0.3.13:
+    resolution:
+      {
+        integrity: sha512-drDt0yl4d/yUhlpD0GzzqahSpA5eUNeIfFq0/aoZb0UlPY0ZwP4u1EfREVvZrYdEnJ3OU9Le9TrzbvWgEkkeKw==,
+      }
+
+  nitro@3.0.260311-beta:
+    resolution:
+      {
+        integrity: sha512-0o0fJ9LUh4WKUqJNX012jyieUOtMCnadkNDWr0mHzdraoHpJP/1CGNefjRyZyMXSpoJfwoWdNEZu2iGf35TUvQ==,
+      }
+    engines: { node: ^20.19.0 || >=22.12.0 }
+    hasBin: true
+    peerDependencies:
+      dotenv: "*"
+      giget: "*"
+      jiti: ^2.6.1
+      rollup: ^4.59.0
+      vite: ^7 || ^8 || >=8.0.0-0
+      xml2js: ^0.6.2
+      zephyr-agent: ^0.1.15
+    peerDependenciesMeta:
+      dotenv:
+        optional: true
+      giget:
+        optional: true
+      jiti:
+        optional: true
+      rollup:
+        optional: true
+      vite:
+        optional: true
+      xml2js:
+        optional: true
+      zephyr-agent:
+        optional: true
+
   nlcst-to-string@4.0.0:
     resolution:
       {
@@ -10421,10 +10529,22 @@ packages:
         integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==,
       }
 
+  ocache@0.1.4:
+    resolution:
+      {
+        integrity: sha512-e7geNdWjxSnvsSgvLuPvgKgu7ubM10ZmTPOgpr7mz2BXYtvjMKTiLhjFi/gWU8chkuP6hNkZBsa9LzOusyaqkQ==,
+      }
+
   ofetch@1.5.1:
     resolution:
       {
         integrity: sha512-2W4oUZlVaqAPAil6FUg/difl6YhqhUR7x2eZY4bQCko22UXg3hptq9KLQdqFClV+Wu85UX7hNtdGTngi/1BxcA==,
+      }
+
+  ofetch@2.0.0-alpha.3:
+    resolution:
+      {
+        integrity: sha512-zpYTCs2byOuft65vI3z43Dd6iSdFbOZZLb9/d21aCpx2rGastVU9dOCv0lu4ykc1Ur1anAYjDi3SUvR0vq50JA==,
       }
 
   ohash@2.0.11:
@@ -12534,6 +12654,83 @@ packages:
       uploadthing:
         optional: true
 
+  unstorage@2.0.0-alpha.7:
+    resolution:
+      {
+        integrity: sha512-ELPztchk2zgFJnakyodVY3vJWGW9jy//keJ32IOJVGUMyaPydwcA1FtVvWqT0TNRch9H+cMNEGllfVFfScImog==,
+      }
+    peerDependencies:
+      "@azure/app-configuration": ^1.11.0
+      "@azure/cosmos": ^4.9.1
+      "@azure/data-tables": ^13.3.2
+      "@azure/identity": ^4.13.0
+      "@azure/keyvault-secrets": ^4.10.0
+      "@azure/storage-blob": ^12.31.0
+      "@capacitor/preferences": ^6 || ^7 || ^8
+      "@deno/kv": ">=0.13.0"
+      "@netlify/blobs": ^6.5.0 || ^7.0.0 || ^8.1.0 || ^9.0.0 || ^10.0.0
+      "@planetscale/database": ^1.19.0
+      "@upstash/redis": ^1.36.2
+      "@vercel/blob": ">=0.27.3"
+      "@vercel/functions": ^2.2.12 || ^3.0.0
+      "@vercel/kv": ^1.0.1
+      aws4fetch: ^1.0.20
+      chokidar: ^4 || ^5
+      db0: ">=0.3.4"
+      idb-keyval: ^6.2.2
+      ioredis: ^5.9.3
+      lru-cache: ^11.2.6
+      mongodb: ^6 || ^7
+      ofetch: "*"
+      uploadthing: ^7.7.4
+    peerDependenciesMeta:
+      "@azure/app-configuration":
+        optional: true
+      "@azure/cosmos":
+        optional: true
+      "@azure/data-tables":
+        optional: true
+      "@azure/identity":
+        optional: true
+      "@azure/keyvault-secrets":
+        optional: true
+      "@azure/storage-blob":
+        optional: true
+      "@capacitor/preferences":
+        optional: true
+      "@deno/kv":
+        optional: true
+      "@netlify/blobs":
+        optional: true
+      "@planetscale/database":
+        optional: true
+      "@upstash/redis":
+        optional: true
+      "@vercel/blob":
+        optional: true
+      "@vercel/functions":
+        optional: true
+      "@vercel/kv":
+        optional: true
+      aws4fetch:
+        optional: true
+      chokidar:
+        optional: true
+      db0:
+        optional: true
+      idb-keyval:
+        optional: true
+      ioredis:
+        optional: true
+      lru-cache:
+        optional: true
+      mongodb:
+        optional: true
+      ofetch:
+        optional: true
+      uploadthing:
+        optional: true
+
   until-async@3.0.2:
     resolution:
       {
@@ -13383,12 +13580,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  "@astrojs/mdx@4.3.14(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))":
+  "@astrojs/mdx@4.3.14(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))":
     dependencies:
       "@astrojs/markdown-remark": 6.3.11
       "@mdx-js/mdx": 3.1.1
       acorn: 8.16.0
-      astro: 5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
+      astro: 5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
       es-module-lexer: 1.7.0
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -13412,16 +13609,16 @@ snapshots:
       stream-replace-string: 2.0.0
       zod: 4.3.6
 
-  "@astrojs/starlight@0.31.1(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))":
+  "@astrojs/starlight@0.31.1(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))":
     dependencies:
-      "@astrojs/mdx": 4.3.14(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
+      "@astrojs/mdx": 4.3.14(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
       "@astrojs/sitemap": 3.7.1
       "@pagefind/default-ui": 1.4.0
       "@types/hast": 3.0.4
       "@types/js-yaml": 4.0.9
       "@types/mdast": 4.0.4
-      astro: 5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
-      astro-expressive-code: 0.40.2(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
+      astro: 5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
+      astro-expressive-code: 0.40.2(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2))
       bcp-47: 2.1.0
       hast-util-from-html: 2.0.3
       hast-util-select: 6.0.4
@@ -16635,27 +16832,27 @@ snapshots:
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
-  "@tanstack/react-start-server@1.166.14(react-dom@19.2.4(react@19.2.4))(react@19.2.4)":
+  "@tanstack/react-start-server@1.166.14(crossws@0.4.4(srvx@0.11.12))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)":
     dependencies:
       "@tanstack/history": 1.161.6
       "@tanstack/react-router": 1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       "@tanstack/router-core": 1.167.5
       "@tanstack/start-client-core": 1.166.13
-      "@tanstack/start-server-core": 1.166.13
+      "@tanstack/start-server-core": 1.166.13(crossws@0.4.4(srvx@0.11.12))
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
     transitivePeerDependencies:
       - crossws
 
-  "@tanstack/react-start@1.166.18(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))":
+  "@tanstack/react-start@1.166.18(crossws@0.4.4(srvx@0.11.12))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))":
     dependencies:
       "@tanstack/react-router": 1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       "@tanstack/react-start-client": 1.166.14(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      "@tanstack/react-start-server": 1.166.14(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      "@tanstack/react-start-server": 1.166.14(crossws@0.4.4(srvx@0.11.12))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       "@tanstack/router-utils": 1.161.6
       "@tanstack/start-client-core": 1.166.13
-      "@tanstack/start-plugin-core": 1.167.2(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-      "@tanstack/start-server-core": 1.166.13
+      "@tanstack/start-plugin-core": 1.167.2(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(crossws@0.4.4(srvx@0.11.12))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      "@tanstack/start-server-core": 1.166.13(crossws@0.4.4(srvx@0.11.12))
       pathe: 2.0.3
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
@@ -16754,7 +16951,7 @@ snapshots:
 
   "@tanstack/start-fn-stubs@1.161.6": {}
 
-  "@tanstack/start-plugin-core@1.167.2(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))":
+  "@tanstack/start-plugin-core@1.167.2(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(crossws@0.4.4(srvx@0.11.12))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))":
     dependencies:
       "@babel/code-frame": 7.27.1
       "@babel/core": 7.29.0
@@ -16765,7 +16962,7 @@ snapshots:
       "@tanstack/router-plugin": 1.166.14(@tanstack/react-router@1.167.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
       "@tanstack/router-utils": 1.161.6
       "@tanstack/start-client-core": 1.166.13
-      "@tanstack/start-server-core": 1.166.13
+      "@tanstack/start-server-core": 1.166.13(crossws@0.4.4(srvx@0.11.12))
       cheerio: 1.2.0
       exsolve: 1.0.8
       pathe: 2.0.3
@@ -16786,13 +16983,13 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  "@tanstack/start-server-core@1.166.13":
+  "@tanstack/start-server-core@1.166.13(crossws@0.4.4(srvx@0.11.12))":
     dependencies:
       "@tanstack/history": 1.161.6
       "@tanstack/router-core": 1.167.5
       "@tanstack/start-client-core": 1.166.13
       "@tanstack/start-storage-context": 1.166.13
-      h3-v2: h3@2.0.1-rc.16
+      h3-v2: h3@2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12))
       seroval: 1.5.1
       tiny-invariant: 1.3.3
     transitivePeerDependencies:
@@ -17446,12 +17643,12 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro-expressive-code@0.40.2(astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)):
+  astro-expressive-code@0.40.2(astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)):
     dependencies:
-      astro: 5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
+      astro: 5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2)
       rehype-expressive-code: 0.40.2
 
-  astro@5.18.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2):
+  astro@5.18.1(@types/node@25.5.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(tsx@4.21.0)(typescript@5.8.3)(yaml@2.8.2):
     dependencies:
       "@astrojs/compiler": 2.13.1
       "@astrojs/internal-helpers": 0.7.6
@@ -17506,7 +17703,7 @@ snapshots:
       ultrahtml: 1.6.0
       unifont: 0.7.4
       unist-util-visit: 5.1.0
-      unstorage: 1.17.4
+      unstorage: 1.17.4(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))
       vfile: 6.0.3
       vite: 6.4.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.2)
       vitefu: 1.1.2(vite@6.4.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -17844,6 +18041,8 @@ snapshots:
 
   concat-map@0.0.1: {}
 
+  consola@3.4.2: {}
+
   content-disposition@1.0.1: {}
 
   content-type@1.0.5: {}
@@ -17887,6 +18086,10 @@ snapshots:
   crossws@0.3.5:
     dependencies:
       uncrypto: 0.1.3
+
+  crossws@0.4.4(srvx@0.11.12):
+    optionalDependencies:
+      srvx: 0.11.12
 
   css-select@5.2.2:
     dependencies:
@@ -17977,6 +18180,11 @@ snapshots:
       is-data-view: 1.0.2
 
   date-fns@4.1.0: {}
+
+  db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)):
+    optionalDependencies:
+      better-sqlite3: 11.10.0
+      drizzle-orm: 0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)
 
   debug@4.4.3:
     dependencies:
@@ -18148,6 +18356,14 @@ snapshots:
   entities@7.0.1: {}
 
   env-paths@2.2.1: {}
+
+  env-runner@0.1.6(miniflare@4.20260317.1):
+    dependencies:
+      crossws: 0.4.4(srvx@0.11.12)
+      httpxy: 0.3.1
+      srvx: 0.11.12
+    optionalDependencies:
+      miniflare: 4.20260317.1
 
   environment@1.1.0: {}
 
@@ -18942,10 +19158,12 @@ snapshots:
       ufo: 1.6.3
       uncrypto: 0.1.3
 
-  h3@2.0.1-rc.16:
+  h3@2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12)):
     dependencies:
       rou3: 0.8.1
       srvx: 0.11.12
+    optionalDependencies:
+      crossws: 0.4.4(srvx@0.11.12)
 
   has-bigints@1.1.0: {}
 
@@ -19170,6 +19388,8 @@ snapshots:
 
   hono@4.12.8: {}
 
+  hookable@6.1.0: {}
+
   html-escaper@2.0.2: {}
 
   html-escaper@3.0.3: {}
@@ -19203,6 +19423,8 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  httpxy@0.3.1: {}
 
   human-signals@2.1.0: {}
 
@@ -20256,6 +20478,59 @@ snapshots:
 
   neotraverse@0.6.18: {}
 
+  nf3@0.3.13: {}
+
+  nitro@3.0.260311-beta(better-sqlite3@11.10.0)(chokidar@5.0.0)(dotenv@17.3.1)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))(jiti@2.6.1)(lru-cache@11.2.7)(miniflare@4.20260317.1)(rollup@4.59.0)(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)):
+    dependencies:
+      consola: 3.4.2
+      crossws: 0.4.4(srvx@0.11.12)
+      db0: 0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))
+      env-runner: 0.1.6(miniflare@4.20260317.1)
+      h3: 2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12))
+      hookable: 6.1.0
+      nf3: 0.3.13
+      ocache: 0.1.4
+      ofetch: 2.0.0-alpha.3
+      ohash: 2.0.11
+      rolldown: 1.0.0-rc.10
+      srvx: 0.11.12
+      unenv: 2.0.0-rc.24
+      unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(lru-cache@11.2.7)(ofetch@2.0.0-alpha.3)
+    optionalDependencies:
+      dotenv: 17.3.1
+      jiti: 2.6.1
+      rollup: 4.59.0
+      vite: 8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+    transitivePeerDependencies:
+      - "@azure/app-configuration"
+      - "@azure/cosmos"
+      - "@azure/data-tables"
+      - "@azure/identity"
+      - "@azure/keyvault-secrets"
+      - "@azure/storage-blob"
+      - "@capacitor/preferences"
+      - "@deno/kv"
+      - "@electric-sql/pglite"
+      - "@libsql/client"
+      - "@netlify/blobs"
+      - "@planetscale/database"
+      - "@upstash/redis"
+      - "@vercel/blob"
+      - "@vercel/functions"
+      - "@vercel/kv"
+      - aws4fetch
+      - better-sqlite3
+      - chokidar
+      - drizzle-orm
+      - idb-keyval
+      - ioredis
+      - lru-cache
+      - miniflare
+      - mongodb
+      - mysql2
+      - sqlite3
+      - uploadthing
+
   nlcst-to-string@4.0.0:
     dependencies:
       "@types/nlcst": 2.0.3
@@ -20355,11 +20630,17 @@ snapshots:
 
   obug@2.1.1: {}
 
+  ocache@0.1.4:
+    dependencies:
+      ohash: 2.0.11
+
   ofetch@1.5.1:
     dependencies:
       destr: 2.0.5
       node-fetch-native: 1.6.7
       ufo: 1.6.3
+
+  ofetch@2.0.0-alpha.3: {}
 
   ohash@2.0.11: {}
 
@@ -21923,7 +22204,7 @@ snapshots:
       "@unrs/resolver-binding-win32-ia32-msvc": 1.11.1
       "@unrs/resolver-binding-win32-x64-msvc": 1.11.1
 
-  unstorage@1.17.4:
+  unstorage@1.17.4(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))):
     dependencies:
       anymatch: 3.1.3
       chokidar: 5.0.0
@@ -21933,6 +22214,15 @@ snapshots:
       node-fetch-native: 1.6.7
       ofetch: 1.5.1
       ufo: 1.6.3
+    optionalDependencies:
+      db0: 0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))
+
+  unstorage@2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8)))(lru-cache@11.2.7)(ofetch@2.0.0-alpha.3):
+    optionalDependencies:
+      chokidar: 5.0.0
+      db0: 0.3.4(better-sqlite3@11.10.0)(drizzle-orm@0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(bun-types@1.3.11)(postgres@3.4.8))
+      lru-cache: 11.2.7
+      ofetch: 2.0.0-alpha.3
 
   until-async@3.0.2: {}
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Orbit, KeyRound } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -28,6 +28,11 @@ function LoginPage() {
   const { pubkey, signIn } = useNostr();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (pubkey) {
     void navigate({ to: "/", replace: true });
@@ -71,7 +76,7 @@ function LoginPage() {
           {error && (
             <p className="text-destructive text-center text-sm">{error}</p>
           )}
-          {!window.nostr && !error && (
+          {mounted && !window.nostr && !error && (
             <p className="text-muted-foreground text-center text-sm">
               Requires a Nostr browser extension (Alby, nos2x, etc.)
             </p>
