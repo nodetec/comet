@@ -1,6 +1,7 @@
-use crate::adapters::sqlite::migrations::{account_migrations, app_migrations};
-use crate::domain::accounts::model::{AccountRecord, AccountSummary};
 use crate::adapters::nostr::protocol as nostr;
+use crate::adapters::sqlite::migrations::{account_migrations, app_migrations};
+use crate::domain::accounts::error::AccountError;
+use crate::domain::accounts::model::{AccountRecord, AccountSummary};
 use crate::error::{now_millis, AppError};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{
@@ -52,7 +53,7 @@ pub fn active_account_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
         .db_path
         .parent()
         .map(Path::to_path_buf)
-        .ok_or_else(|| AppError::custom("Account database path has no parent directory"))
+        .ok_or_else(|| AccountError::Storage("Account database path has no parent directory".into()).into())
 }
 
 pub fn active_account_attachments_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
@@ -94,7 +95,7 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
         nostr::ensure_default_settings(&account_conn)?;
 
         let mut account = account_identity_record(&account_conn, &staged_db_path)?
-            .ok_or_else(|| AppError::custom("Failed to initialize account identity"))?;
+            .ok_or(AccountError::Storage("Failed to initialize account identity".into()))?;
         drop(account_conn);
 
         let mut app_conn = app_database_connection(app)?;
@@ -102,10 +103,10 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 
         let target_dir = account_dir_for_npub(app, &account.npub)?;
         if target_dir.exists() {
-            return Err(AppError::custom(format!(
+            return Err(AccountError::AlreadyExists(format!(
                 "Account workspace already exists at {}. Restore or relink that workspace instead of adding this account again.",
                 target_dir.display()
-            )));
+            )).into());
         }
 
         fs::rename(&staged_dir, &target_dir)?;
@@ -140,7 +141,7 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 pub fn switch_account(app: &AppHandle, public_key: &str) -> Result<AccountSummary, AppError> {
     let mut conn = app_database_connection(app)?;
     let account = load_account_record_by_public_key(app, &conn, public_key)?
-        .ok_or_else(|| AppError::custom(format!("Unknown account: {public_key}")))?;
+        .ok_or(AccountError::NotFound)?;
     ensure_account_database_ready(&account)?;
     set_active_account(&mut conn, public_key)?;
     Ok(AccountSummary {
@@ -149,7 +150,6 @@ pub fn switch_account(app: &AppHandle, public_key: &str) -> Result<AccountSummar
         is_active: true,
     })
 }
-
 
 fn ensure_active_account(app: &AppHandle) -> Result<AccountRecord, AppError> {
     let mut app_conn = app_database_connection(app)?;
@@ -161,7 +161,7 @@ fn ensure_active_account(app: &AppHandle) -> Result<AccountRecord, AppError> {
 
     let has_accounts = conn_has_accounts(&app_conn)?;
     if has_accounts {
-        return Err(AppError::custom("No active account configured."));
+        return Err(AccountError::NoActiveAccount.into());
     }
 
     let account = create_initial_account(app, &mut app_conn)?;
@@ -174,13 +174,12 @@ fn ensure_account_database_ready(account: &AccountRecord) -> Result<(), AppError
     let parent = account
         .db_path
         .parent()
-        .ok_or_else(|| AppError::custom("Account database path has no parent directory"))?;
+        .ok_or_else(|| AccountError::Storage("Account database path has no parent directory".into()))?;
     fs::create_dir_all(parent)?;
     if !account.db_path.exists() {
-        return Err(AppError::custom(format!(
-            "Account database is missing: {}",
-            account.db_path.display()
-        )));
+        return Err(AccountError::DatabaseMissing(
+            account.db_path.display().to_string(),
+        ).into());
     }
     let mut conn = Connection::open(&account.db_path)?;
     account_migrations().to_latest(&mut conn)?;
@@ -245,7 +244,7 @@ fn set_active_account(conn: &mut Connection, public_key: &str) -> Result<(), App
         params![now_millis(), public_key],
     )?;
     if changed == 0 {
-        return Err(AppError::custom(format!("Unknown account: {public_key}")));
+        return Err(AccountError::NotFound.into());
     }
     tx.commit()?;
     Ok(())
@@ -308,9 +307,9 @@ fn ensure_account_not_registered(
         )
         .optional()?;
     if existing_pubkey.is_some() {
-        return Err(AppError::custom(format!(
+        return Err(AccountError::AlreadyExists(format!(
             "Account already exists for pubkey {public_key}. Switch to it instead."
-        )));
+        )).into());
     }
 
     let existing_npub: Option<String> = conn
@@ -321,9 +320,9 @@ fn ensure_account_not_registered(
         )
         .optional()?;
     if existing_npub.is_some() {
-        return Err(AppError::custom(format!(
+        return Err(AccountError::AlreadyExists(format!(
             "Account already exists for npub {npub}. Switch to it instead."
-        )));
+        )).into());
     }
 
     Ok(())
@@ -345,15 +344,15 @@ fn create_initial_account(
         let identity = nostr::create_identity(&account_conn)?;
 
         let mut account = account_identity_record(&account_conn, &staged_db_path)?
-            .ok_or_else(|| AppError::custom("Failed to initialize account identity"))?;
+            .ok_or(AccountError::Storage("Failed to initialize account identity".into()))?;
         drop(account_conn);
 
         let target_dir = account_dir_for_npub(app, &account.npub)?;
         if target_dir.exists() {
-            return Err(AppError::custom(format!(
+            return Err(AccountError::AlreadyExists(format!(
                 "Cannot create account in existing directory: {}",
                 target_dir.display()
-            )));
+            )).into());
         }
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());

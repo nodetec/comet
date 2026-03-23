@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum AccountError {
     #[error("Account not found.")]
@@ -15,4 +14,28 @@ pub enum AccountError {
 
     #[error("{0}")]
     Storage(String),
+}
+
+impl From<rusqlite::Error> for AccountError {
+    fn from(e: rusqlite::Error) -> Self {
+        AccountError::Storage(e.to_string())
+    }
+}
+
+impl From<rusqlite_migration::Error> for AccountError {
+    fn from(e: rusqlite_migration::Error) -> Self {
+        AccountError::Storage(e.to_string())
+    }
+}
+
+impl From<std::io::Error> for AccountError {
+    fn from(e: std::io::Error) -> Self {
+        AccountError::Storage(e.to_string())
+    }
+}
+
+impl From<tauri::Error> for AccountError {
+    fn from(e: tauri::Error) -> Self {
+        AccountError::Storage(e.to_string())
+    }
 }
