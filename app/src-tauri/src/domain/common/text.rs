@@ -382,4 +382,33 @@ mod tests {
             vec!["trail".to_string(), "visible-link-text".to_string(),]
         );
     }
+
+    #[test]
+    fn extract_tags_ignores_tags_inside_inline_code() {
+        let markdown = "Use `#config` for settings and #real outside code";
+        assert_eq!(extract_tags(markdown), vec!["real".to_string()]);
+    }
+
+    #[test]
+    fn preview_from_markdown_truncates_long_content() {
+        let long_line = "a".repeat(200);
+        let markdown = format!("# Title\n\n{long_line}");
+        let preview = preview_from_markdown(&markdown);
+        assert_eq!(preview.len(), 140);
+    }
+
+    #[test]
+    fn strip_markdown_syntax_handles_nested_formatting() {
+        assert_eq!(strip_markdown_syntax("**_bold italic_**"), "bold italic");
+    }
+
+    #[test]
+    fn title_from_markdown_no_h1_returns_empty() {
+        assert_eq!(title_from_markdown("## Not H1\nSome body text"), "");
+    }
+
+    #[test]
+    fn title_from_markdown_empty_h1_returns_empty() {
+        assert_eq!(title_from_markdown("# \n\nBody"), "");
+    }
 }

@@ -150,51 +150,174 @@ pub fn upsert_notebook_from_sync(
 
 #[cfg(test)]
 mod tests {
-    use super::delete_note_from_sync;
+    use super::*;
+    use crate::adapters::sqlite::migrations::account_migrations;
+    use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
     use rusqlite::{params, Connection};
 
+    fn setup_db() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+        conn
+    }
+
+    fn make_synced_note(id: &str, modified_at: i64) -> SyncedNote {
+        SyncedNote {
+            id: id.to_string(),
+            title: format!("Title {id}"),
+            markdown: format!("# Title {id}\n\nBody"),
+            notebook_id: None,
+            created_at: 1000,
+            modified_at,
+            edited_at: modified_at,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+        }
+    }
+
     #[test]
-    fn sync_delete_removes_note_and_invalidates_cache() {
-        let conn = Connection::open_in_memory().expect("open sqlite");
-        conn.execute_batch(
-            "CREATE TABLE notes (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                markdown TEXT NOT NULL
-            );
-            CREATE TABLE notes_fts (
-                note_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                markdown TEXT NOT NULL
-            );",
-        )
-        .expect("create schema");
+    fn upsert_inserts_new_note() {
+        let conn = setup_db();
+        let note = make_synced_note("note-1", 2000);
+
+        let result = upsert_from_sync(&conn, &note, "evt-1").unwrap();
+        assert_eq!(result, Some("note-1".to_string()));
+
+        let title: String = conn
+            .query_row("SELECT title FROM notes WHERE id = 'note-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(title, "Title note-1");
+    }
+
+    #[test]
+    fn upsert_updates_when_remote_is_newer() {
+        let conn = setup_db();
         conn.execute(
-            "INSERT INTO notes (id, title, markdown) VALUES (?1, ?2, ?3)",
-            params!["note-1", "Title", "Body"],
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params!["note-1", "Old Title", "Old body", 1000, 2000, 2000],
         )
-        .expect("insert note");
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Old Title", "Old body"],
+        )
+        .unwrap();
+
+        let note = make_synced_note("note-1", 3000);
+        let result = upsert_from_sync(&conn, &note, "evt-2").unwrap();
+        assert_eq!(result, Some("note-1".to_string()));
+
+        let title: String = conn
+            .query_row("SELECT title FROM notes WHERE id = 'note-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(title, "Title note-1");
+    }
+
+    #[test]
+    fn upsert_skips_when_local_is_newer() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params!["note-1", "Local Title", "Local body", 1000, 5000, 5000],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Local Title", "Local body"],
+        )
+        .unwrap();
+
+        let note = make_synced_note("note-1", 3000);
+        let result = upsert_from_sync(&conn, &note, "evt-3").unwrap();
+        assert_eq!(result, None);
+
+        let title: String = conn
+            .query_row("SELECT title FROM notes WHERE id = 'note-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(title, "Local Title");
+    }
+
+    #[test]
+    fn upsert_notebook_inserts_new() {
+        let conn = setup_db();
+        let notebook = SyncedNotebook {
+            id: "nb-1".to_string(),
+            name: "My Notebook".to_string(),
+            updated_at: 2000,
+        };
+
+        upsert_notebook_from_sync(&conn, &notebook, "evt-nb-1").unwrap();
+
+        let name: String = conn
+            .query_row("SELECT name FROM notebooks WHERE id = 'nb-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(name, "My Notebook");
+    }
+
+    #[test]
+    fn upsert_notebook_updates_when_remote_is_newer() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?2, ?3, ?4, 0)",
+            params!["nb-1", "Old Name", 1000, 2000],
+        )
+        .unwrap();
+
+        let notebook = SyncedNotebook {
+            id: "nb-1".to_string(),
+            name: "Updated Name".to_string(),
+            updated_at: 3000,
+        };
+        upsert_notebook_from_sync(&conn, &notebook, "evt-nb-2").unwrap();
+
+        let name: String = conn
+            .query_row("SELECT name FROM notebooks WHERE id = 'nb-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(name, "Updated Name");
+    }
+
+    #[test]
+    fn delete_note_removes_note_and_fts() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params!["note-1", "Title", "Body", 1000, 2000, 2000],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
             params!["note-1", "Title", "Body"],
         )
-        .expect("insert fts");
+        .unwrap();
 
-        let mut invalidated_note_id: Option<String> = None;
-        delete_note_from_sync(&conn, "note-1", |note_id| {
-            invalidated_note_id = Some(note_id.to_string());
+        let mut invalidated: Option<String> = None;
+        delete_note_from_sync(&conn, "note-1", |id| {
+            invalidated = Some(id.to_string());
         })
-        .expect("delete note from sync");
+        .unwrap();
 
         let notes_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
-            .expect("count notes");
+            .unwrap();
         let fts_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
-            .expect("count notes_fts");
+            .unwrap();
 
         assert_eq!(notes_count, 0);
         assert_eq!(fts_count, 0);
-        assert_eq!(invalidated_note_id.as_deref(), Some("note-1"));
+        assert_eq!(invalidated.as_deref(), Some("note-1"));
     }
 }

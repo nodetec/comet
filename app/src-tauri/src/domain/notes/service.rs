@@ -497,6 +497,7 @@ mod tests {
 
     struct MockNoteRepository {
         notes: RefCell<HashMap<String, NoteRecord>>,
+        notebooks: RefCell<HashMap<String, NotebookSummary>>,
         last_open_note_id: RefCell<Option<String>>,
     }
 
@@ -504,6 +505,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 notes: RefCell::new(HashMap::new()),
+                notebooks: RefCell::new(HashMap::new()),
                 last_open_note_id: RefCell::new(None),
             }
         }
@@ -512,11 +514,72 @@ mod tests {
             self.notes.borrow_mut().insert(record.id.clone(), record);
             self
         }
+
+        fn with_notebook(self, id: &str, name: &str) -> Self {
+            self.notebooks.borrow_mut().insert(
+                id.to_string(),
+                NotebookSummary {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    note_count: 0,
+                },
+            );
+            self
+        }
+    }
+
+    fn make_note(id: &str, markdown: &str) -> NoteRecord {
+        NoteRecord {
+            id: id.to_string(),
+            title: id.to_string(),
+            markdown: markdown.to_string(),
+            modified_at: 1000,
+            notebook_id: None,
+            notebook_name: None,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        }
     }
 
     impl NoteRepository for MockNoteRepository {
         fn note_by_id(&self, note_id: &str) -> Result<Option<NoteRecord>, NoteError> {
             Ok(self.notes.borrow().get(note_id).cloned())
+        }
+
+        fn note_is_active(&self, note_id: &str) -> Result<bool, NoteError> {
+            let notes = self.notes.borrow();
+            Ok(notes.get(note_id).map_or(false, |n| {
+                n.archived_at.is_none() && n.deleted_at.is_none()
+            }))
+        }
+
+        fn next_active_note_id(
+            &self,
+            excluding: Option<&str>,
+        ) -> Result<Option<String>, NoteError> {
+            let notes = self.notes.borrow();
+            Ok(notes
+                .values()
+                .find(|n| {
+                    n.archived_at.is_none()
+                        && n.deleted_at.is_none()
+                        && excluding.map_or(true, |ex| n.id != ex)
+                })
+                .map(|n| n.id.clone()))
+        }
+
+        fn note_markdown_and_notebook(
+            &self,
+            note_id: &str,
+        ) -> Result<(String, Option<String>), NoteError> {
+            let notes = self.notes.borrow();
+            let record = notes.get(note_id).ok_or(NoteError::NotFound)?;
+            Ok((record.markdown.clone(), record.notebook_id.clone()))
         }
 
         fn insert_note(
@@ -573,9 +636,7 @@ mod tests {
             note_id: &str,
         ) -> Result<(String, bool), NoteError> {
             let notes = self.notes.borrow();
-            let record = notes
-                .get(note_id)
-                .ok_or(NoteError::NotFound)?;
+            let record = notes.get(note_id).ok_or(NoteError::NotFound)?;
             Ok((record.markdown.clone(), record.readonly))
         }
 
@@ -609,36 +670,193 @@ mod tests {
             Ok(())
         }
 
-        // Remaining trait methods are not needed for the tests below.
-        fn note_is_active(&self, _: &str) -> Result<bool, NoteError> { unimplemented!() }
-        fn next_active_note_id(&self, _: Option<&str>) -> Result<Option<String>, NoteError> { unimplemented!() }
-        fn note_markdown_and_notebook(&self, _: &str) -> Result<(String, Option<String>), NoteError> { unimplemented!() }
+        fn set_readonly(
+            &self,
+            note_id: &str,
+            readonly: bool,
+            _now: i64,
+        ) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.readonly = readonly;
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn archive_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.archived_at = Some(now);
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn restore_note(&self, note_id: &str, _now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.archived_at = None;
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn trash_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.deleted_at = Some(now);
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn restore_from_trash(&self, note_id: &str, _now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.deleted_at = None;
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn pin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.pinned_at = Some(now);
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn unpin_note(&self, note_id: &str, _now: i64) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.pinned_at = None;
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn assign_notebook(
+            &self,
+            note_id: &str,
+            notebook_id: Option<&str>,
+            _now: i64,
+        ) -> Result<usize, NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            match notes.get_mut(note_id) {
+                Some(record) => {
+                    record.notebook_id = notebook_id.map(str::to_string);
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn delete_note(&self, note_id: &str) -> Result<usize, NoteError> {
+            match self.notes.borrow_mut().remove(note_id) {
+                Some(_) => Ok(1),
+                None => Ok(0),
+            }
+        }
+
+        fn delete_search_document(&self, _note_id: &str) -> Result<(), NoteError> {
+            Ok(())
+        }
+
+        fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError> {
+            let notes = self.notes.borrow();
+            Ok(notes
+                .values()
+                .filter(|n| n.deleted_at.is_some())
+                .map(|n| n.id.clone())
+                .collect())
+        }
+
+        fn delete_trashed_notes(&self) -> Result<(), NoteError> {
+            self.notes
+                .borrow_mut()
+                .retain(|_, n| n.deleted_at.is_none());
+            Ok(())
+        }
+
+        // ── Notebook methods ────────────────────────────────────────────
+
+        fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> {
+            Ok(self.notebooks.borrow().values().cloned().collect())
+        }
+
+        fn insert_notebook(&self, id: &str, name: &str, _now: i64) -> Result<(), NoteError> {
+            self.notebooks.borrow_mut().insert(
+                id.to_string(),
+                NotebookSummary {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    note_count: 0,
+                },
+            );
+            Ok(())
+        }
+
+        fn notebook_by_id(
+            &self,
+            notebook_id: &str,
+        ) -> Result<Option<NotebookSummary>, NoteError> {
+            Ok(self.notebooks.borrow().get(notebook_id).cloned())
+        }
+
+        fn rename_notebook(
+            &self,
+            notebook_id: &str,
+            name: &str,
+            _now: i64,
+        ) -> Result<usize, NoteError> {
+            let mut notebooks = self.notebooks.borrow_mut();
+            match notebooks.get_mut(notebook_id) {
+                Some(nb) => {
+                    nb.name = name.to_string();
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError> {
+            match self.notebooks.borrow_mut().remove(notebook_id) {
+                Some(_) => Ok(1),
+                None => Ok(0),
+            }
+        }
+
+        fn notebook_exists(&self, notebook_id: &str) -> Result<bool, NoteError> {
+            Ok(self.notebooks.borrow().contains_key(notebook_id))
+        }
+
+        // ── Remaining stubs ─────────────────────────────────────────────
+
         fn tags_for_note(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
         fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> { unimplemented!() }
-        fn set_readonly(&self, _: &str, _: bool, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn archive_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn restore_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn trash_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn restore_from_trash(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn pin_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn unpin_note(&self, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn assign_notebook(&self, _: &str, _: Option<&str>, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn delete_note(&self, _: &str) -> Result<usize, NoteError> { unimplemented!() }
-        fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError> { unimplemented!() }
-        fn delete_trashed_notes(&self) -> Result<(), NoteError> { unimplemented!() }
-        fn delete_search_document(&self, _: &str) -> Result<(), NoteError> { unimplemented!() }
         fn query_note_page(&self, _: &NoteQueryInput) -> Result<NotePagePayload, NoteError> { unimplemented!() }
         fn search_notes(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> { unimplemented!() }
         fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
         fn query_contextual_tags(&self, _: &ContextualTagsInput) -> Result<ContextualTagsPayload, NoteError> { unimplemented!() }
         fn todo_count(&self) -> Result<i64, NoteError> { unimplemented!() }
         fn export_notes(&self, _: &ExportNotesInput) -> Result<usize, NoteError> { unimplemented!() }
-        fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> { unimplemented!() }
-        fn insert_notebook(&self, _: &str, _: &str, _: i64) -> Result<(), NoteError> { unimplemented!() }
-        fn notebook_by_id(&self, _: &str) -> Result<Option<NotebookSummary>, NoteError> { unimplemented!() }
-        fn rename_notebook(&self, _: &str, _: &str, _: i64) -> Result<usize, NoteError> { unimplemented!() }
-        fn delete_notebook(&self, _: &str) -> Result<usize, NoteError> { unimplemented!() }
-        fn notebook_exists(&self, _: &str) -> Result<bool, NoteError> { unimplemented!() }
         fn current_npub(&self) -> Result<String, NoteError> { unimplemented!() }
     }
 
@@ -805,5 +1023,271 @@ mod tests {
         );
 
         assert!(matches!(result, Err(NoteError::InvalidNoteId)));
+    }
+
+    // ── load_note ──────────────────────────────────────────────────────
+
+    #[test]
+    fn load_note_returns_record_and_sets_last_open() {
+        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Hello"));
+
+        let record = NoteService::load_note(&repo, "n1").unwrap();
+
+        assert_eq!(record.id, "n1");
+        assert_eq!(repo.last_open_note_id.borrow().as_deref(), Some("n1"));
+    }
+
+    #[test]
+    fn load_note_not_found() {
+        let repo = MockNoteRepository::new();
+
+        let result = NoteService::load_note(&repo, "missing");
+
+        assert!(matches!(result, Err(NoteError::NotFound)));
+    }
+
+    // ── duplicate_note ─────────────────────────────────────────────────
+
+    #[test]
+    fn duplicate_note_copies_markdown_and_notebook() {
+        let mut note = make_note("orig", "# My Note\n\nBody text");
+        note.notebook_id = Some("nb-1".to_string());
+        let repo = MockNoteRepository::new().with_note(note);
+
+        let dup = NoteService::duplicate_note(&repo, "orig").unwrap();
+
+        assert_ne!(dup.id, "orig");
+        assert_eq!(dup.markdown, "# My Note\n\nBody text");
+        assert_eq!(dup.notebook_id.as_deref(), Some("nb-1"));
+    }
+
+    // ── archive_note ───────────────────────────────────────────────────
+
+    #[test]
+    fn archive_note_sets_archived_and_navigates_away() {
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("n1", "# One"))
+            .with_note(make_note("n2", "# Two"));
+        repo.set_last_open_note_id(Some("n1")).unwrap();
+
+        let record = NoteService::archive_note(&repo, "n1").unwrap();
+
+        assert!(record.archived_at.is_some());
+        // last_open should have moved to n2
+        assert_eq!(repo.last_open_note_id.borrow().as_deref(), Some("n2"));
+    }
+
+    // ── restore_note ───────────────────────────────────────────────────
+
+    #[test]
+    fn restore_note_clears_archived_at() {
+        let mut note = make_note("n1", "# Archived");
+        note.archived_at = Some(500);
+        let repo = MockNoteRepository::new().with_note(note);
+
+        let record = NoteService::restore_note(&repo, "n1").unwrap();
+
+        assert!(record.archived_at.is_none());
+    }
+
+    // ── trash_note ─────────────────────────────────────────────────────
+
+    #[test]
+    fn trash_note_sets_deleted_and_navigates_away() {
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("n1", "# One"))
+            .with_note(make_note("n2", "# Two"));
+        repo.set_last_open_note_id(Some("n1")).unwrap();
+
+        let record = NoteService::trash_note(&repo, "n1").unwrap();
+
+        assert!(record.deleted_at.is_some());
+        assert_eq!(repo.last_open_note_id.borrow().as_deref(), Some("n2"));
+    }
+
+    // ── restore_from_trash ─────────────────────────────────────────────
+
+    #[test]
+    fn restore_from_trash_clears_deleted_at() {
+        let mut note = make_note("n1", "# Trashed");
+        note.deleted_at = Some(500);
+        let repo = MockNoteRepository::new().with_note(note);
+
+        let record = NoteService::restore_from_trash(&repo, "n1").unwrap();
+
+        assert!(record.deleted_at.is_none());
+    }
+
+    // ── delete_permanently ─────────────────────────────────────────────
+
+    #[test]
+    fn delete_permanently_removes_note_and_navigates() {
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("n1", "# One"))
+            .with_note(make_note("n2", "# Two"));
+        repo.set_last_open_note_id(Some("n1")).unwrap();
+
+        NoteService::delete_permanently(&repo, "n1").unwrap();
+
+        assert!(repo.notes.borrow().get("n1").is_none());
+        assert_eq!(repo.last_open_note_id.borrow().as_deref(), Some("n2"));
+    }
+
+    #[test]
+    fn delete_permanently_not_found() {
+        let repo = MockNoteRepository::new();
+
+        let result = NoteService::delete_permanently(&repo, "missing");
+
+        assert!(matches!(result, Err(NoteError::NotFound)));
+    }
+
+    // ── empty_trash ────────────────────────────────────────────────────
+
+    #[test]
+    fn empty_trash_returns_deleted_ids() {
+        let mut trashed = make_note("t1", "# Trashed");
+        trashed.deleted_at = Some(100);
+        let repo = MockNoteRepository::new()
+            .with_note(trashed)
+            .with_note(make_note("active", "# Active"));
+
+        let ids = NoteService::empty_trash(&repo).unwrap();
+
+        assert_eq!(ids, vec!["t1"]);
+        // trashed note removed, active note still present
+        assert!(repo.notes.borrow().get("t1").is_none());
+        assert!(repo.notes.borrow().get("active").is_some());
+    }
+
+    // ── pin_note / unpin_note ──────────────────────────────────────────
+
+    #[test]
+    fn pin_note_sets_pinned_at() {
+        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Pin me"));
+
+        let record = NoteService::pin_note(&repo, "n1").unwrap();
+
+        assert!(record.pinned_at.is_some());
+    }
+
+    #[test]
+    fn unpin_note_clears_pinned_at() {
+        let mut note = make_note("n1", "# Pinned");
+        note.pinned_at = Some(500);
+        let repo = MockNoteRepository::new().with_note(note);
+
+        let record = NoteService::unpin_note(&repo, "n1").unwrap();
+
+        assert!(record.pinned_at.is_none());
+    }
+
+    // ── set_readonly ───────────────────────────────────────────────────
+
+    #[test]
+    fn set_readonly_updates_flag() {
+        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Editable"));
+
+        let record = NoteService::set_readonly(
+            &repo,
+            SetNoteReadonlyInput {
+                note_id: "n1".to_string(),
+                readonly: true,
+            },
+        )
+        .unwrap();
+
+        assert!(record.readonly);
+    }
+
+    // ── create_notebook ────────────────────────────────────────────────
+
+    #[test]
+    fn create_notebook_returns_summary() {
+        let repo = MockNoteRepository::new();
+
+        let nb = NoteService::create_notebook(
+            &repo,
+            CreateNotebookInput {
+                name: "Work".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert!(nb.id.starts_with("notebook-"));
+        assert_eq!(nb.name, "Work");
+    }
+
+    // ── rename_notebook ────────────────────────────────────────────────
+
+    #[test]
+    fn rename_notebook_updates_name() {
+        let repo = MockNoteRepository::new().with_notebook("nb-1", "Old Name");
+
+        let nb = NoteService::rename_notebook(
+            &repo,
+            RenameNotebookInput {
+                notebook_id: "nb-1".to_string(),
+                name: "New Name".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(nb.name, "New Name");
+    }
+
+    // ── delete_notebook ────────────────────────────────────────────────
+
+    #[test]
+    fn delete_notebook_removes_existing() {
+        let repo = MockNoteRepository::new().with_notebook("nb-1", "Doomed");
+
+        NoteService::delete_notebook(&repo, "nb-1").unwrap();
+
+        assert!(repo.notebooks.borrow().get("nb-1").is_none());
+    }
+
+    #[test]
+    fn delete_notebook_not_found() {
+        let repo = MockNoteRepository::new();
+
+        let result = NoteService::delete_notebook(&repo, "nb-missing");
+
+        assert!(matches!(result, Err(NoteError::NotebookNotFound)));
+    }
+
+    // ── assign_notebook ────────────────────────────────────────────────
+
+    #[test]
+    fn assign_notebook_sets_notebook_id() {
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("n1", "# Note"))
+            .with_notebook("nb-1", "Work");
+
+        let record = NoteService::assign_notebook(
+            &repo,
+            AssignNoteNotebookInput {
+                note_id: "n1".to_string(),
+                notebook_id: Some("nb-1".to_string()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(record.notebook_id.as_deref(), Some("nb-1"));
+    }
+
+    #[test]
+    fn assign_notebook_not_found() {
+        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Note"));
+
+        let result = NoteService::assign_notebook(
+            &repo,
+            AssignNoteNotebookInput {
+                note_id: "n1".to_string(),
+                notebook_id: Some("nb-missing".to_string()),
+            },
+        );
+
+        assert!(matches!(result, Err(NoteError::NotebookNotFound)));
     }
 }
