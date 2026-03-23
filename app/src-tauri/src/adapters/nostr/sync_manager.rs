@@ -392,7 +392,7 @@ fn gift_wrap_d_tag(secret_key: &SecretKey, note_id: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-use crate::adapters::filesystem::attachments::{
+use crate::domain::blob::service::{
     cleanup_orphaned_blobs, extract_attachment_hashes, find_orphaned_blob_hashes,
 };
 

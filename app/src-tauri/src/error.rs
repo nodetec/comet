@@ -1,3 +1,5 @@
+use crate::domain::accounts::error::AccountError;
+use crate::domain::blob::error::BlobError;
 use crate::domain::notes::error::NoteError;
 use serde::Serialize;
 
@@ -39,6 +41,18 @@ impl AppError {
 
 impl From<NoteError> for AppError {
     fn from(e: NoteError) -> Self {
+        AppError::Custom(e.to_string())
+    }
+}
+
+impl From<AccountError> for AppError {
+    fn from(e: AccountError) -> Self {
+        AppError::Custom(e.to_string())
+    }
+}
+
+impl From<BlobError> for AppError {
+    fn from(e: BlobError) -> Self {
         AppError::Custom(e.to_string())
     }
 }

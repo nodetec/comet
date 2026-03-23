@@ -215,13 +215,13 @@ pub fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), Ap
     let conn = database_connection(&app)?;
 
     // Find orphaned blobs before deleting the note.
-    let orphaned = crate::adapters::filesystem::attachments::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
+    let orphaned = crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
 
     let repo = SqliteNoteRepository::new(&conn);
     NoteService::delete_permanently(&repo, &note_id)?;
 
     // Blob cleanup (needs AppHandle).
-    let blossom_deletions = crate::adapters::filesystem::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions = crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML.
@@ -245,12 +245,12 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
     // Collect trashed note IDs and find orphaned blobs before deleting.
     let repo = SqliteNoteRepository::new(&conn);
     let trashed_ids: Vec<String> = repo.trashed_note_ids()?;
-    let orphaned = crate::adapters::filesystem::attachments::find_orphaned_blob_hashes(&conn, &trashed_ids)?;
+    let orphaned = crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &trashed_ids)?;
 
     let note_ids = NoteService::empty_trash(&repo)?;
 
     // Blob cleanup.
-    let blossom_deletions = crate::adapters::filesystem::attachments::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions = crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML and record pending deletions.
