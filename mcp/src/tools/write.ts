@@ -1,4 +1,4 @@
-import { getDatabase } from "../db";
+import type { DB } from "../db";
 import { extractTags, titleFromMarkdown } from "../lib/markdown";
 import type { LoadedNote, NotebookSummary } from "../lib/types";
 import { readNote } from "./read";
@@ -41,19 +41,18 @@ function normalizeNotebookName(name: string): string {
 }
 
 function upsertNoteSearchDocument(
+  db: DB,
   noteId: string,
   title: string,
   markdown: string,
 ): void {
-  const db = getDatabase();
   db.prepare("DELETE FROM notes_fts WHERE note_id = ?").run(noteId);
   db.prepare(
     "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?, ?, ?)",
   ).run(noteId, title, markdown);
 }
 
-function replaceNoteTags(noteId: string, markdown: string): void {
-  const db = getDatabase();
+function replaceNoteTags(db: DB, noteId: string, markdown: string): void {
   const nextTags = extractTags(markdown);
   const currentRows = db
     .prepare("SELECT tag FROM note_tags WHERE note_id = ? ORDER BY tag ASC")
@@ -99,11 +98,13 @@ function replaceNoteTags(noteId: string, markdown: string): void {
   }
 }
 
-export function createNote(input: {
-  markdown?: string;
-  notebookId?: string;
-}): LoadedNote {
-  const db = getDatabase();
+export function createNote(
+  db: DB,
+  input: {
+    markdown?: string;
+    notebookId?: string;
+  },
+): LoadedNote {
   const noteId = `note-${nowMillis()}`;
   const markdown = input.markdown ?? "# ";
   const title = titleFromMarkdown(markdown);
@@ -114,23 +115,25 @@ export function createNote(input: {
       `INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, locally_modified)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
     ).run(noteId, title, markdown, input.notebookId ?? null, now, now, now);
-    upsertNoteSearchDocument(noteId, title, markdown);
-    replaceNoteTags(noteId, markdown);
+    upsertNoteSearchDocument(db, noteId, title, markdown);
+    replaceNoteTags(db, noteId, markdown);
   });
   transaction();
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Failed to create note.");
   }
   return note;
 }
 
-export function updateNote(input: {
-  noteId: string;
-  markdown: string;
-}): LoadedNote {
-  const db = getDatabase();
+export function updateNote(
+  db: DB,
+  input: {
+    noteId: string;
+    markdown: string;
+  },
+): LoadedNote {
   validateNoteId(input.noteId);
   const title = titleFromMarkdown(input.markdown);
 
@@ -157,20 +160,19 @@ export function updateNote(input: {
       );
     }
 
-    upsertNoteSearchDocument(input.noteId, title, input.markdown);
-    replaceNoteTags(input.noteId, input.markdown);
+    upsertNoteSearchDocument(db, input.noteId, title, input.markdown);
+    replaceNoteTags(db, input.noteId, input.markdown);
   });
   transaction();
 
-  const note = readNote(input.noteId);
+  const note = readNote(db, input.noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function createNotebook(name: string): NotebookSummary {
-  const db = getDatabase();
+export function createNotebook(db: DB, name: string): NotebookSummary {
   const notebookId = `notebook-${nowMillis()}`;
   const normalized = normalizeNotebookName(name);
   const now = nowMillis();
@@ -190,9 +192,8 @@ export function createNotebook(name: string): NotebookSummary {
   return { id: notebookId, name: normalized, noteCount: 0 };
 }
 
-export function archiveNote(noteId: string): LoadedNote {
+export function archiveNote(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -204,16 +205,15 @@ export function archiveNote(noteId: string): LoadedNote {
     throw new Error("Note not found or already archived.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function restoreNote(noteId: string): LoadedNote {
+export function restoreNote(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -225,16 +225,15 @@ export function restoreNote(noteId: string): LoadedNote {
     throw new Error("Note not found or not archived.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function trashNote(noteId: string): LoadedNote {
+export function trashNote(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -246,16 +245,15 @@ export function trashNote(noteId: string): LoadedNote {
     throw new Error("Note not found or already trashed.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function restoreFromTrash(noteId: string): LoadedNote {
+export function restoreFromTrash(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -267,16 +265,15 @@ export function restoreFromTrash(noteId: string): LoadedNote {
     throw new Error("Note not found or not in trash.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function pinNote(noteId: string): LoadedNote {
+export function pinNote(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -288,16 +285,15 @@ export function pinNote(noteId: string): LoadedNote {
     throw new Error("Note not found.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
   return note;
 }
 
-export function unpinNote(noteId: string): LoadedNote {
+export function unpinNote(db: DB, noteId: string): LoadedNote {
   validateNoteId(noteId);
-  const db = getDatabase();
   const now = nowMillis();
   const updated = db
     .prepare(
@@ -309,7 +305,7 @@ export function unpinNote(noteId: string): LoadedNote {
     throw new Error("Note not found.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }
@@ -317,6 +313,7 @@ export function unpinNote(noteId: string): LoadedNote {
 }
 
 export function assignNotebook(
+  db: DB,
   noteId: string,
   notebookId: string | null,
 ): LoadedNote {
@@ -324,9 +321,6 @@ export function assignNotebook(
   if (notebookId) {
     validateNotebookId(notebookId);
   }
-
-  const db = getDatabase();
-
   if (notebookId) {
     const exists = db
       .prepare("SELECT 1 FROM notebooks WHERE id = ? LIMIT 1")
@@ -347,7 +341,7 @@ export function assignNotebook(
     throw new Error("Note not found.");
   }
 
-  const note = readNote(noteId);
+  const note = readNote(db, noteId);
   if (!note) {
     throw new Error("Note not found.");
   }

@@ -79,6 +79,14 @@ function matchListPubkey(pathname: string): string | null {
   return match ? match[1] : null;
 }
 
+function shouldProxyBlobResponse(requestUrl: URL, publicUrl: string): boolean {
+  const targetUrl = new URL(publicUrl, requestUrl);
+  return (
+    targetUrl.origin === requestUrl.origin &&
+    targetUrl.pathname === requestUrl.pathname
+  );
+}
+
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
     rawSql`TRUNCATE blob_owners, blobs, users, invite_codes CASCADE`,
@@ -127,11 +135,35 @@ export async function createBlossomServer(
           return json({ error: "not found" }, 404);
         }
 
+        const publicUrl = objectStorage.getPublicUrl(blob.sha256);
+        if (shouldProxyBlobResponse(url, publicUrl)) {
+          try {
+            const { data, contentType } = await objectStorage.downloadBlob(
+              blob.sha256,
+            );
+            return withCors(
+              new Response(data, {
+                status: 200,
+                headers: {
+                  "Content-Length": String(data.byteLength),
+                  "Content-Type": contentType ?? "application/octet-stream",
+                  "X-Content-Sha256": blob.sha256,
+                },
+              }),
+            );
+          } catch (error) {
+            console.error(
+              `[blossom] failed to proxy blob ${blob.sha256}: ${String(error)}`,
+            );
+            return json({ error: "storage download failed" }, 500);
+          }
+        }
+
         return withCors(
           new Response(null, {
             status: 302,
             headers: {
-              Location: objectStorage.getPublicUrl(blob.sha256),
+              Location: publicUrl,
             },
           }),
         );
@@ -199,7 +231,10 @@ export async function createBlossomServer(
           try {
             await objectStorage.uploadBlob(sha256, data, contentType);
           } catch (e) {
-            console.error("[blossom] S3 upload failed:", e);
+            const err = e instanceof Error ? e : new Error(String(e));
+            console.error(
+              `[blossom] S3 upload failed: ${err.name}: ${err.message}`,
+            );
             return json({ error: "storage upload failed" }, 500);
           }
         }

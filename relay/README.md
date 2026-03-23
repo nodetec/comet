@@ -56,6 +56,6 @@ If Postgres is already running, you usually only need `createdb comet_test` plus
 3. Point the `relay.comet.md` DNS record at the Fly app and provision TLS for that hostname.
 4. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) can deploy the relay job.
 5. Run the first deploy manually:
-   `flyctl deploy --config relay/fly.toml --remote-only`
+   `flyctl deploy --config relay/fly.toml --local-only`
 
 `DATABASE_URL` is a Fly runtime secret. `FLY_API_TOKEN` is a GitHub Actions deploy secret. Keep them in those separate systems.

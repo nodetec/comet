@@ -1,15 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 
-import { useUIStore } from "@/stores/use-ui-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 import { SettingRow } from "./setting-row";
 
 type AppStatus = {
   version: string;
+  appDatabasePath: string;
+  accountPath: string;
   databasePath: string;
   attachmentsPath: string;
   themesPath: string;
+  activeNpub: string;
 };
 
 type ThemeSummary = {
@@ -41,6 +44,9 @@ export function GeneralSettings() {
 
   const items = [
     { label: "Version", value: data.version },
+    { label: "Active Npub", value: data.activeNpub },
+    { label: "App DB", value: data.appDatabasePath },
+    { label: "Account", value: data.accountPath },
     { label: "Database", value: data.databasePath },
     { label: "Attachments", value: data.attachmentsPath },
     { label: "Themes", value: data.themesPath },

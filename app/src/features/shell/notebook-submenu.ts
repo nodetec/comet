@@ -1,6 +1,6 @@
 import { Submenu } from "@tauri-apps/api/menu";
 
-import { type NotebookRef, type NotebookSummary } from "./types";
+import { type NotebookRef, type NotebookSummary } from "@/shared/api/types";
 
 export async function buildNotebookSubmenu(opts: {
   currentNotebook: NotebookRef | null;

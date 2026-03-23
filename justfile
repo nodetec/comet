@@ -32,6 +32,19 @@ app-test-frontend:
 app-test-backend:
   cargo test --manifest-path app/src-tauri/Cargo.toml
 
+app-coverage-frontend:
+  pnpm --filter @comet/app test --coverage
+
+app-coverage-backend:
+  cargo tarpaulin --manifest-path app/src-tauri/Cargo.toml
+
+app-coverage:
+  just app-coverage-frontend
+  just app-coverage-backend
+
+app-clippy:
+  cargo clippy --manifest-path app/src-tauri/Cargo.toml
+
 app-seed:
   pnpm --filter @comet/app seed:db
 
@@ -44,7 +57,7 @@ relay-dev:
   pnpm --filter @comet/relay dev
 
 relay-deploy:
-  flyctl deploy --config relay/fly.toml --remote-only
+  flyctl deploy --config relay/fly.toml --local-only
 
 relay-logs:
   fly logs -a comet-relay
@@ -71,7 +84,7 @@ blossom-dev:
   pnpm --filter @comet/blossom dev
 
 blossom-deploy:
-  flyctl deploy --config blossom/fly.toml --remote-only
+  flyctl deploy --config blossom/fly.toml --local-only
 
 blossom-logs:
   fly logs -a comet-blossom
@@ -119,7 +132,7 @@ web-dev:
   pnpm --filter @comet/web dev
 
 web-deploy:
-  flyctl deploy --config web/fly.toml --remote-only
+  flyctl deploy . --config web/fly.toml --local-only
 
 web-build:
   pnpm --filter @comet/web build

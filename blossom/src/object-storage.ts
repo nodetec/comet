@@ -1,4 +1,9 @@
-import { S3Client } from "bun";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 
 type ObjectStorageOptions = {
   publicBaseUrl?: string;
@@ -7,6 +12,9 @@ type ObjectStorageOptions = {
 export type ObjectStorage = {
   publicBaseUrl: string;
   getPublicUrl: (sha256: string) => string;
+  downloadBlob: (
+    sha256: string,
+  ) => Promise<{ data: Uint8Array; contentType?: string }>;
   uploadBlob: (
     sha256: string,
     data: Uint8Array,
@@ -28,6 +36,14 @@ function getBucketName(): string {
   return bucket;
 }
 
+function getEndpoint(): string | undefined {
+  return (
+    process.env.S3_ENDPOINT ??
+    process.env.AWS_ENDPOINT ??
+    process.env.AWS_ENDPOINT_URL_S3
+  );
+}
+
 function getPublicBaseUrl(bucket: string, override?: string): string {
   const configured =
     override ?? process.env.BLOSSOM_PUBLIC_URL ?? process.env.BUCKET_PUBLIC_URL;
@@ -42,35 +58,18 @@ export function createObjectStorage(
   options: ObjectStorageOptions = {},
 ): ObjectStorage {
   const bucket = getBucketName();
+  const endpoint = getEndpoint();
+  const region = process.env.S3_REGION ?? process.env.AWS_REGION ?? "auto";
+
+  console.log(
+    `[blossom] S3 config: bucket="${bucket}", endpoint="${endpoint ?? "(none)"}", region="${region}"`,
+  );
+
   const client = new S3Client({
-    bucket,
-    region: process.env.S3_REGION ?? process.env.AWS_REGION ?? "auto",
-    ...(process.env.S3_ENDPOINT
-      ? { endpoint: process.env.S3_ENDPOINT }
-      : process.env.AWS_ENDPOINT
-        ? { endpoint: process.env.AWS_ENDPOINT }
-        : process.env.AWS_ENDPOINT_URL_S3
-          ? { endpoint: process.env.AWS_ENDPOINT_URL_S3 }
-          : {}),
-    ...(process.env.S3_ACCESS_KEY_ID
-      ? { accessKeyId: process.env.S3_ACCESS_KEY_ID }
-      : process.env.AWS_ACCESS_KEY_ID
-        ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID }
-        : {}),
-    ...(process.env.S3_SECRET_ACCESS_KEY
-      ? { secretAccessKey: process.env.S3_SECRET_ACCESS_KEY }
-      : process.env.AWS_SECRET_ACCESS_KEY
-        ? { secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
-        : {}),
-    ...(process.env.S3_SESSION_TOKEN
-      ? { sessionToken: process.env.S3_SESSION_TOKEN }
-      : process.env.AWS_SESSION_TOKEN
-        ? { sessionToken: process.env.AWS_SESSION_TOKEN }
-        : {}),
-    ...(process.env.S3_VIRTUAL_HOSTED_STYLE === "true"
-      ? { virtualHostedStyle: true }
-      : {}),
+    region,
+    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
   });
+
   const publicBaseUrl = getPublicBaseUrl(bucket, options.publicBaseUrl);
 
   return {
@@ -78,17 +77,51 @@ export function createObjectStorage(
     getPublicUrl(sha256: string): string {
       return `${publicBaseUrl}/${sha256}`;
     },
+    async downloadBlob(
+      sha256: string,
+    ): Promise<{ data: Uint8Array; contentType?: string }> {
+      const response = await client.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: sha256,
+        }),
+      );
+
+      const body = response.Body;
+      if (!body || typeof body !== "object") {
+        throw new Error(`missing object body for blob ${sha256}`);
+      }
+
+      const bytes = await (
+        body as { transformToByteArray: () => Promise<Uint8Array> }
+      ).transformToByteArray();
+
+      return {
+        data: bytes,
+        contentType: response.ContentType,
+      };
+    },
     async uploadBlob(
       sha256: string,
       data: Uint8Array,
       contentType?: string,
     ): Promise<void> {
-      await client.file(sha256).write(data, {
-        type: contentType ?? "application/octet-stream",
-      });
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: sha256,
+          Body: data,
+          ContentType: contentType ?? "application/octet-stream",
+        }),
+      );
     },
     async deleteBlob(sha256: string): Promise<void> {
-      await client.file(sha256).delete();
+      await client.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: sha256,
+        }),
+      );
     },
   };
 }

@@ -1,13 +1,17 @@
 node_modules/
 .turbo/
 dist/
+.output/
 .astro/
 .wrangler/
+web/.env*
+!web/.env.example
+web/src/routeTree.gen.ts
 app/dist/
 app/src-tauri/target/
 /.webpack/
 relay/dist/
-references/
+reports/
 old/
 .agents/
 .claude/
@@ -21,3 +25,5 @@ comet.db-wal
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+coverage/

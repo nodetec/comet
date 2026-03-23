@@ -10,6 +10,10 @@ COPY packages/nostr/package.json packages/nostr/
 RUN pnpm install --frozen-lockfile
 
 FROM base AS build
+ARG VITE_RELAY_URL
+ARG VITE_BLOSSOM_URL
+ENV VITE_RELAY_URL=$VITE_RELAY_URL
+ENV VITE_BLOSSOM_URL=$VITE_BLOSSOM_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY --from=deps /app/packages/data/node_modules ./packages/data/node_modules

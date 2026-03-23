@@ -3,6 +3,8 @@
  * Uses bun:sqlite when running under Bun, falls back to better-sqlite3 for Node.js.
  */
 
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { Database as BetterSqlite3Database } from "better-sqlite3";
 
 export interface Statement {
@@ -19,10 +21,22 @@ export interface DB {
 }
 
 const isBun = typeof globalThis.Bun !== "undefined";
+const ACCOUNT_DATABASE_FILE = "comet.db";
+const ACCOUNTS_DIR = "accounts";
 
-async function openBunDatabase(path: string): Promise<DB> {
-  const { Database } = await import("bun:sqlite");
-  const raw = new Database(path);
+type DatabaseOpener = (path: string) => DB;
+type ActiveAccountPathResolver = (appDbPath: string) => string;
+
+function createBunDatabase(raw: {
+  close(): void;
+  prepare(sql: string): {
+    run(...params: never[]): void;
+    get(...params: never[]): Record<string, unknown> | null;
+    all(...params: never[]): Record<string, unknown>[];
+  };
+  run(sql: string): void;
+  transaction<T>(fn: () => T): () => T;
+}): DB {
   return {
     prepare(sql: string) {
       const stmt = raw.prepare(sql);
@@ -35,13 +49,10 @@ async function openBunDatabase(path: string): Promise<DB> {
           return { changes: changesRow?.c ?? 0 };
         },
         get(...params: unknown[]) {
-          return stmt.get(...(params as never[])) as Record<
-            string,
-            unknown
-          > | null;
+          return stmt.get(...(params as never[]));
         },
         all(...params: unknown[]) {
-          return stmt.all(...(params as never[])) as Record<string, unknown>[];
+          return stmt.all(...(params as never[]));
         },
       };
     },
@@ -57,12 +68,7 @@ async function openBunDatabase(path: string): Promise<DB> {
   };
 }
 
-function openNodeDatabase(path: string): DB {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const BetterSqlite3 = require("better-sqlite3") as {
-    new (filename: string): BetterSqlite3Database;
-  };
-  const raw = new BetterSqlite3(path);
+function createNodeDatabase(raw: BetterSqlite3Database): DB {
   return {
     prepare(sql: string) {
       const stmt = raw.prepare(sql);
@@ -93,29 +99,117 @@ function openNodeDatabase(path: string): DB {
   };
 }
 
-let db: DB | null = null;
+let openRuntimeDatabase: DatabaseOpener | null = null;
+let resolveActiveAccountPath: ActiveAccountPathResolver | null = null;
+let appDatabasePath: string | null = null;
 
-export async function openDatabase(path: string): Promise<DB> {
-  if (db) {
-    return db;
+async function initializeRuntime(): Promise<void> {
+  if (openRuntimeDatabase && resolveActiveAccountPath) {
+    return;
   }
-  db = isBun ? await openBunDatabase(path) : openNodeDatabase(path);
-  db.run("PRAGMA journal_mode = WAL");
-  db.run("PRAGMA busy_timeout = 5000");
-  db.run("PRAGMA foreign_keys = ON");
-  return db;
+
+  if (isBun) {
+    const { Database } = await import("bun:sqlite");
+    openRuntimeDatabase = (path: string) =>
+      createBunDatabase(new Database(path));
+    resolveActiveAccountPath = (path: string) => {
+      const raw = new Database(path, { readonly: true });
+      try {
+        const row = raw
+          .query("SELECT npub FROM accounts WHERE is_active = 1 LIMIT 1")
+          .get() as { npub: string } | null;
+        if (!row?.npub) {
+          throw new Error(
+            `No active Comet account found in ${path}. Open the Comet app once to initialize it.`,
+          );
+        }
+        return join(
+          dirname(path),
+          ACCOUNTS_DIR,
+          row.npub,
+          ACCOUNT_DATABASE_FILE,
+        );
+      } finally {
+        raw.close();
+      }
+    };
+    return;
+  }
+
+  const { default: BetterSqlite3 } = await import("better-sqlite3");
+  openRuntimeDatabase = (path: string) => {
+    const raw = new BetterSqlite3(path);
+    return createNodeDatabase(raw);
+  };
+  resolveActiveAccountPath = (path: string) => {
+    const raw = new BetterSqlite3(path, {
+      readonly: true,
+    });
+    try {
+      const row = raw
+        .prepare("SELECT npub FROM accounts WHERE is_active = 1 LIMIT 1")
+        .get() as { npub: string } | undefined;
+      if (!row?.npub) {
+        throw new Error(
+          `No active Comet account found in ${path}. Open the Comet app once to initialize it.`,
+        );
+      }
+      return join(dirname(path), ACCOUNTS_DIR, row.npub, ACCOUNT_DATABASE_FILE);
+    } finally {
+      raw.close();
+    }
+  };
 }
 
-export function getDatabase(): DB {
-  if (!db) {
-    throw new Error("Database not initialized. Call openDatabase() first.");
+function configureDatabaseConnection(nextDb: DB): DB {
+  nextDb.run("PRAGMA journal_mode = WAL");
+  nextDb.run("PRAGMA busy_timeout = 5000");
+  nextDb.run("PRAGMA foreign_keys = ON");
+  return nextDb;
+}
+
+function resolveCurrentDatabasePath(): string {
+  if (!appDatabasePath || !resolveActiveAccountPath) {
+    throw new Error(
+      "Database runtime not initialized. Call openDatabase() first.",
+    );
   }
-  return db;
+
+  const nextPath = resolveActiveAccountPath(appDatabasePath);
+  if (!existsSync(nextPath)) {
+    throw new Error(
+      `Active Comet account database not found at ${nextPath}. Make sure the account has been initialized.`,
+    );
+  }
+
+  return nextPath;
+}
+
+function openResolvedDatabase(path: string): DB {
+  if (!openRuntimeDatabase) {
+    throw new Error(
+      "Database runtime not initialized. Call openDatabase() first.",
+    );
+  }
+  return configureDatabaseConnection(openRuntimeDatabase(path));
+}
+
+export async function openDatabase(path: string): Promise<void> {
+  appDatabasePath = path;
+  await initializeRuntime();
+  const db = openResolvedDatabase(resolveCurrentDatabasePath());
+  db.close();
+}
+
+export function withDatabase<T>(fn: (db: DB) => T): T {
+  const db = openResolvedDatabase(resolveCurrentDatabasePath());
+  try {
+    return fn(db);
+  } finally {
+    db.close();
+  }
 }
 
 export function closeDatabase(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
+  appDatabasePath = null;
 }

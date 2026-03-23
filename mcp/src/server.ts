@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { type DB, withDatabase } from "./db";
 import {
   getStats,
   listNotes,
@@ -21,13 +22,37 @@ import {
   updateNote,
 } from "./tools/write";
 
+function successResult(value: unknown) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  };
+}
+
+function errorResult(error: unknown) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: error instanceof Error ? error.message : String(error),
+      },
+    ],
+    isError: true,
+  };
+}
+
+function runTool<T>(fn: (db: DB) => T) {
+  try {
+    return successResult(withDatabase(fn));
+  } catch (error) {
+    return errorResult(error);
+  }
+}
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: "comet-notes",
     version: "0.1.0",
   });
-
-  // --- Read Tools ---
 
   server.tool(
     "list_notes",
@@ -60,12 +85,7 @@ export function createServer(): McpServer {
         .optional()
         .describe("Sort direction (default: newest)"),
     },
-    (args) => {
-      const result = listNotes(args);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    },
+    (args) => runTool((db) => listNotes(db, args)),
   );
 
   server.tool(
@@ -74,18 +94,14 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to load"),
     },
-    (args) => {
-      const note = readNote(args.noteId);
-      if (!note) {
-        return {
-          content: [{ type: "text", text: "Note not found." }],
-          isError: true,
-        };
-      }
-      return {
-        content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-      };
-    },
+    (args) =>
+      runTool((db) => {
+        const note = readNote(db, args.noteId);
+        if (!note) {
+          throw new Error("Note not found.");
+        }
+        return note;
+      }),
   );
 
   server.tool(
@@ -94,24 +110,14 @@ export function createServer(): McpServer {
     {
       query: z.string().describe("Search query"),
     },
-    (args) => {
-      const results = searchNotes(args.query);
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
-    },
+    (args) => runTool((db) => searchNotes(db, args.query)),
   );
 
   server.tool(
     "list_notebooks",
     "List all notebooks with their note counts.",
     {},
-    () => {
-      const notebooks = listNotebooks();
-      return {
-        content: [{ type: "text", text: JSON.stringify(notebooks, null, 2) }],
-      };
-    },
+    () => runTool((db) => listNotebooks(db)),
   );
 
   server.tool(
@@ -123,27 +129,15 @@ export function createServer(): McpServer {
         .optional()
         .describe("Optional search query to filter tags"),
     },
-    (args) => {
-      const tags = listTags(args.query);
-      return {
-        content: [{ type: "text", text: JSON.stringify(tags, null, 2) }],
-      };
-    },
+    (args) => runTool((db) => listTags(db, args.query)),
   );
 
   server.tool(
     "get_stats",
     "Get note and notebook statistics (counts of active, archived, trashed, todo notes).",
     {},
-    () => {
-      const stats = getStats();
-      return {
-        content: [{ type: "text", text: JSON.stringify(stats, null, 2) }],
-      };
-    },
+    () => runTool((db) => getStats(db)),
   );
-
-  // --- Write Tools ---
 
   server.tool(
     "create_note",
@@ -158,21 +152,7 @@ export function createServer(): McpServer {
         .optional()
         .describe("Notebook to assign the note to"),
     },
-    (args) => {
-      try {
-        const note = createNote(args);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => createNote(db, args)),
   );
 
   server.tool(
@@ -182,21 +162,7 @@ export function createServer(): McpServer {
       noteId: z.string().describe("The note ID to update"),
       markdown: z.string().describe("The new markdown content"),
     },
-    (args) => {
-      try {
-        const note = updateNote(args);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => updateNote(db, args)),
   );
 
   server.tool(
@@ -205,21 +171,7 @@ export function createServer(): McpServer {
     {
       name: z.string().describe("The notebook name (max 80 chars)"),
     },
-    (args) => {
-      try {
-        const notebook = createNotebook(args.name);
-        return {
-          content: [{ type: "text", text: JSON.stringify(notebook, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => createNotebook(db, args.name)),
   );
 
   server.tool(
@@ -228,21 +180,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to archive"),
     },
-    (args) => {
-      try {
-        const note = archiveNote(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => archiveNote(db, args.noteId)),
   );
 
   server.tool(
@@ -251,21 +189,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to restore"),
     },
-    (args) => {
-      try {
-        const note = restoreNote(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => restoreNote(db, args.noteId)),
   );
 
   server.tool(
@@ -274,21 +198,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to trash"),
     },
-    (args) => {
-      try {
-        const note = trashNote(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => trashNote(db, args.noteId)),
   );
 
   server.tool(
@@ -297,21 +207,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to restore from trash"),
     },
-    (args) => {
-      try {
-        const note = restoreFromTrash(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => restoreFromTrash(db, args.noteId)),
   );
 
   server.tool(
@@ -320,21 +216,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to pin"),
     },
-    (args) => {
-      try {
-        const note = pinNote(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => pinNote(db, args.noteId)),
   );
 
   server.tool(
@@ -343,21 +225,7 @@ export function createServer(): McpServer {
     {
       noteId: z.string().describe("The note ID to unpin"),
     },
-    (args) => {
-      try {
-        const note = unpinNote(args.noteId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => unpinNote(db, args.noteId)),
   );
 
   server.tool(
@@ -370,21 +238,7 @@ export function createServer(): McpServer {
         .nullable()
         .describe("The notebook ID to assign to, or null to remove"),
     },
-    (args) => {
-      try {
-        const note = assignNotebook(args.noteId, args.notebookId);
-        return {
-          content: [{ type: "text", text: JSON.stringify(note, null, 2) }],
-        };
-      } catch (e) {
-        return {
-          content: [
-            { type: "text", text: e instanceof Error ? e.message : String(e) },
-          ],
-          isError: true,
-        };
-      }
-    },
+    (args) => runTool((db) => assignNotebook(db, args.noteId, args.notebookId)),
   );
 
   return server;

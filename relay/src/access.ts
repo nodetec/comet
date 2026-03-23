@@ -3,7 +3,7 @@ import { inviteCodes, users } from "@comet/data";
 import type { DB } from "./db";
 
 export interface AccessControl {
-  isAllowed(pubkey: string): boolean;
+  isAllowed(pubkey: string): Promise<boolean>;
   allow(
     pubkey: string,
     expiresAt: number | null,
@@ -34,28 +34,24 @@ function generateCode(): string {
 
 export { generateCode };
 
-export async function initAccessControl(
-  db: DB,
-  privateMode: boolean,
-): Promise<AccessControl> {
-  const allowedSet = new Map<string, number | null>();
-  if (privateMode) {
-    const rows = await db
-      .select({ pubkey: users.pubkey, expiresAt: users.expiresAt })
-      .from(users);
-    for (const row of rows) {
-      allowedSet.set(row.pubkey, row.expiresAt);
-    }
-  }
-
-  function isAllowed(pubkey: string): boolean {
+export function initAccessControl(db: DB, privateMode: boolean): AccessControl {
+  async function isAllowed(pubkey: string): Promise<boolean> {
     if (!privateMode) {
       return true;
     }
-    const expiresAt = allowedSet.get(pubkey);
-    if (expiresAt === undefined) {
+
+    const rows = await db
+      .select({ expiresAt: users.expiresAt })
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
+      .limit(1);
+
+    if (rows.length === 0) {
       return false;
     }
+
+    const row = rows[0];
+    const { expiresAt } = row;
     if (expiresAt === null) {
       return true;
     }
@@ -79,7 +75,6 @@ export async function initAccessControl(
         storageLimitBytes: storageLimitBytes ?? null,
       })
       .onConflictDoUpdate({ target: users.pubkey, set });
-    allowedSet.set(pubkey, expiresAt);
   }
 
   async function revoke(pubkey: string): Promise<boolean> {
@@ -87,7 +82,6 @@ export async function initAccessControl(
       .delete(users)
       .where(eq(users.pubkey, pubkey))
       .returning({ pubkey: users.pubkey });
-    allowedSet.delete(pubkey);
     return result.length > 0;
   }
 
@@ -166,7 +160,6 @@ export async function initAccessControl(
       return { ok: false, error: result.error };
     }
 
-    allowedSet.set(pubkey, null);
     return { ok: true };
   }
 

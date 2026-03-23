@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Info, PenLine, Radio, User, X } from "lucide-react";
 
 import {
@@ -7,8 +8,8 @@ import {
   DialogClose,
   DialogPopup,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useUIStore } from "@/stores/use-ui-store";
+} from "@/shared/ui/dialog";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";
@@ -22,11 +23,34 @@ const tabs = [
   { id: "relays" as const, label: "Relays", icon: Radio },
 ];
 
+const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
+  "comet:reopen-settings-after-account-change";
+
 export function SettingsDialog() {
   const open = useUIStore((s) => s.settingsOpen);
   const setOpen = useUIStore((s) => s.setSettingsOpen);
   const activeTab = useUIStore((s) => s.settingsTab);
   const setTab = useUIStore((s) => s.setSettingsTab);
+
+  useEffect(() => {
+    try {
+      const nextTab = window.sessionStorage.getItem(
+        REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY,
+      ) as (typeof tabs)[number]["id"] | null;
+
+      if (!nextTab) {
+        return;
+      }
+
+      window.sessionStorage.removeItem(
+        REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY,
+      );
+      setTab(nextTab);
+      setOpen(true);
+    } catch {
+      // Ignore session storage failures.
+    }
+  }, [setOpen, setTab]);
 
   return (
     <DialogRoot open={open} onOpenChange={setOpen} modal>

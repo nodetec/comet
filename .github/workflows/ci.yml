@@ -16,6 +16,7 @@ jobs:
       docs_deploy: ${{ steps.filter.outputs.docs_deploy }}
       relay: ${{ steps.filter.outputs.relay }}
       relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
+      web_deploy: ${{ steps.filter.outputs.web_deploy }}
       www_deploy: ${{ steps.filter.outputs.www_deploy }}
     steps:
       - uses: actions/checkout@v6
@@ -65,6 +66,13 @@ jobs:
               - 'relay/Dockerfile'
               - 'relay/.dockerignore'
               - 'relay/fly.toml'
+              - 'packages/nostr/**'
+              - 'packages/data/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            web_deploy:
+              - 'web/**'
               - 'packages/nostr/**'
               - 'packages/data/**'
               - 'package.json'
@@ -270,12 +278,12 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy blossom
-        run: flyctl deploy --config blossom/fly.toml --remote-only
+        run: flyctl deploy --config blossom/fly.toml --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   build:
-    if: needs.changes.outputs.app == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.app == 'true'
     needs: [changes, format, checks, test]
     strategy:
       fail-fast: false
@@ -421,7 +429,23 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy relay
-        run: flyctl deploy --config relay/fly.toml --remote-only
+        run: flyctl deploy --config relay/fly.toml --local-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  web_deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.web_deploy == 'true'
+    needs: [changes, format, checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy web
+        run: flyctl deploy . --config web/fly.toml --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 

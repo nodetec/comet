@@ -1,11 +1,12 @@
+/* eslint-disable unicorn/prefer-top-level-await */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
-import { queryClient } from "@/lib/query-client";
+import { queryClient } from "@/shared/config/query-client";
 
-import App from "./App";
+import App from "./app";
 import "./index.css";
 
 declare global {
@@ -47,7 +48,7 @@ if (import.meta.env.DEV) {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+ReactDOM.createRoot(document.querySelector("#root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />

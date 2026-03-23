@@ -91,7 +91,20 @@ export function createFakeObjectStorage(
     deleteCount: 0,
     publicBaseUrl,
     getPublicUrl(sha256: string): string {
-      return `${publicBaseUrl}/${sha256}`;
+      return `${this.publicBaseUrl}/${sha256}`;
+    },
+    downloadBlob(
+      sha256: string,
+    ): Promise<{ data: Uint8Array; contentType?: string }> {
+      const blob = blobs.get(sha256);
+      if (!blob) {
+        return Promise.reject(new Error(`blob not found: ${sha256}`));
+      }
+
+      return Promise.resolve({
+        data: new Uint8Array(blob.data),
+        contentType: blob.contentType,
+      });
     },
     uploadBlob(
       sha256: string,
