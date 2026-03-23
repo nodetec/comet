@@ -1,7 +1,8 @@
 use crate::domain::accounts::model::IdentityCredentials;
 use crate::domain::common::text::strip_title_line;
 use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput};
-use crate::error::{now_millis, now_secs, AppError};
+use crate::domain::common::time::{now_millis, now_secs};
+use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 use tauri::AppHandle;

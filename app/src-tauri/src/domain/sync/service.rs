@@ -1,5 +1,6 @@
 use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
-use crate::error::{now_millis, AppError};
+use crate::domain::common::time::now_millis;
+use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
 
 pub fn delete_note_from_sync(

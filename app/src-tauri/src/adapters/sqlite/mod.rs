@@ -1,3 +1,4 @@
+pub mod connection;
 pub mod migrations;
 pub mod note_repository;
 pub mod relay_repository;

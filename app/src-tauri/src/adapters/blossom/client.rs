@@ -160,7 +160,7 @@ pub async fn upload_and_rewrite_attachments(
         let conn = crate::db::database_connection(app)?;
         conn.execute(
             "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at) VALUES (?1, ?2, 0, ?3, ?4)",
-            rusqlite::params![hash, blossom_url, size_bytes, crate::error::now_millis()],
+            rusqlite::params![hash, blossom_url, size_bytes, crate::domain::common::time::now_millis()],
         )?;
 
         let public_url = format!("{}/{}.{}", blossom_url.trim_end_matches('/'), hash, ext);
@@ -328,7 +328,7 @@ fn sign_blossom_auth(
     blob_hash: &str,
     blossom_url: &str,
 ) -> Result<String, AppError> {
-    let now = crate::error::now_secs() as u64;
+    let now = crate::domain::common::time::now_secs() as u64;
     let expiration = now + 300;
 
     let domain = url::Url::parse(blossom_url)

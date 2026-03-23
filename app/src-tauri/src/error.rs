@@ -62,6 +62,3 @@ impl From<crate::domain::sync::error::SyncError> for AppError {
         AppError::Custom(e.to_string())
     }
 }
-
-// Re-exports for backward compatibility during transition.
-pub use crate::domain::common::time::{now_millis, now_secs};

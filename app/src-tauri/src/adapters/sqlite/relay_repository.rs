@@ -1,6 +1,7 @@
 use crate::domain::relay::model::Relay;
 use crate::domain::relay::service::normalize_relay_url;
-use crate::error::{now_millis, AppError};
+use crate::domain::common::time::now_millis;
+use crate::error::AppError;
 use rusqlite::{params, Connection};
 
 pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
