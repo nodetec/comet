@@ -4,6 +4,9 @@ dist/
 .output/
 .astro/
 .wrangler/
+web/.env*
+!web/.env.example
+web/src/routeTree.gen.ts
 app/dist/
 app/src-tauri/target/
 /.webpack/
