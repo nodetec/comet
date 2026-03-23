@@ -47,15 +47,15 @@ function getHashtagRegexStringChars() {
     "\u30A1-\u30FA\u30FC-\u30FE\uFF66-\uFF9F" +
     "\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A" +
     "\u3041-\u3096\u3099-\u309E\u3400-\u4DBF\u4E00-\u9FFF" +
-    charCode(0x2_a7_00) +
+    charCode(173_824) +
     "-" +
-    charCode(0x2_b7_3f) +
-    charCode(0x2_b7_40) +
+    charCode(177_983) +
+    charCode(177_984) +
     "-" +
-    charCode(0x2_b8_1f) +
-    charCode(0x2_f8_00) +
+    charCode(178_207) +
+    charCode(194_560) +
     "-" +
-    charCode(0x2_fa_1f) +
+    charCode(195_103) +
     "\u3003\u3005\u303B";
 
   const unicodeLetters =

@@ -505,6 +505,9 @@ importers:
       "@tailwindcss/vite":
         specifier: ^4.2.2
         version: 4.2.2(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      "@tanstack/router-cli":
+        specifier: 1.166.13
+        version: 1.166.13
       "@types/node":
         specifier: ^22.5.4
         version: 22.19.15
@@ -5240,6 +5243,14 @@ packages:
     peerDependencies:
       react: ">=16.8"
       react-dom: ">=16.8"
+
+  "@tanstack/router-cli@1.166.13":
+    resolution:
+      {
+        integrity: sha512-yfxWNSvCYsuQ8X2aLo1mthBVsFJ7AMlAeABC42tKXHfySfHH2EzRD3xMgjmE3eTkz33YW9tsXjpWcgX3NOzBrQ==,
+      }
+    engines: { node: ">=20.19" }
+    hasBin: true
 
   "@tanstack/router-core@1.167.5":
     resolution:
@@ -16876,6 +16887,14 @@ snapshots:
       "@tanstack/table-core": 8.21.3
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
+
+  "@tanstack/router-cli@1.166.13":
+    dependencies:
+      "@tanstack/router-generator": 1.166.13
+      chokidar: 3.6.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - supports-color
 
   "@tanstack/router-core@1.167.5":
     dependencies:
