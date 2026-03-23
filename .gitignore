@@ -17,6 +17,7 @@ old/
 .claude/
 skills-lock.json
 .superpowers/
+templates/
 
 comet.db
 comet.db-shm

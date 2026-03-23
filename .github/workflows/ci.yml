@@ -449,9 +449,56 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-  www_deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.www_deploy == 'true'
+  www_preview:
+    if: github.event_name == 'pull_request' && needs.changes.outputs.www_deploy == 'true'
     needs: [changes, format]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter @comet/www
+
+      - name: Build and deploy preview
+        id: deploy
+        run: |
+          OUTPUT=$(pnpm --filter @comet/www run deploy:preview 2>&1)
+          echo "$OUTPUT"
+          URL=$(echo "$OUTPUT" | grep -oP 'https://[^\s]+\.pages\.dev' | head -1)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Comment preview URL
+        if: steps.deploy.outputs.url
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: www-preview
+          message: |
+            **www preview:** ${{ steps.deploy.outputs.url }}
+
+  www_deploy:
+    if: >-
+      always() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/master' &&
+      needs.format.result == 'success' &&
+      (needs.changes.outputs.www_deploy == 'true' || needs.release.result == 'success')
+    needs: [changes, format, release]
     runs-on: ubuntu-latest
     permissions:
       contents: read

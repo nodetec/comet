@@ -16,100 +16,28 @@ const DOWNLOAD_BUTTONS = [
 ---
 
 <Layout
-  title="Comet — Capture locally, transmit globally."
+  title="Comet. Capture locally, transmit globally."
   description="A desktop note-taking app that combines private local storage with the power to publish directly to the Nostr network."
 >
-  <div class="relative isolate h-full overflow-x-hidden bg-neutral-900">
-    <!-- Top nav -->
-    <nav class="absolute top-0 right-0 z-10 flex justify-end p-6">
-      <a
-        id="auth-btn"
-        href="/dashboard/login"
-        class="rounded-md bg-white/10 px-4 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-white/20"
-      >
-        Sign in
-      </a>
-    </nav>
+  <div class="bg-[#0a0a1a]">
 
-    <script>
-      try {
-        if (localStorage.getItem("pubkey")) {
-          const btn = document.getElementById("auth-btn");
-          if (btn) {
-            btn.textContent = "Dashboard";
-            btn.setAttribute("href", "/dashboard");
-          }
-        }
-      } catch {}
-    </script>
-
-    <!-- Grid background -->
-    <svg
-      aria-hidden="true"
-      class="absolute inset-0 -z-10 size-full stroke-white/10 [mask-image:radial-gradient(100%_100%_at_top_right,white,transparent)]"
-    >
-      <defs>
-        <pattern
-          x="50%"
-          y="-1"
-          id="grid"
-          width="200"
-          height="200"
-          patternUnits="userSpaceOnUse"
-        >
-          <path d="M.5 200V.5H200" fill="none" />
-        </pattern>
-      </defs>
-      <svg x="50%" y="-1" class="overflow-visible fill-gray-800/20">
-        <path
-          d="M-200 0h201v201h-201Z M600 0h201v201h-201Z M-400 600h201v201h-201Z M200 800h201v201h-201Z"
-          stroke-width="0"></path>
-      </svg>
-      <rect fill="url(#grid)" width="100%" height="100%" stroke-width="0"
-      ></rect>
-    </svg>
-
-    <!-- Gradient blob -->
-    <div
-      aria-hidden="true"
-      class="absolute top-10 left-[calc(50%-4rem)] -z-10 transform-gpu blur-3xl sm:left-[calc(50%-18rem)] lg:top-[calc(50%-30rem)] lg:left-48 xl:left-[calc(50%-24rem)]"
-    >
-      <div
-        style="clip-path: polygon(73.6% 51.7%, 91.7% 11.8%, 100% 46.4%, 97.4% 82.2%, 92.5% 84.9%, 75.7% 64%, 55.3% 47.5%, 46.5% 49.4%, 45% 62.9%, 50.3% 87.2%, 21.3% 64.1%, 0.1% 100%, 5.4% 51.1%, 21.4% 63.9%, 58.9% 0.2%, 73.6% 51.7%)"
-        class="aspect-[1108/632] w-[69.25rem] bg-gradient-to-r from-[#60caf3] to-[#4a42e1] opacity-20"
-      >
-      </div>
-    </div>
-
-    <!-- Hero -->
-    <div
-      class="mx-auto max-w-7xl px-6 pt-10 pb-24 sm:pb-32 lg:flex lg:px-8 lg:py-24"
-    >
-      <div class="mx-auto max-w-2xl shrink-0 lg:mx-0 lg:pt-8">
-        <!-- Logo + name -->
-        <div class="flex items-center gap-3">
-          <img
-            alt="Comet logo"
-            src="/comet-logo.svg"
-            class="h-11 rounded-md"
-          />
-          <span class="text-2xl font-semibold text-white">Comet</span>
-          <span
-            class="rounded-md border border-neutral-700 bg-neutral-800 p-1 text-xs font-semibold text-neutral-400"
-            >Alpha</span
-          >
+    <!-- Header (absolute, overlaps hero) -->
+    <header class="absolute inset-x-0 top-0 z-50">
+      <nav aria-label="Global" class="flex items-center justify-between p-6 lg:px-8">
+        <div class="flex lg:flex-1">
+          <a href="#" class="-m-1.5 flex items-center gap-3 p-1.5">
+            <img alt="Comet logo" src="/comet-logo.svg" class="h-8 w-auto rounded-md" />
+            <span class="text-xl font-semibold text-white">Comet</span>
+          </a>
+        </div>
+        <div class="flex flex-1 justify-end">
           <a
             href="https://github.com/nodetec/comet"
             target="_blank"
             rel="noopener noreferrer"
             class="text-gray-400 transition-colors hover:text-white"
           >
-            <svg
-              class="size-5"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
+            <svg class="size-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 fill-rule="evenodd"
                 d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
@@ -117,166 +45,668 @@ const DOWNLOAD_BUTTONS = [
             </svg>
           </a>
         </div>
+      </nav>
+    </header>
 
-        <!-- Release badge -->
-        <div class="mt-24 sm:mt-32 lg:mt-16">
-          <a
-            href="https://github.com/nodetec/comet/releases/latest"
-            class="inline-flex space-x-6"
-          >
-            <span
-              class="rounded-full bg-indigo-500/10 px-3 py-1 text-sm/6 font-semibold text-indigo-400 ring-1 ring-indigo-500/20 ring-inset"
-              >What's new</span
-            >
-            <span
-              class="inline-flex items-center space-x-2 text-sm/6 font-medium text-gray-300"
-            >
-              <span>Latest: {tag}</span>
-              <svg
-                class="size-5 text-gray-500"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                  clip-rule="evenodd"></path>
-              </svg>
-            </span>
-          </a>
-        </div>
+    <!-- Hero -->
+    <div class="relative isolate pt-14">
 
-        <h1
-          class="mt-10 text-5xl font-semibold tracking-tight text-pretty text-white sm:text-7xl"
+      <!-- Starry background -->
+      <canvas id="stars-canvas" class="absolute inset-0 -z-10 size-full" aria-hidden="true"></canvas>
+
+      <!-- Shooting stars (CSS) -->
+      <div class="shooting-stars absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <div class="shooting-star"></div>
+        <div class="shooting-star"></div>
+        <div class="shooting-star"></div>
+      </div>
+
+      <!-- Gradient glow -->
+      <div
+        aria-hidden="true"
+        class="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
+      >
+        <div
+          style="clip-path: polygon(73.6% 51.7%, 91.7% 11.8%, 100% 46.4%, 97.4% 82.2%, 92.5% 84.9%, 75.7% 64%, 55.3% 47.5%, 46.5% 49.4%, 45% 62.9%, 50.3% 87.2%, 21.3% 64.1%, 0.1% 100%, 5.4% 51.1%, 21.4% 63.9%, 58.9% 0.2%, 73.6% 51.7%)"
+          class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#60caf3] to-[#4a42e1] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
         >
-          Capture locally, transmit globally.
-        </h1>
-        <p
-          class="mt-8 text-lg font-medium text-pretty text-gray-400 sm:text-xl/8"
-        >
-          Comet is a desktop note-taking app that combines private local storage
-          with the power to publish directly to the Nostr network. Organize with
-          notebooks and tags, write in markdown, and share with the world when
-          you're ready.
-        </p>
-
-        <!-- Download buttons -->
-        <div class="mt-10">
-          <h2 class="text-2xl font-semibold text-white">Install</h2>
-          <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {
-              DOWNLOAD_BUTTONS.map(({ label, pattern }) => {
-                const asset = release
-                  ? findAsset(release.assets, pattern)
-                  : undefined;
-                const href = asset?.url ?? fallbackBase;
-                return (
-                  <a
-                    href={href}
-                    download
-                    class="rounded-md bg-indigo-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-                  >
-                    {label}
-                  </a>
-                );
-              })
-            }
-          </div>
         </div>
       </div>
 
-      <!-- Screenshot -->
-      <div
-        class="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:mt-0 lg:mr-0 lg:ml-10 lg:max-w-none lg:flex-none xl:ml-32"
-      >
-        <div class="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
+      <div class="py-24 sm:py-32 lg:pb-40">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+          <div class="mx-auto max-w-2xl text-center">
+
+            <!-- Release badge -->
+            <div class="mb-10">
+              <a
+                href="https://github.com/nodetec/comet/releases/latest"
+                class="inline-flex space-x-6"
+              >
+                <span
+                  class="rounded-full bg-indigo-500/10 px-3 py-1 text-sm/6 font-semibold text-indigo-400 ring-1 ring-indigo-500/20 ring-inset"
+                  >What's new</span
+                >
+                <span
+                  class="inline-flex items-center space-x-2 text-sm/6 font-medium text-gray-300"
+                >
+                  <span>Latest: {tag}</span>
+                  <svg
+                    class="size-5 text-gray-500"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                      clip-rule="evenodd"></path>
+                  </svg>
+                </span>
+              </a>
+            </div>
+
+            <h1
+              class="text-5xl font-semibold tracking-tight text-balance text-white sm:text-7xl"
+            >
+              Capture locally, transmit globally.
+            </h1>
+            <p
+              class="mt-8 text-lg font-medium text-pretty text-gray-400 sm:text-xl/8"
+            >
+              Markdown notes that start private. Encrypted when they travel. Decentralized when you publish.
+            </p>
+
+            <!-- Download buttons -->
+            <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+              {
+                DOWNLOAD_BUTTONS.map(({ label, pattern }) => {
+                  const asset = release
+                    ? findAsset(release.assets, pattern)
+                    : undefined;
+                  const href = asset?.url ?? fallbackBase;
+                  return (
+                    <a
+                      href={href}
+                      download
+                      class="rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                    >
+                      {label}
+                    </a>
+                  );
+                })
+              }
+            </div>
+          </div>
+
+          <!-- Screenshot -->
           <img
             alt="App screenshot"
             src="/demo.png"
             width="3040"
             height="1882"
-            class="w-[76rem]"
+            class="mt-16 rounded-md bg-white/5 shadow-2xl ring-1 ring-white/10 sm:mt-24"
           />
+        </div>
+      </div>
+
+      <!-- Bottom gradient glow -->
+      <div
+        aria-hidden="true"
+        class="absolute inset-x-0 top-[calc(100%-13rem)] -z-10 transform-gpu overflow-hidden blur-3xl sm:top-[calc(100%-30rem)]"
+      >
+        <div
+          style="clip-path: polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)"
+          class="relative left-[calc(50%+3rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 bg-gradient-to-tr from-[#60caf3] to-[#4a42e1] opacity-20 sm:left-[calc(50%+36rem)] sm:w-[72.1875rem]"
+        >
         </div>
       </div>
     </div>
 
-    <!-- Features -->
-    <div class="bg-neutral-950 py-24 sm:py-32">
+    <!-- Section 1: Editor / Markdown -->
+    <!-- <div class="overflow-hidden py-24 sm:py-32"> -->
+    <!--   <div class="mx-auto max-w-7xl px-6 lg:px-8"> -->
+    <!--     <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-2"> -->
+    <!--       <div class="lg:pt-4 lg:pr-8"> -->
+    <!--         <div class="lg:max-w-lg"> -->
+    <!--           <h2 class="text-base/7 font-semibold text-indigo-400">Markdown-native</h2> -->
+    <!--           <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl">Write like you mean it. Publish like you own it.</p> -->
+    <!--           <p class="mt-6 text-lg/8 text-gray-300">A rich editor that stores everything as markdown. Write with full formatting — headings, code blocks, images, links — and your notes stay portable underneath. Calm typography that invites daily use.</p> -->
+    <!--           <dl class="mt-10 max-w-xl space-y-8 text-base/7 text-gray-400 lg:max-w-none"> -->
+    <!--             <div class="relative pl-9"> -->
+    <!--               <dt class="inline font-semibold text-white"> -->
+    <!--                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-1 size-5 text-indigo-400"> -->
+    <!--                   <path fill-rule="evenodd" d="M4.5 2A2.5 2.5 0 0 0 2 4.5v3.879a2.5 2.5 0 0 0 .732 1.767l7.5 7.5a2.5 2.5 0 0 0 3.536 0l3.878-3.878a2.5 2.5 0 0 0 0-3.536l-7.5-7.5A2.5 2.5 0 0 0 8.38 2H4.5ZM5 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /> -->
+    <!--                 </svg> -->
+    <!--                 Rich editing, markdown storage. -->
+    <!--               </dt> -->
+    <!--               <dd class="inline"> Write with full formatting — what you see is what you get. Under the hood, every note is stored as clean markdown.</dd> -->
+    <!--             </div> -->
+    <!--             <div class="relative pl-9"> -->
+    <!--               <dt class="inline font-semibold text-white"> -->
+    <!--                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-1 size-5 text-indigo-400"> -->
+    <!--                   <path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd" /> -->
+    <!--                 </svg> -->
+    <!--                 Code, images, and links. -->
+    <!--               </dt> -->
+    <!--               <dd class="inline"> Syntax-highlighted code blocks, inline images, and pasted links — all rendered in-place.</dd> -->
+    <!--             </div> -->
+    <!--             <div class="relative pl-9"> -->
+    <!--               <dt class="inline font-semibold text-white"> -->
+    <!--                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-1 size-5 text-indigo-400"> -->
+    <!--                   <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h11A2.5 2.5 0 0 1 18 4.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 2 15.5v-11Zm4.5 0a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5V5a.5.5 0 0 0-.5-.5h-2Z" /> -->
+    <!--                 </svg> -->
+    <!--                 Notebooks &amp; tags. -->
+    <!--               </dt> -->
+    <!--               <dd class="inline"> Flat notebooks for context, #tags written inline for lightweight filtering. No filing systems.</dd> -->
+    <!--             </div> -->
+    <!--           </dl> -->
+    <!--         </div> -->
+    <!--       </div> -->
+    <!--       <img -->
+    <!--         width="3040" -->
+    <!--         height="1882" -->
+    <!--         src="/demo.png" -->
+    <!--         alt="Comet editor screenshot" -->
+    <!--         class="w-[48rem] max-w-none rounded-xl shadow-xl ring-1 ring-white/10 sm:w-[57rem] md:-ml-4 lg:-ml-0" -->
+    <!--       /> -->
+    <!--     </div> -->
+    <!--   </div> -->
+    <!-- </div> -->
+
+    <!-- Section 2: Local-first / Encryption -->
+    <div class="py-24 sm:py-32">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <h2
-          class="text-center text-3xl font-semibold tracking-tight text-white sm:text-4xl"
-        >
-          Built for writers who value ownership
-        </h2>
-        <dl
-          class="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:max-w-none lg:grid-cols-4"
-        >
+        <div class="mx-auto max-w-2xl lg:text-center">
+          <h2 class="text-base/7 font-semibold text-indigo-400">Private by design</h2>
+          <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl lg:text-balance">Your notes. Your device. Encrypted.</p>
+          <p class="mt-6 text-lg/8 text-gray-300">Notes live in SQLite on your machine. No accounts, no cloud lock-in. When you sync, content is encrypted before it leaves your device.</p>
+        </div>
+        <div class="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-4xl">
+          <dl class="grid max-w-xl grid-cols-1 gap-x-8 gap-y-10 lg:max-w-none lg:grid-cols-2 lg:gap-y-16">
+            <div class="relative pl-16">
+              <dt class="text-base/7 font-semibold text-white">
+                <div class="absolute top-0 left-0 flex size-10 items-center justify-center rounded-lg bg-indigo-500">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                  </svg>
+                </div>
+                Local SQLite storage
+              </dt>
+              <dd class="mt-2 text-base/7 text-gray-400">Notes stored locally in a database on your machine. No server required to use Comet.</dd>
+            </div>
+            <div class="relative pl-16">
+              <dt class="text-base/7 font-semibold text-white">
+                <div class="absolute top-0 left-0 flex size-10 items-center justify-center rounded-lg bg-indigo-500">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                </div>
+                Markdown content format
+              </dt>
+              <dd class="mt-2 text-base/7 text-gray-400">Your notes are markdown. Portable, exportable, and future-proof. No proprietary formats.</dd>
+            </div>
+            <div class="relative pl-16">
+              <dt class="text-base/7 font-semibold text-white">
+                <div class="absolute top-0 left-0 flex size-10 items-center justify-center rounded-lg bg-indigo-500">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
+                Encrypted sync
+              </dt>
+              <dd class="mt-2 text-base/7 text-gray-400">Blobs are encrypted before upload. Your relay and Blossom server see ciphertext, not content.</dd>
+            </div>
+            <div class="relative pl-16">
+              <dt class="text-base/7 font-semibold text-white">
+                <div class="absolute top-0 left-0 flex size-10 items-center justify-center rounded-lg bg-indigo-500">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+                  </svg>
+                </div>
+                No accounts required
+              </dt>
+              <dd class="mt-2 text-base/7 text-gray-400">No email, no password, no sign-up. Just open the app and write.</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Sync + Blossom -->
+    <!-- <div class="py-24 sm:py-32"> -->
+    <!--   <div class="mx-auto max-w-7xl px-6 lg:px-8"> -->
+    <!--     <div class="mx-auto max-w-2xl lg:text-center"> -->
+    <!--       <h2 class="text-base/7 font-semibold text-indigo-400">Sync on your terms</h2> -->
+    <!--       <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl lg:text-balance">Sync across devices. No middleman.</p> -->
+    <!--       <p class="mt-6 text-lg/8 text-gray-300">Desktop-to-desktop sync through your own Nostr relay and Blossom blob server. Media and attachments travel encrypted. Self-hostable infrastructure you control.</p> -->
+    <!--     </div> -->
+    <!--     <div class="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none"> -->
+    <!--       <dl class="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3"> -->
+    <!--         <div class="flex flex-col"> -->
+    <!--           <dt class="flex items-center gap-x-3 text-base/7 font-semibold text-white"> -->
+    <!--             <div class="flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Nostr relay sync -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-4 flex flex-auto flex-col text-base/7 text-gray-400"> -->
+    <!--             <p class="flex-auto">Notes sync through a Nostr relay — the same protocol used for publishing, repurposed for private sync.</p> -->
+    <!--           </dd> -->
+    <!--         </div> -->
+    <!--         <div class="flex flex-col"> -->
+    <!--           <dt class="flex items-center gap-x-3 text-base/7 font-semibold text-white"> -->
+    <!--             <div class="flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Blossom blob storage -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-4 flex flex-auto flex-col text-base/7 text-gray-400"> -->
+    <!--             <p class="flex-auto">Images and attachments stored via the Blossom protocol with encrypted uploads and content-addressable hashes.</p> -->
+    <!--           </dd> -->
+    <!--         </div> -->
+    <!--         <div class="flex flex-col"> -->
+    <!--           <dt class="flex items-center gap-x-3 text-base/7 font-semibold text-white"> -->
+    <!--             <div class="flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 0 1-3-3m3 3a3 3 0 1 0 0 6h13.5a3 3 0 1 0 0-6m-16.5-3a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3m-19.5 0a4.5 4.5 0 0 1 .9-2.7L5.737 5.1a3.375 3.375 0 0 1 2.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 0 1 .9 2.7m0 0a3 3 0 0 1-3 3m0 3h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Zm-3 6h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Z" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Self-hostable -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-4 flex flex-auto flex-col text-base/7 text-gray-400"> -->
+    <!--             <p class="flex-auto">Run your own comet-server: relay, blob storage, and admin dashboard in one package.</p> -->
+    <!--           </dd> -->
+    <!--         </div> -->
+    <!--       </dl> -->
+    <!--     </div> -->
+    <!--   </div> -->
+    <!-- </div> -->
+
+    <!-- Section 4: Publishing -->
+    <!-- <div class="py-24 sm:py-32"> -->
+    <!--   <div class="mx-auto max-w-7xl px-6 lg:px-8"> -->
+    <!--     <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-5"> -->
+    <!--       <div class="col-span-2"> -->
+    <!--         <h2 class="text-base/7 font-semibold text-indigo-400">Private to public</h2> -->
+    <!--         <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl">Private until you say otherwise.</p> -->
+    <!--         <p class="mt-6 text-base/7 text-gray-300">Every note starts private. When you're ready, publish to the Nostr network with one action. Your note becomes a long-form article visible on any Nostr client.</p> -->
+    <!--       </div> -->
+    <!--       <dl class="col-span-3 grid grid-cols-1 gap-x-8 gap-y-10 text-base/7 text-gray-400 sm:grid-cols-2 lg:gap-y-16"> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             One-click publish to Nostr -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">Publish any note to the Nostr network with a single action. No separate publishing tool required.</dd> -->
+    <!--         </div> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             Notes stay private by default -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">Nothing is shared until you explicitly choose to publish. Your drafts are yours alone.</dd> -->
+    <!--         </div> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             Long-form article format -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">Published notes use the NIP-23 long-form content standard, designed for articles and essays.</dd> -->
+    <!--         </div> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             Visible on any Nostr client -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">Published content is readable on Habla, Yakihonne, and any other Nostr client that supports long-form posts.</dd> -->
+    <!--         </div> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             Publish status shown in-app -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">See which notes are published and their relay visibility directly in the app.</dd> -->
+    <!--         </div> -->
+    <!--         <div class="relative pl-9"> -->
+    <!--           <dt class="font-semibold text-white"> -->
+    <!--             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="absolute top-1 left-0 size-5 text-indigo-400"> -->
+    <!--               <path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd" /> -->
+    <!--             </svg> -->
+    <!--             Unpublish when you want -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-2">Changed your mind? Remove a published note from your relay with one action.</dd> -->
+    <!--         </div> -->
+    <!--       </dl> -->
+    <!--     </div> -->
+    <!--   </div> -->
+    <!-- </div> -->
+
+    <!-- Section 5: Nostr Identity -->
+    <!-- <div class="py-24 sm:py-32"> -->
+    <!--   <div class="mx-auto max-w-7xl px-6 lg:px-8"> -->
+    <!--     <div class="mx-auto grid max-w-2xl grid-cols-1 gap-16 sm:gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-5"> -->
+    <!--       <div class="col-span-2"> -->
+    <!--         <h2 class="text-base/7 font-semibold text-indigo-400">Your keys, your identity</h2> -->
+    <!--         <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl">Your identity, not ours.</p> -->
+    <!--         <p class="mt-6 text-base/7 text-gray-300">Comet uses Nostr keypairs for identity. No accounts to create, no email to verify. You own your cryptographic identity — it works across every Nostr app.</p> -->
+    <!--       </div> -->
+    <!--       <dl class="col-span-3 grid grid-cols-1 gap-x-8 gap-y-16 sm:grid-cols-2"> -->
+    <!--         <div> -->
+    <!--           <dt class="text-base/7 font-semibold text-white"> -->
+    <!--             <div class="mb-6 flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Nostr keypair identity -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-1 text-base/7 text-gray-400">Your public/private key pair is your account. Generate it once, use it everywhere on the Nostr network.</dd> -->
+    <!--         </div> -->
+    <!--         <div> -->
+    <!--           <dt class="text-base/7 font-semibold text-white"> -->
+    <!--             <div class="mb-6 flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             No platform lock-in -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-1 text-base/7 text-gray-400">Your identity isn't tied to Comet. Use it on any Nostr-compatible client — your keys travel with you.</dd> -->
+    <!--         </div> -->
+    <!--         <div> -->
+    <!--           <dt class="text-base/7 font-semibold text-white"> -->
+    <!--             <div class="mb-6 flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0 1 19.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 0 0 4.5 10.5a7.464 7.464 0 0 1-1.15 3.993m1.989 3.559A11.209 11.209 0 0 0 8.25 10.5a3.75 3.75 0 1 1 7.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 0 1-3.6 9.75m6.633-4.596a18.666 18.666 0 0 1-2.485 5.33" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Cryptographic ownership -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-1 text-base/7 text-gray-400">You sign your own content. Nobody can impersonate you or revoke your identity.</dd> -->
+    <!--         </div> -->
+    <!--         <div> -->
+    <!--           <dt class="text-base/7 font-semibold text-white"> -->
+    <!--             <div class="mb-6 flex size-10 items-center justify-center rounded-lg bg-indigo-500"> -->
+    <!--               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="size-6 text-white"> -->
+    <!--                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /> -->
+    <!--               </svg> -->
+    <!--             </div> -->
+    <!--             Verifiable signatures -->
+    <!--           </dt> -->
+    <!--           <dd class="mt-1 text-base/7 text-gray-400">Every published note is cryptographically signed. Readers can verify it came from you without trusting any server.</dd> -->
+    <!--         </div> -->
+    <!--       </dl> -->
+    <!--     </div> -->
+    <!--   </div> -->
+    <!-- </div> -->
+
+    <!-- Section 6: Roadmap -->
+    <div class="py-24 sm:py-32">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-2xl lg:text-center">
+          <h2 class="text-base/7 font-semibold text-indigo-400">Roadmap</h2>
+          <p class="mt-2 text-4xl font-semibold tracking-tight text-pretty text-white sm:text-5xl lg:text-balance">Where we're headed</p>
+        </div>
+        <div class="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 overflow-hidden sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-4">
           <div>
-            <dt class="text-base font-semibold text-white">Local-first</dt>
-            <dd class="mt-2 text-sm/6 text-gray-400">
-              Your notes live on your machine. No accounts, no cloud lock-in, no
-              surveillance.
-            </dd>
+            <div class="flex items-center text-sm/6 font-semibold text-indigo-400">
+              <svg viewBox="0 0 4 4" aria-hidden="true" class="mr-4 size-1 flex-none">
+                <circle r="2" cx="2" cy="2" fill="currentColor" />
+              </svg>
+              Now
+              <div aria-hidden="true" class="absolute -ml-2 h-px w-screen -translate-x-full bg-white/15 sm:-ml-4 lg:static lg:-mr-6 lg:ml-8 lg:w-auto lg:flex-auto lg:translate-x-0"></div>
+            </div>
+            <p class="mt-6 text-lg/8 font-semibold tracking-tight text-white">Core note-taking</p>
+            <p class="mt-1 text-base/7 text-gray-400">Local notes, markdown editor, notebooks &amp; tags, full-text search, and archive flow.</p>
           </div>
           <div>
-            <dt class="text-base font-semibold text-white">Markdown native</dt>
-            <dd class="mt-2 text-sm/6 text-gray-400">
-              Write in markdown with a live preview editor. Your content stays
-              portable and future-proof.
-            </dd>
+            <div class="flex items-center text-sm/6 font-semibold text-indigo-400">
+              <svg viewBox="0 0 4 4" aria-hidden="true" class="mr-4 size-1 flex-none">
+                <circle r="2" cx="2" cy="2" fill="currentColor" />
+              </svg>
+              Next
+              <div aria-hidden="true" class="absolute -ml-2 h-px w-screen -translate-x-full bg-white/15 sm:-ml-4 lg:static lg:-mr-6 lg:ml-8 lg:w-auto lg:flex-auto lg:translate-x-0"></div>
+            </div>
+            <p class="mt-6 text-lg/8 font-semibold tracking-tight text-white">Linking &amp; publishing</p>
+            <p class="mt-1 text-base/7 text-gray-400">Note-to-note linking, simple publish flow to Nostr, and desktop-to-desktop sync.</p>
           </div>
           <div>
-            <dt class="text-base font-semibold text-white">
-              Publish to Nostr
-            </dt>
-            <dd class="mt-2 text-sm/6 text-gray-400">
-              Share your writing to the Nostr network with one click when you're
-              ready to go public.
-            </dd>
+            <div class="flex items-center text-sm/6 font-semibold text-indigo-400">
+              <svg viewBox="0 0 4 4" aria-hidden="true" class="mr-4 size-1 flex-none">
+                <circle r="2" cx="2" cy="2" fill="currentColor" />
+              </svg>
+              Later
+              <div aria-hidden="true" class="absolute -ml-2 h-px w-screen -translate-x-full bg-white/15 sm:-ml-4 lg:static lg:-mr-6 lg:ml-8 lg:w-auto lg:flex-auto lg:translate-x-0"></div>
+            </div>
+            <p class="mt-6 text-lg/8 font-semibold tracking-tight text-white">Deeper workflows</p>
+            <p class="mt-1 text-base/7 text-gray-400">Richer publishing workflows, stronger retrieval and resurfacing features.</p>
           </div>
           <div>
-            <dt class="text-base font-semibold text-white">
-              Notebooks & tags
-            </dt>
-            <dd class="mt-2 text-sm/6 text-gray-400">
-              Organize your notes into notebooks and tag them for fast filtering
-              and retrieval.
-            </dd>
+            <div class="flex items-center text-sm/6 font-semibold text-indigo-400">
+              <svg viewBox="0 0 4 4" aria-hidden="true" class="mr-4 size-1 flex-none">
+                <circle r="2" cx="2" cy="2" fill="currentColor" />
+              </svg>
+              Future
+              <div aria-hidden="true" class="absolute -ml-2 h-px w-screen -translate-x-full bg-white/15 sm:-ml-4 lg:static lg:-mr-6 lg:ml-8 lg:w-auto lg:flex-auto lg:translate-x-0"></div>
+            </div>
+            <p class="mt-6 text-lg/8 font-semibold tracking-tight text-white">Expand the surface</p>
+            <p class="mt-1 text-base/7 text-gray-400">Mobile experience, deeper sync across devices, expanded editor capabilities.</p>
           </div>
-        </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7: CTA -->
+    <div class="py-24 sm:py-32">
+      <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="relative isolate overflow-hidden bg-white/5 px-6 py-24 text-center shadow-2xl ring-1 ring-white/10 sm:rounded-3xl sm:px-16">
+          <h2 class="text-4xl font-semibold tracking-tight text-balance text-white sm:text-5xl">Begin transmission.</h2>
+          <p class="mx-auto mt-6 max-w-xl text-lg/8 text-pretty text-gray-300">No sign-up. Just download and write.</p>
+          <div class="mt-10 flex items-center justify-center gap-x-6">
+            <div class="relative inline-block text-left" data-dropdown>
+              <button
+                type="button"
+                class="inline-flex items-center gap-x-2 rounded-md bg-indigo-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                data-dropdown-trigger
+              >
+                Download
+                <svg class="size-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                </svg>
+              </button>
+              <div
+                class="absolute bottom-full left-1/2 z-10 mb-2 hidden w-48 -translate-x-1/2 rounded-md bg-gray-900 py-1 shadow-lg ring-1 ring-white/10"
+                data-dropdown-menu
+              >
+                {
+                  DOWNLOAD_BUTTONS.map(({ label, pattern }) => {
+                    const asset = release
+                      ? findAsset(release.assets, pattern)
+                      : undefined;
+                    const href = asset?.url ?? fallbackBase;
+                    return (
+                      <a
+                        href={href}
+                        download
+                        class="block px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
+                      >
+                        {label}
+                      </a>
+                    );
+                  })
+                }
+              </div>
+            </div>
+            <a href="https://github.com/nodetec/comet" target="_blank" rel="noopener noreferrer" class="text-sm/6 font-semibold text-white">
+              GitHub <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <svg viewBox="0 0 1024 1024" aria-hidden="true" class="absolute top-1/2 left-1/2 -z-10 size-[64rem] -translate-x-1/2 [mask-image:radial-gradient(closest-side,white,transparent)]">
+            <circle r="512" cx="512" cy="512" fill="url(#cta-gradient)" fill-opacity="0.25" />
+            <defs>
+              <radialGradient id="cta-gradient">
+                <stop stop-color="#60caf3" />
+                <stop offset="1" stop-color="#4a42e1" />
+              </radialGradient>
+            </defs>
+          </svg>
+        </div>
       </div>
     </div>
 
     <!-- Footer -->
-    <footer class="border-t border-neutral-800 bg-neutral-950">
-      <div
-        class="mx-auto flex max-w-7xl flex-col items-center gap-6 px-6 py-12 sm:flex-row sm:justify-between lg:px-8"
-      >
-        <p class="text-sm text-gray-500">
-          &copy; 2025 Comet. Open source under the MIT License.
-        </p>
-        <div class="flex gap-6">
-          <a
-            href="https://github.com/nodetec/comet"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 hover:text-gray-300">GitHub</a
-          >
-          <a
-            href="https://github.com/nodetec/comet/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 hover:text-gray-300">Releases</a
-          >
-          <a
-            href="https://github.com/nodetec/comet/blob/master/LICENSE"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 hover:text-gray-300">License</a
-          >
+    <footer>
+      <div class="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
+        <div class="flex justify-center gap-x-6 md:order-2">
+          <a href="https://github.com/nodetec/comet" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-white">
+            <span class="sr-only">GitHub</span>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="size-6">
+              <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+            </svg>
+          </a>
+          <a href="https://x.com/chrisatmachine" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-white">
+            <span class="sr-only">X</span>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="size-6">
+              <path d="M13.6823 10.6218L20.2391 3H18.6854L12.9921 9.61788L8.44486 3H3.2002L10.0765 13.0074L3.2002 21H4.75404L10.7663 14.0113L15.5685 21H20.8131L13.6819 10.6218H13.6823ZM11.5541 13.0956L10.8574 12.0991L5.31391 4.16971H7.70053L12.1742 10.5689L12.8709 11.5655L18.6861 19.8835H16.2995L11.5541 13.096V13.0956Z" />
+            </svg>
+          </a>
         </div>
+        <p class="mt-8 text-center text-sm/6 text-gray-400 md:order-1 md:mt-0">&copy; 2026 Comet. Open source under the MIT License.</p>
       </div>
     </footer>
   </div>
+
+  <style>
+    .shooting-star {
+      position: absolute;
+      height: 4px;
+      background: linear-gradient(-45deg, white, transparent);
+      border-radius: 999px;
+      filter: drop-shadow(0 0 6px rgba(150, 180, 255, 0.6));
+      transform: rotate(45deg);
+      transform-origin: top left;
+      animation-name: tail, shooting;
+      animation-timing-function: ease-in-out;
+      animation-iteration-count: infinite;
+    }
+
+    .shooting-star:nth-child(1) { top: 10%; left: 10%; animation-delay: 1s; animation-duration: 10s; }
+    .shooting-star:nth-child(2) { top: 5%; left: 45%; animation-delay: 5s; animation-duration: 14s; }
+    .shooting-star:nth-child(3) { top: 18%; left: 20%; animation-delay: 8s; animation-duration: 12s; }
+
+    @keyframes tail {
+      0% { width: 0; opacity: 0; }
+      30% { width: 150px; opacity: 0.75; }
+      70% { opacity: 0.75; }
+      100% { width: 0; opacity: 0; }
+    }
+
+    @keyframes shooting {
+      0% { transform: translate(0) rotate(45deg); }
+      100% { transform: translate(300px, 300px) rotate(45deg); }
+    }
+  </style>
+
+  <script>
+    const canvas = document.getElementById("stars-canvas") as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d")!;
+
+    function resize() {
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+    }
+
+    interface Star {
+      x: number;
+      y: number;
+      r: number;
+      alpha: number;
+      speed: number;
+      phase: number;
+    }
+
+    let stars: Star[] = [];
+    const STAR_COUNT = 300;
+
+    function createStars() {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      stars = [];
+      for (let i = 0; i < STAR_COUNT; i++) {
+        stars.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: Math.random() * 1.4 + 0.3,
+          alpha: Math.random() * 0.6 + 0.2,
+          speed: Math.random() * 0.8 + 0.2,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+
+    function draw(t: number) {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      for (const s of stars) {
+        const twinkle = Math.sin(t * 0.001 * s.speed + s.phase) * 0.3 + 0.7;
+        const a = s.alpha * twinkle;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+        ctx.fill();
+
+        // Subtle glow on brighter stars
+        if (s.r > 1) {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r * 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(180, 200, 255, ${a * 0.15})`;
+          ctx.fill();
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    createStars();
+    requestAnimationFrame(draw);
+
+    window.addEventListener("resize", () => {
+      resize();
+      createStars();
+    });
+  </script>
+
+  <script>
+    document.querySelectorAll("[data-dropdown]").forEach((dropdown) => {
+      const trigger = dropdown.querySelector("[data-dropdown-trigger]")!;
+      const menu = dropdown.querySelector("[data-dropdown-menu]")!;
+
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.classList.toggle("hidden");
+      });
+
+      document.addEventListener("click", () => {
+        menu.classList.add("hidden");
+      });
+    });
+  </script>
 </Layout>

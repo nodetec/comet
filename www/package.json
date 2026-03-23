@@ -11,12 +11,12 @@
     "deploy:preview": "astro build && wrangler pages deploy"
   },
   "dependencies": {
-    "astro": "^5.9.0"
+    "astro": "^6.0.8"
   },
   "devDependencies": {
-    "wrangler": "^4.20.0",
     "@tailwindcss/vite": "^4.2.1",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "wrangler": "^4.20.0"
   }
 }
