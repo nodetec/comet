@@ -294,7 +294,10 @@ function DebugPanel({
         </div>
       ) : null}
       <div
-        className={cn("p-3 outline-none", expanded && "min-h-0 flex-1")}
+        className={cn(
+          "flex flex-col p-3 outline-none",
+          expanded && "min-h-0 flex-1",
+        )}
         onKeyDown={onKeyDown}
         onPointerDownCapture={onPointerDownCapture}
         ref={viewRef}
@@ -331,7 +334,10 @@ function DebugPanel({
           </Button>
         </div>
         <div
-          className={cn(activePane !== "markdown" && "hidden")}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            activePane !== "markdown" && "hidden",
+          )}
           data-debug-pane="markdown"
         >
           <pre className={debugTextViewClassName}>{markdown}</pre>
