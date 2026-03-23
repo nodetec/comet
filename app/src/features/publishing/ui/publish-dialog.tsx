@@ -11,7 +11,10 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 
-import type { PublishNoteInput, PublishShortNoteInput } from "@/shared/api/types";
+import type {
+  PublishNoteInput,
+  PublishShortNoteInput,
+} from "@/shared/api/types";
 
 function useTagEditor(initialTags: string[]) {
   const [tags, setTags] = useState<string[]>(initialTags);

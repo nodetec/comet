@@ -134,7 +134,14 @@ export function CommandPalette({
   }, [open]);
 
   // Debounced search for notes and tags (notebooks are filtered client-side)
-  useDebouncedSearch(searchTerm, mode, debounceRef, setNoteResults, setTagResults, setSearching);
+  useDebouncedSearch(
+    searchTerm,
+    mode,
+    debounceRef,
+    setNoteResults,
+    setTagResults,
+    setSearching,
+  );
 
   const handleSelectNote = (noteId: string) => {
     onSelectNote(noteId);

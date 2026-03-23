@@ -1,4 +1,9 @@
-import { type Dispatch, type RefObject, type SetStateAction, useEffect } from "react";
+import {
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useEffect,
+} from "react";
 import { type QueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 
@@ -27,7 +32,12 @@ function handleFreshNote(
 }
 
 export function useSyncListener(deps: SyncListenerDeps) {
-  const { queryClient, pendingSaveTimeoutRef, isSavingRef, setSyncEditorRevision } = deps;
+  const {
+    queryClient,
+    pendingSaveTimeoutRef,
+    isSavingRef,
+    setSyncEditorRevision,
+  } = deps;
 
   useEffect(() => {
     const unlisten = listen<{ noteId: string; action: string }>(
@@ -70,7 +80,9 @@ export function useSyncListener(deps: SyncListenerDeps) {
               queryKey: ["note", noteId],
               queryFn: () => loadNote(noteId),
             })
-            .then((freshNote) => handleFreshNote(freshNote, queryClient, setSyncEditorRevision))
+            .then((freshNote) =>
+              handleFreshNote(freshNote, queryClient, setSyncEditorRevision),
+            )
             .catch(() => {});
         }
       },

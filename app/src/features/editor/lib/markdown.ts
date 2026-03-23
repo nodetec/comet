@@ -120,8 +120,7 @@ function isWrapperOnlyListItem(child: LexicalNode): boolean {
 
   return children.every(
     (grandchild) =>
-      $isListNode(grandchild) ||
-      isIgnorableChecklistWrapperChild(grandchild),
+      $isListNode(grandchild) || isIgnorableChecklistWrapperChild(grandchild),
   );
 }
 
@@ -151,7 +150,9 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
     ) {
       const nestedLists = child
         .getChildren()
-        .filter((grandchild): grandchild is ListNode => $isListNode(grandchild));
+        .filter((grandchild): grandchild is ListNode =>
+          $isListNode(grandchild),
+        );
 
       for (const nestedList of nestedLists) {
         previousItem.append(nestedList);
@@ -218,9 +219,7 @@ function parseFencedCodeBlock(
   const text = baseLines.join("\n") + "\n".repeat(trailingBlankLines);
   const info = trimmed.slice(fenceMatch[1].length).trim();
   const language =
-    info.length > 0
-      ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0])
-      : "";
+    info.length > 0 ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0]) : "";
 
   return {
     block: { signature: getCodeBlockSignature(language, text), text },
@@ -252,12 +251,7 @@ function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
       continue;
     }
 
-    const { block, endIndex } = parseFencedCodeBlock(
-      lines,
-      i,
-      match,
-      trimmed,
-    );
+    const { block, endIndex } = parseFencedCodeBlock(lines, i, match, trimmed);
     blocks.push(block);
     i = endIndex + 1;
   }

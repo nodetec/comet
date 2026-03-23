@@ -31,11 +31,7 @@ import {
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
 import { Button } from "@/shared/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
 import { type NotebookRef, type NotebookSummary } from "@/shared/api/types";
@@ -89,7 +85,10 @@ type EditorMenuContext = {
   onDuplicateNote(): void;
 };
 
-async function buildEditorMenu(position: LogicalPosition, ctx: EditorMenuContext) {
+async function buildEditorMenu(
+  position: LogicalPosition,
+  ctx: EditorMenuContext,
+) {
   const readonlyMenuItem = await CheckMenuItem.new({
     id: "editor-menu-readonly",
     text: "Read-only",
@@ -627,7 +626,9 @@ export function EditorPane({
               }}
             />
             <span className="text-muted-foreground min-w-12 text-right text-xs tabular-nums">
-              {findQuery && findMatchCount > 0 && `${activeFindMatchIndex + 1}/${findMatchCount}`}
+              {findQuery &&
+                findMatchCount > 0 &&
+                `${activeFindMatchIndex + 1}/${findMatchCount}`}
               {findQuery && findMatchCount === 0 && "0"}
             </span>
           </label>
@@ -683,7 +684,10 @@ export function EditorPane({
           onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
           onScroll={(event) => {
-            scrollContainerCallbacks.onScroll(noteId, event.currentTarget.scrollTop);
+            scrollContainerCallbacks.onScroll(
+              noteId,
+              event.currentTarget.scrollTop,
+            );
             scrollContainerCallbacks.updateHeaderState(event.currentTarget);
           }}
           ref={scrollContainerRef}

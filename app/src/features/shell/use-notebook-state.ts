@@ -3,7 +3,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 
-import { createNotebook, deleteNotebook, renameNotebook } from "@/shared/api/invoke";
+import {
+  createNotebook,
+  deleteNotebook,
+  renameNotebook,
+} from "@/shared/api/invoke";
 import { type NotebookSummary } from "@/shared/api/types";
 
 export function useNotebookState() {

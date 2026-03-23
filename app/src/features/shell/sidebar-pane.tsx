@@ -40,7 +40,8 @@ function notebookItemStateClass(isActive: boolean, isFocused: boolean) {
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
   if (isActive && isFocused) {
-    stateClass = "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
+    stateClass =
+      "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
   } else if (isActive) {
     stateClass = "bg-accent/80 text-secondary-foreground";
   } else {
@@ -131,11 +132,11 @@ function useSyncState() {
   const [syncState, setSyncState] = useState<string>("disconnected");
 
   useEffect(() => {
-    invoke<string | { error: { message: string } }>(
-      "get_sync_status",
-    ).then((s) => {
-      setSyncState(typeof s === "string" ? s : "error");
-    }).catch(() => {});
+    invoke<string | { error: { message: string } }>("get_sync_status")
+      .then((s) => {
+        setSyncState(typeof s === "string" ? s : "error");
+      })
+      .catch(() => {});
     const unlisten = listen<{ state: string | { error: { message: string } } }>(
       "sync-status",
       (event) => {
@@ -247,7 +248,12 @@ export function SidebarPane({
     event: MouseEvent<HTMLButtonElement>,
     notebookId: string,
   ) => {
-    showNotebookContextMenu(event, notebookId, onShowRenameNotebook, onDeleteNotebook).catch(() => {});
+    showNotebookContextMenu(
+      event,
+      notebookId,
+      onShowRenameNotebook,
+      onDeleteNotebook,
+    ).catch(() => {});
   };
 
   return (
@@ -479,7 +485,8 @@ export function SidebarPane({
                           className={cn(
                             "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                             notebookItemStateClass(
-                              noteFilter === "notebook" && activeNotebookId === notebook.id,
+                              noteFilter === "notebook" &&
+                                activeNotebookId === notebook.id,
                               isFocused,
                             ),
                           )}

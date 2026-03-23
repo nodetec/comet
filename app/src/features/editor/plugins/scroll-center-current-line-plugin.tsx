@@ -53,7 +53,10 @@ export default function ScrollCenterCurrentLinePlugin({
                 const cursorPosition = rect.top + focusOffset;
                 const threshold = viewportHeight * (viewportPercentage / 100);
 
-                if (cursorPosition > viewportHeight - threshold && blockElement) {
+                if (
+                  cursorPosition > viewportHeight - threshold &&
+                  blockElement
+                ) {
                   const el = blockElement as HTMLDivElement;
                   currentLineRef.current = el;
                   requestAnimationFrame(scrollBlockIntoView);

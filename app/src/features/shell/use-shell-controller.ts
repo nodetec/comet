@@ -6,12 +6,12 @@ import { toast } from "sonner";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
-import { defaultNoteSortPrefs, useUIStore } from "@/features/settings/store/use-ui-store";
-
 import {
-  exportNotes,
-  loadNote,
-} from "@/shared/api/invoke";
+  defaultNoteSortPrefs,
+  useUIStore,
+} from "@/features/settings/store/use-ui-store";
+
+import { exportNotes, loadNote } from "@/shared/api/invoke";
 import {
   type LoadedNote,
   type NoteSortDirection,
@@ -718,7 +718,8 @@ export function useShellController() {
           ? editorFocusMode
           : ("none" as const),
       html: currentNote?.html ?? null,
-      isNewNote: currentNote != null && currentNote.id === creatingSelectedNoteId,
+      isNewNote:
+        currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
       notebook: currentNote?.notebook ?? null,

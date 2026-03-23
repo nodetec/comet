@@ -133,9 +133,7 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
         <InfoRow
           icon={<Database className="size-3.5" />}
           label="Relay"
-          value={
-            <span className="text-muted-foreground">Not configured</span>
-          }
+          value={<span className="text-muted-foreground">Not configured</span>}
         />
       )}
 

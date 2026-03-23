@@ -37,9 +37,7 @@ function isAnchorText(
 function $cleanupOrphanedAnchors(children: LexicalNode[]): boolean {
   const hasDecorator = children.some(
     (c) =>
-      $isCometHorizontalRuleNode(c) ||
-      $isImageNode(c) ||
-      $isYouTubeNode(c),
+      $isCometHorizontalRuleNode(c) || $isImageNode(c) || $isYouTubeNode(c),
   );
   if (
     !hasDecorator &&
@@ -54,9 +52,10 @@ function $cleanupOrphanedAnchors(children: LexicalNode[]): boolean {
   return false;
 }
 
-function $collectSpillContent(
-  children: LexicalNode[],
-): { spillBefore: LexicalNode[]; spillAfter: LexicalNode[] } {
+function $collectSpillContent(children: LexicalNode[]): {
+  spillBefore: LexicalNode[];
+  spillAfter: LexicalNode[];
+} {
   const spillBefore: LexicalNode[] = [];
   const spillAfter: LexicalNode[] = [];
   let seenHR = false;

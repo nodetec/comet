@@ -17,10 +17,7 @@ import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NotesPane } from "@/features/notes/ui/notes-pane";
-import {
-  PublishDialog,
-  PublishShortNoteDialog,
-} from "@/features/publishing";
+import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";

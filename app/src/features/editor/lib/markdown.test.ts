@@ -420,7 +420,9 @@ describe("markdown editor pipeline", () => {
 
   it("preserves escaped newlines inside table cells", () => {
     expect(
-      roundtripMarkdown(["| A |", "| --- |", String.raw`| line1\nline2 |`].join("\n")),
+      roundtripMarkdown(
+        ["| A |", "| --- |", String.raw`| line1\nline2 |`].join("\n"),
+      ),
     ).toBe(["| A |", "| --- |", String.raw`| line1\nline2 |`].join("\n"));
   });
 

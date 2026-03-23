@@ -366,10 +366,9 @@ function TableCellActionMenuContainer({
 
       const cellElem = target.closest("td, th") as HTMLElement | null;
       if (cellElem) {
-        editor.getEditorState().read(
-          () => $readAndShowCellMenu(cellElem),
-          { editor },
-        );
+        editor
+          .getEditorState()
+          .read(() => $readAndShowCellMenu(cellElem), { editor });
       } else {
         hideMenu();
       }

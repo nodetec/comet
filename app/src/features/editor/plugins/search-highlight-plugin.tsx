@@ -27,7 +27,9 @@ function clearHighlights() {
 }
 
 function getOrCreateStyleElement() {
-  let style = document.querySelector(`#${HIGHLIGHT_STYLE_ID}`) as HTMLStyleElement;
+  let style = document.querySelector(
+    `#${HIGHLIGHT_STYLE_ID}`,
+  ) as HTMLStyleElement;
   if (!style) {
     style = document.createElement("style");
     style.id = HIGHLIGHT_STYLE_ID;
@@ -110,16 +112,13 @@ function scrollToMatch(
     activeMatchIndex >= 0 &&
     activeMatchIndex < ranges.length;
   const targetRange = hasActiveMatch ? ranges[activeMatchIndex] : ranges[0];
-  const scrollContainer = currentRoot.closest(
-    "[data-editor-scroll-container]",
-  );
+  const scrollContainer = currentRoot.closest("[data-editor-scroll-container]");
   if (!scrollContainer) return;
 
   const scrollRect = scrollContainer.getBoundingClientRect();
   const targetRect = targetRange.getBoundingClientRect();
   const hasVisibleMatch =
-    targetRect.bottom > scrollRect.top &&
-    targetRect.top < scrollRect.bottom;
+    targetRect.bottom > scrollRect.top && targetRect.top < scrollRect.bottom;
 
   if (hasVisibleMatch) return;
 
