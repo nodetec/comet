@@ -554,10 +554,7 @@ export function EditorPane({
   } else if (!isReadOnly) {
     toolbarSlot = (
       <Button
-        className={cn(
-          "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
-          showToolbar && "bg-accent text-accent-foreground",
-        )}
+        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
         onClick={() => setShowToolbar(!showToolbar)}
         size="icon-sm"
         variant="ghost"
