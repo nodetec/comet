@@ -40,7 +40,8 @@ function getHashtagRegexStringChars() {
     "\u1100-\u11FF\u3130-\u3185\uA960-\uA97F\uAC00-\uD7AF\uD7B0-\uD7FF" +
     "\uFFA1-\uFFDC";
 
-  const charCode = String.fromCodePoint;
+  // eslint-disable-next-line unicorn/prefer-code-point -- regex character class needs UTF-16 code units, not code points
+  const charCode = String.fromCharCode;
 
   const cjkChars =
     "\u30A1-\u30FA\u30FC-\u30FE\uFF66-\uFF9F" +
