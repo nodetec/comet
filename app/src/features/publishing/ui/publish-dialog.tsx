@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 
-import type { PublishNoteInput, PublishShortNoteInput } from "./types";
+import type { PublishNoteInput, PublishShortNoteInput } from "@/shared/api/types";
 
 type PublishDialogProps = {
   initialTitle: string;

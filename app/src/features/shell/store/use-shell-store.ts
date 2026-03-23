@@ -1,12 +1,8 @@
 import { create } from "zustand";
 
-export type NoteFilter =
-  | "all"
-  | "today"
-  | "todo"
-  | "notebook"
-  | "archive"
-  | "trash";
+import { type NoteFilter } from "@/shared/api/types";
+
+export type { NoteFilter };
 
 export type FocusedPane = "sidebar" | "notes" | "editor";
 

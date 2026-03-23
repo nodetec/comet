@@ -6,8 +6,8 @@ import {
   useState,
   type MouseEvent,
 } from "react";
-import { useUIStore } from "@/stores/use-ui-store";
-import { useShellStore } from "@/stores/use-shell-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
@@ -37,7 +37,7 @@ import {
 } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
-import { type NotebookRef, type NotebookSummary } from "./types";
+import { type NotebookRef, type NotebookSummary } from "@/shared/api/types";
 
 type EditorPaneProps = {
   archivedAt: number | null;

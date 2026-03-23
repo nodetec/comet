@@ -9,7 +9,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { useUIStore } from "@/stores/use-ui-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";

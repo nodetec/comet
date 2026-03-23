@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { NoteSortDirection, NoteSortField } from "@/features/shell/types";
+import type { NoteSortDirection, NoteSortField } from "@/shared/api/types";
 
 export type NoteSortPrefs = {
   field: NoteSortField;

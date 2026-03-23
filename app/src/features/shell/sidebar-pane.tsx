@@ -22,11 +22,21 @@ import {
 
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
-import { SyncDialog } from "./sync-dialog";
-import { useUIStore } from "@/stores/use-ui-store";
-import { type NoteFilter, useShellStore } from "@/stores/use-shell-store";
+import { SyncDialog } from "@/features/sync";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { type NoteFilter, type NotebookSummary } from "@/shared/api/types";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 
-import { type NotebookSummary, sidebarItemClasses } from "./types";
+function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
+  return [
+    "flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
+    isActive && isFocused
+      ? "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground"
+      : (isActive
+        ? "bg-accent/80 text-secondary-foreground"
+        : "text-secondary-foreground"),
+  ].join(" ");
+}
 
 type SidebarPaneProps = {
   activeNotebookId: string | null;

@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { initAttachmentsBasePath } from "@/shared/lib/attachments";
-import { type NoteFilter } from "@/stores/use-shell-store";
 
 import {
   type AssignNoteNotebookInput,
@@ -10,6 +9,7 @@ import {
   type ContextualTagsPayload,
   type CreateNotebookInput,
   type LoadedNote,
+  type NoteFilter,
   type NotePagePayload,
   type NoteQueryInput,
   type PublishNoteInput,

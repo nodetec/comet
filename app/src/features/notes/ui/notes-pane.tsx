@@ -24,17 +24,40 @@ import { useInView } from "react-intersection-observer";
 
 import { Button } from "@/shared/ui/button";
 import { searchWordsFromQuery } from "@/shared/lib/search";
-import { type NoteFilter, useShellStore } from "@/stores/use-shell-store";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 
-import { buildNotebookSubmenu } from "./notebook-submenu";
+import { buildNotebookSubmenu } from "@/features/shell/notebook-submenu";
 
 import {
-  notesHeading,
+  type NoteFilter,
   type NotebookSummary,
   type NoteSortDirection,
   type NoteSortField,
   type NoteSummary,
-} from "./types";
+} from "@/shared/api/types";
+
+function notesHeading(
+  noteFilter: NoteFilter,
+  activeNotebook: NotebookSummary | null,
+) {
+  if (noteFilter === "archive") {
+    return "Archive";
+  }
+
+  if (noteFilter === "trash") {
+    return "Trash";
+  }
+
+  if (noteFilter === "today") {
+    return "Today";
+  }
+
+  if (noteFilter === "notebook" && activeNotebook) {
+    return activeNotebook.name;
+  }
+
+  return "All Notes";
+}
 
 type NotesPaneProps = {
   activeNotebook: NotebookSummary | null;

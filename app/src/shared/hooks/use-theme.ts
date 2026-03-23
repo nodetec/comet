@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-import { useUIStore } from "@/stores/use-ui-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 type ThemeData = {
   name: string;

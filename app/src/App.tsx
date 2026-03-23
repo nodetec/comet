@@ -14,13 +14,13 @@ import {
 } from "@/shared/ui/dialog";
 import { Toaster } from "@/shared/ui/sonner";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
-import { CommandPalette } from "@/features/shell/command-palette";
+import { CommandPalette } from "@/features/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
-import { NotesPane } from "@/features/shell/notes-pane";
+import { NotesPane } from "@/features/notes/ui/notes-pane";
 import {
   PublishDialog,
   PublishShortNoteDialog,
-} from "@/features/shell/publish-dialog";
+} from "@/features/publishing";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";

@@ -11,8 +11,8 @@ import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
-import { useShellStore } from "@/stores/use-shell-store";
-import { defaultNoteSortPrefs, useUIStore } from "@/stores/use-ui-store";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { defaultNoteSortPrefs, useUIStore } from "@/features/settings/store/use-ui-store";
 
 import {
   archiveNote,
@@ -36,7 +36,7 @@ import {
   setNoteReadonly,
   trashNote,
   unpinNote,
-} from "./api";
+} from "@/shared/api/invoke";
 import {
   type LoadedNote,
   type NoteQueryInput,
@@ -45,9 +45,9 @@ import {
   type NoteSortField,
   type PublishNoteInput,
   type PublishShortNoteInput,
-} from "./types";
+} from "@/shared/api/types";
 import { useNotebookState } from "./use-notebook-state";
-import { usePublishState } from "./use-publish-state";
+import { usePublishState } from "@/features/publishing";
 import { flattenNotePages, nextSelectedNoteIdAfterRemoval } from "./utils";
 
 const EMPTY_NOTEBOOKS: NotebookSummary[] = [];
