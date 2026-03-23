@@ -38,13 +38,13 @@ fn restart_sync_async(app: &AppHandle) {
 #[tauri::command]
 pub fn list_relays(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::adapters::nostr::protocol::list_relays(&conn)
+    crate::adapters::sqlite::relay_repository::list_relays(&conn)
 }
 
 #[tauri::command]
 pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::adapters::nostr::protocol::set_sync_relay(&conn, &url)?;
+    let relays = crate::adapters::sqlite::relay_repository::set_sync_relay(&conn, &url)?;
     reset_sync_state(&conn)?;
     restart_sync_async(&app);
     Ok(relays)
@@ -53,7 +53,7 @@ pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::domain::
 #[tauri::command]
 pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::adapters::nostr::protocol::remove_sync_relay(&conn)?;
+    let relays = crate::adapters::sqlite::relay_repository::remove_sync_relay(&conn)?;
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         app_clone
@@ -70,7 +70,7 @@ pub fn add_publish_relay(
     url: String,
 ) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::adapters::nostr::protocol::add_publish_relay(&conn, &url)
+    crate::adapters::sqlite::relay_repository::add_publish_relay(&conn, &url)
 }
 
 #[tauri::command]
@@ -80,7 +80,7 @@ pub fn remove_relay(
     kind: String,
 ) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    crate::adapters::nostr::protocol::remove_relay(&conn, &url, &kind)
+    crate::adapters::sqlite::relay_repository::remove_relay(&conn, &url, &kind)
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 use crate::domain::accounts::model::IdentityCredentials;
 use crate::domain::common::text::strip_title_line;
-use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput, Relay};
+use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput};
 use crate::error::{now_millis, now_secs, AppError};
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -79,74 +79,6 @@ fn get_npub(conn: &Connection) -> Result<Option<String>, AppError> {
 
 pub fn current_npub(conn: &Connection) -> Result<String, AppError> {
     get_npub(conn)?.ok_or_else(|| AppError::custom("No Nostr identity configured."))
-}
-
-pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
-    let mut stmt = conn.prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")?;
-    let relays = stmt
-        .query_map([], |row| {
-            Ok(Relay {
-                url: row.get(0)?,
-                kind: row.get(1)?,
-                created_at: row.get(2)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(relays)
-}
-
-pub fn set_sync_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
-    let url = normalize_relay_url(url)?;
-    let now = now_millis();
-
-    // Remove any existing sync relay
-    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])?;
-
-    conn.execute(
-        "INSERT OR REPLACE INTO relays (url, kind, created_at) VALUES (?1, 'sync', ?2)",
-        params![url, now],
-    )?;
-
-    list_relays(conn)
-}
-
-pub fn remove_sync_relay(conn: &Connection) -> Result<Vec<Relay>, AppError> {
-    conn.execute("DELETE FROM relays WHERE kind = 'sync'", [])?;
-    list_relays(conn)
-}
-
-pub fn add_publish_relay(conn: &Connection, url: &str) -> Result<Vec<Relay>, AppError> {
-    let url = normalize_relay_url(url)?;
-    let now = now_millis();
-
-    conn.execute(
-        "INSERT INTO relays (url, kind, created_at) VALUES (?1, 'publish', ?2)",
-        params![url, now],
-    )
-    .map_err(|_| AppError::custom(format!("Relay already added: {url}")))?;
-
-    list_relays(conn)
-}
-
-pub fn remove_relay(conn: &Connection, url: &str, kind: &str) -> Result<Vec<Relay>, AppError> {
-    conn.execute(
-        "DELETE FROM relays WHERE url = ?1 AND kind = ?2",
-        params![url, kind],
-    )?;
-    list_relays(conn)
-}
-
-fn normalize_relay_url(raw: &str) -> Result<String, AppError> {
-    let parsed = url::Url::parse(raw.trim()).map_err(|_| AppError::custom("Invalid relay URL"))?;
-    match parsed.scheme() {
-        "wss" | "ws" => {}
-        _ => {
-            return Err(AppError::custom(
-                "Relay URL must start with wss:// or ws://",
-            ))
-        }
-    }
-    Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
 
 pub async fn publish_note(
