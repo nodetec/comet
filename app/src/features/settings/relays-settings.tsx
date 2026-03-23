@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { errorMessage } from "@/lib/utils";
+import { Button } from "@/shared/ui/button";
+import { Switch } from "@/shared/ui/switch";
+import { errorMessage } from "@/shared/lib/utils";
 
 import { SettingRow } from "./setting-row";
 import { useInlineEditor } from "./use-inline-editor";
@@ -101,7 +101,7 @@ function SyncRelaySection({
         A single relay used to sync notes between your devices.
       </p>
 
-      {relay && !editor.editing ? (
+      {relay && !editor.editing && (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {relay.url}
@@ -122,11 +122,8 @@ function SyncRelaySection({
             Remove
           </Button>
         </div>
-      ) : !editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Set sync relay
-        </Button>
-      ) : (
+      )}
+      {editor.editing && (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -143,6 +140,11 @@ function SyncRelaySection({
           }
           submitLabel="Save"
         />
+      )}
+      {!relay && !editor.editing && (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Set sync relay
+        </Button>
       )}
     </div>
   );
@@ -182,7 +184,7 @@ function BlossomSection({
         A Blossom server used to sync image attachments between devices.
       </p>
 
-      {blossomUrl && !editor.editing ? (
+      {blossomUrl && !editor.editing && (
         <div className="flex items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">
             {blossomUrl}
@@ -203,11 +205,8 @@ function BlossomSection({
             Remove
           </Button>
         </div>
-      ) : !editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Set Blossom server
-        </Button>
-      ) : (
+      )}
+      {editor.editing && (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -225,6 +224,11 @@ function BlossomSection({
           submitLabel="Save"
           placeholder="https://..."
         />
+      )}
+      {!blossomUrl && !editor.editing && (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Set Blossom server
+        </Button>
       )}
     </div>
   );
@@ -315,11 +319,7 @@ function PublishRelaysSection({
         </ul>
       )}
 
-      {!editor.editing ? (
-        <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Add relay
-        </Button>
-      ) : (
+      {editor.editing ? (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
@@ -336,6 +336,10 @@ function PublishRelaysSection({
           }
           submitLabel="Add"
         />
+      ) : (
+        <Button variant="link" size="xs" onClick={() => editor.open()}>
+          Add relay
+        </Button>
       )}
     </div>
   );

@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { toastErrorHandler } from "@/lib/mutation-utils";
+import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 
-import { createNotebook, deleteNotebook, renameNotebook } from "./api";
-import { type NotebookSummary } from "./types";
+import {
+  createNotebook,
+  deleteNotebook,
+  renameNotebook,
+} from "@/shared/api/invoke";
+import { type NotebookSummary } from "@/shared/api/types";
 
 export function useNotebookState() {
   const queryClient = useQueryClient();

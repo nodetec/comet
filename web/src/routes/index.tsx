@@ -5,7 +5,11 @@ import { NotesPage } from "~/components/dashboard/notes-page";
 
 export const Route = createFileRoute("/")({
   beforeLoad: () => {
-    const pubkey = localStorage.getItem("pubkey");
+    if (typeof window === "undefined") {
+      throw redirect({ to: "/login" });
+    }
+
+    const pubkey = window.localStorage.getItem("pubkey");
     if (!pubkey) {
       throw redirect({ to: "/login" });
     }

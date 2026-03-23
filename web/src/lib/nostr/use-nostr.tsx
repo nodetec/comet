@@ -11,6 +11,30 @@ import { RelayClient } from "~/lib/nostr/client";
 
 const PUBKEY_STORAGE_KEY = "pubkey";
 
+function getStoredPubkey(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(PUBKEY_STORAGE_KEY);
+}
+
+function setStoredPubkey(pubkey: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(PUBKEY_STORAGE_KEY, pubkey);
+}
+
+function clearStoredPubkey(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(PUBKEY_STORAGE_KEY);
+}
+
 interface NostrContextValue {
   pubkey: string | null;
   isAuthenticated: boolean;
@@ -23,9 +47,7 @@ interface NostrContextValue {
 const NostrContext = createContext<NostrContextValue | null>(null);
 
 export function NostrProvider({ children }: { children: ReactNode }) {
-  const [pubkey, setPubkey] = useState<string | null>(() =>
-    localStorage.getItem(PUBKEY_STORAGE_KEY),
-  );
+  const [pubkey, setPubkey] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [relay, setRelay] = useState<RelayClient | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +89,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
 
     try {
       const pk = await window.nostr.getPublicKey();
-      localStorage.setItem(PUBKEY_STORAGE_KEY, pk);
+      setStoredPubkey(pk);
       setPubkey(pk);
       connectRelay(pk);
     } catch (err) {
@@ -78,7 +100,7 @@ export function NostrProvider({ children }: { children: ReactNode }) {
   }, [connectRelay]);
 
   const signOut = useCallback(() => {
-    localStorage.removeItem(PUBKEY_STORAGE_KEY);
+    clearStoredPubkey();
     setPubkey(null);
     setIsAuthenticated(false);
     setRelay(null);
@@ -88,19 +110,22 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Auto-connect on mount if pubkey exists in localStorage
   useEffect(() => {
-    if (pubkey && !relayRef.current) {
-      connectRelay(pubkey);
+    const storedPubkey = getStoredPubkey();
+    if (storedPubkey) {
+      setPubkey(storedPubkey);
+      if (!relayRef.current) {
+        connectRelay(storedPubkey);
+      }
     }
+
     return () => {
       if (relayRef.current) {
         relayRef.current.disconnect();
         relayRef.current = null;
       }
     };
-    // Only run on mount; connectRelay is stable (stable useCallback ref)
-  }, []);
+  }, [connectRelay]);
 
   return (
     <NostrContext.Provider

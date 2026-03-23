@@ -95,7 +95,7 @@ export async function createRelayServer(
   }
 
   const storage = initStorage(db);
-  const access = await initAccessControl(db, privateMode);
+  const access = initAccessControl(db, privateMode);
   const connections = new ConnectionManager();
   const relayDeps: RelayDeps = { storage, connections, relayUrl, access };
 

@@ -1,6 +1,6 @@
 import { type InfiniteData } from "@tanstack/react-query";
 
-import { type NotePagePayload } from "./types";
+import { type NotePagePayload } from "@/shared/api/types";
 
 export function flattenNotePages(
   data: InfiniteData<NotePagePayload, unknown> | undefined,
@@ -19,7 +19,7 @@ export function nextSelectedNoteIdAfterRemoval(
     return null;
   }
 
-  if (removedIndex < 0) {
+  if (removedIndex === -1) {
     return remainingNotes[0]?.id ?? null;
   }
 

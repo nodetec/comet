@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 
-import { useUIStore } from "@/stores/use-ui-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 import { SettingRow } from "./setting-row";
 

@@ -16,5 +16,13 @@ export default tseslint.config(
       ],
     },
   },
-  { ignores: [".output/", "node_modules/", ".vinxi/", "src/routeTree.gen.ts"] },
+  {
+    ignores: [
+      "dist/",
+      ".output/",
+      "node_modules/",
+      ".vinxi/",
+      "src/routeTree.gen.ts",
+    ],
+  },
 );

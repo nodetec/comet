@@ -8,8 +8,8 @@ import {
   DialogClose,
   DialogPopup,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useUIStore } from "@/stores/use-ui-store";
+} from "@/shared/ui/dialog";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";

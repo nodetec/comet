@@ -5,8 +5,8 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
 import { Check, Copy } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { errorMessage } from "@/lib/utils";
+import { Button } from "@/shared/ui/button";
+import { errorMessage } from "@/shared/lib/utils";
 
 const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
   "comet:reopen-settings-after-account-change";
@@ -229,7 +229,7 @@ export function ProfileSettings() {
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-sm font-medium">Accounts</h3>
-          {!addingAccount ? (
+          {addingAccount ? null : (
             <Button
               variant="link"
               size="xs"
@@ -238,7 +238,7 @@ export function ProfileSettings() {
             >
               Add Account
             </Button>
-          ) : null}
+          )}
         </div>
 
         <div className="space-y-3">

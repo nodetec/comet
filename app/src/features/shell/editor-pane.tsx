@@ -2,12 +2,13 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
 } from "react";
-import { useUIStore } from "@/stores/use-ui-store";
-import { useShellStore } from "@/stores/use-shell-store";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
@@ -28,16 +29,12 @@ import {
 import {
   NoteEditor,
   type NoteEditorHandle,
-} from "@/components/editor/note-editor";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { resolveActiveEditorSearch } from "@/lib/search";
-import { cn } from "@/lib/utils";
-import { type NotebookRef, type NotebookSummary } from "./types";
+} from "@/features/editor/note-editor";
+import { Button } from "@/shared/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { resolveActiveEditorSearch } from "@/shared/lib/search";
+import { cn } from "@/shared/lib/utils";
+import { type NotebookRef, type NotebookSummary } from "@/shared/api/types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
@@ -68,12 +65,288 @@ type EditorPaneProps = {
   onChange(markdown: string): void;
 };
 
+// eslint-disable-next-line sonarjs/slow-regex -- bounded by single-line input
+const H1_TITLE_RE = /^#\s+(.+?)\s*$/;
+
+type EditorMenuContext = {
+  readonly: boolean;
+  isPublishedNote: boolean;
+  isDeletePublishedNotePending: boolean;
+  notebook: NotebookRef | null;
+  notebooks: NotebookSummary[];
+  pinnedAt: number | null;
+  publishedAt: number | null;
+  onSetReadonly(readonly: boolean): void;
+  onAssignNotebook(notebookId: string | null): void;
+  onDeletePublishedNote(): void;
+  onPublishShortNote(): void;
+  onOpenPublishDialog(): void;
+  onSetPinned(pinned: boolean): void;
+  onDuplicateNote(): void;
+};
+
+async function buildEditorMenu(
+  position: LogicalPosition,
+  ctx: EditorMenuContext,
+) {
+  const readonlyMenuItem = await CheckMenuItem.new({
+    id: "editor-menu-readonly",
+    text: "Read-only",
+    checked: ctx.readonly,
+    enabled: !ctx.isPublishedNote,
+    action: () => ctx.onSetReadonly(!ctx.readonly),
+  });
+
+  const moveToNotebookSubmenu = await buildNotebookSubmenu({
+    currentNotebook: ctx.notebook,
+    notebooks: ctx.notebooks,
+    idPrefix: "editor-menu-notebook",
+    onAssign: (notebookId) => ctx.onAssignNotebook(notebookId),
+  });
+
+  const deletePublishedItem = {
+    id: "editor-menu-delete-published",
+    text: "Delete from Nostr",
+    enabled: !ctx.isDeletePublishedNotePending,
+    action: ctx.onDeletePublishedNote,
+  };
+
+  let publishItems;
+  if (ctx.isPublishedNote) {
+    publishItems = [deletePublishedItem];
+  } else {
+    const publishAsSubmenu = await Submenu.new({
+      text: ctx.publishedAt ? "Update on Nostr" : "Publish As",
+      items: [
+        {
+          id: "editor-menu-publish-note",
+          text: "Note",
+          action: () => ctx.onPublishShortNote(),
+        },
+        {
+          id: "editor-menu-publish-article",
+          text: "Article",
+          action: () => ctx.onOpenPublishDialog(),
+        },
+      ],
+    });
+    publishItems = ctx.publishedAt
+      ? [publishAsSubmenu, deletePublishedItem]
+      : [publishAsSubmenu];
+  }
+
+  const menu = await Menu.new({
+    items: [
+      {
+        id: ctx.pinnedAt ? "editor-menu-unpin" : "editor-menu-pin",
+        text: ctx.pinnedAt ? "Unpin" : "Pin To Top",
+        action: () => ctx.onSetPinned(!ctx.pinnedAt),
+      },
+      readonlyMenuItem,
+      {
+        id: "editor-menu-duplicate",
+        text: "Duplicate",
+        action: ctx.onDuplicateNote,
+      },
+      moveToNotebookSubmenu,
+      ...publishItems,
+    ],
+  });
+
+  try {
+    await menu.popup(position);
+  } finally {
+    await menu.close();
+  }
+}
+
 function firstLineH1Title(markdown: string) {
   const [firstLine = ""] = markdown.split("\n", 1);
-  const match = firstLine.match(/^#\s+(.+?)\s*$/);
+  const match = H1_TITLE_RE.exec(firstLine);
   return match?.[1] ?? null;
 }
 
+function useEditorScrollHeader(
+  noteId: string | null,
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const [showHeaderBorder, setShowHeaderBorder] = useState(false);
+  const [showHeaderTitle, setShowHeaderTitle] = useState(false);
+  const noteScrollPositionsRef = useRef<Map<string, number>>(new Map());
+
+  const updateHeaderState = useCallback(
+    (scrollContainer: HTMLDivElement | null) => {
+      const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
+      setShowHeaderBorder(scrolled);
+
+      if (!scrollContainer || !noteId) {
+        setShowHeaderTitle(false);
+        return;
+      }
+
+      const firstLine = scrollContainer.querySelector(
+        "[data-lexical-editor] > :first-child",
+      ) as HTMLElement | null;
+
+      if (!firstLine) {
+        setShowHeaderTitle(false);
+        return;
+      }
+
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      const firstLineRect = firstLine.getBoundingClientRect();
+      setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
+    },
+    [noteId],
+  );
+
+  useLayoutEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) {
+      updateHeaderState(null);
+      return;
+    }
+
+    const nextScrollTop = noteId
+      ? (noteScrollPositionsRef.current.get(noteId) ?? 0)
+      : 0;
+    scrollContainer.scrollTop = nextScrollTop;
+    setShowHeaderBorder(nextScrollTop > 0);
+
+    const frame = window.requestAnimationFrame(() => {
+      updateHeaderState(scrollContainer);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [noteId, scrollContainerRef, updateHeaderState]);
+
+  const scrollContainerCallbacks = useMemo(
+    () => ({
+      onScroll: (noteId: string | null, scrollTop: number) => {
+        if (noteId) {
+          noteScrollPositionsRef.current.set(noteId, scrollTop);
+        }
+      },
+      updateHeaderState,
+    }),
+    [updateHeaderState],
+  );
+
+  return { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks };
+}
+
+function useFindBar({
+  noteId,
+  searchQuery,
+  editorRef,
+  setFocusedPane,
+}: {
+  noteId: string | null;
+  searchQuery: string;
+  editorRef: React.RefObject<NoteEditorHandle | null>;
+  setFocusedPane: (pane: "sidebar" | "notes" | "editor") => void;
+}) {
+  const [findOpen, setFindOpen] = useState(false);
+  const [findMatchCount, setFindMatchCount] = useState(0);
+  const [findQuery, setFindQuery] = useState("");
+  const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
+  const [findScrollRevision, setFindScrollRevision] = useState(0);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
+  const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
+
+  const activeEditorSearch = resolveActiveEditorSearch({
+    editorQuery: hasEditorFindQuery ? findQuery : "",
+    noteQuery: searchQuery,
+  });
+  const editorSearchQuery = activeEditorSearch.query;
+  const isUsingEditorFindSearch = activeEditorSearch.source === "editor";
+
+  useEffect(() => {
+    setActiveFindMatchIndex(0);
+  }, [findQuery, noteId]);
+
+  useEffect(() => {
+    if (!isUsingEditorFindSearch) {
+      setFindMatchCount(0);
+    }
+  }, [isUsingEditorFindSearch]);
+
+  useEffect(() => {
+    if (findMatchCount === 0) {
+      setActiveFindMatchIndex(0);
+      return;
+    }
+    setActiveFindMatchIndex((prev) => Math.min(prev, findMatchCount - 1));
+  }, [findMatchCount]);
+
+  const closeFind = useCallback(
+    (focusEditor: boolean) => {
+      setFocusedPane("editor");
+      setFindOpen(false);
+      setFindMatchCount(0);
+      setFindQuery("");
+      setActiveFindMatchIndex(0);
+      if (focusEditor) {
+        requestAnimationFrame(() => {
+          editorRef.current?.focus();
+        });
+      }
+    },
+    [setFocusedPane, editorRef],
+  );
+
+  const stepActiveFindMatch = useCallback(
+    (direction: 1 | -1) => {
+      if (findMatchCount === 0) return;
+      setActiveFindMatchIndex((prev) => {
+        const next = prev + direction;
+        if (next < 0) return findMatchCount - 1;
+        if (next >= findMatchCount) return 0;
+        return next;
+      });
+      setFindScrollRevision((r) => r + 1);
+    },
+    [findMatchCount],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "f") {
+        event.preventDefault();
+        setFocusedPane("editor");
+        setFindOpen(true);
+        requestAnimationFrame(() => {
+          findInputRef.current?.focus();
+          findInputRef.current?.select();
+        });
+      }
+      if (event.key === "Escape" && findOpen) {
+        event.preventDefault();
+        closeFind(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeFind, findOpen, setFocusedPane]);
+
+  return {
+    findOpen,
+    findMatchCount,
+    findQuery,
+    activeFindMatchIndex,
+    findScrollRevision,
+    findInputRef,
+    editorSearchQuery,
+    isUsingEditorFindSearch,
+    setFindMatchCount,
+    setFindQuery,
+    setActiveFindMatchIndex,
+    closeFind,
+    stepActiveFindMatch,
+  };
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
   deletedAt,
@@ -123,229 +396,47 @@ export function EditorPane({
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
-  const [showHeaderBorder, setShowHeaderBorder] = useState(false);
-  const [showHeaderTitle, setShowHeaderTitle] = useState(false);
-  const [findOpen, setFindOpen] = useState(false);
-  const [findMatchCount, setFindMatchCount] = useState(0);
-  const [findQuery, setFindQuery] = useState("");
-  const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
-  const [findScrollRevision, setFindScrollRevision] = useState(0);
-  const findInputRef = useRef<HTMLInputElement | null>(null);
-  const noteScrollPositionsRef = useRef<Map<string, number>>(new Map());
   const noteTitle = firstLineH1Title(markdown);
-  const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
 
-  const activeEditorSearch = resolveActiveEditorSearch({
-    editorQuery: hasEditorFindQuery ? findQuery : "",
-    noteQuery: searchQuery,
-  });
-  const editorSearchQuery = activeEditorSearch.query;
-  const isUsingEditorFindSearch = activeEditorSearch.source === "editor";
-  const updateHeaderState = useCallback(
-    (scrollContainer: HTMLDivElement | null) => {
-      const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
-      setShowHeaderBorder(scrolled);
+  const find = useFindBar({ noteId, searchQuery, editorRef, setFocusedPane });
+  const {
+    findOpen,
+    findMatchCount,
+    findQuery,
+    activeFindMatchIndex,
+    findScrollRevision,
+    findInputRef,
+    editorSearchQuery,
+    isUsingEditorFindSearch,
+    setFindMatchCount,
+    setFindQuery,
+    setActiveFindMatchIndex,
+    closeFind,
+    stepActiveFindMatch,
+  } = find;
 
-      if (!scrollContainer || !noteId) {
-        setShowHeaderTitle(false);
-        return;
-      }
-
-      const firstLine = scrollContainer.querySelector(
-        "[data-lexical-editor] > :first-child",
-      ) as HTMLElement | null;
-
-      if (!firstLine) {
-        setShowHeaderTitle(false);
-        return;
-      }
-
-      const scrollRect = scrollContainer.getBoundingClientRect();
-      const firstLineRect = firstLine.getBoundingClientRect();
-      setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
-    },
-    [noteId],
-  );
-
-  useLayoutEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) {
-      updateHeaderState(null);
-      return;
-    }
-
-    const nextScrollTop = noteId
-      ? (noteScrollPositionsRef.current.get(noteId) ?? 0)
-      : 0;
-    scrollContainer.scrollTop = nextScrollTop;
-    setShowHeaderBorder(nextScrollTop > 0);
-
-    const frame = window.requestAnimationFrame(() => {
-      updateHeaderState(scrollContainer);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [noteId, updateHeaderState]);
-
-  useEffect(() => {
-    setActiveFindMatchIndex(0);
-  }, [findQuery, noteId]);
-
-  useEffect(() => {
-    if (!isUsingEditorFindSearch) {
-      setFindMatchCount(0);
-    }
-  }, [isUsingEditorFindSearch]);
-
-  useEffect(() => {
-    if (findMatchCount === 0) {
-      setActiveFindMatchIndex(0);
-      return;
-    }
-
-    setActiveFindMatchIndex((previousIndex) =>
-      Math.min(previousIndex, findMatchCount - 1),
-    );
-  }, [findMatchCount]);
-
-  const closeFind = useCallback(
-    (focusEditor: boolean) => {
-      setFocusedPane("editor");
-      setFindOpen(false);
-      setFindMatchCount(0);
-      setFindQuery("");
-      setActiveFindMatchIndex(0);
-      if (!focusEditor) {
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        editorRef.current?.focus();
-      });
-    },
-    [setFocusedPane],
-  );
-
-  const stepActiveFindMatch = useCallback(
-    (direction: 1 | -1) => {
-      if (findMatchCount === 0) {
-        return;
-      }
-
-      setActiveFindMatchIndex((previousIndex) => {
-        const nextIndex = previousIndex + direction;
-        if (nextIndex < 0) {
-          return findMatchCount - 1;
-        }
-        if (nextIndex >= findMatchCount) {
-          return 0;
-        }
-        return nextIndex;
-      });
-      setFindScrollRevision((r) => r + 1);
-    },
-    [findMatchCount],
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "f") {
-        event.preventDefault();
-        setFocusedPane("editor");
-        setFindOpen(true);
-        requestAnimationFrame(() => {
-          findInputRef.current?.focus();
-          findInputRef.current?.select();
-        });
-      }
-
-      if (event.key === "Escape" && findOpen) {
-        event.preventDefault();
-        closeFind(true);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeFind, findOpen, setFocusedPane]);
+  const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
+    useEditorScrollHeader(noteId, scrollContainerRef);
 
   const openEditorMenu = useCallback(
     async (position: LogicalPosition) => {
-      if (!noteId) {
-        return;
-      }
-
-      const readonlyMenuItem = await CheckMenuItem.new({
-        id: "editor-menu-readonly",
-        text: "Read-only",
-        checked: readonly,
-        enabled: !isPublishedNote,
-        action: () => onSetReadonly(!readonly),
-      });
-
-      const moveToNotebookSubmenu = await buildNotebookSubmenu({
-        currentNotebook: notebook,
+      if (!noteId) return;
+      await buildEditorMenu(position, {
+        readonly,
+        isPublishedNote,
+        isDeletePublishedNotePending,
+        notebook,
         notebooks,
-        idPrefix: "editor-menu-notebook",
-        onAssign: (notebookId) => onAssignNotebook(notebookId),
+        pinnedAt,
+        publishedAt,
+        onSetReadonly,
+        onAssignNotebook,
+        onDeletePublishedNote,
+        onPublishShortNote,
+        onOpenPublishDialog,
+        onSetPinned,
+        onDuplicateNote,
       });
-
-      const deletePublishedItem = {
-        id: "editor-menu-delete-published",
-        text: "Delete from Nostr",
-        enabled: !isDeletePublishedNotePending,
-        action: onDeletePublishedNote,
-      };
-
-      let publishItems;
-      if (isPublishedNote) {
-        publishItems = [deletePublishedItem];
-      } else {
-        const publishAsSubmenu = await Submenu.new({
-          text: publishedAt ? "Update on Nostr" : "Publish As",
-          items: [
-            {
-              id: "editor-menu-publish-note",
-              text: "Note",
-              action: () => onPublishShortNote(),
-            },
-            {
-              id: "editor-menu-publish-article",
-              text: "Article",
-              action: () => onOpenPublishDialog(),
-            },
-          ],
-        });
-        publishItems = publishedAt
-          ? [publishAsSubmenu, deletePublishedItem]
-          : [publishAsSubmenu];
-      }
-
-      const menu = await Menu.new({
-        items: [
-          {
-            id: pinnedAt ? "editor-menu-unpin" : "editor-menu-pin",
-            text: pinnedAt ? "Unpin" : "Pin To Top",
-            action: () => {
-              onSetPinned(!pinnedAt);
-            },
-          },
-          readonlyMenuItem,
-          {
-            id: "editor-menu-duplicate",
-            text: "Duplicate",
-            action: onDuplicateNote,
-          },
-          moveToNotebookSubmenu,
-          ...publishItems,
-        ],
-      });
-
-      try {
-        await menu.popup(position);
-      } finally {
-        await menu.close();
-      }
     },
     [
       isDeletePublishedNotePending,
@@ -414,63 +505,72 @@ export function EditorPane({
     </Button>
   );
 
-  const statusContent = isPublishedNote ? (
-    <>
-      <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
-        Published
-      </span>
-      <Tooltip>
-        <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
-          <Lock className="size-[1.2rem]" />
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          Short notes are immutable on Nostr and can&apos;t be updated.
-        </TooltipContent>
-      </Tooltip>
-    </>
-  ) : publishedAt != null ? (
-    modifiedAt <= publishedAt ? (
-      <span className="text-muted-foreground pointer-events-auto text-xs">
-        Published
-      </span>
-    ) : (
-      <button
-        className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
-        onClick={onOpenPublishDialog}
-        type="button"
-      >
-        Update
-      </button>
-    )
-  ) : null;
-
-  const toolbarSlot = readonly ? (
-    <Tooltip>
-      <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
-        <span aria-label="Read-only" title="Read-only">
-          <PencilOff className="size-[1.2rem]" />
+  let statusContent: React.ReactNode = null;
+  if (isPublishedNote) {
+    statusContent = (
+      <>
+        <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
+          Published
         </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">Read-only</TooltipContent>
-    </Tooltip>
-  ) : !isReadOnly ? (
-    <Button
-      className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
-        showToolbar && "bg-accent text-accent-foreground",
-      )}
-      onClick={() => setShowToolbar(!showToolbar)}
-      size="icon-sm"
-      variant="ghost"
-      title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-    >
-      {showToolbar ? (
-        <PanelBottomClose className="size-[1.2rem]" />
+        <Tooltip>
+          <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
+            <Lock className="size-[1.2rem]" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            Short notes are immutable on Nostr and can&apos;t be updated.
+          </TooltipContent>
+        </Tooltip>
+      </>
+    );
+  } else if (publishedAt != null) {
+    statusContent =
+      modifiedAt <= publishedAt ? (
+        <span className="text-muted-foreground pointer-events-auto text-xs">
+          Published
+        </span>
       ) : (
-        <PanelBottomOpen className="size-[1.2rem]" />
-      )}
-    </Button>
-  ) : null;
+        <button
+          className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
+          onClick={onOpenPublishDialog}
+          type="button"
+        >
+          Update
+        </button>
+      );
+  }
+
+  let toolbarSlot: React.ReactNode = null;
+  if (readonly) {
+    toolbarSlot = (
+      <Tooltip>
+        <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
+          <span aria-label="Read-only" title="Read-only">
+            <PencilOff className="size-[1.2rem]" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Read-only</TooltipContent>
+      </Tooltip>
+    );
+  } else if (!isReadOnly) {
+    toolbarSlot = (
+      <Button
+        className={cn(
+          "text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto",
+          showToolbar && "bg-accent text-accent-foreground",
+        )}
+        onClick={() => setShowToolbar(!showToolbar)}
+        size="icon-sm"
+        variant="ghost"
+        title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+      >
+        {showToolbar ? (
+          <PanelBottomClose className="size-[1.2rem]" />
+        ) : (
+          <PanelBottomOpen className="size-[1.2rem]" />
+        )}
+      </Button>
+    );
+  }
 
   return (
     <section className="bg-background relative flex h-full min-h-0 flex-col">
@@ -526,11 +626,10 @@ export function EditorPane({
               }}
             />
             <span className="text-muted-foreground min-w-12 text-right text-xs tabular-nums">
-              {findQuery && findMatchCount > 0
-                ? `${activeFindMatchIndex + 1}/${findMatchCount}`
-                : findQuery
-                  ? "0"
-                  : ""}
+              {findQuery &&
+                findMatchCount > 0 &&
+                `${activeFindMatchIndex + 1}/${findMatchCount}`}
+              {findQuery && findMatchCount === 0 && "0"}
             </span>
           </label>
           <Button
@@ -585,13 +684,11 @@ export function EditorPane({
           onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
           onScroll={(event) => {
-            if (noteId) {
-              noteScrollPositionsRef.current.set(
-                noteId,
-                event.currentTarget.scrollTop,
-              );
-            }
-            updateHeaderState(event.currentTarget);
+            scrollContainerCallbacks.onScroll(
+              noteId,
+              event.currentTarget.scrollTop,
+            );
+            scrollContainerCallbacks.updateHeaderState(event.currentTarget);
           }}
           ref={scrollContainerRef}
           style={

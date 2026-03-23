@@ -156,7 +156,7 @@ export async function handleMessage(
       await handleEvent(connId, message[1], deps);
       break;
     case "AUTH":
-      handleAuth(connId, message[1], deps);
+      await handleAuth(connId, message[1], deps);
       break;
     case "REQ":
       await handleReq(connId, message as [string, string, ...unknown[]], deps);
@@ -292,7 +292,11 @@ async function handleEvent(
   }
 }
 
-function handleAuth(connId: string, event: unknown, deps: RelayDeps): void {
+async function handleAuth(
+  connId: string,
+  event: unknown,
+  deps: RelayDeps,
+): Promise<void> {
   const { connections, access } = deps;
   const challenge = connections.getChallenge(connId);
   const result = validateAuthEvent(event, challenge, deps.relayUrl);
@@ -300,7 +304,7 @@ function handleAuth(connId: string, event: unknown, deps: RelayDeps): void {
 
   if (result.ok && result.pubkey) {
     // Check allowlist in private mode
-    if (access.privateMode && !access.isAllowed(result.pubkey)) {
+    if (access.privateMode && !(await access.isAllowed(result.pubkey))) {
       console.log(
         `[AUTH] rejected pubkey=${result.pubkey.slice(0, 8)}… reason="not on allowlist"`,
       );
