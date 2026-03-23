@@ -1,0 +1,49 @@
+{
+  "name": "@comet/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "ios": "react-native run-ios",
+    "android": "react-native run-android",
+    "ubrn:ios": "ubrn build ios --and-generate && cd ios && bundle exec pod install",
+    "ubrn:android": "ubrn build android --and-generate",
+    "ubrn:checkout": "ubrn checkout",
+    "ubrn:clean": "ubrn clean",
+    "postinstall": "node -e \"const fs=require('fs');const f=require.resolve('html-entities/lib/index.js');const c=fs.readFileSync(f,'utf8');if(!c.startsWith('\\\"worklet\\\"'))fs.writeFileSync(f,'\\\"worklet\\\";\\n'+c);\"",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expensify/react-native-live-markdown": "^0.1.304",
+    "@react-navigation/native": "^7.0.0",
+    "@react-navigation/native-stack": "^7.0.0",
+    "@tanstack/react-query": "^5.90.0",
+    "date-fns": "^4.1.0",
+    "html-entities": "2.5.3",
+    "react": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-gesture-handler": "^2.24.0",
+    "react-native-keychain": "^9.2.0",
+    "react-native-safe-area-context": "^5.0.0",
+    "react-native-screens": "~4.10.0",
+    "react-native-worklets": "^0.7.0",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.29.2",
+    "@babel/runtime": "^7.29.2",
+    "@react-native-community/cli": "latest",
+    "@react-native-community/cli-config": "latest",
+    "@react-native-community/cli-platform-android": "latest",
+    "@react-native-community/cli-platform-ios": "latest",
+    "@react-native/eslint-config": "^0.79.0",
+    "@react-native/metro-config": "^0.79.0",
+    "@react-native/typescript-config": "^0.79.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^9.0.0",
+    "patch-package": "^8.0.1",
+    "typescript": "~5.8.0",
+    "uniffi-bindgen-react-native": "^0.30.0-1"
+  }
+}

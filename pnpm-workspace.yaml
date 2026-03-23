@@ -3,6 +3,7 @@ packages:
   - blossom
   - docs
   - mcp
+  - mobile
   - relay
   - web
   - www

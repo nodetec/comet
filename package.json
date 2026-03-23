@@ -60,6 +60,15 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "turbo": "^2.0.0"
   },
+  "pnpm": {
+    "packageExtensions": {
+      "@expensify/react-native-live-markdown": {
+        "dependencies": {
+          "html-entities": "^2.5.3"
+        }
+      }
+    }
+  },
   "lint-staged": {
     "app/**/*.{ts,tsx}": [
       "pnpm --filter @comet/app exec eslint --fix",

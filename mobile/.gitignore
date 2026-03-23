@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Rust build artifacts
+rust/target/
+rust/Cargo.lock
+
+# iOS
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
+ios/CometMobile.xcworkspace/xcuserdata/
+ios/CometMobile.xcodeproj/xcuserdata/
+ios/CometMobile.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Android
+android/app/build/
+android/build/
+android/.gradle/
+android/app/debug.keystore
+android/local.properties
+
+# Metro
+.metro-health-check*
+
+# Ruby
+Gemfile.lock
+vendor/bundle/
+
+# Generated uniffi bindings
+src/generated/
+
+# Patches (keep the directory but not node_modules patches applied at runtime)
+
+# Misc
+*.jsbundle
+*.hbc
+.env
+.env.*

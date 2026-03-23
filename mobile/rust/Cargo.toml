@@ -1,0 +1,3 @@
+[workspace]
+members = ["comet-mobile"]
+resolver = "2"
