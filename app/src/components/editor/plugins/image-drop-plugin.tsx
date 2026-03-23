@@ -8,7 +8,7 @@ import {
   $setSelection,
 } from "lexical";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { IMAGE_EXTENSIONS, importImage } from "@/lib/attachments";
+import { IMAGE_EXTENSIONS, importImage } from "@/shared/lib/attachments";
 import { $createImageNode } from "../nodes/image-node";
 
 const IMAGE_EXTENSIONS_RE = new RegExp(

@@ -8,7 +8,7 @@ import {
   DialogClose,
   DialogPopup,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/shared/ui/dialog";
 import { useUIStore } from "@/stores/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";

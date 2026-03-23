@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
 import { Lock, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   DialogBackdrop,
   DialogClose,
@@ -9,7 +9,7 @@ import {
   DialogPortal,
   DialogRoot,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/shared/ui/dialog";
 
 import type { PublishNoteInput, PublishShortNoteInput } from "./types";
 

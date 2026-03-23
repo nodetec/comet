@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/attachments", () => ({
+vi.mock("@/shared/lib/attachments", () => ({
   resolveImageSrc: (src: string) => src,
 }));
 

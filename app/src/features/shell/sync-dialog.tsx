@@ -24,9 +24,9 @@ import {
   DialogPortal,
   DialogRoot,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn, errorMessage } from "@/lib/utils";
+} from "@/shared/ui/dialog";
+import { Button } from "@/shared/ui/button";
+import { cn, errorMessage } from "@/shared/lib/utils";
 
 type SyncInfo = {
   state: string | { error: { message: string } };

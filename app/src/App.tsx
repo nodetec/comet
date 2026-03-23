@@ -1,9 +1,9 @@
 import { type CSSProperties, useEffect, useState } from "react";
 
-import { useTheme } from "@/hooks/use-theme";
+import { useTheme } from "@/shared/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   DialogBackdrop,
   DialogClose,
@@ -11,8 +11,8 @@ import {
   DialogPortal,
   DialogRoot,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Toaster } from "@/components/ui/sonner";
+} from "@/shared/ui/dialog";
+import { Toaster } from "@/shared/ui/sonner";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/shell/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";

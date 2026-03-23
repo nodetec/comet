@@ -33,7 +33,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
-vi.mock("@/lib/attachments", () => ({
+vi.mock("@/shared/lib/attachments", () => ({
   resolveImageSrc: (src: string) =>
     src.startsWith("attachment://")
       ? `asset:///attachments/${src.slice("attachment://".length)}`

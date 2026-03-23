@@ -1,5 +1,5 @@
 import { Marked, type MarkedExtension, type Tokens } from "marked";
-import { resolveImageSrc } from "@/lib/attachments";
+import { resolveImageSrc } from "@/shared/lib/attachments";
 import { extractYouTubeVideoId } from "./youtube-utils";
 
 function escapeHtml(text: string): string {

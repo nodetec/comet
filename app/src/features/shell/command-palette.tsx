@@ -8,8 +8,8 @@ import {
   DialogPopup,
   DialogPortal,
   DialogRoot,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+} from "@/shared/ui/dialog";
+import { cn } from "@/shared/lib/utils";
 
 import { type NotebookSummary } from "./types";
 

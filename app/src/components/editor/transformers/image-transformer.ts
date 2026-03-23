@@ -1,6 +1,6 @@
 import type { TextMatchTransformer } from "@lexical/markdown";
 import { $createImageNode, $isImageNode, ImageNode } from "../nodes/image-node";
-import { resolveImageSrc, unresolveImageSrc } from "@/lib/attachments";
+import { resolveImageSrc, unresolveImageSrc } from "@/shared/lib/attachments";
 
 export const IMAGE: TextMatchTransformer = {
   dependencies: [ImageNode],

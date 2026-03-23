@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { errorMessage } from "@/lib/utils";
+import { Button } from "@/shared/ui/button";
+import { Switch } from "@/shared/ui/switch";
+import { errorMessage } from "@/shared/lib/utils";
 
 import { SettingRow } from "./setting-row";
 import { useInlineEditor } from "./use-inline-editor";

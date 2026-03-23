@@ -9,8 +9,8 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
-import { toastErrorHandler } from "@/lib/mutation-utils";
-import { errorMessage } from "@/lib/utils";
+import { toastErrorHandler } from "@/shared/lib/mutation-utils";
+import { errorMessage } from "@/shared/lib/utils";
 import { useShellStore } from "@/stores/use-shell-store";
 import { defaultNoteSortPrefs, useUIStore } from "@/stores/use-ui-store";
 

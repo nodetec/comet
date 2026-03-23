@@ -29,14 +29,14 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/components/editor/note-editor";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { resolveActiveEditorSearch } from "@/lib/search";
-import { cn } from "@/lib/utils";
+} from "@/shared/ui/tooltip";
+import { resolveActiveEditorSearch } from "@/shared/lib/search";
+import { cn } from "@/shared/lib/utils";
 import { type NotebookRef, type NotebookSummary } from "./types";
 
 type EditorPaneProps = {

@@ -24,7 +24,7 @@ import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
 
-import { searchWordsFromQuery } from "@/lib/search";
+import { searchWordsFromQuery } from "@/shared/lib/search";
 
 import theme from "./theme";
 import { TRANSFORMERS } from "./transformers";

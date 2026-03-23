@@ -16,7 +16,7 @@ import { $setBlocksType } from "@lexical/selection";
 import { $createCodeNode } from "@lexical/code";
 import { mergeRegister } from "@lexical/utils";
 import { open } from "@tauri-apps/plugin-dialog";
-import { IMAGE_EXTENSIONS, importImage } from "@/lib/attachments";
+import { IMAGE_EXTENSIONS, importImage } from "@/shared/lib/attachments";
 import {
   Bold,
   Italic,
@@ -30,7 +30,7 @@ import {
   Image,
   Table,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import { $createImageNode } from "../nodes/image-node";
 import { INSERT_TABLE_COMMAND } from "@lexical/table";
 import {

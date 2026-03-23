@@ -1,7 +1,7 @@
 import { Minus, Plus } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/shared/ui/button";
+import { Switch } from "@/shared/ui/switch";
 import { useUIStore } from "@/stores/use-ui-store";
 
 import { SettingRow } from "./setting-row";

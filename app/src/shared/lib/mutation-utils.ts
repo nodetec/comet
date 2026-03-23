@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { errorMessage } from "@/lib/utils";
+import { errorMessage } from "@/shared/lib/utils";
 
 export function toastErrorHandler(
   message: string,

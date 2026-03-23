@@ -22,8 +22,8 @@ import {
 } from "react";
 import { useInView } from "react-intersection-observer";
 
-import { Button } from "@/components/ui/button";
-import { searchWordsFromQuery } from "@/lib/search";
+import { Button } from "@/shared/ui/button";
+import { searchWordsFromQuery } from "@/shared/lib/search";
 import { type NoteFilter, useShellStore } from "@/stores/use-shell-store";
 
 import { buildNotebookSubmenu } from "./notebook-submenu";

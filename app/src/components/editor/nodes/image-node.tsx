@@ -34,7 +34,7 @@ import {
   type ReactNode,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { resolveImageSrc } from "@/lib/attachments";
+import { resolveImageSrc } from "@/shared/lib/attachments";
 
 type BlobFetchStatus = "downloaded" | "missing" | "needsUnlock";
 
