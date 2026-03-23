@@ -269,9 +269,38 @@ fn is_tag_char(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
 }
 
+/// Strip the leading H1 title line from markdown, returning the body.
+pub fn strip_title_line(markdown: &str) -> String {
+    if let Some(rest) = markdown.strip_prefix("# ") {
+        // Skip the first line (the H1 title)
+        match rest.find('\n') {
+            Some(pos) => rest[pos..].trim_start_matches('\n').to_string(),
+            None => String::new(), // entire content was just the title
+        }
+    } else {
+        markdown.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strip_title_line_removes_h1_and_keeps_body() {
+        assert_eq!(strip_title_line("# Title\n\nBody"), "Body");
+    }
+
+    #[test]
+    fn strip_title_line_handles_title_only_notes() {
+        assert_eq!(strip_title_line("# Title"), "");
+    }
+
+    #[test]
+    fn strip_title_line_leaves_non_h1_markdown_unchanged() {
+        let markdown = "## Section\nBody";
+        assert_eq!(strip_title_line(markdown), markdown);
+    }
 
     #[test]
     fn title_from_markdown_uses_first_non_empty_h1() {

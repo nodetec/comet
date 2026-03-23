@@ -1,4 +1,5 @@
 use crate::domain::accounts::model::IdentityCredentials;
+use crate::domain::common::text::strip_title_line;
 use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput, Relay};
 use crate::error::{now_millis, now_secs, AppError};
 use nostr_sdk::prelude::*;
@@ -461,18 +462,6 @@ pub async fn delete_published_note(
     })
 }
 
-pub(crate) fn strip_title_line(markdown: &str) -> String {
-    if let Some(rest) = markdown.strip_prefix("# ") {
-        // Skip the first line (the H1 title)
-        match rest.find('\n') {
-            Some(pos) => rest[pos..].trim_start_matches('\n').to_string(),
-            None => String::new(), // entire content was just the title
-        }
-    } else {
-        markdown.to_string()
-    }
-}
-
 /// Imports an nsec (bech32 or hex), replacing the existing identity.
 /// Returns the normalized imported identity.
 pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<IdentityCredentials, AppError> {
@@ -481,23 +470,3 @@ pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<IdentityCredentials,
     insert_identity(conn, &keys)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::strip_title_line;
-
-    #[test]
-    fn strip_title_line_removes_h1_and_keeps_body() {
-        assert_eq!(strip_title_line("# Title\n\nBody"), "Body");
-    }
-
-    #[test]
-    fn strip_title_line_handles_title_only_notes() {
-        assert_eq!(strip_title_line("# Title"), "");
-    }
-
-    #[test]
-    fn strip_title_line_leaves_non_h1_markdown_unchanged() {
-        let markdown = "## Section\nBody";
-        assert_eq!(strip_title_line(markdown), markdown);
-    }
-}
