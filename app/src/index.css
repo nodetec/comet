@@ -309,6 +309,14 @@ body {
 }
 
 .comet-lexical-tree-view {
+  display: contents;
+}
+
+.comet-lexical-tree-view > pre,
+.comet-lexical-debug-text-view {
+  order: 2;
+  min-height: 0;
+  flex: 1;
   max-height: min(24rem, 45vh);
   overflow: auto;
   margin: 0;
@@ -319,6 +327,11 @@ body {
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--foreground);
+}
+
+.comet-lexical-tree-view-expanded > pre,
+.comet-lexical-debug-text-view-expanded {
+  max-height: 100%;
 }
 
 .comet-lexical-tree-button {
@@ -342,7 +355,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.75rem;
 }
 
 .comet-lexical-tree-slider {
