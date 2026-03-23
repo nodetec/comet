@@ -1,7 +1,8 @@
+use crate::domain::accounts::model::IdentityCredentials;
+use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput, Relay};
 use crate::error::{now_millis, now_secs, AppError};
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
@@ -23,13 +24,6 @@ pub fn ensure_default_settings(conn: &Connection) -> Result<(), AppError> {
         params![DEFAULT_BLOSSOM_URL],
     )?;
     Ok(())
-}
-
-#[derive(Debug, Clone)]
-pub struct IdentityCredentials {
-    pub public_key: String,
-    pub npub: String,
-    pub nsec: String,
 }
 
 fn insert_identity(conn: &Connection, keys: &Keys) -> Result<IdentityCredentials, AppError> {
@@ -84,14 +78,6 @@ fn get_npub(conn: &Connection) -> Result<Option<String>, AppError> {
 
 pub fn current_npub(conn: &Connection) -> Result<String, AppError> {
     get_npub(conn)?.ok_or_else(|| AppError::custom("No Nostr identity configured."))
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Relay {
-    pub url: String,
-    pub kind: String,
-    pub created_at: i64,
 }
 
 pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
@@ -160,23 +146,6 @@ fn normalize_relay_url(raw: &str) -> Result<String, AppError> {
         }
     }
     Ok(parsed.as_str().trim_end_matches('/').to_string())
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PublishResult {
-    pub success_count: usize,
-    pub fail_count: usize,
-    pub relay_count: usize,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PublishNoteInput {
-    pub note_id: String,
-    pub title: String,
-    pub image: Option<String>,
-    pub tags: Vec<String>,
 }
 
 pub async fn publish_note(
@@ -302,13 +271,6 @@ pub async fn publish_note(
         fail_count,
         relay_count,
     })
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PublishShortNoteInput {
-    pub note_id: String,
-    pub tags: Vec<String>,
 }
 
 pub async fn publish_short_note(

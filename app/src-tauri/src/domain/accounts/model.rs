@@ -2,6 +2,13 @@ use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
+pub struct IdentityCredentials {
+    pub public_key: String,
+    pub npub: String,
+    pub nsec: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct AccountRecord {
     pub public_key: String,
     pub npub: String,

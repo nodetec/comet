@@ -6,7 +6,7 @@ use crate::domain::notes::service::NoteService;
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
-use crate::adapters::nostr::sync_manager::SyncCommand;
+use crate::domain::sync::model::SyncCommand;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,11 @@
+use crate::domain::sync::model::{
+    SyncChangePayload, SyncCommand, SyncState, SyncStatusPayload, SyncedNote, SyncedNotebook,
+};
 use crate::error::{now_millis, AppError};
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,40 +14,6 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, watch, Mutex};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-
-// ── Types ──────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum SyncState {
-    Disconnected,
-    NeedsUnlock,
-    Connecting,
-    Authenticating,
-    Syncing,
-    Connected,
-    Error { message: String },
-}
-
-#[derive(Debug)]
-pub enum SyncCommand {
-    PushNote(String),
-    PushNotebook(String),
-    PushDeletion(String),
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncStatusPayload {
-    pub state: SyncState,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncChangePayload {
-    pub note_id: String,
-    pub action: String, // "upsert" or "delete"
-}
 
 /// Emit a sync log line to both stderr and the frontend.
 fn sync_log(app: &AppHandle, msg: &str) {
@@ -62,22 +30,6 @@ fn delete_note_from_sync(
     conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
     invalidate_cache(note_id);
     Ok(())
-}
-
-/// Note fields extracted from a synced event rumor.
-pub struct SyncedNote {
-    pub id: String,
-    pub title: String,
-    pub markdown: String,
-    pub notebook_id: Option<String>,
-    pub created_at: i64,
-    pub modified_at: i64,
-    pub edited_at: i64,
-    pub archived_at: Option<i64>,
-    pub deleted_at: Option<i64>,
-    pub pinned_at: Option<i64>,
-    pub readonly: bool,
-    pub tags: Vec<String>,
 }
 
 // ── SyncManager ────────────────────────────────────────────────────────
@@ -271,11 +223,6 @@ fn notebook_to_rumor(
         .build(pubkey)
 }
 
-struct SyncedNotebook {
-    id: String,
-    name: String,
-    updated_at: i64,
-}
 
 fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook, AppError> {
     let id = rumor

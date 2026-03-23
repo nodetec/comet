@@ -36,13 +36,13 @@ fn restart_sync_async(app: &AppHandle) {
 }
 
 #[tauri::command]
-pub fn list_relays(app: AppHandle) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
+pub fn list_relays(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     crate::adapters::nostr::protocol::list_relays(&conn)
 }
 
 #[tauri::command]
-pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
+pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     let relays = crate::adapters::nostr::protocol::set_sync_relay(&conn, &url)?;
     reset_sync_state(&conn)?;
@@ -51,7 +51,7 @@ pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::adapters
 }
 
 #[tauri::command]
-pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
+pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     let relays = crate::adapters::nostr::protocol::remove_sync_relay(&conn)?;
     let app_clone = app.clone();
@@ -68,7 +68,7 @@ pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::adapters::nostr::p
 pub fn add_publish_relay(
     app: AppHandle,
     url: String,
-) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     crate::adapters::nostr::protocol::add_publish_relay(&conn, &url)
 }
@@ -78,7 +78,7 @@ pub fn remove_relay(
     app: AppHandle,
     url: String,
     kind: String,
-) -> Result<Vec<crate::adapters::nostr::protocol::Relay>, AppError> {
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     crate::adapters::nostr::protocol::remove_relay(&conn, &url, &kind)
 }
@@ -86,16 +86,16 @@ pub fn remove_relay(
 #[tauri::command]
 pub async fn publish_note(
     app: AppHandle,
-    input: crate::adapters::nostr::protocol::PublishNoteInput,
-) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+    input: crate::domain::relay::model::PublishNoteInput,
+) -> Result<crate::domain::relay::model::PublishResult, AppError> {
     crate::adapters::nostr::protocol::publish_note(&app, input).await
 }
 
 #[tauri::command]
 pub async fn publish_short_note(
     app: AppHandle,
-    input: crate::adapters::nostr::protocol::PublishShortNoteInput,
-) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+    input: crate::domain::relay::model::PublishShortNoteInput,
+) -> Result<crate::domain::relay::model::PublishResult, AppError> {
     crate::adapters::nostr::protocol::publish_short_note(&app, input).await
 }
 
@@ -103,14 +103,14 @@ pub async fn publish_short_note(
 pub async fn delete_published_note(
     app: AppHandle,
     note_id: String,
-) -> Result<crate::adapters::nostr::protocol::PublishResult, AppError> {
+) -> Result<crate::domain::relay::model::PublishResult, AppError> {
     crate::adapters::nostr::protocol::delete_published_note(&app, &note_id).await
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
-    state: crate::adapters::nostr::sync_manager::SyncState,
+    state: crate::domain::sync::model::SyncState,
     relay_url: Option<String>,
     blossom_url: Option<String>,
     npub: Option<String>,
@@ -220,7 +220,7 @@ pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppEr
 }
 
 #[tauri::command]
-pub async fn get_sync_status(app: AppHandle) -> Result<crate::adapters::nostr::sync_manager::SyncState, AppError> {
+pub async fn get_sync_status(app: AppHandle) -> Result<crate::domain::sync::model::SyncState, AppError> {
     let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     Ok(manager.state().await)
 }
