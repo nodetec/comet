@@ -1,4 +1,4 @@
-use crate::adapters::nostr::protocol as nostr;
+use crate::adapters::sqlite::identity_repository as nostr;
 use crate::adapters::sqlite::connection::{
     account_db_path, account_db_relative_path_string, account_dir_for_npub,
     accounts_root_dir, app_database_connection, ensure_account_database_ready,
