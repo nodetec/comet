@@ -28,7 +28,7 @@ import {
 import {
   NoteEditor,
   type NoteEditorHandle,
-} from "@/components/editor/note-editor";
+} from "@/features/editor/note-editor";
 import { Button } from "@/shared/ui/button";
 import {
   Tooltip,
