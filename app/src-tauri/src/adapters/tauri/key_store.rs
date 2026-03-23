@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::ports::key_store::KeyStore;
 use nostr_sdk::prelude::*;
 use rusqlite::{Connection, OptionalExtension};
 use std::{collections::HashMap, sync::Mutex};
@@ -11,6 +12,43 @@ const NOSTR_NSEC_KEY_PREFIX: &str = "nostr-nsec";
 pub struct UnlockedNostrKeys {
     keys_by_public_key: Mutex<HashMap<String, Keys>>,
 }
+
+/// Tauri-backed implementation of `KeyStore`.
+pub struct TauriKeyStore<'a> {
+    app: &'a AppHandle,
+}
+
+impl<'a> TauriKeyStore<'a> {
+    pub fn new(app: &'a AppHandle) -> Self {
+        Self { app }
+    }
+}
+
+impl KeyStore for TauriKeyStore<'_> {
+    fn store_nsec(&self, public_key: &str, nsec: &str) -> Result<(), AppError> {
+        store_account_nsec(self.app, public_key, nsec)
+    }
+
+    fn load_nsec(&self, public_key: &str) -> Result<String, AppError> {
+        load_account_nsec(self.app, public_key)
+    }
+
+    fn remove_nsec(&self, public_key: &str) {
+        remove_account_nsec(self.app, public_key);
+    }
+
+    fn is_unlocked(&self, public_key: &str) -> Result<bool, AppError> {
+        Ok(cached_keys_for_account(self.app, public_key)?.is_some())
+    }
+
+    fn keys_for_account(&self, public_key: &str) -> Result<Keys, AppError> {
+        keys_for_account(self.app, public_key)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Implementation helpers
+// ---------------------------------------------------------------------------
 
 fn storage_key(public_key: &str) -> String {
     format!("{NOSTR_NSEC_KEY_PREFIX}:{public_key}")
@@ -60,7 +98,11 @@ fn cache_account_keys(app: &AppHandle, public_key: &str, keys: &Keys) -> Result<
     Ok(())
 }
 
-pub(crate) fn is_current_identity_unlocked(
+// ---------------------------------------------------------------------------
+// Public free functions (backward-compatible API)
+// ---------------------------------------------------------------------------
+
+pub fn is_current_identity_unlocked(
     app: &AppHandle,
     conn: &Connection,
 ) -> Result<bool, AppError> {
@@ -68,7 +110,7 @@ pub(crate) fn is_current_identity_unlocked(
     Ok(cached_keys_for_account(app, &public_key)?.is_some())
 }
 
-pub(crate) fn store_account_nsec(
+pub fn store_account_nsec(
     app: &AppHandle,
     public_key: &str,
     raw_secret: &str,
@@ -95,7 +137,7 @@ pub(crate) fn store_account_nsec(
     Ok(())
 }
 
-pub(crate) fn remove_account_nsec(app: &AppHandle, public_key: &str) {
+pub fn remove_account_nsec(app: &AppHandle, public_key: &str) {
     if let Ok(mut guard) = cache_state(app).keys_by_public_key.lock() {
         guard.remove(public_key);
     }
@@ -104,7 +146,7 @@ pub(crate) fn remove_account_nsec(app: &AppHandle, public_key: &str) {
         .remove_item(app.clone(), request(public_key, None));
 }
 
-pub(crate) fn load_account_nsec(app: &AppHandle, public_key: &str) -> Result<String, AppError> {
+pub fn load_account_nsec(app: &AppHandle, public_key: &str) -> Result<String, AppError> {
     let response = app
         .secure_storage()
         .get_item(app.clone(), request(public_key, None))
@@ -117,7 +159,7 @@ pub(crate) fn load_account_nsec(app: &AppHandle, public_key: &str) -> Result<Str
     })
 }
 
-pub(crate) fn keys_for_account(app: &AppHandle, public_key: &str) -> Result<Keys, AppError> {
+pub fn keys_for_account(app: &AppHandle, public_key: &str) -> Result<Keys, AppError> {
     if let Some(keys) = cached_keys_for_account(app, public_key)? {
         return Ok(keys);
     }
@@ -136,7 +178,7 @@ pub(crate) fn keys_for_account(app: &AppHandle, public_key: &str) -> Result<Keys
     Ok(keys)
 }
 
-pub(crate) fn keys_for_current_identity(
+pub fn keys_for_current_identity(
     app: &AppHandle,
     conn: &Connection,
 ) -> Result<(Keys, String), AppError> {
