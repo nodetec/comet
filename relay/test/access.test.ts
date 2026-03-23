@@ -11,6 +11,7 @@ import {
   waitForMessage,
   type TestContext,
 } from "./helpers";
+import { users } from "@comet/data";
 
 const sk = generateSecretKey();
 const pubkey = getPublicKey(sk);
@@ -52,8 +53,8 @@ describe("AccessControl (open mode)", () => {
   });
 
   test("open mode allows everyone", () => {
-    expect(ctx.access.isAllowed(pubkey)).toBe(true);
-    expect(ctx.access.isAllowed(otherPubkey)).toBe(true);
+    expect(ctx.access.isAllowed(pubkey)).resolves.toBe(true);
+    expect(ctx.access.isAllowed(otherPubkey)).resolves.toBe(true);
     expect(ctx.access.privateMode).toBe(false);
   });
 });
@@ -69,23 +70,23 @@ describe("AccessControl (private mode)", () => {
     await ctx.cleanup();
   });
 
-  test("private mode rejects unknown pubkeys", () => {
-    expect(ctx.access.isAllowed(pubkey)).toBe(false);
+  test("private mode rejects unknown pubkeys", async () => {
+    expect(await ctx.access.isAllowed(pubkey)).toBe(false);
     expect(ctx.access.privateMode).toBe(true);
   });
 
   test("allow adds a pubkey", async () => {
     await ctx.access.allow(pubkey, null);
-    expect(ctx.access.isAllowed(pubkey)).toBe(true);
-    expect(ctx.access.isAllowed(otherPubkey)).toBe(false);
+    expect(await ctx.access.isAllowed(pubkey)).toBe(true);
+    expect(await ctx.access.isAllowed(otherPubkey)).toBe(false);
   });
 
   test("revoke removes a pubkey", async () => {
     await ctx.access.allow(otherPubkey, null);
-    expect(ctx.access.isAllowed(otherPubkey)).toBe(true);
+    expect(await ctx.access.isAllowed(otherPubkey)).toBe(true);
     const revoked = await ctx.access.revoke(otherPubkey);
     expect(revoked).toBe(true);
-    expect(ctx.access.isAllowed(otherPubkey)).toBe(false);
+    expect(await ctx.access.isAllowed(otherPubkey)).toBe(false);
   });
 
   test("list returns all pubkeys", async () => {
@@ -96,6 +97,18 @@ describe("AccessControl (private mode)", () => {
     expect(list.find((e) => e.pubkey === otherPubkey)?.expires_at).toBe(
       1700000000,
     );
+  });
+
+  test("isAllowed sees users added outside relay access control", async () => {
+    await ctx.db
+      .insert(users)
+      .values({ pubkey: otherPubkey })
+      .onConflictDoUpdate({
+        target: users.pubkey,
+        set: { expiresAt: null, storageLimitBytes: null },
+      });
+
+    expect(await ctx.access.isAllowed(otherPubkey)).toBe(true);
   });
 });
 
