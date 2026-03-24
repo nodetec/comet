@@ -213,10 +213,7 @@ impl NoteService {
         repo.note_by_id(&input.note_id)?.ok_or(NoteError::NotFound)
     }
 
-    pub fn archive_note(
-        repo: &dyn NoteRepository,
-        note_id: &str,
-    ) -> Result<NoteRecord, NoteError> {
+    pub fn archive_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
         let updated = repo.archive_note(note_id, now)?;
@@ -232,10 +229,7 @@ impl NoteService {
         repo.note_by_id(note_id)?.ok_or(NoteError::NotFound)
     }
 
-    pub fn restore_note(
-        repo: &dyn NoteRepository,
-        note_id: &str,
-    ) -> Result<NoteRecord, NoteError> {
+    pub fn restore_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
         let updated = repo.restore_note(note_id, now)?;
@@ -245,10 +239,7 @@ impl NoteService {
         repo.note_by_id(note_id)?.ok_or(NoteError::NotFound)
     }
 
-    pub fn trash_note(
-        repo: &dyn NoteRepository,
-        note_id: &str,
-    ) -> Result<NoteRecord, NoteError> {
+    pub fn trash_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
         let updated = repo.trash_note(note_id, now)?;
@@ -280,10 +271,7 @@ impl NoteService {
     /// Permanently deletes a note from the database and updates navigation.
     /// Returns the IDs of trashed notes that were deleted (just `[note_id]`).
     /// Blob cleanup must be handled by the caller.
-    pub fn delete_permanently(
-        repo: &dyn NoteRepository,
-        note_id: &str,
-    ) -> Result<(), NoteError> {
+    pub fn delete_permanently(repo: &dyn NoteRepository, note_id: &str) -> Result<(), NoteError> {
         validate_note_id(note_id)?;
         repo.delete_search_document(note_id)?;
         let deleted = repo.delete_note(note_id)?;
@@ -334,10 +322,7 @@ impl NoteService {
             .ok_or_else(|| NoteError::Storage("Failed to rename notebook.".into()))
     }
 
-    pub fn delete_notebook(
-        repo: &dyn NoteRepository,
-        notebook_id: &str,
-    ) -> Result<(), NoteError> {
+    pub fn delete_notebook(repo: &dyn NoteRepository, notebook_id: &str) -> Result<(), NoteError> {
         validate_notebook_id(notebook_id)?;
         let deleted = repo.delete_notebook(notebook_id)?;
         if deleted == 0 {
@@ -359,8 +344,7 @@ impl NoteService {
         }
 
         let now = now_millis();
-        let updated =
-            repo.assign_notebook(&input.note_id, input.notebook_id.as_deref(), now)?;
+        let updated = repo.assign_notebook(&input.note_id, input.notebook_id.as_deref(), now)?;
         if updated == 0 {
             return Err(NoteError::NotFound);
         }
@@ -396,10 +380,7 @@ impl NoteService {
         repo.search_notes(query)
     }
 
-    pub fn search_tags(
-        repo: &dyn NoteRepository,
-        query: &str,
-    ) -> Result<Vec<String>, NoteError> {
+    pub fn search_tags(repo: &dyn NoteRepository, query: &str) -> Result<Vec<String>, NoteError> {
         repo.search_tags(query)
     }
 
@@ -553,9 +534,9 @@ mod tests {
 
         fn note_is_active(&self, note_id: &str) -> Result<bool, NoteError> {
             let notes = self.notes.borrow();
-            Ok(notes.get(note_id).map_or(false, |n| {
-                n.archived_at.is_none() && n.deleted_at.is_none()
-            }))
+            Ok(notes
+                .get(note_id)
+                .map_or(false, |n| n.archived_at.is_none() && n.deleted_at.is_none()))
         }
 
         fn next_active_note_id(
@@ -631,10 +612,7 @@ mod tests {
             Ok(self.last_open_note_id.borrow().clone())
         }
 
-        fn note_markdown_and_readonly(
-            &self,
-            note_id: &str,
-        ) -> Result<(String, bool), NoteError> {
+        fn note_markdown_and_readonly(&self, note_id: &str) -> Result<(String, bool), NoteError> {
             let notes = self.notes.borrow();
             let record = notes.get(note_id).ok_or(NoteError::NotFound)?;
             Ok((record.markdown.clone(), record.readonly))
@@ -813,10 +791,7 @@ mod tests {
             Ok(())
         }
 
-        fn notebook_by_id(
-            &self,
-            notebook_id: &str,
-        ) -> Result<Option<NotebookSummary>, NoteError> {
+        fn notebook_by_id(&self, notebook_id: &str) -> Result<Option<NotebookSummary>, NoteError> {
             Ok(self.notebooks.borrow().get(notebook_id).cloned())
         }
 
@@ -849,15 +824,36 @@ mod tests {
 
         // ── Remaining stubs ─────────────────────────────────────────────
 
-        fn tags_for_note(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
-        fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> { unimplemented!() }
-        fn query_note_page(&self, _: &NoteQueryInput) -> Result<NotePagePayload, NoteError> { unimplemented!() }
-        fn search_notes(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> { unimplemented!() }
-        fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> { unimplemented!() }
-        fn query_contextual_tags(&self, _: &ContextualTagsInput) -> Result<ContextualTagsPayload, NoteError> { unimplemented!() }
-        fn todo_count(&self) -> Result<i64, NoteError> { unimplemented!() }
-        fn export_notes(&self, _: &ExportNotesInput) -> Result<usize, NoteError> { unimplemented!() }
-        fn current_npub(&self) -> Result<String, NoteError> { unimplemented!() }
+        fn tags_for_note(&self, _: &str) -> Result<Vec<String>, NoteError> {
+            unimplemented!()
+        }
+        fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> {
+            unimplemented!()
+        }
+        fn query_note_page(&self, _: &NoteQueryInput) -> Result<NotePagePayload, NoteError> {
+            unimplemented!()
+        }
+        fn search_notes(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> {
+            unimplemented!()
+        }
+        fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> {
+            unimplemented!()
+        }
+        fn query_contextual_tags(
+            &self,
+            _: &ContextualTagsInput,
+        ) -> Result<ContextualTagsPayload, NoteError> {
+            unimplemented!()
+        }
+        fn todo_count(&self) -> Result<i64, NoteError> {
+            unimplemented!()
+        }
+        fn export_notes(&self, _: &ExportNotesInput) -> Result<usize, NoteError> {
+            unimplemented!()
+        }
+        fn current_npub(&self) -> Result<String, NoteError> {
+            unimplemented!()
+        }
     }
 
     // ── create_note ─────────────────────────────────────────────────────
@@ -866,8 +862,8 @@ mod tests {
     fn create_note_inserts_and_returns_record() {
         let repo = MockNoteRepository::new();
 
-        let record = NoteService::create_note(&repo, None, &[], None)
-            .expect("create_note should succeed");
+        let record =
+            NoteService::create_note(&repo, None, &[], None).expect("create_note should succeed");
 
         assert!(record.id.starts_with("note-"));
         assert!(record.markdown.starts_with("# "));
@@ -891,13 +887,8 @@ mod tests {
     fn create_note_with_initial_markdown() {
         let repo = MockNoteRepository::new();
 
-        let record = NoteService::create_note(
-            &repo,
-            None,
-            &[],
-            Some("# Imported\n\nContent here"),
-        )
-        .expect("create_note should succeed");
+        let record = NoteService::create_note(&repo, None, &[], Some("# Imported\n\nContent here"))
+            .expect("create_note should succeed");
 
         assert_eq!(record.title, "Imported");
         assert!(record.markdown.contains("Content here"));

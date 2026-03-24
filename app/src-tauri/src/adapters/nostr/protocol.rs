@@ -37,7 +37,9 @@ pub async fn publish_note(
             ));
         }
 
-        let d_tag = if let Some(d) = existing_d_tag { d } else {
+        let d_tag = if let Some(d) = existing_d_tag {
+            d
+        } else {
             conn.execute(
                 "UPDATE notes SET nostr_d_tag = ?1 WHERE id = ?1",
                 params![id],
@@ -56,7 +58,13 @@ pub async fn publish_note(
         crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
-        crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+        crate::adapters::blossom::client::upload_and_rewrite_attachments(
+            app,
+            blossom_url,
+            &content,
+            &keys,
+        )
+        .await?
     } else {
         content
     };
@@ -172,7 +180,13 @@ pub async fn publish_short_note(
         crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
     };
     let content = if let Some(ref blossom_url) = blossom_url {
-        crate::adapters::blossom::client::upload_and_rewrite_attachments(app, blossom_url, &content, &keys).await?
+        crate::adapters::blossom::client::upload_and_rewrite_attachments(
+            app,
+            blossom_url,
+            &content,
+            &keys,
+        )
+        .await?
     } else {
         content
     };
@@ -318,4 +332,3 @@ pub async fn delete_published_note(
         relay_count,
     })
 }
-

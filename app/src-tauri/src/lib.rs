@@ -21,7 +21,10 @@ pub fn run() {
             file_name: Some("comet".to_string()),
         }))
         .level(log::LevelFilter::Info)
-        .level_for("comet_lib::adapters::nostr::sync_manager", log::LevelFilter::Debug)
+        .level_for(
+            "comet_lib::adapters::nostr::sync_manager",
+            log::LevelFilter::Debug,
+        )
         .rotation_strategy(RotationStrategy::KeepSome(5))
         .timezone_strategy(TimezoneStrategy::UseLocal);
 
@@ -89,6 +92,8 @@ pub fn run() {
             commands::sync::list_relays,
             commands::sync::set_sync_relay,
             commands::sync::remove_sync_relay,
+            commands::sync::set_preferred_sync_relay,
+            commands::sync::pause_sync_relay,
             commands::sync::add_publish_relay,
             commands::sync::remove_relay,
             commands::sync::publish_note,
@@ -110,28 +115,26 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
-            match event {
-                #[cfg(target_os = "macos")]
-                RunEvent::WindowEvent {
-                    event: WindowEvent::CloseRequested { api, .. },
-                    ..
-                } => {
-                    api.prevent_close();
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.hide();
-                    }
-                    let _ = app.hide();
+        .run(|app, event| match event {
+            #[cfg(target_os = "macos")]
+            RunEvent::WindowEvent {
+                event: WindowEvent::CloseRequested { api, .. },
+                ..
+            } => {
+                api.prevent_close();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
                 }
-                #[cfg(target_os = "macos")]
-                RunEvent::Reopen { .. } => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                    let _ = app.show();
-                }
-                _ => {}
+                let _ = app.hide();
             }
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { .. } => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                let _ = app.show();
+            }
+            _ => {}
         });
 }

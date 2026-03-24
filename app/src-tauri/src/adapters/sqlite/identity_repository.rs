@@ -75,10 +75,6 @@ fn get_npub(conn: &Connection) -> Result<Option<String>, AppError> {
     .map_err(Into::into)
 }
 
-pub fn current_npub(conn: &Connection) -> Result<String, AppError> {
-    get_npub(conn)?.ok_or_else(|| AppError::custom("No Nostr identity configured."))
-}
-
 /// Imports an nsec (bech32 or hex), replacing the existing identity.
 pub fn import_nsec(conn: &Connection, nsec: &str) -> Result<IdentityCredentials, AppError> {
     let keys = Keys::parse(nsec).map_err(|e| AppError::custom(format!("Invalid key: {e}")))?;

@@ -75,20 +75,16 @@ fn ensure_active_account(app: &AppHandle) -> Result<AccountRecord, AppError> {
         return Err(AccountError::NoActiveAccount.into());
     }
 
-    let account =
-        crate::domain::accounts::service::create_initial_account(app, &mut app_conn)?;
+    let account = crate::domain::accounts::service::create_initial_account(app, &mut app_conn)?;
 
     ensure_account_database_ready(&account)?;
     Ok(account)
 }
 
 pub(crate) fn ensure_account_database_ready(account: &AccountRecord) -> Result<(), AppError> {
-    let parent = account
-        .db_path
-        .parent()
-        .ok_or_else(|| {
-            AccountError::Storage("Account database path has no parent directory".into())
-        })?;
+    let parent = account.db_path.parent().ok_or_else(|| {
+        AccountError::Storage("Account database path has no parent directory".into())
+    })?;
     fs::create_dir_all(parent)?;
     if !account.db_path.exists() {
         return Err(AccountError::DatabaseMissing(account.db_path.display().to_string()).into());

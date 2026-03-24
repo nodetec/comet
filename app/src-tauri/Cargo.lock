@@ -815,6 +815,7 @@ dependencies = [
  "hex",
  "hmac",
  "log",
+ "negentropy",
  "nostr-sdk",
  "notify",
  "regex-lite",

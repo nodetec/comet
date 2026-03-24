@@ -1,8 +1,44 @@
 import type { NostrEvent } from "@comet/nostr";
 
-export type { NostrEvent };
+export const REVISION_SYNC_EVENT_KIND = 1059;
+export const REVISION_NEGENTROPY_STRATEGY = "revision-sync.v1";
+export const RELAY_AUTH_EVENT_KIND = 22242;
 
-export type Filter = {
+export type RevisionOp = "put" | "del";
+
+export type RevisionEnvelope = {
+  recipient: string;
+  documentId: string;
+  revisionId: string;
+  parentRevisionIds: string[];
+  op: RevisionOp;
+  mtime: number;
+  entityType: string | null;
+  schemaVersion: string | null;
+  event: NostrEvent;
+};
+
+export type RevisionHead = {
+  recipient: string;
+  documentId: string;
+  revisionId: string;
+  op: RevisionOp;
+  mtime: number;
+};
+
+export type RevisionScope = {
+  recipient: string;
+  documentIds?: string[];
+  revisionIds?: string[];
+};
+
+export type RelayKindClassification =
+  | "revision"
+  | "companion"
+  | "pass-through"
+  | "unsupported";
+
+export type RelayFilter = {
   ids?: string[];
   authors?: string[];
   kinds?: number[];
@@ -12,21 +48,7 @@ export type Filter = {
   [key: `#${string}`]: string[] | undefined | number;
 };
 
-export type ClientMessage =
-  | ["EVENT", NostrEvent]
-  | ["REQ", string, ...Filter[]]
-  | ["CLOSE", string];
-
-export type RelayMessage =
-  | ["EVENT", string, NostrEvent]
-  | ["OK", string, boolean, string]
-  | ["EOSE", string]
-  | ["CLOSED", string, string]
-  | ["NOTICE", string];
-
-// NIP-CF: Changes Feed
-
-export type ChangesFilter = {
+export type RevisionChangesFilter = {
   since?: number;
   until_seq?: number;
   limit?: number;
@@ -36,17 +58,33 @@ export type ChangesFilter = {
   [key: `#${string}`]: string[] | undefined | number | boolean;
 };
 
-export type ChangeEntry = {
-  seq: number;
-  eventId: string;
-  type: "STORED" | "DELETED";
-  kind: number;
-  pubkey: string;
-  reason: ChangeReason | null;
-  tags?: [string, string][]; // denormalized single-letter tags for filtering
+export type NegentropyItem = {
+  id: string;
+  timestamp: number;
 };
 
-export type ChangeReason = {
-  deletion_id?: string;
-  superseded_by?: string;
+export type RevisionRelayConfig = {
+  port: number;
+  host: string;
+  databaseUrl: string;
+  relayUrl: string;
+  privateMode: boolean;
+  adminToken: string | null;
+  defaultPayloadRetentionDays: number | null;
+  defaultCompactionIntervalSeconds: number;
+  companionKinds: number[];
+  passThroughKinds: number[];
+};
+
+export type RelayRetentionPolicy = {
+  payloadRetentionDays: number | null;
+  compactionIntervalSeconds: number;
+  updatedAt: number | null;
+};
+
+export type AllowedUser = {
+  pubkey: string;
+  expiresAt: number | null;
+  storageLimitBytes: number | null;
+  createdAt: number;
 };

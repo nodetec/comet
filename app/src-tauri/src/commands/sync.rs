@@ -1,32 +1,9 @@
 use crate::db::database_connection;
+use crate::domain::relay::service::normalize_relay_url;
 use crate::error::AppError;
 use rusqlite::OptionalExtension;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
-
-fn reset_sync_state(conn: &rusqlite::Connection) -> Result<(), AppError> {
-    conn.execute_batch("BEGIN")?;
-    let result = (|| -> Result<(), AppError> {
-        conn.execute(
-            "UPDATE notes SET sync_event_id = NULL, locally_modified = 1",
-            [],
-        )?;
-        conn.execute(
-            "UPDATE notebooks SET sync_event_id = NULL, locally_modified = 1",
-            [],
-        )?;
-        conn.execute("DELETE FROM app_settings WHERE key = 'sync_checkpoint'", [])?;
-        conn.execute("DELETE FROM app_settings WHERE key = 'sync_relay_url'", [])?;
-        conn.execute("DELETE FROM pending_deletions", [])?;
-        Ok(())
-    })();
-    if result.is_ok() {
-        conn.execute_batch("COMMIT")?;
-    } else {
-        let _ = conn.execute_batch("ROLLBACK");
-    }
-    result
-}
 
 fn restart_sync_async(app: &AppHandle) {
     let app_clone = app.clone();
@@ -42,25 +19,129 @@ pub fn list_relays(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Re
 }
 
 #[tauri::command]
-pub fn set_sync_relay(app: AppHandle, url: String) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
+pub fn set_sync_relay(
+    app: AppHandle,
+    url: String,
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::adapters::sqlite::relay_repository::set_sync_relay(&conn, &url)?;
-    reset_sync_state(&conn)?;
+    let normalized_url = normalize_relay_url(&url)?;
+    let relays = crate::adapters::sqlite::relay_repository::set_sync_relay(&conn, &normalized_url)?;
+    if crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn).is_none() {
+        crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(
+            &conn,
+            &normalized_url,
+        )?;
+    }
     restart_sync_async(&app);
     Ok(relays)
 }
 
 #[tauri::command]
-pub fn remove_sync_relay(app: AppHandle) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
+pub fn remove_sync_relay(
+    app: AppHandle,
+    url: Option<String>,
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
-    let relays = crate::adapters::sqlite::relay_repository::remove_sync_relay(&conn)?;
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
-        app_clone
-            .state::<crate::adapters::nostr::sync_manager::SyncManager>()
-            .stop()
-            .await;
-    });
+    let active_relay_url =
+        crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn);
+    let relays =
+        crate::adapters::sqlite::relay_repository::remove_sync_relay(&conn, url.as_deref())?;
+    if let Some(removed_url) = url.as_deref().map(normalize_relay_url).transpose()? {
+        let _ =
+            crate::adapters::sqlite::sync_repository::clear_paused_sync_relay(&conn, &removed_url);
+        if crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn).as_deref()
+            == Some(removed_url.as_str())
+        {
+            let fallback = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn)
+                .into_iter()
+                .next();
+            if let Some(next_url) = fallback {
+                crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(
+                    &conn, &next_url,
+                )?;
+            } else {
+                crate::adapters::sqlite::sync_repository::clear_preferred_sync_relay_url(&conn);
+            }
+        }
+    } else {
+        crate::adapters::sqlite::sync_repository::clear_paused_sync_relay_urls(&conn);
+        crate::adapters::sqlite::sync_repository::clear_preferred_sync_relay_url(&conn);
+    }
+    if url
+        .as_ref()
+        .zip(active_relay_url.as_ref())
+        .is_some_and(|(removed, active)| removed == active)
+    {
+        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+    }
+    let remaining_sync_relays =
+        crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    if remaining_sync_relays.is_empty() {
+        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            app_clone
+                .state::<crate::adapters::nostr::sync_manager::SyncManager>()
+                .stop()
+                .await;
+        });
+    } else {
+        restart_sync_async(&app);
+    }
+    Ok(relays)
+}
+
+#[tauri::command]
+pub fn set_preferred_sync_relay(
+    app: AppHandle,
+    url: String,
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
+    let conn = database_connection(&app)?;
+    let url = normalize_relay_url(&url)?;
+    let configured_relays = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    if !configured_relays
+        .iter()
+        .any(|configured| configured == &url)
+    {
+        return Err(AppError::custom(format!(
+            "Sync relay is not configured: {url}"
+        )));
+    }
+
+    crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(&conn, &url)?;
+    let relays = crate::adapters::sqlite::relay_repository::list_relays(&conn)?;
+    restart_sync_async(&app);
+    Ok(relays)
+}
+
+#[tauri::command]
+pub fn pause_sync_relay(
+    app: AppHandle,
+    url: String,
+    paused: bool,
+) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
+    let conn = database_connection(&app)?;
+    let url = normalize_relay_url(&url)?;
+    let configured_relays = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    if !configured_relays
+        .iter()
+        .any(|configured| configured == &url)
+    {
+        return Err(AppError::custom(format!(
+            "Sync relay is not configured: {url}"
+        )));
+    }
+
+    crate::adapters::sqlite::sync_repository::set_sync_relay_paused(&conn, &url, paused)?;
+    if paused
+        && crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn).as_deref()
+            == Some(url.as_str())
+    {
+        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+    }
+
+    let relays = crate::adapters::sqlite::relay_repository::list_relays(&conn)?;
+    restart_sync_async(&app);
     Ok(relays)
 }
 
@@ -112,6 +193,9 @@ pub async fn delete_published_note(
 pub struct SyncInfo {
     state: crate::domain::sync::model::SyncState,
     relay_url: Option<String>,
+    relay_urls: Vec<String>,
+    active_relay_url: Option<String>,
+    preferred_relay_url: Option<String>,
     blossom_url: Option<String>,
     npub: Option<String>,
     synced_notes: i64,
@@ -130,7 +214,16 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
 
     let conn = database_connection(&app)?;
 
-    let relay_url = crate::adapters::sqlite::sync_repository::get_sync_relay_url(&conn);
+    let relay_urls = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    let active_relay_url =
+        crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn)
+            .filter(|url| relay_urls.contains(url));
+    let preferred_relay_url =
+        crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn)
+            .filter(|url| relay_urls.contains(url));
+    let relay_url = active_relay_url
+        .clone()
+        .or_else(|| relay_urls.first().cloned());
     let blossom_url = crate::adapters::sqlite::sync_repository::get_blossom_url(&conn);
     let npub: Option<String> = conn
         .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
@@ -176,6 +269,9 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
     Ok(SyncInfo {
         state,
         relay_url,
+        relay_urls,
+        active_relay_url,
+        preferred_relay_url,
         blossom_url,
         npub,
         synced_notes,
@@ -220,7 +316,9 @@ pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppEr
 }
 
 #[tauri::command]
-pub async fn get_sync_status(app: AppHandle) -> Result<crate::domain::sync::model::SyncState, AppError> {
+pub async fn get_sync_status(
+    app: AppHandle,
+) -> Result<crate::domain::sync::model::SyncState, AppError> {
     let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>();
     Ok(manager.state().await)
 }
@@ -238,7 +336,7 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
          DELETE FROM notebooks;
          DELETE FROM blob_meta;
          DELETE FROM pending_deletions;
-         DELETE FROM app_settings WHERE key = 'sync_checkpoint';",
+         DELETE FROM app_settings WHERE key IN ('sync_checkpoint', 'active_sync_relay_url');",
     )?;
 
     crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;

@@ -1,44 +1,34 @@
 ---
 title: Comet Docs
-description: Calm, text-first documentation for the local-first notes app built to help people leave a trail.
+description: Current sync design drafts for Comet's revision-aware multi-relay model.
 template: splash
 hero:
-  tagline: Architecture, workflows, and specifications for a desktop-first notes app with local ownership and explicit publishing.
+  tagline: Revision-aware sync drafts for Comet's encrypted gift-wrap, anti-entropy, and live relay feed model.
   actions:
-    - text: Start with the workspace
-      link: /guides/getting-started/
-    - text: Read the product foundation
-      link: /product/foundation/
+    - text: Read Revision Gift Wrap
+      link: /specs/revision-gift-wrap/
+    - text: Read Revision Negentropy
+      link: /specs/revision-negentropy/
 ---
 
 ## What lives here
 
-This site is the working reference for Comet's product shape and technical
-direction. It favors a small, durable set of documents over sprawling
-reference noise.
+This site now focuses only on the current sync design direction.
 
-- Use the guide section for local setup and day-to-day workspace commands.
-- Use the product section to keep the app aligned with its desktop-first,
-  markdown-first, local-first promise.
-- Use the specifications section for protocol drafts and implementation notes
-  that should stay reviewable over time.
+- The older docs set has been archived out of the site.
+- The remaining documents describe the current revision-based sync proposal.
+- The goal is to make the sync model coherent before expanding the docs surface again.
 
-## Product stance
+## Current Docs
 
-Comet is built as a calm desktop notes app for thoughtful professionals. The
-default experience is fast capture, fast resume, and clear retrieval.
+- [Revision Gift Wrap](/specs/revision-gift-wrap/) defines the outer sync envelope for immutable encrypted revisions.
+- [Revision Negentropy](/specs/revision-negentropy/) defines bootstrap and repair sync over logical revision identities.
+- [Revision Changes Feed](/specs/revision-changes-feed/) defines the live relay tail over immutable revision events.
 
-- Notes live locally in SQLite.
-- Markdown stays visible and first-class.
-- Links cross notebook boundaries.
-- Publishing to Nostr is explicit, not ambient.
+## Scope
 
-## Next reads
+These drafts are intentionally narrow.
 
-- Start at [Getting Started](/guides/getting-started/) to run the app or docs
-  site locally.
-- Read [Foundation](/product/foundation/) before changing information
-  architecture or product scope.
-- Use [Blossom Blob Storage API](/specs/blossom-api/) for the current blob
-  service routes and auth model.
-- Review [Changes Feed](/specs/changes-feed/) for the current relay sync draft.
+- They focus on revision identity, anti-entropy, and live sync.
+- They do not yet try to document the whole product or workspace.
+- They should be treated as the active design set for Comet sync work.

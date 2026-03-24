@@ -1,175 +1,97 @@
-import { and, eq, sql } from "drizzle-orm";
-import { inviteCodes, users } from "@comet/data";
-import type { DB } from "./db";
+import { eq } from "drizzle-orm";
 
-export interface AccessControl {
-  isAllowed(pubkey: string): Promise<boolean>;
-  allow(
+import type { RevisionRelayDb } from "./db";
+import type { AllowedUser } from "./types";
+
+import { relayAllowedUsers } from "./storage/schema";
+
+export type AccessControl = {
+  privateMode: boolean;
+  isAllowed: (pubkey: string) => Promise<boolean>;
+  allow: (
     pubkey: string,
     expiresAt: number | null,
     storageLimitBytes?: number | null,
-  ): Promise<void>;
-  revoke(pubkey: string): Promise<boolean>;
-  list(): Promise<
-    Array<{
-      pubkey: string;
-      expires_at: number | null;
-      storage_limit_bytes: number | null;
-    }>
-  >;
-  setStorageLimit(pubkey: string, limitBytes: number | null): Promise<void>;
-  registerWithInviteCode(
-    pubkey: string,
-    code: string,
-  ): Promise<{ ok: boolean; error?: string }>;
-  readonly privateMode: boolean;
-}
+  ) => Promise<void>;
+  revoke: (pubkey: string) => Promise<boolean>;
+  list: () => Promise<AllowedUser[]>;
+};
 
-function generateCode(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = new Uint8Array(12);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
-}
+export function createAccessControl(
+  db: RevisionRelayDb,
+  privateMode: boolean,
+): AccessControl {
+  return {
+    privateMode,
 
-export { generateCode };
-
-export function initAccessControl(db: DB, privateMode: boolean): AccessControl {
-  async function isAllowed(pubkey: string): Promise<boolean> {
-    if (!privateMode) {
-      return true;
-    }
-
-    const rows = await db
-      .select({ expiresAt: users.expiresAt })
-      .from(users)
-      .where(eq(users.pubkey, pubkey))
-      .limit(1);
-
-    if (rows.length === 0) {
-      return false;
-    }
-
-    const row = rows[0];
-    const { expiresAt } = row;
-    if (expiresAt === null) {
-      return true;
-    }
-    return expiresAt > Math.floor(Date.now() / 1000);
-  }
-
-  async function allow(
-    pubkey: string,
-    expiresAt: number | null,
-    storageLimitBytes?: number | null,
-  ): Promise<void> {
-    const set: Record<string, unknown> = { expiresAt };
-    if (storageLimitBytes !== undefined) {
-      set.storageLimitBytes = storageLimitBytes;
-    }
-    await db
-      .insert(users)
-      .values({
-        pubkey,
-        expiresAt,
-        storageLimitBytes: storageLimitBytes ?? null,
-      })
-      .onConflictDoUpdate({ target: users.pubkey, set });
-  }
-
-  async function revoke(pubkey: string): Promise<boolean> {
-    const result = await db
-      .delete(users)
-      .where(eq(users.pubkey, pubkey))
-      .returning({ pubkey: users.pubkey });
-    return result.length > 0;
-  }
-
-  async function list(): Promise<
-    Array<{
-      pubkey: string;
-      expires_at: number | null;
-      storage_limit_bytes: number | null;
-    }>
-  > {
-    const rows = await db
-      .select({
-        pubkey: users.pubkey,
-        expiresAt: users.expiresAt,
-        storageLimitBytes: users.storageLimitBytes,
-      })
-      .from(users)
-      .orderBy(users.createdAt);
-    return rows.map((r) => ({
-      pubkey: r.pubkey,
-      expires_at: r.expiresAt,
-      storage_limit_bytes: r.storageLimitBytes,
-    }));
-  }
-
-  async function setStorageLimit(
-    pubkey: string,
-    limitBytes: number | null,
-  ): Promise<void> {
-    await db
-      .update(users)
-      .set({ storageLimitBytes: limitBytes })
-      .where(eq(users.pubkey, pubkey));
-  }
-
-  async function registerWithInviteCode(
-    pubkey: string,
-    code: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    // Check if pubkey already registered
-    const existingRows = await db
-      .select({ pubkey: users.pubkey })
-      .from(users)
-      .where(eq(users.pubkey, pubkey));
-    if (existingRows.length > 0) {
-      return { ok: false, error: "pubkey already registered" };
-    }
-
-    // Atomically validate, increment use count, and create user
-    const result = await db.transaction(async (tx) => {
-      // Conditionally increment use_count only if the code is still valid
-      const now = Math.floor(Date.now() / 1000);
-      const updatedRows = await tx
-        .update(inviteCodes)
-        .set({ useCount: sql`${inviteCodes.useCount} + 1` })
-        .where(
-          and(
-            eq(inviteCodes.code, code),
-            eq(inviteCodes.revoked, false),
-            sql`${inviteCodes.useCount} < ${inviteCodes.maxUses}`,
-            sql`(${inviteCodes.expiresAt} IS NULL OR ${inviteCodes.expiresAt} > ${now})`,
-          ),
-        )
-        .returning({ id: inviteCodes.id });
-
-      if (updatedRows.length === 0) {
-        return { ok: false as const, error: "invalid or expired invite code" };
+    async isAllowed(pubkey) {
+      if (!privateMode) {
+        return true;
       }
 
-      const [updated] = updatedRows;
-      await tx.insert(users).values({ pubkey, inviteCodeId: updated.id });
-      return { ok: true as const, id: updated.id };
-    });
+      const rows = await db
+        .select({ expiresAt: relayAllowedUsers.expiresAt })
+        .from(relayAllowedUsers)
+        .where(eq(relayAllowedUsers.pubkey, pubkey))
+        .limit(1);
 
-    if (!result.ok) {
-      return { ok: false, error: result.error };
-    }
+      if (rows.length === 0) {
+        return false;
+      }
 
-    return { ok: true };
-  }
+      const expiresAt = rows[0].expiresAt;
+      if (expiresAt === null) {
+        return true;
+      }
 
-  return {
-    isAllowed,
-    allow,
-    revoke,
-    list,
-    setStorageLimit,
-    registerWithInviteCode,
-    privateMode,
+      return expiresAt > Math.floor(Date.now() / 1000);
+    },
+
+    async allow(pubkey, expiresAt, storageLimitBytes) {
+      const createdAt = Math.floor(Date.now() / 1000);
+      await db
+        .insert(relayAllowedUsers)
+        .values({
+          pubkey,
+          expiresAt,
+          storageLimitBytes: storageLimitBytes ?? null,
+          createdAt,
+        })
+        .onConflictDoUpdate({
+          target: relayAllowedUsers.pubkey,
+          set: {
+            expiresAt,
+            ...(storageLimitBytes !== undefined ? { storageLimitBytes } : {}),
+          },
+        });
+    },
+
+    async revoke(pubkey) {
+      const rows = await db
+        .delete(relayAllowedUsers)
+        .where(eq(relayAllowedUsers.pubkey, pubkey))
+        .returning({ pubkey: relayAllowedUsers.pubkey });
+
+      return rows.length > 0;
+    },
+
+    async list() {
+      const rows = await db
+        .select({
+          pubkey: relayAllowedUsers.pubkey,
+          expiresAt: relayAllowedUsers.expiresAt,
+          storageLimitBytes: relayAllowedUsers.storageLimitBytes,
+          createdAt: relayAllowedUsers.createdAt,
+        })
+        .from(relayAllowedUsers)
+        .orderBy(relayAllowedUsers.createdAt);
+
+      return rows.map((row) => ({
+        pubkey: row.pubkey,
+        expiresAt: row.expiresAt,
+        storageLimitBytes: row.storageLimitBytes,
+        createdAt: row.createdAt,
+      }));
+    },
   };
 }

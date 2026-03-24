@@ -1,9 +1,8 @@
-use crate::adapters::sqlite::identity_repository as nostr;
 use crate::adapters::sqlite::connection::{
-    account_db_path, account_db_relative_path_string, account_dir_for_npub,
-    accounts_root_dir, app_database_connection, ensure_account_database_ready,
-    ACCOUNT_DATABASE_FILE,
+    account_db_path, account_db_relative_path_string, account_dir_for_npub, accounts_root_dir,
+    app_database_connection, ensure_account_database_ready, ACCOUNT_DATABASE_FILE,
 };
+use crate::adapters::sqlite::identity_repository as nostr;
 use crate::domain::accounts::error::AccountError;
 use crate::domain::accounts::model::{AccountRecord, AccountSummary};
 use crate::domain::common::time::now_millis;
@@ -46,10 +45,9 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
         let identity = nostr::import_nsec(&account_conn, nsec)?;
         nostr::ensure_default_settings(&account_conn)?;
 
-        let mut account = account_identity_record(&account_conn, &staged_db_path)?
-            .ok_or(AccountError::Storage(
-                "Failed to initialize account identity".into(),
-            ))?;
+        let mut account = account_identity_record(&account_conn, &staged_db_path)?.ok_or(
+            AccountError::Storage("Failed to initialize account identity".into()),
+        )?;
         drop(account_conn);
 
         let mut app_conn = app_database_connection(app)?;
@@ -99,8 +97,8 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 
 pub fn switch_account(app: &AppHandle, public_key: &str) -> Result<AccountSummary, AppError> {
     let mut conn = app_database_connection(app)?;
-    let account = load_account_record_by_public_key(app, &conn, public_key)?
-        .ok_or(AccountError::NotFound)?;
+    let account =
+        load_account_record_by_public_key(app, &conn, public_key)?.ok_or(AccountError::NotFound)?;
     ensure_account_database_ready(&account)?;
     set_active_account(&mut conn, public_key)?;
     Ok(AccountSummary {
@@ -125,10 +123,9 @@ pub(crate) fn create_initial_account(
         crate::adapters::sqlite::migrations::account_migrations().to_latest(&mut account_conn)?;
         let identity = nostr::create_identity(&account_conn)?;
 
-        let mut account = account_identity_record(&account_conn, &staged_db_path)?
-            .ok_or(AccountError::Storage(
-                "Failed to initialize account identity".into(),
-            ))?;
+        let mut account = account_identity_record(&account_conn, &staged_db_path)?.ok_or(
+            AccountError::Storage("Failed to initialize account identity".into()),
+        )?;
         drop(account_conn);
 
         let target_dir = account_dir_for_npub(app, &account.npub)?;

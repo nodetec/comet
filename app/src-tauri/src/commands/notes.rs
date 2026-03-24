@@ -3,10 +3,10 @@ use crate::db::database_connection;
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::model::*;
 use crate::domain::notes::service::NoteService;
+use crate::domain::sync::model::SyncCommand;
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
-use crate::domain::sync::model::SyncCommand;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -14,7 +14,10 @@ use tauri::{AppHandle, Manager};
 // ---------------------------------------------------------------------------
 
 fn sync_push(app: &AppHandle, cmd: SyncCommand) {
-    let manager = app.state::<crate::adapters::nostr::sync_manager::SyncManager>().inner().clone();
+    let manager = app
+        .state::<crate::adapters::nostr::sync_manager::SyncManager>()
+        .inner()
+        .clone();
     tauri::async_runtime::spawn(async move {
         manager.push(cmd).await;
     });
@@ -30,13 +33,20 @@ fn render_html(app: &AppHandle, note_id: &str, modified_at: i64, markdown: &str)
     html
 }
 
-fn record_to_loaded_note(app: &AppHandle, record: NoteRecord, repo: &SqliteNoteRepository) -> Result<LoadedNote, AppError> {
+fn record_to_loaded_note(
+    app: &AppHandle,
+    record: NoteRecord,
+    repo: &SqliteNoteRepository,
+) -> Result<LoadedNote, AppError> {
     let tags = repo.tags_for_note(&record.id)?;
     let html = render_html(app, &record.id, record.modified_at, &record.markdown);
     Ok(LoadedNote {
         id: record.id,
         title: record.title,
-        notebook: record.notebook_id.zip(record.notebook_name).map(|(id, name)| NotebookRef { id, name }),
+        notebook: record
+            .notebook_id
+            .zip(record.notebook_name)
+            .map(|(id, name)| NotebookRef { id, name }),
         modified_at: record.modified_at,
         markdown: record.markdown,
         html,
@@ -71,8 +81,13 @@ fn spawn_blossom_deletions(app: &AppHandle, blossom_deletions: Vec<(String, Stri
     tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::new();
         for (server_url, ciphertext_hash) in blossom_deletions {
-            if let Err(e) =
-                crate::adapters::blossom::client::delete_blob(&client, &server_url, &ciphertext_hash, &keys).await
+            if let Err(e) = crate::adapters::blossom::client::delete_blob(
+                &client,
+                &server_url,
+                &ciphertext_hash,
+                &keys,
+            )
+            .await
             {
                 eprintln!("[blob-gc] failed to delete from Blossom: {e}");
             }
@@ -132,7 +147,8 @@ pub fn create_note(
 ) -> Result<LoadedNote, AppError> {
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
-    let record = NoteService::create_note(&repo, notebook_id.as_deref(), &tags, markdown.as_deref())?;
+    let record =
+        NoteService::create_note(&repo, notebook_id.as_deref(), &tags, markdown.as_deref())?;
     record_to_loaded_note(&app, record, &repo)
 }
 
@@ -160,7 +176,10 @@ pub fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, App
 }
 
 #[tauri::command]
-pub fn set_note_readonly(app: AppHandle, input: SetNoteReadonlyInput) -> Result<LoadedNote, AppError> {
+pub fn set_note_readonly(
+    app: AppHandle,
+    input: SetNoteReadonlyInput,
+) -> Result<LoadedNote, AppError> {
     let note_id = input.note_id.clone();
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
@@ -215,13 +234,15 @@ pub fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), Ap
     let conn = database_connection(&app)?;
 
     // Find orphaned blobs before deleting the note.
-    let orphaned = crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
+    let orphaned =
+        crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
 
     let repo = SqliteNoteRepository::new(&conn);
     NoteService::delete_permanently(&repo, &note_id)?;
 
     // Blob cleanup (needs AppHandle).
-    let blossom_deletions = crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions =
+        crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML.
@@ -250,7 +271,8 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
     let note_ids = NoteService::empty_trash(&repo)?;
 
     // Blob cleanup.
-    let blossom_deletions = crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
+    let blossom_deletions =
+        crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
     // Invalidate cached HTML and record pending deletions.

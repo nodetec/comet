@@ -74,6 +74,9 @@ pub fn list_themes(app: AppHandle) -> Result<Vec<crate::infra::themes::ThemeSumm
 }
 
 #[tauri::command]
-pub fn read_theme(app: AppHandle, theme_id: String) -> Result<crate::infra::themes::ThemeData, AppError> {
+pub fn read_theme(
+    app: AppHandle,
+    theme_id: String,
+) -> Result<crate::infra::themes::ThemeData, AppError> {
     crate::infra::themes::read_theme(&app, &theme_id)
 }

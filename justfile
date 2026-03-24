@@ -56,6 +56,9 @@ app-check:
 relay-dev:
   pnpm --filter @comet/relay dev
 
+relay-dev-multi count="3" start_port="3400":
+  pnpm --filter @comet/relay dev:multi -- --count {{count}} --start-port {{start_port}}
+
 relay-deploy:
   flyctl deploy --config relay/fly.toml --local-only
 

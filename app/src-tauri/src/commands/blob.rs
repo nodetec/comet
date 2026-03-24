@@ -15,7 +15,9 @@ pub enum BlobFetchStatus {
 #[tauri::command]
 pub fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
     let conn = database_connection(&app)?;
-    Ok(crate::adapters::sqlite::sync_repository::get_blossom_url(&conn))
+    Ok(crate::adapters::sqlite::sync_repository::get_blossom_url(
+        &conn,
+    ))
 }
 
 #[tauri::command]
@@ -66,10 +68,9 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
         return Ok(BlobFetchStatus::NeedsUnlock);
     }
 
-    let (keys, pubkey_hex) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
-    log::info!(
-        "[blob] resolved account plaintext_hash={hash} pubkey={pubkey_hex}"
-    );
+    let (keys, pubkey_hex) =
+        crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
+    log::info!("[blob] resolved account plaintext_hash={hash} pubkey={pubkey_hex}");
 
     let meta: Option<(String, String, String)> =
         if let Some(ref blossom_url) = preferred_blossom_url {
@@ -99,9 +100,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
     let (server_url, ciphertext_hash, key_hex) = match meta {
         Some(m) => m,
         None => {
-            log::warn!(
-                "[blob] missing metadata plaintext_hash={hash} pubkey={pubkey_hex}"
-            );
+            log::warn!("[blob] missing metadata plaintext_hash={hash} pubkey={pubkey_hex}");
             return Ok(BlobFetchStatus::Missing);
         }
     };
@@ -117,8 +116,13 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
     drop(conn);
 
     let http_client = reqwest::Client::new();
-    let ciphertext =
-        crate::adapters::blossom::client::download_blob(&http_client, &server_url, &ciphertext_hash, &keys).await?;
+    let ciphertext = crate::adapters::blossom::client::download_blob(
+        &http_client,
+        &server_url,
+        &ciphertext_hash,
+        &keys,
+    )
+    .await?;
     log::info!(
         "[blob] downloaded ciphertext plaintext_hash={} ciphertext_hash={} size={}",
         hash,
@@ -143,9 +147,7 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
         .optional()?
         .and_then(|md| crate::domain::blob::service::extract_blob_extension(&md, &hash))
         .unwrap_or_else(|| "bin".to_string());
-    log::info!(
-        "[blob] resolved extension plaintext_hash={hash} ext={ext}"
-    );
+    log::info!("[blob] resolved extension plaintext_hash={hash} ext={ext}");
 
     crate::adapters::filesystem::attachments::save_blob(&app, &hash, &ext, &plaintext)?;
     log::info!("[blob] saved locally plaintext_hash={hash} ext={ext}");

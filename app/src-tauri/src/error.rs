@@ -56,9 +56,3 @@ impl From<BlobError> for AppError {
         AppError::Custom(e.to_string())
     }
 }
-
-impl From<crate::domain::sync::error::SyncError> for AppError {
-    fn from(e: crate::domain::sync::error::SyncError) -> Self {
-        AppError::Custom(e.to_string())
-    }
-}

@@ -3,19 +3,9 @@
 //! Produces HTML that Lexical's `$generateNodesFromDOM` can consume directly,
 //! matching the output of the marked.js pipeline in the frontend.
 
-use crate::ports::markdown_renderer::MarkdownRenderer;
 use comrak::options::{Extension, Options, Parse, Render};
 use comrak::Arena;
 use std::borrow::Cow;
-
-/// Comrak-based implementation of `MarkdownRenderer`.
-pub struct ComrakRenderer;
-
-impl MarkdownRenderer for ComrakRenderer {
-    fn render(&self, markdown: &str) -> String {
-        markdown_to_lexical_html(markdown)
-    }
-}
 
 /// Full pipeline: preprocess → parse → render → postprocess.
 pub fn markdown_to_lexical_html(markdown: &str) -> String {

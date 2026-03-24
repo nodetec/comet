@@ -13,6 +13,9 @@ type Relay = {
   url: string;
   kind: "sync" | "publish";
   createdAt: number;
+  paused: boolean;
+  preferred: boolean;
+  active: boolean;
 };
 
 export function RelaysSettings() {
@@ -23,13 +26,13 @@ export function RelaysSettings() {
     queryFn: () => invoke<Relay[]>("list_relays"),
   });
 
-  const syncRelay = relays.find((r) => r.kind === "sync");
+  const syncRelays = relays.filter((r) => r.kind === "sync");
   const publishRelays = relays.filter((r) => r.kind === "publish");
 
   return (
     <div className="space-y-8">
       <SyncToggle />
-      <SyncRelaySection relay={syncRelay} queryClient={queryClient} />
+      <SyncRelaySection relays={syncRelays} queryClient={queryClient} />
       <BlossomSection queryClient={queryClient} />
       <ResyncSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
@@ -71,15 +74,15 @@ function SyncToggle() {
 }
 
 function SyncRelaySection({
-  relay,
+  relays,
   queryClient,
 }: {
-  relay: Relay | undefined;
+  relays: Relay[];
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const editor = useInlineEditor();
 
-  const setSyncMutation = useMutation({
+  const addSyncMutation = useMutation({
     mutationFn: (url: string) => invoke<Relay[]>("set_sync_relay", { url }),
     onSuccess: (data) => {
       queryClient.setQueryData(["relays"], data);
@@ -88,7 +91,23 @@ function SyncRelaySection({
   });
 
   const removeSyncMutation = useMutation({
-    mutationFn: () => invoke<Relay[]>("remove_sync_relay"),
+    mutationFn: (url: string) => invoke<Relay[]>("remove_sync_relay", { url }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["relays"], data);
+    },
+  });
+
+  const pauseSyncMutation = useMutation({
+    mutationFn: ({ url, paused }: { url: string; paused: boolean }) =>
+      invoke<Relay[]>("pause_sync_relay", { url, paused }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["relays"], data);
+    },
+  });
+
+  const preferSyncMutation = useMutation({
+    mutationFn: (url: string) =>
+      invoke<Relay[]>("set_preferred_sync_relay", { url }),
     onSuccess: (data) => {
       queryClient.setQueryData(["relays"], data);
     },
@@ -96,54 +115,84 @@ function SyncRelaySection({
 
   return (
     <div>
-      <h3 className="mb-1 text-sm font-medium">Sync Relay</h3>
+      <h3 className="mb-1 text-sm font-medium">Sync Relays</h3>
       <p className="text-muted-foreground mb-3 text-xs">
-        A single relay used to sync notes between your devices.
+        Notes are pushed to every unpaused sync relay. Live sync prefers your
+        preferred relay, then falls back to the next healthy relay.
       </p>
 
-      {relay && !editor.editing && (
-        <div className="flex items-center gap-2">
-          <code className="bg-muted rounded px-2 py-1 text-sm">
-            {relay.url}
-          </code>
-          <Button
-            variant="link"
-            size="xs"
-            onClick={() => editor.open(relay.url)}
-          >
-            Change
-          </Button>
-          <Button
-            variant="link"
-            size="xs"
-            className="text-destructive"
-            onClick={() => removeSyncMutation.mutate()}
-          >
-            Remove
-          </Button>
-        </div>
+      {relays.length > 0 && !editor.editing && (
+        <ul className="mb-3 space-y-1.5">
+          {relays.map((relay) => (
+            <li key={relay.url} className="flex items-center gap-2">
+              <code className="bg-muted rounded px-2 py-1 text-sm">
+                {relay.url}
+              </code>
+              {relay.preferred ? (
+                <span className="text-muted-foreground text-xs">Preferred</span>
+              ) : null}
+              {relay.active ? (
+                <span className="text-muted-foreground text-xs">Active</span>
+              ) : null}
+              {relay.paused ? (
+                <span className="text-muted-foreground text-xs">Paused</span>
+              ) : null}
+              {relay.preferred ? null : (
+                <Button
+                  variant="link"
+                  size="xs"
+                  onClick={() => preferSyncMutation.mutate(relay.url)}
+                  disabled={preferSyncMutation.isPending}
+                >
+                  Make preferred
+                </Button>
+              )}
+              <Button
+                variant="link"
+                size="xs"
+                onClick={() =>
+                  pauseSyncMutation.mutate({
+                    url: relay.url,
+                    paused: !relay.paused,
+                  })
+                }
+                disabled={pauseSyncMutation.isPending}
+              >
+                {relay.paused ? "Resume" : "Pause"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => removeSyncMutation.mutate(relay.url)}
+                className="text-muted-foreground transition-colors hover:text-red-500"
+                title="Remove relay"
+              >
+                <X className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
       {editor.editing && (
         <RelayUrlForm
           value={editor.value}
           onChange={editor.setValue}
-          onSubmit={() => setSyncMutation.mutate(editor.value.trim())}
+          onSubmit={() => addSyncMutation.mutate(editor.value.trim())}
           onCancel={() => {
             editor.close();
-            setSyncMutation.reset();
+            addSyncMutation.reset();
           }}
-          isPending={setSyncMutation.isPending}
+          isPending={addSyncMutation.isPending}
           error={
-            setSyncMutation.isError
-              ? errorMessage(setSyncMutation.error, "Failed to set relay")
+            addSyncMutation.isError
+              ? errorMessage(addSyncMutation.error, "Failed to add relay")
               : undefined
           }
-          submitLabel="Save"
+          submitLabel="Add"
         />
       )}
-      {!relay && !editor.editing && (
+      {!editor.editing && (
         <Button variant="link" size="xs" onClick={() => editor.open()}>
-          Set sync relay
+          Add sync relay
         </Button>
       )}
     </div>

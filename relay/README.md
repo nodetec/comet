@@ -1,61 +1,104 @@
 # Relay
 
-Relay is the Bun-based Nostr relay workspace for Comet.
+Relay is the Bun-based workspace for the revision-sync extension currently
+being designed in the Comet repo.
+
+It has a revision-native data model:
+
+- immutable revision metadata
+- explicit parent edges
+- materialized current heads
+- fetchable encrypted payload bodies
+- relay-local `CHANGES`
+- revision-aware Negentropy bootstrap
 
 ## Commands
 
 - `bun run src/index.ts`: start the relay
-- `bun test --max-concurrency 1`: run the relay test suite serially
-- `bun --watch src/index.ts`: start the relay in watch mode
-- `just relay-deploy`: deploy the relay to Fly
+- `bun --watch src/index.ts`: start in watch mode
+- `bun run src/dev/multi-relay.ts`: start a local multi-relay cluster for testing
+- `bun test --max-concurrency 1`: run the test suite serially
 
-## Environment
+### Local Multi-Relay Harness
 
-| Variable            | Default                           | Description                                                  |
-| ------------------- | --------------------------------- | ------------------------------------------------------------ |
-| `PORT`              | `3000`                            | HTTP and WebSocket port                                      |
-| `DATABASE_URL`      | —                                 | Postgres connection string                                   |
-| `RELAY_URL`         | `ws://localhost:$PORT`            | Public relay URL used for NIP-42 validation                  |
-| `PRIVATE_MODE`      | `false`                           | Require AUTH and allowlist checks based on the `users` table |
-| `TEST_DATABASE_URL` | `postgres://localhost/comet_test` | Postgres connection string used by relay tests               |
-
-On Fly, `RELAY_URL` is set in [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) to `wss://relay.comet.md`. If that value is removed, the relay falls back to `wss://$FLY_APP_NAME.fly.dev`. Local development and tests still use localhost URLs.
-
-## Local test setup
-
-Use a disposable Postgres database for relay tests. The suite runs migrations and truncates shared tables during setup, so do not point `TEST_DATABASE_URL` at a real app, staging, or production database.
-
-One working local setup on macOS is:
+To spin up several local relays backed by separate local Postgres databases:
 
 ```sh
-brew install postgresql@16
-brew services start postgresql@16
-createdb comet_test
-export TEST_DATABASE_URL=postgres://$USER@localhost:5432/comet_test
-just relay-test
+bun run src/dev/multi-relay.ts --count 3 --start-port 3400
 ```
 
-If Postgres is already running, you usually only need `createdb comet_test` plus the `TEST_DATABASE_URL` export.
+Or from the repo root:
 
-## Fly.io
+```sh
+just relay-dev-multi 3 3400
+```
 
-- [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) is the starting Fly config for the relay workspace
-- [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile) builds the relay from the monorepo root using the checked-in `pnpm-lock.yaml`
-- [`packages/data`](/Users/chris/Repos/project/comet/packages/data) owns the shared Postgres schema and migrations consumed by the relay
-- [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) deploys the relay on pushes to `master` after CI passes when relay runtime or deploy files changed
-- Set `DATABASE_URL` as a Fly app secret before deploy. Do not store it in GitHub Actions.
-- Set `FLY_API_TOKEN` as a GitHub Actions secret before enabling deploys
-- Keep `PRIVATE_MODE=true` unless you intentionally want an open relay
-- `RELAY_URL` is set in [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) to `wss://relay.comet.md`
+Useful options:
 
-### First-time setup
+- `--count <n>`: number of relays to start
+- `--start-port <n>`: first relay port
+- `--admin-db <url>`: admin Postgres URL used to create/drop relay databases
+- `--keep-databases`: leave the created databases in place after shutdown
 
-1. Create the Fly app and update [`fly.toml`](/Users/chris/Repos/project/comet/relay/fly.toml) if `app = "comet-relay"` is not the final app name.
-2. Set the database secret on Fly so the running relay has it at runtime:
-   `fly secrets set DATABASE_URL=postgres://... --app <your-fly-app>`
-3. Point the `relay.comet.md` DNS record at the Fly app and provision TLS for that hostname.
-4. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) can deploy the relay job.
-5. Run the first deploy manually:
-   `flyctl deploy --config relay/fly.toml --local-only`
+The harness prints each relay websocket URL and cleans up the processes and temporary databases on `Ctrl+C`.
 
-`DATABASE_URL` is a Fly runtime secret. `FLY_API_TOKEN` is a GitHub Actions deploy secret. Keep them in those separate systems.
+## Admin Retention API
+
+The relay exposes a small HTTP admin API for payload-retention policy:
+
+- `GET /admin/retention`
+- `PATCH /admin/retention`
+
+Example update:
+
+```sh
+curl -X PATCH http://127.0.0.1:3400/admin/retention \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"payload_retention_days":90,"compaction_interval_seconds":300}'
+```
+
+Fields:
+
+- `payload_retention_days`
+  - `null` disables automatic payload compaction
+  - non-head revision payloads older than this many days become eligible
+- `compaction_interval_seconds`
+  - how often the relay runs the compaction pass
+
+Environment variables:
+
+- `PRIVATE_MODE`
+  - when `true`, the relay sends websocket `AUTH` challenges and requires NIP-42 authentication for revision reads and writes
+- `RELAY_ADMIN_TOKEN`
+  - bearer token used for protected admin endpoints
+- `RELAY_DEFAULT_PAYLOAD_RETENTION_DAYS`
+  - default policy before any admin API update is persisted
+- `RELAY_DEFAULT_COMPACTION_INTERVAL_SECONDS`
+  - default scheduler interval before any admin API update is persisted
+
+## Access Admin API
+
+The relay also exposes protected operator endpoints for access control and connection inspection:
+
+- `GET /admin/allowlist`
+- `POST /admin/allowlist`
+- `DELETE /admin/allowlist/:pubkey`
+- `GET /admin/connections`
+
+Notes:
+
+- `/admin/allowlist` and `/admin/connections` require `RELAY_ADMIN_TOKEN`
+- in `PRIVATE_MODE`, revision websocket clients must authenticate and the authenticated pubkey must be present on the allowlist
+- `/admin/connections` reports authenticated pubkeys and active live `CHANGES` subscription ids per websocket connection
+
+## Current State
+
+This workspace now has:
+
+- revision-native Postgres schema and migrations
+- revision publish, head materialization, and live `CHANGES`
+- revision-aware Negentropy bootstrap with `snapshot_seq` handoff
+- payload-retention advertisement and payload compaction
+- an HTTP admin API for runtime retention policy updates
+- a local multi-relay harness and a broad relay integration suite

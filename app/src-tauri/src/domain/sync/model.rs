@@ -25,13 +25,6 @@ pub struct SyncStatusPayload {
     pub state: SyncState,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyncChangePayload {
-    pub note_id: String,
-    pub action: String,
-}
-
 /// Note fields extracted from a synced event rumor.
 pub struct SyncedNote {
     pub id: String,

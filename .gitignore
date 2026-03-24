@@ -12,9 +12,11 @@ app/src-tauri/target/
 /.webpack/
 relay/dist/
 reports/
+repos/
 old/
 .agents/
 .claude/
+.codex/
 skills-lock.json
 .superpowers/
 templates/

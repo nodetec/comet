@@ -31,6 +31,9 @@ import { cn, errorMessage } from "@/shared/lib/utils";
 type SyncInfo = {
   state: string | { error: { message: string } };
   relayUrl: string | null;
+  relayUrls: string[];
+  activeRelayUrl: string | null;
+  preferredRelayUrl: string | null;
   blossomUrl: string | null;
   npub: string | null;
   syncedNotes: number;
@@ -123,19 +126,36 @@ function InfoRow({
 function SyncInfoPanel({ info }: { info: SyncInfo }) {
   return (
     <div className="divide-accent/30 divide-y">
-      {info.relayUrl ? (
+      {info.activeRelayUrl ? (
         <InfoRow
           icon={<Database className="size-3.5" />}
-          label="Relay"
-          value={info.relayUrl.replace(/^wss?:\/\//, "")}
+          label="Active relay"
+          value={info.activeRelayUrl.replace(/^wss?:\/\//, "")}
         />
       ) : (
         <InfoRow
           icon={<Database className="size-3.5" />}
-          label="Relay"
+          label="Active relay"
           value={<span className="text-muted-foreground">Not configured</span>}
         />
       )}
+
+      {info.relayUrls.length > 0 ? (
+        <InfoRow
+          icon={<Database className="size-3.5" />}
+          label="Configured relays"
+          value={info.relayUrls.length}
+        />
+      ) : null}
+
+      {info.preferredRelayUrl &&
+      info.preferredRelayUrl !== info.activeRelayUrl ? (
+        <InfoRow
+          icon={<Database className="size-3.5" />}
+          label="Preferred relay"
+          value={info.preferredRelayUrl.replace(/^wss?:\/\//, "")}
+        />
+      ) : null}
 
       <InfoRow
         icon={<HardDrive className="size-3.5" />}

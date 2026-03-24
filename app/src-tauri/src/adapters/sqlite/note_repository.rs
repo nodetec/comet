@@ -7,7 +7,7 @@ use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
     ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NoteFilterInput, NotePagePayload,
-    NoteQueryInput, NoteSortDirection, NoteSortField, NotebookRef, NoteSummary, NotebookSummary,
+    NoteQueryInput, NoteSortDirection, NoteSortField, NoteSummary, NotebookRef, NotebookSummary,
     SearchResult,
 };
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
@@ -405,10 +405,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .ok_or(NoteError::NotFound)
     }
 
-    fn note_markdown_and_readonly(
-        &self,
-        note_id: &str,
-    ) -> Result<(String, bool), NoteError> {
+    fn note_markdown_and_readonly(&self, note_id: &str) -> Result<(String, bool), NoteError> {
         self.conn
             .query_row(
                 "SELECT markdown, readonly FROM notes WHERE id = ?1",
@@ -520,12 +517,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         Ok(())
     }
 
-    fn set_readonly(
-        &self,
-        note_id: &str,
-        readonly: bool,
-        now: i64,
-    ) -> Result<usize, NoteError> {
+    fn set_readonly(&self, note_id: &str, readonly: bool, now: i64) -> Result<usize, NoteError> {
         self.conn
             .execute(
                 "UPDATE notes
@@ -625,9 +617,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .conn
             .prepare("SELECT id FROM notes WHERE deleted_at IS NOT NULL")
             .map_err(map_err)?;
-        let rows = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(map_err)?;
+        let rows = stmt.query_map([], |row| row.get(0)).map_err(map_err)?;
         let mut ids = Vec::new();
         for row in rows {
             ids.push(row.map_err(map_err)?);
@@ -655,10 +645,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         markdown: &str,
     ) -> Result<(), NoteError> {
         self.conn
-            .execute(
-                "DELETE FROM notes_fts WHERE note_id = ?1",
-                params![note_id],
-            )
+            .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])
             .map_err(map_err)?;
         self.conn
             .execute(
@@ -671,10 +658,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
     fn delete_search_document(&self, note_id: &str) -> Result<(), NoteError> {
         self.conn
-            .execute(
-                "DELETE FROM notes_fts WHERE note_id = ?1",
-                params![note_id],
-            )
+            .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])
             .map_err(map_err)?;
         Ok(())
     }
@@ -861,10 +845,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         values.push(Value::from((limit + 1) as i64));
         values.push(Value::from(input.offset as i64));
 
-        let mut statement = self
-            .conn
-            .prepare(&sql)
-            .map_err(map_err)?;
+        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
                 row_to_note_summary(row, &search_tokens)
@@ -936,10 +917,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             }
         };
 
-        let mut statement = self
-            .conn
-            .prepare(&sql)
-            .map_err(map_err)?;
+        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
                 let markdown: String = row.get(2)?;
@@ -1034,10 +1012,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
         sql.push_str(" ORDER BY nt.tag ASC");
 
-        let mut statement = self
-            .conn
-            .prepare(&sql)
-            .map_err(map_err)?;
+        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
                 row.get::<_, String>(0)
@@ -1081,10 +1056,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         sql.push_str(&clauses.join(" AND "));
         sql.push_str(" ORDER BY n.edited_at DESC");
 
-        let mut statement = self
-            .conn
-            .prepare(&sql)
-            .map_err(map_err)?;
+        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -1181,12 +1153,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
-    fn rename_notebook(
-        &self,
-        notebook_id: &str,
-        name: &str,
-        now: i64,
-    ) -> Result<usize, NoteError> {
+    fn rename_notebook(&self, notebook_id: &str, name: &str, now: i64) -> Result<usize, NoteError> {
         self.conn
             .execute(
                 "UPDATE notebooks SET name = ?1, updated_at = ?2, locally_modified = 1 WHERE id = ?3",
@@ -1197,10 +1164,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
     fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError> {
         self.conn
-            .execute(
-                "DELETE FROM notebooks WHERE id = ?1",
-                params![notebook_id],
-            )
+            .execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])
             .map_err(map_err)
     }
 
@@ -1254,11 +1218,9 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
     fn current_npub(&self) -> Result<String, NoteError> {
         self.conn
-            .query_row(
-                "SELECT npub FROM nostr_identity LIMIT 1",
-                [],
-                |row| row.get::<_, String>(0),
-            )
+            .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
+                row.get::<_, String>(0)
+            })
             .optional()
             .map_err(map_err)?
             .ok_or_else(|| NoteError::Storage("No Nostr identity configured.".to_string()))

@@ -64,6 +64,13 @@
       "when": 1773773777935,
       "tag": "0008_silky_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774393200000,
+      "tag": "0009_relay_revision_sync",
+      "breakpoints": true
     }
   ]
 }

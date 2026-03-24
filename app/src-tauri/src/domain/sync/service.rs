@@ -1,5 +1,5 @@
-use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
 use crate::domain::common::time::now_millis;
+use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -11,6 +11,11 @@ pub fn delete_note_from_sync(
     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
     conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
     invalidate_cache(note_id);
+    Ok(())
+}
+
+pub fn delete_notebook_from_sync(conn: &Connection, notebook_id: &str) -> Result<(), AppError> {
+    conn.execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])?;
     Ok(())
 }
 

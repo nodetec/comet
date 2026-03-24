@@ -6,7 +6,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 const tsconfigRootDir = path.dirname(fileURLToPath(import.meta.url));
-const files = ["src/**/*.ts", "test/**/*.ts", "drizzle.config.ts"];
+const files = ["src/**/*.ts", "test/**/*.ts"];
 
 function scopeConfig(config) {
   return {
@@ -21,7 +21,7 @@ function scopeConfigs(configs) {
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "drizzle/**"],
+    ignores: ["dist/**", "node_modules/**", "vendor/**"],
     linterOptions: {
       reportUnusedDisableDirectives: "error",
     },

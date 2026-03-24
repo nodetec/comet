@@ -1,7 +1,7 @@
 use crate::domain::blob::error::BlobError;
 use crate::error::AppError;
-pub use crate::ports::blob_storage::ImportedImage;
 use crate::ports::blob_storage::BlobStorage;
+pub use crate::ports::blob_storage::ImportedImage;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;

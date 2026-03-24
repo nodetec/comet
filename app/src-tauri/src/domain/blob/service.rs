@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use crate::error::AppError;
 
 /// Detect image format from magic bytes.
+#[cfg(test)]
 pub fn detect_image_extension(data: &[u8]) -> Option<String> {
     if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some("png".to_string())
@@ -240,9 +241,8 @@ mod tests {
     fn extract_multiple_hashes() {
         let hash1 = "a".repeat(64);
         let hash2 = "b".repeat(64);
-        let markdown = format!(
-            "![img1](attachment://{hash1}.png)\n![img2](attachment://{hash2}.webp)"
-        );
+        let markdown =
+            format!("![img1](attachment://{hash1}.png)\n![img2](attachment://{hash2}.webp)");
         let hashes = extract_attachment_hashes(&markdown);
         assert_eq!(hashes, vec![hash1, hash2]);
     }
@@ -258,9 +258,7 @@ mod tests {
     fn extract_deduplication_preserves_all_occurrences() {
         // The regex captures all occurrences; dedup is the caller's responsibility.
         let hash = "d".repeat(64);
-        let markdown = format!(
-            "![a](attachment://{hash}.png)\n![b](attachment://{hash}.jpg)"
-        );
+        let markdown = format!("![a](attachment://{hash}.png)\n![b](attachment://{hash}.jpg)");
         let hashes = extract_attachment_hashes(&markdown);
         assert_eq!(hashes.len(), 2);
         assert_eq!(hashes[0], hash);

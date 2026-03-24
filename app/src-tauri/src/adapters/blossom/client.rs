@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use chacha20poly1305::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
     ChaCha20Poly1305, Nonce,
 };
 use nostr_sdk::prelude::*;
@@ -8,61 +8,6 @@ use regex_lite::Regex;
 use reqwest::{header::LOCATION, redirect::Policy, Url};
 use sha2::{Digest, Sha256};
 use tauri::AppHandle;
-
-/// Upload an encrypted blob to a Blossom server.
-/// Returns the SHA-256 hash of the ciphertext (the Blossom content address).
-pub async fn upload_blob(
-    client: &reqwest::Client,
-    blossom_url: &str,
-    ciphertext: Vec<u8>,
-    keys: &Keys,
-) -> Result<String, AppError> {
-    let mut hasher = Sha256::new();
-    hasher.update(&ciphertext);
-    let ciphertext_hash = format!("{:x}", hasher.finalize());
-
-    eprintln!(
-        "[blossom] uploading encrypted blob hash={} size={} to {}",
-        &ciphertext_hash[..8],
-        ciphertext.len(),
-        blossom_url
-    );
-
-    let auth_header = sign_blossom_auth(keys, "upload", &ciphertext_hash, blossom_url)?;
-
-    let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
-
-    let resp = client
-        .put(&url)
-        .header("Authorization", auth_header)
-        .header("Content-Type", "application/octet-stream")
-        .header("X-SHA-256", &ciphertext_hash)
-        .body(ciphertext)
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("[blossom] upload request failed: {e}");
-            AppError::custom(format!("Blossom upload failed: {e}"))
-        })?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let reason_header = resp
-            .headers()
-            .get("x-reason")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        let body = resp.text().await.unwrap_or_default();
-        eprintln!("[blossom] upload failed ({status}): {reason_header} {body}");
-        return Err(AppError::custom(format!(
-            "Blossom upload failed ({status}): {reason_header} {body}"
-        )));
-    }
-
-    eprintln!("[blossom] upload ok hash={}", &ciphertext_hash[..8]);
-    Ok(ciphertext_hash)
-}
 
 /// Upload a plaintext blob to a Blossom server for public access (publishing).
 /// Returns the SHA-256 hash of the plaintext.
@@ -280,25 +225,6 @@ pub async fn download_blob(
 }
 
 // ── Blob encryption ────────────────────────────────────────────────────
-
-/// Encrypt a blob with a random ChaCha20-Poly1305 key.
-/// Returns (nonce + ciphertext, `key_hex`).
-pub fn encrypt_blob(plaintext: &[u8]) -> Result<(Vec<u8>, String), AppError> {
-    let key = ChaCha20Poly1305::generate_key(&mut OsRng);
-    let cipher = ChaCha20Poly1305::new(&key);
-    let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
-
-    let ciphertext = cipher
-        .encrypt(&nonce, plaintext)
-        .map_err(|e| AppError::custom(format!("Encryption failed: {e}")))?;
-
-    let mut result = Vec::with_capacity(12 + ciphertext.len());
-    result.extend_from_slice(&nonce);
-    result.extend_from_slice(&ciphertext);
-
-    let key_hex = hex::encode(key.as_slice());
-    Ok((result, key_hex))
-}
 
 /// Decrypt a blob with a ChaCha20-Poly1305 key.
 /// Expects nonce (12 bytes) prepended to ciphertext.

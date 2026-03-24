@@ -6,6 +6,9 @@ pub struct Relay {
     pub url: String,
     pub kind: String,
     pub created_at: i64,
+    pub paused: bool,
+    pub preferred: bool,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

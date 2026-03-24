@@ -7,8 +7,8 @@ use nostr_sdk::prelude::nip44::v2::ConversationKey;
 use nostr_sdk::prelude::nip59::RANGE_RANDOM_TIMESTAMP_TWEAK;
 use nostr_sdk::prelude::*;
 
-use crate::error::AppError;
 use crate::adapters::nostr::nip44_ext;
+use crate::error::AppError;
 
 /// Unwrapped gift wrap result.
 pub struct UnwrappedGift {

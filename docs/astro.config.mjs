@@ -23,21 +23,16 @@ export default defineConfig({
         baseUrl:
           "https://github.com/nodetec/comet/edit/master/docs/src/content/docs/",
       },
-      customCss: ["./src/styles/custom.css"],
       sidebar: [
-        {
-          label: "Guide",
-          items: [{ label: "Getting Started", slug: "guides/getting-started" }],
-        },
-        {
-          label: "Product",
-          items: [{ label: "Foundation", slug: "product/foundation" }],
-        },
         {
           label: "Specifications",
           items: [
-            { label: "Blossom API", slug: "specs/blossom-api" },
-            { label: "Changes Feed", slug: "specs/changes-feed" },
+            { label: "Revision Gift Wrap", slug: "specs/revision-gift-wrap" },
+            { label: "Revision Negentropy", slug: "specs/revision-negentropy" },
+            {
+              label: "Revision Changes Feed",
+              slug: "specs/revision-changes-feed",
+            },
           ],
         },
       ],

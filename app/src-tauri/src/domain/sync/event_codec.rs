@@ -1,3 +1,4 @@
+#[cfg(test)]
 use crate::domain::common::text::strip_title_line;
 use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
 use crate::error::AppError;
@@ -75,6 +76,7 @@ pub fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
 
 // ── Note codec ──────────────────────────────────────────────────────────
 
+#[cfg(test)]
 pub fn note_to_rumor(
     note_id: &str,
     title: &str,
@@ -412,8 +414,20 @@ mod tests {
     fn is_notebook_rumor_false_for_notes() {
         let pubkey = test_pubkey();
         let rumor = note_to_rumor(
-            "note-1", "Title", "# Title\n\nBody", 1000, 1000, 1000,
-            None, None, None, None, false, &[], &[], pubkey,
+            "note-1",
+            "Title",
+            "# Title\n\nBody",
+            1000,
+            1000,
+            1000,
+            None,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
         );
         assert!(!is_notebook_rumor(&rumor));
     }
@@ -431,8 +445,20 @@ mod tests {
     fn is_deleted_rumor_false_for_normal_notes() {
         let pubkey = test_pubkey();
         let rumor = note_to_rumor(
-            "note-1", "Title", "# Title", 1000, 1000, 1000,
-            None, None, None, None, false, &[], &[], pubkey,
+            "note-1",
+            "Title",
+            "# Title",
+            1000,
+            1000,
+            1000,
+            None,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
         );
         assert!(!is_deleted_rumor(&rumor));
     }
