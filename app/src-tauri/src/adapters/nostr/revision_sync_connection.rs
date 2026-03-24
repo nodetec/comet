@@ -7,13 +7,13 @@ use crate::adapters::nostr::revision_push::{
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
 };
-use crate::domain::sync::model::{SyncCommand, SyncState};
+use crate::domain::sync::model::{SyncChangePayload, SyncCommand, SyncState};
 use crate::error::AppError;
 use nostr_sdk::prelude::Keys;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, watch, Mutex};
 
 use super::sync_manager::{set_state, sync_log};
@@ -220,7 +220,7 @@ async fn handle_revision_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
-            crate::domain::sync::revision_apply_service::apply_remote_revision_event(
+            if let Some(change) = crate::domain::sync::revision_apply_service::apply_remote_revision_event(
                 &conn,
                 relay_url,
                 keys,
@@ -230,7 +230,9 @@ async fn handle_revision_incoming_message(
                     app.state::<crate::infra::cache::RenderedHtmlCache>()
                         .invalidate(note_id);
                 },
-            )?;
+            )? {
+                emit_sync_remote_change(app, change);
+            }
         }
         crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::ChangesEose {
             last_seq,
@@ -279,4 +281,8 @@ async fn handle_revision_incoming_message(
     }
 
     Ok(())
+}
+
+fn emit_sync_remote_change(app: &AppHandle, payload: SyncChangePayload) {
+    let _ = app.emit("sync-remote-change", payload);
 }

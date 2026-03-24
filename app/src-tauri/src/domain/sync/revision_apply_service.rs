@@ -6,6 +6,7 @@ use crate::domain::sync::event_codec::{
     is_deleted_rumor, is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
 };
 use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
+use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::service::{
     delete_note_from_sync, delete_notebook_from_sync, upsert_from_sync, upsert_notebook_from_sync,
 };
@@ -20,7 +21,7 @@ pub fn apply_remote_revision_event(
     event: &Event,
     stored_seq: Option<i64>,
     mut invalidate_cache: impl FnMut(&str),
-) -> Result<(), AppError> {
+) -> Result<Option<SyncChangePayload>, AppError> {
     let meta = parse_revision_envelope_meta(event)?;
     let unwrapped = crate::adapters::nostr::nip59_ext::extract_rumor(keys, event)?;
     let preferred_blossom_url: Option<String> = conn
@@ -31,7 +32,7 @@ pub fn apply_remote_revision_event(
         )
         .optional()?;
 
-    if is_deleted_rumor(&unwrapped.rumor) {
+    let change_payload = if is_deleted_rumor(&unwrapped.rumor) {
         let entity_id = unwrapped
             .rumor
             .tags
@@ -81,6 +82,10 @@ pub fn apply_remote_revision_event(
                 mtime: meta.mtime,
             }],
         )?;
+        Some(SyncChangePayload {
+            note_id: entity_id,
+            action: "delete".to_string(),
+        })
     } else if is_notebook_rumor(&unwrapped.rumor) {
         let notebook = rumor_to_synced_notebook(&unwrapped.rumor)?;
         upsert_notebook_from_sync(conn, &notebook, &event.id.to_hex())?;
@@ -124,6 +129,10 @@ pub fn apply_remote_revision_event(
             "UPDATE notebooks SET current_rev = ?1 WHERE id = ?2",
             params![meta.revision_id, notebook.id],
         )?;
+        Some(SyncChangePayload {
+            note_id: notebook.id,
+            action: "upsert".to_string(),
+        })
     } else {
         if let Some(ref blossom_url) = preferred_blossom_url {
             let pubkey_hex = keys.public_key().to_hex();
@@ -186,8 +195,14 @@ pub fn apply_remote_revision_event(
                 params![meta.revision_id, note_id],
             )?;
             invalidate_cache(&note_id);
+            Some(SyncChangePayload {
+                note_id,
+                action: "upsert".to_string(),
+            })
+        } else {
+            None
         }
-    }
+    };
 
     if let Some(stored_seq) = stored_seq {
         let min_payload_mtime =
@@ -205,7 +220,7 @@ pub fn apply_remote_revision_event(
         )?;
     }
 
-    Ok(())
+    Ok(change_payload)
 }
 
 #[cfg(test)]
@@ -291,8 +306,9 @@ mod tests {
         )
         .unwrap();
 
-        apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
-            .unwrap();
+        let change =
+            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
+                .unwrap();
 
         let current_rev: Option<String> = conn
             .query_row(
@@ -302,6 +318,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(current_rev, Some(revision_id));
+        assert_eq!(
+            change.map(|payload| (payload.note_id, payload.action)),
+            Some(("note-1".to_string(), "upsert".to_string()))
+        );
     }
 
     #[test]
@@ -380,8 +400,9 @@ mod tests {
         )
         .unwrap();
 
-        apply_remote_revision_event(&conn, "ws://relay.example", &keys, &event, Some(1), |_| {})
-            .unwrap();
+        let change =
+            apply_remote_revision_event(&conn, "ws://relay.example", &keys, &event, Some(1), |_| {})
+                .unwrap();
 
         let stored: Option<(String, String, String)> = conn
             .query_row(
@@ -401,6 +422,10 @@ mod tests {
                 ciphertext_hash,
                 key_hex,
             ))
+        );
+        assert_eq!(
+            change.map(|payload| (payload.note_id, payload.action)),
+            Some(("note-blob".to_string(), "upsert".to_string()))
         );
     }
 

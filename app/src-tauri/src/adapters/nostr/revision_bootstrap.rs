@@ -5,6 +5,7 @@ use crate::adapters::sqlite::revision_sync_repository::{
     list_sync_heads_for_recipient, upsert_sync_relay_state,
 };
 use crate::db::{active_account, database_connection};
+use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::revision_apply_service::apply_remote_revision_event;
 use crate::domain::sync::revision_negentropy::{RevisionNegentropyItem, RevisionNegentropySession};
 use crate::error::AppError;
@@ -12,7 +13,7 @@ use nostr_sdk::prelude::Keys;
 use rusqlite::Connection;
 use std::collections::BTreeSet;
 use std::path::Path;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use url::Url;
 
 pub struct RevisionBootstrapResult {
@@ -32,18 +33,44 @@ pub async fn bootstrap_relay_connection(
     let db_path = active_account(app)?.db_path;
     drop(conn);
 
-    bootstrap_with_keys(&db_path, &keys, relay_ws_url, |note_id| {
-        app.state::<crate::infra::cache::RenderedHtmlCache>()
-            .invalidate(note_id);
-    })
+    bootstrap_with_keys_and_changes(
+        &db_path,
+        &keys,
+        relay_ws_url,
+        |note_id| {
+            app.state::<crate::infra::cache::RenderedHtmlCache>()
+                .invalidate(note_id);
+        },
+        |change| {
+            let _ = app.emit("sync-remote-change", change);
+        },
+    )
     .await
 }
 
+#[cfg(test)]
 pub async fn bootstrap_with_keys(
     db_path: &Path,
     keys: &Keys,
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
+) -> Result<RevisionBootstrapResult, AppError> {
+    bootstrap_with_keys_and_changes(
+        db_path,
+        keys,
+        relay_ws_url,
+        &mut invalidate_cache,
+        |_| {},
+    )
+    .await
+}
+
+async fn bootstrap_with_keys_and_changes(
+    db_path: &Path,
+    keys: &Keys,
+    relay_ws_url: &str,
+    mut invalidate_cache: impl FnMut(&str),
+    mut on_change: impl FnMut(SyncChangePayload),
 ) -> Result<RevisionBootstrapResult, AppError> {
     let relay_http_url = relay_http_url_from_ws(relay_ws_url)?;
     let relay_info = fetch_relay_info(&relay_http_url).await?;
@@ -171,14 +198,16 @@ pub async fn bootstrap_with_keys(
                     }
 
                     let conn = open_sync_db(db_path)?;
-                    apply_remote_revision_event(
+                    if let Some(change) = apply_remote_revision_event(
                         &conn,
                         relay_ws_url,
                         keys,
                         &event,
                         None,
                         &mut invalidate_cache,
-                    )?;
+                    )? {
+                        on_change(change);
+                    }
                 }
                 RevisionRelayIncomingMessage::EventStatus {
                     subscription_id,

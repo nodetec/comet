@@ -149,7 +149,7 @@ pub fn build_revision_note_rumor(
     let mut tags = vec![
         Tag::identifier(input.document_id),
         Tag::title(input.title),
-        Tag::custom(TagKind::custom("t"), vec![input.entity_type.to_string()]),
+        Tag::custom(TagKind::custom("type"), vec![input.entity_type.to_string()]),
         Tag::custom(
             TagKind::custom("modified_at"),
             vec![input.modified_at.to_string()],
