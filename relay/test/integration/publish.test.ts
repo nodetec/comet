@@ -134,7 +134,7 @@ describe("relay integration > publish", () => {
         ["d", "doc-1"],
         ["op", "put"],
         ["m", "1700000000000"],
-        ["type", "note"],
+        ["t", "note"],
         ["v", "2"],
       ],
     };
@@ -164,7 +164,7 @@ describe("relay integration > publish", () => {
         ["prev", "not-hex"],
         ["op", "put"],
         ["m", "1700000000000"],
-        ["type", "note"],
+        ["t", "note"],
         ["v", "2"],
       ],
     };

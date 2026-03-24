@@ -64,7 +64,7 @@ The outer tags should include:
 ["prev",  <parent_revision_id>]        // repeatable
 ["op",    "put" | "del"]
 ["m",     <modified_at_ms_as_string>]
-["type",  "note" | "notebook"]
+["t",     "note" | "notebook"]         // optional
 ["v",     "2"]
 ```
 
@@ -76,7 +76,7 @@ Field meanings:
 - `prev`: parent revision ID; a merge revision may include more than one
 - `op`: normal content revision or tombstone revision
 - `m`: logical revision timestamp used for ordering hints
-- `type`: logical sync entity type
+- `t`: optional logical sync entity type
 - `v`: Comet sync schema version
 
 For this extension, the outer `p` tag is not just transport metadata. It defines the recipient-specific namespace in which `d`, `rev`, heads, and anti-entropy scope are evaluated.

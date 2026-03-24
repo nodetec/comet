@@ -163,7 +163,7 @@ pub fn build_pending_note_revision(
         parent_revision_ids: parent_revision_ids.clone(),
         op: "put".to_string(),
         mtime: modified_at,
-        entity_type: "note".to_string(),
+        entity_type: Some("note".to_string()),
         schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
     });
 
@@ -283,7 +283,7 @@ pub fn build_pending_notebook_revision(
         parent_revision_ids: parent_revision_ids.clone(),
         op: "put".to_string(),
         mtime: updated_at,
-        entity_type: "notebook".to_string(),
+        entity_type: Some("notebook".to_string()),
         schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
     });
 

@@ -15,6 +15,19 @@ pub fn comet_base_tags() -> Vec<Tag> {
     ]
 }
 
+fn find_entity_type_tag(rumor: &UnsignedEvent) -> Option<&str> {
+    rumor
+        .tags
+        .find(TagKind::custom("t"))
+        .and_then(|t| t.content())
+        .or_else(|| {
+            rumor
+                .tags
+                .find(TagKind::custom("type"))
+                .and_then(|t| t.content())
+        })
+}
+
 // ── Notebook codec ──────────────────────────────────────────────────────
 
 pub fn notebook_to_rumor(
@@ -27,7 +40,7 @@ pub fn notebook_to_rumor(
     tags.extend([
         Tag::identifier(notebook_id),
         Tag::title(name),
-        Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+        Tag::custom(TagKind::custom("t"), vec!["notebook".to_string()]),
         Tag::custom(TagKind::custom("modified_at"), vec![updated_at.to_string()]),
     ]);
 
@@ -66,12 +79,7 @@ pub fn rumor_to_synced_notebook(rumor: &UnsignedEvent) -> Result<SyncedNotebook,
 }
 
 pub fn is_notebook_rumor(rumor: &UnsignedEvent) -> bool {
-    rumor.kind == COMET_EVENT_KIND
-        && rumor
-            .tags
-            .find(TagKind::custom("type"))
-            .and_then(|t| t.content())
-            == Some("notebook")
+    rumor.kind == COMET_EVENT_KIND && find_entity_type_tag(rumor) == Some("notebook")
 }
 
 // ── Note codec ──────────────────────────────────────────────────────────
@@ -98,7 +106,7 @@ pub fn note_to_rumor(
     let mut event_tags = comet_base_tags();
     event_tags.extend([
         Tag::identifier(note_id),
-        Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
+        Tag::custom(TagKind::custom("t"), vec!["note".to_string()]),
         Tag::title(title),
         Tag::custom(
             TagKind::custom("modified_at"),
@@ -272,7 +280,7 @@ pub fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
     let mut tags = comet_base_tags();
     tags.extend([
         Tag::identifier(note_id),
-        Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
+        Tag::custom(TagKind::custom("t"), vec!["note".to_string()]),
         Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
     EventBuilder::new(COMET_EVENT_KIND, "")
@@ -284,7 +292,7 @@ pub fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedE
     let mut tags = comet_base_tags();
     tags.extend([
         Tag::identifier(notebook_id),
-        Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
+        Tag::custom(TagKind::custom("t"), vec!["notebook".to_string()]),
         Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
     EventBuilder::new(COMET_EVENT_KIND, "")
@@ -505,8 +513,14 @@ mod tests {
 
         let type_val = rumor
             .tags
-            .find(TagKind::custom("type"))
+            .find(TagKind::custom("t"))
             .and_then(|t| t.content())
+            .or_else(|| {
+                rumor
+                    .tags
+                    .find(TagKind::custom("type"))
+                    .and_then(|t| t.content())
+            })
             .map(str::to_string);
         assert_eq!(type_val, Some("note".to_string()));
     }

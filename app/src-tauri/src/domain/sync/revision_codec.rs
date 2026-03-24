@@ -33,8 +33,20 @@ pub struct RevisionEnvelopeMeta {
     pub parent_revision_ids: Vec<String>,
     pub op: String,
     pub mtime: i64,
-    pub entity_type: String,
+    pub entity_type: Option<String>,
     pub schema_version: String,
+}
+
+fn find_entity_type_tag(event: &Event) -> Option<String> {
+    event.tags
+        .find(TagKind::custom("t"))
+        .and_then(|tag| tag.content())
+        .or_else(|| {
+            event.tags
+                .find(TagKind::custom("type"))
+                .and_then(|tag| tag.content())
+        })
+        .map(std::string::ToString::to_string)
 }
 
 pub fn parse_revision_envelope_meta(event: &Event) -> Result<RevisionEnvelopeMeta, AppError> {
@@ -77,12 +89,7 @@ pub fn parse_revision_envelope_meta(event: &Event) -> Result<RevisionEnvelopeMet
         .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Missing op tag in revision envelope"))?;
 
-    let entity_type = event
-        .tags
-        .find(TagKind::custom("type"))
-        .and_then(|tag| tag.content())
-        .map(std::string::ToString::to_string)
-        .ok_or_else(|| AppError::custom("Missing type tag in revision envelope"))?;
+    let entity_type = find_entity_type_tag(event);
 
     let schema_version = event
         .tags
@@ -118,9 +125,12 @@ pub fn revision_envelope_tags(meta: &RevisionEnvelopeMeta) -> Vec<Tag> {
         Tag::custom(TagKind::custom("r"), vec![meta.revision_id.clone()]),
         Tag::custom(TagKind::custom("m"), vec![meta.mtime.to_string()]),
         Tag::custom(TagKind::custom("op"), vec![meta.op.clone()]),
-        Tag::custom(TagKind::custom("type"), vec![meta.entity_type.clone()]),
         Tag::custom(TagKind::custom("v"), vec![meta.schema_version.clone()]),
     ];
+
+    if let Some(entity_type) = &meta.entity_type {
+        tags.push(Tag::custom(TagKind::custom("t"), vec![entity_type.clone()]));
+    }
 
     for parent in &meta.parent_revision_ids {
         tags.push(Tag::custom(TagKind::custom("prev"), vec![parent.clone()]));
@@ -138,7 +148,7 @@ pub fn build_revision_note_rumor(
     let mut tags = vec![
         Tag::identifier(input.document_id),
         Tag::title(input.title),
-        Tag::custom(TagKind::custom("type"), vec![input.entity_type.to_string()]),
+        Tag::custom(TagKind::custom("t"), vec![input.entity_type.to_string()]),
         Tag::custom(
             TagKind::custom("modified_at"),
             vec![input.modified_at.to_string()],

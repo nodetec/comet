@@ -127,7 +127,7 @@ pub async fn push_deletion_revision(
             parent_revision_ids,
             op: "del".to_string(),
             mtime: head.mtime,
-            entity_type: pending.entity_type.clone(),
+            entity_type: Some(pending.entity_type.clone()),
             schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
         });
 
@@ -458,7 +458,7 @@ mod tests {
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: "note".into(),
+                entity_type: Some("note".into()),
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )

@@ -22,7 +22,7 @@ describe("parseRevisionEnvelope", () => {
         ],
         ["op", "put"],
         ["m", "1700000000000"],
-        ["type", "note"],
+        ["t", "note"],
         ["v", "2"],
       ],
       content: "ciphertext",

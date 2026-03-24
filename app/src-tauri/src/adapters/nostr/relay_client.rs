@@ -544,7 +544,7 @@ mod tests {
             "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
             "created_at": 1700000000,
             "kind": 1059,
-            "tags": [["p","recipient"],["d","doc"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["m","1700000000000"],["op","put"],["type","note"],["v","2"]],
+            "tags": [["p","recipient"],["d","doc"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["m","1700000000000"],["op","put"],["t","note"],["v","2"]],
             "content": "ciphertext",
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });

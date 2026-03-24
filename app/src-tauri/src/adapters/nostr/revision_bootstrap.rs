@@ -1422,7 +1422,7 @@ mod tests {
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: "note".into(),
+                entity_type: Some("note".into()),
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -1530,7 +1530,7 @@ mod tests {
                 parent_revision_ids,
                 op: "del".into(),
                 mtime: head.mtime,
-                entity_type: pending.entity_type.clone(),
+                entity_type: Some(pending.entity_type.clone()),
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             });
             let event =

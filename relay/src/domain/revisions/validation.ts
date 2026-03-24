@@ -11,6 +11,10 @@ function getSingleTag(tags: string[][], name: string): string | null {
   return tag?.[1] ?? null;
 }
 
+function getEntityTypeTag(tags: string[][]): string | null {
+  return getSingleTag(tags, "t") ?? getSingleTag(tags, "type");
+}
+
 function parseRevisionOp(value: string | null): RevisionOp | null {
   if (value === "put" || value === "del") {
     return value;
@@ -65,7 +69,7 @@ export function parseRevisionEnvelope(
     parentRevisionIds,
     op,
     mtime,
-    entityType: getSingleTag(event.tags, "type"),
+    entityType: getEntityTypeTag(event.tags),
     schemaVersion: getSingleTag(event.tags, "v"),
     event,
   };

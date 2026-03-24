@@ -205,6 +205,7 @@ export const syncRevisions = pgTable(
     index("idx_sync_revisions_scope").on(table.recipient, table.dTag),
     index("idx_sync_revisions_rev").on(table.rev),
     index("idx_sync_revisions_mtime").on(table.mtime),
+    index("idx_sync_revisions_entity_type").on(table.entityType),
   ],
 );
 

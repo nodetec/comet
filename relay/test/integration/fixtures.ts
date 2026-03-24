@@ -37,7 +37,7 @@ export function revisionEvent(
       ]),
       ["op", op],
       ["m", `${mtime}`],
-      ["type", "note"],
+      ["t", "note"],
       ["v", "2"],
     ],
     content: `ciphertext-${revisionId}`,
