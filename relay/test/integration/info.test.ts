@@ -43,4 +43,18 @@ describe("relay integration > info", () => {
       },
     });
   });
+
+  test("accepts websocket upgrades on the relay root", async () => {
+    const ctx = await startTestRevisionRelay(39415);
+    contexts.push(ctx);
+
+    const ws = new WebSocket(`ws://127.0.0.1:${ctx.port}/`);
+
+    await new Promise<void>((resolve, reject) => {
+      ws.onopen = () => resolve();
+      ws.onerror = (event) => reject(event);
+    });
+
+    ws.close();
+  });
 });

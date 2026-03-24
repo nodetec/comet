@@ -68,6 +68,14 @@ export async function createRevisionRelayServer(
     hostname: config.host,
     fetch(request, serverInstance) {
       const url = new URL(request.url);
+      if (
+        (url.pathname === "/" || url.pathname === "/ws") &&
+        serverInstance.upgrade(request, {
+          data: { connectionId: crypto.randomUUID() },
+        })
+      ) {
+        return;
+      }
       if (url.pathname === "/admin/retention") {
         return handleRetentionApiRequest(request, {
           adminToken: config.adminToken,
@@ -125,14 +133,6 @@ export async function createRevisionRelayServer(
       }
       if (url.pathname === "/healthz") {
         return new Response("ok");
-      }
-      if (
-        url.pathname === "/ws" &&
-        serverInstance.upgrade(request, {
-          data: { connectionId: crypto.randomUUID() },
-        })
-      ) {
-        return;
       }
       return new Response("Revision relay", { status: 200 });
     },
