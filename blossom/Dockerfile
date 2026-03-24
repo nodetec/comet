@@ -28,6 +28,12 @@ ENV NODE_ENV=production
 
 COPY --from=deploy /prod/blossom ./
 
+# Railway may still inject a stale service start command like
+# `pnpm --filter @comet/blossom start`. The runtime image only needs Bun, so we
+# provide a tiny shim that always starts the Blossom process.
+RUN printf '%s\n' '#!/bin/sh' 'exec bun run src/index.ts' > /usr/local/bin/pnpm \
+  && chmod +x /usr/local/bin/pnpm
+
 EXPOSE 3000
 
-CMD ["bun", "run", "src/index.ts"]
+ENTRYPOINT ["bun", "run", "src/index.ts"]
