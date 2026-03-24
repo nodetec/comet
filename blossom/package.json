@@ -13,7 +13,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1014.0",
     "@comet/data": "workspace:*",
     "@comet/nostr": "workspace:*",
     "drizzle-orm": "^0.45.1",

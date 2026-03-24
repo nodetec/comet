@@ -1,10 +1,3 @@
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
-
 type ObjectStorageOptions = {
   publicBaseUrl?: string;
 };
@@ -44,6 +37,24 @@ function getEndpoint(): string | undefined {
   );
 }
 
+function getOptionalEnvValue(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value && value.trim() !== "") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function parseVirtualHostedStyle(): boolean | undefined {
+  const value = process.env.S3_VIRTUAL_HOSTED_STYLE;
+  if (value === undefined) {
+    return undefined;
+  }
+  return value === "true";
+}
+
 function getPublicBaseUrl(bucket: string, override?: string): string {
   const configured =
     override ?? process.env.BLOSSOM_PUBLIC_URL ?? process.env.BUCKET_PUBLIC_URL;
@@ -60,14 +71,32 @@ export function createObjectStorage(
   const bucket = getBucketName();
   const endpoint = getEndpoint();
   const region = process.env.S3_REGION ?? process.env.AWS_REGION ?? "auto";
+  const accessKeyId = getOptionalEnvValue(
+    "S3_ACCESS_KEY_ID",
+    "AWS_ACCESS_KEY_ID",
+  );
+  const secretAccessKey = getOptionalEnvValue(
+    "S3_SECRET_ACCESS_KEY",
+    "AWS_SECRET_ACCESS_KEY",
+  );
+  const sessionToken = getOptionalEnvValue(
+    "S3_SESSION_TOKEN",
+    "AWS_SESSION_TOKEN",
+  );
+  const virtualHostedStyle = parseVirtualHostedStyle();
 
   console.log(
     `[blossom] S3 config: bucket="${bucket}", endpoint="${endpoint ?? "(none)"}", region="${region}"`,
   );
 
-  const client = new S3Client({
+  const client = new Bun.S3Client({
+    bucket,
     region,
-    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+    ...(endpoint ? { endpoint } : {}),
+    ...(accessKeyId ? { accessKeyId } : {}),
+    ...(secretAccessKey ? { secretAccessKey } : {}),
+    ...(sessionToken ? { sessionToken } : {}),
+    ...(virtualHostedStyle !== undefined ? { virtualHostedStyle } : {}),
   });
 
   const publicBaseUrl = getPublicBaseUrl(bucket, options.publicBaseUrl);
@@ -80,25 +109,15 @@ export function createObjectStorage(
     async downloadBlob(
       sha256: string,
     ): Promise<{ data: Uint8Array; contentType?: string }> {
-      const response = await client.send(
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: sha256,
-        }),
-      );
-
-      const body = response.Body;
-      if (!body || typeof body !== "object") {
-        throw new Error(`missing object body for blob ${sha256}`);
-      }
-
-      const bytes = await (
-        body as { transformToByteArray: () => Promise<Uint8Array> }
-      ).transformToByteArray();
+      const file = client.file(sha256);
+      const [buffer, stat] = await Promise.all([
+        file.arrayBuffer(),
+        file.stat(),
+      ]);
 
       return {
-        data: bytes,
-        contentType: response.ContentType,
+        data: new Uint8Array(buffer),
+        contentType: stat.type,
       };
     },
     async uploadBlob(
@@ -106,22 +125,12 @@ export function createObjectStorage(
       data: Uint8Array,
       contentType?: string,
     ): Promise<void> {
-      await client.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: sha256,
-          Body: data,
-          ContentType: contentType ?? "application/octet-stream",
-        }),
-      );
+      await client.file(sha256).write(data, {
+        type: contentType ?? "application/octet-stream",
+      });
     },
     async deleteBlob(sha256: string): Promise<void> {
-      await client.send(
-        new DeleteObjectCommand({
-          Bucket: bucket,
-          Key: sha256,
-        }),
-      );
+      await client.delete(sha256);
     },
   };
 }
