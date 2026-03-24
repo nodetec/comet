@@ -1,5 +1,6 @@
 [build]
 builder = "DOCKERFILE"
+buildCommand = null
 dockerfilePath = "/relay/Dockerfile"
 watchPatterns = [
   "relay/**",
@@ -10,6 +11,7 @@ watchPatterns = [
 ]
 
 [deploy]
+startCommand = null
 healthcheckPath = "/healthz"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
