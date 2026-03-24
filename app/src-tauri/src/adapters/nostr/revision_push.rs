@@ -1,13 +1,7 @@
 use crate::adapters::nostr::relay_client::{RevisionRelayConnection, RevisionRelayIncomingMessage};
-use crate::adapters::sqlite::revision_sync_repository::{
-    get_sync_head, list_sync_revision_parents,
-};
 use crate::adapters::sqlite::sync_repository::get_blossom_url;
 use crate::db::database_connection;
 use crate::domain::blob::service::extract_attachment_hashes;
-use crate::domain::sync::revision_codec::{
-    revision_envelope_tags, RevisionEnvelopeMeta, REVISION_SYNC_SCHEMA_VERSION,
-};
 use crate::domain::sync::revision_service::{
     build_pending_note_deletion_revision, build_pending_note_revision,
     build_pending_notebook_deletion_revision, build_pending_notebook_revision,
@@ -249,7 +243,6 @@ pub async fn push_deletion_revision(
     entity_id: &str,
 ) -> Result<(), AppError> {
     let recipient = keys.public_key();
-    let recipient_hex = recipient.to_hex();
     let event = {
         let conn = database_connection(app)?;
         let pending = if entity_id.starts_with("notebook-") {
@@ -274,27 +267,7 @@ pub async fn push_deletion_revision(
             pending
         };
 
-        let head = get_sync_head(&conn, &recipient_hex, &pending.document_coord)?
-            .ok_or_else(|| AppError::custom("Missing sync head for deletion revision"))?;
-        let parent_revision_ids =
-            list_sync_revision_parents(
-                &conn,
-                &recipient_hex,
-                &pending.document_coord,
-                &head.rev,
-            )?;
-        let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-            recipient: recipient_hex.clone(),
-            document_coord: pending.document_coord.clone(),
-            revision_id: head.rev,
-            parent_revision_ids,
-            op: "del".to_string(),
-            mtime: head.mtime,
-            entity_type: None,
-            schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-        });
-
-        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, tags)?
+        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
     };
 
     let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;

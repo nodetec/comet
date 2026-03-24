@@ -8,6 +8,7 @@ import {
   type ContextualTagsInput,
   type ContextualTagsPayload,
   type CreateNotebookInput,
+  type NoteConflictInfo,
   type LoadedNote,
   type NoteFilter,
   type NotePagePayload,
@@ -64,6 +65,10 @@ export async function loadNote(noteId: string) {
   }
 
   return note;
+}
+
+export async function getNoteConflict(noteId: string) {
+  return invoke<NoteConflictInfo | null>("get_note_conflict", { noteId });
 }
 
 export async function createNote(input: {
@@ -147,6 +152,10 @@ export async function publishShortNote(input: PublishShortNoteInput) {
 
 export async function deletePublishedNote(noteId: string) {
   return invoke<PublishResult>("delete_published_note", { noteId });
+}
+
+export async function resolveNoteConflict(noteId: string) {
+  return invoke("resolve_note_conflict", { noteId });
 }
 
 export async function exportNotes(input: {

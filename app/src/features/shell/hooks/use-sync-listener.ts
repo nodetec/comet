@@ -46,6 +46,9 @@ export function useSyncListener(deps: SyncListenerDeps) {
         const { noteId, action } = event.payload;
         void queryClient.invalidateQueries({ queryKey: ["notes"] });
         void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+        void queryClient.invalidateQueries({
+          queryKey: ["note-conflict", noteId],
+        });
         void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
         void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
         // If the updated note is currently open, refetch then remount editor

@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   getBootstrap,
   getContextualTags,
+  getNoteConflict,
   getTodoCount,
   loadNote,
   NOTE_PAGE_SIZE,
@@ -152,6 +153,12 @@ export function useNoteQueries(params: NoteQueryParams) {
     queryKey: ["note", selectedNoteId],
   });
 
+  const noteConflictQuery = useQuery({
+    enabled: Boolean(selectedNoteId),
+    queryFn: () => getNoteConflict(selectedNoteId!),
+    queryKey: ["note-conflict", selectedNoteId],
+  });
+
   return {
     bootstrapQuery,
     todoCountQuery,
@@ -165,5 +172,6 @@ export function useNoteQueries(params: NoteQueryParams) {
     totalNoteCount,
     activeNpub,
     initialSelectedNoteId,
+    noteConflictQuery,
   };
 }

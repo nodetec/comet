@@ -47,6 +47,25 @@ export type LoadedNote = {
   title: string;
 };
 
+export type NoteConflictHead = {
+  isAvailable: boolean;
+  isCurrent: boolean;
+  markdown: string | null;
+  mtime: number;
+  op: string;
+  preview: string | null;
+  revisionId: string;
+  title: string | null;
+};
+
+export type NoteConflictInfo = {
+  currentRevisionId: string | null;
+  headCount: number;
+  heads: NoteConflictHead[];
+  noteId: string;
+  relayUrl: string | null;
+};
+
 export type BootstrapPayload = {
   npub: string;
   initialNotes: NotePagePayload;

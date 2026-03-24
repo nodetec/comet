@@ -1,5 +1,6 @@
 use crate::adapters::sqlite::note_repository::SqliteNoteRepository;
 use crate::db::database_connection;
+use crate::domain::common::text::preview_from_markdown;
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::model::*;
 use crate::domain::notes::service::NoteService;
@@ -7,6 +8,7 @@ use crate::domain::sync::model::SyncCommand;
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
+use rusqlite::{params, OptionalExtension};
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,14 @@ fn record_to_loaded_note(
         published_at: record.published_at,
         published_kind: record.published_kind,
     })
+}
+
+fn preferred_conflict_relay_url(conn: &rusqlite::Connection) -> Option<String> {
+    let available = crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(conn);
+    let active = crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(conn);
+    active
+        .filter(|relay_url| available.contains(relay_url))
+        .or_else(|| available.into_iter().next())
 }
 
 /// Spawn async Blossom blob deletions for orphaned blobs.
@@ -136,6 +146,197 @@ pub fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::load_note(&repo, &note_id)?;
     record_to_loaded_note(&app, record, &repo)
+}
+
+#[tauri::command]
+pub async fn get_note_conflict(
+    app: AppHandle,
+    note_id: String,
+) -> Result<Option<NoteConflictInfo>, AppError> {
+    let conn = database_connection(&app)?;
+    let current_note: Option<(Option<String>, String, String)> = conn
+        .query_row(
+            "SELECT current_rev, title, markdown FROM notes WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()?;
+
+    let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
+    let recipient = keys.public_key().to_hex();
+    let document_coord =
+        crate::domain::sync::revision_codec::compute_document_coord(keys.secret_key(), &note_id);
+    let current_revision_id = current_note.as_ref().and_then(|(rev, _, _)| rev.clone());
+    let relay_url = preferred_conflict_relay_url(&conn);
+    let scope_heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
+        &conn,
+        &recipient,
+        &document_coord,
+    )?;
+    if scope_heads.len() <= 1 {
+        return Ok(None);
+    }
+
+    let mut heads = scope_heads
+        .into_iter()
+        .map(|head| NoteConflictHead {
+            revision_id: head.rev.clone(),
+            mtime: head.mtime,
+            op: head.op,
+            title: None,
+            markdown: None,
+            preview: None,
+            is_current: current_revision_id.as_deref() == Some(head.rev.as_str()),
+            is_available: false,
+        })
+        .collect::<Vec<_>>();
+
+    if let Some((Some(current_rev), title, markdown)) = current_note.as_ref() {
+        if let Some(head) = heads
+            .iter_mut()
+            .find(|head| head.revision_id == *current_rev)
+        {
+            head.title = Some(title.clone());
+            head.markdown = Some(markdown.clone());
+            head.preview = Some(preview_from_markdown(markdown));
+            head.is_available = true;
+        }
+    }
+
+    if let Some(ref relay_url) = relay_url {
+        let revision_ids = heads
+            .iter()
+            .map(|head| head.revision_id.clone())
+            .collect::<Vec<_>>();
+
+        if let Ok(mut connection) = crate::adapters::nostr::relay_client::RevisionRelayConnection::connect_authenticated(relay_url, &keys).await {
+            if connection
+                .send_req_revisions("conflict-inspect", &recipient, &revision_ids)
+                .await
+                .is_ok()
+            {
+                loop {
+                    match connection.recv_message().await {
+                        Ok(crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::Event {
+                            subscription_id,
+                            event,
+                        }) if subscription_id == "conflict-inspect" => {
+                            let meta =
+                                crate::domain::sync::revision_codec::parse_revision_envelope_meta(
+                                    &event,
+                                )?;
+                            let Some(head) = heads
+                                .iter_mut()
+                                .find(|head| head.revision_id == meta.revision_id)
+                            else {
+                                continue;
+                            };
+
+                            if meta.op == "del" {
+                                head.title = head.title.clone().or_else(|| Some("Deleted".into()));
+                                head.preview = Some("Deleted".into());
+                                head.is_available = true;
+                                continue;
+                            }
+
+                            let unwrapped =
+                                crate::adapters::nostr::nip59_ext::extract_rumor(&keys, &event)?;
+                            let note = crate::domain::sync::event_codec::rumor_to_synced_note(
+                                &unwrapped.rumor,
+                            )?;
+                            head.title = Some(note.title.clone());
+                            head.preview = Some(preview_from_markdown(&note.markdown));
+                            head.markdown = Some(note.markdown);
+                            head.is_available = true;
+                        }
+                        Ok(
+                            crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::EventStatus {
+                                subscription_id,
+                                rev,
+                                status,
+                            },
+                        ) if subscription_id == "conflict-inspect" => {
+                            if status == "payload_compacted" {
+                                if let Some(head) =
+                                    heads.iter_mut().find(|head| head.revision_id == rev)
+                                {
+                                    head.preview =
+                                        Some("Payload compacted on the relay".into());
+                                }
+                            }
+                        }
+                        Ok(
+                            crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::Eose {
+                                subscription_id,
+                            },
+                        ) if subscription_id == "conflict-inspect" => break,
+                        Ok(_) => {}
+                        Err(error) => {
+                            eprintln!(
+                                "[sync] conflict inspection failed note={} relay={}: {}",
+                                note_id, relay_url, error
+                            );
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    heads.sort_by(|left, right| {
+        right
+            .is_current
+            .cmp(&left.is_current)
+            .then_with(|| right.is_available.cmp(&left.is_available))
+            .then_with(|| right.mtime.cmp(&left.mtime))
+            .then_with(|| left.revision_id.cmp(&right.revision_id))
+    });
+
+    Ok(Some(NoteConflictInfo {
+        note_id,
+        current_revision_id,
+        head_count: heads.len(),
+        relay_url,
+        heads,
+    }))
+}
+
+#[tauri::command]
+pub async fn resolve_note_conflict(app: AppHandle, note_id: String) -> Result<(), AppError> {
+    let conn = database_connection(&app)?;
+    let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
+    let recipient = keys.public_key().to_hex();
+    let document_coord =
+        crate::domain::sync::revision_codec::compute_document_coord(keys.secret_key(), &note_id);
+    let heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
+        &conn,
+        &recipient,
+        &document_coord,
+    )?;
+    if heads.len() <= 1 {
+        return Err(AppError::custom("Note is not conflicted."));
+    }
+
+    let relay_urls = crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(&conn);
+    let active_relay_url = preferred_conflict_relay_url(&conn)
+        .ok_or_else(|| AppError::custom("No sync relay configured"))?;
+    let backup_relay_urls = relay_urls
+        .into_iter()
+        .filter(|relay_url| relay_url != &active_relay_url)
+        .collect::<Vec<_>>();
+    drop(conn);
+
+    crate::adapters::nostr::revision_push::push_note_revision(
+        &app,
+        &active_relay_url,
+        &backup_relay_urls,
+        &keys,
+        &note_id,
+    )
+    .await?;
+
+    Ok(())
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 use crate::adapters::sqlite::revision_sync_repository::{
-    replace_sync_heads, replace_sync_revision_parents, upsert_sync_revision, LocalSyncHead,
-    LocalSyncRevision,
+    apply_sync_head_update, list_sync_heads_for_scope, replace_sync_revision_parents,
+    upsert_sync_revision, LocalSyncRevision,
 };
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_codec::{
@@ -42,9 +42,30 @@ pub struct PendingDeletionRevision {
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
+    pub tags: Vec<Tag>,
     pub rumor: UnsignedEvent,
     pub op: String,
     pub entity_type: String,
+}
+
+fn current_parent_revision_ids_for_scope(
+    conn: &Connection,
+    recipient: &str,
+    document_coord: &str,
+    fallback_current_rev: Option<String>,
+) -> Result<Vec<String>, AppError> {
+    let mut parent_revision_ids = list_sync_heads_for_scope(conn, recipient, document_coord)?
+        .into_iter()
+        .map(|head| head.rev)
+        .collect::<Vec<_>>();
+
+    if parent_revision_ids.is_empty() {
+        parent_revision_ids = fallback_current_rev.into_iter().collect();
+    }
+
+    parent_revision_ids.sort();
+    parent_revision_ids.dedup();
+    Ok(parent_revision_ids)
 }
 
 pub fn build_pending_note_revision(
@@ -105,15 +126,10 @@ pub fn build_pending_note_revision(
 
     let edited_at = edited_at.unwrap_or(modified_at);
 
-    // `current_rev` is the single revision currently materialized into the
-    // local note row. It is not the full sync head set for the document.
-    //
-    // When Comet creates a new local revision, it currently extends the
-    // materialized revision it last applied, while the full graph head set
-    // remains in `sync_heads`.
-    let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let parent_revision_ids =
+        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
 
     let note_tags = {
         let mut stmt =
@@ -263,17 +279,14 @@ pub fn persist_local_note_revision(
         &revision.parent_revision_ids,
     )?;
 
-    replace_sync_heads(
+    apply_sync_head_update(
         conn,
         &revision.recipient,
         &revision.document_coord,
-        &[LocalSyncHead {
-            recipient: revision.recipient.clone(),
-            d_tag: revision.document_coord.clone(),
-            rev: revision.revision_id.clone(),
-            op: revision.op.clone(),
-            mtime: revision.mtime,
-        }],
+        &revision.revision_id,
+        &revision.op,
+        revision.mtime,
+        &revision.parent_revision_ids,
     )?;
 
     // `sync_heads` is the authoritative graph head set and may eventually hold
@@ -304,12 +317,11 @@ pub fn build_pending_notebook_revision(
     let (name, updated_at, current_rev) =
         row.ok_or_else(|| AppError::custom(format!("Notebook not found: {notebook_id}")))?;
 
-    // `current_rev` tracks the single revision currently materialized into the
-    // notebook row. The full graph head set lives separately in `sync_heads`.
-    let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord =
         compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
+    let parent_revision_ids =
+        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
 
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
@@ -389,17 +401,14 @@ pub fn persist_local_notebook_revision(
         &revision.parent_revision_ids,
     )?;
 
-    replace_sync_heads(
+    apply_sync_head_update(
         conn,
         &revision.recipient,
         &revision.document_coord,
-        &[LocalSyncHead {
-            recipient: revision.recipient.clone(),
-            d_tag: revision.document_coord.clone(),
-            rev: revision.revision_id.clone(),
-            op: revision.op.clone(),
-            mtime: revision.mtime,
-        }],
+        &revision.revision_id,
+        &revision.op,
+        revision.mtime,
+        &revision.parent_revision_ids,
     )?;
 
     // `current_rev` records the revision currently applied to the notebook row.
@@ -427,12 +436,10 @@ pub fn build_pending_note_deletion_revision(
         )
         .optional()?
         .flatten();
-
-    // Deletion revisions extend the single materialized revision in the local
-    // row, not the full head set in `sync_heads`.
-    let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let parent_revision_ids =
+        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
         "recipient": recipient_hex,
@@ -447,6 +454,16 @@ pub fn build_pending_note_deletion_revision(
     .map_err(|e| AppError::custom(format!("Failed to canonicalize note deletion payload: {e}")))?;
     let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
     let rumor = crate::domain::sync::event_codec::deleted_note_rumor(note_id, keys.public_key());
+    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
+        recipient: recipient_hex.clone(),
+        document_coord: document_coord.clone(),
+        revision_id: revision_id.clone(),
+        parent_revision_ids: parent_revision_ids.clone(),
+        op: "del".to_string(),
+        mtime: now,
+        entity_type: None,
+        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
+    });
 
     Ok(PendingDeletionRevision {
         recipient: recipient_hex,
@@ -454,6 +471,7 @@ pub fn build_pending_note_deletion_revision(
         revision_id,
         parent_revision_ids,
         mtime: now,
+        tags,
         rumor,
         op: "del".to_string(),
         entity_type: "note".to_string(),
@@ -475,13 +493,11 @@ pub fn build_pending_notebook_deletion_revision(
         )
         .optional()?
         .flatten();
-
-    // Deletion revisions extend the single materialized revision in the local
-    // row, not the full head set in `sync_heads`.
-    let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord =
         compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
+    let parent_revision_ids =
+        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
         "recipient": recipient_hex,
@@ -501,6 +517,16 @@ pub fn build_pending_notebook_deletion_revision(
     let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
     let rumor =
         crate::domain::sync::event_codec::deleted_notebook_rumor(notebook_id, keys.public_key());
+    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
+        recipient: recipient_hex.clone(),
+        document_coord: document_coord.clone(),
+        revision_id: revision_id.clone(),
+        parent_revision_ids: parent_revision_ids.clone(),
+        op: "del".to_string(),
+        mtime: now,
+        entity_type: None,
+        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
+    });
 
     Ok(PendingDeletionRevision {
         recipient: recipient_hex,
@@ -508,6 +534,7 @@ pub fn build_pending_notebook_deletion_revision(
         revision_id,
         parent_revision_ids,
         mtime: now,
+        tags,
         rumor,
         op: "del".to_string(),
         entity_type: "notebook".to_string(),
@@ -543,17 +570,14 @@ pub fn persist_local_deletion_revision(
         &revision.parent_revision_ids,
     )?;
 
-    replace_sync_heads(
+    apply_sync_head_update(
         conn,
         &revision.recipient,
         &revision.document_coord,
-        &[LocalSyncHead {
-            recipient: revision.recipient.clone(),
-            d_tag: revision.document_coord.clone(),
-            rev: revision.revision_id.clone(),
-            op: revision.op.clone(),
-            mtime: revision.mtime,
-        }],
+        &revision.revision_id,
+        &revision.op,
+        revision.mtime,
+        &revision.parent_revision_ids,
     )?;
 
     Ok(())

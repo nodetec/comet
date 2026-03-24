@@ -51,6 +51,29 @@ pub struct LoadedNote {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NoteConflictHead {
+    pub revision_id: String,
+    pub mtime: i64,
+    pub op: String,
+    pub title: Option<String>,
+    pub markdown: Option<String>,
+    pub preview: Option<String>,
+    pub is_current: bool,
+    pub is_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteConflictInfo {
+    pub note_id: String,
+    pub current_revision_id: Option<String>,
+    pub head_count: usize,
+    pub relay_url: Option<String>,
+    pub heads: Vec<NoteConflictHead>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NotePagePayload {
     pub notes: Vec<NoteSummary>,
     pub has_more: bool,

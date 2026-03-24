@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
@@ -11,7 +11,11 @@ import {
   useUIStore,
 } from "@/features/settings/store/use-ui-store";
 
-import { exportNotes, loadNote } from "@/shared/api/invoke";
+import {
+  exportNotes,
+  loadNote,
+  resolveNoteConflict,
+} from "@/shared/api/invoke";
 import {
   type LoadedNote,
   type NoteSortDirection,
@@ -115,6 +119,7 @@ export function useShellController() {
     todoCountQuery,
     notesQuery,
     noteQuery,
+    noteConflictQuery,
     currentNotes,
     notebooks,
     activeNotebook,
@@ -247,6 +252,7 @@ export function useShellController() {
   ]);
 
   const currentNote = noteQuery.data;
+  const currentNoteConflict = noteConflictQuery.data;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
     (bootstrapQuery.isSuccess &&
@@ -317,6 +323,25 @@ export function useShellController() {
       markdown: draftMarkdown,
     });
   };
+
+  const resolveNoteConflictMutation = useMutation({
+    mutationFn: resolveNoteConflict,
+    onSuccess: async (noteId) => {
+      toast.success("Conflict resolution published.", {
+        id: "resolve-note-conflict-success",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["note", noteId] }),
+        queryClient.invalidateQueries({ queryKey: ["note-conflict", noteId] }),
+        queryClient.invalidateQueries({ queryKey: ["notes"] }),
+        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
+      ]);
+    },
+    onError: toastErrorHandler(
+      "Couldn't resolve note conflict",
+      "resolve-note-conflict-error",
+    ),
+  });
 
   const discardPendingSave = () => {
     if (pendingSaveTimeoutRef.current !== null) {
@@ -702,6 +727,28 @@ export function useShellController() {
     handleSetNotePinned,
     handleSetNoteReadonly,
     handleToggleTag,
+    async handleResolveCurrentNoteConflict() {
+      if (!currentNote) {
+        return;
+      }
+
+      if (
+        draftNoteId === currentNote.id &&
+        draftMarkdown !== currentNote.markdown
+      ) {
+        await flushCurrentDraftAsync();
+        return;
+      }
+
+      await resolveNoteConflictMutation.mutateAsync(currentNote.id);
+    },
+    handleLoadConflictHead(markdown: string) {
+      if (!currentNote) {
+        return;
+      }
+      setDraft(currentNote.id, markdown);
+      setSyncEditorRevision((revision) => revision + 1);
+    },
     submitNotebook,
     submitRenameNotebook,
   };
@@ -722,6 +769,7 @@ export function useShellController() {
         currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
+      noteConflict: currentNoteConflict ?? null,
       notebook: currentNote?.notebook ?? null,
       notebooks,
       noteId:
@@ -735,6 +783,7 @@ export function useShellController() {
       readonly: currentNote?.readonly ?? false,
       searchQuery,
       isDeletePublishedNotePending,
+      isResolveConflictPending: resolveNoteConflictMutation.isPending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           latestRef.current.handleAssignNoteNotebook(
@@ -797,15 +846,25 @@ export function useShellController() {
       onFocusHandled() {
         setEditorFocusMode("none");
       },
+      onLoadConflictHead(markdown: string) {
+        latestRef.current.handleLoadConflictHead(markdown);
+      },
+      onResolveConflict() {
+        void latestRef.current
+          .handleResolveCurrentNoteConflict()
+          .catch(() => {});
+      },
     }),
     [
       creatingSelectedNoteId,
       currentEditorMarkdown,
+      currentNoteConflict,
       currentNote,
       displayedSelectedNoteId,
       editorFocusMode,
       isDeletePublishedNotePending,
       isCreatingNote,
+      resolveNoteConflictMutation.isPending,
       notebooks,
       isPublishNotePending,
       isPublishShortNotePending,

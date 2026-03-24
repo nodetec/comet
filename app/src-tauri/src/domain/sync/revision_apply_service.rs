@@ -1,6 +1,7 @@
 use crate::adapters::sqlite::revision_sync_repository::{
-    get_sync_relay_state, replace_sync_heads, replace_sync_revision_parents,
-    upsert_sync_relay_state, upsert_sync_revision, LocalSyncHead, LocalSyncRevision,
+    apply_sync_head_update, get_sync_relay_state, list_sync_heads_for_scope,
+    replace_sync_revision_parents, upsert_sync_relay_state, upsert_sync_revision,
+    LocalSyncRevision,
 };
 use crate::domain::sync::event_codec::{
     is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
@@ -54,12 +55,7 @@ pub fn apply_remote_revision_event(
             .and_then(|tag| tag.content())
             .ok_or_else(|| AppError::custom("Missing d tag in deletion revision rumor"))?
             .to_string();
-
-        if is_notebook_rumor(&unwrapped.rumor) {
-            delete_notebook_from_sync(conn, &entity_id)?;
-        } else {
-            delete_note_from_sync(conn, &entity_id, |note_id| invalidate_cache(note_id))?;
-        }
+        let is_notebook = is_notebook_rumor(&unwrapped.rumor);
 
         upsert_sync_revision(
             conn,
@@ -85,25 +81,33 @@ pub fn apply_remote_revision_event(
             &meta.parent_revision_ids,
         )?;
         // `sync_heads` stores the authoritative graph head set for this
-        // document scope. The materialized row in `notes` / `notebooks` keeps a
-        // separate single `current_rev` pointer to the revision this device
-        // actually applied into local state.
-        replace_sync_heads(
+        // document scope. Each incoming revision removes any parent heads it
+        // supersedes and becomes a new head itself.
+        apply_sync_head_update(
             conn,
             &meta.recipient,
             &meta.document_coord,
-            &[LocalSyncHead {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-            }],
+            &meta.revision_id,
+            &meta.op,
+            meta.mtime,
+            &meta.parent_revision_ids,
         )?;
-        Some(SyncChangePayload {
-            note_id: entity_id,
-            action: "delete".to_string(),
-        })
+        let remaining_heads =
+            list_sync_heads_for_scope(conn, &meta.recipient, &meta.document_coord)?;
+        let has_content_head = remaining_heads.iter().any(|head| head.op == "put");
+        if has_content_head {
+            None
+        } else {
+            if is_notebook {
+                delete_notebook_from_sync(conn, &entity_id)?;
+            } else {
+                delete_note_from_sync(conn, &entity_id, |note_id| invalidate_cache(note_id))?;
+            }
+            Some(SyncChangePayload {
+                note_id: entity_id,
+                action: "delete".to_string(),
+            })
+        }
     } else if is_notebook_rumor(&unwrapped.rumor) {
         let notebook = rumor_to_synced_notebook(&unwrapped.rumor)?;
         validate_revision_payload_mtime(meta.mtime, notebook.updated_at, "notebook")?;
@@ -134,17 +138,14 @@ pub fn apply_remote_revision_event(
         )?;
         // `sync_heads` tracks the full graph head set; `current_rev` below
         // records which single revision this notebook row is materialized from.
-        replace_sync_heads(
+        apply_sync_head_update(
             conn,
             &meta.recipient,
             &meta.document_coord,
-            &[LocalSyncHead {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-            }],
+            &meta.revision_id,
+            &meta.op,
+            meta.mtime,
+            &meta.parent_revision_ids,
         )?;
         conn.execute(
             "UPDATE notebooks SET current_rev = ?1 WHERE id = ?2",
@@ -201,17 +202,14 @@ pub fn apply_remote_revision_event(
         // `sync_heads` is the graph truth for this document scope. `current_rev`
         // is only updated when the note row was actually materialized from this
         // revision.
-        replace_sync_heads(
+        apply_sync_head_update(
             conn,
             &meta.recipient,
             &meta.document_coord,
-            &[LocalSyncHead {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-            }],
+            &meta.revision_id,
+            &meta.op,
+            meta.mtime,
+            &meta.parent_revision_ids,
         )?;
 
         if updated.is_some() {

@@ -169,6 +169,7 @@ pub fn replace_sync_revision_parents(
     Ok(())
 }
 
+#[cfg(test)]
 pub fn replace_sync_heads(
     conn: &Connection,
     recipient: &str,
@@ -189,6 +190,32 @@ pub fn replace_sync_heads(
             params![head.recipient, head.d_tag, head.rev, head.op, head.mtime],
         )?;
     }
+
+    Ok(())
+}
+
+pub fn apply_sync_head_update(
+    conn: &Connection,
+    recipient: &str,
+    d_tag: &str,
+    rev: &str,
+    op: &str,
+    mtime: i64,
+    parent_revs: &[String],
+) -> Result<(), AppError> {
+    for parent_rev in parent_revs {
+        conn.execute(
+            "DELETE FROM sync_heads
+             WHERE recipient = ?1 AND d_tag = ?2 AND rev = ?3",
+            params![recipient, d_tag, parent_rev],
+        )?;
+    }
+
+    conn.execute(
+        "INSERT OR REPLACE INTO sync_heads (recipient, d_tag, rev, op, mtime)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![recipient, d_tag, rev, op, mtime],
+    )?;
 
     Ok(())
 }
@@ -215,6 +242,30 @@ pub fn list_sync_heads_for_recipient(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+pub fn list_sync_heads_for_scope(
+    conn: &Connection,
+    recipient: &str,
+    d_tag: &str,
+) -> Result<Vec<LocalSyncHead>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT recipient, d_tag, rev, op, mtime
+         FROM sync_heads
+         WHERE recipient = ?1 AND d_tag = ?2
+         ORDER BY mtime DESC, rev ASC",
+    )?;
+    let rows = stmt.query_map(params![recipient, d_tag], |row| {
+        Ok(LocalSyncHead {
+            recipient: row.get(0)?,
+            d_tag: row.get(1)?,
+            rev: row.get(2)?,
+            op: row.get(3)?,
+            mtime: row.get(4)?,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+#[cfg(test)]
 pub fn get_sync_head(
     conn: &Connection,
     recipient: &str,
@@ -243,6 +294,7 @@ pub fn get_sync_head(
     .map_err(Into::into)
 }
 
+#[cfg(test)]
 pub fn list_sync_revision_parents(
     conn: &Connection,
     recipient: &str,
@@ -333,6 +385,54 @@ mod tests {
         assert_eq!(
             heads[0].rev,
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+    }
+
+    #[test]
+    fn apply_sync_head_update_preserves_conflicting_heads() {
+        let conn = setup_db();
+
+        apply_sync_head_update(
+            &conn,
+            "recipient-1",
+            "doc-1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "put",
+            1000,
+            &[],
+        )
+        .unwrap();
+
+        apply_sync_head_update(
+            &conn,
+            "recipient-1",
+            "doc-1",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "put",
+            2000,
+            &["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()],
+        )
+        .unwrap();
+
+        apply_sync_head_update(
+            &conn,
+            "recipient-1",
+            "doc-1",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "put",
+            2000,
+            &["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()],
+        )
+        .unwrap();
+
+        let heads = list_sync_heads_for_scope(&conn, "recipient-1", "doc-1").unwrap();
+        assert_eq!(heads.len(), 2);
+        assert_eq!(
+            heads.iter().map(|head| head.rev.as_str()).collect::<Vec<_>>(),
+            vec![
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            ]
         );
     }
 }
