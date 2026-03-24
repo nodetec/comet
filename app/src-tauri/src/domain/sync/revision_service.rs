@@ -105,6 +105,12 @@ pub fn build_pending_note_revision(
 
     let edited_at = edited_at.unwrap_or(modified_at);
 
+    // `current_rev` is the single revision currently materialized into the
+    // local note row. It is not the full sync head set for the document.
+    //
+    // When Comet creates a new local revision, it currently extends the
+    // materialized revision it last applied, while the full graph head set
+    // remains in `sync_heads`.
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord = compute_document_coord(keys.secret_key(), note_id);
@@ -270,6 +276,9 @@ pub fn persist_local_note_revision(
         }],
     )?;
 
+    // `sync_heads` is the authoritative graph head set and may eventually hold
+    // multiple conflicting heads for the same document. `current_rev` is only
+    // the single revision this local note row is materialized from.
     conn.execute(
         "UPDATE notes SET current_rev = ?1 WHERE id = ?2",
         params![revision.revision_id, revision.note_id],
@@ -295,6 +304,8 @@ pub fn build_pending_notebook_revision(
     let (name, updated_at, current_rev) =
         row.ok_or_else(|| AppError::custom(format!("Notebook not found: {notebook_id}")))?;
 
+    // `current_rev` tracks the single revision currently materialized into the
+    // notebook row. The full graph head set lives separately in `sync_heads`.
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord =
@@ -391,6 +402,8 @@ pub fn persist_local_notebook_revision(
         }],
     )?;
 
+    // `current_rev` records the revision currently applied to the notebook row.
+    // It is not a substitute for the graph head set in `sync_heads`.
     conn.execute(
         "UPDATE notebooks SET current_rev = ?1 WHERE id = ?2",
         params![revision.revision_id, revision.notebook_id],
@@ -415,6 +428,8 @@ pub fn build_pending_note_deletion_revision(
         .optional()?
         .flatten();
 
+    // Deletion revisions extend the single materialized revision in the local
+    // row, not the full head set in `sync_heads`.
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord = compute_document_coord(keys.secret_key(), note_id);
@@ -461,6 +476,8 @@ pub fn build_pending_notebook_deletion_revision(
         .optional()?
         .flatten();
 
+    // Deletion revisions extend the single materialized revision in the local
+    // row, not the full head set in `sync_heads`.
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
     let document_coord =

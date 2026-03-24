@@ -18,6 +18,8 @@ use url::Url;
 
 pub struct RevisionBootstrapResult {
     pub connection: RevisionRelayConnection,
+    // `NEG-STATUS.snapshot_seq`: the relay sequence boundary that separates the
+    // negotiated head snapshot from the live `CHANGES` tail that follows it.
     pub snapshot_seq: i64,
     pub have: Vec<String>,
     pub need: Vec<String>,
@@ -259,6 +261,8 @@ async fn bootstrap_with_keys_and_changes(
     }
 
     let conn = open_sync_db(db_path)?;
+    // Record the Negentropy handoff boundary so the live `CHANGES` subscription
+    // can resume from the exact snapshot we just reconciled against.
     upsert_sync_relay_state(
         &conn,
         relay_ws_url,

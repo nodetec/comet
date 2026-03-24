@@ -74,6 +74,9 @@ pub(super) async fn run_revision_sync_connection(
     }
 
     let recipient = bootstrap.recipient.clone();
+    // `snapshot_seq` is the bootstrap handoff boundary returned by Negentropy.
+    // The live `CHANGES` subscription starts from that boundary, while
+    // `checkpoint_seq` later advances as events are actually applied.
     let snapshot_seq = bootstrap.snapshot_seq;
     let mut connection = bootstrap.connection;
     let backup_relay_urls = configured_relay_urls
@@ -239,17 +242,21 @@ async fn handle_revision_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
+            let relay_state = crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
+                &conn, relay_url,
+            )?;
             let min_payload_mtime =
-                crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
-                    &conn, relay_url,
-                )?
-                .and_then(|state| state.min_payload_mtime);
+                relay_state.as_ref().and_then(|state| state.min_payload_mtime);
+            let snapshot_seq = relay_state.as_ref().and_then(|state| state.snapshot_seq);
             crate::adapters::sqlite::sync_repository::save_checkpoint(&conn, last_seq);
+            // `last_seq` is the live `CHANGES` progress marker. Preserve the
+            // original bootstrap `snapshot_seq` so the handoff boundary remains
+            // distinguishable from the live checkpoint.
             crate::adapters::sqlite::revision_sync_repository::upsert_sync_relay_state(
                 &conn,
                 relay_url,
                 Some(last_seq),
-                Some(last_seq),
+                snapshot_seq,
                 Some(crate::domain::common::time::now_millis()),
                 min_payload_mtime,
             )?;

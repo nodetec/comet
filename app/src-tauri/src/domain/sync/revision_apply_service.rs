@@ -1,6 +1,6 @@
 use crate::adapters::sqlite::revision_sync_repository::{
-    replace_sync_heads, replace_sync_revision_parents, upsert_sync_relay_state,
-    upsert_sync_revision, LocalSyncHead, LocalSyncRevision,
+    get_sync_relay_state, replace_sync_heads, replace_sync_revision_parents,
+    upsert_sync_relay_state, upsert_sync_revision, LocalSyncHead, LocalSyncRevision,
 };
 use crate::domain::sync::event_codec::{
     is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
@@ -84,6 +84,10 @@ pub fn apply_remote_revision_event(
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
+        // `sync_heads` stores the authoritative graph head set for this
+        // document scope. The materialized row in `notes` / `notebooks` keeps a
+        // separate single `current_rev` pointer to the revision this device
+        // actually applied into local state.
         replace_sync_heads(
             conn,
             &meta.recipient,
@@ -128,6 +132,8 @@ pub fn apply_remote_revision_event(
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
+        // `sync_heads` tracks the full graph head set; `current_rev` below
+        // records which single revision this notebook row is materialized from.
         replace_sync_heads(
             conn,
             &meta.recipient,
@@ -192,6 +198,9 @@ pub fn apply_remote_revision_event(
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
+        // `sync_heads` is the graph truth for this document scope. `current_rev`
+        // is only updated when the note row was actually materialized from this
+        // revision.
         replace_sync_heads(
             conn,
             &meta.recipient,
@@ -221,16 +230,14 @@ pub fn apply_remote_revision_event(
     };
 
     if let Some(stored_seq) = stored_seq {
-        let min_payload_mtime =
-            crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
-                conn, relay_url,
-            )?
-            .and_then(|state| state.min_payload_mtime);
+        let state = get_sync_relay_state(conn, relay_url)?;
+        let min_payload_mtime = state.as_ref().and_then(|state| state.min_payload_mtime);
+        let snapshot_seq = state.as_ref().and_then(|state| state.snapshot_seq);
         upsert_sync_relay_state(
             conn,
             relay_url,
             Some(stored_seq),
-            Some(stored_seq),
+            snapshot_seq,
             Some(crate::domain::common::time::now_millis()),
             min_payload_mtime,
         )?;
@@ -338,6 +345,83 @@ mod tests {
             change.map(|payload| (payload.note_id, payload.action)),
             Some(("note-1".to_string(), "upsert".to_string()))
         );
+    }
+
+    #[test]
+    fn live_apply_advances_checkpoint_without_overwriting_snapshot_seq() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let recipient = keys.public_key();
+        let relay_url = "wss://relay.example";
+        let note_id = "note-1";
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
+
+        upsert_sync_relay_state(&conn, relay_url, None, Some(12), Some(1000), Some(500)).unwrap();
+
+        let canonical_payload = canonicalize_revision_payload(
+            &recipient.to_hex(),
+            &document_coord,
+            &[],
+            "put",
+            "note",
+            "Title",
+            "# Title\n\nBody",
+            None,
+            100,
+            200,
+            200,
+            None,
+            None,
+            None,
+            false,
+            &[],
+        )
+        .unwrap();
+        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
+        let rumor = build_revision_note_rumor(
+            RevisionRumorInput {
+                document_id: note_id,
+                title: "Title",
+                markdown: "# Title\n\nBody",
+                notebook_id: None,
+                created_at: 100,
+                modified_at: 200,
+                edited_at: 200,
+                archived_at: None,
+                deleted_at: None,
+                pinned_at: None,
+                readonly: false,
+                tags: &[],
+                blob_tags: &[],
+                entity_type: "note",
+                parent_revision_ids: &[],
+                op: "put",
+            },
+            keys.public_key(),
+        );
+        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
+            &keys,
+            &recipient,
+            rumor,
+            revision_envelope_tags(&RevisionEnvelopeMeta {
+                recipient: recipient.to_hex(),
+                document_coord,
+                revision_id,
+                parent_revision_ids: vec![],
+                op: "put".into(),
+                mtime: 200,
+                entity_type: None,
+                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
+            }),
+        )
+        .unwrap();
+
+        apply_remote_revision_event(&conn, relay_url, &keys, &event, Some(20), |_| {}).unwrap();
+
+        let state = get_sync_relay_state(&conn, relay_url).unwrap().unwrap();
+        assert_eq!(state.snapshot_seq, Some(12));
+        assert_eq!(state.checkpoint_seq, Some(20));
+        assert_eq!(state.min_payload_mtime, Some(500));
     }
 
     #[test]

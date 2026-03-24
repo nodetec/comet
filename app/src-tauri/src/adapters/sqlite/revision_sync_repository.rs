@@ -5,7 +5,13 @@ use rusqlite::{params, Connection, OptionalExtension};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncRelayState {
     pub relay_url: String,
+    // Last applied `CHANGES` sequence for this relay. This advances during the
+    // live subscription after bootstrap.
     pub checkpoint_seq: Option<i64>,
+    // Bootstrap handoff boundary returned by `NEG-STATUS.snapshot_seq`. Live
+    // `CHANGES` starts from this boundary, but the value itself should remain
+    // the bootstrap snapshot marker rather than being overwritten on every
+    // live event.
     pub snapshot_seq: Option<i64>,
     pub last_synced_at: Option<i64>,
     pub min_payload_mtime: Option<i64>,
@@ -76,6 +82,13 @@ pub fn upsert_sync_relay_state(
     last_synced_at: Option<i64>,
     min_payload_mtime: Option<i64>,
 ) -> Result<(), AppError> {
+    // This helper stores two distinct relay progress markers:
+    //
+    // - `snapshot_seq`: the bootstrap handoff boundary returned by Negentropy
+    // - `checkpoint_seq`: the last applied live `CHANGES` position
+    //
+    // Callers should preserve `snapshot_seq` once bootstrap has recorded it,
+    // and only advance `checkpoint_seq` during live catch-up / streaming.
     add_sync_relay(conn, relay_url)?;
     conn.execute(
         "INSERT INTO sync_relay_state
@@ -162,6 +175,8 @@ pub fn replace_sync_heads(
     d_tag: &str,
     heads: &[LocalSyncHead],
 ) -> Result<(), AppError> {
+    // `sync_heads` stores the full current head set for one sync document
+    // scope. A document may have more than one head here during a conflict.
     conn.execute(
         "DELETE FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
         params![recipient, d_tag],
@@ -205,6 +220,9 @@ pub fn get_sync_head(
     recipient: &str,
     d_tag: &str,
 ) -> Result<Option<LocalSyncHead>, AppError> {
+    // This helper returns one head row when the caller expects a single-head
+    // scope. It should not be treated as "the" authoritative head if the
+    // document is conflicted and `sync_heads` contains multiple rows.
     conn.query_row(
         "SELECT recipient, d_tag, rev, op, mtime
          FROM sync_heads

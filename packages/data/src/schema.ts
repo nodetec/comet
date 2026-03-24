@@ -186,6 +186,8 @@ export const relayEventTags = pgTable(
   ],
 );
 
+// Immutable revision metadata keyed by recipient + document scope + revision id.
+// This is the revision graph record, not the app's current materialized state.
 export const syncRevisions = pgTable(
   "sync_revisions",
   {
@@ -234,6 +236,12 @@ export const syncRevisionParents = pgTable(
   ],
 );
 
+// The full current head set for each sync document scope. This may contain
+// multiple rows for a single `(recipient, d_tag)` when the document is
+// conflicted.
+//
+// App-local `current_rev` pointers are a separate materialization concern and
+// intentionally do not replace this head set.
 export const syncHeads = pgTable(
   "sync_heads",
   {
