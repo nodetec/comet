@@ -2,6 +2,7 @@ use crate::adapters::sqlite::revision_sync_repository::{
     replace_sync_heads, replace_sync_revision_parents, upsert_sync_revision, LocalSyncHead,
     LocalSyncRevision,
 };
+use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_codec::{
     build_revision_note_rumor, canonicalize_revision_payload, compute_document_d_tag,
     compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
@@ -114,6 +115,52 @@ pub fn build_pending_note_revision(
         let rows = stmt.query_map(params![note_id], |row| row.get(0))?;
         rows.collect::<Result<Vec<String>, _>>()?
     };
+    let preferred_blossom_url: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'blossom_url'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let mut blob_tags = Vec::new();
+    let mut seen_hashes = std::collections::HashSet::new();
+    for hash in extract_attachment_hashes(&markdown) {
+        if !seen_hashes.insert(hash.clone()) {
+            continue;
+        }
+
+        let meta: Option<(String, String)> = if let Some(ref blossom_url) = preferred_blossom_url {
+            conn.query_row(
+                "SELECT ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND pubkey = ?2
+                 ORDER BY CASE WHEN server_url = ?3 THEN 0 ELSE 1 END, rowid DESC
+                 LIMIT 1",
+                params![hash, recipient_hex, blossom_url],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+        } else {
+            conn.query_row(
+                "SELECT ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND pubkey = ?2
+                 ORDER BY rowid DESC
+                 LIMIT 1",
+                params![hash, recipient_hex],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+        };
+
+        if let Some((ciphertext_hash, key_hex)) = meta {
+            blob_tags.push((hash, ciphertext_hash, key_hex));
+        } else if preferred_blossom_url.is_some() {
+            return Err(AppError::custom(format!(
+                "Missing encrypted blob metadata for attachment: {hash}"
+            )));
+        }
+    }
 
     let canonical_payload = canonicalize_revision_payload(
         &recipient_hex,
@@ -149,6 +196,7 @@ pub fn build_pending_note_revision(
             pinned_at,
             readonly,
             tags: &note_tags,
+            blob_tags: &blob_tags,
             entity_type: "note",
             parent_revision_ids: &parent_revision_ids,
             op: "put",
@@ -530,6 +578,50 @@ mod tests {
         assert_eq!(revision.recipient, recipient.to_hex());
         assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "r"));
         assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "m"));
+    }
+
+    #[test]
+    fn builds_note_revision_with_blob_tags_from_metadata() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let recipient = Keys::generate().public_key();
+        let hash = "a".repeat(64);
+        let ciphertext_hash = "b".repeat(64);
+        let key_hex = "c".repeat(64);
+
+        conn.execute(
+            "UPDATE notes SET markdown = ?1 WHERE id = 'note-1'",
+            params![format!("# Title\n\n![img](attachment://{hash}.png)")],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('blossom_url', 'https://blobs.example.com')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
+             VALUES (?1, 'https://blobs.example.com', ?2, ?3, ?4)",
+            params![hash, recipient.to_hex(), ciphertext_hash, key_hex],
+        )
+        .unwrap();
+
+        let revision = build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
+        let blob_tag = revision
+            .rumor
+            .tags
+            .find(TagKind::custom("blob"))
+            .expect("blob tag should be present");
+
+        assert_eq!(
+            blob_tag.as_slice(),
+            vec![
+                "blob".to_string(),
+                hash,
+                ciphertext_hash,
+                key_hex,
+            ]
+        );
     }
 
     #[test]

@@ -21,6 +21,7 @@ pub struct RevisionRumorInput<'a> {
     pub pinned_at: Option<i64>,
     pub readonly: bool,
     pub tags: &'a [String],
+    pub blob_tags: &'a [(String, String, String)],
     pub entity_type: &'a str,
     pub parent_revision_ids: &'a [String],
     pub op: &'a str,
@@ -205,6 +206,17 @@ pub fn build_revision_note_rumor(
 
     for tag in input.tags {
         tags.push(Tag::hashtag(tag));
+    }
+
+    for (plaintext_hash, ciphertext_hash, key_hex) in input.blob_tags {
+        tags.push(Tag::custom(
+            TagKind::custom("blob"),
+            vec![
+                plaintext_hash.clone(),
+                ciphertext_hash.clone(),
+                key_hex.clone(),
+            ],
+        ));
     }
 
     EventBuilder::new(Kind::ApplicationSpecificData, content)

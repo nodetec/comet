@@ -11,7 +11,7 @@ use crate::domain::sync::service::{
 };
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 
 pub fn apply_remote_revision_event(
     conn: &Connection,
@@ -23,6 +23,13 @@ pub fn apply_remote_revision_event(
 ) -> Result<(), AppError> {
     let meta = parse_revision_envelope_meta(event)?;
     let unwrapped = crate::adapters::nostr::nip59_ext::extract_rumor(keys, event)?;
+    let preferred_blossom_url: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'blossom_url'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
 
     if is_deleted_rumor(&unwrapped.rumor) {
         let entity_id = unwrapped
@@ -118,6 +125,21 @@ pub fn apply_remote_revision_event(
             params![meta.revision_id, notebook.id],
         )?;
     } else {
+        if let Some(ref blossom_url) = preferred_blossom_url {
+            let pubkey_hex = keys.public_key().to_hex();
+            for tag in unwrapped.rumor.tags.filter(TagKind::custom("blob")) {
+                let parts = tag.as_slice();
+                if parts.len() < 4 {
+                    continue;
+                }
+                conn.execute(
+                    "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![parts[1], blossom_url, pubkey_hex, parts[2], parts[3]],
+                )?;
+            }
+        }
+
         let note = rumor_to_synced_note(&unwrapped.rumor)?;
         let note_id = note.id.clone();
         let updated = upsert_from_sync(conn, &note, &event.id.to_hex())?;
@@ -245,6 +267,7 @@ mod tests {
                 pinned_at: None,
                 readonly: false,
                 tags: &["alpha".to_string()],
+                blob_tags: &[],
                 entity_type: "note",
                 parent_revision_ids: &[],
                 op: "put",
@@ -279,6 +302,106 @@ mod tests {
             )
             .unwrap();
         assert_eq!(current_rev, Some(revision_id));
+    }
+
+    #[test]
+    fn applies_remote_note_revision_persists_blob_metadata() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let recipient = keys.public_key();
+        let note_id = "note-blob";
+        let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+        let hash = "a".repeat(64);
+        let ciphertext_hash = "b".repeat(64);
+        let key_hex = "c".repeat(64);
+
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('blossom_url', 'https://blobs.example.com')",
+            [],
+        )
+        .unwrap();
+
+        let markdown = format!("# Title\n\n![img](attachment://{hash}.png)");
+        let canonical_payload = canonicalize_revision_payload(
+            &recipient.to_hex(),
+            &d_tag,
+            &[],
+            "put",
+            "note",
+            "Title",
+            &markdown,
+            None,
+            100,
+            200,
+            200,
+            None,
+            None,
+            None,
+            false,
+            &[],
+        )
+        .unwrap();
+        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
+        let rumor = build_revision_note_rumor(
+            RevisionRumorInput {
+                document_id: note_id,
+                title: "Title",
+                markdown: &markdown,
+                notebook_id: None,
+                created_at: 100,
+                modified_at: 200,
+                edited_at: 200,
+                archived_at: None,
+                deleted_at: None,
+                pinned_at: None,
+                readonly: false,
+                tags: &[],
+                blob_tags: &[(hash.clone(), ciphertext_hash.clone(), key_hex.clone())],
+                entity_type: "note",
+                parent_revision_ids: &[],
+                op: "put",
+            },
+            keys.public_key(),
+        );
+        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
+            &keys,
+            &recipient,
+            rumor,
+            revision_envelope_tags(&RevisionEnvelopeMeta {
+                recipient: recipient.to_hex(),
+                d_tag: d_tag.clone(),
+                revision_id: revision_id.clone(),
+                parent_revision_ids: vec![],
+                op: "put".into(),
+                mtime: 200,
+                entity_type: Some("note".into()),
+                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
+            }),
+        )
+        .unwrap();
+
+        apply_remote_revision_event(&conn, "ws://relay.example", &keys, &event, Some(1), |_| {})
+            .unwrap();
+
+        let stored: Option<(String, String, String)> = conn
+            .query_row(
+                "SELECT server_url, ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND pubkey = ?2",
+                params![hash, recipient.to_hex()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .unwrap();
+
+        assert_eq!(
+            stored,
+            Some((
+                "https://blobs.example.com".to_string(),
+                ciphertext_hash,
+                key_hex,
+            ))
+        );
     }
 
     #[test]

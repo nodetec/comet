@@ -6,7 +6,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 pub const DEFAULT_SYNC_RELAY: &str = "wss://relay.comet.md";
 pub const DEFAULT_PUBLISH_RELAY: &str = "wss://relay.damus.io";
-pub const DEFAULT_BLOSSOM_URL: &str = "https://blossom.comet.md";
+pub const DEFAULT_BLOSSOM_URL: &str = "https://media.comet.md";
 
 pub fn ensure_default_settings(conn: &Connection) -> Result<(), AppError> {
     let now = now_millis();

@@ -2,7 +2,9 @@ use crate::adapters::nostr::relay_client::{RevisionRelayConnection, RevisionRela
 use crate::adapters::sqlite::revision_sync_repository::{
     get_sync_head, list_sync_revision_parents,
 };
+use crate::adapters::sqlite::sync_repository::get_blossom_url;
 use crate::db::database_connection;
+use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_codec::{
     revision_envelope_tags, RevisionEnvelopeMeta, REVISION_SYNC_SCHEMA_VERSION,
 };
@@ -13,6 +15,7 @@ use crate::domain::sync::revision_service::{
 };
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
+use rusqlite::{params, OptionalExtension};
 use tauri::AppHandle;
 
 use super::sync_manager::sync_log;
@@ -24,6 +27,8 @@ pub async fn push_note_revision(
     keys: &Keys,
     note_id: &str,
 ) -> Result<(), AppError> {
+    maybe_upload_note_attachments(app, note_id, keys).await?;
+
     let recipient = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
@@ -47,6 +52,159 @@ pub async fn push_note_revision(
             fanout.success_count, fanout.relay_count
         ),
     );
+    Ok(())
+}
+
+async fn maybe_upload_note_attachments(
+    app: &AppHandle,
+    note_id: &str,
+    keys: &Keys,
+) -> Result<(), AppError> {
+    let (blossom_url, markdown) = {
+        let conn = database_connection(app)?;
+        let blossom_url = get_blossom_url(&conn);
+        let markdown: String = conn.query_row(
+            "SELECT markdown FROM notes WHERE id = ?1",
+            rusqlite::params![note_id],
+            |row| row.get(0),
+        )?;
+        (blossom_url, markdown)
+    };
+
+    let attachment_hashes = extract_attachment_hashes(&markdown);
+    if attachment_hashes.is_empty() {
+        sync_log(app, &format!("revision blossom skip note={note_id}: no attachments"));
+        return Ok(());
+    }
+
+    let Some(blossom_url) = blossom_url else {
+        sync_log(
+            app,
+            &format!(
+                "revision blossom skip note={note_id}: attachments={} but no blossom url configured",
+                attachment_hashes.len()
+            ),
+        );
+        return Ok(());
+    };
+
+    sync_log(
+        app,
+        &format!(
+            "revision blossom upload note={note_id} attachments={} url={}",
+            attachment_hashes.len(),
+            blossom_url
+        ),
+    );
+
+    let http_client = reqwest::Client::new();
+    let pubkey_hex = keys.public_key().to_hex();
+    let mut unique_hashes = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for hash in attachment_hashes {
+        if seen.insert(hash.clone()) {
+            unique_hashes.push(hash);
+        }
+    }
+
+    let mut uploaded = 0usize;
+    let mut reused = 0usize;
+
+    for hash in unique_hashes {
+        let existing: Option<(String, String)> = {
+            let conn = database_connection(app)?;
+            conn.query_row(
+                "SELECT ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                params![hash, blossom_url, pubkey_hex],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+        };
+
+        if let Some((ciphertext_hash, _)) = existing {
+            let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
+            let exists = http_client
+                .head(&head_url)
+                .send()
+                .await
+                .map(|response| response.status().is_success())
+                .unwrap_or(false);
+
+            if exists {
+                reused += 1;
+                sync_log(
+                    app,
+                    &format!(
+                        "revision blossom reuse note={note_id} plaintext={} ciphertext={}",
+                        &hash[..8.min(hash.len())],
+                        &ciphertext_hash[..8.min(ciphertext_hash.len())]
+                    ),
+                );
+                continue;
+            }
+
+            let conn = database_connection(app)?;
+            conn.execute(
+                "DELETE FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                params![hash, blossom_url, pubkey_hex],
+            )?;
+            sync_log(
+                app,
+                &format!(
+                    "revision blossom stale metadata cleared note={note_id} plaintext={}",
+                    &hash[..8.min(hash.len())]
+                ),
+            );
+        }
+
+        let (blob_data, _) = crate::adapters::filesystem::attachments::read_blob(app, &hash)?
+            .ok_or_else(|| {
+                AppError::custom(format!(
+                    "Local attachment missing for revision sync: {hash}"
+                ))
+            })?;
+
+        let (ciphertext, key_hex) = crate::adapters::blossom::client::encrypt_blob(&blob_data)?;
+        let ciphertext_hash =
+            crate::adapters::blossom::client::upload_blob(&http_client, &blossom_url, ciphertext, keys)
+                .await?;
+
+        let conn = database_connection(app)?;
+        conn.execute(
+            "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![hash, blossom_url, pubkey_hex, ciphertext_hash, key_hex],
+        )?;
+        conn.execute(
+            "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at)
+             VALUES (?1, ?2, 1, ?3, ?4)",
+            params![
+                ciphertext_hash,
+                blossom_url,
+                blob_data.len() as i64,
+                crate::domain::common::time::now_millis()
+            ],
+        )?;
+
+        uploaded += 1;
+        sync_log(
+            app,
+            &format!(
+                "revision blossom encrypted upload note={note_id} plaintext={} ciphertext={} bytes={}",
+                &hash[..8.min(hash.len())],
+                &ciphertext_hash[..8.min(ciphertext_hash.len())],
+                blob_data.len()
+            ),
+        );
+    }
+
+    sync_log(
+        app,
+        &format!("revision blossom ready note={note_id} uploaded={uploaded} reused={reused}"),
+    );
+
     Ok(())
 }
 
@@ -440,6 +598,7 @@ mod tests {
                 pinned_at: None,
                 readonly: false,
                 tags: &[],
+                blob_tags: &[],
                 entity_type: "note",
                 parent_revision_ids: &[],
                 op: "put",

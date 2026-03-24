@@ -428,6 +428,102 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn bootstraps_revision_blob_metadata_without_rewriting_attachment_urls() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
+        let keys = Keys::generate();
+        let relay = TestRevisionRelay::start(39441).await;
+        let hash = "a".repeat(64);
+        let ciphertext_hash = "b".repeat(64);
+        let key_hex = "c".repeat(64);
+        let markdown = format!("# Blob Title\n\n![img](attachment://{hash}.png)");
+
+        let temp_dir = std::env::temp_dir();
+        let source_db_path = temp_dir.join(format!(
+            "comet-revision-blob-source-test-{}.db",
+            std::process::id()
+        ));
+        let destination_db_path = temp_dir.join(format!(
+            "comet-revision-blob-destination-test-{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&source_db_path);
+        let _ = std::fs::remove_file(&destination_db_path);
+
+        let mut source_conn = Connection::open(&source_db_path).unwrap();
+        account_migrations().to_latest(&mut source_conn).unwrap();
+        seed_note(&source_conn, "note-blob", "Blob Title", &markdown);
+        source_conn
+            .execute(
+                "INSERT INTO app_settings (key, value) VALUES ('blossom_url', 'https://blobs.example.com')",
+                [],
+            )
+            .unwrap();
+        source_conn
+            .execute(
+                "INSERT INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
+                 VALUES (?1, 'https://blobs.example.com', ?2, ?3, ?4)",
+                rusqlite::params![hash, keys.public_key().to_hex(), ciphertext_hash, key_hex],
+            )
+            .unwrap();
+
+        let pushed_revision_id =
+            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-blob").await;
+
+        let mut destination_conn = Connection::open(&destination_db_path).unwrap();
+        account_migrations()
+            .to_latest(&mut destination_conn)
+            .unwrap();
+        destination_conn
+            .execute(
+                "INSERT INTO app_settings (key, value) VALUES ('blossom_url', 'https://blobs.example.com')",
+                [],
+            )
+            .unwrap();
+
+        let result = bootstrap_with_keys(&destination_db_path, &keys, &relay.ws_url, |_| {})
+            .await
+            .unwrap();
+
+        assert_eq!(result.snapshot_seq, 1);
+        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+
+        let (stored_markdown, current_rev): (String, Option<String>) = destination_conn
+            .query_row(
+                "SELECT markdown, current_rev FROM notes WHERE id = 'note-blob'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(stored_markdown, markdown);
+        assert_eq!(current_rev, Some(pushed_revision_id));
+
+        let stored_blob_meta: (String, String, String) = destination_conn
+            .query_row(
+                "SELECT server_url, ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND pubkey = ?2",
+                rusqlite::params![hash, keys.public_key().to_hex()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            stored_blob_meta,
+            (
+                "https://blobs.example.com".to_string(),
+                ciphertext_hash,
+                key_hex,
+            )
+        );
+
+        let _ = std::fs::remove_file(source_db_path);
+        let _ = std::fs::remove_file(destination_db_path);
+        relay.stop();
+    }
+
+    #[tokio::test]
     async fn pushes_local_revision_and_bootstraps_it_into_second_db_via_root_websocket_url() {
         if !external_relay_test_prereqs_available() {
             return;
@@ -1404,6 +1500,7 @@ mod tests {
                 pinned_at: None,
                 readonly: false,
                 tags: &[],
+                blob_tags: &[],
                 entity_type: "note",
                 parent_revision_ids: &[],
                 op: "put",
