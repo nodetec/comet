@@ -237,4 +237,22 @@ describe("blossom integration", () => {
     });
     expect(ctx!.objectStorage.uploadCount).toBe(0);
   });
+
+  test("rejects uploads from pubkeys that are not on the allowlist", async () => {
+    const signer = createSigner();
+    const body = new TextEncoder().encode("not allowlisted");
+
+    const response = await fetch(`${ctx!.baseUrl}/upload`, {
+      method: "PUT",
+      headers: {
+        Authorization: createAuthHeader(signer, "upload"),
+        "Content-Type": "text/plain",
+      },
+      body,
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "forbidden" });
+    expect(ctx!.objectStorage.uploadCount).toBe(0);
+  });
 });

@@ -3,7 +3,7 @@ import {
   generateSecretKey,
   getPublicKey,
 } from "nostr-tools/pure";
-import { users } from "@comet/data";
+import { relayAllowedUsers } from "@comet/data";
 import { KIND_BLOSSOM_AUTH, type NostrEvent } from "@comet/nostr";
 import { createBlossomServer } from "../src/server";
 import type { DB } from "../src/db";
@@ -151,11 +151,12 @@ export async function allowStorageForPubkey(
   pubkey: string,
   storageLimitBytes: number | null = null,
 ): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
   await db
-    .insert(users)
-    .values({ pubkey, storageLimitBytes })
+    .insert(relayAllowedUsers)
+    .values({ pubkey, storageLimitBytes, createdAt: now })
     .onConflictDoUpdate({
-      target: users.pubkey,
+      target: relayAllowedUsers.pubkey,
       set: { storageLimitBytes },
     });
 }

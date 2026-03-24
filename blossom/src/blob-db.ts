@@ -1,5 +1,5 @@
 import { count, desc, eq, sql } from "drizzle-orm";
-import { blobs, blobOwners, users } from "@comet/data";
+import { blobs, blobOwners, relayAllowedUsers } from "@comet/data";
 import type { DB } from "./db";
 
 export const DEFAULT_STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024;
@@ -12,6 +12,10 @@ export type BlobRecord = {
 };
 
 export type RemoveOwnerResult = "not_owner" | "removed" | "removed_last_owner";
+export type PubkeyAccessPolicy = {
+  allowed: boolean;
+  storageLimitBytes: number;
+};
 
 export async function insertBlob(
   db: DB,
@@ -137,15 +141,38 @@ export async function getBlobTotalSizeByPubkey(
   return Number(rows[0]?.value ?? 0);
 }
 
-export async function getStorageLimitForPubkey(
+export async function getPubkeyAccessPolicy(
   db: DB,
   pubkey: string,
-): Promise<number> {
+): Promise<PubkeyAccessPolicy> {
   const rows = await db
-    .select({ storageLimitBytes: users.storageLimitBytes })
-    .from(users)
-    .where(eq(users.pubkey, pubkey))
+    .select({
+      expiresAt: relayAllowedUsers.expiresAt,
+      storageLimitBytes: relayAllowedUsers.storageLimitBytes,
+    })
+    .from(relayAllowedUsers)
+    .where(eq(relayAllowedUsers.pubkey, pubkey))
     .limit(1);
 
-  return rows[0]?.storageLimitBytes ?? DEFAULT_STORAGE_LIMIT_BYTES;
+  if (rows.length === 0) {
+    return {
+      allowed: false,
+      storageLimitBytes: DEFAULT_STORAGE_LIMIT_BYTES,
+    };
+  }
+
+  const row = rows[0];
+
+  const now = Math.floor(Date.now() / 1000);
+  if (row.expiresAt !== null && row.expiresAt <= now) {
+    return {
+      allowed: false,
+      storageLimitBytes: row.storageLimitBytes ?? DEFAULT_STORAGE_LIMIT_BYTES,
+    };
+  }
+
+  return {
+    allowed: true,
+    storageLimitBytes: row.storageLimitBytes ?? DEFAULT_STORAGE_LIMIT_BYTES,
+  };
 }

@@ -89,7 +89,7 @@ function shouldProxyBlobResponse(requestUrl: URL, publicUrl: string): boolean {
 
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
-    rawSql`TRUNCATE blob_owners, blobs, users, invite_codes CASCADE`,
+    rawSql`TRUNCATE blob_owners, blobs, relay_allowed_users, users, invite_codes CASCADE`,
   );
 }
 
@@ -209,18 +209,22 @@ export async function createBlossomServer(
         const [currentUsage, storageLimit, existingBlob, alreadyOwned] =
           await Promise.all([
             blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey),
-            blobDb.getStorageLimitForPubkey(db, auth.pubkey),
+            blobDb.getPubkeyAccessPolicy(db, auth.pubkey),
             blobDb.getBlob(db, sha256),
             blobDb.hasOwner(db, sha256, auth.pubkey),
           ]);
 
+        if (!storageLimit.allowed) {
+          return json({ error: "forbidden" }, 403);
+        }
+
         const additionalUsage = alreadyOwned ? 0 : data.byteLength;
-        if (currentUsage + additionalUsage > storageLimit) {
+        if (currentUsage + additionalUsage > storageLimit.storageLimitBytes) {
           return json(
             {
               error: "storage limit exceeded",
               usage: currentUsage,
-              limit: storageLimit,
+              limit: storageLimit.storageLimitBytes,
               required: additionalUsage,
             },
             507,
@@ -286,6 +290,13 @@ export async function createBlossomServer(
         if (!auth.ok) {
           return json({ error: auth.reason }, 401);
         }
+        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
+          db,
+          auth.pubkey,
+        );
+        if (!accessPolicy.allowed) {
+          return json({ error: "forbidden" }, 403);
+        }
 
         const blob = await blobDb.getBlob(db, blobSha256);
         if (!blob) {
@@ -312,6 +323,13 @@ export async function createBlossomServer(
         );
         if (!auth.ok) {
           return json({ error: auth.reason }, 401);
+        }
+        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
+          db,
+          auth.pubkey,
+        );
+        if (!accessPolicy.allowed) {
+          return json({ error: "forbidden" }, 403);
         }
 
         if (auth.pubkey !== listPubkey) {
