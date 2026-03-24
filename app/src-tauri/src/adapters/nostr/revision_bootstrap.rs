@@ -299,6 +299,7 @@ mod tests {
     };
     use nostr_sdk::prelude::Event;
     use nostr_sdk::prelude::Keys;
+    use postgres::{Client as PgClient, NoTls};
     use reqwest::Client;
     use rusqlite::Connection;
     use std::path::PathBuf;
@@ -1426,28 +1427,32 @@ mod tests {
     }
 
     fn create_database(database_name: &str) {
-        let status = Command::new("psql")
-            .arg(database_url_for("postgres"))
-            .arg("-c")
-            .arg(format!("CREATE DATABASE \"{database_name}\""))
-            .status()
-            .unwrap();
-        assert!(status.success());
+        assert_valid_database_name(database_name);
+
+        let database_name = database_name.to_string();
+        thread::spawn(move || {
+            let mut client = PgClient::connect(&database_url_for("postgres"), NoTls).unwrap();
+            client
+                .simple_query(&format!("CREATE DATABASE \"{database_name}\""))
+                .unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     fn drop_database(database_name: &str) {
-        let _ = Command::new("psql")
-            .arg(database_url_for("postgres"))
-            .arg("-c")
-            .arg(format!(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{database_name}' AND pid <> pg_backend_pid();"
-            ))
-            .status();
-        let _ = Command::new("psql")
-            .arg(database_url_for("postgres"))
-            .arg("-c")
-            .arg(format!("DROP DATABASE IF EXISTS \"{database_name}\""))
-            .status();
+        assert_valid_database_name(database_name);
+
+        let database_name = database_name.to_string();
+        let _ = thread::spawn(move || {
+            if let Ok(mut client) = PgClient::connect(&database_url_for("postgres"), NoTls) {
+                let _ = client.simple_query(&format!(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{database_name}' AND pid <> pg_backend_pid();"
+                ));
+                let _ = client.simple_query(&format!("DROP DATABASE IF EXISTS \"{database_name}\""));
+            }
+        })
+        .join();
     }
 
     fn database_url_for(database_name: &str) -> String {
@@ -1469,5 +1474,14 @@ mod tests {
             thread::sleep(Duration::from_millis(100));
         }
         panic!("relay did not become healthy");
+    }
+
+    fn assert_valid_database_name(database_name: &str) {
+        assert!(
+            database_name
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '_'),
+            "unexpected test database name: {database_name}"
+        );
     }
 }

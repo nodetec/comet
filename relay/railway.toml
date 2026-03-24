@@ -1,0 +1,9 @@
+[build]
+buildCommand = "pnpm --filter @comet/relay build"
+watchPatterns = ["relay/**", "packages/**", "pnpm-lock.yaml"]
+
+[deploy]
+startCommand = "pnpm --filter @comet/relay start"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

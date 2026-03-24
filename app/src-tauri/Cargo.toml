@@ -53,6 +53,9 @@ tauri-plugin-opener = "2"
 tauri-plugin-secure-storage = "1.4.0"
 negentropy = "0.5.0"
 
+[dev-dependencies]
+postgres = "0.19"
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"

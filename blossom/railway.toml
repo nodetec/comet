@@ -1,0 +1,9 @@
+[build]
+buildCommand = "pnpm --filter @comet/blossom build"
+watchPatterns = ["blossom/**", "packages/**", "pnpm-lock.yaml"]
+
+[deploy]
+startCommand = "pnpm --filter @comet/blossom start"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
