@@ -59,12 +59,6 @@ relay-dev:
 relay-dev-multi count="3" start_port="3400":
   pnpm --filter @comet/relay dev:multi -- --count {{count}} --start-port {{start_port}}
 
-relay-deploy:
-  flyctl deploy --config relay/fly.toml --local-only
-
-relay-logs:
-  fly logs -a comet-relay
-
 relay-build:
   pnpm --filter @comet/relay build
 

@@ -15,7 +15,6 @@ jobs:
       blossom_deploy: ${{ steps.filter.outputs.blossom_deploy }}
       docs_deploy: ${{ steps.filter.outputs.docs_deploy }}
       relay: ${{ steps.filter.outputs.relay }}
-      relay_deploy: ${{ steps.filter.outputs.relay_deploy }}
       web_deploy: ${{ steps.filter.outputs.web_deploy }}
       www_deploy: ${{ steps.filter.outputs.www_deploy }}
     steps:
@@ -60,17 +59,6 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
               - 'turbo.json'
-            relay_deploy:
-              - 'relay/src/**'
-              - 'relay/package.json'
-              - 'relay/Dockerfile'
-              - 'relay/.dockerignore'
-              - 'relay/fly.toml'
-              - 'packages/nostr/**'
-              - 'packages/data/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
             web_deploy:
               - 'web/**'
               - 'packages/nostr/**'
@@ -416,22 +404,6 @@ jobs:
             artifacts/**/*.rpm
             artifacts/**/*.AppImage
           make_latest: true
-
-  relay_deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.relay_deploy == 'true'
-    needs: [changes, format, checks, relay]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy relay
-        run: flyctl deploy --config relay/fly.toml --local-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   web_deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.changes.outputs.web_deploy == 'true'
