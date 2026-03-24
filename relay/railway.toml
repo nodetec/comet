@@ -1,9 +1,15 @@
 [build]
-buildCommand = "pnpm --filter @comet/relay build"
-watchPatterns = ["relay/**", "packages/**", "pnpm-lock.yaml"]
+builder = "DOCKERFILE"
+dockerfilePath = "/relay/Dockerfile"
+watchPatterns = [
+  "relay/**",
+  "packages/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
 
 [deploy]
-startCommand = "pnpm --filter @comet/relay start"
-healthcheckPath = "/"
+healthcheckPath = "/healthz"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3

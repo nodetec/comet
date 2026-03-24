@@ -19,6 +19,43 @@ It has a revision-native data model:
 - `bun run src/dev/multi-relay.ts`: start a local multi-relay cluster for testing
 - `bun test --max-concurrency 1`: run the test suite serially
 
+## Railway Deploy
+
+Railway's default builder does not include Bun, so the relay should be deployed
+with [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile) instead
+of the plain package build command.
+
+Recommended Railway setup:
+
+- Root directory: repo root
+- Dockerfile path: `relay/Dockerfile`
+- Railway config file path: `/relay/railway.toml` if you want Railway to read the checked-in deploy config
+- Port: `3400`
+- Healthcheck path: `/healthz`
+
+If you are configuring the service entirely through the Railway UI instead of a
+checked-in config file, set:
+
+- `RAILWAY_DOCKERFILE_PATH=/relay/Dockerfile`
+
+Required environment variables:
+
+- `DATABASE_URL`
+- `RELAY_URL`
+
+Recommended environment variables:
+
+- `PRIVATE_MODE=true`
+- `RELAY_ADMIN_TOKEN=<long-random-secret>`
+- `RELAY_DEFAULT_PAYLOAD_RETENTION_DAYS=90`
+- `RELAY_DEFAULT_COMPACTION_INTERVAL_SECONDS=300`
+
+Example `RELAY_URL`:
+
+```sh
+RELAY_URL=wss://relay.comet.md
+```
+
 ### Local Multi-Relay Harness
 
 To spin up several local relays backed by separate local Postgres databases:
