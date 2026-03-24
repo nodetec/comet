@@ -304,11 +304,13 @@ mod tests {
     use rusqlite::Connection;
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
+    use std::sync::Once;
     use std::thread;
     use std::time::Duration;
     use url::Url;
 
     const TEST_ADMIN_TOKEN: &str = "test-admin-token";
+    static EXTERNAL_TEST_PREREQ_WARNING: Once = Once::new();
 
     #[test]
     fn converts_ws_root_to_http_root() {
@@ -324,6 +326,10 @@ mod tests {
 
     #[tokio::test]
     async fn bootstraps_from_a_real_relay() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39420).await;
         let event =
@@ -361,6 +367,10 @@ mod tests {
 
     #[tokio::test]
     async fn pushes_local_revision_and_bootstraps_it_into_second_db() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39421).await;
 
@@ -419,6 +429,10 @@ mod tests {
 
     #[tokio::test]
     async fn pushes_local_notebook_revision_and_bootstraps_it_into_second_db() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39422).await;
 
@@ -471,6 +485,10 @@ mod tests {
 
     #[tokio::test]
     async fn bootstraps_note_deletion_after_destination_already_has_note() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39423).await;
 
@@ -554,6 +572,10 @@ mod tests {
 
     #[tokio::test]
     async fn receives_live_changes_after_bootstrap() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39424).await;
 
@@ -659,6 +681,10 @@ mod tests {
 
     #[tokio::test]
     async fn fails_to_bootstrap_private_mode_relay_without_allowlist() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start_private(39430).await;
 
@@ -689,6 +715,10 @@ mod tests {
 
     #[tokio::test]
     async fn bootstraps_from_private_mode_relay_after_allowlisting_identity() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start_private(39431).await;
         relay.allow_pubkey(&keys.public_key().to_hex()).await;
@@ -726,6 +756,10 @@ mod tests {
 
     #[tokio::test]
     async fn receives_live_changes_after_bootstrap_in_private_mode() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start_private(39432).await;
         relay.allow_pubkey(&keys.public_key().to_hex()).await;
@@ -832,6 +866,10 @@ mod tests {
 
     #[tokio::test]
     async fn publishes_locally_while_a_live_changes_subscription_is_active() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay = TestRevisionRelay::start(39425).await;
 
@@ -901,6 +939,10 @@ mod tests {
 
     #[tokio::test]
     async fn bootstraps_additive_state_from_two_relays() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay_a = TestRevisionRelay::start(39426).await;
         let relay_b = TestRevisionRelay::start(39427).await;
@@ -950,6 +992,10 @@ mod tests {
 
     #[tokio::test]
     async fn does_not_refetch_same_logical_revision_from_second_relay() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay_a = TestRevisionRelay::start(39428).await;
         let relay_b = TestRevisionRelay::start(39429).await;
@@ -1025,6 +1071,10 @@ mod tests {
 
     #[tokio::test]
     async fn bootstraps_additive_state_from_open_and_private_relays() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
         let keys = Keys::generate();
         let relay_open = TestRevisionRelay::start(39433).await;
         let relay_private = TestRevisionRelay::start_private(39434).await;
@@ -1474,6 +1524,29 @@ mod tests {
             thread::sleep(Duration::from_millis(100));
         }
         panic!("relay did not become healthy");
+    }
+
+    fn external_relay_test_prereqs_available() -> bool {
+        let has_test_database = std::env::var("TEST_DATABASE_URL")
+            .ok()
+            .is_some_and(|value| !value.trim().is_empty());
+        let has_bun = Command::new("bun")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok();
+
+        let available = has_test_database && has_bun;
+        if !available {
+            EXTERNAL_TEST_PREREQ_WARNING.call_once(|| {
+                eprintln!(
+                    "skipping revision relay process tests: TEST_DATABASE_URL and bun are required"
+                );
+            });
+        }
+
+        available
     }
 
     fn assert_valid_database_name(database_name: &str) {
