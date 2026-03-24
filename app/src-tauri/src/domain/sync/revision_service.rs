@@ -63,7 +63,7 @@ pub fn build_pending_note_revision(
         Option<i64>,
         bool,
         Option<String>,
-        Option<String>,
+        Option<i64>,
     )> = conn
         .query_row(
             "SELECT title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, readonly, current_rev, pinned_at
@@ -103,7 +103,6 @@ pub fn build_pending_note_revision(
     ) = row.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
 
     let edited_at = edited_at.unwrap_or(modified_at);
-    let pinned_at = pinned_at.and_then(|value| value.parse::<i64>().ok());
 
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
