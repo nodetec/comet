@@ -292,20 +292,6 @@ export const syncChanges = pgTable(
   ],
 );
 
-export const syncChangeTags = pgTable(
-  "sync_change_tags",
-  {
-    seq: bigint("seq", { mode: "number" })
-      .notNull()
-      .references(() => syncChanges.seq, { onDelete: "cascade" }),
-    tagName: text("tag_name").notNull(),
-    tagValue: text("tag_value").notNull(),
-  },
-  (table) => [
-    index("idx_sync_change_tags_lookup").on(table.tagName, table.tagValue),
-  ],
-);
-
 export const relaySettings = pgTable("relay_settings", {
   id: integer("id").primaryKey(),
   payloadRetentionDays: integer("payload_retention_days"),

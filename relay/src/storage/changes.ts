@@ -3,7 +3,7 @@ import { and, asc, eq, gt, inArray, lte, max } from "drizzle-orm";
 import type { RevisionRelayDb } from "../db";
 import type { NostrEvent } from "@comet/nostr";
 
-import { syncChangeTags, syncChanges, syncPayloads } from "./schema";
+import { syncChanges, syncPayloads } from "./schema";
 import type { RevisionChangesFilter } from "../types";
 
 export type StoredChangeEvent = {
@@ -21,7 +21,6 @@ export type ChangeStore = {
     eventId: string;
     op: "put" | "del";
     mtime: number;
-    tags: string[][];
   }) => Promise<number>;
   queryStoredRevisionEvents: (
     filter: RevisionChangesFilter,
@@ -55,18 +54,6 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
           mtime: input.mtime,
         })
         .returning({ seq: syncChanges.seq });
-
-      if (input.tags.length > 0) {
-        await db.insert(syncChangeTags).values(
-          input.tags
-            .filter((tag) => tag.length >= 2)
-            .map(([tagName, tagValue]) => ({
-              seq: row.seq,
-              tagName,
-              tagValue,
-            })),
-        );
-      }
 
       return row.seq;
     },

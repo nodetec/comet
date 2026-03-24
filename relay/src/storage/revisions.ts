@@ -4,7 +4,6 @@ import type { RevisionRelayDb } from "../db";
 import type { RelayFilter, RevisionEnvelope } from "../types";
 import {
   syncChanges,
-  syncChangeTags,
   syncHeads,
   syncPayloads,
   syncRevisionParents,
@@ -109,18 +108,6 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           })
           .returning({ seq: syncChanges.seq });
         storedSeq = change.seq;
-
-        const changeTags = envelope.event.tags
-          .filter((tag) => tag.length >= 2)
-          .map(([tagName, tagValue]) => ({
-            seq: change.seq,
-            tagName,
-            tagValue,
-          }));
-
-        if (changeTags.length > 0) {
-          await tx.insert(syncChangeTags).values(changeTags);
-        }
 
         await tx
           .update(syncRevisions)

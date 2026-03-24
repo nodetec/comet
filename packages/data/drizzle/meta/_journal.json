@@ -71,6 +71,13 @@
       "when": 1774393200000,
       "tag": "0009_relay_revision_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774415400000,
+      "tag": "0010_drop_sync_change_tags",
+      "breakpoints": true
     }
   ]
 }

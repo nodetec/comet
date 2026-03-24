@@ -271,7 +271,7 @@ async function handleRetentionApiRequest(
 
 async function truncateAll(db: RevisionRelayDb) {
   await db.execute(
-    rawSql`TRUNCATE relay_allowed_users, relay_settings, sync_change_tags, sync_changes, sync_heads, sync_revision_parents, sync_revisions, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
+    rawSql`TRUNCATE relay_allowed_users, relay_settings, sync_changes, sync_heads, sync_revision_parents, sync_revisions, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
   );
 }
 

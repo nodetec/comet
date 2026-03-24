@@ -3,7 +3,6 @@ export {
   relayEvents,
   relayEventTags,
   relaySettings,
-  syncChangeTags,
   syncChanges,
   syncHeads,
   syncPayloads,
