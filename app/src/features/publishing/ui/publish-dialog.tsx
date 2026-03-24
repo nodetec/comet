@@ -15,6 +15,10 @@ import type {
   PublishNoteInput,
   PublishShortNoteInput,
 } from "@/shared/api/types";
+import {
+  hasAttachmentReferences,
+  isAttachmentUri,
+} from "@/shared/lib/attachments";
 
 function useTagEditor(initialTags: string[]) {
   const [tags, setTags] = useState<string[]>(initialTags);
@@ -49,6 +53,7 @@ function useTagEditor(initialTags: string[]) {
 }
 
 type PublishDialogProps = {
+  content: string;
   initialTitle: string;
   initialTags: string[];
   noteId: string;
@@ -59,6 +64,7 @@ type PublishDialogProps = {
 };
 
 export function PublishDialog({
+  content,
   initialTitle,
   initialTags,
   noteId,
@@ -72,6 +78,7 @@ export function PublishDialog({
       <DialogPortal keepMounted={false}>
         <DialogBackdrop />
         <PublishDialogContent
+          content={content}
           key={noteId}
           initialTitle={initialTitle}
           initialTags={initialTags}
@@ -85,6 +92,7 @@ export function PublishDialog({
 }
 
 function PublishDialogContent({
+  content,
   initialTitle,
   initialTags,
   noteId,
@@ -95,6 +103,9 @@ function PublishDialogContent({
   const [image, setImage] = useState("");
   const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
     useTagEditor(initialTags);
+  const hasLocalAttachmentImages = hasAttachmentReferences(content);
+  const hasAttachmentCoverImage = isAttachmentUri(image.trim());
+  const publishBlocked = hasLocalAttachmentImages || hasAttachmentCoverImage;
 
   const handleSubmit = () => {
     onSubmit({
@@ -169,11 +180,28 @@ function PublishDialogContent({
         </div>
       </div>
 
+      <div className="bg-muted/50 mt-4 rounded-md border px-3 py-2.5">
+        <p className="text-muted-foreground text-xs">
+          Only inline markdown images with remote URLs will work. Local attached
+          images and <code>attachment://</code> cover images can&apos;t be
+          published yet.
+        </p>
+        {publishBlocked ? (
+          <p className="text-destructive mt-1 text-xs">
+            Remove local attached images before publishing this note.
+          </p>
+        ) : null}
+      </div>
+
       <div className="mt-6 flex justify-end gap-2">
         <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
           Cancel
         </DialogClose>
-        <Button disabled={pending} onClick={handleSubmit} size="sm">
+        <Button
+          disabled={pending || publishBlocked}
+          onClick={handleSubmit}
+          size="sm"
+        >
           {pending ? "Publishing…" : "Publish"}
         </Button>
       </div>
@@ -231,6 +259,7 @@ function PublishShortNoteDialogContent({
 }: Omit<PublishShortNoteDialogProps, "open" | "onOpenChange">) {
   const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
     useTagEditor(initialTags);
+  const hasLocalAttachmentImages = hasAttachmentReferences(content);
 
   const handleSubmit = () => {
     onSubmit({ noteId, tags });
@@ -288,11 +317,27 @@ function PublishShortNoteDialogContent({
         <p className="text-muted-foreground text-xs">{LOCK_WARNING}</p>
       </div>
 
+      <div className="bg-muted/50 mt-4 rounded-md border px-3 py-2.5">
+        <p className="text-muted-foreground text-xs">
+          Only inline markdown images with remote URLs will work. Local attached
+          images can&apos;t be published yet.
+        </p>
+        {hasLocalAttachmentImages ? (
+          <p className="text-destructive mt-1 text-xs">
+            Remove local attached images before publishing this note.
+          </p>
+        ) : null}
+      </div>
+
       <div className="mt-4 flex justify-end gap-2">
         <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
           Cancel
         </DialogClose>
-        <Button disabled={pending} onClick={handleSubmit} size="sm">
+        <Button
+          disabled={pending || hasLocalAttachmentImages}
+          onClick={handleSubmit}
+          size="sm"
+        >
           {pending ? "Publishing…" : "Publish"}
         </Button>
       </div>

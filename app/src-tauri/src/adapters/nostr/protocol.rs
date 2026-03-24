@@ -1,16 +1,37 @@
 use crate::domain::common::text::strip_title_line;
 use crate::domain::common::time::{now_millis, now_secs};
+use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, OptionalExtension};
 use tauri::AppHandle;
 
+const PUBLISH_ATTACHMENT_ERROR: &str =
+    "Publishing notes with local attached images isn't supported yet. Only inline markdown images with remote URLs will work.";
+const PUBLISH_COVER_ATTACHMENT_ERROR: &str =
+    "Cover images must use a remote URL. attachment:// cover images aren't supported yet.";
+
+fn ensure_publishable_markdown(markdown: &str) -> Result<(), AppError> {
+    if extract_attachment_hashes(markdown).is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::custom(PUBLISH_ATTACHMENT_ERROR))
+    }
+}
+
 pub async fn publish_note(
     app: &AppHandle,
     input: PublishNoteInput,
 ) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
+    if input
+        .image
+        .as_deref()
+        .is_some_and(|image| image.starts_with("attachment://"))
+    {
+        return Err(AppError::custom(PUBLISH_COVER_ATTACHMENT_ERROR));
+    }
 
     // Synchronous DB block — Connection is not Send, must drop before any .await
     let (keys, d_tag, content, relay_urls) = {
@@ -25,6 +46,8 @@ pub async fn publish_note(
             )
             .optional()?
             .ok_or_else(|| AppError::custom("Note not found."))?;
+
+        ensure_publishable_markdown(&markdown)?;
 
         let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
@@ -52,29 +75,6 @@ pub async fn publish_note(
         (keys, d_tag, content, relay_urls)
     };
 
-    // Upload attachment images to Blossom and rewrite URIs to public URLs
-    let blossom_url = {
-        let conn = crate::db::database_connection(app)?;
-        crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
-    };
-    eprintln!(
-        "[publish] note={} blossom_url={} attachment_uploads={}",
-        note_id,
-        blossom_url.as_deref().unwrap_or("<none>"),
-        blossom_url.is_some()
-    );
-    let content = if let Some(ref blossom_url) = blossom_url {
-        crate::adapters::blossom::client::upload_and_rewrite_attachments(
-            app,
-            blossom_url,
-            &content,
-            &keys,
-        )
-        .await?
-    } else {
-        content
-    };
-
     let now = now_secs() as u64;
 
     let mut event_tags: Vec<Tag> = vec![
@@ -82,19 +82,7 @@ pub async fn publish_note(
         Tag::title(&input.title),
         Tag::custom(TagKind::custom("published_at"), vec![now.to_string()]),
     ];
-    // Rewrite cover image URI if it references a local attachment
-    let image = input.image.as_ref().map(|img| {
-        if let Some(ref blossom_url) = blossom_url {
-            if img.starts_with("attachment://") {
-                return img.replace(
-                    "attachment://",
-                    &format!("{}/", blossom_url.trim_end_matches('/')),
-                );
-            }
-        }
-        img.clone()
-    });
-    if let Some(ref image) = image {
+    if let Some(ref image) = input.image {
         event_tags.push(Tag::custom(TagKind::custom("image"), vec![image.clone()]));
     }
     for t in &input.tags {
@@ -164,6 +152,8 @@ pub async fn publish_short_note(
             .optional()?
             .ok_or_else(|| AppError::custom("Note not found."))?;
 
+        ensure_publishable_markdown(&markdown)?;
+
         let mut stmt = conn.prepare("SELECT url FROM relays WHERE kind = 'publish'")?;
         let relay_urls: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
@@ -178,29 +168,6 @@ pub async fn publish_short_note(
         let content = strip_title_line(&markdown);
 
         (keys, content, relay_urls)
-    };
-
-    // Upload attachment images to Blossom and rewrite URIs to public URLs
-    let blossom_url = {
-        let conn = crate::db::database_connection(app)?;
-        crate::adapters::sqlite::sync_repository::get_blossom_url(&conn)
-    };
-    eprintln!(
-        "[publish-short] note={} blossom_url={} attachment_uploads={}",
-        note_id,
-        blossom_url.as_deref().unwrap_or("<none>"),
-        blossom_url.is_some()
-    );
-    let content = if let Some(ref blossom_url) = blossom_url {
-        crate::adapters::blossom::client::upload_and_rewrite_attachments(
-            app,
-            blossom_url,
-            &content,
-            &keys,
-        )
-        .await?
-    } else {
-        content
     };
 
     let mut event_tags: Vec<Tag> = Vec::new();

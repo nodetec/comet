@@ -4,10 +4,8 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Nonce,
 };
 use nostr_sdk::prelude::*;
-use regex_lite::Regex;
 use reqwest::{header::LOCATION, redirect::Policy, Url};
 use sha2::{Digest, Sha256};
-use tauri::AppHandle;
 
 fn short_hash(hash: &str) -> &str {
     &hash[..8.min(hash.len())]
@@ -89,172 +87,9 @@ pub async fn upload_blob(
     Ok(ciphertext_hash)
 }
 
-/// Upload a plaintext blob to a Blossom server for public access (publishing).
-/// Returns the SHA-256 hash of the plaintext.
-pub async fn upload_plaintext_blob(
-    client: &reqwest::Client,
-    blossom_url: &str,
-    data: Vec<u8>,
-    ext: &str,
-    keys: &Keys,
-) -> Result<String, AppError> {
-    let mut hasher = Sha256::new();
-    hasher.update(&data);
-    let hash = format!("{:x}", hasher.finalize());
-
-    let content_type = match ext {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "svg" => "image/svg+xml",
-        _ => "application/octet-stream",
-    };
-
-    blossom_log(&format!(
-        "plaintext upload start plaintext_hash={} size={} type={} url={}",
-        short_hash(&hash),
-        data.len(),
-        content_type,
-        blossom_url
-    ));
-
-    let auth_header = sign_blossom_auth(keys, "upload", &hash, blossom_url)?;
-    let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
-    blossom_log(&format!(
-        "plaintext upload request prepared plaintext_hash={} endpoint={} auth_bytes={}",
-        short_hash(&hash),
-        url,
-        auth_header.len()
-    ));
-
-    let resp = client
-        .put(&url)
-        .header("Authorization", auth_header)
-        .header("Content-Type", content_type)
-        .header("X-SHA-256", &hash)
-        .body(data)
-        .send()
-        .await
-        .map_err(|e| {
-            blossom_log(&format!(
-                "plaintext upload request failed plaintext_hash={} error={e}",
-                short_hash(&hash)
-            ));
-            AppError::custom(format!("Blossom upload failed: {e}"))
-        })?;
-
-    blossom_log(&format!(
-        "plaintext upload response plaintext_hash={} status={}",
-        short_hash(&hash),
-        resp.status()
-    ));
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let reason_header = resp
-            .headers()
-            .get("x-reason")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        let body = resp.text().await.unwrap_or_default();
-        blossom_log(&format!(
-            "plaintext upload failed plaintext_hash={} status={} reason_header={} body={}",
-            short_hash(&hash),
-            status,
-            reason_header,
-            body
-        ));
-        return Err(AppError::custom(format!(
-            "Blossom upload failed ({status}): {reason_header} {body}"
-        )));
-    }
-
-    blossom_log(&format!(
-        "plaintext upload ok plaintext_hash={}",
-        short_hash(&hash)
-    ));
-
-    Ok(hash)
-}
-
-/// Find all `attachment://` URIs in markdown, upload the plaintext blobs to
-/// Blossom, and return the markdown with URIs rewritten to public Blossom URLs.
-pub async fn upload_and_rewrite_attachments(
-    app: &AppHandle,
-    blossom_url: &str,
-    markdown: &str,
-    keys: &Keys,
-) -> Result<String, AppError> {
-    let re = Regex::new(r"attachment://([a-f0-9]{64})\.(\w+)").unwrap();
-    let mut replacements: Vec<(String, String)> = Vec::new();
-    let http_client = reqwest::Client::new();
-    blossom_log(&format!(
-        "rewrite attachments start url={} markdown_bytes={}",
-        blossom_url,
-        markdown.len()
-    ));
-
-    // Collect unique attachment URIs
-    let mut seen = std::collections::HashSet::new();
-    for caps in re.captures_iter(markdown) {
-        let full_match = caps.get(0).unwrap().as_str().to_string();
-        if !seen.insert(full_match.clone()) {
-            continue;
-        }
-        let hash = caps.get(1).unwrap().as_str();
-        let ext = caps.get(2).unwrap().as_str();
-        blossom_log(&format!(
-            "rewrite attachment found hash={} ext={}",
-            short_hash(hash),
-            ext
-        ));
-
-        let (data, _) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
-            .ok_or_else(|| AppError::custom(format!("Local image not found: {hash}.{ext}")))?;
-        blossom_log(&format!(
-            "rewrite attachment loaded hash={} bytes={}",
-            short_hash(hash),
-            data.len()
-        ));
-
-        let size_bytes = data.len() as i64;
-        upload_plaintext_blob(&http_client, blossom_url, data, ext, keys).await?;
-
-        // Record the upload
-        let conn = crate::db::database_connection(app)?;
-        conn.execute(
-            "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at) VALUES (?1, ?2, 0, ?3, ?4)",
-            rusqlite::params![hash, blossom_url, size_bytes, crate::domain::common::time::now_millis()],
-        )?;
-        blossom_log(&format!(
-            "rewrite attachment recorded hash={} size_bytes={} server_url={}",
-            short_hash(hash),
-            size_bytes,
-            blossom_url
-        ));
-
-        let public_url = format!("{}/{}.{}", blossom_url.trim_end_matches('/'), hash, ext);
-        replacements.push((full_match, public_url));
-    }
-
-    let mut result = markdown.to_string();
-    for (from, to) in replacements {
-        result = result.replace(&from, &to);
-    }
-    blossom_log(&format!(
-        "rewrite attachments complete replacements={} url={}",
-        seen.len(),
-        blossom_url
-    ));
-    Ok(result)
-}
-
 /// Delete a stored Blossom object by its server object hash.
 ///
-/// Revision-sync uploads delete by ciphertext hash. Public publish flows may
-/// delete by plaintext hash instead.
+/// For Comet's current encrypted attachment flow, this is the ciphertext hash.
 pub async fn delete_blob(
     client: &reqwest::Client,
     blossom_url: &str,

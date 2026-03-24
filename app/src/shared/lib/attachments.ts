@@ -4,6 +4,14 @@ export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 const ATTACHMENT_PREFIX = "attachment://";
 
+export function isAttachmentUri(src: string): boolean {
+  return src.startsWith(ATTACHMENT_PREFIX);
+}
+
+export function hasAttachmentReferences(markdown: string): boolean {
+  return markdown.includes(ATTACHMENT_PREFIX);
+}
+
 let cachedBasePath: string | null = null;
 
 export async function initAttachmentsBasePath(): Promise<void> {
@@ -22,7 +30,7 @@ export function getAttachmentsBasePath(): string {
  * Passes through non-attachment URIs unchanged.
  */
 export function resolveImageSrc(src: string): string {
-  if (src.startsWith(ATTACHMENT_PREFIX)) {
+  if (isAttachmentUri(src)) {
     const filename = src.slice(ATTACHMENT_PREFIX.length);
     const basePath = getAttachmentsBasePath();
     const absolutePath = `${basePath}/${filename}`;

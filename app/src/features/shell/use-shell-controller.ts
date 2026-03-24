@@ -832,6 +832,7 @@ export function useShellController() {
 
   const publishDialogProps = useMemo(
     () => ({
+      content: currentEditorMarkdown,
       initialTitle: currentNote?.title ?? "",
       initialTags: currentNote?.tags ?? [],
       noteId: currentNote?.id ?? "",
@@ -843,6 +844,7 @@ export function useShellController() {
       },
     }),
     [
+      currentEditorMarkdown,
       currentNote?.id,
       currentNote?.tags,
       currentNote?.title,
