@@ -203,7 +203,7 @@ pub struct SyncInfo {
     pending_notes: i64,
     pending_notebooks: i64,
     total_notes: i64,
-    checkpoint: i64,
+    checkpoint_seq: Option<i64>,
     blobs_stored: i64,
 }
 
@@ -261,7 +261,16 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         |row| row.get(0),
     )?;
 
-    let checkpoint: i64 = crate::adapters::sqlite::sync_repository::get_checkpoint(&conn);
+    let checkpoint_seq = relay_url
+        .as_deref()
+        .map(|relay_url| {
+            crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
+                &conn, relay_url,
+            )
+        })
+        .transpose()?
+        .flatten()
+        .and_then(|state| state.checkpoint_seq);
 
     let blobs_stored: i64 =
         conn.query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;
@@ -279,7 +288,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         pending_notes,
         pending_notebooks,
         total_notes,
-        checkpoint,
+        checkpoint_seq,
         blobs_stored,
     })
 }
@@ -336,7 +345,7 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
          DELETE FROM notebooks;
          DELETE FROM blob_meta;
          DELETE FROM pending_deletions;
-         DELETE FROM app_settings WHERE key IN ('sync_checkpoint', 'active_sync_relay_url');",
+         DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
     )?;
 
     crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;

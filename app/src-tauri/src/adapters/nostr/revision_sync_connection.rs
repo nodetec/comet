@@ -248,7 +248,6 @@ async fn handle_revision_incoming_message(
             let min_payload_mtime =
                 relay_state.as_ref().and_then(|state| state.min_payload_mtime);
             let snapshot_seq = relay_state.as_ref().and_then(|state| state.snapshot_seq);
-            crate::adapters::sqlite::sync_repository::save_checkpoint(&conn, last_seq);
             // `last_seq` is the live `CHANGES` progress marker. Preserve the
             // original bootstrap `snapshot_seq` so the handoff boundary remains
             // distinguishable from the live checkpoint.

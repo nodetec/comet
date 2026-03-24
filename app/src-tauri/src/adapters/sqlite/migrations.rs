@@ -176,5 +176,6 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_sync_heads_mtime ON sync_heads(mtime DESC);",
         ),
         M::up("ALTER TABLE blob_uploads RENAME COLUMN hash TO object_hash;"),
+        M::up("DELETE FROM app_settings WHERE key = 'sync_checkpoint';"),
     ])
 }

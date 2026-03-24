@@ -41,7 +41,7 @@ type SyncInfo = {
   pendingNotes: number;
   pendingNotebooks: number;
   totalNotes: number;
-  checkpoint: number;
+  checkpointSeq: number | null;
   blobsStored: number;
 };
 
@@ -197,13 +197,13 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
         />
       ) : null}
 
-      {info.checkpoint > 0 ? (
+      {info.checkpointSeq == null ? null : (
         <InfoRow
           icon={<CloudSync className="size-3.5" />}
-          label="Checkpoint"
-          value={info.checkpoint}
+          label="Relay checkpoint"
+          value={info.checkpointSeq}
         />
-      ) : null}
+      )}
     </div>
   );
 }
