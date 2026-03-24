@@ -428,6 +428,134 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pushes_local_revision_and_bootstraps_it_into_second_db_via_root_websocket_url() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
+        let keys = Keys::generate();
+        let relay = TestRevisionRelay::start(39435).await;
+
+        let temp_dir = std::env::temp_dir();
+        let source_db_path = temp_dir.join(format!(
+            "comet-revision-push-root-source-test-{}.db",
+            std::process::id()
+        ));
+        let destination_db_path = temp_dir.join(format!(
+            "comet-revision-push-root-destination-test-{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&source_db_path);
+        let _ = std::fs::remove_file(&destination_db_path);
+
+        let mut source_conn = Connection::open(&source_db_path).unwrap();
+        account_migrations().to_latest(&mut source_conn).unwrap();
+        seed_note(
+            &source_conn,
+            "note-1",
+            "Root Path Title",
+            "# Root Path Title\n\nLocal Body",
+        );
+
+        let pushed_revision_id =
+            push_local_note_revision(&source_db_path, &keys, &relay.root_ws_url, "note-1").await;
+
+        let mut destination_conn = Connection::open(&destination_db_path).unwrap();
+        account_migrations()
+            .to_latest(&mut destination_conn)
+            .unwrap();
+
+        let result =
+            bootstrap_with_keys(&destination_db_path, &keys, &relay.root_ws_url, |_| {})
+                .await
+                .unwrap();
+
+        assert_eq!(result.snapshot_seq, 1);
+        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+
+        let (title, markdown, current_rev): (String, String, Option<String>) = destination_conn
+            .query_row(
+                "SELECT title, markdown, current_rev FROM notes WHERE id = 'note-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(title, "Root Path Title");
+        assert_eq!(markdown, "# Root Path Title\n\nLocal Body");
+        assert_eq!(current_rev, Some(pushed_revision_id));
+
+        let _ = std::fs::remove_file(source_db_path);
+        let _ = std::fs::remove_file(destination_db_path);
+        relay.stop();
+    }
+
+    #[tokio::test]
+    async fn pushes_pinned_local_revision_and_bootstraps_it_into_second_db() {
+        if !external_relay_test_prereqs_available() {
+            return;
+        }
+
+        let keys = Keys::generate();
+        let relay = TestRevisionRelay::start(39436).await;
+
+        let temp_dir = std::env::temp_dir();
+        let source_db_path = temp_dir.join(format!(
+            "comet-revision-pinned-source-test-{}.db",
+            std::process::id()
+        ));
+        let destination_db_path = temp_dir.join(format!(
+            "comet-revision-pinned-destination-test-{}.db",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&source_db_path);
+        let _ = std::fs::remove_file(&destination_db_path);
+
+        let mut source_conn = Connection::open(&source_db_path).unwrap();
+        account_migrations().to_latest(&mut source_conn).unwrap();
+        seed_pinned_note(
+            &source_conn,
+            "note-1",
+            "Pinned Title",
+            "# Pinned Title\n\nPinned Body",
+            250,
+        );
+
+        let pushed_revision_id =
+            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+
+        let mut destination_conn = Connection::open(&destination_db_path).unwrap();
+        account_migrations()
+            .to_latest(&mut destination_conn)
+            .unwrap();
+
+        let result = bootstrap_with_keys(&destination_db_path, &keys, &relay.ws_url, |_| {})
+            .await
+            .unwrap();
+
+        assert_eq!(result.snapshot_seq, 1);
+        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+
+        let (title, markdown, current_rev, pinned_at): (String, String, Option<String>, Option<i64>) =
+            destination_conn
+                .query_row(
+                    "SELECT title, markdown, current_rev, pinned_at FROM notes WHERE id = 'note-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .unwrap();
+
+        assert_eq!(title, "Pinned Title");
+        assert_eq!(markdown, "# Pinned Title\n\nPinned Body");
+        assert_eq!(current_rev, Some(pushed_revision_id));
+        assert_eq!(pinned_at, Some(250));
+
+        let _ = std::fs::remove_file(source_db_path);
+        let _ = std::fs::remove_file(destination_db_path);
+        relay.stop();
+    }
+
+    #[tokio::test]
     async fn pushes_local_notebook_revision_and_bootstraps_it_into_second_db() {
         if !external_relay_test_prereqs_available() {
             return;
@@ -1122,6 +1250,7 @@ mod tests {
     struct TestRevisionRelay {
         child: Child,
         ws_url: String,
+        root_ws_url: String,
         http_url: String,
         admin_token: Option<String>,
         _db_name: String,
@@ -1145,7 +1274,8 @@ mod tests {
                 .canonicalize()
                 .unwrap();
             let relay_dir = repo_root.join("relay");
-            let ws_url = format!("ws://127.0.0.1:{port}/ws");
+            let root_ws_url = format!("ws://127.0.0.1:{port}");
+            let ws_url = format!("{root_ws_url}/ws");
             let http_url = format!("http://127.0.0.1:{port}");
 
             let mut command = Command::new("bun");
@@ -1156,7 +1286,7 @@ mod tests {
                 .env("HOST", "127.0.0.1")
                 .env("PORT", port.to_string())
                 .env("DATABASE_URL", database_url_for(&db_name))
-                .env("RELAY_URL", &ws_url)
+                .env("RELAY_URL", &root_ws_url)
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
 
@@ -1173,6 +1303,7 @@ mod tests {
             Self {
                 child,
                 ws_url,
+                root_ws_url,
                 http_url,
                 admin_token: if private_mode {
                     Some(TEST_ADMIN_TOKEN.to_string())
@@ -1429,6 +1560,21 @@ mod tests {
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
              VALUES (?1, ?2, ?3, 100, 200, 200, 1)",
             rusqlite::params![note_id, title, markdown],
+        )
+        .unwrap();
+    }
+
+    fn seed_pinned_note(
+        conn: &Connection,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+        pinned_at: i64,
+    ) {
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, pinned_at, locally_modified)
+             VALUES (?1, ?2, ?3, 100, 200, 200, ?4, 1)",
+            rusqlite::params![note_id, title, markdown, pinned_at],
         )
         .unwrap();
     }
