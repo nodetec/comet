@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { $convertFromMarkdownString } from "@lexical/markdown";
 import {
   $createParagraphNode,
   $getRoot,
@@ -9,6 +10,7 @@ import {
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $createListItemNode, $createListNode } from "@lexical/list";
 import { $importMarkdownFromHTML } from "../lib/markdown";
+import { TRANSFORMERS } from "../transformers";
 
 interface InitialContentPluginProps {
   html: string | null;
@@ -75,6 +77,11 @@ export default function InitialContentPlugin({
           } else {
             $setSelection(null);
           }
+        } else {
+          const root = $getRoot();
+          root.clear();
+          $convertFromMarkdownString(markdown, TRANSFORMERS);
+          $setSelection(null);
         }
 
         const root = $getRoot();

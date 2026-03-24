@@ -110,6 +110,7 @@ export function useShellController() {
     useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
     defaultNoteSortPrefs;
   const setNoteSortPrefs = useUIStore((state) => state.setNoteSortPrefs);
+  const previousConflictNoteIdRef = useRef<string | null>(null);
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
@@ -286,7 +287,18 @@ export function useShellController() {
   });
 
   useEffect(() => {
-    if (!currentNote || !isCurrentNoteConflicted) {
+    if (!currentNote) {
+      previousConflictNoteIdRef.current = null;
+      return;
+    }
+
+    const conflictNoteId = isCurrentNoteConflicted ? currentNote.id : null;
+    const justBecameConflicted =
+      conflictNoteId !== null &&
+      previousConflictNoteIdRef.current !== conflictNoteId;
+    previousConflictNoteIdRef.current = conflictNoteId;
+
+    if (!justBecameConflicted) {
       return;
     }
 
@@ -802,7 +814,10 @@ export function useShellController() {
         currentNote && currentNote.id === selectedNoteId
           ? editorFocusMode
           : ("none" as const),
-      html: currentNote?.html ?? null,
+      html:
+        currentNote && currentEditorMarkdown === currentNote.markdown
+          ? (currentNote.html ?? null)
+          : null,
       isNewNote:
         currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
