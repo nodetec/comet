@@ -1,14 +1,14 @@
 export function documentScopeKey(
   recipient: string,
-  documentId: string,
+  documentCoord: string,
 ): string {
-  return `${recipient}:${documentId}`;
+  return `${recipient}:${documentCoord}`;
 }
 
 export function revisionScopeKey(
   recipient: string,
-  documentId: string,
+  documentCoord: string,
   revisionId: string,
 ): string {
-  return `${recipient}:${documentId}:${revisionId}`;
+  return `${recipient}:${documentCoord}:${revisionId}`;
 }

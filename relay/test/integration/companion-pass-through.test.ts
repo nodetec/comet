@@ -227,7 +227,7 @@ describe("relay integration > companion/pass-through", () => {
       ["r", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
       ["op", "put"],
       ["m", "1700000000000"],
-      ["t", "note"],
+      ["type", "note"],
       ["v", "2"],
     ]);
     const syncTwo = genericEvent("revision-2", REVISION_SYNC_EVENT_KIND, [
@@ -240,7 +240,7 @@ describe("relay integration > companion/pass-through", () => {
       ],
       ["op", "put"],
       ["m", "1700000000100"],
-      ["t", "note"],
+      ["type", "note"],
       ["v", "2"],
     ]);
 

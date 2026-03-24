@@ -20,12 +20,6 @@ fn find_entity_type_tag(rumor: &UnsignedEvent) -> Option<&str> {
         .tags
         .find(TagKind::custom("type"))
         .and_then(|t| t.content())
-        .or_else(|| {
-            rumor
-                .tags
-                .find(TagKind::custom("t"))
-                .and_then(|t| t.content())
-        })
 }
 
 // ── Notebook codec ──────────────────────────────────────────────────────
@@ -266,22 +260,13 @@ pub fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppErro
     })
 }
 
-// ── Deletion tombstones ─────────────────────────────────────────────────
-
-pub fn is_deleted_rumor(rumor: &UnsignedEvent) -> bool {
-    rumor
-        .tags
-        .find(TagKind::custom("deleted"))
-        .and_then(|t| t.content())
-        == Some("true")
-}
+// ── Deletion rumors ─────────────────────────────────────────────────────
 
 pub fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
     let mut tags = comet_base_tags();
     tags.extend([
         Tag::identifier(note_id),
         Tag::custom(TagKind::custom("type"), vec!["note".to_string()]),
-        Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
     EventBuilder::new(COMET_EVENT_KIND, "")
         .tags(tags)
@@ -293,7 +278,6 @@ pub fn deleted_notebook_rumor(notebook_id: &str, pubkey: PublicKey) -> UnsignedE
     tags.extend([
         Tag::identifier(notebook_id),
         Tag::custom(TagKind::custom("type"), vec!["notebook".to_string()]),
-        Tag::custom(TagKind::custom("deleted"), vec!["true".to_string()]),
     ]);
     EventBuilder::new(COMET_EVENT_KIND, "")
         .tags(tags)
@@ -446,44 +430,6 @@ mod tests {
         assert!(!is_notebook_rumor(&rumor));
     }
 
-    // ── is_deleted_rumor ────────────────────────────────────────────────
-
-    #[test]
-    fn is_deleted_rumor_true_for_deletion_tombstones() {
-        let pubkey = test_pubkey();
-        let rumor = deleted_note_rumor("note-del", pubkey);
-        assert!(is_deleted_rumor(&rumor));
-    }
-
-    #[test]
-    fn is_deleted_rumor_false_for_normal_notes() {
-        let pubkey = test_pubkey();
-        let rumor = note_to_rumor(
-            "note-1",
-            "Title",
-            "# Title",
-            1000,
-            1000,
-            1000,
-            None,
-            None,
-            None,
-            None,
-            false,
-            &[],
-            &[],
-            pubkey,
-        );
-        assert!(!is_deleted_rumor(&rumor));
-    }
-
-    #[test]
-    fn is_deleted_rumor_true_for_notebook_deletion() {
-        let pubkey = test_pubkey();
-        let rumor = deleted_notebook_rumor("nb-del", pubkey);
-        assert!(is_deleted_rumor(&rumor));
-    }
-
     // ── deleted_note_rumor ──────────────────────────────────────────────
 
     #[test]
@@ -500,16 +446,11 @@ mod tests {
     }
 
     #[test]
-    fn deleted_note_rumor_has_deleted_true_tag() {
+    fn deleted_note_rumor_does_not_include_deleted_tag() {
         let pubkey = test_pubkey();
         let rumor = deleted_note_rumor("note-xyz", pubkey);
 
-        let deleted_val = rumor
-            .tags
-            .find(TagKind::custom("deleted"))
-            .and_then(|t| t.content())
-            .map(str::to_string);
-        assert_eq!(deleted_val, Some("true".to_string()));
+        assert!(rumor.tags.find(TagKind::custom("deleted")).is_none());
     }
 
     #[test]
@@ -521,12 +462,6 @@ mod tests {
             .tags
             .find(TagKind::custom("type"))
             .and_then(|t| t.content())
-            .or_else(|| {
-                rumor
-                    .tags
-                    .find(TagKind::custom("t"))
-                    .and_then(|t| t.content())
-            })
             .map(str::to_string);
         assert_eq!(type_val, Some("note".to_string()));
     }

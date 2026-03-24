@@ -57,14 +57,14 @@ describe("relay integration > concurrency", () => {
       expect(await headStore.listHeads({ recipient: "recipient-1" })).toEqual([
         {
           recipient: "recipient-1",
-          documentId: "doc-1",
+          documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
           mtime: 1_700_000_000_100,
         },
         {
           recipient: "recipient-1",
-          documentId: "doc-1",
+          documentCoord: "doc-1",
           revisionId: REV_C,
           op: "put",
           mtime: 1_700_000_000_200,

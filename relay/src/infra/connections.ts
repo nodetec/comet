@@ -69,7 +69,7 @@ export function createConnectionRegistry() {
       seq: number;
       event: NostrEvent;
       recipient: string;
-      documentId: string;
+      documentCoord: string;
       revisionId: string;
     }) {
       for (const record of connections.values()) {
@@ -108,7 +108,7 @@ function matchesLiveChangesFilter(
     seq: number;
     event: NostrEvent;
     recipient: string;
-    documentId: string;
+    documentCoord: string;
     revisionId: string;
   },
 ) {
@@ -125,7 +125,10 @@ function matchesLiveChangesFilter(
   }
 
   const documentFilter = asStringArray(filter["#d"]);
-  if (documentFilter.length > 0 && !documentFilter.includes(input.documentId)) {
+  if (
+    documentFilter.length > 0 &&
+    !documentFilter.includes(input.documentCoord)
+  ) {
     return false;
   }
 

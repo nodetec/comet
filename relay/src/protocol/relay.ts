@@ -167,7 +167,7 @@ export function createClientMessageHandler(options: {
             seq: result.seq,
             event,
             recipient: revisionEnvelope.recipient,
-            documentId: revisionEnvelope.documentId,
+            documentCoord: revisionEnvelope.documentCoord,
             revisionId: revisionEnvelope.revisionId,
           });
         }

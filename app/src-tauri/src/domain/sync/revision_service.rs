@@ -4,7 +4,7 @@ use crate::adapters::sqlite::revision_sync_repository::{
 };
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_codec::{
-    build_revision_note_rumor, canonicalize_revision_payload, compute_document_d_tag,
+    build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
     compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
     REVISION_SYNC_SCHEMA_VERSION,
 };
@@ -15,7 +15,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 pub struct PendingNoteRevision {
     pub note_id: String,
     pub recipient: String,
-    pub d_tag: String,
+    pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
@@ -27,7 +27,7 @@ pub struct PendingNoteRevision {
 pub struct PendingNotebookRevision {
     pub notebook_id: String,
     pub recipient: String,
-    pub d_tag: String,
+    pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
@@ -38,7 +38,7 @@ pub struct PendingNotebookRevision {
 
 pub struct PendingDeletionRevision {
     pub recipient: String,
-    pub d_tag: String,
+    pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
@@ -107,7 +107,7 @@ pub fn build_pending_note_revision(
 
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
-    let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+    let document_coord = compute_document_coord(keys.secret_key(), note_id);
 
     let note_tags = {
         let mut stmt =
@@ -164,7 +164,7 @@ pub fn build_pending_note_revision(
 
     let canonical_payload = canonicalize_revision_payload(
         &recipient_hex,
-        &d_tag,
+        &document_coord,
         &parent_revision_ids,
         "put",
         "note",
@@ -206,19 +206,19 @@ pub fn build_pending_note_revision(
 
     let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
         recipient: recipient_hex.clone(),
-        d_tag: d_tag.clone(),
+        document_coord: document_coord.clone(),
         revision_id: revision_id.clone(),
         parent_revision_ids: parent_revision_ids.clone(),
         op: "put".to_string(),
         mtime: modified_at,
-        entity_type: Some("note".to_string()),
+        entity_type: None,
         schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
     });
 
     Ok(PendingNoteRevision {
         note_id: note_id.to_string(),
         recipient: recipient_hex,
-        d_tag,
+        document_coord,
         revision_id,
         parent_revision_ids,
         mtime: modified_at,
@@ -236,7 +236,7 @@ pub fn persist_local_note_revision(
         conn,
         &LocalSyncRevision {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -252,7 +252,7 @@ pub fn persist_local_note_revision(
     replace_sync_revision_parents(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &revision.revision_id,
         &revision.parent_revision_ids,
     )?;
@@ -260,10 +260,10 @@ pub fn persist_local_note_revision(
     replace_sync_heads(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &[LocalSyncHead {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -297,12 +297,13 @@ pub fn build_pending_notebook_revision(
 
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
-    let d_tag = compute_document_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
+    let document_coord =
+        compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
 
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
         "recipient": recipient_hex,
-        "d": d_tag,
+        "d": document_coord,
         "parents": parent_revision_ids.clone(),
         "op": "put",
         "type": "notebook",
@@ -326,19 +327,19 @@ pub fn build_pending_notebook_revision(
 
     let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
         recipient: recipient_hex.clone(),
-        d_tag: d_tag.clone(),
+        document_coord: document_coord.clone(),
         revision_id: revision_id.clone(),
         parent_revision_ids: parent_revision_ids.clone(),
         op: "put".to_string(),
         mtime: updated_at,
-        entity_type: Some("notebook".to_string()),
+        entity_type: None,
         schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
     });
 
     Ok(PendingNotebookRevision {
         notebook_id: notebook_id.to_string(),
         recipient: recipient_hex,
-        d_tag,
+        document_coord,
         revision_id,
         parent_revision_ids,
         mtime: updated_at,
@@ -356,7 +357,7 @@ pub fn persist_local_notebook_revision(
         conn,
         &LocalSyncRevision {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -372,7 +373,7 @@ pub fn persist_local_notebook_revision(
     replace_sync_revision_parents(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &revision.revision_id,
         &revision.parent_revision_ids,
     )?;
@@ -380,10 +381,10 @@ pub fn persist_local_notebook_revision(
     replace_sync_heads(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &[LocalSyncHead {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -416,11 +417,11 @@ pub fn build_pending_note_deletion_revision(
 
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
-    let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+    let document_coord = compute_document_coord(keys.secret_key(), note_id);
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
         "recipient": recipient_hex,
-        "d": d_tag,
+        "d": document_coord,
         "parents": parent_revision_ids.clone(),
         "op": "del",
         "type": "note",
@@ -434,7 +435,7 @@ pub fn build_pending_note_deletion_revision(
 
     Ok(PendingDeletionRevision {
         recipient: recipient_hex,
-        d_tag,
+        document_coord,
         revision_id,
         parent_revision_ids,
         mtime: now,
@@ -462,11 +463,12 @@ pub fn build_pending_notebook_deletion_revision(
 
     let parent_revision_ids = current_rev.into_iter().collect::<Vec<_>>();
     let recipient_hex = recipient.to_hex();
-    let d_tag = compute_document_d_tag(keys.secret_key(), &format!("notebook:{notebook_id}"));
+    let document_coord =
+        compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
     let canonical_payload = serde_json::to_string(&serde_json::json!({
         "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
         "recipient": recipient_hex,
-        "d": d_tag,
+        "d": document_coord,
         "parents": parent_revision_ids.clone(),
         "op": "del",
         "type": "notebook",
@@ -485,7 +487,7 @@ pub fn build_pending_notebook_deletion_revision(
 
     Ok(PendingDeletionRevision {
         recipient: recipient_hex,
-        d_tag,
+        document_coord,
         revision_id,
         parent_revision_ids,
         mtime: now,
@@ -503,7 +505,7 @@ pub fn persist_local_deletion_revision(
         conn,
         &LocalSyncRevision {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -519,7 +521,7 @@ pub fn persist_local_deletion_revision(
     replace_sync_revision_parents(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &revision.revision_id,
         &revision.parent_revision_ids,
     )?;
@@ -527,10 +529,10 @@ pub fn persist_local_deletion_revision(
     replace_sync_heads(
         conn,
         &revision.recipient,
-        &revision.d_tag,
+        &revision.document_coord,
         &[LocalSyncHead {
             recipient: revision.recipient.clone(),
-            d_tag: revision.d_tag.clone(),
+            d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
             mtime: revision.mtime,
@@ -574,7 +576,7 @@ mod tests {
             build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
 
         assert_eq!(revision.revision_id, revision_again.revision_id);
-        assert_eq!(revision.d_tag, revision_again.d_tag);
+        assert_eq!(revision.document_coord, revision_again.document_coord);
         assert_eq!(revision.recipient, recipient.to_hex());
         assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "r"));
         assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "m"));

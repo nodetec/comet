@@ -317,7 +317,7 @@ mod tests {
         get_sync_head, get_sync_relay_state, list_sync_revision_parents,
     };
     use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_d_tag,
+        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
         compute_revision_id, parse_revision_envelope_meta, revision_envelope_tags,
         RevisionEnvelopeMeta, RevisionRumorInput, REVISION_SYNC_SCHEMA_VERSION,
     };
@@ -811,7 +811,7 @@ mod tests {
                 "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
                 rusqlite::params![
                     keys.public_key().to_hex(),
-                    compute_document_d_tag(keys.secret_key(), "note-1")
+                    compute_document_coord(keys.secret_key(), "note-1")
                 ],
                 |row| row.get(0),
             )
@@ -1494,10 +1494,10 @@ mod tests {
 
     fn make_remote_note_event(keys: &Keys, note_id: &str, title: &str, markdown: &str) -> Event {
         let recipient = keys.public_key();
-        let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
         let canonical = canonicalize_revision_payload(
             &recipient.to_hex(),
-            &d_tag,
+            &document_coord,
             &[],
             "put",
             "note",
@@ -1543,12 +1543,12 @@ mod tests {
             rumor,
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag,
+                document_coord,
                 revision_id,
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: Some("note".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -1643,20 +1643,25 @@ mod tests {
                 build_pending_note_deletion_revision(&conn, keys, &recipient, note_id, 300)
                     .unwrap();
             persist_local_deletion_revision(&conn, &pending).unwrap();
-            let head = get_sync_head(&conn, &recipient.to_hex(), &pending.d_tag)
+            let head = get_sync_head(&conn, &recipient.to_hex(), &pending.document_coord)
                 .unwrap()
                 .unwrap();
             let parent_revision_ids =
-                list_sync_revision_parents(&conn, &recipient.to_hex(), &pending.d_tag, &head.rev)
-                    .unwrap();
+                list_sync_revision_parents(
+                    &conn,
+                    &recipient.to_hex(),
+                    &pending.document_coord,
+                    &head.rev,
+                )
+                .unwrap();
             let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag: pending.d_tag.clone(),
+                document_coord: pending.document_coord.clone(),
                 revision_id: head.rev,
                 parent_revision_ids,
                 op: "del".into(),
                 mtime: head.mtime,
-                entity_type: Some(pending.entity_type.clone()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             });
             let event =

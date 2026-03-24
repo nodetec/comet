@@ -16,8 +16,8 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
   return {
     async listHeads(scope) {
       const conditions = [eq(syncHeads.recipient, scope.recipient)];
-      if (scope.documentIds && scope.documentIds.length > 0) {
-        conditions.push(inArray(syncHeads.dTag, scope.documentIds));
+      if (scope.documentCoords && scope.documentCoords.length > 0) {
+        conditions.push(inArray(syncHeads.dTag, scope.documentCoords));
       }
       if (scope.revisionIds && scope.revisionIds.length > 0) {
         conditions.push(inArray(syncHeads.rev, scope.revisionIds));
@@ -26,7 +26,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
       const rows = await db
         .select({
           recipient: syncHeads.recipient,
-          documentId: syncHeads.dTag,
+          documentCoord: syncHeads.dTag,
           revisionId: syncHeads.rev,
           op: syncHeads.op,
           mtime: syncHeads.mtime,
@@ -37,7 +37,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
 
       return rows.map((row) => ({
         recipient: row.recipient,
-        documentId: row.documentId,
+        documentCoord: row.documentCoord,
         revisionId: row.revisionId,
         op: row.op,
         mtime: row.mtime,
@@ -52,14 +52,16 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
         eq(syncRevisions.recipient, scope.recipient),
         lte(syncRevisions.storedSeq, snapshotSeq),
       ];
-      if (scope.documentIds && scope.documentIds.length > 0) {
-        revisionConditions.push(inArray(syncRevisions.dTag, scope.documentIds));
+      if (scope.documentCoords && scope.documentCoords.length > 0) {
+        revisionConditions.push(
+          inArray(syncRevisions.dTag, scope.documentCoords),
+        );
       }
 
       const revisions = await db
         .select({
           recipient: syncRevisions.recipient,
-          documentId: syncRevisions.dTag,
+          documentCoord: syncRevisions.dTag,
           revisionId: syncRevisions.rev,
           op: syncRevisions.op,
           mtime: syncRevisions.mtime,
@@ -76,15 +78,15 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
         eq(syncRevisions.recipient, scope.recipient),
         lte(syncRevisions.storedSeq, snapshotSeq),
       ];
-      if (scope.documentIds && scope.documentIds.length > 0) {
+      if (scope.documentCoords && scope.documentCoords.length > 0) {
         supersededConditions.push(
-          inArray(syncRevisions.dTag, scope.documentIds),
+          inArray(syncRevisions.dTag, scope.documentCoords),
         );
       }
 
       const supersededRows = await db
         .select({
-          documentId: syncRevisionParents.dTag,
+          documentCoord: syncRevisionParents.dTag,
           parentRevisionId: syncRevisionParents.parentRev,
         })
         .from(syncRevisionParents)
@@ -100,14 +102,14 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
 
       const superseded = new Set(
         supersededRows.map(
-          ({ documentId, parentRevisionId }) =>
-            `${documentId}:${parentRevisionId}`,
+          ({ documentCoord, parentRevisionId }) =>
+            `${documentCoord}:${parentRevisionId}`,
         ),
       );
 
       const snapshotHeads = revisions.filter(
         (revision) =>
-          !superseded.has(`${revision.documentId}:${revision.revisionId}`),
+          !superseded.has(`${revision.documentCoord}:${revision.revisionId}`),
       );
 
       if (!scope.revisionIds || scope.revisionIds.length === 0) {

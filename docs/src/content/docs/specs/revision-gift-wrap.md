@@ -64,7 +64,7 @@ The outer tags should include:
 ["prev",  <parent_revision_id>]        // repeatable
 ["op",    "put" | "del"]
 ["m",     <modified_at_ms_as_string>]
-["t",     "note" | "notebook"]         // optional
+["type",  "note" | "notebook"]         // optional, relay-visible hint
 ["v",     "2"]
 ```
 
@@ -76,7 +76,10 @@ Field meanings:
 - `prev`: parent revision ID; a merge revision may include more than one
 - `op`: normal content revision or tombstone revision
 - `m`: logical revision timestamp used for ordering hints
-- `t`: optional logical sync entity type
+- `type`: optional relay-visible logical sync entity type
+
+For Comet itself, this outer `type` hint should normally be omitted for privacy. The authoritative entity type lives only inside the encrypted payload. Other apps may choose to publish an outer `type` if they want relay-visible classification.
+
 - `v`: Comet sync schema version
 
 For this extension, the outer `p` tag is not just transport metadata. It defines the recipient-specific namespace in which `d`, `rev`, heads, and anti-entropy scope are evaluated.
@@ -127,6 +130,8 @@ Logical deletion should be represented as a normal revision with:
 
 A tombstone is the current document head until a newer revision supersedes it.
 
+For Comet, the outer `op` is the authoritative deletion signal. The inner encrypted payload does not need a second `deleted=true` marker. It only needs to carry the inner document id and inner `type` so the client can interpret what logical entity is being deleted.
+
 ### Merge revisions
 
 A merge revision is any revision with multiple `prev` tags.
@@ -149,7 +154,7 @@ For relay implementation, heads should be **materialized on write** and treated 
 
 To support revision-aware sync, the relay should:
 
-- retain immutable revisions keyed by `(recipient, d_tag, rev)`
+- retain immutable revisions keyed by `(recipient, document_coord, rev)`
 - store parent edges for `prev`
 - materialize the current head set
 - allow filtering by the revision tags used in sync
@@ -157,7 +162,7 @@ To support revision-aware sync, the relay should:
 Recommendation:
 
 - keep the relay-queryable wire surface to single-letter tags such as `p`, `d`, `r`, and `m`
-- map those tags onto descriptive internal schema fields like `recipient`, `d_tag`, `rev`, and `mtime`
+- map those tags onto descriptive internal schema fields like `recipient`, `document_coord`, `rev`, and `mtime`
 
 Non-queryable metadata such as `prev`, `op`, and `type` can remain descriptive until there is a real need to expose them as indexed relay filters.
 

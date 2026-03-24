@@ -8,7 +8,7 @@ export type RevisionOp = "put" | "del";
 
 export type RevisionEnvelope = {
   recipient: string;
-  documentId: string;
+  documentCoord: string;
   revisionId: string;
   parentRevisionIds: string[];
   op: RevisionOp;
@@ -20,7 +20,7 @@ export type RevisionEnvelope = {
 
 export type RevisionHead = {
   recipient: string;
-  documentId: string;
+  documentCoord: string;
   revisionId: string;
   op: RevisionOp;
   mtime: number;
@@ -28,7 +28,7 @@ export type RevisionHead = {
 
 export type RevisionScope = {
   recipient: string;
-  documentIds?: string[];
+  documentCoords?: string[];
   revisionIds?: string[];
 };
 

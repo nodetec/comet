@@ -274,18 +274,23 @@ pub async fn push_deletion_revision(
             pending
         };
 
-        let head = get_sync_head(&conn, &recipient_hex, &pending.d_tag)?
+        let head = get_sync_head(&conn, &recipient_hex, &pending.document_coord)?
             .ok_or_else(|| AppError::custom("Missing sync head for deletion revision"))?;
         let parent_revision_ids =
-            list_sync_revision_parents(&conn, &recipient_hex, &pending.d_tag, &head.rev)?;
+            list_sync_revision_parents(
+                &conn,
+                &recipient_hex,
+                &pending.document_coord,
+                &head.rev,
+            )?;
         let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
             recipient: recipient_hex.clone(),
-            d_tag: pending.d_tag.clone(),
+            document_coord: pending.document_coord.clone(),
             revision_id: head.rev,
             parent_revision_ids,
             op: "del".to_string(),
             mtime: head.mtime,
-            entity_type: Some(pending.entity_type.clone()),
+            entity_type: None,
             schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
         });
 
@@ -396,7 +401,7 @@ async fn send_event_on_connection(
 mod tests {
     use super::*;
     use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_d_tag,
+        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
         compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
         REVISION_SYNC_SCHEMA_VERSION,
     };
@@ -563,10 +568,10 @@ mod tests {
 
     fn make_remote_note_event(keys: &Keys, note_id: &str, title: &str, markdown: &str) -> Event {
         let recipient = keys.public_key();
-        let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
         let canonical = canonicalize_revision_payload(
             &recipient.to_hex(),
-            &d_tag,
+            &document_coord,
             &[],
             "put",
             "note",
@@ -612,12 +617,12 @@ mod tests {
             rumor,
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag,
+                document_coord,
                 revision_id,
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: Some("note".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )

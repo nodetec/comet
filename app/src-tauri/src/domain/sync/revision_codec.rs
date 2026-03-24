@@ -29,7 +29,7 @@ pub struct RevisionRumorInput<'a> {
 
 pub struct RevisionEnvelopeMeta {
     pub recipient: String,
-    pub d_tag: String,
+    pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub op: String,
@@ -40,13 +40,8 @@ pub struct RevisionEnvelopeMeta {
 
 fn find_entity_type_tag(event: &Event) -> Option<String> {
     event.tags
-        .find(TagKind::custom("t"))
+        .find(TagKind::custom("type"))
         .and_then(|tag| tag.content())
-        .or_else(|| {
-            event.tags
-                .find(TagKind::custom("type"))
-                .and_then(|tag| tag.content())
-        })
         .map(std::string::ToString::to_string)
 }
 
@@ -62,7 +57,7 @@ pub fn parse_revision_envelope_meta(event: &Event) -> Result<RevisionEnvelopeMet
         .map(std::string::ToString::to_string)
         .ok_or_else(|| AppError::custom("Missing p tag in revision envelope"))?;
 
-    let d_tag = event
+    let document_coord = event
         .tags
         .find(TagKind::d())
         .and_then(|tag| tag.content())
@@ -107,7 +102,7 @@ pub fn parse_revision_envelope_meta(event: &Event) -> Result<RevisionEnvelopeMet
 
     Ok(RevisionEnvelopeMeta {
         recipient,
-        d_tag,
+        document_coord,
         revision_id,
         parent_revision_ids,
         op,
@@ -122,7 +117,7 @@ pub fn revision_envelope_tags(meta: &RevisionEnvelopeMeta) -> Vec<Tag> {
         Tag::public_key(
             PublicKey::parse(&meta.recipient).expect("recipient should be valid hex pubkey"),
         ),
-        Tag::identifier(&meta.d_tag),
+        Tag::identifier(&meta.document_coord),
         Tag::custom(TagKind::custom("r"), vec![meta.revision_id.clone()]),
         Tag::custom(TagKind::custom("m"), vec![meta.mtime.to_string()]),
         Tag::custom(TagKind::custom("op"), vec![meta.op.clone()]),
@@ -130,7 +125,10 @@ pub fn revision_envelope_tags(meta: &RevisionEnvelopeMeta) -> Vec<Tag> {
     ];
 
     if let Some(entity_type) = &meta.entity_type {
-        tags.push(Tag::custom(TagKind::custom("t"), vec![entity_type.clone()]));
+        tags.push(Tag::custom(
+            TagKind::custom("type"),
+            vec![entity_type.clone()],
+        ));
     }
 
     for parent in &meta.parent_revision_ids {
@@ -224,7 +222,7 @@ pub fn build_revision_note_rumor(
         .build(pubkey)
 }
 
-pub fn compute_document_d_tag(secret_key: &SecretKey, document_id: &str) -> String {
+pub fn compute_document_coord(secret_key: &SecretKey, document_id: &str) -> String {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret_key.as_secret_bytes())
         .expect("HMAC accepts any key size");
     mac.update(document_id.as_bytes());
@@ -243,7 +241,7 @@ pub fn compute_revision_id(
 
 pub fn canonicalize_revision_payload(
     recipient: &str,
-    d_tag: &str,
+    document_coord: &str,
     parent_revision_ids: &[String],
     op: &str,
     entity_type: &str,
@@ -268,7 +266,7 @@ pub fn canonicalize_revision_payload(
     serde_json::to_string(&serde_json::json!({
         "strategy": REVISION_SYNC_STRATEGY,
         "recipient": recipient,
-        "d": d_tag,
+        "d": document_coord,
         "parents": sorted_parents,
         "op": op,
         "type": entity_type,

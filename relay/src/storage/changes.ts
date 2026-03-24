@@ -16,7 +16,7 @@ export type ChangeStore = {
   minSequence: () => Promise<number>;
   appendStoredRevisionChange: (input: {
     recipient: string;
-    documentId: string;
+    documentCoord: string;
     revisionId: string;
     eventId: string;
     op: "put" | "del";
@@ -47,7 +47,7 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
         .insert(syncChanges)
         .values({
           recipient: input.recipient,
-          dTag: input.documentId,
+          dTag: input.documentCoord,
           rev: input.revisionId,
           eventId: input.eventId,
           op: input.op,

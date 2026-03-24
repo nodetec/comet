@@ -3,7 +3,7 @@ use crate::adapters::sqlite::revision_sync_repository::{
     upsert_sync_revision, LocalSyncHead, LocalSyncRevision,
 };
 use crate::domain::sync::event_codec::{
-    is_deleted_rumor, is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
+    is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
 };
 use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
 use crate::domain::sync::model::SyncChangePayload;
@@ -32,13 +32,13 @@ pub fn apply_remote_revision_event(
         )
         .optional()?;
 
-    let change_payload = if is_deleted_rumor(&unwrapped.rumor) {
+    let change_payload = if meta.op == "del" {
         let entity_id = unwrapped
             .rumor
             .tags
             .find(TagKind::d())
             .and_then(|tag| tag.content())
-            .ok_or_else(|| AppError::custom("Missing d tag in deleted revision rumor"))?
+            .ok_or_else(|| AppError::custom("Missing d tag in deletion revision rumor"))?
             .to_string();
 
         if is_notebook_rumor(&unwrapped.rumor) {
@@ -51,7 +51,7 @@ pub fn apply_remote_revision_event(
             conn,
             &LocalSyncRevision {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -66,17 +66,17 @@ pub fn apply_remote_revision_event(
         replace_sync_revision_parents(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
         replace_sync_heads(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &[LocalSyncHead {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -94,7 +94,7 @@ pub fn apply_remote_revision_event(
             conn,
             &LocalSyncRevision {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -109,17 +109,17 @@ pub fn apply_remote_revision_event(
         replace_sync_revision_parents(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
         replace_sync_heads(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &[LocalSyncHead {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -157,7 +157,7 @@ pub fn apply_remote_revision_event(
             conn,
             &LocalSyncRevision {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -172,17 +172,17 @@ pub fn apply_remote_revision_event(
         replace_sync_revision_parents(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &meta.revision_id,
             &meta.parent_revision_ids,
         )?;
         replace_sync_heads(
             conn,
             &meta.recipient,
-            &meta.d_tag,
+            &meta.document_coord,
             &[LocalSyncHead {
                 recipient: meta.recipient.clone(),
-                d_tag: meta.d_tag.clone(),
+                d_tag: meta.document_coord.clone(),
                 rev: meta.revision_id.clone(),
                 op: meta.op.clone(),
                 mtime: meta.mtime,
@@ -229,7 +229,7 @@ mod tests {
     use crate::adapters::sqlite::migrations::account_migrations;
     use crate::domain::sync::event_codec::{deleted_note_rumor, deleted_notebook_rumor};
     use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_d_tag,
+        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
         compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
         REVISION_SYNC_SCHEMA_VERSION,
     };
@@ -247,10 +247,10 @@ mod tests {
         let keys = Keys::generate();
         let recipient = keys.public_key();
         let note_id = "note-1";
-        let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
         let canonical_payload = canonicalize_revision_payload(
             &recipient.to_hex(),
-            &d_tag,
+            &document_coord,
             &[],
             "put",
             "note",
@@ -295,12 +295,12 @@ mod tests {
             rumor,
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag: d_tag.clone(),
+                document_coord: document_coord.clone(),
                 revision_id: revision_id.clone(),
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: Some("note".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -330,7 +330,7 @@ mod tests {
         let keys = Keys::generate();
         let recipient = keys.public_key();
         let note_id = "note-blob";
-        let d_tag = compute_document_d_tag(keys.secret_key(), note_id);
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
         let hash = "a".repeat(64);
         let ciphertext_hash = "b".repeat(64);
         let key_hex = "c".repeat(64);
@@ -344,7 +344,7 @@ mod tests {
         let markdown = format!("# Title\n\n![img](attachment://{hash}.png)");
         let canonical_payload = canonicalize_revision_payload(
             &recipient.to_hex(),
-            &d_tag,
+            &document_coord,
             &[],
             "put",
             "note",
@@ -389,12 +389,12 @@ mod tests {
             rumor,
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag: d_tag.clone(),
+                document_coord: document_coord.clone(),
                 revision_id: revision_id.clone(),
                 parent_revision_ids: vec![],
                 op: "put".into(),
                 mtime: 200,
-                entity_type: Some("note".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -447,11 +447,11 @@ mod tests {
 
         let keys = Keys::generate();
         let recipient = keys.public_key();
-        let d_tag = compute_document_d_tag(keys.secret_key(), "note-1");
+        let document_coord = compute_document_coord(keys.secret_key(), "note-1");
         let canonical_payload = serde_json::to_string(&serde_json::json!({
             "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
             "recipient": recipient.to_hex(),
-            "d": d_tag,
+            "d": document_coord,
             "parents": [],
             "op": "del",
             "type": "note",
@@ -467,12 +467,12 @@ mod tests {
             deleted_note_rumor("note-1", keys.public_key()),
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag,
+                document_coord,
                 revision_id: revision_id.clone(),
                 parent_revision_ids: vec![],
                 op: "del".into(),
                 mtime: 300,
-                entity_type: Some("note".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -495,7 +495,7 @@ mod tests {
                 "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
                 params![
                     recipient.to_hex(),
-                    compute_document_d_tag(keys.secret_key(), "note-1")
+                    compute_document_coord(keys.secret_key(), "note-1")
                 ],
                 |row| row.get(0),
             )
@@ -515,11 +515,11 @@ mod tests {
 
         let keys = Keys::generate();
         let recipient = keys.public_key();
-        let d_tag = compute_document_d_tag(keys.secret_key(), "notebook:notebook-1");
+        let document_coord = compute_document_coord(keys.secret_key(), "notebook:notebook-1");
         let canonical_payload = serde_json::to_string(&serde_json::json!({
             "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
             "recipient": recipient.to_hex(),
-            "d": d_tag,
+            "d": document_coord,
             "parents": [],
             "op": "del",
             "type": "notebook",
@@ -535,12 +535,12 @@ mod tests {
             deleted_notebook_rumor("notebook-1", keys.public_key()),
             revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
-                d_tag,
+                document_coord,
                 revision_id: revision_id.clone(),
                 parent_revision_ids: vec![],
                 op: "del".into(),
                 mtime: 300,
-                entity_type: Some("notebook".into()),
+                entity_type: None,
                 schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
             }),
         )
@@ -563,7 +563,7 @@ mod tests {
                 "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
                 params![
                     recipient.to_hex(),
-                    compute_document_d_tag(keys.secret_key(), "notebook:notebook-1")
+                    compute_document_coord(keys.secret_key(), "notebook:notebook-1")
                 ],
                 |row| row.get(0),
             )

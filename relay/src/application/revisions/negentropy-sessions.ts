@@ -69,12 +69,12 @@ function parseRevisionScope(input: Record<string, unknown>): RevisionScope {
     );
   }
 
-  const documentIds = arrayOfStrings(input["#d"]);
+  const documentCoords = arrayOfStrings(input["#d"]);
   const revisionIds = arrayOfStrings(input["#r"]);
 
   return {
     recipient: recipientValues[0],
-    documentIds: documentIds.length > 0 ? documentIds : undefined,
+    documentCoords: documentCoords.length > 0 ? documentCoords : undefined,
     revisionIds: revisionIds.length > 0 ? revisionIds : undefined,
   };
 }

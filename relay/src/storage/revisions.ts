@@ -28,7 +28,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         .where(
           and(
             eq(syncRevisions.recipient, envelope.recipient),
-            eq(syncRevisions.dTag, envelope.documentId),
+            eq(syncRevisions.dTag, envelope.documentCoord),
             eq(syncRevisions.rev, envelope.revisionId),
           ),
         )
@@ -46,7 +46,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         await tx.insert(syncPayloads).values({
           eventId: envelope.event.id,
           recipient: envelope.recipient,
-          dTag: envelope.documentId,
+          dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           pubkey: envelope.event.pubkey,
           kind: envelope.event.kind,
@@ -58,7 +58,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
 
         await tx.insert(syncRevisions).values({
           recipient: envelope.recipient,
-          dTag: envelope.documentId,
+          dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           op: envelope.op,
           mtime: envelope.mtime,
@@ -71,7 +71,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           await tx.insert(syncRevisionParents).values(
             envelope.parentRevisionIds.map((parentRev) => ({
               recipient: envelope.recipient,
-              dTag: envelope.documentId,
+              dTag: envelope.documentCoord,
               rev: envelope.revisionId,
               parentRev,
             })),
@@ -82,7 +82,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
             .where(
               and(
                 eq(syncHeads.recipient, envelope.recipient),
-                eq(syncHeads.dTag, envelope.documentId),
+                eq(syncHeads.dTag, envelope.documentCoord),
                 inArray(syncHeads.rev, envelope.parentRevisionIds),
               ),
             );
@@ -90,7 +90,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
 
         await tx.insert(syncHeads).values({
           recipient: envelope.recipient,
-          dTag: envelope.documentId,
+          dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           op: envelope.op,
           mtime: envelope.mtime,
@@ -100,7 +100,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           .insert(syncChanges)
           .values({
             recipient: envelope.recipient,
-            dTag: envelope.documentId,
+            dTag: envelope.documentCoord,
             rev: envelope.revisionId,
             eventId: envelope.event.id,
             op: envelope.op,
@@ -115,7 +115,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           .where(
             and(
               eq(syncRevisions.recipient, envelope.recipient),
-              eq(syncRevisions.dTag, envelope.documentId),
+              eq(syncRevisions.dTag, envelope.documentCoord),
               eq(syncRevisions.rev, envelope.revisionId),
             ),
           );

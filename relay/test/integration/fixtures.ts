@@ -18,7 +18,7 @@ export function revisionEvent(
   revisionId: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
-  documentId = "doc-1",
+  documentCoord = "doc-1",
   op: "put" | "del" = "put",
   recipient = "recipient-1",
 ): NostrEvent {
@@ -29,7 +29,7 @@ export function revisionEvent(
     kind: REVISION_SYNC_EVENT_KIND,
     tags: [
       ["p", recipient],
-      ["d", documentId],
+      ["d", documentCoord],
       ["r", revisionId],
       ...parentRevisionIds.map((parentRevisionId) => [
         "prev",
@@ -37,7 +37,7 @@ export function revisionEvent(
       ]),
       ["op", op],
       ["m", `${mtime}`],
-      ["t", "note"],
+      ["type", "note"],
       ["v", "2"],
     ],
     content: `ciphertext-${revisionId}`,
@@ -50,14 +50,14 @@ export function revisionEventForRecipient(
   recipient: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
-  documentId = "doc-1",
+  documentCoord = "doc-1",
   op: "put" | "del" = "put",
 ): NostrEvent {
   return revisionEvent(
     revisionId,
     mtime,
     parentRevisionIds,
-    documentId,
+    documentCoord,
     op,
     recipient,
   );
@@ -67,9 +67,15 @@ export function deletionRevisionEvent(
   revisionId: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
-  documentId = "doc-1",
+  documentCoord = "doc-1",
 ): NostrEvent {
-  return revisionEvent(revisionId, mtime, parentRevisionIds, documentId, "del");
+  return revisionEvent(
+    revisionId,
+    mtime,
+    parentRevisionIds,
+    documentCoord,
+    "del",
+  );
 }
 
 export function authEvent(

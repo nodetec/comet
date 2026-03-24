@@ -12,7 +12,7 @@ function getSingleTag(tags: string[][], name: string): string | null {
 }
 
 function getEntityTypeTag(tags: string[][]): string | null {
-  return getSingleTag(tags, "t") ?? getSingleTag(tags, "type");
+  return getSingleTag(tags, "type");
 }
 
 function parseRevisionOp(value: string | null): RevisionOp | null {
@@ -34,7 +34,7 @@ export function parseRevisionEnvelope(
   }
 
   const recipient = getSingleTag(event.tags, "p");
-  const documentId = getSingleTag(event.tags, "d");
+  const documentCoord = getSingleTag(event.tags, "d");
   const revisionId = getSingleTag(event.tags, "r");
   const op = parseRevisionOp(getSingleTag(event.tags, "op"));
   const mtimeText = getSingleTag(event.tags, "m");
@@ -42,7 +42,7 @@ export function parseRevisionEnvelope(
 
   if (
     !recipient ||
-    !documentId ||
+    !documentCoord ||
     !revisionId ||
     !op ||
     !Number.isFinite(mtime) ||
@@ -64,7 +64,7 @@ export function parseRevisionEnvelope(
 
   return {
     recipient,
-    documentId,
+    documentCoord,
     revisionId,
     parentRevisionIds,
     op,

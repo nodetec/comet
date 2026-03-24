@@ -22,7 +22,7 @@ describe("parseRevisionEnvelope", () => {
         ],
         ["op", "put"],
         ["m", "1700000000000"],
-        ["t", "note"],
+        ["type", "note"],
         ["v", "2"],
       ],
       content: "ciphertext",
@@ -32,7 +32,7 @@ describe("parseRevisionEnvelope", () => {
     expect(envelope).not.toBeNull();
     expect(envelope).toMatchObject({
       recipient: "recipient-1",
-      documentId: "doc-1",
+      documentCoord: "doc-1",
       revisionId,
       parentRevisionIds: [
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

@@ -49,7 +49,7 @@ describe("relay integration > handoff", () => {
       expect(await headStore.listHeads({ recipient: "recipient-1" })).toEqual([
         {
           recipient: "recipient-1",
-          documentId: "doc-1",
+          documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
           mtime: 1_700_000_000_100,
@@ -61,7 +61,7 @@ describe("relay integration > handoff", () => {
       ).toEqual([
         {
           recipient: "recipient-1",
-          documentId: "doc-1",
+          documentCoord: "doc-1",
           revisionId: REV_A,
           op: "put",
           mtime: 1_700_000_000_000,
@@ -73,7 +73,7 @@ describe("relay integration > handoff", () => {
       ).toEqual([
         {
           recipient: "recipient-1",
-          documentId: "doc-1",
+          documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
           mtime: 1_700_000_000_100,

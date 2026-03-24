@@ -10,7 +10,7 @@ function head(
 ): RevisionHead {
   return {
     recipient: "pubkey-1",
-    documentId: "doc-1",
+    documentCoord: "doc-1",
     revisionId,
     op,
     mtime,
