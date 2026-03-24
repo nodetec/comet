@@ -206,6 +206,8 @@ pub fn build_revision_note_rumor(
         tags.push(Tag::hashtag(tag));
     }
 
+    // Preserve the plaintext attachment id used by markdown while carrying the
+    // encrypted Blossom object id and decryption key in the sync payload.
     for (plaintext_hash, ciphertext_hash, key_hex) in input.blob_tags {
         tags.push(Tag::custom(
             TagKind::custom("blob"),

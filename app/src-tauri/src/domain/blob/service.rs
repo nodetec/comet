@@ -23,7 +23,7 @@ pub fn detect_image_extension(data: &[u8]) -> Option<String> {
     }
 }
 
-/// Extract the file extension for a blob hash from markdown content.
+/// Extract the file extension for a plaintext attachment hash from markdown.
 pub fn extract_blob_extension(content: &str, hash: &str) -> Option<String> {
     let pattern = format!("attachment://{hash}.");
     if let Some(pos) = content.find(&pattern) {
@@ -36,7 +36,7 @@ pub fn extract_blob_extension(content: &str, hash: &str) -> Option<String> {
     None
 }
 
-/// Extract `attachment://` hashes from markdown content.
+/// Extract plaintext attachment hashes from `attachment://` markdown references.
 pub fn extract_attachment_hashes(markdown: &str) -> Vec<String> {
     static RE: std::sync::LazyLock<Regex> =
         std::sync::LazyLock::new(|| Regex::new(r"attachment://([a-f0-9]{64})\.\w+").unwrap());
@@ -94,8 +94,11 @@ pub fn find_orphaned_blob_hashes(
     Ok(candidate_hashes)
 }
 
-/// Clean up orphaned blobs: delete local files, remove `blob_meta/blob_uploads` entries.
-/// Returns (`server_url`, `ciphertext_hash`) pairs for Blossom server deletion.
+/// Clean up orphaned blobs for plaintext attachment hashes.
+///
+/// This removes local files, deletes `blob_meta` bridge records, and returns
+/// `(server_url, ciphertext_hash)` pairs for deleting the encrypted Blossom
+/// objects those plaintext attachments pointed at.
 pub fn cleanup_orphaned_blobs(
     app: &AppHandle,
     conn: &Connection,

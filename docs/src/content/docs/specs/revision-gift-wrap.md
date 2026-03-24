@@ -112,6 +112,35 @@ Properties of this approach:
 - changed by any meaningful document mutation
 - usable as a 32-byte anti-entropy ID
 
+## Blob Identity
+
+Comet keeps attachment references and stored blob objects intentionally separate.
+
+Within the encrypted note payload:
+
+- markdown references attachments as `attachment://<plaintext_hash>.<ext>`
+- `blob` tags carry `(plaintext_hash, ciphertext_hash, encryption_key_hex)`
+
+That split is intentional:
+
+- `plaintext_hash` identifies the logical attachment reference inside Comet markdown
+- `ciphertext_hash` identifies the encrypted object stored on Blossom
+- `encryption_key_hex` lets the client decrypt the downloaded ciphertext back into the plaintext attachment bytes
+
+This means the same attachment can remain addressable inside the note by its plaintext hash, while the server only stores and serves the encrypted ciphertext object.
+
+Local clients should persist a bridge record such as `blob_meta` that maps:
+
+```text
+plaintext_hash -> (server_url, ciphertext_hash, encryption_key)
+```
+
+When debugging:
+
+- if the editor or markdown contains `attachment://...`, that hash is the plaintext hash
+- if a Blossom URL or server object lookup is involved, that hash is usually the ciphertext hash for revision-sync blobs
+- public publish flows that rewrite markdown to direct Blossom URLs may use plaintext hashes in the final URL instead of ciphertext hashes
+
 ## Revision Rules
 
 ### Immutable revisions

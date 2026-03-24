@@ -30,7 +30,7 @@ pub async fn upload_blob(
     let ciphertext_hash = format!("{:x}", hasher.finalize());
 
     blossom_log(&format!(
-        "encrypted upload start hash={} size={} url={}",
+        "encrypted upload start ciphertext_hash={} size={} url={}",
         short_hash(&ciphertext_hash),
         ciphertext.len(),
         blossom_url
@@ -49,14 +49,14 @@ pub async fn upload_blob(
         .await
         .map_err(|e| {
             blossom_log(&format!(
-                "encrypted upload request failed hash={} error={e}",
+                "encrypted upload request failed ciphertext_hash={} error={e}",
                 short_hash(&ciphertext_hash)
             ));
             AppError::custom(format!("Blossom upload failed: {e}"))
         })?;
 
     blossom_log(&format!(
-        "encrypted upload response hash={} status={}",
+        "encrypted upload response ciphertext_hash={} status={}",
         short_hash(&ciphertext_hash),
         resp.status()
     ));
@@ -71,7 +71,7 @@ pub async fn upload_blob(
             .to_string();
         let body = resp.text().await.unwrap_or_default();
         blossom_log(&format!(
-            "encrypted upload failed hash={} status={} reason_header={} body={}",
+            "encrypted upload failed ciphertext_hash={} status={} reason_header={} body={}",
             short_hash(&ciphertext_hash),
             status,
             reason_header,
@@ -83,7 +83,7 @@ pub async fn upload_blob(
     }
 
     blossom_log(&format!(
-        "encrypted upload ok hash={}",
+        "encrypted upload ok ciphertext_hash={}",
         short_hash(&ciphertext_hash)
     ));
     Ok(ciphertext_hash)
@@ -112,7 +112,7 @@ pub async fn upload_plaintext_blob(
     };
 
     blossom_log(&format!(
-        "upload start hash={} size={} type={} url={}",
+        "plaintext upload start plaintext_hash={} size={} type={} url={}",
         short_hash(&hash),
         data.len(),
         content_type,
@@ -122,7 +122,7 @@ pub async fn upload_plaintext_blob(
     let auth_header = sign_blossom_auth(keys, "upload", &hash, blossom_url)?;
     let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
     blossom_log(&format!(
-        "upload request prepared hash={} endpoint={} auth_bytes={}",
+        "plaintext upload request prepared plaintext_hash={} endpoint={} auth_bytes={}",
         short_hash(&hash),
         url,
         auth_header.len()
@@ -138,14 +138,14 @@ pub async fn upload_plaintext_blob(
         .await
         .map_err(|e| {
             blossom_log(&format!(
-                "upload request failed hash={} error={e}",
+                "plaintext upload request failed plaintext_hash={} error={e}",
                 short_hash(&hash)
             ));
             AppError::custom(format!("Blossom upload failed: {e}"))
         })?;
 
     blossom_log(&format!(
-        "upload response hash={} status={}",
+        "plaintext upload response plaintext_hash={} status={}",
         short_hash(&hash),
         resp.status()
     ));
@@ -160,7 +160,7 @@ pub async fn upload_plaintext_blob(
             .to_string();
         let body = resp.text().await.unwrap_or_default();
         blossom_log(&format!(
-            "upload failed hash={} status={} reason_header={} body={}",
+            "plaintext upload failed plaintext_hash={} status={} reason_header={} body={}",
             short_hash(&hash),
             status,
             reason_header,
@@ -171,7 +171,10 @@ pub async fn upload_plaintext_blob(
         )));
     }
 
-    blossom_log(&format!("upload ok hash={}", short_hash(&hash)));
+    blossom_log(&format!(
+        "plaintext upload ok plaintext_hash={}",
+        short_hash(&hash)
+    ));
 
     Ok(hash)
 }
@@ -248,20 +251,23 @@ pub async fn upload_and_rewrite_attachments(
     Ok(result)
 }
 
-/// Delete a blob from a Blossom server by its hash.
+/// Delete a stored Blossom object by its server object hash.
+///
+/// Revision-sync uploads delete by ciphertext hash. Public publish flows may
+/// delete by plaintext hash instead.
 pub async fn delete_blob(
     client: &reqwest::Client,
     blossom_url: &str,
-    hash: &str,
+    object_hash: &str,
     keys: &Keys,
 ) -> Result<(), AppError> {
     blossom_log(&format!(
-        "delete start hash={} url={}",
-        short_hash(hash),
+        "delete start object_hash={} url={}",
+        short_hash(object_hash),
         blossom_url
     ));
-    let auth_header = sign_blossom_auth(keys, "delete", hash, blossom_url)?;
-    let url = format!("{}/{}", blossom_url.trim_end_matches('/'), hash);
+    let auth_header = sign_blossom_auth(keys, "delete", object_hash, blossom_url)?;
+    let url = format!("{}/{}", blossom_url.trim_end_matches('/'), object_hash);
 
     let resp = client
         .delete(&url)
@@ -270,8 +276,8 @@ pub async fn delete_blob(
         .await
         .map_err(|e| {
             blossom_log(&format!(
-                "delete request failed hash={} error={e}",
-                short_hash(hash)
+                "delete request failed object_hash={} error={e}",
+                short_hash(object_hash)
             ));
             AppError::custom(format!("Blossom delete failed: {e}"))
         })?;
@@ -279,15 +285,18 @@ pub async fn delete_blob(
     if !resp.status().is_success() && resp.status().as_u16() != 404 {
         let status = resp.status();
         blossom_log(&format!(
-            "delete failed hash={} status={status}",
-            short_hash(hash)
+            "delete failed object_hash={} status={status}",
+            short_hash(object_hash)
         ));
         return Err(AppError::custom(format!(
             "Blossom delete failed ({status})"
         )));
     }
 
-    blossom_log(&format!("delete ok hash={}", short_hash(hash)));
+    blossom_log(&format!(
+        "delete ok object_hash={}",
+        short_hash(object_hash)
+    ));
     Ok(())
 }
 
@@ -299,7 +308,7 @@ pub async fn download_blob(
     keys: &Keys,
 ) -> Result<Vec<u8>, AppError> {
     blossom_log(&format!(
-        "download start hash={} url={}",
+        "download start ciphertext_hash={} url={}",
         short_hash(ciphertext_hash),
         blossom_url
     ));
@@ -318,7 +327,7 @@ pub async fn download_blob(
         .await
         .map_err(|e| {
             blossom_log(&format!(
-                "download request failed hash={} error={e}",
+                "download request failed ciphertext_hash={} error={e}",
                 short_hash(ciphertext_hash)
             ));
             AppError::custom(format!("Blossom download failed: {e}"))
@@ -334,21 +343,21 @@ pub async fn download_blob(
             .or_else(|_| Url::parse(&url).and_then(|base| base.join(location)))
             .map_err(|e| AppError::custom(format!("Invalid Blossom redirect URL: {e}")))?;
         blossom_log(&format!(
-            "download redirect hash={} location={}",
+            "download redirect ciphertext_hash={} location={}",
             short_hash(ciphertext_hash),
             redirect_url
         ));
 
         client.get(redirect_url).send().await.map_err(|e| {
             blossom_log(&format!(
-                "download redirect failed hash={} error={e}",
+                "download redirect failed ciphertext_hash={} error={e}",
                 short_hash(ciphertext_hash)
             ));
             AppError::custom(format!("Blossom download failed: {e}"))
         })?
     } else {
         blossom_log(&format!(
-            "download direct response hash={} status={}",
+            "download direct response ciphertext_hash={} status={}",
             short_hash(ciphertext_hash),
             resp.status()
         ));
@@ -358,7 +367,7 @@ pub async fn download_blob(
     if !resp.status().is_success() {
         let status = resp.status();
         blossom_log(&format!(
-            "download failed hash={} status={status}",
+            "download failed ciphertext_hash={} status={status}",
             short_hash(ciphertext_hash)
         ));
         return Err(AppError::custom(format!(
@@ -372,7 +381,7 @@ pub async fn download_blob(
         .map(|b| b.to_vec())
         .map_err(|e| AppError::custom(format!("Failed to read blob response: {e}")))?;
     blossom_log(&format!(
-        "download ok hash={} bytes={}",
+        "download ok ciphertext_hash={} bytes={}",
         short_hash(ciphertext_hash),
         bytes.len()
     ));

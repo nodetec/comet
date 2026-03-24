@@ -149,6 +149,9 @@ pub fn note_to_rumor(
         event_tags.push(Tag::hashtag(t));
     }
 
+    // Inner note payloads keep the plaintext attachment identity stable in
+    // markdown, then carry the ciphertext locator and decryption key alongside
+    // it so another device can fetch and decrypt the blob later.
     for (plaintext_hash, ciphertext_hash, key_hex) in blob_tags {
         event_tags.push(Tag::custom(
             TagKind::custom("blob"),
