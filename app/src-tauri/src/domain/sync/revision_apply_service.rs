@@ -14,6 +14,20 @@ use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
+fn validate_revision_payload_mtime(
+    outer_mtime: i64,
+    inner_mtime: i64,
+    entity_type: &str,
+) -> Result<(), AppError> {
+    if outer_mtime != inner_mtime {
+        return Err(AppError::custom(format!(
+            "Revision timestamp mismatch for {entity_type}: outer m={outer_mtime}, inner modified_at={inner_mtime}"
+        )));
+    }
+
+    Ok(())
+}
+
 pub fn apply_remote_revision_event(
     conn: &Connection,
     relay_url: &str,
@@ -88,6 +102,7 @@ pub fn apply_remote_revision_event(
         })
     } else if is_notebook_rumor(&unwrapped.rumor) {
         let notebook = rumor_to_synced_notebook(&unwrapped.rumor)?;
+        validate_revision_payload_mtime(meta.mtime, notebook.updated_at, "notebook")?;
         upsert_notebook_from_sync(conn, &notebook, &event.id.to_hex())?;
 
         upsert_sync_revision(
@@ -150,6 +165,7 @@ pub fn apply_remote_revision_event(
         }
 
         let note = rumor_to_synced_note(&unwrapped.rumor)?;
+        validate_revision_payload_mtime(meta.mtime, note.modified_at, "note")?;
         let note_id = note.id.clone();
         let updated = upsert_from_sync(conn, &note, &event.id.to_hex())?;
 
@@ -426,6 +442,139 @@ mod tests {
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
             Some(("note-blob".to_string(), "upsert".to_string()))
+        );
+    }
+
+    #[test]
+    fn rejects_note_revision_when_outer_m_differs_from_inner_modified_at() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let recipient = keys.public_key();
+        let note_id = "note-bad-mtime";
+        let document_coord = compute_document_coord(keys.secret_key(), note_id);
+        let canonical_payload = canonicalize_revision_payload(
+            &recipient.to_hex(),
+            &document_coord,
+            &[],
+            "put",
+            "note",
+            "Title",
+            "# Title\n\nBody",
+            None,
+            100,
+            200,
+            200,
+            None,
+            None,
+            None,
+            false,
+            &[],
+        )
+        .unwrap();
+        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
+        let rumor = build_revision_note_rumor(
+            RevisionRumorInput {
+                document_id: note_id,
+                title: "Title",
+                markdown: "# Title\n\nBody",
+                notebook_id: None,
+                created_at: 100,
+                modified_at: 200,
+                edited_at: 200,
+                archived_at: None,
+                deleted_at: None,
+                pinned_at: None,
+                readonly: false,
+                tags: &[],
+                blob_tags: &[],
+                entity_type: "note",
+                parent_revision_ids: &[],
+                op: "put",
+            },
+            keys.public_key(),
+        );
+        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
+            &keys,
+            &recipient,
+            rumor,
+            revision_envelope_tags(&RevisionEnvelopeMeta {
+                recipient: recipient.to_hex(),
+                document_coord,
+                revision_id,
+                parent_revision_ids: vec![],
+                op: "put".into(),
+                mtime: 201,
+                entity_type: None,
+                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
+            }),
+        )
+        .unwrap();
+
+        let error =
+            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
+                .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("Revision timestamp mismatch for note"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_notebook_revision_when_outer_m_differs_from_inner_updated_at() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let recipient = keys.public_key();
+        let notebook_id = "notebook-1";
+        let document_coord =
+            compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
+        let canonical_payload = serde_json::to_string(&serde_json::json!({
+            "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
+            "recipient": recipient.to_hex(),
+            "d": document_coord,
+            "parents": [],
+            "op": "put",
+            "type": "notebook",
+            "name": "Notebook",
+            "updated_at": 200,
+            "schema_version": REVISION_SYNC_SCHEMA_VERSION,
+        }))
+        .unwrap();
+        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
+        let rumor = crate::domain::sync::event_codec::notebook_to_rumor(
+            notebook_id,
+            "Notebook",
+            200,
+            keys.public_key(),
+        );
+        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
+            &keys,
+            &recipient,
+            rumor,
+            revision_envelope_tags(&RevisionEnvelopeMeta {
+                recipient: recipient.to_hex(),
+                document_coord,
+                revision_id,
+                parent_revision_ids: vec![],
+                op: "put".into(),
+                mtime: 201,
+                entity_type: None,
+                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
+            }),
+        )
+        .unwrap();
+
+        let error =
+            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
+                .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("Revision timestamp mismatch for notebook"),
+            "unexpected error: {error}"
         );
     }
 
