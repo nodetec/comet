@@ -87,6 +87,14 @@ function shouldProxyBlobResponse(requestUrl: URL, publicUrl: string): boolean {
   );
 }
 
+function shortHash(hash: string): string {
+  return hash.slice(0, 8);
+}
+
+function shortPubkey(pubkey: string): string {
+  return pubkey.slice(0, 12);
+}
+
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
     rawSql`TRUNCATE blob_owners, blobs, relay_allowed_users, users, invite_codes CASCADE`,
@@ -130,13 +138,18 @@ export async function createBlossomServer(
       }
 
       if (request.method === "GET" && blobSha256) {
+        console.log(`[blossom] get blob hash=${shortHash(blobSha256)}`);
         const blob = await blobDb.getBlob(db, blobSha256);
         if (!blob) {
+          console.warn(`[blossom] get missing hash=${shortHash(blobSha256)}`);
           return json({ error: "not found" }, 404);
         }
 
         const publicUrl = objectStorage.getPublicUrl(blob.sha256);
         if (shouldProxyBlobResponse(url, publicUrl)) {
+          console.log(
+            `[blossom] get proxy hash=${shortHash(blob.sha256)} public_url=${publicUrl}`,
+          );
           try {
             const { data, contentType } = await objectStorage.downloadBlob(
               blob.sha256,
@@ -159,6 +172,10 @@ export async function createBlossomServer(
           }
         }
 
+        console.log(
+          `[blossom] get redirect hash=${shortHash(blob.sha256)} public_url=${publicUrl}`,
+        );
+
         return withCors(
           new Response(null, {
             status: 302,
@@ -170,8 +187,10 @@ export async function createBlossomServer(
       }
 
       if (request.method === "HEAD" && blobSha256) {
+        console.log(`[blossom] head blob hash=${shortHash(blobSha256)}`);
         const blob = await blobDb.getBlob(db, blobSha256);
         if (!blob) {
+          console.warn(`[blossom] head missing hash=${shortHash(blobSha256)}`);
           return withCors(new Response(null, { status: 404 }));
         }
 
@@ -188,16 +207,24 @@ export async function createBlossomServer(
       }
 
       if (request.method === "PUT" && url.pathname === "/upload") {
+        console.log(`[blossom] upload request path=/upload`);
         const auth = validateBlossomAuth(
           request.headers.get("authorization") ?? undefined,
           "upload",
         );
         if (!auth.ok) {
+          console.warn(`[blossom] upload auth failed reason=${auth.reason}`);
           return json({ error: auth.reason }, 401);
         }
+        console.log(
+          `[blossom] upload auth ok pubkey=${shortPubkey(auth.pubkey)}`,
+        );
 
         const body = await request.arrayBuffer();
         if (body.byteLength === 0) {
+          console.warn(
+            `[blossom] upload rejected pubkey=${shortPubkey(auth.pubkey)} reason=empty-body`,
+          );
           return json({ error: "empty body" }, 400);
         }
 
@@ -205,6 +232,9 @@ export async function createBlossomServer(
         const sha256 = await computeSha256Hex(data);
         const contentType =
           request.headers.get("content-type") ?? "application/octet-stream";
+        console.log(
+          `[blossom] upload parsed pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} bytes=${data.byteLength} type=${contentType}`,
+        );
 
         const [currentUsage, storageLimit, existingBlob, alreadyOwned] =
           await Promise.all([
@@ -215,11 +245,20 @@ export async function createBlossomServer(
           ]);
 
         if (!storageLimit.allowed) {
+          console.warn(
+            `[blossom] upload forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} reason=not-allowlisted`,
+          );
           return json({ error: "forbidden" }, 403);
         }
+        console.log(
+          `[blossom] upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes} already_owned=${alreadyOwned} existing_blob=${existingBlob !== null}`,
+        );
 
         const additionalUsage = alreadyOwned ? 0 : data.byteLength;
         if (currentUsage + additionalUsage > storageLimit.storageLimitBytes) {
+          console.warn(
+            `[blossom] upload over-limit pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} usage=${currentUsage} required=${additionalUsage} limit=${storageLimit.storageLimitBytes}`,
+          );
           return json(
             {
               error: "storage limit exceeded",
@@ -237,10 +276,14 @@ export async function createBlossomServer(
           } catch (e) {
             const err = e instanceof Error ? e : new Error(String(e));
             console.error(
-              `[blossom] S3 upload failed: ${err.name}: ${err.message}`,
+              `[blossom] storage upload failed hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} error=${err.name}: ${err.message}`,
             );
             return json({ error: "storage upload failed" }, 500);
           }
+        } else {
+          console.log(
+            `[blossom] upload skipped object-storage write hash=${shortHash(sha256)} reason=existing-blob`,
+          );
         }
 
         await blobDb.insertBlob(
@@ -249,6 +292,9 @@ export async function createBlossomServer(
           data.byteLength,
           contentType,
           auth.pubkey,
+        );
+        console.log(
+          `[blossom] upload metadata stored hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} url=${objectStorage.getPublicUrl(sha256)}`,
         );
 
         return json({
@@ -263,6 +309,9 @@ export async function createBlossomServer(
       // Admin blob deletion — ADMIN_TOKEN auth (no Nostr signing required)
       const adminBlobMatch = url.pathname.match(/^\/admin\/([a-f0-9]{64})$/);
       if (request.method === "DELETE" && adminBlobMatch) {
+        console.log(
+          `[blossom] admin delete request hash=${shortHash(adminBlobMatch[1])}`,
+        );
         const adminToken = process.env.ADMIN_TOKEN;
         if (!adminToken) {
           return json({ error: "admin not configured" }, 503);
@@ -282,19 +331,27 @@ export async function createBlossomServer(
       }
 
       if (request.method === "DELETE" && blobSha256) {
+        console.log(`[blossom] delete request hash=${shortHash(blobSha256)}`);
         const auth = validateBlossomAuth(
           request.headers.get("authorization") ?? undefined,
           "delete",
           { sha256: blobSha256 },
         );
         if (!auth.ok) {
+          console.warn(`[blossom] delete auth failed reason=${auth.reason}`);
           return json({ error: auth.reason }, 401);
         }
+        console.log(
+          `[blossom] delete auth ok pubkey=${shortPubkey(auth.pubkey)}`,
+        );
         const accessPolicy = await blobDb.getPubkeyAccessPolicy(
           db,
           auth.pubkey,
         );
         if (!accessPolicy.allowed) {
+          console.warn(
+            `[blossom] delete forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(blobSha256)} reason=not-allowlisted`,
+          );
           return json({ error: "forbidden" }, 403);
         }
 
@@ -304,6 +361,9 @@ export async function createBlossomServer(
         }
 
         const removal = await blobDb.removeOwner(db, blobSha256, auth.pubkey);
+        console.log(
+          `[blossom] delete owner removal hash=${shortHash(blobSha256)} pubkey=${shortPubkey(auth.pubkey)} result=${removal}`,
+        );
         if (removal === "not_owner") {
           return json({ error: "forbidden" }, 403);
         }
@@ -317,18 +377,26 @@ export async function createBlossomServer(
       }
 
       if (request.method === "GET" && listPubkey) {
+        console.log(`[blossom] list request pubkey=${shortPubkey(listPubkey)}`);
         const auth = validateBlossomAuth(
           request.headers.get("authorization") ?? undefined,
           "list",
         );
         if (!auth.ok) {
+          console.warn(`[blossom] list auth failed reason=${auth.reason}`);
           return json({ error: auth.reason }, 401);
         }
+        console.log(
+          `[blossom] list auth ok pubkey=${shortPubkey(auth.pubkey)}`,
+        );
         const accessPolicy = await blobDb.getPubkeyAccessPolicy(
           db,
           auth.pubkey,
         );
         if (!accessPolicy.allowed) {
+          console.warn(
+            `[blossom] list forbidden pubkey=${shortPubkey(auth.pubkey)} reason=not-allowlisted`,
+          );
           return json({ error: "forbidden" }, 403);
         }
 
@@ -337,6 +405,9 @@ export async function createBlossomServer(
         }
 
         const blobs = await blobDb.listBlobsByPubkey(db, listPubkey);
+        console.log(
+          `[blossom] list ok pubkey=${shortPubkey(listPubkey)} count=${blobs.length}`,
+        );
         return json(
           blobs.map((blob) => ({
             url: objectStorage.getPublicUrl(blob.sha256),

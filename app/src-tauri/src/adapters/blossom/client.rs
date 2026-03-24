@@ -9,6 +9,14 @@ use reqwest::{header::LOCATION, redirect::Policy, Url};
 use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
+fn short_hash(hash: &str) -> &str {
+    &hash[..8.min(hash.len())]
+}
+
+fn blossom_log(message: &str) {
+    eprintln!("[blossom] {message}");
+}
+
 /// Upload a plaintext blob to a Blossom server for public access (publishing).
 /// Returns the SHA-256 hash of the plaintext.
 pub async fn upload_plaintext_blob(
@@ -31,16 +39,22 @@ pub async fn upload_plaintext_blob(
         _ => "application/octet-stream",
     };
 
-    eprintln!(
-        "[blossom] uploading plaintext blob hash={} size={} type={} to {}",
-        &hash[..8],
+    blossom_log(&format!(
+        "upload start hash={} size={} type={} url={}",
+        short_hash(&hash),
         data.len(),
         content_type,
         blossom_url
-    );
+    ));
 
     let auth_header = sign_blossom_auth(keys, "upload", &hash, blossom_url)?;
     let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
+    blossom_log(&format!(
+        "upload request prepared hash={} endpoint={} auth_bytes={}",
+        short_hash(&hash),
+        url,
+        auth_header.len()
+    ));
 
     let resp = client
         .put(&url)
@@ -51,9 +65,18 @@ pub async fn upload_plaintext_blob(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("[blossom] plaintext upload request failed: {e}");
+            blossom_log(&format!(
+                "upload request failed hash={} error={e}",
+                short_hash(&hash)
+            ));
             AppError::custom(format!("Blossom upload failed: {e}"))
         })?;
+
+    blossom_log(&format!(
+        "upload response hash={} status={}",
+        short_hash(&hash),
+        resp.status()
+    ));
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -64,11 +87,19 @@ pub async fn upload_plaintext_blob(
             .unwrap_or("")
             .to_string();
         let body = resp.text().await.unwrap_or_default();
-        eprintln!("[blossom] plaintext upload failed ({status}): {reason_header} {body}");
+        blossom_log(&format!(
+            "upload failed hash={} status={} reason_header={} body={}",
+            short_hash(&hash),
+            status,
+            reason_header,
+            body
+        ));
         return Err(AppError::custom(format!(
             "Blossom upload failed ({status}): {reason_header} {body}"
         )));
     }
+
+    blossom_log(&format!("upload ok hash={}", short_hash(&hash)));
 
     Ok(hash)
 }
@@ -84,6 +115,11 @@ pub async fn upload_and_rewrite_attachments(
     let re = Regex::new(r"attachment://([a-f0-9]{64})\.(\w+)").unwrap();
     let mut replacements: Vec<(String, String)> = Vec::new();
     let http_client = reqwest::Client::new();
+    blossom_log(&format!(
+        "rewrite attachments start url={} markdown_bytes={}",
+        blossom_url,
+        markdown.len()
+    ));
 
     // Collect unique attachment URIs
     let mut seen = std::collections::HashSet::new();
@@ -94,9 +130,19 @@ pub async fn upload_and_rewrite_attachments(
         }
         let hash = caps.get(1).unwrap().as_str();
         let ext = caps.get(2).unwrap().as_str();
+        blossom_log(&format!(
+            "rewrite attachment found hash={} ext={}",
+            short_hash(hash),
+            ext
+        ));
 
         let (data, _) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
             .ok_or_else(|| AppError::custom(format!("Local image not found: {hash}.{ext}")))?;
+        blossom_log(&format!(
+            "rewrite attachment loaded hash={} bytes={}",
+            short_hash(hash),
+            data.len()
+        ));
 
         let size_bytes = data.len() as i64;
         upload_plaintext_blob(&http_client, blossom_url, data, ext, keys).await?;
@@ -107,6 +153,12 @@ pub async fn upload_and_rewrite_attachments(
             "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at) VALUES (?1, ?2, 0, ?3, ?4)",
             rusqlite::params![hash, blossom_url, size_bytes, crate::domain::common::time::now_millis()],
         )?;
+        blossom_log(&format!(
+            "rewrite attachment recorded hash={} size_bytes={} server_url={}",
+            short_hash(hash),
+            size_bytes,
+            blossom_url
+        ));
 
         let public_url = format!("{}/{}.{}", blossom_url.trim_end_matches('/'), hash, ext);
         replacements.push((full_match, public_url));
@@ -116,6 +168,11 @@ pub async fn upload_and_rewrite_attachments(
     for (from, to) in replacements {
         result = result.replace(&from, &to);
     }
+    blossom_log(&format!(
+        "rewrite attachments complete replacements={} url={}",
+        seen.len(),
+        blossom_url
+    ));
     Ok(result)
 }
 
@@ -126,11 +183,11 @@ pub async fn delete_blob(
     hash: &str,
     keys: &Keys,
 ) -> Result<(), AppError> {
-    eprintln!(
-        "[blossom] deleting hash={} from {}",
-        &hash[..8.min(hash.len())],
+    blossom_log(&format!(
+        "delete start hash={} url={}",
+        short_hash(hash),
         blossom_url
-    );
+    ));
     let auth_header = sign_blossom_auth(keys, "delete", hash, blossom_url)?;
     let url = format!("{}/{}", blossom_url.trim_end_matches('/'), hash);
 
@@ -140,22 +197,25 @@ pub async fn delete_blob(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("[blossom] delete request failed: {e}");
+            blossom_log(&format!(
+                "delete request failed hash={} error={e}",
+                short_hash(hash)
+            ));
             AppError::custom(format!("Blossom delete failed: {e}"))
         })?;
 
     if !resp.status().is_success() && resp.status().as_u16() != 404 {
         let status = resp.status();
-        eprintln!(
-            "[blossom] delete failed ({status}) for hash={}",
-            &hash[..8.min(hash.len())]
-        );
+        blossom_log(&format!(
+            "delete failed hash={} status={status}",
+            short_hash(hash)
+        ));
         return Err(AppError::custom(format!(
             "Blossom delete failed ({status})"
         )));
     }
 
-    eprintln!("[blossom] delete ok hash={}", &hash[..8.min(hash.len())]);
+    blossom_log(&format!("delete ok hash={}", short_hash(hash)));
     Ok(())
 }
 
@@ -166,11 +226,11 @@ pub async fn download_blob(
     ciphertext_hash: &str,
     keys: &Keys,
 ) -> Result<Vec<u8>, AppError> {
-    eprintln!(
-        "[blossom] downloading hash={} from {}",
-        &ciphertext_hash[..8],
+    blossom_log(&format!(
+        "download start hash={} url={}",
+        short_hash(ciphertext_hash),
         blossom_url
-    );
+    ));
     let auth_header = sign_blossom_auth(keys, "get", ciphertext_hash, blossom_url)?;
 
     let url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
@@ -185,7 +245,10 @@ pub async fn download_blob(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("[blossom] download request failed: {e}");
+            blossom_log(&format!(
+                "download request failed hash={} error={e}",
+                short_hash(ciphertext_hash)
+            ));
             AppError::custom(format!("Blossom download failed: {e}"))
         })?;
 
@@ -198,30 +261,50 @@ pub async fn download_blob(
         let redirect_url = Url::parse(location)
             .or_else(|_| Url::parse(&url).and_then(|base| base.join(location)))
             .map_err(|e| AppError::custom(format!("Invalid Blossom redirect URL: {e}")))?;
+        blossom_log(&format!(
+            "download redirect hash={} location={}",
+            short_hash(ciphertext_hash),
+            redirect_url
+        ));
 
         client.get(redirect_url).send().await.map_err(|e| {
-            eprintln!("[blossom] redirected download request failed: {e}");
+            blossom_log(&format!(
+                "download redirect failed hash={} error={e}",
+                short_hash(ciphertext_hash)
+            ));
             AppError::custom(format!("Blossom download failed: {e}"))
         })?
     } else {
+        blossom_log(&format!(
+            "download direct response hash={} status={}",
+            short_hash(ciphertext_hash),
+            resp.status()
+        ));
         resp
     };
 
     if !resp.status().is_success() {
         let status = resp.status();
-        eprintln!(
-            "[blossom] download failed ({status}) for hash={}",
-            &ciphertext_hash[..8]
-        );
+        blossom_log(&format!(
+            "download failed hash={} status={status}",
+            short_hash(ciphertext_hash)
+        ));
         return Err(AppError::custom(format!(
             "Blossom download failed ({status})"
         )));
     }
 
-    resp.bytes()
+    let bytes = resp
+        .bytes()
         .await
         .map(|b| b.to_vec())
-        .map_err(|e| AppError::custom(format!("Failed to read blob response: {e}")))
+        .map_err(|e| AppError::custom(format!("Failed to read blob response: {e}")))?;
+    blossom_log(&format!(
+        "download ok hash={} bytes={}",
+        short_hash(ciphertext_hash),
+        bytes.len()
+    ));
+    Ok(bytes)
 }
 
 // ── Blob encryption ────────────────────────────────────────────────────

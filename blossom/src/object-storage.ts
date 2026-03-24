@@ -20,6 +20,10 @@ function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+function shortHash(hash: string): string {
+  return hash.slice(0, 8);
+}
+
 function getBucketName(): string {
   const bucket =
     process.env.S3_BUCKET ?? process.env.AWS_BUCKET ?? process.env.BUCKET_NAME;
@@ -109,11 +113,17 @@ export function createObjectStorage(
     async downloadBlob(
       sha256: string,
     ): Promise<{ data: Uint8Array; contentType?: string }> {
+      console.log(
+        `[blossom] object-storage download start hash=${shortHash(sha256)}`,
+      );
       const file = client.file(sha256);
       const [buffer, stat] = await Promise.all([
         file.arrayBuffer(),
         file.stat(),
       ]);
+      console.log(
+        `[blossom] object-storage download ok hash=${shortHash(sha256)} bytes=${buffer.byteLength} type=${stat.type}`,
+      );
 
       return {
         data: new Uint8Array(buffer),
@@ -125,12 +135,24 @@ export function createObjectStorage(
       data: Uint8Array,
       contentType?: string,
     ): Promise<void> {
+      console.log(
+        `[blossom] object-storage upload start hash=${shortHash(sha256)} bytes=${data.byteLength} type=${contentType ?? "application/octet-stream"}`,
+      );
       await client.file(sha256).write(data, {
         type: contentType ?? "application/octet-stream",
       });
+      console.log(
+        `[blossom] object-storage upload ok hash=${shortHash(sha256)}`,
+      );
     },
     async deleteBlob(sha256: string): Promise<void> {
+      console.log(
+        `[blossom] object-storage delete start hash=${shortHash(sha256)}`,
+      );
       await client.delete(sha256);
+      console.log(
+        `[blossom] object-storage delete ok hash=${shortHash(sha256)}`,
+      );
     },
   };
 }
