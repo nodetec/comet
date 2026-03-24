@@ -29,6 +29,12 @@ ENV NODE_ENV=production
 
 COPY --from=deploy /prod/relay ./
 
+# Railway may still inject a stale service start command like
+# `pnpm --filter @comet/relay start`. The runtime image only needs Bun, so we
+# provide a tiny shim that always starts the relay process.
+RUN printf '%s\n' '#!/bin/sh' 'exec bun run src/index.ts' > /usr/local/bin/pnpm \
+  && chmod +x /usr/local/bin/pnpm
+
 EXPOSE 3400
 
 ENTRYPOINT ["bun", "run", "src/index.ts"]
