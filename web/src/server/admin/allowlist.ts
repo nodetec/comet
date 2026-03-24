@@ -2,22 +2,19 @@ import { createServerFn } from "@tanstack/react-start";
 import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { assertAdmin } from "~/server/middleware";
-import { users, blobOwners, blobs } from "@comet/data";
+import { blobOwners, blobs } from "@comet/data";
 import { DEFAULT_STORAGE_LIMIT_BYTES } from "~/lib/utils";
+import {
+  allowRelayUser,
+  listRelayAllowedUsers,
+  revokeRelayUser,
+} from "~/server/relay-client";
 
 export const listAllowedUsers = createServerFn({ method: "GET" }).handler(
   async () => {
     assertAdmin();
-    const [allowedList, usageRows] = await Promise.all([
-      db
-        .select({
-          pubkey: users.pubkey,
-          expiresAt: users.expiresAt,
-          storageLimitBytes: users.storageLimitBytes,
-          createdAt: users.createdAt,
-        })
-        .from(users)
-        .orderBy(users.createdAt),
+    const [allowlistResponse, usageRows] = await Promise.all([
+      listRelayAllowedUsers(),
       db
         .select({
           pubkey: blobOwners.pubkey,
@@ -35,12 +32,12 @@ export const listAllowedUsers = createServerFn({ method: "GET" }).handler(
 
     return {
       defaultStorageLimitBytes: DEFAULT_STORAGE_LIMIT_BYTES,
-      pubkeys: allowedList.map((p) => ({
-        pubkey: p.pubkey,
-        expiresAt: p.expiresAt,
-        storageLimitBytes: p.storageLimitBytes,
-        createdAt: p.createdAt,
-        storageUsedBytes: usageMap.get(p.pubkey) ?? 0,
+      pubkeys: allowlistResponse.users.map((user) => ({
+        pubkey: user.pubkey,
+        expiresAt: user.expires_at,
+        storageLimitBytes: user.storage_limit_bytes,
+        createdAt: user.created_at,
+        storageUsedBytes: usageMap.get(user.pubkey) ?? 0,
       })),
     };
   },
@@ -59,17 +56,14 @@ export const allowUser = createServerFn({ method: "POST" })
     if (!data.pubkey || !/^[a-f0-9]{64}$/.test(data.pubkey)) {
       throw new Error("invalid pubkey: must be 64-char hex");
     }
-    const expiresAt = data.expiresAt ?? null;
-    const storageLimitBytes = data.storageLimitBytes ?? null;
-    const set: Record<string, unknown> = { expiresAt };
-    if (data.storageLimitBytes !== undefined) {
-      set.storageLimitBytes = storageLimitBytes;
-    }
-    await db
-      .insert(users)
-      .values({ pubkey: data.pubkey, expiresAt, storageLimitBytes })
-      .onConflictDoUpdate({ target: users.pubkey, set });
-    return { allowed: true, pubkey: data.pubkey, expiresAt };
+
+    return allowRelayUser({
+      pubkey: data.pubkey,
+      expires_at: data.expiresAt ?? null,
+      ...(data.storageLimitBytes !== undefined
+        ? { storage_limit_bytes: data.storageLimitBytes }
+        : {}),
+    });
   });
 
 export const revokeUser = createServerFn({ method: "POST" })
@@ -79,8 +73,8 @@ export const revokeUser = createServerFn({ method: "POST" })
     if (!data.pubkey || !/^[a-f0-9]{64}$/.test(data.pubkey)) {
       throw new Error("invalid pubkey");
     }
-    await db.delete(users).where(eq(users.pubkey, data.pubkey));
-    return { revoked: true };
+
+    return revokeRelayUser(data.pubkey);
   });
 
 export const setStorageLimit = createServerFn({ method: "POST" })
@@ -92,9 +86,9 @@ export const setStorageLimit = createServerFn({ method: "POST" })
     if (!data.pubkey || !/^[a-f0-9]{64}$/.test(data.pubkey)) {
       throw new Error("invalid pubkey");
     }
-    await db
-      .update(users)
-      .set({ storageLimitBytes: data.storageLimitBytes })
-      .where(eq(users.pubkey, data.pubkey));
-    return { pubkey: data.pubkey, storageLimitBytes: data.storageLimitBytes };
+
+    return allowRelayUser({
+      pubkey: data.pubkey,
+      storage_limit_bytes: data.storageLimitBytes,
+    });
   });
