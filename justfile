@@ -122,9 +122,6 @@ docs-check:
 web-dev:
   pnpm --filter @comet/web dev
 
-web-deploy:
-  flyctl deploy . --config web/fly.toml --local-only
-
 web-build:
   pnpm --filter @comet/web build
 
