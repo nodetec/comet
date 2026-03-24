@@ -9,7 +9,6 @@ Comet Blossom is a Bun-based media server for Nostr Blossom uploads.
 - `just blossom-test`
 - `just blossom-typecheck`
 - `just blossom-lint`
-- `just blossom-deploy`
 
 ## Service Boundary
 
@@ -58,26 +57,6 @@ just blossom-test
 ```
 
 If Postgres is already running, you usually only need `createdb comet_test` plus the `TEST_DATABASE_URL` export.
-
-## Fly.io
-
-- [`fly.toml`](/Users/chris/Repos/project/comet/blossom/fly.toml) is the starting Fly config for the Blossom workspace.
-- [`Dockerfile`](/Users/chris/Repos/project/comet/blossom/Dockerfile) builds Blossom from the monorepo root using the checked-in [`pnpm-lock.yaml`](/Users/chris/Repos/project/comet/pnpm-lock.yaml).
-- [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) deploys Blossom on pushes to `master` after CI passes when Blossom runtime or deploy files change.
-- Set `DATABASE_URL` as a Fly app secret before deploy. Do not store it in GitHub Actions.
-- Set `S3_BUCKET` plus any required S3 credentials on the Fly app before deploy.
-- Add `FLY_API_TOKEN` to the GitHub repository secrets before enabling deploys.
-
-### First-time setup
-
-1. Create the Fly app and update [`fly.toml`](/Users/chris/Repos/project/comet/blossom/fly.toml) if `app = "comet-blossom"` is not the final app name.
-2. Set the database secret on Fly so the running Blossom service has it at runtime:
-   `fly secrets set DATABASE_URL=postgres://... --app <your-fly-app>`
-3. Set the bucket name and any required S3 credentials on the Fly app.
-4. Optionally set `BLOSSOM_PUBLIC_URL` on Fly if you want returned blob URLs to use a custom public hostname instead of the bucket URL.
-5. Add `FLY_API_TOKEN` to the GitHub repository secrets so [`.github/workflows/ci.yml`](/Users/chris/Repos/project/comet/.github/workflows/ci.yml) can deploy Blossom.
-6. Run the first deploy manually:
-   `flyctl deploy --config blossom/fly.toml --local-only`
 
 ## Railway
 

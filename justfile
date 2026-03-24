@@ -80,12 +80,6 @@ relay-check:
 blossom-dev:
   pnpm --filter @comet/blossom dev
 
-blossom-deploy:
-  flyctl deploy --config blossom/fly.toml --local-only
-
-blossom-logs:
-  fly logs -a comet-blossom
-
 blossom-build:
   pnpm --filter @comet/blossom build
 
