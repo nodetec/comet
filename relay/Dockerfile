@@ -31,4 +31,4 @@ COPY --from=deploy /prod/relay ./
 
 EXPOSE 3400
 
-CMD ["bun", "run", "src/index.ts"]
+ENTRYPOINT ["bun", "run", "src/index.ts"]
