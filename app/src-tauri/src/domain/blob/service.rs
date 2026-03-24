@@ -98,7 +98,8 @@ pub fn find_orphaned_blob_hashes(
 ///
 /// This removes local files, deletes `blob_meta` bridge records, and returns
 /// `(server_url, ciphertext_hash)` pairs for deleting the encrypted Blossom
-/// objects those plaintext attachments pointed at.
+/// objects those plaintext attachments pointed at. It also clears matching
+/// `blob_uploads.object_hash` records for those stored Blossom objects.
 pub fn cleanup_orphaned_blobs(
     app: &AppHandle,
     conn: &Connection,
@@ -117,15 +118,17 @@ pub fn cleanup_orphaned_blobs(
         .prepare("DELETE FROM blob_meta WHERE plaintext_hash = ?1")
         .ok();
     let mut del_uploads_stmt = conn
-        .prepare("DELETE FROM blob_uploads WHERE hash = ?1")
+        .prepare("DELETE FROM blob_uploads WHERE object_hash = ?1")
         .ok();
 
     for hash in orphaned_hashes {
+        let mut object_hashes = Vec::new();
         if let Some(ref mut stmt) = meta_stmt {
             if let Ok(rows) = stmt.query_map(params![hash], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             }) {
                 for row in rows.flatten() {
+                    object_hashes.push(row.1.clone());
                     blossom_deletions.push(row);
                 }
             }
@@ -134,7 +137,9 @@ pub fn cleanup_orphaned_blobs(
             let _ = stmt.execute(params![hash]);
         }
         if let Some(ref mut stmt) = del_uploads_stmt {
-            let _ = stmt.execute(params![hash]);
+            for object_hash in &object_hashes {
+                let _ = stmt.execute(params![object_hash]);
+            }
         }
         let _ = crate::adapters::filesystem::attachments::delete_local_blob(app, hash);
         eprintln!(

@@ -178,7 +178,7 @@ async fn maybe_upload_note_attachments(
             params![hash, blossom_url, pubkey_hex, ciphertext_hash, key_hex],
         )?;
         conn.execute(
-            "INSERT OR REPLACE INTO blob_uploads (hash, server_url, encrypted, size_bytes, uploaded_at)
+            "INSERT OR REPLACE INTO blob_uploads (object_hash, server_url, encrypted, size_bytes, uploaded_at)
              VALUES (?1, ?2, 1, ?3, ?4)",
             params![
                 ciphertext_hash,
