@@ -3,6 +3,7 @@ title: Revision Gift Wrap
 description: Draft Comet extension that adds stable logical revisions to encrypted gift-wrapped sync events.
 sidebar:
   label: Revision Wrap
+  order: 1
 ---
 
 `draft`

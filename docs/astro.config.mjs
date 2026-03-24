@@ -26,14 +26,7 @@ export default defineConfig({
       sidebar: [
         {
           label: "Specifications",
-          items: [
-            { label: "Revision Gift Wrap", slug: "specs/revision-gift-wrap" },
-            { label: "Revision Negentropy", slug: "specs/revision-negentropy" },
-            {
-              label: "Revision Changes Feed",
-              slug: "specs/revision-changes-feed",
-            },
-          ],
+          autogenerate: { directory: "specs" },
         },
       ],
     }),

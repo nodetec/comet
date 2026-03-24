@@ -3,6 +3,7 @@ title: Revision Negentropy
 description: Draft Comet anti-entropy protocol that applies the Negentropy algorithm to logical revision identities instead of raw event IDs.
 sidebar:
   label: Revision Neg
+  order: 2
 ---
 
 `draft`

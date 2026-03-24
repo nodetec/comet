@@ -3,6 +3,7 @@ title: Revision Changes Feed
 description: Draft Comet changes feed for live and incremental sync over immutable revision gift wraps.
 sidebar:
   label: Revision Feed
+  order: 3
 ---
 
 `draft`
