@@ -7,7 +7,7 @@ import {
 import { type QueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 
-import { loadNote } from "@/shared/api/invoke";
+import { getNoteConflict, loadNote } from "@/shared/api/invoke";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 export interface SyncListenerDeps {
@@ -73,19 +73,28 @@ export function useSyncListener(deps: SyncListenerDeps) {
           return;
         }
 
-        if (
-          currentDraftId === noteId &&
-          action === "upsert" &&
-          !hasPendingSave
-        ) {
-          void queryClient
-            .fetchQuery({
+        if (currentDraftId === noteId && action === "upsert") {
+          void Promise.all([
+            queryClient.fetchQuery({
               queryKey: ["note", noteId],
               queryFn: () => loadNote(noteId),
+            }),
+            getNoteConflict(noteId).catch(() => null),
+          ])
+            .then(([freshNote, conflict]) => {
+              if (conflict && conflict.headCount > 1) {
+                if (pendingSaveTimeoutRef.current !== null) {
+                  window.clearTimeout(pendingSaveTimeoutRef.current);
+                  pendingSaveTimeoutRef.current = null;
+                }
+                handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+                return;
+              }
+
+              if (!hasPendingSave) {
+                handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+              }
             })
-            .then((freshNote) =>
-              handleFreshNote(freshNote, queryClient, setSyncEditorRevision),
-            )
             .catch(() => {});
         }
       },

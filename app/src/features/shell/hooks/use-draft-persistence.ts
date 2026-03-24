@@ -1,7 +1,11 @@
 import { type RefObject, useEffect } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 
-import { pendingDraftStorageKey, saveNote } from "@/shared/api/invoke";
+import {
+  getNoteConflict,
+  pendingDraftStorageKey,
+  saveNote,
+} from "@/shared/api/invoke";
 import { type LoadedNote } from "@/shared/api/types";
 
 export interface DraftPersistenceDeps {
@@ -11,6 +15,7 @@ export interface DraftPersistenceDeps {
   currentNote: LoadedNote | undefined;
   draftNoteId: string | null;
   draftMarkdown: string;
+  isCurrentNoteConflicted: boolean;
   saveNotePending: boolean;
   mutateSaveNote: (input: { id: string; markdown: string }) => void;
   pendingSaveTimeoutRef: RefObject<number | null>;
@@ -25,6 +30,7 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     currentNote,
     draftNoteId,
     draftMarkdown,
+    isCurrentNoteConflicted,
     saveNotePending,
     mutateSaveNote,
     pendingSaveTimeoutRef,
@@ -44,11 +50,20 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
         markdown: string;
       };
       if (noteId && markdown) {
-        void saveNote({ id: noteId, markdown })
-          .then(() => {
-            localStorage.removeItem(draftKey);
-            void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-            void queryClient.invalidateQueries({ queryKey: ["notes"] });
+        void getNoteConflict(noteId)
+          .then((conflict) => {
+            if (conflict && conflict.headCount > 1) {
+              localStorage.removeItem(draftKey);
+              return;
+            }
+
+            return saveNote({ id: noteId, markdown }).then(() => {
+              localStorage.removeItem(draftKey);
+              void queryClient.invalidateQueries({
+                queryKey: ["note", noteId],
+              });
+              void queryClient.invalidateQueries({ queryKey: ["notes"] });
+            });
           })
           .catch(() => {});
       }
@@ -64,6 +79,10 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     }
 
     if (currentNote.readonly) {
+      return;
+    }
+
+    if (isCurrentNoteConflicted) {
       return;
     }
 
@@ -102,6 +121,7 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     currentNote,
     draftMarkdown,
     draftNoteId,
+    isCurrentNoteConflicted,
     mutateSaveNote,
     pendingSaveTimeoutRef,
     saveNotePending,

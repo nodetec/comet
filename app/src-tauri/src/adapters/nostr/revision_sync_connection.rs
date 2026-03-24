@@ -10,6 +10,7 @@ use crate::adapters::sqlite::sync_repository::{
 use crate::domain::sync::model::{SyncChangePayload, SyncCommand, SyncState};
 use crate::error::AppError;
 use nostr_sdk::prelude::Keys;
+use rusqlite::Connection;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -88,6 +89,14 @@ pub(super) async fn run_revision_sync_connection(
         .send_changes("sync", &recipient, snapshot_seq, true)
         .await?;
 
+    flush_pending_local_changes(
+        app,
+        &relay_url,
+        &backup_relay_urls,
+        &keys,
+    )
+    .await?;
+
     let mut pending_pushes: HashMap<String, tokio::time::Instant> = HashMap::new();
     let debounce_duration = Duration::from_secs(2);
     let mut connected = false;
@@ -155,6 +164,130 @@ pub(super) async fn run_revision_sync_connection(
             }
         }
     }
+}
+
+fn list_pending_local_sync_commands(conn: &Connection) -> Result<Vec<SyncCommand>, AppError> {
+    let mut commands = Vec::new();
+
+    {
+        let mut stmt = conn.prepare(
+            "SELECT entity_id
+             FROM pending_deletions
+             ORDER BY created_at ASC, entity_id ASC",
+        )?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        for row in rows {
+            commands.push(SyncCommand::PushDeletion(row?));
+        }
+    }
+
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id
+             FROM notes
+             WHERE locally_modified = 1
+             ORDER BY modified_at ASC, id ASC",
+        )?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        for row in rows {
+            commands.push(SyncCommand::PushNote(row?));
+        }
+    }
+
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id
+             FROM notebooks
+             WHERE locally_modified = 1
+             ORDER BY updated_at ASC, id ASC",
+        )?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        for row in rows {
+            commands.push(SyncCommand::PushNotebook(row?));
+        }
+    }
+
+    Ok(commands)
+}
+
+async fn flush_pending_local_changes(
+    app: &AppHandle,
+    active_relay_url: &str,
+    backup_relay_urls: &[String],
+    keys: &Keys,
+) -> Result<(), AppError> {
+    let conn = crate::db::database_connection(app)?;
+    let pending_commands = list_pending_local_sync_commands(&conn)?;
+    drop(conn);
+
+    if pending_commands.is_empty() {
+        return Ok(());
+    }
+
+    let mut pending_notes = 0usize;
+    let mut pending_notebooks = 0usize;
+    let mut pending_deletions = 0usize;
+    for command in &pending_commands {
+        match command {
+            SyncCommand::PushNote(_) => pending_notes += 1,
+            SyncCommand::PushNotebook(_) => pending_notebooks += 1,
+            SyncCommand::PushDeletion(_) => pending_deletions += 1,
+        }
+    }
+    sync_log(
+        app,
+        &format!(
+            "replaying pending local changes notes={} notebooks={} deletions={}",
+            pending_notes, pending_notebooks, pending_deletions
+        ),
+    );
+
+    for command in pending_commands {
+        match command {
+            SyncCommand::PushNote(note_id) => {
+                if let Err(error) =
+                    push_note_revision(app, active_relay_url, backup_relay_urls, keys, &note_id)
+                        .await
+                {
+                    sync_log(app, &format!("revision push error: {note_id}: {error}"));
+                }
+            }
+            SyncCommand::PushNotebook(notebook_id) => {
+                if let Err(error) = push_notebook_revision(
+                    app,
+                    active_relay_url,
+                    backup_relay_urls,
+                    keys,
+                    &notebook_id,
+                )
+                .await
+                {
+                    sync_log(
+                        app,
+                        &format!("revision push notebook error: {notebook_id}: {error}"),
+                    );
+                }
+            }
+            SyncCommand::PushDeletion(entity_id) => {
+                if let Err(error) = push_deletion_revision(
+                    app,
+                    active_relay_url,
+                    backup_relay_urls,
+                    keys,
+                    &entity_id,
+                )
+                .await
+                {
+                    sync_log(
+                        app,
+                        &format!("revision delete push error: {entity_id}: {error}"),
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn log_bootstrap_result(app: &AppHandle, relay_url: &str, bootstrap: &RevisionBootstrapResult) {
@@ -287,6 +420,43 @@ async fn handle_revision_incoming_message(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapters::sqlite::migrations::account_migrations;
+
+    #[test]
+    fn lists_pending_local_sync_commands_from_all_backlogs() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
+             VALUES ('note-1', 'Title', '# Title', 100, 200, 200, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
+             VALUES ('notebook-1', 'Notebook', 100, 300, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO pending_deletions (entity_id, created_at)
+             VALUES ('note-2', 50)",
+            [],
+        )
+        .unwrap();
+
+        let commands = list_pending_local_sync_commands(&conn).unwrap();
+        assert_eq!(commands.len(), 3);
+        assert!(matches!(&commands[0], SyncCommand::PushDeletion(id) if id == "note-2"));
+        assert!(matches!(&commands[1], SyncCommand::PushNote(id) if id == "note-1"));
+        assert!(matches!(&commands[2], SyncCommand::PushNotebook(id) if id == "notebook-1"));
+    }
 }
 
 fn emit_sync_remote_change(app: &AppHandle, payload: SyncChangePayload) {

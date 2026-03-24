@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
@@ -253,6 +253,7 @@ export function useShellController() {
 
   const currentNote = noteQuery.data;
   const currentNoteConflict = noteConflictQuery.data;
+  const isCurrentNoteConflicted = (currentNoteConflict?.headCount ?? 0) > 1;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
     (bootstrapQuery.isSuccess &&
@@ -277,15 +278,46 @@ export function useShellController() {
     currentNote,
     draftNoteId,
     draftMarkdown,
+    isCurrentNoteConflicted,
     saveNotePending,
     mutateSaveNote,
     pendingSaveTimeoutRef,
     queryClient,
   });
 
+  useEffect(() => {
+    if (!currentNote || !isCurrentNoteConflicted) {
+      return;
+    }
+
+    if (pendingSaveTimeoutRef.current !== null) {
+      window.clearTimeout(pendingSaveTimeoutRef.current);
+      pendingSaveTimeoutRef.current = null;
+    }
+
+    if (
+      draftNoteId === currentNote.id &&
+      draftMarkdown !== currentNote.markdown
+    ) {
+      setDraft(currentNote.id, currentNote.markdown);
+      setSyncEditorRevision((revision) => revision + 1);
+    }
+  }, [
+    currentNote,
+    draftMarkdown,
+    draftNoteId,
+    isCurrentNoteConflicted,
+    pendingSaveTimeoutRef,
+    setDraft,
+  ]);
+
   // --- Flush / discard helpers ---
   const flushCurrentDraft = () => {
     if (!currentNote || draftNoteId !== currentNote.id) {
+      return;
+    }
+
+    if (isCurrentNoteConflicted) {
       return;
     }
 
@@ -309,6 +341,10 @@ export function useShellController() {
       return;
     }
 
+    if (isCurrentNoteConflicted) {
+      return;
+    }
+
     if (draftMarkdown === currentNote.markdown) {
       return;
     }
@@ -323,25 +359,6 @@ export function useShellController() {
       markdown: draftMarkdown,
     });
   };
-
-  const resolveNoteConflictMutation = useMutation({
-    mutationFn: resolveNoteConflict,
-    onSuccess: async (noteId) => {
-      toast.success("Conflict resolution published.", {
-        id: "resolve-note-conflict-success",
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["note", noteId] }),
-        queryClient.invalidateQueries({ queryKey: ["note-conflict", noteId] }),
-        queryClient.invalidateQueries({ queryKey: ["notes"] }),
-        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-      ]);
-    },
-    onError: toastErrorHandler(
-      "Couldn't resolve note conflict",
-      "resolve-note-conflict-error",
-    ),
-  });
 
   const discardPendingSave = () => {
     if (pendingSaveTimeoutRef.current !== null) {
@@ -736,11 +753,32 @@ export function useShellController() {
         draftNoteId === currentNote.id &&
         draftMarkdown !== currentNote.markdown
       ) {
-        await flushCurrentDraftAsync();
+        await saveNoteMutation.mutateAsync({
+          id: currentNote.id,
+          markdown: draftMarkdown,
+        });
         return;
       }
 
-      await resolveNoteConflictMutation.mutateAsync(currentNote.id);
+      try {
+        await resolveNoteConflict(currentNote.id);
+        toast.success("Conflict resolution published.", {
+          id: "resolve-note-conflict-success",
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["note", currentNote.id] }),
+          queryClient.invalidateQueries({
+            queryKey: ["note-conflict", currentNote.id],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["notes"] }),
+          queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
+        ]);
+      } catch (error) {
+        toastErrorHandler(
+          "Couldn't resolve note conflict",
+          "resolve-note-conflict-error",
+        )(error);
+      }
     },
     handleLoadConflictHead(markdown: string) {
       if (!currentNote) {
@@ -783,7 +821,7 @@ export function useShellController() {
       readonly: currentNote?.readonly ?? false,
       searchQuery,
       isDeletePublishedNotePending,
-      isResolveConflictPending: resolveNoteConflictMutation.isPending,
+      isResolveConflictPending: false,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           latestRef.current.handleAssignNoteNotebook(
@@ -864,7 +902,6 @@ export function useShellController() {
       editorFocusMode,
       isDeletePublishedNotePending,
       isCreatingNote,
-      resolveNoteConflictMutation.isPending,
       notebooks,
       isPublishNotePending,
       isPublishShortNotePending,

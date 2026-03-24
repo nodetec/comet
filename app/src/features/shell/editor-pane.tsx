@@ -390,7 +390,6 @@ export function EditorPane({
   const isArchived = archivedAt !== null;
   const isPublishedNote = publishedKind === 1;
   const isSystemReadOnly = isArchived || deletedAt !== null || isPublishedNote;
-  const isReadOnly = readonly || isSystemReadOnly;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
@@ -409,12 +408,8 @@ export function EditorPane({
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const noteTitle = firstLineH1Title(markdown);
-  const [conflictDetailsOpen, setConflictDetailsOpen] = useState(true);
   const hasConflict = (noteConflict?.headCount ?? 0) > 1;
-
-  useEffect(() => {
-    setConflictDetailsOpen(true);
-  }, [noteId]);
+  const isReadOnly = readonly || isSystemReadOnly || hasConflict;
 
   const find = useFindBar({ noteId, searchQuery, editorRef, setFocusedPane });
   const {
@@ -440,7 +435,7 @@ export function EditorPane({
     async (position: LogicalPosition) => {
       if (!noteId) return;
       await buildEditorMenu(position, {
-        readonly,
+        readonly: readonly || hasConflict,
         isPublishedNote,
         isDeletePublishedNotePending,
         notebook,
@@ -471,6 +466,7 @@ export function EditorPane({
       onSetReadonly,
       pinnedAt,
       publishedAt,
+      hasConflict,
       readonly,
     ],
   );
@@ -558,15 +554,20 @@ export function EditorPane({
   }
 
   let toolbarSlot: React.ReactNode = null;
-  if (readonly) {
+  if (readonly || hasConflict) {
     toolbarSlot = (
       <Tooltip>
         <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
-          <span aria-label="Read-only" title="Read-only">
+          <span
+            aria-label={hasConflict ? "Resolve conflict to edit" : "Read-only"}
+            title={hasConflict ? "Resolve conflict to edit" : "Read-only"}
+          >
             <PencilOff className="size-[1.2rem]" />
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Read-only</TooltipContent>
+        <TooltipContent side="bottom">
+          {hasConflict ? "Resolve conflict to edit" : "Read-only"}
+        </TooltipContent>
       </Tooltip>
     );
   } else if (!isReadOnly) {
@@ -615,88 +616,30 @@ export function EditorPane({
       </header>
 
       {noteId && hasConflict ? (
-        <div className="border-divider border-b bg-amber-500/10 px-4 py-3">
+        <div className="border-primary/20 bg-primary/10 sticky top-0 z-30 border-b px-4 py-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">
                 Conflicting revisions detected
               </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                This note currently has {noteConflict?.headCount} heads on the
-                sync graph. Review the competing versions below, then resolve by
-                publishing the current editor state as a merge revision.
+              <p className="text-secondary-foreground/80 mt-1 text-xs">
+                This note has {noteConflict?.headCount} competing revisions.
+                Switch between them in the footer, choose the version you want
+                to keep in the editor, then resolve the conflict.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 onClick={onResolveConflict}
+                className="shadow-none"
                 size="sm"
-                variant="outline"
+                variant="default"
                 disabled={isResolveConflictPending || readonly}
               >
                 {isResolveConflictPending ? "Resolving…" : "Resolve conflict"}
               </Button>
-              <Button
-                className="px-2"
-                onClick={() => setConflictDetailsOpen((open) => !open)}
-                size="sm"
-                variant="ghost"
-              >
-                {conflictDetailsOpen ? (
-                  <ChevronUp className="size-4" />
-                ) : (
-                  <ChevronDown className="size-4" />
-                )}
-              </Button>
             </div>
           </div>
-
-          {conflictDetailsOpen ? (
-            <div className="mt-3 flex flex-col gap-2">
-              {noteConflict?.heads.map((head) => (
-                <div
-                  key={head.revisionId}
-                  className="bg-background/70 rounded-md border px-3 py-2"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {head.title ??
-                          (head.op === "del"
-                            ? "Deleted version"
-                            : "Unavailable version")}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {new Date(head.mtime).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {head.isCurrent ? (
-                        <span className="bg-accent text-accent-foreground rounded px-2 py-0.5 text-[11px]">
-                          Current
-                        </span>
-                      ) : null}
-                      {head.markdown ? (
-                        <Button
-                          onClick={() => onLoadConflictHead(head.markdown!)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Load into editor
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    {head.preview ??
-                      (head.isAvailable
-                        ? "No preview available."
-                        : "Head payload is not available locally.")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -854,6 +797,47 @@ export function EditorPane({
           <div className="pointer-events-auto" ref={toolbarContainerRef} />
         </div>
       )}
+
+      {noteId && hasConflict ? (
+        <div className="border-divider bg-background/95 shrink-0 border-t px-4 py-2 backdrop-blur">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <span className="text-muted-foreground shrink-0 text-xs font-medium">
+              Revisions
+            </span>
+            {noteConflict?.heads.map((head, index) => {
+              const label =
+                head.title ??
+                (head.op === "del" ? "Deleted version" : "Unavailable version");
+
+              return (
+                <button
+                  key={head.revisionId}
+                  className={cn(
+                    "border-input bg-background hover:bg-muted flex min-w-0 shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-left transition-colors",
+                    head.isCurrent &&
+                      "border-primary/40 bg-primary/10 text-foreground",
+                  )}
+                  disabled={!head.markdown}
+                  onClick={() =>
+                    head.markdown && onLoadConflictHead(head.markdown)
+                  }
+                  type="button"
+                >
+                  <span className="text-muted-foreground text-[11px] tabular-nums">
+                    V{index + 1}
+                  </span>
+                  <span className="max-w-44 truncate text-xs font-medium">
+                    {label}
+                  </span>
+                  {head.isCurrent ? (
+                    <span className="text-primary text-[11px]">Current</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
