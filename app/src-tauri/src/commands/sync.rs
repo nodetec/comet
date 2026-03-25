@@ -199,9 +199,7 @@ pub struct SyncInfo {
     blossom_url: Option<String>,
     npub: Option<String>,
     synced_notes: i64,
-    synced_notebooks: i64,
     pending_notes: i64,
-    pending_notebooks: i64,
     total_notes: i64,
     checkpoint_seq: Option<i64>,
     blobs_stored: i64,
@@ -243,20 +241,8 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         |row| row.get(0),
     )?;
 
-    let synced_notebooks: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notebooks WHERE sync_event_id IS NOT NULL",
-        [],
-        |row| row.get(0),
-    )?;
-
     let pending_notes: i64 = conn.query_row(
         "SELECT COUNT(*) FROM notes WHERE locally_modified = 1",
-        [],
-        |row| row.get(0),
-    )?;
-
-    let pending_notebooks: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notebooks WHERE locally_modified = 1",
         [],
         |row| row.get(0),
     )?;
@@ -284,9 +270,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         blossom_url,
         npub,
         synced_notes,
-        synced_notebooks,
         pending_notes,
-        pending_notebooks,
         total_notes,
         checkpoint_seq,
         blobs_stored,
@@ -342,7 +326,6 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
         "DELETE FROM notes_fts;
          DELETE FROM note_tags;
          DELETE FROM notes;
-         DELETE FROM notebooks;
          DELETE FROM blob_meta;
          DELETE FROM pending_deletions;
          DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",

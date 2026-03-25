@@ -7,8 +7,7 @@ use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
     ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NoteFilterInput, NotePagePayload,
-    NoteQueryInput, NoteSortDirection, NoteSortField, NoteSummary, NotebookRef, NotebookSummary,
-    SearchResult,
+    NoteQueryInput, NoteSortDirection, NoteSortField, NoteSummary, SearchResult,
 };
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 
@@ -235,7 +234,6 @@ fn append_note_view_clauses(
     clauses: &mut Vec<String>,
     values: &mut Vec<Value>,
     note_filter: NoteFilterInput,
-    active_notebook_id: Option<&str>,
 ) {
     match note_filter {
         NoteFilterInput::All => {
@@ -260,37 +258,24 @@ fn append_note_view_clauses(
         NoteFilterInput::Trash => {
             clauses.push("n.deleted_at IS NOT NULL".to_string());
         }
-        NoteFilterInput::Notebook => {
-            clauses.push("n.archived_at IS NULL".to_string());
-            clauses.push("n.deleted_at IS NULL".to_string());
-            clauses.push("n.notebook_id = ?".to_string());
-            values.push(Value::from(
-                active_notebook_id.unwrap_or_default().to_string(),
-            ));
-        }
     }
 }
 
 // ── Row mappers ─────────────────────────────────────────────────────
 
 fn row_to_note_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<NoteRecord> {
-    let notebook_id: Option<String> = row.get(4)?;
-    let notebook_name: Option<String> = row.get(5)?;
-
     Ok(NoteRecord {
         id: row.get(0)?,
         title: row.get(1)?,
         markdown: row.get(2)?,
         modified_at: row.get(3)?,
-        notebook_id,
-        notebook_name,
-        archived_at: row.get(6)?,
-        deleted_at: row.get(7)?,
-        pinned_at: row.get(8)?,
-        readonly: row.get::<_, i64>(9)? != 0,
-        nostr_d_tag: row.get(10)?,
-        published_at: row.get(11)?,
-        published_kind: row.get(12)?,
+        archived_at: row.get(4)?,
+        deleted_at: row.get(5)?,
+        pinned_at: row.get(6)?,
+        readonly: row.get::<_, i64>(7)? != 0,
+        nostr_d_tag: row.get(8)?,
+        published_at: row.get(9)?,
+        published_kind: row.get(10)?,
     })
 }
 
@@ -299,35 +284,19 @@ fn row_to_note_summary(
     search_tokens: &[String],
 ) -> rusqlite::Result<NoteSummary> {
     let markdown: String = row.get(2)?;
-    let notebook_id: Option<String> = row.get(4)?;
-    let notebook_name: Option<String> = row.get(5)?;
 
     Ok(NoteSummary {
         id: row.get(0)?,
         title: row.get(1)?,
-        notebook: notebook_id
-            .zip(notebook_name)
-            .map(|(id, name)| NotebookRef { id, name }),
         edited_at: row.get(3)?,
         preview: preview_from_markdown(&markdown),
         search_snippet: search_snippet_for_summary(&markdown, search_tokens),
-        archived_at: row.get(6)?,
-        deleted_at: row.get(7)?,
-        pinned_at: row.get(8)?,
-        readonly: row.get::<_, i64>(9)? != 0,
-        has_conflict: row.get::<_, i64>(10)? != 0,
+        archived_at: row.get(4)?,
+        deleted_at: row.get(5)?,
+        pinned_at: row.get(6)?,
+        readonly: row.get::<_, i64>(7)? != 0,
+        has_conflict: row.get::<_, i64>(8)? != 0,
     })
-}
-
-// ── Notebook name validation helper ─────────────────────────────────
-
-fn handle_notebook_write_error(error: rusqlite::Error) -> NoteError {
-    match error {
-        rusqlite::Error::SqliteFailure(inner, _) if inner.extended_code == 2067 => {
-            NoteError::DuplicateNotebookName
-        }
-        other => NoteError::Storage(other.to_string()),
-    }
 }
 
 // ── SqliteNoteRepository ────────────────────────────────────────────
@@ -348,11 +317,10 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     fn note_by_id(&self, note_id: &str) -> Result<Option<NoteRecord>, NoteError> {
         self.conn
             .query_row(
-                "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name,
+                "SELECT n.id, n.title, n.markdown, n.modified_at,
                         n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
                         n.nostr_d_tag, n.published_at, n.published_kind
                  FROM notes n
-                 LEFT JOIN notebooks b ON b.id = n.notebook_id
                  WHERE n.id = ?1",
                 params![note_id],
                 row_to_note_record,
@@ -389,17 +357,12 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
-    fn note_markdown_and_notebook(
-        &self,
-        note_id: &str,
-    ) -> Result<(String, Option<String>), NoteError> {
+    fn note_markdown(&self, note_id: &str) -> Result<String, NoteError> {
         self.conn
             .query_row(
-                "SELECT markdown, notebook_id
-                 FROM notes
-                 WHERE id = ?1",
+                "SELECT markdown FROM notes WHERE id = ?1",
                 params![note_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| row.get(0),
             )
             .optional()
             .map_err(map_err)?
@@ -461,14 +424,13 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         note_id: &str,
         title: &str,
         markdown: &str,
-        notebook_id: Option<&str>,
         now: i64,
     ) -> Result<(), NoteError> {
         self.conn
             .execute(
-                "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, locally_modified)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5, 1)",
-                params![note_id, title, markdown, notebook_id, now],
+                "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
+                 VALUES (?1, ?2, ?3, ?4, ?4, ?4, 1)",
+                params![note_id, title, markdown, now],
             )
             .map_err(map_err)?;
 
@@ -589,20 +551,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .execute(
                 "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
                 params![now, note_id],
-            )
-            .map_err(map_err)
-    }
-
-    fn assign_notebook(
-        &self,
-        note_id: &str,
-        notebook_id: Option<&str>,
-        now: i64,
-    ) -> Result<usize, NoteError> {
-        self.conn
-            .execute(
-                "UPDATE notes SET notebook_id = ?1, modified_at = ?2, locally_modified = 1 WHERE id = ?3",
-                params![notebook_id, now, note_id],
             )
             .map_err(map_err)
     }
@@ -733,22 +681,13 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     // ── Queries ───────────────────────────────────────────────────────
 
     fn query_note_page(&self, input: &NoteQueryInput) -> Result<NotePagePayload, NoteError> {
-        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
-            return Ok(NotePagePayload {
-                notes: Vec::new(),
-                has_more: false,
-                next_offset: None,
-                total_count: 0,
-            });
-        }
-
         let limit = input.limit.clamp(1, MAX_NOTES_PAGE_SIZE);
         let search_tokens = search_tokens_from_query(&input.search_query);
         let search_mode = search_mode_from_tokens(&search_tokens);
         let active_tags = normalized_active_tags(&input.active_tags);
 
         let mut sql = String::from(
-            "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
+            "SELECT n.id, n.title, n.markdown, n.edited_at, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
                     EXISTS (
                       SELECT 1
                       FROM sync_revisions sr_current
@@ -758,8 +697,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                       WHERE sr_current.rev = n.current_rev
                         AND sh.rev != n.current_rev
                     ) AS has_conflict
-             FROM notes n
-             LEFT JOIN notebooks b ON b.id = n.notebook_id",
+             FROM notes n",
         );
         let mut clauses = Vec::new();
         let mut values = Vec::new();
@@ -768,7 +706,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             match search_mode {
                 SearchMode::Match(search_query) => {
                     sql = String::from(
-                        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
+                        "SELECT n.id, n.title, n.markdown, n.modified_at, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
                                 EXISTS (
                                   SELECT 1
                                   FROM sync_revisions sr_current
@@ -779,7 +717,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                                     AND sh.rev != n.current_rev
                                 ) AS has_conflict
                          FROM notes n
-                         LEFT JOIN notebooks b ON b.id = n.notebook_id
                          JOIN notes_fts ON notes_fts.note_id = n.id",
                     );
                     clauses.push("notes_fts MATCH ?".to_string());
@@ -799,12 +736,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             }
         }
 
-        append_note_view_clauses(
-            &mut clauses,
-            &mut values,
-            input.note_filter,
-            input.active_notebook_id.as_deref(),
-        );
+        append_note_view_clauses(&mut clauses, &mut values, input.note_filter);
 
         for tag in &active_tags {
             clauses.push(
@@ -898,9 +830,8 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
         let (sql, values): (String, Vec<Value>) = match &search_mode {
             SearchMode::Match(search_query) => (
-                "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+                "SELECT n.id, n.title, n.markdown, n.archived_at
                  FROM notes n
-                 LEFT JOIN notebooks b ON b.id = n.notebook_id
                  JOIN notes_fts ON notes_fts.note_id = n.id
                  WHERE notes_fts MATCH ?
                  ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC
@@ -913,9 +844,8 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             ),
             SearchMode::Like(patterns) => {
                 let mut sql = String::from(
-                    "SELECT n.id, n.title, n.markdown, b.id, b.name, n.archived_at
+                    "SELECT n.id, n.title, n.markdown, n.archived_at
                      FROM notes n
-                     LEFT JOIN notebooks b ON b.id = n.notebook_id
                      JOIN notes_fts ON notes_fts.note_id = n.id
                      WHERE ",
                 );
@@ -940,18 +870,13 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
                 let markdown: String = row.get(2)?;
-                let notebook_id: Option<String> = row.get(3)?;
-                let notebook_name: Option<String> = row.get(4)?;
 
                 Ok(SearchResult {
                     id: row.get(0)?,
                     title: row.get(1)?,
-                    notebook: notebook_id
-                        .zip(notebook_name)
-                        .map(|(id, name)| NotebookRef { id, name }),
                     preview: search_snippet_for_summary(&markdown, &search_tokens)
                         .unwrap_or_else(|| preview_from_markdown(&markdown)),
-                    archived_at: row.get(5)?,
+                    archived_at: row.get(3)?,
                 })
             })
             .map_err(map_err)?;
@@ -1005,10 +930,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         &self,
         input: &ContextualTagsInput,
     ) -> Result<ContextualTagsPayload, NoteError> {
-        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
-            return Ok(ContextualTagsPayload { tags: Vec::new() });
-        }
-
         let mut sql = String::from(
             "SELECT DISTINCT nt.tag
              FROM notes n
@@ -1017,12 +938,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         let mut clauses = Vec::new();
         let mut values = Vec::new();
 
-        append_note_view_clauses(
-            &mut clauses,
-            &mut values,
-            input.note_filter,
-            input.active_notebook_id.as_deref(),
-        );
+        append_note_view_clauses(&mut clauses, &mut values, input.note_filter);
 
         if !clauses.is_empty() {
             sql.push_str(" WHERE ");
@@ -1057,20 +973,11 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     }
 
     fn export_notes(&self, input: &ExportNotesInput) -> Result<usize, NoteError> {
-        if input.note_filter == NoteFilterInput::Notebook && input.active_notebook_id.is_none() {
-            return Ok(0);
-        }
-
         let mut sql = String::from("SELECT n.title, n.markdown FROM notes n WHERE ");
         let mut clauses = Vec::new();
         let mut values = Vec::new();
 
-        append_note_view_clauses(
-            &mut clauses,
-            &mut values,
-            input.note_filter,
-            input.active_notebook_id.as_deref(),
-        );
+        append_note_view_clauses(&mut clauses, &mut values, input.note_filter);
 
         sql.push_str(&clauses.join(" AND "));
         sql.push_str(" ORDER BY n.edited_at DESC");
@@ -1105,98 +1012,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         }
 
         Ok(count)
-    }
-
-    // ── Notebooks ─────────────────────────────────────────────────────
-
-    fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> {
-        let mut statement = self
-            .conn
-            .prepare(
-                "SELECT b.id, b.name, COUNT(n.id) AS note_count
-                 FROM notebooks b
-                 LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
-                 GROUP BY b.id, b.name, b.created_at
-                 ORDER BY LOWER(b.name) ASC, b.created_at ASC",
-            )
-            .map_err(map_err)?;
-
-        let rows = statement
-            .query_map([], |row| {
-                Ok(NotebookSummary {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    note_count: row.get::<_, i64>(2)? as usize,
-                })
-            })
-            .map_err(map_err)?;
-
-        let mut notebooks = Vec::new();
-        for row in rows {
-            notebooks.push(row.map_err(map_err)?);
-        }
-
-        Ok(notebooks)
-    }
-
-    fn insert_notebook(&self, id: &str, name: &str, now: i64) -> Result<(), NoteError> {
-        self.conn
-            .execute(
-                "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
-                 VALUES (?1, ?2, ?3, ?3, 1)",
-                params![id, name, now],
-            )
-            .map_err(handle_notebook_write_error)?;
-
-        Ok(())
-    }
-
-    fn notebook_by_id(&self, notebook_id: &str) -> Result<Option<NotebookSummary>, NoteError> {
-        self.conn
-            .query_row(
-                "SELECT b.id, b.name, COUNT(n.id) AS note_count
-                 FROM notebooks b
-                 LEFT JOIN notes n ON n.notebook_id = b.id AND n.archived_at IS NULL
-                 WHERE b.id = ?1
-                 GROUP BY b.id, b.name",
-                params![notebook_id],
-                |row| {
-                    Ok(NotebookSummary {
-                        id: row.get(0)?,
-                        name: row.get(1)?,
-                        note_count: row.get::<_, i64>(2)? as usize,
-                    })
-                },
-            )
-            .optional()
-            .map_err(map_err)
-    }
-
-    fn rename_notebook(&self, notebook_id: &str, name: &str, now: i64) -> Result<usize, NoteError> {
-        self.conn
-            .execute(
-                "UPDATE notebooks SET name = ?1, updated_at = ?2, locally_modified = 1 WHERE id = ?3",
-                params![name, now, notebook_id],
-            )
-            .map_err(handle_notebook_write_error)
-    }
-
-    fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError> {
-        self.conn
-            .execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])
-            .map_err(map_err)
-    }
-
-    fn notebook_exists(&self, notebook_id: &str) -> Result<bool, NoteError> {
-        self.conn
-            .query_row(
-                "SELECT 1 FROM notebooks WHERE id = ?1 LIMIT 1",
-                params![notebook_id],
-                |_| Ok(()),
-            )
-            .optional()
-            .map_err(map_err)
-            .map(|v| v.is_some())
     }
 
     // ── App settings ──────────────────────────────────────────────────

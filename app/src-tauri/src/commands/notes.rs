@@ -45,10 +45,6 @@ fn record_to_loaded_note(
     Ok(LoadedNote {
         id: record.id,
         title: record.title,
-        notebook: record
-            .notebook_id
-            .zip(record.notebook_name)
-            .map(|(id, name)| NotebookRef { id, name }),
         modified_at: record.modified_at,
         markdown: record.markdown,
         html,
@@ -357,14 +353,12 @@ pub async fn resolve_note_conflict(
 #[tauri::command]
 pub fn create_note(
     app: AppHandle,
-    notebook_id: Option<String>,
     tags: Vec<String>,
     markdown: Option<String>,
 ) -> Result<LoadedNote, AppError> {
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
-    let record =
-        NoteService::create_note(&repo, notebook_id.as_deref(), &tags, markdown.as_deref())?;
+    let record = NoteService::create_note(&repo, &tags, markdown.as_deref())?;
     record_to_loaded_note(&app, record, &repo)
 }
 
@@ -503,58 +497,6 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
     }
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn create_notebook(
-    app: AppHandle,
-    input: CreateNotebookInput,
-) -> Result<NotebookSummary, AppError> {
-    let conn = database_connection(&app)?;
-    let repo = SqliteNoteRepository::new(&conn);
-    let notebook = NoteService::create_notebook(&repo, input)?;
-    sync_push(&app, SyncCommand::PushNotebook(notebook.id.clone()));
-    Ok(notebook)
-}
-
-#[tauri::command]
-pub fn rename_notebook(
-    app: AppHandle,
-    input: RenameNotebookInput,
-) -> Result<NotebookSummary, AppError> {
-    let conn = database_connection(&app)?;
-    let repo = SqliteNoteRepository::new(&conn);
-    let notebook = NoteService::rename_notebook(&repo, input)?;
-    sync_push(&app, SyncCommand::PushNotebook(notebook.id.clone()));
-    Ok(notebook)
-}
-
-#[tauri::command]
-pub fn delete_notebook(app: AppHandle, notebook_id: String) -> Result<(), AppError> {
-    let conn = database_connection(&app)?;
-    let repo = SqliteNoteRepository::new(&conn);
-    NoteService::delete_notebook(&repo, &notebook_id)?;
-
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
-        rusqlite::params![notebook_id, now_millis()],
-    );
-    sync_push(&app, SyncCommand::PushDeletion(notebook_id));
-    Ok(())
-}
-
-#[tauri::command]
-pub fn assign_note_notebook(
-    app: AppHandle,
-    input: AssignNoteNotebookInput,
-) -> Result<LoadedNote, AppError> {
-    let note_id = input.note_id.clone();
-    let conn = database_connection(&app)?;
-    let repo = SqliteNoteRepository::new(&conn);
-    let record = NoteService::assign_notebook(&repo, input)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
-    sync_push(&app, SyncCommand::PushNote(note_id));
-    Ok(note)
 }
 
 #[tauri::command]

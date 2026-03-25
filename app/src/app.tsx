@@ -220,11 +220,9 @@ function App() {
       </DialogRoot>
       <CommandPalette
         availableTags={sidebarPaneProps.availableTags}
-        notebooks={notesPaneProps.notebooks}
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onSelectNote={notesPaneProps.onSelectNote}
-        onSelectNotebook={sidebarPaneProps.onSelectNotebook}
         onToggleTag={sidebarPaneProps.onToggleTag}
       />
       <SettingsDialog />

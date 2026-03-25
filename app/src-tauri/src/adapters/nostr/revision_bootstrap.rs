@@ -327,8 +327,7 @@ mod tests {
     };
     use crate::domain::sync::revision_service::{
         build_pending_note_deletion_revision, build_pending_note_revision,
-        build_pending_notebook_revision, persist_local_deletion_revision,
-        persist_local_note_revision, persist_local_notebook_revision,
+        persist_local_deletion_revision, persist_local_note_revision,
     };
     use nostr_sdk::prelude::Event;
     use nostr_sdk::prelude::Keys;
@@ -678,62 +677,6 @@ mod tests {
         assert_eq!(markdown, "# Pinned Title\n\nPinned Body");
         assert_eq!(current_rev, Some(pushed_revision_id));
         assert_eq!(pinned_at, Some(250));
-
-        let _ = std::fs::remove_file(source_db_path);
-        let _ = std::fs::remove_file(destination_db_path);
-        relay.stop();
-    }
-
-    #[tokio::test]
-    async fn pushes_local_notebook_revision_and_bootstraps_it_into_second_db() {
-        if !external_relay_test_prereqs_available() {
-            return;
-        }
-
-        let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39422).await;
-
-        let temp_dir = std::env::temp_dir();
-        let source_db_path = temp_dir.join(format!(
-            "comet-revision-notebook-source-test-{}.db",
-            std::process::id()
-        ));
-        let destination_db_path = temp_dir.join(format!(
-            "comet-revision-notebook-destination-test-{}.db",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_file(&source_db_path);
-        let _ = std::fs::remove_file(&destination_db_path);
-
-        let mut source_conn = Connection::open(&source_db_path).unwrap();
-        account_migrations().to_latest(&mut source_conn).unwrap();
-        seed_notebook(&source_conn, "notebook-1", "Trips");
-
-        let pushed_revision_id =
-            push_local_notebook_revision(&source_db_path, &keys, &relay.ws_url, "notebook-1").await;
-
-        let mut destination_conn = Connection::open(&destination_db_path).unwrap();
-        account_migrations()
-            .to_latest(&mut destination_conn)
-            .unwrap();
-
-        let result = bootstrap_with_keys(&destination_db_path, &keys, &relay.ws_url, |_| {})
-            .await
-            .unwrap();
-
-        assert_eq!(result.snapshot_seq, 1);
-        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
-
-        let (name, current_rev): (String, Option<String>) = destination_conn
-            .query_row(
-                "SELECT name, current_rev FROM notebooks WHERE id = 'notebook-1'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
-
-        assert_eq!(name, "Trips");
-        assert_eq!(current_rev, Some(pushed_revision_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -1507,7 +1450,6 @@ mod tests {
             "note",
             title,
             markdown,
-            None,
             100,
             200,
             200,
@@ -1524,7 +1466,6 @@ mod tests {
                 document_id: note_id,
                 title,
                 markdown,
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,
@@ -1594,40 +1535,6 @@ mod tests {
         conn.execute(
             "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
             rusqlite::params![event.id.to_hex(), note_id],
-        )
-        .unwrap();
-
-        revision_id
-    }
-
-    async fn push_local_notebook_revision(
-        db_path: &Path,
-        keys: &Keys,
-        relay_ws_url: &str,
-        notebook_id: &str,
-    ) -> String {
-        let recipient = keys.public_key();
-        let (event, revision_id) = {
-            let conn = Connection::open(db_path).unwrap();
-            let pending =
-                build_pending_notebook_revision(&conn, keys, &recipient, notebook_id).unwrap();
-            persist_local_notebook_revision(&conn, &pending).unwrap();
-            let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-                keys,
-                &recipient,
-                pending.rumor,
-                pending.tags,
-            )
-            .unwrap();
-            (event, pending.revision_id)
-        };
-
-        publish_local_event(relay_ws_url, keys, &event).await;
-
-        let conn = Connection::open(db_path).unwrap();
-        conn.execute(
-            "UPDATE notebooks SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
-            rusqlite::params![event.id.to_hex(), notebook_id],
         )
         .unwrap();
 
@@ -1710,15 +1617,6 @@ mod tests {
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, pinned_at, locally_modified)
              VALUES (?1, ?2, ?3, 100, 200, 200, ?4, 1)",
             rusqlite::params![note_id, title, markdown, pinned_at],
-        )
-        .unwrap();
-    }
-
-    fn seed_notebook(conn: &Connection, notebook_id: &str, name: &str) {
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
-             VALUES (?1, ?2, 100, 200, 1)",
-            rusqlite::params![notebook_id, name],
         )
         .unwrap();
     }

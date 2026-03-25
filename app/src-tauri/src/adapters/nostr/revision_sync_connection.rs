@@ -1,9 +1,7 @@
 use crate::adapters::nostr::revision_bootstrap::{
     bootstrap_relay_connection, RevisionBootstrapResult,
 };
-use crate::adapters::nostr::revision_push::{
-    push_deletion_revision, push_note_revision, push_notebook_revision,
-};
+use crate::adapters::nostr::revision_push::{push_deletion_revision, push_note_revision};
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
 };
@@ -194,19 +192,6 @@ fn list_pending_local_sync_commands(conn: &Connection) -> Result<Vec<SyncCommand
         }
     }
 
-    {
-        let mut stmt = conn.prepare(
-            "SELECT id
-             FROM notebooks
-             WHERE locally_modified = 1
-             ORDER BY updated_at ASC, id ASC",
-        )?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
-        for row in rows {
-            commands.push(SyncCommand::PushNotebook(row?));
-        }
-    }
-
     Ok(commands)
 }
 
@@ -225,20 +210,18 @@ async fn flush_pending_local_changes(
     }
 
     let mut pending_notes = 0usize;
-    let mut pending_notebooks = 0usize;
     let mut pending_deletions = 0usize;
     for command in &pending_commands {
         match command {
             SyncCommand::PushNote(_) => pending_notes += 1,
-            SyncCommand::PushNotebook(_) => pending_notebooks += 1,
             SyncCommand::PushDeletion(_) => pending_deletions += 1,
         }
     }
     sync_log(
         app,
         &format!(
-            "replaying pending local changes notes={} notebooks={} deletions={}",
-            pending_notes, pending_notebooks, pending_deletions
+            "replaying pending local changes notes={} deletions={}",
+            pending_notes, pending_deletions
         ),
     );
 
@@ -250,22 +233,6 @@ async fn flush_pending_local_changes(
                         .await
                 {
                     sync_log(app, &format!("revision push error: {note_id}: {error}"));
-                }
-            }
-            SyncCommand::PushNotebook(notebook_id) => {
-                if let Err(error) = push_notebook_revision(
-                    app,
-                    active_relay_url,
-                    backup_relay_urls,
-                    keys,
-                    &notebook_id,
-                )
-                .await
-                {
-                    sync_log(
-                        app,
-                        &format!("revision push notebook error: {notebook_id}: {error}"),
-                    );
                 }
             }
             SyncCommand::PushDeletion(entity_id) => {
@@ -316,17 +283,6 @@ async fn handle_revision_push_command(
         Some(SyncCommand::PushNote(note_id)) => {
             sync_log(app, &format!("queued revision push {note_id}"));
             pending_pushes.insert(note_id, tokio::time::Instant::now() + debounce_duration);
-        }
-        Some(SyncCommand::PushNotebook(notebook_id)) => {
-            if let Err(error) =
-                push_notebook_revision(app, active_relay_url, backup_relay_urls, keys, &notebook_id)
-                    .await
-            {
-                sync_log(
-                    app,
-                    &format!("revision push notebook error: {notebook_id}: {error}"),
-                );
-            }
         }
         Some(SyncCommand::PushDeletion(id)) => {
             if let Err(error) =
@@ -439,12 +395,6 @@ mod tests {
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
-             VALUES ('notebook-1', 'Notebook', 100, 300, 1)",
-            [],
-        )
-        .unwrap();
-        conn.execute(
             "INSERT INTO pending_deletions (entity_id, created_at)
              VALUES ('note-2', 50)",
             [],
@@ -452,10 +402,9 @@ mod tests {
         .unwrap();
 
         let commands = list_pending_local_sync_commands(&conn).unwrap();
-        assert_eq!(commands.len(), 3);
+        assert_eq!(commands.len(), 2);
         assert!(matches!(&commands[0], SyncCommand::PushDeletion(id) if id == "note-2"));
         assert!(matches!(&commands[1], SyncCommand::PushNote(id) if id == "note-1"));
-        assert!(matches!(&commands[2], SyncCommand::PushNotebook(id) if id == "notebook-1"));
     }
 }
 

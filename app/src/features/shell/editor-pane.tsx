@@ -13,8 +13,6 @@ import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
-
-import { buildNotebookSubmenu } from "./notebook-submenu";
 import {
   ChevronDown,
   ChevronLeft,
@@ -37,11 +35,7 @@ import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
-import {
-  type NoteConflictInfo,
-  type NotebookRef,
-  type NotebookSummary,
-} from "@/shared/api/types";
+import { type NoteConflictInfo } from "@/shared/api/types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
@@ -55,8 +49,6 @@ type EditorPaneProps = {
   markdown: string;
   modifiedAt: number;
   noteConflict: NoteConflictInfo | null;
-  notebook: NotebookRef | null;
-  notebooks: NotebookSummary[];
   noteId: string | null;
   pinnedAt: number | null;
   publishedAt: number | null;
@@ -64,7 +56,6 @@ type EditorPaneProps = {
   readonly: boolean;
   selectedConflictRevisionId: string | null;
   searchQuery: string;
-  onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
   onDuplicateNote(): void;
   onOpenPublishDialog(): void;
@@ -84,12 +75,9 @@ type EditorMenuContext = {
   readonly: boolean;
   isPublishedNote: boolean;
   isDeletePublishedNotePending: boolean;
-  notebook: NotebookRef | null;
-  notebooks: NotebookSummary[];
   pinnedAt: number | null;
   publishedAt: number | null;
   onSetReadonly(readonly: boolean): void;
-  onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
   onPublishShortNote(): void;
   onOpenPublishDialog(): void;
@@ -107,13 +95,6 @@ async function buildEditorMenu(
     checked: ctx.readonly,
     enabled: !ctx.isPublishedNote,
     action: () => ctx.onSetReadonly(!ctx.readonly),
-  });
-
-  const moveToNotebookSubmenu = await buildNotebookSubmenu({
-    currentNotebook: ctx.notebook,
-    notebooks: ctx.notebooks,
-    idPrefix: "editor-menu-notebook",
-    onAssign: (notebookId) => ctx.onAssignNotebook(notebookId),
   });
 
   const deletePublishedItem = {
@@ -160,7 +141,6 @@ async function buildEditorMenu(
         text: "Duplicate",
         action: ctx.onDuplicateNote,
       },
-      moveToNotebookSubmenu,
       ...publishItems,
     ],
   });
@@ -375,8 +355,6 @@ export function EditorPane({
   markdown,
   modifiedAt,
   noteConflict,
-  notebook,
-  notebooks,
   noteId,
   pinnedAt,
   publishedAt,
@@ -384,7 +362,6 @@ export function EditorPane({
   readonly,
   selectedConflictRevisionId,
   searchQuery,
-  onAssignNotebook,
   onDeletePublishedNote,
   onDuplicateNote,
   onOpenPublishDialog,
@@ -486,12 +463,9 @@ export function EditorPane({
         readonly: readonly || hasConflict,
         isPublishedNote,
         isDeletePublishedNotePending,
-        notebook,
-        notebooks,
         pinnedAt,
         publishedAt,
         onSetReadonly,
-        onAssignNotebook,
         onDeletePublishedNote,
         onPublishShortNote,
         onOpenPublishDialog,
@@ -502,10 +476,7 @@ export function EditorPane({
     [
       isDeletePublishedNotePending,
       isPublishedNote,
-      notebook,
-      notebooks,
       noteId,
-      onAssignNotebook,
       onDeletePublishedNote,
       onDuplicateNote,
       onOpenPublishDialog,

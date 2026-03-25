@@ -1,7 +1,7 @@
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
     ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NotePagePayload, NoteQueryInput,
-    NotebookSummary, SearchResult,
+    SearchResult,
 };
 
 /// Raw database row for a note, without HTML rendering.
@@ -11,8 +11,6 @@ pub struct NoteRecord {
     pub title: String,
     pub markdown: String,
     pub modified_at: i64,
-    pub notebook_id: Option<String>,
-    pub notebook_name: Option<String>,
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
@@ -22,7 +20,7 @@ pub struct NoteRecord {
     pub published_kind: Option<i64>,
 }
 
-/// Abstracts all database operations for notes and notebooks.
+/// Abstracts all database operations for notes.
 ///
 /// Methods are granular so the service layer can orchestrate them.
 /// Must not depend on rusqlite, Tauri, or any infrastructure.
@@ -32,10 +30,7 @@ pub trait NoteRepository {
     fn note_by_id(&self, note_id: &str) -> Result<Option<NoteRecord>, NoteError>;
     fn note_is_active(&self, note_id: &str) -> Result<bool, NoteError>;
     fn next_active_note_id(&self, excluding: Option<&str>) -> Result<Option<String>, NoteError>;
-    fn note_markdown_and_notebook(
-        &self,
-        note_id: &str,
-    ) -> Result<(String, Option<String>), NoteError>;
+    fn note_markdown(&self, note_id: &str) -> Result<String, NoteError>;
     fn note_markdown_and_readonly(&self, note_id: &str) -> Result<(String, bool), NoteError>;
     fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError>;
     fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError>;
@@ -47,7 +42,6 @@ pub trait NoteRepository {
         note_id: &str,
         title: &str,
         markdown: &str,
-        notebook_id: Option<&str>,
         now: i64,
     ) -> Result<(), NoteError>;
     fn update_note_content(
@@ -70,12 +64,6 @@ pub trait NoteRepository {
     fn restore_from_trash(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
     fn pin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
     fn unpin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
-    fn assign_notebook(
-        &self,
-        note_id: &str,
-        notebook_id: Option<&str>,
-        now: i64,
-    ) -> Result<usize, NoteError>;
     fn delete_note(&self, note_id: &str) -> Result<usize, NoteError>;
     fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError>;
     fn delete_trashed_notes(&self) -> Result<(), NoteError>;
@@ -102,15 +90,6 @@ pub trait NoteRepository {
     ) -> Result<ContextualTagsPayload, NoteError>;
     fn todo_count(&self) -> Result<i64, NoteError>;
     fn export_notes(&self, input: &ExportNotesInput) -> Result<usize, NoteError>;
-
-    // ── Notebooks ───────────────────────────────────────────────────────
-
-    fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError>;
-    fn insert_notebook(&self, id: &str, name: &str, now: i64) -> Result<(), NoteError>;
-    fn notebook_by_id(&self, notebook_id: &str) -> Result<Option<NotebookSummary>, NoteError>;
-    fn rename_notebook(&self, notebook_id: &str, name: &str, now: i64) -> Result<usize, NoteError>;
-    fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError>;
-    fn notebook_exists(&self, notebook_id: &str) -> Result<bool, NoteError>;
 
     // ── App settings ────────────────────────────────────────────────────
 

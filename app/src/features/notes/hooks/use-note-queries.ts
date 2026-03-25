@@ -15,16 +15,13 @@ import {
   type NoteQueryInput,
   type NoteSortDirection,
   type NoteSortField,
-  type NotebookSummary,
 } from "@/shared/api/types";
 import { flattenNotePages } from "@/features/shell/utils";
 
-const EMPTY_NOTEBOOKS: NotebookSummary[] = [];
 const EMPTY_TAGS: string[] = [];
 
 export interface NoteQueryParams {
   noteFilter: NoteFilter;
-  activeNotebookId: string | null;
   activeTags: string[];
   searchQuery: string;
   sortField: NoteSortField;
@@ -35,7 +32,6 @@ export interface NoteQueryParams {
 export function useNoteQueries(params: NoteQueryParams) {
   const {
     noteFilter,
-    activeNotebookId,
     activeTags,
     searchQuery,
     sortField,
@@ -62,13 +58,9 @@ export function useNoteQueries(params: NoteQueryParams) {
     enabled: bootstrapQuery.isSuccess,
   });
 
-  const notebooks = bootstrapQuery.data?.notebooks ?? EMPTY_NOTEBOOKS;
-  const activeNotebook =
-    notebooks.find((notebook) => notebook.id === activeNotebookId) ?? null;
   const initialSelectedNoteId = bootstrapQuery.data?.selectedNoteId ?? null;
   const isDefaultNotesView =
     noteFilter === "all" &&
-    activeNotebookId === null &&
     normalizedQuery === "" &&
     normalizedActiveTags.length === 0 &&
     sortField === "modified_at" &&
@@ -76,7 +68,6 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const notesQueryInput = useMemo<NoteQueryInput>(
     () => ({
-      activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
       activeTags: normalizedActiveTags,
       limit: NOTE_PAGE_SIZE,
       noteFilter,
@@ -86,7 +77,6 @@ export function useNoteQueries(params: NoteQueryParams) {
       sortDirection,
     }),
     [
-      activeNotebookId,
       normalizedActiveTags,
       normalizedQuery,
       noteFilter,
@@ -129,20 +119,12 @@ export function useNoteQueries(params: NoteQueryParams) {
   const contextualTagsQuery = useQuery({
     enabled: bootstrapQuery.isSuccess,
     initialData:
-      noteFilter === "all" && activeNotebookId === null && bootstrapQuery.data
+      noteFilter === "all" && bootstrapQuery.data
         ? bootstrapQuery.data.initialTags
         : undefined,
     placeholderData: (previousData) => previousData,
-    queryFn: () =>
-      getContextualTags({
-        activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
-        noteFilter,
-      }),
-    queryKey: [
-      "contextual-tags",
-      noteFilter,
-      noteFilter === "notebook" ? (activeNotebookId ?? "") : "",
-    ],
+    queryFn: () => getContextualTags({ noteFilter }),
+    queryKey: ["contextual-tags", noteFilter],
   });
   const availableTags = contextualTagsQuery.data?.tags ?? EMPTY_TAGS;
 
@@ -166,8 +148,6 @@ export function useNoteQueries(params: NoteQueryParams) {
     noteQuery,
     contextualTagsQuery,
     currentNotes,
-    notebooks,
-    activeNotebook,
     availableTags,
     totalNoteCount,
     activeNpub,

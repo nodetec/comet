@@ -3,11 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { initAttachmentsBasePath } from "@/shared/lib/attachments";
 
 import {
-  type AssignNoteNotebookInput,
   type BootstrapPayload,
   type ContextualTagsInput,
   type ContextualTagsPayload,
-  type CreateNotebookInput,
   type NoteConflictInfo,
   type LoadedNote,
   type NoteFilter,
@@ -15,7 +13,6 @@ import {
   type NoteQueryInput,
   type PublishNoteInput,
   type PublishShortNoteInput,
-  type RenameNotebookInput,
 } from "./types";
 
 export const NOTE_PAGE_SIZE = 40;
@@ -71,11 +68,7 @@ export async function getNoteConflict(noteId: string) {
   return invoke<NoteConflictInfo | null>("get_note_conflict", { noteId });
 }
 
-export async function createNote(input: {
-  notebookId: string | null;
-  tags: string[];
-  markdown?: string;
-}) {
+export async function createNote(input: { tags: string[]; markdown?: string }) {
   return invoke<LoadedNote>("create_note", input);
 }
 
@@ -118,22 +111,6 @@ export async function deleteNotePermanently(noteId: string) {
   return invoke("delete_note_permanently", { noteId });
 }
 
-export async function createNotebook(input: CreateNotebookInput) {
-  return invoke("create_notebook", { input });
-}
-
-export async function renameNotebook(input: RenameNotebookInput) {
-  return invoke("rename_notebook", { input });
-}
-
-export async function deleteNotebook(notebookId: string) {
-  return invoke("delete_notebook", { notebookId });
-}
-
-export async function assignNoteNotebook(input: AssignNoteNotebookInput) {
-  return invoke<LoadedNote>("assign_note_notebook", { input });
-}
-
 export async function pinNote(noteId: string) {
   return invoke<LoadedNote>("pin_note", { noteId });
 }
@@ -163,7 +140,6 @@ export async function resolveNoteConflict(
 
 export async function exportNotes(input: {
   noteFilter: NoteFilter;
-  activeNotebookId: string | null;
   exportDir: string;
 }) {
   return invoke<number>("export_notes", { input });

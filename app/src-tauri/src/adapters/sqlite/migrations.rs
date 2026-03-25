@@ -25,16 +25,7 @@ pub fn app_migrations() -> Migrations<'static> {
            created_at         INTEGER NOT NULL,
            updated_at         INTEGER NOT NULL,
            PRIMARY KEY (principal, account_public_key)
-         );
-         CREATE TABLE IF NOT EXISTS mcp_notebook_access (
-           principal          TEXT NOT NULL,
-           account_public_key TEXT NOT NULL REFERENCES accounts(public_key) ON DELETE CASCADE ON UPDATE CASCADE,
-           notebook_id        TEXT NOT NULL,
-           created_at         INTEGER NOT NULL,
-           PRIMARY KEY (principal, account_public_key, notebook_id)
-         );
-         CREATE INDEX IF NOT EXISTS idx_mcp_notebook_access_lookup
-           ON mcp_notebook_access(account_public_key, principal);",
+         );",
     )])
 }
 
@@ -45,19 +36,10 @@ pub fn account_migrations() -> Migrations<'static> {
                key TEXT PRIMARY KEY,
                value TEXT NOT NULL
              );
-             CREATE TABLE notebooks (
-               id TEXT PRIMARY KEY,
-               name TEXT NOT NULL UNIQUE,
-               created_at INTEGER NOT NULL,
-               updated_at INTEGER NOT NULL,
-               sync_event_id TEXT,
-               locally_modified INTEGER NOT NULL DEFAULT 0
-             );
              CREATE TABLE notes (
                id TEXT PRIMARY KEY,
                title TEXT NOT NULL,
                markdown TEXT NOT NULL,
-               notebook_id TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
                created_at INTEGER NOT NULL,
                modified_at INTEGER NOT NULL,
                archived_at INTEGER,
@@ -116,8 +98,6 @@ pub fn account_migrations() -> Migrations<'static> {
              );
              CREATE INDEX idx_notes_modified_at ON notes(modified_at DESC);
              CREATE INDEX idx_notes_edited_at ON notes(edited_at DESC);
-             CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
-               WHERE archived_at IS NULL;
              CREATE INDEX idx_notes_archived_at ON notes(archived_at);
              CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
              CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);
@@ -125,7 +105,6 @@ pub fn account_migrations() -> Migrations<'static> {
         ),
         M::up(
             "ALTER TABLE notes ADD COLUMN current_rev TEXT;
-             ALTER TABLE notebooks ADD COLUMN current_rev TEXT;
              CREATE TABLE sync_relays (
                relay_url TEXT PRIMARY KEY,
                created_at INTEGER NOT NULL

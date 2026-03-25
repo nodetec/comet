@@ -1,21 +1,4 @@
-export type NoteFilter =
-  | "all"
-  | "today"
-  | "todo"
-  | "notebook"
-  | "archive"
-  | "trash";
-
-export type NotebookSummary = {
-  id: string;
-  name: string;
-  noteCount: number;
-};
-
-export type NotebookRef = {
-  id: string;
-  name: string;
-};
+export type NoteFilter = "all" | "today" | "todo" | "archive" | "trash";
 
 export type NoteSummary = {
   archivedAt: number | null;
@@ -23,7 +6,6 @@ export type NoteSummary = {
   editedAt: number;
   hasConflict: boolean;
   id: string;
-  notebook: NotebookRef | null;
   pinnedAt: number | null;
   preview: string;
   readonly: boolean;
@@ -39,7 +21,6 @@ export type LoadedNote = {
   markdown: string;
   modifiedAt: number;
   nostrDTag: string | null;
-  notebook: NotebookRef | null;
   pinnedAt: number | null;
   publishedAt: number | null;
   publishedKind: number | null;
@@ -71,7 +52,6 @@ export type BootstrapPayload = {
   npub: string;
   initialNotes: NotePagePayload;
   initialTags: ContextualTagsPayload;
-  notebooks: NotebookSummary[];
   selectedNoteId: string | null;
   archivedCount: number;
   trashedCount: number;
@@ -81,7 +61,6 @@ export type NoteSortField = "modified_at" | "created_at" | "title";
 export type NoteSortDirection = "newest" | "oldest";
 
 export type NoteQueryInput = {
-  activeNotebookId: string | null;
   activeTags: string[];
   limit: number;
   noteFilter: NoteFilter;
@@ -99,26 +78,11 @@ export type NotePagePayload = {
 };
 
 export type ContextualTagsInput = {
-  activeNotebookId: string | null;
   noteFilter: NoteFilter;
 };
 
 export type ContextualTagsPayload = {
   tags: string[];
-};
-
-export type CreateNotebookInput = {
-  name: string;
-};
-
-export type RenameNotebookInput = {
-  notebookId: string;
-  name: string;
-};
-
-export type AssignNoteNotebookInput = {
-  noteId: string;
-  notebookId: string | null;
 };
 
 export type PublishNoteInput = {

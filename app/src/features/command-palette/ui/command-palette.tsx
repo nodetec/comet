@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Command as CommandPrimitive } from "cmdk";
-import { Archive, BookText, FileText, Hash, Search } from "lucide-react";
+import { Archive, FileText, Hash, Search } from "lucide-react";
 
 import {
   DialogBackdrop,
@@ -11,25 +11,20 @@ import {
 } from "@/shared/ui/dialog";
 import { cn } from "@/shared/lib/utils";
 
-import { type NotebookSummary } from "@/shared/api/types";
-
 type SearchResult = {
   id: string;
   title: string;
-  notebook: { id: string; name: string } | null;
   preview: string;
   archivedAt: number | null;
 };
 
-type SearchMode = "notes" | "tags" | "notebooks";
+type SearchMode = "notes" | "tags";
 
 type CommandPaletteProps = {
   availableTags: string[];
-  notebooks: NotebookSummary[];
   open: boolean;
   onOpenChange(open: boolean): void;
   onSelectNote(noteId: string): void;
-  onSelectNotebook(notebookId: string): void;
   onToggleTag(tag: string): void;
 };
 
@@ -46,7 +41,7 @@ function useDebouncedSearch(
       clearTimeout(debounceRef.current);
     }
 
-    if (!searchTerm || mode === "notebooks") {
+    if (!searchTerm) {
       setNoteResults([]);
       setTagResults([]);
       setSearching(false);
@@ -76,14 +71,11 @@ function useDebouncedSearch(
   }, [searchTerm, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 export function CommandPalette({
   availableTags,
-  notebooks,
   open,
   onOpenChange,
   onSelectNote,
-  onSelectNotebook,
   onToggleTag,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
@@ -92,36 +84,16 @@ export function CommandPalette({
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<number | null>(null);
 
-  let mode: SearchMode;
-  if (query.startsWith("#")) {
-    mode = "tags";
-  } else if (query.startsWith("@")) {
-    mode = "notebooks";
-  } else {
-    mode = "notes";
-  }
+  const mode: SearchMode = query.startsWith("#") ? "tags" : "notes";
 
   const searchTerm =
     mode === "notes" ? query.trim() : query.trim().slice(1).trim();
 
-  const filteredNotebooks = useMemo(() => {
-    if (mode !== "notebooks") return [];
-    if (!searchTerm) return notebooks;
-    const lower = searchTerm.toLowerCase();
-    return notebooks.filter((nb) => nb.name.toLowerCase().includes(lower));
-  }, [mode, searchTerm, notebooks]);
-
   const displayedTags =
     mode === "tags" && !searchTerm ? availableTags : tagResults;
 
-  let hasResults: boolean;
-  if (mode === "tags") {
-    hasResults = displayedTags.length > 0;
-  } else if (mode === "notebooks") {
-    hasResults = filteredNotebooks.length > 0;
-  } else {
-    hasResults = noteResults.length > 0;
-  }
+  const hasResults =
+    mode === "tags" ? displayedTags.length > 0 : noteResults.length > 0;
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -133,7 +105,7 @@ export function CommandPalette({
     }
   }, [open]);
 
-  // Debounced search for notes and tags (notebooks are filtered client-side)
+  // Debounced search for notes and tags
   useDebouncedSearch(
     searchTerm,
     mode,
@@ -153,19 +125,10 @@ export function CommandPalette({
     onOpenChange(false);
   };
 
-  const handleSelectNotebook = (notebookId: string) => {
-    onSelectNotebook(notebookId);
-    onOpenChange(false);
-  };
-
-  let showList: boolean | string;
-  if (mode === "notebooks") {
-    showList = searchTerm !== "" || notebooks.length > 0;
-  } else if (mode === "tags") {
-    showList = displayedTags.length > 0 || (searchTerm && !searching);
-  } else {
-    showList = searchTerm && !(searching && !hasResults);
-  }
+  const showList =
+    mode === "tags"
+      ? displayedTags.length > 0 || (!!searchTerm && !searching)
+      : !!searchTerm && !(searching && !hasResults);
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
@@ -177,7 +140,7 @@ export function CommandPalette({
               <Search className="text-muted-foreground mr-2 size-4 shrink-0" />
               <CommandPrimitive.Input
                 className="placeholder:text-muted-foreground flex h-12 w-full bg-transparent py-3 text-lg outline-none"
-                placeholder="Search notes, #tags or @notebooks"
+                placeholder="Search notes or #tags"
                 value={query}
                 onValueChange={setQuery}
               />
@@ -191,7 +154,6 @@ export function CommandPalette({
               {searchTerm && !searching && !hasResults && (
                 <CommandPrimitive.Empty className="text-muted-foreground py-6 text-center text-sm">
                   {mode === "tags" && "No tags found."}
-                  {mode === "notebooks" && "No notebooks found."}
                   {mode === "notes" && "No notes found."}
                 </CommandPrimitive.Empty>
               )}
@@ -206,19 +168,6 @@ export function CommandPalette({
                   >
                     <Hash className="text-muted-foreground size-4 shrink-0" />
                     <span className="truncate">{tag}</span>
-                  </CommandPrimitive.Item>
-                ))}
-
-              {mode === "notebooks" &&
-                filteredNotebooks.map((nb) => (
-                  <CommandPrimitive.Item
-                    key={nb.id}
-                    value={nb.id}
-                    onSelect={() => handleSelectNotebook(nb.id)}
-                    className="data-[selected=true]:bg-accent flex cursor-default items-center gap-3 rounded-md px-2 py-2 text-sm outline-none select-none"
-                  >
-                    <BookText className="text-primary size-4 shrink-0" />
-                    <span className="truncate">{nb.name}</span>
                   </CommandPrimitive.Item>
                 ))}
 
@@ -249,11 +198,6 @@ export function CommandPalette({
                       {result.preview && (
                         <div className="text-muted-foreground mt-0.5 truncate text-xs">
                           {result.preview}
-                        </div>
-                      )}
-                      {result.notebook && (
-                        <div className="text-primary mt-0.5 truncate text-xs">
-                          {result.notebook.name}
                         </div>
                       )}
                     </div>

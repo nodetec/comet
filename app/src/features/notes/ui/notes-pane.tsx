@@ -33,20 +33,14 @@ import { Button } from "@/shared/ui/button";
 import { searchWordsFromQuery } from "@/shared/lib/search";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
-import { buildNotebookSubmenu } from "@/features/shell/notebook-submenu";
-
 import {
   type NoteFilter,
-  type NotebookSummary,
   type NoteSortDirection,
   type NoteSortField,
   type NoteSummary,
 } from "@/shared/api/types";
 
-function notesHeading(
-  noteFilter: NoteFilter,
-  activeNotebook: NotebookSummary | null,
-) {
+function notesHeading(noteFilter: NoteFilter) {
   if (noteFilter === "archive") {
     return "Archive";
   }
@@ -59,15 +53,10 @@ function notesHeading(
     return "Today";
   }
 
-  if (noteFilter === "notebook" && activeNotebook) {
-    return activeNotebook.name;
-  }
-
   return "All Notes";
 }
 
 type NotesPaneProps = {
-  activeNotebook: NotebookSummary | null;
   activeTags: string[];
   creatingNoteId: string | null;
   filteredNotes: NoteSummary[];
@@ -75,14 +64,12 @@ type NotesPaneProps = {
   isCreatingNote: boolean;
   isLoadingMoreNotes: boolean;
   isMutatingNote: boolean;
-  notebooks: NotebookSummary[];
   noteFilter: NoteFilter;
   searchQuery: string;
   selectedNoteId: string | null;
   sortField: NoteSortField;
   sortDirection: NoteSortDirection;
   totalNoteCount: number;
-  onAssignNoteNotebook(noteId: string, notebookId: string | null): void;
   onArchiveNote(noteId: string): void;
   onChangeSearch(query: string): void;
   onChangeSortField(field: NoteSortField): void;
@@ -221,8 +208,6 @@ async function showNoteContextMenu(
   ctx: {
     isArchive: boolean;
     isTrash: boolean;
-    notebooks: NotebookSummary[];
-    onAssignNoteNotebook: (noteId: string, notebookId: string | null) => void;
     onSetNotePinned: (noteId: string, pinned: boolean) => void;
     onCopyNoteContent: (noteId: string) => void;
     onDeleteNotePermanently: (noteId: string) => void;
@@ -235,15 +220,6 @@ async function showNoteContextMenu(
   },
 ) {
   event.preventDefault();
-  const moveToNotebookSubmenu =
-    !ctx.isArchive &&
-    !ctx.isTrash &&
-    (await buildNotebookSubmenu({
-      currentNotebook: note.notebook,
-      notebooks: ctx.notebooks,
-      idPrefix: `note-menu-notebook-${note.id}`,
-      onAssign: (notebookId) => ctx.onAssignNoteNotebook(note.id, notebookId),
-    }));
 
   const menu = await Menu.new({
     items: [
@@ -257,9 +233,6 @@ async function showNoteContextMenu(
         text: "Copy",
         action: () => ctx.onCopyNoteContent(note.id),
       },
-      ...(moveToNotebookSubmenu
-        ? [{ item: "Separator" as const }, moveToNotebookSubmenu]
-        : []),
       { item: "Separator" as const },
       ...(ctx.isTrash
         ? [
@@ -528,11 +501,6 @@ const NoteRow = memo(function NoteRow({
                     addSuffix: true,
                   }).replace(/^about /, "")}
             </span>
-            {note.notebook ? (
-              <span className="text-primary ml-auto min-w-0 truncate text-xs">
-                {note.notebook.name}
-              </span>
-            ) : null}
           </div>
         </div>
       </button>
@@ -546,7 +514,6 @@ const NoteRow = memo(function NoteRow({
 });
 
 export function NotesPane({
-  activeNotebook,
   activeTags,
   creatingNoteId,
   filteredNotes,
@@ -554,13 +521,11 @@ export function NotesPane({
   isCreatingNote,
   isLoadingMoreNotes,
   isMutatingNote,
-  notebooks,
   noteFilter,
   searchQuery,
   selectedNoteId,
   sortField,
   sortDirection,
-  onAssignNoteNotebook,
   onArchiveNote,
   onChangeSearch,
   onChangeSortField,
@@ -595,7 +560,7 @@ export function NotesPane({
     }
   }, [creatingNoteId]);
 
-  const viewKey = `${noteFilter}-${activeNotebook?.id ?? ""}-${activeTags.join(",")}-${searchQuery}`;
+  const viewKey = `${noteFilter}-${activeTags.join(",")}-${searchQuery}`;
   const prevViewKeyRef = useRef(viewKey);
   const skipAnimationUntilRef = useRef(0);
 
@@ -657,7 +622,7 @@ export function NotesPane({
 
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
-  }, [activeNotebook?.id, filteredNotes.length, noteFilter, searchQuery]);
+  }, [filteredNotes.length, noteFilter, searchQuery]);
 
   useEffect(() => {
     if (!inView || !hasMoreNotes) {
@@ -674,8 +639,6 @@ export function NotesPane({
     showNoteContextMenu(event, note, {
       isArchive,
       isTrash,
-      notebooks,
-      onAssignNoteNotebook,
       onSetNotePinned,
       onCopyNoteContent,
       onDeleteNotePermanently,
@@ -750,7 +713,7 @@ export function NotesPane({
                   type="button"
                 >
                   <h2 className="min-w-0 truncate font-medium">
-                    {notesHeading(noteFilter, activeNotebook)}
+                    {notesHeading(noteFilter)}
                   </h2>
                   <ChevronDown className="text-muted-foreground size-4 shrink-0" />
                 </button>

@@ -12,7 +12,6 @@ pub struct RevisionRumorInput<'a> {
     pub document_id: &'a str,
     pub title: &'a str,
     pub markdown: &'a str,
-    pub notebook_id: Option<&'a str>,
     pub created_at: i64,
     pub modified_at: i64,
     pub edited_at: i64,
@@ -163,13 +162,6 @@ pub fn build_revision_note_rumor(
         Tag::custom(TagKind::custom("op"), vec![input.op.to_string()]),
     ];
 
-    if let Some(notebook_id) = input.notebook_id {
-        tags.push(Tag::custom(
-            TagKind::custom("notebook_id"),
-            vec![notebook_id.to_string()],
-        ));
-    }
-
     if let Some(ts) = input.archived_at {
         tags.push(Tag::custom(
             TagKind::custom("archived_at"),
@@ -249,7 +241,6 @@ pub fn canonicalize_revision_payload(
     entity_type: &str,
     title: &str,
     markdown: &str,
-    notebook_id: Option<&str>,
     created_at: i64,
     modified_at: i64,
     edited_at: i64,
@@ -274,7 +265,6 @@ pub fn canonicalize_revision_payload(
         "type": entity_type,
         "title": title,
         "markdown": markdown,
-        "notebook_id": notebook_id,
         "created_at": created_at,
         "modified_at": modified_at,
         "edited_at": edited_at,
@@ -302,7 +292,6 @@ mod tests {
             "note",
             "Title",
             "# Title\n\nBody",
-            None,
             100,
             200,
             200,
@@ -322,7 +311,6 @@ mod tests {
             "note",
             "Title",
             "# Title\n\nBody",
-            None,
             100,
             200,
             200,

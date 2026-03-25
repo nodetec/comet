@@ -4,8 +4,7 @@ use crate::db::database_connection;
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_service::{
     build_pending_note_deletion_revision, build_pending_note_revision,
-    build_pending_notebook_deletion_revision, build_pending_notebook_revision,
-    persist_local_deletion_revision, persist_local_note_revision, persist_local_notebook_revision,
+    persist_local_deletion_revision, persist_local_note_revision,
 };
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -202,39 +201,6 @@ async fn maybe_upload_note_attachments(
     Ok(())
 }
 
-pub async fn push_notebook_revision(
-    app: &AppHandle,
-    active_relay_url: &str,
-    backup_relay_urls: &[String],
-    keys: &Keys,
-    notebook_id: &str,
-) -> Result<(), AppError> {
-    let recipient = keys.public_key();
-    let event = {
-        let conn = database_connection(app)?;
-        let pending = build_pending_notebook_revision(&conn, keys, &recipient, notebook_id)?;
-        persist_local_notebook_revision(&conn, &pending)?;
-        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
-    };
-
-    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
-
-    let conn = database_connection(app)?;
-    conn.execute(
-        "UPDATE notebooks SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
-        rusqlite::params![event.id.to_hex(), notebook_id],
-    )?;
-
-    sync_log(
-        app,
-        &format!(
-            "pushed revision notebook {notebook_id} to {}/{} relays",
-            fanout.success_count, fanout.relay_count
-        ),
-    );
-    Ok(())
-}
-
 pub async fn push_deletion_revision(
     app: &AppHandle,
     active_relay_url: &str,
@@ -245,27 +211,14 @@ pub async fn push_deletion_revision(
     let recipient = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
-        let pending = if entity_id.starts_with("notebook-") {
-            let pending = build_pending_notebook_deletion_revision(
-                &conn,
-                keys,
-                &recipient,
-                entity_id,
-                crate::domain::common::time::now_millis(),
-            )?;
-            persist_local_deletion_revision(&conn, &pending)?;
-            pending
-        } else {
-            let pending = build_pending_note_deletion_revision(
-                &conn,
-                keys,
-                &recipient,
-                entity_id,
-                crate::domain::common::time::now_millis(),
-            )?;
-            persist_local_deletion_revision(&conn, &pending)?;
-            pending
-        };
+        let pending = build_pending_note_deletion_revision(
+            &conn,
+            keys,
+            &recipient,
+            entity_id,
+            crate::domain::common::time::now_millis(),
+        )?;
+        persist_local_deletion_revision(&conn, &pending)?;
 
         crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
     };
@@ -550,7 +503,6 @@ mod tests {
             "note",
             title,
             markdown,
-            None,
             100,
             200,
             200,
@@ -567,7 +519,6 @@ mod tests {
                 document_id: note_id,
                 title,
                 markdown,
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,

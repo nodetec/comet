@@ -1,5 +1,4 @@
-use crate::domain::common::time::now_millis;
-use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
+use crate::domain::sync::model::SyncedNote;
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -11,11 +10,6 @@ pub fn delete_note_from_sync(
     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
     conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
     invalidate_cache(note_id);
-    Ok(())
-}
-
-pub fn delete_notebook_from_sync(conn: &Connection, notebook_id: &str) -> Result<(), AppError> {
-    conn.execute("DELETE FROM notebooks WHERE id = ?1", params![notebook_id])?;
     Ok(())
 }
 
@@ -47,25 +41,14 @@ pub fn upsert_from_sync(
         }
     }
 
-    // Ensure referenced notebook exists (it may arrive after the note in the sync stream).
-    // Stub gets updated_at = 0 so the real notebook event always wins LWW.
-    if let Some(ref nb_id) = note.notebook_id {
-        let now = now_millis();
-        conn.execute(
-            "INSERT OR IGNORE INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?1, ?2, 0, 0)",
-            params![nb_id, now],
-        )?;
-    }
-
     if existing.is_some() {
         // Update existing note
         conn.execute(
-            "UPDATE notes SET title = ?1, markdown = ?2, notebook_id = ?3, modified_at = ?4, edited_at = ?5, \
-             archived_at = ?6, deleted_at = ?7, pinned_at = ?8, readonly = ?9, sync_event_id = ?10, locally_modified = 0 WHERE id = ?11",
+            "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?4, \
+             archived_at = ?5, deleted_at = ?6, pinned_at = ?7, readonly = ?8, sync_event_id = ?9, locally_modified = 0 WHERE id = ?10",
             params![
                 note.title,
                 note.markdown,
-                note.notebook_id,
                 note.modified_at,
                 note.edited_at,
                 note.archived_at,
@@ -79,13 +62,12 @@ pub fn upsert_from_sync(
     } else {
         // Insert new note
         conn.execute(
-            "INSERT INTO notes (id, title, markdown, notebook_id, created_at, modified_at, edited_at, \
-             archived_at, deleted_at, pinned_at, readonly, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0)",
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, \
+             archived_at, deleted_at, pinned_at, readonly, sync_event_id, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0)",
             params![
                 note.id,
                 note.title,
                 note.markdown,
-                note.notebook_id,
                 note.created_at,
                 note.modified_at,
                 note.edited_at,
@@ -116,48 +98,11 @@ pub fn upsert_from_sync(
 
     Ok(Some(note.id.clone()))
 }
-
-pub fn upsert_notebook_from_sync(
-    conn: &Connection,
-    notebook: &SyncedNotebook,
-    sync_event_id: &str,
-) -> Result<(), AppError> {
-    let existing: Option<i64> = conn
-        .query_row(
-            "SELECT updated_at FROM notebooks WHERE id = ?1",
-            params![notebook.id],
-            |row| row.get(0),
-        )
-        .optional()?;
-
-    if let Some(local_updated) = existing {
-        if local_updated >= notebook.updated_at {
-            // Local version is same or newer — just update sync_event_id
-            conn.execute(
-                "UPDATE notebooks SET sync_event_id = ?1 WHERE id = ?2",
-                params![sync_event_id, notebook.id],
-            )?;
-            return Ok(());
-        }
-        conn.execute(
-            "UPDATE notebooks SET name = ?1, updated_at = ?2, sync_event_id = ?3, locally_modified = 0 WHERE id = ?4",
-            params![notebook.name, notebook.updated_at, sync_event_id, notebook.id],
-        )?;
-    } else {
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, sync_event_id, locally_modified) \
-             VALUES (?1, ?2, ?3, ?3, ?4, 0)",
-            params![notebook.id, notebook.name, notebook.updated_at, sync_event_id],
-        )?;
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::domain::sync::model::{SyncedNote, SyncedNotebook};
+    use crate::domain::sync::model::SyncedNote;
     use rusqlite::{params, Connection};
 
     fn setup_db() -> Connection {
@@ -171,7 +116,6 @@ mod tests {
             id: id.to_string(),
             title: format!("Title {id}"),
             markdown: format!("# Title {id}\n\nBody"),
-            notebook_id: None,
             created_at: 1000,
             modified_at,
             edited_at: modified_at,
@@ -249,49 +193,6 @@ mod tests {
             })
             .unwrap();
         assert_eq!(title, "Local Title");
-    }
-
-    #[test]
-    fn upsert_notebook_inserts_new() {
-        let conn = setup_db();
-        let notebook = SyncedNotebook {
-            id: "nb-1".to_string(),
-            name: "My Notebook".to_string(),
-            updated_at: 2000,
-        };
-
-        upsert_notebook_from_sync(&conn, &notebook, "evt-nb-1").unwrap();
-
-        let name: String = conn
-            .query_row("SELECT name FROM notebooks WHERE id = 'nb-1'", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert_eq!(name, "My Notebook");
-    }
-
-    #[test]
-    fn upsert_notebook_updates_when_remote_is_newer() {
-        let conn = setup_db();
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified) VALUES (?1, ?2, ?3, ?4, 0)",
-            params!["nb-1", "Old Name", 1000, 2000],
-        )
-        .unwrap();
-
-        let notebook = SyncedNotebook {
-            id: "nb-1".to_string(),
-            name: "Updated Name".to_string(),
-            updated_at: 3000,
-        };
-        upsert_notebook_from_sync(&conn, &notebook, "evt-nb-2").unwrap();
-
-        let name: String = conn
-            .query_row("SELECT name FROM notebooks WHERE id = 'nb-1'", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert_eq!(name, "Updated Name");
     }
 
     #[test]

@@ -23,7 +23,6 @@ import {
   type PublishNoteInput,
   type PublishShortNoteInput,
 } from "@/shared/api/types";
-import { useNotebookState } from "./use-notebook-state";
 import { usePublishState } from "@/features/publishing";
 
 import { useNoteQueries } from "@/features/notes/hooks/use-note-queries";
@@ -54,25 +53,7 @@ export function useShellController() {
   const [isResolveConflictPending, setIsResolveConflictPending] =
     useState(false);
 
-  const notebook = useNotebookState();
   const publish = usePublishState();
-  const {
-    deleteNotebookMutation,
-    editingNotebookId,
-    handleDeleteNotebook,
-    hideCreateNotebook,
-    hideRenameNotebook,
-    isCreatingNotebook,
-    newNotebookName,
-    renameNotebookMutation,
-    renamingNotebookName,
-    setNewNotebookName,
-    setRenamingNotebookName,
-    showCreateNotebook,
-    showRenameNotebook,
-    submitNotebook,
-    submitRenameNotebook,
-  } = notebook;
   const {
     deletePublishDialogOpen,
     deletePublishedNoteMutation,
@@ -98,24 +79,20 @@ export function useShellController() {
   const isSavingRef = useRef(false);
 
   const queryClient = useQueryClient();
-  const activeNotebookId = useShellStore((state) => state.activeNotebookId);
   const activeTags = useShellStore((state) => state.activeTags);
   const draftMarkdown = useShellStore((state) => state.draftMarkdown);
   const draftNoteId = useShellStore((state) => state.draftNoteId);
   const noteFilter = useShellStore((state) => state.noteFilter);
   const searchQuery = useShellStore((state) => state.searchQuery);
   const selectedNoteId = useShellStore((state) => state.selectedNoteId);
-  const clearActiveTags = useShellStore((state) => state.clearActiveTags);
   const setDraft = useShellStore((state) => state.setDraft);
   const setActiveTags = useShellStore((state) => state.setActiveTags);
   const setNoteFilter = useShellStore((state) => state.setNoteFilter);
-  const setNotebookFilter = useShellStore((state) => state.setNotebookFilter);
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
   const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
   const setFocusedPane = useShellStore((state) => state.setFocusedPane);
 
-  const sortViewKey =
-    noteFilter === "notebook" ? (activeNotebookId ?? "all") : noteFilter;
+  const sortViewKey = noteFilter;
   const sortPrefs =
     useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
     defaultNoteSortPrefs;
@@ -132,15 +109,12 @@ export function useShellController() {
     noteQuery,
     noteConflictQuery,
     currentNotes,
-    notebooks,
-    activeNotebook,
     availableTags,
     totalNoteCount,
     activeNpub,
     initialSelectedNoteId,
   } = useNoteQueries({
     noteFilter,
-    activeNotebookId,
     activeTags,
     searchQuery,
     sortField: noteSortField,
@@ -159,7 +133,6 @@ export function useShellController() {
     restoreFromTrashMutation,
     deleteNotePermanentlyMutation,
     emptyTrashMutation,
-    assignNoteNotebookMutation,
     pinNoteMutation,
     unpinNoteMutation,
     setNoteReadonlyMutation,
@@ -172,7 +145,6 @@ export function useShellController() {
     draftNoteId,
     draftMarkdown,
     noteFilter,
-    activeNotebookId,
     activeNpub,
     isSavingRef,
     setSelectedNoteId,
@@ -207,24 +179,6 @@ export function useShellController() {
       setActiveTags(nextActiveTags);
     }
   }, [activeTags, availableTags, setActiveTags]);
-
-  // --- Notebook filter cleanup ---
-  useEffect(() => {
-    if (noteFilter !== "notebook") {
-      return;
-    }
-
-    if (!activeNotebookId || !activeNotebook) {
-      clearActiveTags();
-      setNoteFilter("all");
-    }
-  }, [
-    activeNotebook,
-    activeNotebookId,
-    clearActiveTags,
-    noteFilter,
-    setNoteFilter,
-  ]);
 
   // --- Sync draft from loaded note ---
   useEffect(() => {
@@ -488,11 +442,7 @@ export function useShellController() {
 
     flushCurrentDraft();
     const tagsForNewNote = [...activeTags];
-    if (
-      noteFilter !== "notebook" &&
-      noteFilter !== "today" &&
-      noteFilter !== "todo"
-    ) {
+    if (noteFilter !== "today" && noteFilter !== "todo") {
       setNoteFilter("all");
     }
     setSearchQuery("");
@@ -500,7 +450,6 @@ export function useShellController() {
     setIsCreatingNoteTransition(true);
     setEditorFocusMode(source === "pointer" ? "pointerup" : "immediate");
     createNoteMutation.mutate({
-      notebookId: noteFilter === "notebook" ? activeNotebookId : null,
       tags: tagsForNewNote,
       markdown: noteFilter === "todo" ? "- [ ] " : undefined,
     });
@@ -542,19 +491,6 @@ export function useShellController() {
 
   const handleEmptyTrash = () => {
     emptyTrashMutation.mutate();
-  };
-
-  const handleSelectNotebook = (notebookId: string) => {
-    if (
-      currentNote &&
-      (currentNote.notebook?.id !== notebookId ||
-        currentNote.archivedAt ||
-        currentNote.deletedAt)
-    ) {
-      setSelectedNoteId(null);
-      setDraft("", "");
-    }
-    setNotebookFilter(notebookId);
   };
 
   const handleToggleTag = (tag: string) => {
@@ -656,41 +592,11 @@ export function useShellController() {
     })().catch(() => {});
   };
 
-  const handleAssignNoteNotebook = (
-    noteId: string,
-    notebookId: string | null,
-  ) => {
-    if (
-      archiveNoteMutation.isPending ||
-      restoreNoteMutation.isPending ||
-      deleteNotePermanentlyMutation.isPending ||
-      assignNoteNotebookMutation.isPending ||
-      pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending ||
-      duplicateNoteMutation.isPending ||
-      setNoteReadonlyMutation.isPending
-    ) {
-      return;
-    }
-
-    void (async () => {
-      if (noteId === selectedNoteId) {
-        await flushCurrentDraftAsync();
-      }
-
-      await assignNoteNotebookMutation.mutateAsync({
-        noteId,
-        notebookId,
-      });
-    })().catch(() => {});
-  };
-
   const handleSetNotePinned = (noteId: string, pinned: boolean) => {
     if (
       archiveNoteMutation.isPending ||
       restoreNoteMutation.isPending ||
       deleteNotePermanentlyMutation.isPending ||
-      assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
       duplicateNoteMutation.isPending ||
@@ -708,7 +614,6 @@ export function useShellController() {
       archiveNoteMutation.isPending ||
       restoreNoteMutation.isPending ||
       deleteNotePermanentlyMutation.isPending ||
-      assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
       duplicateNoteMutation.isPending ||
@@ -734,7 +639,6 @@ export function useShellController() {
       archiveNoteMutation.isPending ||
       restoreNoteMutation.isPending ||
       deleteNotePermanentlyMutation.isPending ||
-      assignNoteNotebookMutation.isPending ||
       pinNoteMutation.isPending ||
       unpinNoteMutation.isPending ||
       duplicateNoteMutation.isPending ||
@@ -779,7 +683,6 @@ export function useShellController() {
 
         const count = await exportNotes({
           noteFilter: noteFilter,
-          activeNotebookId: noteFilter === "notebook" ? activeNotebookId : null,
           exportDir: selected as string,
         });
 
@@ -796,11 +699,9 @@ export function useShellController() {
   const currentHandlers = {
     fetchNextPage: notesQuery.fetchNextPage,
     flushCurrentDraftAsync,
-    handleAssignNoteNotebook,
     handleArchiveNote,
     handleCopyNoteContent,
     handleCreateNote,
-    handleDeleteNotebook,
     handleDuplicateNote,
     handleDeleteNotePermanently,
     handleEmptyTrash,
@@ -812,7 +713,6 @@ export function useShellController() {
     handleSelectTrash,
     handleTrashNote,
     handleSelectNote,
-    handleSelectNotebook,
     handleSelectToday,
     handleSelectTodo,
     handleSetNotePinned,
@@ -879,8 +779,6 @@ export function useShellController() {
         setSyncEditorRevision((revision) => revision + 1);
       }
     },
-    submitNotebook,
-    submitRenameNotebook,
   };
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
@@ -903,8 +801,6 @@ export function useShellController() {
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
       noteConflict: currentNoteConflict ?? null,
-      notebook: currentNote?.notebook ?? null,
-      notebooks,
       noteId:
         displayedSelectedNoteId || isCreatingNote
           ? (currentNote?.id ?? null)
@@ -918,14 +814,6 @@ export function useShellController() {
       searchQuery,
       isDeletePublishedNotePending,
       isResolveConflictPending,
-      onAssignNotebook(notebookId: string | null) {
-        if (currentNote) {
-          latestRef.current.handleAssignNoteNotebook(
-            currentNote.id,
-            notebookId,
-          );
-        }
-      },
       onDeletePublishedNote() {
         if (
           !currentNote ||
@@ -997,7 +885,6 @@ export function useShellController() {
       editorFocusMode,
       isDeletePublishedNotePending,
       isCreatingNote,
-      notebooks,
       isPublishNotePending,
       isPublishShortNotePending,
       isResolveConflictPending,
@@ -1124,7 +1011,6 @@ export function useShellController() {
     archiveNoteMutation.isPending ||
     restoreNoteMutation.isPending ||
     deleteNotePermanentlyMutation.isPending ||
-    assignNoteNotebookMutation.isPending ||
     pinNoteMutation.isPending ||
     unpinNoteMutation.isPending ||
     duplicateNoteMutation.isPending ||
@@ -1132,7 +1018,6 @@ export function useShellController() {
 
   const notesPaneProps = useMemo(
     () => ({
-      activeNotebook,
       activeTags,
       creatingNoteId: creatingSelectedNoteId,
       filteredNotes: currentNotes,
@@ -1146,10 +1031,7 @@ export function useShellController() {
       onChangeSortDirection: (direction: NoteSortDirection) =>
         setNoteSortPrefs(sortViewKey, { direction }),
       isMutatingNote,
-      notebooks,
       noteFilter,
-      onAssignNoteNotebook: (noteId: string, notebookId: string | null) =>
-        latestRef.current.handleAssignNoteNotebook(noteId, notebookId),
       onArchiveNote: (noteId: string) =>
         latestRef.current.handleArchiveNote(noteId),
       onChangeSearch: setSearchQuery,
@@ -1186,14 +1068,12 @@ export function useShellController() {
       totalNoteCount,
     }),
     [
-      activeNotebook,
       activeTags,
       creatingSelectedNoteId,
       currentNotes,
       displayedSelectedNoteId,
       isCreatingNote,
       isMutatingNote,
-      notebooks,
       noteFilter,
       noteSortDirection,
       noteSortField,
@@ -1210,24 +1090,12 @@ export function useShellController() {
 
   const sidebarPaneProps = useMemo(
     () => ({
-      activeNotebookId,
       activeTags,
       availableTags,
-      editingNotebookId,
-      isCreatingNotebook,
-      newNotebookName,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
       todoCount: todoCountQuery.data ?? 0,
       trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
       noteFilter,
-      notebooks,
-      onChangeNotebookName: setNewNotebookName,
-      onChangeRenamingNotebookName: setRenamingNotebookName,
-      onCreateNotebook: () => latestRef.current.submitNotebook(),
-      onDeleteNotebook: (notebookId: string) =>
-        latestRef.current.handleDeleteNotebook(notebookId),
-      onHideCreateNotebook: hideCreateNotebook,
-      onHideRenameNotebook: hideRenameNotebook,
       onSelectAll: () => {
         setFocusedPane("sidebar");
         latestRef.current.handleSelectAll();
@@ -1249,46 +1117,20 @@ export function useShellController() {
         latestRef.current.handleSelectTrash();
       },
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
-      onSelectNotebook: (notebookId: string) => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectNotebook(notebookId);
-      },
-      onShowCreateNotebook: showCreateNotebook,
-      onShowRenameNotebook: (notebookId: string) =>
-        showRenameNotebook(notebookId, notebooks),
-      onSubmitRenameNotebook: () => latestRef.current.submitRenameNotebook(),
       onToggleTag: (tag: string) => latestRef.current.handleToggleTag(tag),
-      renameNotebookDisabled:
-        renameNotebookMutation.isPending || deleteNotebookMutation.isPending,
-      renamingNotebookName,
     }),
     [
-      activeNotebookId,
       activeTags,
       availableTags,
       bootstrapQuery.data?.archivedCount,
       bootstrapQuery.data?.trashedCount,
-      deleteNotebookMutation.isPending,
-      editingNotebookId,
-      hideCreateNotebook,
-      hideRenameNotebook,
-      isCreatingNotebook,
-      newNotebookName,
       noteFilter,
-      notebooks,
-      renameNotebookMutation.isPending,
-      renamingNotebookName,
       setFocusedPane,
-      setNewNotebookName,
-      setRenamingNotebookName,
-      showCreateNotebook,
-      showRenameNotebook,
       todoCountQuery.data,
     ],
   );
 
   return {
-    activeNotebookId,
     bootstrapError: bootstrapQuery.isError
       ? errorMessage(bootstrapQuery.error, "Failed to load the note library.")
       : null,

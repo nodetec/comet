@@ -5,7 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
 import {
   Archive,
-  BookText,
   CalendarDays,
   CheckSquare,
   Square,
@@ -15,7 +14,6 @@ import {
   CloudSync,
   CloudCheck,
   FileTextIcon,
-  PlusCircleIcon,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -24,18 +22,8 @@ import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { SyncDialog } from "@/features/sync";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { type NoteFilter, type NotebookSummary } from "@/shared/api/types";
+import { type NoteFilter } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
-
-function notebookItemStateClass(isActive: boolean, isFocused: boolean) {
-  if (isActive && isFocused) {
-    return "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
-  }
-  if (isActive) {
-    return "bg-accent/80 text-secondary-foreground";
-  }
-  return "text-secondary-foreground";
-}
 
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
@@ -51,36 +39,19 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
 }
 
 type SidebarPaneProps = {
-  activeNotebookId: string | null;
   activeTags: string[];
   archivedCount: number;
   todoCount: number;
   trashedCount: number;
-  editingNotebookId: string | null;
   availableTags: string[];
-  isCreatingNotebook: boolean;
-  newNotebookName: string;
   noteFilter: NoteFilter;
-  notebooks: NotebookSummary[];
-  onChangeNotebookName(name: string): void;
-  onChangeRenamingNotebookName(name: string): void;
-  onCreateNotebook(): void;
-  onShowCreateNotebook(): void;
-  onHideCreateNotebook(): void;
-  onHideRenameNotebook(): void;
-  onDeleteNotebook(notebookId: string): void;
   onSelectAll(): void;
   onSelectToday(): void;
   onSelectTodo(): void;
-  onSelectNotebook(notebookId: string): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
   onEmptyTrash(): void;
   onToggleTag(tag: string): void;
-  onShowRenameNotebook(notebookId: string): void;
-  onSubmitRenameNotebook(): void;
-  renameNotebookDisabled: boolean;
-  renamingNotebookName: string;
 };
 
 async function showTrashContextMenu(
@@ -91,34 +62,6 @@ async function showTrashContextMenu(
   const menu = await Menu.new({
     items: [
       { id: "empty-trash", text: "Empty Trash", action: () => onEmptyTrash() },
-    ],
-  });
-  try {
-    await menu.popup(new LogicalPosition(event.clientX, event.clientY));
-  } finally {
-    await menu.close();
-  }
-}
-
-async function showNotebookContextMenu(
-  event: MouseEvent<HTMLButtonElement>,
-  notebookId: string,
-  onShowRename: (id: string) => void,
-  onDelete: (id: string) => void,
-) {
-  event.preventDefault();
-  const menu = await Menu.new({
-    items: [
-      {
-        id: `rename-notebook-${notebookId}`,
-        text: "Rename",
-        action: () => onShowRename(notebookId),
-      },
-      {
-        id: `delete-notebook-${notebookId}`,
-        text: "Delete",
-        action: () => onDelete(notebookId),
-      },
     ],
   });
   try {
@@ -152,38 +95,20 @@ function useSyncState() {
   return syncState;
 }
 
-// eslint-disable-next-line sonarjs/cognitive-complexity
 export function SidebarPane({
-  activeNotebookId,
   activeTags,
   archivedCount,
   todoCount,
   trashedCount,
   availableTags,
-  editingNotebookId,
-  isCreatingNotebook,
-  newNotebookName,
   noteFilter,
-  notebooks,
-  onChangeNotebookName,
-  onChangeRenamingNotebookName,
-  onCreateNotebook,
-  onHideCreateNotebook,
-  onHideRenameNotebook,
-  onDeleteNotebook,
   onSelectAll,
   onSelectToday,
   onSelectTodo,
-  onSelectNotebook,
   onSelectArchive,
   onSelectTrash,
   onEmptyTrash,
   onToggleTag,
-  onShowRenameNotebook,
-  onShowCreateNotebook,
-  onSubmitRenameNotebook,
-  renameNotebookDisabled,
-  renamingNotebookName,
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
@@ -193,7 +118,6 @@ export function SidebarPane({
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showFooterBorder, setShowFooterBorder] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
-  const [notebooksOpen, setNotebooksOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const footerSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -201,13 +125,7 @@ export function SidebarPane({
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     setShowHeaderBorder((scrollContainer?.scrollTop ?? 0) > 0);
-  }, [
-    availableTags.length,
-    editingNotebookId,
-    isCreatingNotebook,
-    noteFilter,
-    notebooks.length,
-  ]);
+  }, [availableTags.length, noteFilter]);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -232,28 +150,10 @@ export function SidebarPane({
     return () => {
       observer.disconnect();
     };
-  }, [
-    availableTags.length,
-    editingNotebookId,
-    isCreatingNotebook,
-    noteFilter,
-    notebooks.length,
-  ]);
+  }, [availableTags.length, noteFilter]);
 
   const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
     showTrashContextMenu(event, onEmptyTrash).catch(() => {});
-  };
-
-  const handleNotebookContextMenu = (
-    event: MouseEvent<HTMLButtonElement>,
-    notebookId: string,
-  ) => {
-    showNotebookContextMenu(
-      event,
-      notebookId,
-      onShowRenameNotebook,
-      onDeleteNotebook,
-    ).catch(() => {});
   };
 
   return (
@@ -396,124 +296,6 @@ export function SidebarPane({
           </div>
         </section>
 
-        <section>
-          <button
-            className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
-            onClick={() => {
-              setNotebooksOpen((current) => !current);
-            }}
-            type="button"
-          >
-            <span className="leading-none">Notebooks</span>
-            <ChevronRight
-              className={cn(
-                "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-                notebooksOpen ? "rotate-90" : "rotate-0",
-              )}
-            />
-          </button>
-          <div
-            className={cn(
-              "grid overflow-hidden transition-all duration-200 ease-out",
-              notebooksOpen
-                ? "grid-rows-[1fr] pt-1 opacity-100"
-                : "grid-rows-[0fr] opacity-0",
-            )}
-          >
-            <div className="min-h-0">
-              {isCreatingNotebook ? (
-                <div className="bg-accent/30 flex items-center gap-2 rounded-md px-3 py-1.5">
-                  <BookText className="text-primary mr-1 size-4 shrink-0" />
-                  <input
-                    autoFocus
-                    className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
-                    onBlur={onHideCreateNotebook}
-                    onChange={(event) =>
-                      onChangeNotebookName(event.currentTarget.value)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        onCreateNotebook();
-                      }
-
-                      if (event.key === "Escape") {
-                        onHideCreateNotebook();
-                      }
-                    }}
-                    placeholder="Notebook name"
-                    value={newNotebookName}
-                  />
-                </div>
-              ) : null}
-
-              <div>
-                {notebooks.length > 0
-                  ? notebooks.map((notebook) =>
-                      editingNotebookId === notebook.id ? (
-                        <div
-                          className="bg-accent/30 flex items-center gap-3 rounded-md px-3 py-1.5"
-                          key={notebook.id}
-                        >
-                          <BookText className="text-primary size-4 shrink-0" />
-                          <input
-                            autoFocus
-                            className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
-                            onBlur={onHideRenameNotebook}
-                            onChange={(event) =>
-                              onChangeRenamingNotebookName(
-                                event.currentTarget.value,
-                              )
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                onSubmitRenameNotebook();
-                              }
-
-                              if (event.key === "Escape") {
-                                onHideRenameNotebook();
-                              }
-                            }}
-                            placeholder="Notebook name"
-                            value={renamingNotebookName}
-                          />
-                          <span className="text-muted-foreground text-xs">
-                            {notebook.noteCount}
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          className={cn(
-                            "flex w-full cursor-default items-center justify-between gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
-                            notebookItemStateClass(
-                              noteFilter === "notebook" &&
-                                activeNotebookId === notebook.id,
-                              isFocused,
-                            ),
-                          )}
-                          disabled={renameNotebookDisabled}
-                          key={notebook.id}
-                          onClick={() => onSelectNotebook(notebook.id)}
-                          onContextMenu={(event) =>
-                            handleNotebookContextMenu(event, notebook.id)
-                          }
-                          type="button"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <BookText className="text-primary size-4 shrink-0" />
-                            <span className="truncate">{notebook.name}</span>
-                          </div>
-                          <span className="text-muted-foreground text-xs">
-                            {notebook.noteCount}
-                          </span>
-                        </button>
-                      ),
-                    )
-                  : null}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {availableTags.length > 0 ? (
           <section>
             <button
@@ -568,16 +350,7 @@ export function SidebarPane({
         <div className="h-px shrink-0" ref={footerSentinelRef} />
       </nav>
 
-      <div className={showFooterBorder ? "border-divider border-t" : ""}>
-        <Button
-          className="text-muted-foreground justify-start bg-transparent px-3 hover:bg-transparent"
-          onClick={onShowCreateNotebook}
-          variant="ghost"
-        >
-          <PlusCircleIcon className="size-3.5" />
-          Notebook
-        </Button>
-      </div>
+      {showFooterBorder ? <div className="border-divider border-t" /> : null}
     </aside>
   );
 }

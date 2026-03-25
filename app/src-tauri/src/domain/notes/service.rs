@@ -23,34 +23,8 @@ fn validate_note_id(note_id: &str) -> Result<(), NoteError> {
     Ok(())
 }
 
-fn validate_notebook_id(notebook_id: &str) -> Result<(), NoteError> {
-    if notebook_id.is_empty()
-        || notebook_id.contains('/')
-        || notebook_id.contains('\\')
-        || notebook_id.contains("..")
-    {
-        return Err(NoteError::InvalidNotebookId);
-    }
-    Ok(())
-}
-
-fn normalize_notebook_name(name: &str) -> Result<String, NoteError> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Err(NoteError::EmptyNotebookName);
-    }
-    if trimmed.len() > 80 {
-        return Err(NoteError::NotebookNameTooLong);
-    }
-    Ok(trimmed.to_string())
-}
-
 fn generate_note_id() -> String {
     format!("note-{}", now_millis())
-}
-
-fn generate_notebook_id() -> String {
-    format!("notebook-{}", now_millis())
 }
 
 /// Build the default markdown content for a new note.
@@ -74,7 +48,6 @@ fn default_markdown(tags: &[String]) -> String {
 impl NoteService {
     pub fn bootstrap(repo: &dyn NoteRepository) -> Result<BootstrapPayload, NoteError> {
         let npub = repo.current_npub()?;
-        let notebooks = repo.list_notebooks()?;
 
         let selected_note_id = repo
             .last_open_note_id()?
@@ -85,7 +58,6 @@ impl NoteService {
             repo,
             NoteQueryInput {
                 note_filter: NoteFilterInput::All,
-                active_notebook_id: None,
                 search_query: String::new(),
                 active_tags: Vec::new(),
                 limit: INITIAL_NOTES_PAGE_SIZE,
@@ -99,7 +71,6 @@ impl NoteService {
             repo,
             ContextualTagsInput {
                 note_filter: NoteFilterInput::All,
-                active_notebook_id: None,
             },
         )?;
 
@@ -107,7 +78,6 @@ impl NoteService {
 
         Ok(BootstrapPayload {
             npub,
-            notebooks,
             selected_note_id,
             initial_notes,
             initial_tags,
@@ -139,7 +109,6 @@ impl NoteService {
 
     pub fn create_note(
         repo: &dyn NoteRepository,
-        notebook_id: Option<&str>,
         tags: &[String],
         initial_markdown: Option<&str>,
     ) -> Result<NoteRecord, NoteError> {
@@ -151,7 +120,7 @@ impl NoteService {
         let now = now_millis();
         let extracted_tags = extract_tags(&markdown);
 
-        repo.insert_note(&note_id, &title, &markdown, notebook_id, now)?;
+        repo.insert_note(&note_id, &title, &markdown, now)?;
         repo.upsert_search_document(&note_id, &title, &markdown)?;
         if !extracted_tags.is_empty() {
             repo.replace_tags(&note_id, &markdown)?;
@@ -166,8 +135,8 @@ impl NoteService {
         note_id: &str,
     ) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
-        let (markdown, notebook_id) = repo.note_markdown_and_notebook(note_id)?;
-        Self::create_note(repo, notebook_id.as_deref(), &[], Some(&markdown))
+        let markdown = repo.note_markdown(note_id)?;
+        Self::create_note(repo, &[], Some(&markdown))
     }
 
     /// Returns `(record, content_changed)`.
@@ -295,64 +264,6 @@ impl NoteService {
         Ok(note_ids)
     }
 
-    pub fn create_notebook(
-        repo: &dyn NoteRepository,
-        input: CreateNotebookInput,
-    ) -> Result<NotebookSummary, NoteError> {
-        let name = normalize_notebook_name(&input.name)?;
-        let notebook_id = generate_notebook_id();
-        let now = now_millis();
-        repo.insert_notebook(&notebook_id, &name, now)?;
-        repo.notebook_by_id(&notebook_id)?
-            .ok_or_else(|| NoteError::Storage("Failed to create notebook.".into()))
-    }
-
-    pub fn rename_notebook(
-        repo: &dyn NoteRepository,
-        input: RenameNotebookInput,
-    ) -> Result<NotebookSummary, NoteError> {
-        validate_notebook_id(&input.notebook_id)?;
-        let name = normalize_notebook_name(&input.name)?;
-        let now = now_millis();
-        let updated = repo.rename_notebook(&input.notebook_id, &name, now)?;
-        if updated == 0 {
-            return Err(NoteError::NotebookNotFound);
-        }
-        repo.notebook_by_id(&input.notebook_id)?
-            .ok_or_else(|| NoteError::Storage("Failed to rename notebook.".into()))
-    }
-
-    pub fn delete_notebook(repo: &dyn NoteRepository, notebook_id: &str) -> Result<(), NoteError> {
-        validate_notebook_id(notebook_id)?;
-        let deleted = repo.delete_notebook(notebook_id)?;
-        if deleted == 0 {
-            return Err(NoteError::NotebookNotFound);
-        }
-        Ok(())
-    }
-
-    pub fn assign_notebook(
-        repo: &dyn NoteRepository,
-        input: AssignNoteNotebookInput,
-    ) -> Result<NoteRecord, NoteError> {
-        validate_note_id(&input.note_id)?;
-        if let Some(ref notebook_id) = input.notebook_id {
-            validate_notebook_id(notebook_id)?;
-            if !repo.notebook_exists(notebook_id)? {
-                return Err(NoteError::NotebookNotFound);
-            }
-        }
-
-        let now = now_millis();
-        let updated = repo.assign_notebook(&input.note_id, input.notebook_id.as_deref(), now)?;
-        if updated == 0 {
-            return Err(NoteError::NotFound);
-        }
-
-        repo.set_last_open_note_id(Some(&input.note_id))?;
-        repo.note_by_id(&input.note_id)?.ok_or(NoteError::NotFound)
-    }
-
     pub fn pin_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
@@ -439,46 +350,10 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn normalize_notebook_name_trims_whitespace() {
-        assert_eq!(
-            normalize_notebook_name("  Field Notes  ").unwrap(),
-            "Field Notes"
-        );
-    }
-
-    #[test]
-    fn normalize_notebook_name_rejects_empty() {
-        assert!(matches!(
-            normalize_notebook_name(""),
-            Err(NoteError::EmptyNotebookName)
-        ));
-        assert!(matches!(
-            normalize_notebook_name("   "),
-            Err(NoteError::EmptyNotebookName)
-        ));
-    }
-
-    #[test]
-    fn normalize_notebook_name_rejects_too_long() {
-        let long_name = "a".repeat(81);
-        assert!(matches!(
-            normalize_notebook_name(&long_name),
-            Err(NoteError::NotebookNameTooLong)
-        ));
-    }
-
-    #[test]
-    fn normalize_notebook_name_accepts_max_length() {
-        let name = "a".repeat(80);
-        assert_eq!(normalize_notebook_name(&name).unwrap(), name);
-    }
-
     // ── Mock repository ─────────────────────────────────────────────────
 
     struct MockNoteRepository {
         notes: RefCell<HashMap<String, NoteRecord>>,
-        notebooks: RefCell<HashMap<String, NotebookSummary>>,
         last_open_note_id: RefCell<Option<String>>,
     }
 
@@ -486,25 +361,12 @@ mod tests {
         fn new() -> Self {
             Self {
                 notes: RefCell::new(HashMap::new()),
-                notebooks: RefCell::new(HashMap::new()),
                 last_open_note_id: RefCell::new(None),
             }
         }
 
         fn with_note(self, record: NoteRecord) -> Self {
             self.notes.borrow_mut().insert(record.id.clone(), record);
-            self
-        }
-
-        fn with_notebook(self, id: &str, name: &str) -> Self {
-            self.notebooks.borrow_mut().insert(
-                id.to_string(),
-                NotebookSummary {
-                    id: id.to_string(),
-                    name: name.to_string(),
-                    note_count: 0,
-                },
-            );
             self
         }
     }
@@ -515,8 +377,6 @@ mod tests {
             title: id.to_string(),
             markdown: markdown.to_string(),
             modified_at: 1000,
-            notebook_id: None,
-            notebook_name: None,
             archived_at: None,
             deleted_at: None,
             pinned_at: None,
@@ -554,13 +414,10 @@ mod tests {
                 .map(|n| n.id.clone()))
         }
 
-        fn note_markdown_and_notebook(
-            &self,
-            note_id: &str,
-        ) -> Result<(String, Option<String>), NoteError> {
+        fn note_markdown(&self, note_id: &str) -> Result<String, NoteError> {
             let notes = self.notes.borrow();
             let record = notes.get(note_id).ok_or(NoteError::NotFound)?;
-            Ok((record.markdown.clone(), record.notebook_id.clone()))
+            Ok(record.markdown.clone())
         }
 
         fn insert_note(
@@ -568,7 +425,6 @@ mod tests {
             note_id: &str,
             title: &str,
             markdown: &str,
-            notebook_id: Option<&str>,
             now: i64,
         ) -> Result<(), NoteError> {
             let record = NoteRecord {
@@ -576,8 +432,6 @@ mod tests {
                 title: title.to_string(),
                 markdown: markdown.to_string(),
                 modified_at: now,
-                notebook_id: notebook_id.map(str::to_string),
-                notebook_name: None,
                 archived_at: None,
                 deleted_at: None,
                 pinned_at: None,
@@ -730,22 +584,6 @@ mod tests {
             }
         }
 
-        fn assign_notebook(
-            &self,
-            note_id: &str,
-            notebook_id: Option<&str>,
-            _now: i64,
-        ) -> Result<usize, NoteError> {
-            let mut notes = self.notes.borrow_mut();
-            match notes.get_mut(note_id) {
-                Some(record) => {
-                    record.notebook_id = notebook_id.map(str::to_string);
-                    Ok(1)
-                }
-                None => Ok(0),
-            }
-        }
-
         fn delete_note(&self, note_id: &str) -> Result<usize, NoteError> {
             match self.notes.borrow_mut().remove(note_id) {
                 Some(_) => Ok(1),
@@ -771,55 +609,6 @@ mod tests {
                 .borrow_mut()
                 .retain(|_, n| n.deleted_at.is_none());
             Ok(())
-        }
-
-        // ── Notebook methods ────────────────────────────────────────────
-
-        fn list_notebooks(&self) -> Result<Vec<NotebookSummary>, NoteError> {
-            Ok(self.notebooks.borrow().values().cloned().collect())
-        }
-
-        fn insert_notebook(&self, id: &str, name: &str, _now: i64) -> Result<(), NoteError> {
-            self.notebooks.borrow_mut().insert(
-                id.to_string(),
-                NotebookSummary {
-                    id: id.to_string(),
-                    name: name.to_string(),
-                    note_count: 0,
-                },
-            );
-            Ok(())
-        }
-
-        fn notebook_by_id(&self, notebook_id: &str) -> Result<Option<NotebookSummary>, NoteError> {
-            Ok(self.notebooks.borrow().get(notebook_id).cloned())
-        }
-
-        fn rename_notebook(
-            &self,
-            notebook_id: &str,
-            name: &str,
-            _now: i64,
-        ) -> Result<usize, NoteError> {
-            let mut notebooks = self.notebooks.borrow_mut();
-            match notebooks.get_mut(notebook_id) {
-                Some(nb) => {
-                    nb.name = name.to_string();
-                    Ok(1)
-                }
-                None => Ok(0),
-            }
-        }
-
-        fn delete_notebook(&self, notebook_id: &str) -> Result<usize, NoteError> {
-            match self.notebooks.borrow_mut().remove(notebook_id) {
-                Some(_) => Ok(1),
-                None => Ok(0),
-            }
-        }
-
-        fn notebook_exists(&self, notebook_id: &str) -> Result<bool, NoteError> {
-            Ok(self.notebooks.borrow().contains_key(notebook_id))
         }
 
         // ── Remaining stubs ─────────────────────────────────────────────
@@ -862,32 +651,20 @@ mod tests {
     fn create_note_inserts_and_returns_record() {
         let repo = MockNoteRepository::new();
 
-        let record =
-            NoteService::create_note(&repo, None, &[], None).expect("create_note should succeed");
+        let record = NoteService::create_note(&repo, &[], None).expect("create_note should succeed");
 
         assert!(record.id.starts_with("note-"));
         assert!(record.markdown.starts_with("# "));
         assert!(!record.readonly);
-        assert!(record.notebook_id.is_none());
         // Verify it was stored
         assert!(repo.notes.borrow().contains_key(&record.id));
-    }
-
-    #[test]
-    fn create_note_with_notebook() {
-        let repo = MockNoteRepository::new();
-
-        let record = NoteService::create_note(&repo, Some("nb-1"), &[], None)
-            .expect("create_note should succeed");
-
-        assert_eq!(record.notebook_id.as_deref(), Some("nb-1"));
     }
 
     #[test]
     fn create_note_with_initial_markdown() {
         let repo = MockNoteRepository::new();
 
-        let record = NoteService::create_note(&repo, None, &[], Some("# Imported\n\nContent here"))
+        let record = NoteService::create_note(&repo, &[], Some("# Imported\n\nContent here"))
             .expect("create_note should succeed");
 
         assert_eq!(record.title, "Imported");
@@ -898,7 +675,7 @@ mod tests {
     fn create_note_sets_last_open_note_id() {
         let repo = MockNoteRepository::new();
 
-        let record = NoteService::create_note(&repo, None, &[], None).unwrap();
+        let record = NoteService::create_note(&repo, &[], None).unwrap();
 
         assert_eq!(
             repo.last_open_note_id.borrow().as_deref(),
@@ -915,8 +692,6 @@ mod tests {
             title: "Locked".to_string(),
             markdown: "# Locked".to_string(),
             modified_at: 1000,
-            notebook_id: None,
-            notebook_name: None,
             archived_at: None,
             deleted_at: None,
             pinned_at: None,
@@ -945,8 +720,6 @@ mod tests {
             title: "Original".to_string(),
             markdown: "# Original\n\nOld body".to_string(),
             modified_at: 1000,
-            notebook_id: None,
-            notebook_name: None,
             archived_at: None,
             deleted_at: None,
             pinned_at: None,
@@ -977,8 +750,6 @@ mod tests {
             title: "Same".to_string(),
             markdown: markdown.clone(),
             modified_at: 1000,
-            notebook_id: None,
-            notebook_name: None,
             archived_at: None,
             deleted_at: None,
             pinned_at: None,
@@ -1040,16 +811,13 @@ mod tests {
     // ── duplicate_note ─────────────────────────────────────────────────
 
     #[test]
-    fn duplicate_note_copies_markdown_and_notebook() {
-        let mut note = make_note("orig", "# My Note\n\nBody text");
-        note.notebook_id = Some("nb-1".to_string());
-        let repo = MockNoteRepository::new().with_note(note);
+    fn duplicate_note_copies_markdown() {
+        let repo = MockNoteRepository::new().with_note(make_note("orig", "# My Note\n\nBody text"));
 
         let dup = NoteService::duplicate_note(&repo, "orig").unwrap();
 
         assert_ne!(dup.id, "orig");
         assert_eq!(dup.markdown, "# My Note\n\nBody text");
-        assert_eq!(dup.notebook_id.as_deref(), Some("nb-1"));
     }
 
     // ── archive_note ───────────────────────────────────────────────────
@@ -1191,94 +959,4 @@ mod tests {
         assert!(record.readonly);
     }
 
-    // ── create_notebook ────────────────────────────────────────────────
-
-    #[test]
-    fn create_notebook_returns_summary() {
-        let repo = MockNoteRepository::new();
-
-        let nb = NoteService::create_notebook(
-            &repo,
-            CreateNotebookInput {
-                name: "Work".to_string(),
-            },
-        )
-        .unwrap();
-
-        assert!(nb.id.starts_with("notebook-"));
-        assert_eq!(nb.name, "Work");
-    }
-
-    // ── rename_notebook ────────────────────────────────────────────────
-
-    #[test]
-    fn rename_notebook_updates_name() {
-        let repo = MockNoteRepository::new().with_notebook("nb-1", "Old Name");
-
-        let nb = NoteService::rename_notebook(
-            &repo,
-            RenameNotebookInput {
-                notebook_id: "nb-1".to_string(),
-                name: "New Name".to_string(),
-            },
-        )
-        .unwrap();
-
-        assert_eq!(nb.name, "New Name");
-    }
-
-    // ── delete_notebook ────────────────────────────────────────────────
-
-    #[test]
-    fn delete_notebook_removes_existing() {
-        let repo = MockNoteRepository::new().with_notebook("nb-1", "Doomed");
-
-        NoteService::delete_notebook(&repo, "nb-1").unwrap();
-
-        assert!(repo.notebooks.borrow().get("nb-1").is_none());
-    }
-
-    #[test]
-    fn delete_notebook_not_found() {
-        let repo = MockNoteRepository::new();
-
-        let result = NoteService::delete_notebook(&repo, "nb-missing");
-
-        assert!(matches!(result, Err(NoteError::NotebookNotFound)));
-    }
-
-    // ── assign_notebook ────────────────────────────────────────────────
-
-    #[test]
-    fn assign_notebook_sets_notebook_id() {
-        let repo = MockNoteRepository::new()
-            .with_note(make_note("n1", "# Note"))
-            .with_notebook("nb-1", "Work");
-
-        let record = NoteService::assign_notebook(
-            &repo,
-            AssignNoteNotebookInput {
-                note_id: "n1".to_string(),
-                notebook_id: Some("nb-1".to_string()),
-            },
-        )
-        .unwrap();
-
-        assert_eq!(record.notebook_id.as_deref(), Some("nb-1"));
-    }
-
-    #[test]
-    fn assign_notebook_not_found() {
-        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Note"));
-
-        let result = NoteService::assign_notebook(
-            &repo,
-            AssignNoteNotebookInput {
-                note_id: "n1".to_string(),
-                notebook_id: Some("nb-missing".to_string()),
-            },
-        );
-
-        assert!(matches!(result, Err(NoteError::NotebookNotFound)));
-    }
 }

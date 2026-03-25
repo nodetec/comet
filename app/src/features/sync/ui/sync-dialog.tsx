@@ -12,7 +12,6 @@ import {
   HardDrive,
   Image,
   Key,
-  Notebook,
   ScrollText,
   X,
 } from "lucide-react";
@@ -37,9 +36,7 @@ type SyncInfo = {
   blossomUrl: string | null;
   npub: string | null;
   syncedNotes: number;
-  syncedNotebooks: number;
   pendingNotes: number;
-  pendingNotebooks: number;
   totalNotes: number;
   checkpointSeq: number | null;
   blobsStored: number;
@@ -163,20 +160,12 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
         value={`${info.syncedNotes} / ${info.totalNotes}`}
       />
 
-      <InfoRow
-        icon={<Notebook className="size-3.5" />}
-        label="Notebooks synced"
-        value={info.syncedNotebooks}
-      />
-
-      {info.pendingNotes + info.pendingNotebooks > 0 ? (
+      {info.pendingNotes > 0 ? (
         <InfoRow
           icon={<CloudSync className="size-3.5" />}
           label="Pending sync"
           value={
-            <span className="text-amber-400">
-              {info.pendingNotes + info.pendingNotebooks} unsynced
-            </span>
+            <span className="text-amber-400">{info.pendingNotes} unsynced</span>
           }
         />
       ) : null}

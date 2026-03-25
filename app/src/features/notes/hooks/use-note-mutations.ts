@@ -4,7 +4,6 @@ import { type QueryClient, useMutation } from "@tanstack/react-query";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import {
   archiveNote,
-  assignNoteNotebook,
   createNote,
   deleteNotePermanently,
   duplicateNote,
@@ -28,7 +27,6 @@ export interface NoteMutationDeps {
   draftNoteId: string | null;
   draftMarkdown: string;
   noteFilter: NoteFilter;
-  activeNotebookId: string | null;
   activeNpub: string | null;
   isSavingRef: RefObject<boolean>;
   setSelectedNoteId: (id: string | null) => void;
@@ -46,7 +44,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     selectedNoteId,
     draftNoteId,
     noteFilter,
-    activeNotebookId,
     activeNpub,
     isSavingRef,
     setSelectedNoteId,
@@ -237,30 +234,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     onError: toastErrorHandler("Couldn't empty trash", "empty-trash-error"),
   });
 
-  const assignNoteNotebookMutation = useMutation({
-    mutationFn: assignNoteNotebook,
-    onSuccess: (updatedNote) => {
-      queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-
-      if (
-        selectedNoteId === updatedNote.id &&
-        noteFilter === "notebook" &&
-        activeNotebookId &&
-        updatedNote.notebook?.id !== activeNotebookId
-      ) {
-        setSelectedNoteId(
-          nextSelectedNoteIdAfterRemoval(currentNotes, updatedNote.id),
-        );
-      }
-
-      void invalidateShellData();
-    },
-    onError: toastErrorHandler(
-      "Couldn't move note",
-      "assign-note-notebook-error",
-    ),
-  });
-
   const pinNoteMutation = useMutation({
     mutationFn: pinNote,
     onSuccess: (updatedNote) => {
@@ -302,7 +275,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     restoreFromTrashMutation,
     deleteNotePermanentlyMutation,
     emptyTrashMutation,
-    assignNoteNotebookMutation,
     pinNoteMutation,
     unpinNoteMutation,
     setNoteReadonlyMutation,

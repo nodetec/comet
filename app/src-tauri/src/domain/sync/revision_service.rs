@@ -24,18 +24,6 @@ pub struct PendingNoteRevision {
     pub op: String,
 }
 
-pub struct PendingNotebookRevision {
-    pub notebook_id: String,
-    pub recipient: String,
-    pub document_coord: String,
-    pub revision_id: String,
-    pub parent_revision_ids: Vec<String>,
-    pub mtime: i64,
-    pub tags: Vec<Tag>,
-    pub rumor: UnsignedEvent,
-    pub op: String,
-}
-
 pub struct PendingDeletionRevision {
     pub recipient: String,
     pub document_coord: String,
@@ -77,7 +65,6 @@ pub fn build_pending_note_revision(
     let row: Option<(
         String,
         String,
-        Option<String>,
         i64,
         i64,
         Option<i64>,
@@ -88,7 +75,7 @@ pub fn build_pending_note_revision(
         Option<i64>,
     )> = conn
         .query_row(
-            "SELECT title, markdown, notebook_id, created_at, modified_at, edited_at, archived_at, deleted_at, readonly, current_rev, pinned_at
+            "SELECT title, markdown, created_at, modified_at, edited_at, archived_at, deleted_at, readonly, current_rev, pinned_at
              FROM notes
              WHERE id = ?1",
             params![note_id],
@@ -101,10 +88,9 @@ pub fn build_pending_note_revision(
                     row.get(4)?,
                     row.get(5)?,
                     row.get(6)?,
-                    row.get(7)?,
-                    row.get::<_, i64>(8)? != 0,
+                    row.get::<_, i64>(7)? != 0,
+                    row.get(8)?,
                     row.get(9)?,
-                    row.get(10)?,
                 ))
             },
         )
@@ -113,7 +99,6 @@ pub fn build_pending_note_revision(
     let (
         title,
         markdown,
-        notebook_id,
         created_at,
         modified_at,
         edited_at,
@@ -192,7 +177,6 @@ pub fn build_pending_note_revision(
         "note",
         &title,
         &markdown,
-        notebook_id.as_deref(),
         created_at,
         modified_at,
         edited_at,
@@ -209,7 +193,6 @@ pub fn build_pending_note_revision(
             document_id: note_id,
             title: &title,
             markdown: &markdown,
-            notebook_id: notebook_id.as_deref(),
             created_at,
             modified_at,
             edited_at,
@@ -300,127 +283,6 @@ pub fn persist_local_note_revision(
     Ok(())
 }
 
-pub fn build_pending_notebook_revision(
-    conn: &Connection,
-    keys: &Keys,
-    recipient: &PublicKey,
-    notebook_id: &str,
-) -> Result<PendingNotebookRevision, AppError> {
-    let row: Option<(String, i64, Option<String>)> = conn
-        .query_row(
-            "SELECT name, updated_at, current_rev FROM notebooks WHERE id = ?1",
-            params![notebook_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .optional()?;
-
-    let (name, updated_at, current_rev) =
-        row.ok_or_else(|| AppError::custom(format!("Notebook not found: {notebook_id}")))?;
-
-    let recipient_hex = recipient.to_hex();
-    let document_coord =
-        compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
-    let parent_revision_ids =
-        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
-
-    let canonical_payload = serde_json::to_string(&serde_json::json!({
-        "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-        "recipient": recipient_hex,
-        "d": document_coord,
-        "parents": parent_revision_ids.clone(),
-        "op": "put",
-        "type": "notebook",
-        "name": name,
-        "updated_at": updated_at,
-        "schema_version": crate::domain::sync::revision_codec::REVISION_SYNC_SCHEMA_VERSION,
-    }))
-    .map_err(|e| {
-        AppError::custom(format!(
-            "Failed to canonicalize notebook revision payload: {e}"
-        ))
-    })?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
-
-    let rumor = crate::domain::sync::event_codec::notebook_to_rumor(
-        notebook_id,
-        &name,
-        updated_at,
-        keys.public_key(),
-    );
-
-    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-        recipient: recipient_hex.clone(),
-        document_coord: document_coord.clone(),
-        revision_id: revision_id.clone(),
-        parent_revision_ids: parent_revision_ids.clone(),
-        op: "put".to_string(),
-        mtime: updated_at,
-        entity_type: None,
-        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-    });
-
-    Ok(PendingNotebookRevision {
-        notebook_id: notebook_id.to_string(),
-        recipient: recipient_hex,
-        document_coord,
-        revision_id,
-        parent_revision_ids,
-        mtime: updated_at,
-        tags,
-        rumor,
-        op: "put".to_string(),
-    })
-}
-
-pub fn persist_local_notebook_revision(
-    conn: &Connection,
-    revision: &PendingNotebookRevision,
-) -> Result<(), AppError> {
-    upsert_sync_revision(
-        conn,
-        &LocalSyncRevision {
-            recipient: revision.recipient.clone(),
-            d_tag: revision.document_coord.clone(),
-            rev: revision.revision_id.clone(),
-            op: revision.op.clone(),
-            mtime: revision.mtime,
-            entity_type: Some("notebook".to_string()),
-            payload_event_id: None,
-            payload_retained: true,
-            relay_url: None,
-            stored_seq: None,
-            created_at: revision.mtime,
-        },
-    )?;
-
-    replace_sync_revision_parents(
-        conn,
-        &revision.recipient,
-        &revision.document_coord,
-        &revision.revision_id,
-        &revision.parent_revision_ids,
-    )?;
-
-    apply_sync_head_update(
-        conn,
-        &revision.recipient,
-        &revision.document_coord,
-        &revision.revision_id,
-        &revision.op,
-        revision.mtime,
-        &revision.parent_revision_ids,
-    )?;
-
-    // `current_rev` records the revision currently applied to the notebook row.
-    // It is not a substitute for the graph head set in `sync_heads`.
-    conn.execute(
-        "UPDATE notebooks SET current_rev = ?1 WHERE id = ?2",
-        params![revision.revision_id, revision.notebook_id],
-    )?;
-
-    Ok(())
-}
-
 pub fn build_pending_note_deletion_revision(
     conn: &Connection,
     keys: &Keys,
@@ -475,69 +337,6 @@ pub fn build_pending_note_deletion_revision(
         rumor,
         op: "del".to_string(),
         entity_type: "note".to_string(),
-    })
-}
-
-pub fn build_pending_notebook_deletion_revision(
-    conn: &Connection,
-    keys: &Keys,
-    recipient: &PublicKey,
-    notebook_id: &str,
-    now: i64,
-) -> Result<PendingDeletionRevision, AppError> {
-    let current_rev: Option<String> = conn
-        .query_row(
-            "SELECT current_rev FROM notebooks WHERE id = ?1",
-            params![notebook_id],
-            |row| row.get(0),
-        )
-        .optional()?
-        .flatten();
-    let recipient_hex = recipient.to_hex();
-    let document_coord =
-        compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
-    let parent_revision_ids =
-        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
-    let canonical_payload = serde_json::to_string(&serde_json::json!({
-        "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-        "recipient": recipient_hex,
-        "d": document_coord,
-        "parents": parent_revision_ids.clone(),
-        "op": "del",
-        "type": "notebook",
-        "entity_id": notebook_id,
-        "mtime": now,
-        "schema_version": crate::domain::sync::revision_codec::REVISION_SYNC_SCHEMA_VERSION,
-    }))
-    .map_err(|e| {
-        AppError::custom(format!(
-            "Failed to canonicalize notebook deletion payload: {e}"
-        ))
-    })?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
-    let rumor =
-        crate::domain::sync::event_codec::deleted_notebook_rumor(notebook_id, keys.public_key());
-    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-        recipient: recipient_hex.clone(),
-        document_coord: document_coord.clone(),
-        revision_id: revision_id.clone(),
-        parent_revision_ids: parent_revision_ids.clone(),
-        op: "del".to_string(),
-        mtime: now,
-        entity_type: None,
-        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-    });
-
-    Ok(PendingDeletionRevision {
-        recipient: recipient_hex,
-        document_coord,
-        revision_id,
-        parent_revision_ids,
-        mtime: now,
-        tags,
-        rumor,
-        op: "del".to_string(),
-        entity_type: "notebook".to_string(),
     })
 }
 
@@ -685,26 +484,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(current_rev, Some(revision.revision_id.clone()));
-    }
-
-    #[test]
-    fn builds_notebook_revision() {
-        let conn = setup_db();
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
-             VALUES ('notebook-1', 'Notebook', 100, 200, 1)",
-            [],
-        )
-        .unwrap();
-        let keys = Keys::generate();
-        let recipient = Keys::generate().public_key();
-
-        let revision =
-            build_pending_notebook_revision(&conn, &keys, &recipient, "notebook-1").unwrap();
-
-        assert_eq!(revision.notebook_id, "notebook-1");
-        assert_eq!(revision.recipient, recipient.to_hex());
-        assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "r"));
     }
 
     #[test]

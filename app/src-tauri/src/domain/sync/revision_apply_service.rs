@@ -3,14 +3,10 @@ use crate::adapters::sqlite::revision_sync_repository::{
     replace_sync_revision_parents, upsert_sync_relay_state, upsert_sync_revision,
     LocalSyncRevision,
 };
-use crate::domain::sync::event_codec::{
-    is_notebook_rumor, rumor_to_synced_note, rumor_to_synced_notebook,
-};
+use crate::domain::sync::event_codec::rumor_to_synced_note;
 use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
 use crate::domain::sync::model::SyncChangePayload;
-use crate::domain::sync::service::{
-    delete_note_from_sync, delete_notebook_from_sync, upsert_from_sync, upsert_notebook_from_sync,
-};
+use crate::domain::sync::service::{delete_note_from_sync, upsert_from_sync};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -55,7 +51,6 @@ pub fn apply_remote_revision_event(
             .and_then(|tag| tag.content())
             .ok_or_else(|| AppError::custom("Missing d tag in deletion revision rumor"))?
             .to_string();
-        let is_notebook = is_notebook_rumor(&unwrapped.rumor);
 
         upsert_sync_revision(
             conn,
@@ -98,63 +93,12 @@ pub fn apply_remote_revision_event(
         if has_content_head {
             None
         } else {
-            if is_notebook {
-                delete_notebook_from_sync(conn, &entity_id)?;
-            } else {
-                delete_note_from_sync(conn, &entity_id, |note_id| invalidate_cache(note_id))?;
-            }
+            delete_note_from_sync(conn, &entity_id, |note_id| invalidate_cache(note_id))?;
             Some(SyncChangePayload {
                 note_id: entity_id,
                 action: "delete".to_string(),
             })
         }
-    } else if is_notebook_rumor(&unwrapped.rumor) {
-        let notebook = rumor_to_synced_notebook(&unwrapped.rumor)?;
-        validate_revision_payload_mtime(meta.mtime, notebook.updated_at, "notebook")?;
-        upsert_notebook_from_sync(conn, &notebook, &event.id.to_hex())?;
-
-        upsert_sync_revision(
-            conn,
-            &LocalSyncRevision {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-                entity_type: meta.entity_type.clone(),
-                payload_event_id: Some(event.id.to_hex()),
-                payload_retained: true,
-                relay_url: Some(relay_url.to_string()),
-                stored_seq,
-                created_at: event.created_at.as_secs() as i64,
-            },
-        )?;
-        replace_sync_revision_parents(
-            conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.parent_revision_ids,
-        )?;
-        // `sync_heads` tracks the full graph head set; `current_rev` below
-        // records which single revision this notebook row is materialized from.
-        apply_sync_head_update(
-            conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.op,
-            meta.mtime,
-            &meta.parent_revision_ids,
-        )?;
-        conn.execute(
-            "UPDATE notebooks SET current_rev = ?1 WHERE id = ?2",
-            params![meta.revision_id, notebook.id],
-        )?;
-        Some(SyncChangePayload {
-            note_id: notebook.id,
-            action: "upsert".to_string(),
-        })
     } else {
         if let Some(ref blossom_url) = preferred_blossom_url {
             let pubkey_hex = keys.public_key().to_hex();
@@ -248,7 +192,7 @@ pub fn apply_remote_revision_event(
 mod tests {
     use super::*;
     use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::domain::sync::event_codec::{deleted_note_rumor, deleted_notebook_rumor};
+    use crate::domain::sync::event_codec::deleted_note_rumor;
     use crate::domain::sync::revision_codec::{
         build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
         compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
@@ -277,7 +221,6 @@ mod tests {
             "note",
             "Title",
             "# Title\n\nBody",
-            None,
             100,
             200,
             200,
@@ -294,7 +237,6 @@ mod tests {
                 document_id: note_id,
                 title: "Title",
                 markdown: "# Title\n\nBody",
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,
@@ -364,7 +306,6 @@ mod tests {
             "note",
             "Title",
             "# Title\n\nBody",
-            None,
             100,
             200,
             200,
@@ -381,7 +322,6 @@ mod tests {
                 document_id: note_id,
                 title: "Title",
                 markdown: "# Title\n\nBody",
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,
@@ -448,7 +388,6 @@ mod tests {
             "note",
             "Title",
             &markdown,
-            None,
             100,
             200,
             200,
@@ -465,7 +404,6 @@ mod tests {
                 document_id: note_id,
                 title: "Title",
                 markdown: &markdown,
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,
@@ -542,7 +480,6 @@ mod tests {
             "note",
             "Title",
             "# Title\n\nBody",
-            None,
             100,
             200,
             200,
@@ -559,7 +496,6 @@ mod tests {
                 document_id: note_id,
                 title: "Title",
                 markdown: "# Title\n\nBody",
-                notebook_id: None,
                 created_at: 100,
                 modified_at: 200,
                 edited_at: 200,
@@ -600,62 +536,6 @@ mod tests {
             error
                 .to_string()
                 .contains("Revision timestamp mismatch for note"),
-            "unexpected error: {error}"
-        );
-    }
-
-    #[test]
-    fn rejects_notebook_revision_when_outer_m_differs_from_inner_updated_at() {
-        let conn = setup_db();
-        let keys = Keys::generate();
-        let recipient = keys.public_key();
-        let notebook_id = "notebook-1";
-        let document_coord =
-            compute_document_coord(keys.secret_key(), &format!("notebook:{notebook_id}"));
-        let canonical_payload = serde_json::to_string(&serde_json::json!({
-            "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-            "recipient": recipient.to_hex(),
-            "d": document_coord,
-            "parents": [],
-            "op": "put",
-            "type": "notebook",
-            "name": "Notebook",
-            "updated_at": 200,
-            "schema_version": REVISION_SYNC_SCHEMA_VERSION,
-        }))
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let rumor = crate::domain::sync::event_codec::notebook_to_rumor(
-            notebook_id,
-            "Notebook",
-            200,
-            keys.public_key(),
-        );
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
-                revision_id,
-                parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 201,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
-
-        let error =
-            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
-                .unwrap_err();
-
-        assert!(
-            error
-                .to_string()
-                .contains("Revision timestamp mismatch for notebook"),
             "unexpected error: {error}"
         );
     }
@@ -734,71 +614,4 @@ mod tests {
         assert_eq!(head_op, "del");
     }
 
-    #[test]
-    fn applies_remote_notebook_deletion_revision() {
-        let conn = setup_db();
-        conn.execute(
-            "INSERT INTO notebooks (id, name, created_at, updated_at)
-             VALUES ('notebook-1', 'Notebook', 100, 200)",
-            [],
-        )
-        .unwrap();
-
-        let keys = Keys::generate();
-        let recipient = keys.public_key();
-        let document_coord = compute_document_coord(keys.secret_key(), "notebook:notebook-1");
-        let canonical_payload = serde_json::to_string(&serde_json::json!({
-            "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-            "recipient": recipient.to_hex(),
-            "d": document_coord,
-            "parents": [],
-            "op": "del",
-            "type": "notebook",
-            "entity_id": "notebook-1",
-            "mtime": 300,
-            "schema_version": REVISION_SYNC_SCHEMA_VERSION,
-        }))
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            deleted_notebook_rumor("notebook-1", keys.public_key()),
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
-                revision_id: revision_id.clone(),
-                parent_revision_ids: vec![],
-                op: "del".into(),
-                mtime: 300,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
-
-        apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(9), |_| {})
-            .unwrap();
-
-        let remaining: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM notebooks WHERE id = 'notebook-1'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(remaining, 0);
-
-        let head_op: String = conn
-            .query_row(
-                "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
-                params![
-                    recipient.to_hex(),
-                    compute_document_coord(keys.secret_key(), "notebook:notebook-1")
-                ],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(head_op, "del");
-    }
 }
