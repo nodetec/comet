@@ -7,7 +7,14 @@ import {
   PredefinedMenuItem,
   Submenu,
 } from "@tauri-apps/api/menu";
-import { ChevronDown, PenBoxIcon, Pin, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  GitMergeConflict,
+  PenBoxIcon,
+  Pin,
+  Search,
+  X,
+} from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
 import {
   Fragment,
@@ -398,6 +405,146 @@ const HighlightedText = memo(function HighlightedText({
   return <>{parts}</>;
 });
 
+type NoteRowProps = {
+  focusedPane: "sidebar" | "notes" | "editor";
+  highlightWords: string[];
+  isJustCreated: boolean;
+  isMutatingNote: boolean;
+  isNextActive: boolean;
+  isSearchFocused: boolean;
+  note: NoteSummary;
+  onContextMenu(event: MouseEvent<HTMLButtonElement>, note: NoteSummary): void;
+  onSelectNote(noteId: string): void;
+  searchWords: string[];
+  selectedNoteId: string | null;
+  setSlideInNoteId(noteId: string | null): void;
+  shouldSkipAnimation: boolean;
+};
+
+function noteCardPreview(note: NoteSummary, searchWords: string[]) {
+  const fallback = note.title ? "" : "No content yet";
+  if (searchWords.length > 0) {
+    return note.searchSnippet || note.preview || fallback;
+  }
+  return note.preview || fallback;
+}
+
+function noteRowClassName(params: {
+  focusedPane: "sidebar" | "notes" | "editor";
+  isActive: boolean;
+  isSearchFocused: boolean;
+}) {
+  const { focusedPane, isActive, isSearchFocused } = params;
+  return [
+    "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
+    isActive ? "bg-accent/50" : "",
+    isActive && focusedPane === "notes" && !isSearchFocused
+      ? "before:bg-primary/60 before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
+      : "",
+  ].join(" ");
+}
+
+const NoteRow = memo(function NoteRow({
+  focusedPane,
+  highlightWords,
+  isJustCreated,
+  isMutatingNote,
+  isNextActive,
+  isSearchFocused,
+  note,
+  onContextMenu,
+  onSelectNote,
+  searchWords,
+  selectedNoteId,
+  setSlideInNoteId,
+  shouldSkipAnimation,
+}: NoteRowProps) {
+  const isActive = note.id === selectedNoteId;
+  const cardPreview = noteCardPreview(note, searchWords);
+
+  return (
+    <motion.div
+      layout="position"
+      transition={{
+        layout: {
+          duration: shouldSkipAnimation ? 0 : 0.2,
+          ease: "easeInOut",
+        },
+      }}
+      className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
+      key={note.id}
+      onAnimationEnd={() => {
+        if (isJustCreated) setSlideInNoteId(null);
+      }}
+    >
+      <button
+        className={noteRowClassName({
+          focusedPane,
+          isActive,
+          isSearchFocused,
+        })}
+        onClick={() => onSelectNote(note.id)}
+        onContextMenu={(event) => onContextMenu(event, note)}
+        onMouseDown={(event) => {
+          if (event.button === 2) {
+            event.preventDefault();
+          }
+        }}
+        disabled={isMutatingNote}
+        type="button"
+      >
+        <div className="flex w-full flex-1 flex-col gap-1.5">
+          {note.title || !note.preview ? (
+            <h3
+              className={`min-w-0 truncate font-semibold ${note.title ? "text-[var(--heading-color)]" : "text-muted-foreground"}`}
+            >
+              <HighlightedText
+                highlightWords={highlightWords}
+                text={note.title || "Untitled"}
+              />
+            </h3>
+          ) : null}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p
+              className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title || !note.preview ? "line-clamp-2" : "line-clamp-3"}`}
+            >
+              <HighlightedText
+                highlightWords={highlightWords}
+                text={cardPreview}
+              />
+            </p>
+          </div>
+          <div className="flex w-full items-center gap-1.5">
+            {note.pinnedAt ? (
+              <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+            ) : null}
+            {note.hasConflict ? (
+              <GitMergeConflict className="text-primary/80 size-3 shrink-0" />
+            ) : null}
+            <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
+              {Date.now() - note.editedAt < 60_000
+                ? "just now"
+                : formatDistanceToNow(new Date(note.editedAt), {
+                    addSuffix: true,
+                  }).replace(/^about /, "")}
+            </span>
+            {note.notebook ? (
+              <span className="text-primary ml-auto min-w-0 truncate text-xs">
+                {note.notebook.name}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </button>
+      <div className="w-full px-[0.30rem]">
+        <div
+          className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`}
+        />
+      </div>
+    </motion.div>
+  );
+});
+
 export function NotesPane({
   activeNotebook,
   activeTags,
@@ -661,99 +808,27 @@ export function NotesPane({
             <div className="space-y-0 px-3">
               <LayoutGroup key={viewKey}>
                 {filteredNotes.map((note, index) => {
-                  const isActive = note.id === selectedNoteId;
                   const isNextActive =
                     filteredNotes[index + 1]?.id === selectedNoteId;
                   const isJustCreated = note.id === slideInNoteId;
-                  const fallback = note.title ? "" : "No content yet";
-                  const cardPreview =
-                    searchWords.length > 0
-                      ? note.searchSnippet || note.preview || fallback
-                      : note.preview || fallback;
 
                   return (
-                    <motion.div
-                      layout="position"
-                      transition={{
-                        layout: {
-                          duration: shouldSkipAnimation ? 0 : 0.2,
-                          ease: "easeInOut",
-                        },
-                      }}
-                      className={`flex w-full flex-col items-center ${isJustCreated ? "animate-slide-in-left" : ""}`}
+                    <NoteRow
+                      focusedPane={focusedPane}
+                      highlightWords={highlightWords}
+                      isJustCreated={isJustCreated}
+                      isMutatingNote={isMutatingNote}
+                      isNextActive={isNextActive}
+                      isSearchFocused={isSearchFocused}
                       key={note.id}
-                      onAnimationEnd={() => {
-                        if (isJustCreated) setSlideInNoteId(null);
-                      }}
-                    >
-                      <button
-                        className={[
-                          "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
-                          isActive ? "bg-accent/50" : "",
-                          isActive &&
-                          focusedPane === "notes" &&
-                          !isSearchFocused
-                            ? "before:bg-primary/60 before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
-                            : "",
-                        ].join(" ")}
-                        onClick={() => onSelectNote(note.id)}
-                        onContextMenu={(event) =>
-                          handleNoteContextMenu(event, note)
-                        }
-                        onMouseDown={(event) => {
-                          if (event.button === 2) {
-                            event.preventDefault();
-                          }
-                        }}
-                        disabled={isMutatingNote}
-                        type="button"
-                      >
-                        <div className="flex w-full flex-1 flex-col gap-1.5">
-                          {note.title || !note.preview ? (
-                            <h3
-                              className={`min-w-0 truncate font-semibold ${note.title ? "text-[var(--heading-color)]" : "text-muted-foreground"}`}
-                            >
-                              <HighlightedText
-                                highlightWords={highlightWords}
-                                text={note.title || "Untitled"}
-                              />
-                            </h3>
-                          ) : null}
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <p
-                              className={`text-muted-foreground text-sm break-all whitespace-break-spaces ${note.title || !note.preview ? "line-clamp-2" : "line-clamp-3"}`}
-                            >
-                              <HighlightedText
-                                highlightWords={highlightWords}
-                                text={cardPreview}
-                              />
-                            </p>
-                          </div>
-                          <div className="flex w-full items-center gap-1.5">
-                            {note.pinnedAt ? (
-                              <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
-                            ) : null}
-                            <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
-                              {Date.now() - note.editedAt < 60_000
-                                ? "just now"
-                                : formatDistanceToNow(new Date(note.editedAt), {
-                                    addSuffix: true,
-                                  }).replace(/^about /, "")}
-                            </span>
-                            {note.notebook ? (
-                              <span className="text-primary ml-auto min-w-0 truncate text-xs">
-                                {note.notebook.name}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </button>
-                      <div className="w-full px-[0.30rem]">
-                        <div
-                          className={`h-px w-full ${isActive || isNextActive ? "bg-transparent" : "bg-accent/35"}`}
-                        />
-                      </div>
-                    </motion.div>
+                      note={note}
+                      onContextMenu={handleNoteContextMenu}
+                      onSelectNote={onSelectNote}
+                      searchWords={searchWords}
+                      selectedNoteId={selectedNoteId}
+                      setSlideInNoteId={setSlideInNoteId}
+                      shouldSkipAnimation={shouldSkipAnimation}
+                    />
                   );
                 })}
               </LayoutGroup>

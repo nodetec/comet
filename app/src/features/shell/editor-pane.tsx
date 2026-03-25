@@ -7,6 +7,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
+import { format } from "date-fns";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
@@ -16,6 +17,8 @@ import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 import { buildNotebookSubmenu } from "./notebook-submenu";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Ellipsis,
   Lock,
@@ -59,6 +62,7 @@ type EditorPaneProps = {
   publishedAt: number | null;
   publishedKind: number | null;
   readonly: boolean;
+  selectedConflictRevisionId: string | null;
   searchQuery: string;
   onAssignNotebook(notebookId: string | null): void;
   onDeletePublishedNote(): void;
@@ -68,7 +72,7 @@ type EditorPaneProps = {
   onResolveConflict(): void;
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
-  onLoadConflictHead(markdown: string): void;
+  onLoadConflictHead(revisionId: string, markdown: string | null): void;
   onFocusHandled(): void;
   onChange(markdown: string): void;
 };
@@ -172,6 +176,10 @@ function firstLineH1Title(markdown: string) {
   const [firstLine = ""] = markdown.split("\n", 1);
   const match = H1_TITLE_RE.exec(firstLine);
   return match?.[1] ?? null;
+}
+
+function formatConflictHeadTimestamp(mtime: number) {
+  return format(mtime, "MMM d, yyyy 'at' h:mm a");
 }
 
 function useEditorScrollHeader(
@@ -374,6 +382,7 @@ export function EditorPane({
   publishedAt,
   publishedKind,
   readonly,
+  selectedConflictRevisionId,
   searchQuery,
   onAssignNotebook,
   onDeletePublishedNote,
@@ -410,6 +419,45 @@ export function EditorPane({
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.headCount ?? 0) > 1;
   const isReadOnly = readonly || isSystemReadOnly || hasConflict;
+  const viewableConflictHeads =
+    noteConflict?.heads.filter(
+      (head) => head.op === "del" || Boolean(head.markdown),
+    ) ?? [];
+  const viewedConflictHeadIndex = (() => {
+    if (viewableConflictHeads.length === 0) {
+      return -1;
+    }
+
+    const selectedRevisionIndex = viewableConflictHeads.findIndex(
+      (head) => head.revisionId === selectedConflictRevisionId,
+    );
+    if (selectedRevisionIndex !== -1) {
+      return selectedRevisionIndex;
+    }
+
+    const currentHeadIndex = viewableConflictHeads.findIndex(
+      (head) => head.isCurrent,
+    );
+    if (currentHeadIndex !== -1) {
+      return currentHeadIndex;
+    }
+
+    return 0;
+  })();
+  const viewedConflictHead =
+    viewedConflictHeadIndex >= 0
+      ? viewableConflictHeads[viewedConflictHeadIndex]
+      : null;
+  const isViewingDeletedConflictHead = viewedConflictHead?.op === "del";
+  const conflictPrimaryActionVariant = isViewingDeletedConflictHead
+    ? "destructive"
+    : "default";
+  const conflictPrimaryActionLabel = isViewingDeletedConflictHead
+    ? "Delete note"
+    : "Choose";
+  const conflictPrimaryActionPendingLabel = isViewingDeletedConflictHead
+    ? "Deleting…"
+    : "Choosing…";
 
   const find = useFindBar({ noteId, searchQuery, editorRef, setFocusedPane });
   const {
@@ -617,28 +665,10 @@ export function EditorPane({
 
       {noteId && hasConflict ? (
         <div className="border-primary/20 bg-primary/10 sticky top-0 z-30 border-b px-4 py-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                Conflicting revisions detected
-              </p>
-              <p className="text-secondary-foreground/80 mt-1 text-xs">
-                This note has {noteConflict?.headCount} competing revisions.
-                Switch between them in the footer, choose the version you want
-                to keep in the editor, then resolve the conflict.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={onResolveConflict}
-                className="shadow-none"
-                size="sm"
-                variant="default"
-                disabled={isResolveConflictPending || readonly}
-              >
-                {isResolveConflictPending ? "Resolving…" : "Resolve conflict"}
-              </Button>
-            </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              Conflicting revisions detected
+            </p>
           </div>
         </div>
       ) : null}
@@ -744,35 +774,49 @@ export function EditorPane({
         >
           {noteId ? (
             <div className="relative flex min-h-full w-full flex-col">
-              <NoteEditor
-                devtoolsContainer={devtoolsContainer}
-                focusMode={focusMode}
-                html={html}
-                isNew={isNewNote}
-                loadKey={editorKey ?? noteId}
-                markdown={markdown}
-                onChange={onChange}
-                onEditorFocusChange={(focused) => {
-                  if (focused) {
-                    setFocusedPane("editor");
+              {isViewingDeletedConflictHead ? (
+                <div className="flex min-h-full items-center justify-center px-6">
+                  <div className="max-w-sm text-center">
+                    <p className="text-foreground text-sm font-medium">
+                      This version deletes the note
+                    </p>
+                    <p className="text-muted-foreground mt-2 text-sm">
+                      Choose Delete note to apply this version and remove the
+                      note from sync.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <NoteEditor
+                  devtoolsContainer={devtoolsContainer}
+                  focusMode={focusMode}
+                  html={html}
+                  isNew={isNewNote}
+                  loadKey={editorKey ?? noteId}
+                  markdown={markdown}
+                  onChange={onChange}
+                  onEditorFocusChange={(focused) => {
+                    if (focused) {
+                      setFocusedPane("editor");
+                    }
+                  }}
+                  onFocusHandled={onFocusHandled}
+                  onSearchMatchCountChange={
+                    isUsingEditorFindSearch ? setFindMatchCount : undefined
                   }
-                }}
-                onFocusHandled={onFocusHandled}
-                onSearchMatchCountChange={
-                  isUsingEditorFindSearch ? setFindMatchCount : undefined
-                }
-                readOnly={isReadOnly}
-                ref={editorRef}
-                searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
-                searchActiveMatchIndex={
-                  isUsingEditorFindSearch ? activeFindMatchIndex : null
-                }
-                searchQuery={editorSearchQuery}
-                searchScrollRevision={
-                  isUsingEditorFindSearch ? findScrollRevision : undefined
-                }
-                toolbarContainer={toolbarContainer}
-              />
+                  readOnly={isReadOnly}
+                  ref={editorRef}
+                  searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
+                  searchActiveMatchIndex={
+                    isUsingEditorFindSearch ? activeFindMatchIndex : null
+                  }
+                  searchQuery={editorSearchQuery}
+                  searchScrollRevision={
+                    isUsingEditorFindSearch ? findScrollRevision : undefined
+                  }
+                  toolbarContainer={toolbarContainer}
+                />
+              )}
             </div>
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -799,42 +843,81 @@ export function EditorPane({
       )}
 
       {noteId && hasConflict ? (
-        <div className="border-divider bg-background/95 shrink-0 border-t px-4 py-2 backdrop-blur">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <span className="text-muted-foreground shrink-0 text-xs font-medium">
-              Revisions
-            </span>
-            {noteConflict?.heads.map((head, index) => {
-              const label =
-                head.title ??
-                (head.op === "del" ? "Deleted version" : "Unavailable version");
+        <div className="border-divider bg-background/95 shrink-0 border-t backdrop-blur">
+          <div className="flex h-13 items-center justify-between gap-4 px-4">
+            <div className="min-w-0">
+              <p className="text-foreground truncate text-xs font-medium">
+                {viewedConflictHead?.title ??
+                  (viewedConflictHead?.op === "del"
+                    ? "Deleted version"
+                    : "Conflicting revision")}
+              </p>
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
+                <span>
+                  {viewedConflictHead
+                    ? formatConflictHeadTimestamp(viewedConflictHead.mtime)
+                    : "No previewable revision available"}
+                </span>
+              </div>
+            </div>
 
-              return (
-                <button
-                  key={head.revisionId}
-                  className={cn(
-                    "border-input bg-background hover:bg-muted flex min-w-0 shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-left transition-colors",
-                    head.isCurrent &&
-                      "border-primary/40 bg-primary/10 text-foreground",
-                  )}
-                  disabled={!head.markdown}
-                  onClick={() =>
-                    head.markdown && onLoadConflictHead(head.markdown)
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                className="shadow-none"
+                disabled={isResolveConflictPending || readonly}
+                onClick={onResolveConflict}
+                size="sm"
+                type="button"
+                variant={conflictPrimaryActionVariant}
+              >
+                {isResolveConflictPending
+                  ? conflictPrimaryActionPendingLabel
+                  : conflictPrimaryActionLabel}
+              </Button>
+              <Button
+                className="text-muted-foreground"
+                disabled={viewedConflictHeadIndex <= 0}
+                onClick={() => {
+                  const previousHead =
+                    viewedConflictHeadIndex > 0
+                      ? viewableConflictHeads[viewedConflictHeadIndex - 1]
+                      : null;
+                  if (previousHead) {
+                    onLoadConflictHead(
+                      previousHead.revisionId,
+                      previousHead.markdown,
+                    );
                   }
-                  type="button"
-                >
-                  <span className="text-muted-foreground text-[11px] tabular-nums">
-                    V{index + 1}
-                  </span>
-                  <span className="max-w-44 truncate text-xs font-medium">
-                    {label}
-                  </span>
-                  {head.isCurrent ? (
-                    <span className="text-primary text-[11px]">Current</span>
-                  ) : null}
-                </button>
-              );
-            })}
+                }}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <ChevronLeft className="size-[1.2rem]" />
+              </Button>
+              <Button
+                className="text-muted-foreground"
+                disabled={
+                  viewedConflictHeadIndex < 0 ||
+                  viewedConflictHeadIndex >= viewableConflictHeads.length - 1
+                }
+                onClick={() => {
+                  const nextHead =
+                    viewedConflictHeadIndex >= 0 &&
+                    viewedConflictHeadIndex < viewableConflictHeads.length - 1
+                      ? viewableConflictHeads[viewedConflictHeadIndex + 1]
+                      : null;
+                  if (nextHead) {
+                    onLoadConflictHead(nextHead.revisionId, nextHead.markdown);
+                  }
+                }}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <ChevronRight className="size-[1.2rem]" />
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

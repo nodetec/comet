@@ -315,6 +315,7 @@ fn row_to_note_summary(
         deleted_at: row.get(7)?,
         pinned_at: row.get(8)?,
         readonly: row.get::<_, i64>(9)? != 0,
+        has_conflict: row.get::<_, i64>(10)? != 0,
     })
 }
 
@@ -747,7 +748,16 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         let active_tags = normalized_active_tags(&input.active_tags);
 
         let mut sql = String::from(
-            "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
+            "SELECT n.id, n.title, n.markdown, n.edited_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
+                    EXISTS (
+                      SELECT 1
+                      FROM sync_revisions sr_current
+                      JOIN sync_heads sh
+                        ON sh.recipient = sr_current.recipient
+                       AND sh.d_tag = sr_current.d_tag
+                      WHERE sr_current.rev = n.current_rev
+                        AND sh.rev != n.current_rev
+                    ) AS has_conflict
              FROM notes n
              LEFT JOIN notebooks b ON b.id = n.notebook_id",
         );
@@ -758,7 +768,16 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             match search_mode {
                 SearchMode::Match(search_query) => {
                     sql = String::from(
-                        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly
+                        "SELECT n.id, n.title, n.markdown, n.modified_at, b.id, b.name, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
+                                EXISTS (
+                                  SELECT 1
+                                  FROM sync_revisions sr_current
+                                  JOIN sync_heads sh
+                                    ON sh.recipient = sr_current.recipient
+                                   AND sh.d_tag = sr_current.d_tag
+                                  WHERE sr_current.rev = n.current_rev
+                                    AND sh.rev != n.current_rev
+                                ) AS has_conflict
                          FROM notes n
                          LEFT JOIN notebooks b ON b.id = n.notebook_id
                          JOIN notes_fts ON notes_fts.note_id = n.id",

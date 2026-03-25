@@ -28,6 +28,7 @@ pub struct NoteSummary {
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,
     pub readonly: bool,
+    pub has_conflict: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

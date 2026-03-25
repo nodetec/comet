@@ -154,8 +154,11 @@ export async function deletePublishedNote(noteId: string) {
   return invoke<PublishResult>("delete_published_note", { noteId });
 }
 
-export async function resolveNoteConflict(noteId: string) {
-  return invoke("resolve_note_conflict", { noteId });
+export async function resolveNoteConflict(
+  noteId: string,
+  deleteSelected = false,
+) {
+  return invoke("resolve_note_conflict", { deleteSelected, noteId });
 }
 
 export async function exportNotes(input: {

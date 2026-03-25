@@ -29,6 +29,7 @@ function App() {
     useState(false);
   const {
     bootstrapError,
+    chooseConflictDialogProps,
     deletePublishDialogProps,
     editorPaneProps,
     notesPaneProps,
@@ -85,6 +86,23 @@ function App() {
     );
   }
 
+  const chooseConflictActionVariant = chooseConflictDialogProps.deleteSelected
+    ? "destructive"
+    : "default";
+  const chooseConflictActionLabel = chooseConflictDialogProps.deleteSelected
+    ? "Delete note"
+    : "Choose";
+  const chooseConflictPendingLabel = chooseConflictDialogProps.deleteSelected
+    ? "Deleting…"
+    : "Choosing…";
+  const chooseConflictDialogTitle = chooseConflictDialogProps.deleteSelected
+    ? "Delete this note?"
+    : "Choose this version?";
+  const chooseConflictDialogDescription =
+    chooseConflictDialogProps.deleteSelected
+      ? "This will publish the deleted version currently shown and remove the note as the chosen resolution for this conflict."
+      : "This will publish the version currently shown in the editor as the chosen resolution for this conflict.";
+
   return (
     <div
       className="text-foreground relative h-full min-h-0 overflow-hidden"
@@ -139,6 +157,37 @@ function App() {
       </div>
       <PublishDialog {...publishDialogProps} />
       <PublishShortNoteDialog {...publishShortNoteDialogProps} />
+      <DialogRoot
+        open={chooseConflictDialogProps.open}
+        onOpenChange={chooseConflictDialogProps.onOpenChange}
+      >
+        <DialogPortal>
+          <DialogBackdrop />
+          <DialogPopup className="w-full max-w-sm p-6">
+            <DialogTitle className="text-base font-semibold">
+              {chooseConflictDialogTitle}
+            </DialogTitle>
+            <p className="text-muted-foreground mt-2 text-sm">
+              {chooseConflictDialogDescription}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
+                Cancel
+              </DialogClose>
+              <Button
+                disabled={chooseConflictDialogProps.pending}
+                onClick={chooseConflictDialogProps.onConfirm}
+                size="sm"
+                variant={chooseConflictActionVariant}
+              >
+                {chooseConflictDialogProps.pending
+                  ? chooseConflictPendingLabel
+                  : chooseConflictActionLabel}
+              </Button>
+            </div>
+          </DialogPopup>
+        </DialogPortal>
+      </DialogRoot>
       <DialogRoot
         open={deletePublishDialogProps.open}
         onOpenChange={deletePublishDialogProps.onOpenChange}

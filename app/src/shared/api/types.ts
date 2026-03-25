@@ -21,6 +21,7 @@ export type NoteSummary = {
   archivedAt: number | null;
   deletedAt: number | null;
   editedAt: number;
+  hasConflict: boolean;
   id: string;
   notebook: NotebookRef | null;
   pinnedAt: number | null;

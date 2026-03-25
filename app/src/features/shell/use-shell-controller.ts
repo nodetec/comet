@@ -43,6 +43,16 @@ export function useShellController() {
   const [editorFocusMode, setEditorFocusMode] = useState<
     "none" | "immediate" | "pointerup"
   >("none");
+  const [chooseConflictDialogOpen, setChooseConflictDialogOpen] =
+    useState(false);
+  const [chooseConflictNoteId, setChooseConflictNoteId] = useState<
+    string | null
+  >(null);
+  const [selectedConflictRevisionId, setSelectedConflictRevisionId] = useState<
+    string | null
+  >(null);
+  const [isResolveConflictPending, setIsResolveConflictPending] =
+    useState(false);
 
   const notebook = useNotebookState();
   const publish = usePublishState();
@@ -255,6 +265,10 @@ export function useShellController() {
   const currentNote = noteQuery.data;
   const currentNoteConflict = noteConflictQuery.data;
   const isCurrentNoteConflicted = (currentNoteConflict?.headCount ?? 0) > 1;
+  const selectedConflictHead =
+    currentNoteConflict?.heads.find(
+      (head) => head.revisionId === selectedConflictRevisionId,
+    ) ?? null;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
     (bootstrapQuery.isSuccess &&
@@ -289,6 +303,7 @@ export function useShellController() {
   useEffect(() => {
     if (!currentNote) {
       previousConflictNoteIdRef.current = null;
+      setSelectedConflictRevisionId(null);
       return;
     }
 
@@ -321,6 +336,53 @@ export function useShellController() {
     isCurrentNoteConflicted,
     pendingSaveTimeoutRef,
     setDraft,
+  ]);
+
+  useEffect(() => {
+    if (!currentNote || !currentNoteConflict || !isCurrentNoteConflicted) {
+      setSelectedConflictRevisionId(null);
+      return;
+    }
+
+    if (
+      selectedConflictRevisionId &&
+      currentNoteConflict.heads.some(
+        (head) => head.revisionId === selectedConflictRevisionId,
+      )
+    ) {
+      return;
+    }
+
+    setSelectedConflictRevisionId(
+      currentNoteConflict.currentRevisionId ??
+        currentNoteConflict.heads[0]?.revisionId ??
+        null,
+    );
+  }, [
+    currentNote,
+    currentNoteConflict,
+    isCurrentNoteConflicted,
+    selectedConflictRevisionId,
+  ]);
+
+  useEffect(() => {
+    if (!chooseConflictDialogOpen) {
+      return;
+    }
+
+    if (
+      !currentNote ||
+      !isCurrentNoteConflicted ||
+      chooseConflictNoteId !== currentNote.id
+    ) {
+      setChooseConflictDialogOpen(false);
+      setChooseConflictNoteId(null);
+    }
+  }, [
+    chooseConflictDialogOpen,
+    chooseConflictNoteId,
+    currentNote,
+    isCurrentNoteConflicted,
   ]);
 
   // --- Flush / discard helpers ---
@@ -761,19 +823,32 @@ export function useShellController() {
         return;
       }
 
+      setIsResolveConflictPending(true);
       if (
+        selectedConflictHead?.op !== "del" &&
         draftNoteId === currentNote.id &&
         draftMarkdown !== currentNote.markdown
       ) {
-        await saveNoteMutation.mutateAsync({
-          id: currentNote.id,
-          markdown: draftMarkdown,
-        });
-        return;
+        try {
+          await saveNoteMutation.mutateAsync({
+            id: currentNote.id,
+            markdown: draftMarkdown,
+          });
+          setChooseConflictDialogOpen(false);
+          setChooseConflictNoteId(null);
+          return;
+        } finally {
+          setIsResolveConflictPending(false);
+        }
       }
 
       try {
-        await resolveNoteConflict(currentNote.id);
+        await resolveNoteConflict(
+          currentNote.id,
+          selectedConflictHead?.op === "del",
+        );
+        setChooseConflictDialogOpen(false);
+        setChooseConflictNoteId(null);
         toast.success("Conflict resolution published.", {
           id: "resolve-note-conflict-success",
         });
@@ -790,14 +865,19 @@ export function useShellController() {
           "Couldn't resolve note conflict",
           "resolve-note-conflict-error",
         )(error);
+      } finally {
+        setIsResolveConflictPending(false);
       }
     },
-    handleLoadConflictHead(markdown: string) {
+    handleLoadConflictHead(revisionId: string, markdown: string | null) {
       if (!currentNote) {
         return;
       }
-      setDraft(currentNote.id, markdown);
-      setSyncEditorRevision((revision) => revision + 1);
+      setSelectedConflictRevisionId(revisionId);
+      if (markdown !== null) {
+        setDraft(currentNote.id, markdown);
+        setSyncEditorRevision((revision) => revision + 1);
+      }
     },
     submitNotebook,
     submitRenameNotebook,
@@ -834,9 +914,10 @@ export function useShellController() {
       publishedAt: currentNote?.publishedAt ?? null,
       publishedKind: currentNote?.publishedKind ?? null,
       readonly: currentNote?.readonly ?? false,
+      selectedConflictRevisionId,
       searchQuery,
       isDeletePublishedNotePending,
-      isResolveConflictPending: false,
+      isResolveConflictPending,
       onAssignNotebook(notebookId: string | null) {
         if (currentNote) {
           latestRef.current.handleAssignNoteNotebook(
@@ -899,13 +980,12 @@ export function useShellController() {
       onFocusHandled() {
         setEditorFocusMode("none");
       },
-      onLoadConflictHead(markdown: string) {
-        latestRef.current.handleLoadConflictHead(markdown);
+      onLoadConflictHead(revisionId: string, markdown: string | null) {
+        latestRef.current.handleLoadConflictHead(revisionId, markdown);
       },
       onResolveConflict() {
-        void latestRef.current
-          .handleResolveCurrentNoteConflict()
-          .catch(() => {});
+        setChooseConflictNoteId(currentNote?.id ?? null);
+        setChooseConflictDialogOpen(true);
       },
     }),
     [
@@ -920,8 +1000,12 @@ export function useShellController() {
       notebooks,
       isPublishNotePending,
       isPublishShortNotePending,
+      isResolveConflictPending,
       searchQuery,
+      selectedConflictRevisionId,
       selectedNoteId,
+      setChooseConflictNoteId,
+      setChooseConflictDialogOpen,
       setDeletePublishDialogOpen,
       setDraft,
       setEditorFocusMode,
@@ -1007,6 +1091,32 @@ export function useShellController() {
       isDeletePublishedNotePending,
       mutateDeletePublishedNote,
       setDeletePublishDialogOpen,
+    ],
+  );
+
+  const chooseConflictDialogProps = useMemo(
+    () => ({
+      deleteSelected: selectedConflictHead?.op === "del",
+      open: chooseConflictDialogOpen,
+      pending: isResolveConflictPending,
+      onOpenChange(open: boolean) {
+        setChooseConflictDialogOpen(open);
+        if (!open) {
+          setChooseConflictNoteId(null);
+        }
+      },
+      onConfirm() {
+        void latestRef.current
+          .handleResolveCurrentNoteConflict()
+          .catch(() => {});
+      },
+    }),
+    [
+      chooseConflictDialogOpen,
+      isResolveConflictPending,
+      selectedConflictHead?.op,
+      setChooseConflictNoteId,
+      setChooseConflictDialogOpen,
     ],
   );
 
@@ -1193,6 +1303,7 @@ export function useShellController() {
     publishDialogProps,
     publishShortNoteDialogProps,
     deletePublishDialogProps,
+    chooseConflictDialogProps,
     notesPaneProps,
     sidebarPaneProps,
   };

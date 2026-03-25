@@ -303,7 +303,11 @@ pub async fn get_note_conflict(
 }
 
 #[tauri::command]
-pub async fn resolve_note_conflict(app: AppHandle, note_id: String) -> Result<(), AppError> {
+pub async fn resolve_note_conflict(
+    app: AppHandle,
+    note_id: String,
+    delete_selected: Option<bool>,
+) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
     let recipient = keys.public_key().to_hex();
@@ -327,14 +331,25 @@ pub async fn resolve_note_conflict(app: AppHandle, note_id: String) -> Result<()
         .collect::<Vec<_>>();
     drop(conn);
 
-    crate::adapters::nostr::revision_push::push_note_revision(
-        &app,
-        &active_relay_url,
-        &backup_relay_urls,
-        &keys,
-        &note_id,
-    )
-    .await?;
+    if delete_selected.unwrap_or(false) {
+        crate::adapters::nostr::revision_push::push_deletion_revision(
+            &app,
+            &active_relay_url,
+            &backup_relay_urls,
+            &keys,
+            &note_id,
+        )
+        .await?;
+    } else {
+        crate::adapters::nostr::revision_push::push_note_revision(
+            &app,
+            &active_relay_url,
+            &backup_relay_urls,
+            &keys,
+            &note_id,
+        )
+        .await?;
+    }
 
     Ok(())
 }
