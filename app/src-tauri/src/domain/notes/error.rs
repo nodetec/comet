@@ -9,6 +9,18 @@ pub enum NoteError {
     #[error("Invalid note id.")]
     InvalidNoteId,
 
+    #[error("Invalid tag path.")]
+    InvalidTagPath,
+
+    #[error("Tag not found.")]
+    TagNotFound,
+
+    #[error("Only root tags can be pinned.")]
+    TagNotPinnable,
+
+    #[error("Invalid export input.")]
+    InvalidExportInput,
+
     #[error("{0}")]
     Storage(String),
 }

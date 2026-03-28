@@ -156,5 +156,34 @@ pub fn account_migrations() -> Migrations<'static> {
         ),
         M::up("ALTER TABLE blob_uploads RENAME COLUMN hash TO object_hash;"),
         M::up("DELETE FROM app_settings WHERE key = 'sync_checkpoint';"),
+        M::up(
+            "CREATE TABLE tags (
+               id INTEGER PRIMARY KEY,
+               path TEXT NOT NULL UNIQUE,
+               parent_id INTEGER REFERENCES tags(id) ON DELETE RESTRICT,
+               last_segment TEXT NOT NULL,
+               depth INTEGER NOT NULL,
+               pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
+               hide_subtag_notes INTEGER NOT NULL DEFAULT 0 CHECK (hide_subtag_notes IN (0, 1)),
+               icon TEXT,
+               created_at INTEGER NOT NULL,
+               updated_at INTEGER NOT NULL
+             );
+             CREATE INDEX idx_tags_parent_id ON tags(parent_id);
+             CREATE INDEX idx_tags_depth_path ON tags(depth, path);
+             CREATE TABLE note_tag_links (
+               note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+               tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+               is_direct INTEGER NOT NULL CHECK (is_direct IN (0, 1)),
+               PRIMARY KEY (note_id, tag_id)
+             );
+             CREATE INDEX idx_note_tag_links_tag_id_note_id ON note_tag_links(tag_id, note_id);
+             CREATE INDEX idx_note_tag_links_tag_id_direct_note_id ON note_tag_links(tag_id, is_direct, note_id);
+             CREATE INDEX idx_note_tag_links_note_id_direct ON note_tag_links(note_id, is_direct);
+             INSERT INTO app_settings (key, value) VALUES ('tag_index_version', 'bear_tags_v1')
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+             INSERT INTO app_settings (key, value) VALUES ('tag_index_status', 'pending')
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+        ),
     ])
 }

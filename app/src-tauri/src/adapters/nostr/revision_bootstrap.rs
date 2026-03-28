@@ -57,14 +57,8 @@ pub async fn bootstrap_with_keys(
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<RevisionBootstrapResult, AppError> {
-    bootstrap_with_keys_and_changes(
-        db_path,
-        keys,
-        relay_ws_url,
-        &mut invalidate_cache,
-        |_| {},
-    )
-    .await
+    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, &mut invalidate_cache, |_| {})
+        .await
 }
 
 async fn bootstrap_with_keys_and_changes(
@@ -593,10 +587,9 @@ mod tests {
             .to_latest(&mut destination_conn)
             .unwrap();
 
-        let result =
-            bootstrap_with_keys(&destination_db_path, &keys, &relay.root_ws_url, |_| {})
-                .await
-                .unwrap();
+        let result = bootstrap_with_keys(&destination_db_path, &keys, &relay.root_ws_url, |_| {})
+            .await
+            .unwrap();
 
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_revision_id.clone()]);
@@ -664,14 +657,18 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_revision_id.clone()]);
 
-        let (title, markdown, current_rev, pinned_at): (String, String, Option<String>, Option<i64>) =
-            destination_conn
-                .query_row(
-                    "SELECT title, markdown, current_rev, pinned_at FROM notes WHERE id = 'note-1'",
-                    [],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-                )
-                .unwrap();
+        let (title, markdown, current_rev, pinned_at): (
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+        ) = destination_conn
+            .query_row(
+                "SELECT title, markdown, current_rev, pinned_at FROM notes WHERE id = 'note-1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
 
         assert_eq!(title, "Pinned Title");
         assert_eq!(markdown, "# Pinned Title\n\nPinned Body");
@@ -1557,14 +1554,13 @@ mod tests {
             let head = get_sync_head(&conn, &recipient.to_hex(), &pending.document_coord)
                 .unwrap()
                 .unwrap();
-            let parent_revision_ids =
-                list_sync_revision_parents(
-                    &conn,
-                    &recipient.to_hex(),
-                    &pending.document_coord,
-                    &head.rev,
-                )
-                .unwrap();
+            let parent_revision_ids = list_sync_revision_parents(
+                &conn,
+                &recipient.to_hex(),
+                &pending.document_coord,
+                &head.rev,
+            )
+            .unwrap();
             let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
                 recipient: recipient.to_hex(),
                 document_coord: pending.document_coord.clone(),
@@ -1628,7 +1624,7 @@ mod tests {
         )
         .unwrap();
         conn.execute(
-            "DELETE FROM note_tags WHERE note_id = ?1",
+            "DELETE FROM note_tag_links WHERE note_id = ?1",
             rusqlite::params![note_id],
         )
         .unwrap();

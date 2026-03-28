@@ -67,8 +67,21 @@ pub struct NotePagePayload {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ContextualTagNode {
+    pub path: String,
+    pub label: String,
+    pub depth: usize,
+    pub pinned: bool,
+    pub hide_subtag_notes: bool,
+    pub direct_note_count: usize,
+    pub inclusive_note_count: usize,
+    pub children: Vec<ContextualTagNode>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContextualTagsPayload {
-    pub tags: Vec<String>,
+    pub roots: Vec<ContextualTagNode>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -97,7 +110,7 @@ pub enum NoteFilterInput {
 pub struct NoteQueryInput {
     pub note_filter: NoteFilterInput,
     pub search_query: String,
-    pub active_tags: Vec<String>,
+    pub active_tag_path: Option<String>,
     pub limit: usize,
     pub offset: usize,
     pub sort_field: NoteSortField,
@@ -139,6 +152,33 @@ pub struct SetNoteReadonlyInput {
     pub readonly: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameTagInput {
+    pub from_path: String,
+    pub to_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteTagInput {
+    pub path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTagPinnedInput {
+    pub path: String,
+    pub pinned: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetHideSubtagNotesInput {
+    pub path: String,
+    pub hide_subtag_notes: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {
@@ -148,9 +188,29 @@ pub struct SearchResult {
     pub archived_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportModeInput {
+    NoteFilter,
+    Tag,
+}
+
+fn default_export_mode() -> ExportModeInput {
+    ExportModeInput::NoteFilter
+}
+
+fn default_preserve_tags() -> bool {
+    true
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportNotesInput {
-    pub note_filter: NoteFilterInput,
+    #[serde(default = "default_export_mode")]
+    pub export_mode: ExportModeInput,
+    pub note_filter: Option<NoteFilterInput>,
+    pub tag_path: Option<String>,
+    #[serde(default = "default_preserve_tags")]
+    pub preserve_tags: bool,
     pub export_dir: String,
 }

@@ -1,7 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+
+import { getTagIndexDiagnostics, repairTagIndex } from "@/shared/api/invoke";
+import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 
 import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { Button } from "@/shared/ui/button";
 
 import { SettingRow } from "./setting-row";
 
@@ -21,6 +27,7 @@ type ThemeSummary = {
 };
 
 export function GeneralSettings() {
+  const queryClient = useQueryClient();
   const themeName = useUIStore((s) => s.themeName);
   const setThemeName = useUIStore((s) => s.setThemeName);
 
@@ -32,6 +39,31 @@ export function GeneralSettings() {
   const { data: themes = [] } = useQuery({
     queryKey: ["themes"],
     queryFn: () => invoke<ThemeSummary[]>("list_themes"),
+  });
+
+  const { data: tagIndexDiagnostics } = useQuery({
+    queryKey: ["tag-index-diagnostics"],
+    queryFn: getTagIndexDiagnostics,
+  });
+
+  const repairTagIndexMutation = useMutation({
+    mutationFn: repairTagIndex,
+    onSuccess: async () => {
+      toast.success("Tag index rebuilt.", {
+        id: "repair-tag-index-success",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tag-index-diagnostics"] }),
+        queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
+        queryClient.invalidateQueries({ queryKey: ["notes"] }),
+        queryClient.invalidateQueries({ queryKey: ["contextual-tags"] }),
+        queryClient.invalidateQueries({ queryKey: ["note"] }),
+      ]);
+    },
+    onError: toastErrorHandler(
+      "Couldn't rebuild tag index",
+      "repair-tag-index-error",
+    ),
   });
 
   if (isLoading || !data) {
@@ -52,6 +84,24 @@ export function GeneralSettings() {
     { label: "Themes", value: data.themesPath },
   ];
 
+  const tagIndexDescription = tagIndexDiagnostics
+    ? [
+        tagIndexDiagnostics.version
+          ? `Version ${tagIndexDiagnostics.version}`
+          : "No version recorded",
+        tagIndexDiagnostics.status
+          ? `status ${tagIndexDiagnostics.status}`
+          : "status unknown",
+        `${tagIndexDiagnostics.tagCount} tags`,
+        `${tagIndexDiagnostics.directLinkCount} direct links`,
+        tagIndexDiagnostics.lastRebuiltAt
+          ? `rebuilt ${formatDistanceToNow(tagIndexDiagnostics.lastRebuiltAt, {
+              addSuffix: true,
+            })}`
+          : "never rebuilt",
+      ].join(" • ")
+    : "Loading tag index diagnostics…";
+
   return (
     <div className="space-y-8">
       <div>
@@ -71,6 +121,20 @@ export function GeneralSettings() {
               </option>
             ))}
           </select>
+        </SettingRow>
+        <SettingRow
+          label="Tag Index"
+          description={tagIndexDescription}
+          border={false}
+        >
+          <Button
+            disabled={repairTagIndexMutation.isPending}
+            onClick={() => repairTagIndexMutation.mutate()}
+            size="sm"
+            variant="outline"
+          >
+            {repairTagIndexMutation.isPending ? "Rebuilding…" : "Rebuild"}
+          </Button>
         </SettingRow>
       </div>
 

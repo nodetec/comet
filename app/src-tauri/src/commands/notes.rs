@@ -60,7 +60,8 @@ fn record_to_loaded_note(
 }
 
 fn preferred_conflict_relay_url(conn: &rusqlite::Connection) -> Option<String> {
-    let available = crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(conn);
+    let available =
+        crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(conn);
     let active = crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(conn);
     active
         .filter(|relay_url| available.contains(relay_url))
@@ -205,7 +206,12 @@ pub async fn get_note_conflict(
             .map(|head| head.revision_id.clone())
             .collect::<Vec<_>>();
 
-        if let Ok(mut connection) = crate::adapters::nostr::relay_client::RevisionRelayConnection::connect_authenticated(relay_url, &keys).await {
+        if let Ok(mut connection) =
+            crate::adapters::nostr::relay_client::RevisionRelayConnection::connect_authenticated(
+                relay_url, &keys,
+            )
+            .await
+        {
             if connection
                 .send_req_revisions("conflict-inspect", &recipient, &revision_ids)
                 .await
@@ -318,7 +324,8 @@ pub async fn resolve_note_conflict(
         return Err(AppError::custom("Note is not conflicted."));
     }
 
-    let relay_urls = crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(&conn);
+    let relay_urls =
+        crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(&conn);
     let active_relay_url = preferred_conflict_relay_url(&conn)
         .ok_or_else(|| AppError::custom("No sync relay configured"))?;
     let backup_relay_urls = relay_urls
@@ -397,6 +404,55 @@ pub fn set_note_readonly(
     let note = record_to_loaded_note(&app, record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
+}
+
+#[tauri::command]
+pub fn rename_tag(app: AppHandle, input: RenameTagInput) -> Result<Vec<String>, AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    let affected_note_ids = NoteService::rename_tag(&repo, input)?;
+
+    let cache = app.state::<RenderedHtmlCache>();
+    for note_id in &affected_note_ids {
+        cache.invalidate(note_id);
+        sync_push(&app, SyncCommand::PushNote(note_id.clone()));
+    }
+
+    Ok(affected_note_ids)
+}
+
+#[tauri::command]
+pub fn delete_tag(app: AppHandle, input: DeleteTagInput) -> Result<Vec<String>, AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    let affected_note_ids = NoteService::delete_tag(&repo, input)?;
+
+    let cache = app.state::<RenderedHtmlCache>();
+    for note_id in &affected_note_ids {
+        cache.invalidate(note_id);
+        sync_push(&app, SyncCommand::PushNote(note_id.clone()));
+    }
+
+    Ok(affected_note_ids)
+}
+
+#[tauri::command]
+pub fn set_tag_pinned(app: AppHandle, input: SetTagPinnedInput) -> Result<(), AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    NoteService::set_tag_pinned(&repo, input)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_hide_subtag_notes(
+    app: AppHandle,
+    input: SetHideSubtagNotesInput,
+) -> Result<(), AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    NoteService::set_hide_subtag_notes(&repo, input)?;
+    Ok(())
 }
 
 #[tauri::command]

@@ -91,6 +91,7 @@ pub(crate) fn ensure_account_database_ready(account: &AccountRecord) -> Result<(
     }
     let mut conn = Connection::open(&account.db_path)?;
     account_migrations().to_latest(&mut conn)?;
+    crate::adapters::sqlite::tag_index::ensure_tag_index_ready(&mut conn)?;
     Ok(())
 }
 

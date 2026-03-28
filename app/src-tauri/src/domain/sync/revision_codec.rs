@@ -38,7 +38,8 @@ pub struct RevisionEnvelopeMeta {
 }
 
 fn find_entity_type_tag(event: &Event) -> Option<String> {
-    event.tags
+    event
+        .tags
         .find(TagKind::custom("type"))
         .and_then(|tag| tag.content())
         .map(std::string::ToString::to_string)

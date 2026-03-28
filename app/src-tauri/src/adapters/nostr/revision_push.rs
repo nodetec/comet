@@ -66,7 +66,10 @@ async fn maybe_upload_note_attachments(
 
     let attachment_hashes = extract_attachment_hashes(&markdown);
     if attachment_hashes.is_empty() {
-        sync_log(app, &format!("revision blossom skip note={note_id}: no attachments"));
+        sync_log(
+            app,
+            &format!("revision blossom skip note={note_id}: no attachments"),
+        );
         return Ok(());
     }
 
@@ -160,9 +163,13 @@ async fn maybe_upload_note_attachments(
             })?;
 
         let (ciphertext, key_hex) = crate::adapters::blossom::client::encrypt_blob(&blob_data)?;
-        let ciphertext_hash =
-            crate::adapters::blossom::client::upload_blob(&http_client, &blossom_url, ciphertext, keys)
-                .await?;
+        let ciphertext_hash = crate::adapters::blossom::client::upload_blob(
+            &http_client,
+            &blossom_url,
+            ciphertext,
+            keys,
+        )
+        .await?;
 
         let conn = database_connection(app)?;
         conn.execute(
@@ -331,6 +338,7 @@ mod tests {
         compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
         REVISION_SYNC_SCHEMA_VERSION,
     };
+    use ::url::Url;
     use postgres::{Client as PgClient, NoTls};
     use reqwest::Client;
     use std::path::PathBuf;
@@ -338,7 +346,6 @@ mod tests {
     use std::sync::Once;
     use std::thread;
     use std::time::Duration;
-    use ::url::Url;
 
     const TEST_ADMIN_TOKEN: &str = "test-admin-token";
     static EXTERNAL_TEST_PREREQ_WARNING: Once = Once::new();
@@ -570,7 +577,9 @@ mod tests {
             true
         } else {
             EXTERNAL_TEST_PREREQ_WARNING.call_once(|| {
-                eprintln!("skipping revision relay process tests: TEST_DATABASE_URL and bun are required");
+                eprintln!(
+                    "skipping revision relay process tests: TEST_DATABASE_URL and bun are required"
+                );
             });
             false
         }
@@ -629,11 +638,9 @@ mod tests {
     fn assert_valid_database_name(name: &str) {
         assert!(
             !name.is_empty()
-                && name
-                    .chars()
-                    .all(|character| character.is_ascii_lowercase()
-                        || character.is_ascii_digit()
-                        || character == '_'),
+                && name.chars().all(|character| character.is_ascii_lowercase()
+                    || character.is_ascii_digit()
+                    || character == '_'),
             "invalid database name: {name}"
         );
     }

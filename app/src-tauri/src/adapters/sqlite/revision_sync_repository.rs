@@ -428,7 +428,10 @@ mod tests {
         let heads = list_sync_heads_for_scope(&conn, "recipient-1", "doc-1").unwrap();
         assert_eq!(heads.len(), 2);
         assert_eq!(
-            heads.iter().map(|head| head.rev.as_str()).collect::<Vec<_>>(),
+            heads
+                .iter()
+                .map(|head| head.rev.as_str())
+                .collect::<Vec<_>>(),
             vec![
                 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",

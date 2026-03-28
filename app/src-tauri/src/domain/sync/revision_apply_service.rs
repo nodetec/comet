@@ -4,8 +4,8 @@ use crate::adapters::sqlite::revision_sync_repository::{
     LocalSyncRevision,
 };
 use crate::domain::sync::event_codec::rumor_to_synced_note;
-use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
 use crate::domain::sync::model::SyncChangePayload;
+use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
 use crate::domain::sync::service::{delete_note_from_sync, upsert_from_sync};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -269,9 +269,15 @@ mod tests {
         )
         .unwrap();
 
-        let change =
-            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
-                .unwrap();
+        let change = apply_remote_revision_event(
+            &conn,
+            "wss://relay.example",
+            &keys,
+            &event,
+            Some(7),
+            |_| {},
+        )
+        .unwrap();
 
         let current_rev: Option<String> = conn
             .query_row(
@@ -436,9 +442,15 @@ mod tests {
         )
         .unwrap();
 
-        let change =
-            apply_remote_revision_event(&conn, "ws://relay.example", &keys, &event, Some(1), |_| {})
-                .unwrap();
+        let change = apply_remote_revision_event(
+            &conn,
+            "ws://relay.example",
+            &keys,
+            &event,
+            Some(1),
+            |_| {},
+        )
+        .unwrap();
 
         let stored: Option<(String, String, String)> = conn
             .query_row(
@@ -528,9 +540,15 @@ mod tests {
         )
         .unwrap();
 
-        let error =
-            apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(7), |_| {})
-                .unwrap_err();
+        let error = apply_remote_revision_event(
+            &conn,
+            "wss://relay.example",
+            &keys,
+            &event,
+            Some(7),
+            |_| {},
+        )
+        .unwrap_err();
 
         assert!(
             error
@@ -613,5 +631,4 @@ mod tests {
             .unwrap();
         assert_eq!(head_op, "del");
     }
-
 }

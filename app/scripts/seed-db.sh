@@ -68,7 +68,8 @@ BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS notes_fts;
 DROP TABLE IF EXISTS notes;
-DROP TABLE IF EXISTS note_tags;
+DROP TABLE IF EXISTS note_tag_links;
+DROP TABLE IF EXISTS tags;
 DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS relays;
@@ -149,10 +150,24 @@ CREATE TABLE nostr_identity (
   created_at INTEGER NOT NULL
 );
 
-CREATE TABLE note_tags (
+CREATE TABLE tags (
+  id INTEGER PRIMARY KEY,
+  path TEXT NOT NULL UNIQUE,
+  parent_id INTEGER REFERENCES tags(id) ON DELETE RESTRICT,
+  last_segment TEXT NOT NULL,
+  depth INTEGER NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
+  hide_subtag_notes INTEGER NOT NULL DEFAULT 0 CHECK (hide_subtag_notes IN (0, 1)),
+  icon TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE note_tag_links (
   note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-  tag TEXT NOT NULL,
-  PRIMARY KEY (note_id, tag)
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  is_direct INTEGER NOT NULL CHECK (is_direct IN (0, 1)),
+  PRIMARY KEY (note_id, tag_id)
 );
 
 CREATE VIRTUAL TABLE notes_fts USING fts5(
@@ -169,7 +184,11 @@ CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
 CREATE INDEX idx_notes_archived_at ON notes(archived_at);
 CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
 CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);
-CREATE INDEX idx_note_tags_tag ON note_tags(tag);
+CREATE INDEX idx_tags_parent_id ON tags(parent_id);
+CREATE INDEX idx_tags_depth_path ON tags(depth, path);
+CREATE INDEX idx_note_tag_links_tag_id_note_id ON note_tag_links(tag_id, note_id);
+CREATE INDEX idx_note_tag_links_tag_id_direct_note_id ON note_tag_links(tag_id, is_direct, note_id);
+CREATE INDEX idx_note_tag_links_note_id_direct ON note_tag_links(note_id, is_direct);
 
 INSERT INTO notebooks (id, name, created_at, updated_at) VALUES
   ('notebook-ideas', 'Ideas', $NOW_MS, $NOW_MS),
@@ -365,25 +384,45 @@ This one exists to exercise archive and restore flows.
 
 INSERT INTO app_settings (key, value) VALUES
   ('last_open_note_id', 'note-writing-draft'),
+  ('tag_index_version', 'bear_tags_v1'),
+  ('tag_index_status', 'ready'),
   ('blossom_url', 'https://media.comet.md');
 
-INSERT INTO note_tags (note_id, tag) VALUES
-  ('note-pinned-trail', 'design'),
-  ('note-pinned-trail', 'product'),
-  ('note-deep-match', 'search'),
-  ('note-deep-match', 'testing'),
-  ('note-title-only-match', 'memo'),
-  ('note-writing-draft', 'launch'),
-  ('note-writing-draft', 'writing'),
-  ('note-short-query', 'ai'),
-  ('note-short-query', 'tools'),
-  ('note-research', 'market'),
-  ('note-research', 'research'),
-  ('note-uncategorized', 'inbox'),
-  ('note-personal', 'home'),
-  ('note-personal', 'personal'),
-  ('note-archived', 'archive'),
-  ('note-archived', 'draft');
+INSERT INTO tags (id, path, parent_id, last_segment, depth, created_at, updated_at) VALUES
+  (1, 'ai', NULL, 'ai', 1, $NOW_MS, $NOW_MS),
+  (2, 'archive', NULL, 'archive', 1, $NOW_MS, $NOW_MS),
+  (3, 'design', NULL, 'design', 1, $NOW_MS, $NOW_MS),
+  (4, 'draft', NULL, 'draft', 1, $NOW_MS, $NOW_MS),
+  (5, 'home', NULL, 'home', 1, $NOW_MS, $NOW_MS),
+  (6, 'inbox', NULL, 'inbox', 1, $NOW_MS, $NOW_MS),
+  (7, 'launch', NULL, 'launch', 1, $NOW_MS, $NOW_MS),
+  (8, 'market', NULL, 'market', 1, $NOW_MS, $NOW_MS),
+  (9, 'memo', NULL, 'memo', 1, $NOW_MS, $NOW_MS),
+  (10, 'personal', NULL, 'personal', 1, $NOW_MS, $NOW_MS),
+  (11, 'product', NULL, 'product', 1, $NOW_MS, $NOW_MS),
+  (12, 'research', NULL, 'research', 1, $NOW_MS, $NOW_MS),
+  (13, 'search', NULL, 'search', 1, $NOW_MS, $NOW_MS),
+  (14, 'testing', NULL, 'testing', 1, $NOW_MS, $NOW_MS),
+  (15, 'tools', NULL, 'tools', 1, $NOW_MS, $NOW_MS),
+  (16, 'writing', NULL, 'writing', 1, $NOW_MS, $NOW_MS);
+
+INSERT INTO note_tag_links (note_id, tag_id, is_direct) VALUES
+  ('note-pinned-trail', 3, 1),
+  ('note-pinned-trail', 11, 1),
+  ('note-deep-match', 13, 1),
+  ('note-deep-match', 14, 1),
+  ('note-title-only-match', 9, 1),
+  ('note-writing-draft', 7, 1),
+  ('note-writing-draft', 16, 1),
+  ('note-short-query', 1, 1),
+  ('note-short-query', 15, 1),
+  ('note-research', 8, 1),
+  ('note-research', 12, 1),
+  ('note-uncategorized', 6, 1),
+  ('note-personal', 5, 1),
+  ('note-personal', 10, 1),
+  ('note-archived', 2, 1),
+  ('note-archived', 4, 1);
 
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;

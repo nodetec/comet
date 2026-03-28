@@ -30,7 +30,8 @@ sqlite3 "$DB_PATH" <<SQL
 PRAGMA foreign_keys = OFF;
 
 DELETE FROM notes_fts;
-DELETE FROM note_tags;
+DELETE FROM note_tag_links;
+DELETE FROM tags;
 DELETE FROM notes;
 DELETE FROM notebooks;
 DELETE FROM blob_meta;

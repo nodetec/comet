@@ -1,0 +1,93 @@
+{
+  "pathCases": [
+    {
+      "raw": "roadmap",
+      "canonical": "roadmap",
+      "rendered": "#roadmap"
+    },
+    {
+      "raw": "Work/ project   alpha ",
+      "canonical": "work/project alpha",
+      "rendered": "#work/project alpha#"
+    },
+    {
+      "raw": "123",
+      "canonical": null,
+      "rendered": null
+    },
+    {
+      "raw": "work//project",
+      "canonical": null,
+      "rendered": null
+    },
+    {
+      "raw": "journal/2026",
+      "canonical": null,
+      "rendered": null
+    }
+  ],
+  "entityCases": [
+    {
+      "text": "hello #roadmap, there",
+      "match": {
+        "start": 6,
+        "end": 14,
+        "canonical": "roadmap"
+      }
+    },
+    {
+      "text": "hello #project alpha# there",
+      "match": {
+        "start": 6,
+        "end": 21,
+        "canonical": "project alpha"
+      }
+    },
+    {
+      "text": "hello #work/project alpha# there",
+      "match": {
+        "start": 6,
+        "end": 26,
+        "canonical": "work/project alpha"
+      }
+    },
+    {
+      "text": "\\#roadmap",
+      "match": null
+    },
+    {
+      "text": "#work//project",
+      "match": null
+    },
+    {
+      "text": "#project alpha",
+      "match": null
+    },
+    {
+      "text": "#!/bin/bash",
+      "match": null
+    }
+  ],
+  "publishCases": [
+    {
+      "raw": "#Roadmap",
+      "canonical": "roadmap"
+    },
+    {
+      "raw": "#Project Alpha#",
+      "canonical": "project alpha"
+    },
+    {
+      "raw": "Work/Project Alpha",
+      "canonical": "work/project alpha"
+    },
+    {
+      "raw": "123",
+      "canonical": null
+    },
+    {
+      "raw": "work//alpha",
+      "canonical": null
+    }
+  ]
+}

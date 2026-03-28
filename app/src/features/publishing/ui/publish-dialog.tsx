@@ -1,6 +1,10 @@
 import { useState, type KeyboardEvent } from "react";
 import { Lock, X } from "lucide-react";
 
+import {
+  normalizePublishTag,
+  normalizePublishTags,
+} from "@/features/publishing/lib/tags";
 import { Button } from "@/shared/ui/button";
 import {
   DialogBackdrop,
@@ -10,6 +14,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
 
 import type {
   PublishNoteInput,
@@ -21,19 +26,36 @@ import {
 } from "@/shared/lib/attachments";
 
 function useTagEditor(initialTags: string[]) {
-  const [tags, setTags] = useState<string[]>(initialTags);
+  const [tags, setTags] = useState<string[]>(() =>
+    normalizePublishTags(initialTags),
+  );
   const [tagInput, setTagInput] = useState("");
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const addTag = (raw: string) => {
-    const tag = raw.trim().replace(/^#/, "").trim();
-    if (tag && !tags.includes(tag)) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setTagInput("");
+      setTagError(null);
+      return;
+    }
+
+    const tag = normalizePublishTag(trimmed);
+    if (!tag) {
+      setTagError("Enter a valid tag path.");
+      return;
+    }
+
+    if (!tags.includes(tag)) {
       setTags([...tags, tag]);
     }
     setTagInput("");
+    setTagError(null);
   };
 
   const removeTag = (tag: string) => {
     setTags(tags.filter((t) => t !== tag));
+    setTagError(null);
   };
 
   const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -49,7 +71,16 @@ function useTagEditor(initialTags: string[]) {
     }
   };
 
-  return { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown };
+  return {
+    tags,
+    tagInput,
+    tagError,
+    setTagInput,
+    setTagError,
+    addTag,
+    removeTag,
+    handleTagKeyDown,
+  };
 }
 
 type PublishDialogProps = {
@@ -101,8 +132,16 @@ function PublishDialogContent({
 }: Omit<PublishDialogProps, "open" | "onOpenChange">) {
   const [title, setTitle] = useState(initialTitle);
   const [image, setImage] = useState("");
-  const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
-    useTagEditor(initialTags);
+  const {
+    tags,
+    tagInput,
+    tagError,
+    setTagInput,
+    setTagError,
+    addTag,
+    removeTag,
+    handleTagKeyDown,
+  } = useTagEditor(initialTags);
   const hasLocalAttachmentImages = hasAttachmentReferences(content);
   const hasAttachmentCoverImage = isAttachmentUri(image.trim());
   const publishBlocked = hasLocalAttachmentImages || hasAttachmentCoverImage;
@@ -127,8 +166,7 @@ function PublishDialogContent({
           <span className="text-muted-foreground text-xs font-medium">
             Title
           </span>
-          <input
-            className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
+          <Input
             onChange={(e) => setTitle(e.target.value)}
             placeholder={initialTitle}
             type="text"
@@ -140,8 +178,7 @@ function PublishDialogContent({
           <span className="text-muted-foreground text-xs font-medium">
             Cover Image URL
           </span>
-          <input
-            className="border-input bg-background focus:ring-ring rounded-md border px-3 py-2 text-sm outline-none focus:ring-1"
+          <Input
             onChange={(e) => setImage(e.target.value)}
             placeholder="https://…"
             type="url"
@@ -167,7 +204,10 @@ function PublishDialogContent({
             ))}
             <input
               className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
-              onChange={(e) => setTagInput(e.target.value)}
+              onChange={(e) => {
+                setTagInput(e.target.value);
+                setTagError(null);
+              }}
               onKeyDown={handleTagKeyDown}
               onBlur={() => {
                 if (tagInput.trim()) addTag(tagInput);
@@ -177,6 +217,9 @@ function PublishDialogContent({
               value={tagInput}
             />
           </div>
+          {tagError ? (
+            <p className="text-destructive text-xs">{tagError}</p>
+          ) : null}
         </div>
       </div>
 
@@ -198,7 +241,7 @@ function PublishDialogContent({
           Cancel
         </DialogClose>
         <Button
-          disabled={pending || publishBlocked}
+          disabled={pending || publishBlocked || !!tagError}
           onClick={handleSubmit}
           size="sm"
         >
@@ -257,8 +300,16 @@ function PublishShortNoteDialogContent({
   pending,
   onSubmit,
 }: Omit<PublishShortNoteDialogProps, "open" | "onOpenChange">) {
-  const { tags, tagInput, setTagInput, addTag, removeTag, handleTagKeyDown } =
-    useTagEditor(initialTags);
+  const {
+    tags,
+    tagInput,
+    tagError,
+    setTagInput,
+    setTagError,
+    addTag,
+    removeTag,
+    handleTagKeyDown,
+  } = useTagEditor(initialTags);
   const hasLocalAttachmentImages = hasAttachmentReferences(content);
 
   const handleSubmit = () => {
@@ -299,7 +350,10 @@ function PublishShortNoteDialogContent({
             ))}
             <input
               className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
-              onChange={(e) => setTagInput(e.target.value)}
+              onChange={(e) => {
+                setTagInput(e.target.value);
+                setTagError(null);
+              }}
               onKeyDown={handleTagKeyDown}
               onBlur={() => {
                 if (tagInput.trim()) addTag(tagInput);
@@ -309,6 +363,9 @@ function PublishShortNoteDialogContent({
               value={tagInput}
             />
           </div>
+          {tagError ? (
+            <p className="text-destructive text-xs">{tagError}</p>
+          ) : null}
         </div>
       </div>
 
@@ -334,7 +391,7 @@ function PublishShortNoteDialogContent({
           Cancel
         </DialogClose>
         <Button
-          disabled={pending || hasLocalAttachmentImages}
+          disabled={pending || hasLocalAttachmentImages || !!tagError}
           onClick={handleSubmit}
           size="sm"
         >

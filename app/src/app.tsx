@@ -219,11 +219,11 @@ function App() {
         </DialogPortal>
       </DialogRoot>
       <CommandPalette
-        availableTags={sidebarPaneProps.availableTags}
+        availableTagPaths={sidebarPaneProps.availableTagPaths}
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onSelectNote={notesPaneProps.onSelectNote}
-        onToggleTag={sidebarPaneProps.onToggleTag}
+        onSelectTagPath={sidebarPaneProps.onSelectTagPath}
       />
       <SettingsDialog />
       <Toaster closeButton position="bottom-right" richColors />

@@ -1,3 +1,4 @@
+use crate::domain::common::text::extract_tags;
 use crate::domain::sync::model::SyncedNote;
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -18,6 +19,14 @@ pub fn upsert_from_sync(
     note: &SyncedNote,
     sync_event_id: &str,
 ) -> Result<Option<String>, AppError> {
+    let parsed_direct_tags = extract_tags(&note.markdown);
+    if !note.tags.is_empty() && note.tags != parsed_direct_tags {
+        eprintln!(
+            "[sync] direct tag mismatch for note={} payload_tags={:?} parsed_tags={:?}",
+            note.id, note.tags, parsed_direct_tags
+        );
+    }
+
     let existing: Option<(String, i64)> = conn
         .query_row(
             "SELECT id, modified_at FROM notes WHERE id = ?1",
@@ -79,15 +88,7 @@ pub fn upsert_from_sync(
             ],
         )?;
     }
-
-    // Update tags
-    conn.execute("DELETE FROM note_tags WHERE note_id = ?1", params![note.id])?;
-    for tag in &note.tags {
-        conn.execute(
-            "INSERT OR IGNORE INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-            params![note.id, tag],
-        )?;
-    }
+    crate::adapters::sqlite::tag_index::rebuild_note_tag_index(conn, &note.id, &note.markdown)?;
 
     // Update FTS
     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note.id])?;

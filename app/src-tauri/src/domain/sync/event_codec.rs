@@ -257,7 +257,8 @@ mod tests {
         assert!(parsed.readonly);
         assert_eq!(parsed.tags, tags);
         assert_eq!(
-            rumor.tags
+            rumor
+                .tags
                 .find(TagKind::custom("type"))
                 .and_then(|tag| tag.content()),
             Some("note")
@@ -352,7 +353,8 @@ mod tests {
 
         assert_eq!(parsed.tags, vec!["alpha".to_string(), "beta".to_string()]);
         assert_eq!(
-            rumor.tags
+            rumor
+                .tags
                 .find(TagKind::custom("type"))
                 .and_then(|tag| tag.content()),
             Some("note")

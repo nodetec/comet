@@ -57,11 +57,20 @@ export type BootstrapPayload = {
   trashedCount: number;
 };
 
+export type TagIndexDiagnostics = {
+  version: string | null;
+  status: string | null;
+  lastRebuiltAt: number | null;
+  tagCount: number;
+  linkCount: number;
+  directLinkCount: number;
+};
+
 export type NoteSortField = "modified_at" | "created_at" | "title";
 export type NoteSortDirection = "newest" | "oldest";
 
 export type NoteQueryInput = {
-  activeTags: string[];
+  activeTagPath: string | null;
   limit: number;
   noteFilter: NoteFilter;
   offset: number;
@@ -81,8 +90,38 @@ export type ContextualTagsInput = {
   noteFilter: NoteFilter;
 };
 
+export type RenameTagInput = {
+  fromPath: string;
+  toPath: string;
+};
+
+export type DeleteTagInput = {
+  path: string;
+};
+
+export type SetTagPinnedInput = {
+  path: string;
+  pinned: boolean;
+};
+
+export type SetHideSubtagNotesInput = {
+  hideSubtagNotes: boolean;
+  path: string;
+};
+
+export type ContextualTagNode = {
+  children: ContextualTagNode[];
+  depth: number;
+  directNoteCount: number;
+  hideSubtagNotes: boolean;
+  inclusiveNoteCount: number;
+  label: string;
+  path: string;
+  pinned: boolean;
+};
+
 export type ContextualTagsPayload = {
-  tags: string[];
+  roots: ContextualTagNode[];
 };
 
 export type PublishNoteInput = {
@@ -95,4 +134,14 @@ export type PublishNoteInput = {
 export type PublishShortNoteInput = {
   noteId: string;
   tags: string[];
+};
+
+export type ExportMode = "note_filter" | "tag";
+
+export type ExportNotesInput = {
+  exportMode: ExportMode;
+  noteFilter?: NoteFilter;
+  tagPath?: string;
+  preserveTags?: boolean;
+  exportDir: string;
 };

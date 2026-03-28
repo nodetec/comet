@@ -87,13 +87,7 @@ pub(super) async fn run_revision_sync_connection(
         .send_changes("sync", &recipient, snapshot_seq, true)
         .await?;
 
-    flush_pending_local_changes(
-        app,
-        &relay_url,
-        &backup_relay_urls,
-        &keys,
-    )
-    .await?;
+    flush_pending_local_changes(app, &relay_url, &backup_relay_urls, &keys).await?;
 
     let mut pending_pushes: HashMap<String, tokio::time::Instant> = HashMap::new();
     let debounce_duration = Duration::from_secs(2);
@@ -312,17 +306,19 @@ async fn handle_revision_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
-            if let Some(change) = crate::domain::sync::revision_apply_service::apply_remote_revision_event(
-                &conn,
-                relay_url,
-                keys,
-                &event,
-                Some(seq),
-                |note_id| {
-                    app.state::<crate::infra::cache::RenderedHtmlCache>()
-                        .invalidate(note_id);
-                },
-            )? {
+            if let Some(change) =
+                crate::domain::sync::revision_apply_service::apply_remote_revision_event(
+                    &conn,
+                    relay_url,
+                    keys,
+                    &event,
+                    Some(seq),
+                    |note_id| {
+                        app.state::<crate::infra::cache::RenderedHtmlCache>()
+                            .invalidate(note_id);
+                    },
+                )?
+            {
                 emit_sync_remote_change(app, change);
             }
         }
@@ -331,11 +327,13 @@ async fn handle_revision_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
-            let relay_state = crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
-                &conn, relay_url,
-            )?;
-            let min_payload_mtime =
-                relay_state.as_ref().and_then(|state| state.min_payload_mtime);
+            let relay_state =
+                crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
+                    &conn, relay_url,
+                )?;
+            let min_payload_mtime = relay_state
+                .as_ref()
+                .and_then(|state| state.min_payload_mtime);
             let snapshot_seq = relay_state.as_ref().and_then(|state| state.snapshot_seq);
             // `last_seq` is the live `CHANGES` progress marker. Preserve the
             // original bootstrap `snapshot_seq` so the handoff boundary remains

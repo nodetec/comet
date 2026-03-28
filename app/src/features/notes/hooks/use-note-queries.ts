@@ -11,6 +11,7 @@ import {
   queryNotes,
 } from "@/shared/api/invoke";
 import {
+  type ContextualTagNode,
   type NoteFilter,
   type NoteQueryInput,
   type NoteSortDirection,
@@ -18,11 +19,26 @@ import {
 } from "@/shared/api/types";
 import { flattenNotePages } from "@/features/shell/utils";
 
-const EMPTY_TAGS: string[] = [];
+const EMPTY_TAG_TREE: ContextualTagNode[] = [];
+
+function flattenTagPaths(nodes: ContextualTagNode[]): string[] {
+  const paths: string[] = [];
+
+  const visit = (tagNodes: ContextualTagNode[]) => {
+    for (const node of tagNodes) {
+      paths.push(node.path);
+      visit(node.children);
+    }
+  };
+
+  visit(nodes);
+
+  return paths;
+}
 
 export interface NoteQueryParams {
   noteFilter: NoteFilter;
-  activeTags: string[];
+  activeTagPath: string | null;
   searchQuery: string;
   sortField: NoteSortField;
   sortDirection: NoteSortDirection;
@@ -32,7 +48,7 @@ export interface NoteQueryParams {
 export function useNoteQueries(params: NoteQueryParams) {
   const {
     noteFilter,
-    activeTags,
+    activeTagPath,
     searchQuery,
     sortField,
     sortDirection,
@@ -40,11 +56,7 @@ export function useNoteQueries(params: NoteQueryParams) {
   } = params;
 
   const normalizedQuery = searchQuery.trim();
-  const normalizedActiveTags = useMemo(
-    // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig targets ES2020, so toSorted() is unavailable here
-    () => [...activeTags].sort((left, right) => left.localeCompare(right)),
-    [activeTags],
-  );
+  const normalizedActiveTagPath = activeTagPath?.trim() || null;
 
   const bootstrapQuery = useQuery({
     queryKey: ["bootstrap"],
@@ -62,13 +74,13 @@ export function useNoteQueries(params: NoteQueryParams) {
   const isDefaultNotesView =
     noteFilter === "all" &&
     normalizedQuery === "" &&
-    normalizedActiveTags.length === 0 &&
+    normalizedActiveTagPath === null &&
     sortField === "modified_at" &&
     sortDirection === "newest";
 
   const notesQueryInput = useMemo<NoteQueryInput>(
     () => ({
-      activeTags: normalizedActiveTags,
+      activeTagPath: normalizedActiveTagPath,
       limit: NOTE_PAGE_SIZE,
       noteFilter,
       offset: 0,
@@ -77,7 +89,7 @@ export function useNoteQueries(params: NoteQueryParams) {
       sortDirection,
     }),
     [
-      normalizedActiveTags,
+      normalizedActiveTagPath,
       normalizedQuery,
       noteFilter,
       sortField,
@@ -126,7 +138,11 @@ export function useNoteQueries(params: NoteQueryParams) {
     queryFn: () => getContextualTags({ noteFilter }),
     queryKey: ["contextual-tags", noteFilter],
   });
-  const availableTags = contextualTagsQuery.data?.tags ?? EMPTY_TAGS;
+  const availableTagTree = contextualTagsQuery.data?.roots ?? EMPTY_TAG_TREE;
+  const availableTagPaths = useMemo(
+    () => flattenTagPaths(availableTagTree),
+    [availableTagTree],
+  );
 
   const noteQuery = useQuery({
     enabled: Boolean(selectedNoteId),
@@ -148,7 +164,8 @@ export function useNoteQueries(params: NoteQueryParams) {
     noteQuery,
     contextualTagsQuery,
     currentNotes,
-    availableTags,
+    availableTagPaths,
+    availableTagTree,
     totalNoteCount,
     activeNpub,
     initialSelectedNoteId,

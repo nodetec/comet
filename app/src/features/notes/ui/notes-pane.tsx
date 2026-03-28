@@ -57,7 +57,7 @@ function notesHeading(noteFilter: NoteFilter) {
 }
 
 type NotesPaneProps = {
-  activeTags: string[];
+  activeTagPath: string | null;
   creatingNoteId: string | null;
   filteredNotes: NoteSummary[];
   hasMoreNotes: boolean | undefined;
@@ -514,7 +514,7 @@ const NoteRow = memo(function NoteRow({
 });
 
 export function NotesPane({
-  activeTags,
+  activeTagPath,
   creatingNoteId,
   filteredNotes,
   hasMoreNotes,
@@ -560,7 +560,7 @@ export function NotesPane({
     }
   }, [creatingNoteId]);
 
-  const viewKey = `${noteFilter}-${activeTags.join(",")}-${searchQuery}`;
+  const viewKey = `${noteFilter}-${activeTagPath ?? ""}-${searchQuery}`;
   const prevViewKeyRef = useRef(viewKey);
   const skipAnimationUntilRef = useRef(0);
 

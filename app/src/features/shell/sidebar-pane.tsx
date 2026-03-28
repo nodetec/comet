@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type RefObject,
+} from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Menu } from "@tauri-apps/api/menu";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
 import {
   Archive,
   CalendarDays,
@@ -18,11 +25,21 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
+import {
+  DialogBackdrop,
+  DialogDescription,
+  DialogPopup,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
 import { SyncDialog } from "@/features/sync";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { type NoteFilter } from "@/shared/api/types";
+import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
@@ -38,12 +55,161 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   return `flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors ${stateClass}`;
 }
 
+function defaultExpandedTagPaths(nodes: ContextualTagNode[]) {
+  const next = new Set<string>();
+
+  const visit = (tagNodes: ContextualTagNode[]) => {
+    for (const node of tagNodes) {
+      if (node.depth <= 1) {
+        next.add(node.path);
+      }
+      visit(node.children);
+    }
+  };
+
+  visit(nodes);
+  return next;
+}
+
+function renameErrorMessage(input: string, normalizedTarget: string | null) {
+  if (input.trim().length === 0) {
+    return null;
+  }
+
+  if (normalizedTarget == null) {
+    return "Enter a valid tag path.";
+  }
+
+  return null;
+}
+
+function resetRenameDialog(params: {
+  setRenameDialogOpen: (open: boolean) => void;
+  setRenameSourcePath: (path: string) => void;
+  setRenameInputValue: (value: string) => void;
+}) {
+  params.setRenameDialogOpen(false);
+  params.setRenameSourcePath("");
+  params.setRenameInputValue("");
+}
+
+function submitRenameDialog(params: {
+  event: { preventDefault(): void };
+  renameHasChanged: boolean;
+  normalizedRenameTarget: string | null;
+  renameSourcePath: string;
+  onRenameTag: (fromPath: string, toPath: string) => void;
+  onClose: () => void;
+}) {
+  const {
+    event,
+    renameHasChanged,
+    normalizedRenameTarget,
+    renameSourcePath,
+    onRenameTag,
+    onClose,
+  } = params;
+
+  event.preventDefault();
+  if (!renameHasChanged || !normalizedRenameTarget) {
+    return;
+  }
+
+  onRenameTag(renameSourcePath, normalizedRenameTarget);
+  onClose();
+}
+
+function useExpandedTagPaths(availableTagTree: ContextualTagNode[]) {
+  const [expandedTagPaths, setExpandedTagPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  useEffect(() => {
+    setExpandedTagPaths(defaultExpandedTagPaths(availableTagTree));
+  }, [availableTagTree]);
+
+  return { expandedTagPaths, setExpandedTagPaths };
+}
+
+function useRenameInputFocus(
+  renameDialogOpen: boolean,
+  renameInputRef: RefObject<HTMLInputElement | null>,
+) {
+  useEffect(() => {
+    if (!renameDialogOpen) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [renameDialogOpen, renameInputRef]);
+}
+
+function useSidebarBorders(params: {
+  availableTagTreeLength: number;
+  noteFilter: NoteFilter;
+  scrollContainerRef: RefObject<HTMLElement | null>;
+  footerSentinelRef: RefObject<HTMLDivElement | null>;
+}) {
+  const {
+    availableTagTreeLength,
+    noteFilter,
+    scrollContainerRef,
+    footerSentinelRef,
+  } = params;
+  const [showHeaderBorder, setShowHeaderBorder] = useState(false);
+  const [showFooterBorder, setShowFooterBorder] = useState(false);
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    setShowHeaderBorder((scrollContainer?.scrollTop ?? 0) > 0);
+  }, [availableTagTreeLength, noteFilter, scrollContainerRef]);
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    const footerSentinel = footerSentinelRef.current;
+    if (!scrollContainer || !footerSentinel) {
+      setShowFooterBorder(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowFooterBorder(!entry?.isIntersecting);
+      },
+      {
+        root: scrollContainer,
+        threshold: 1,
+      },
+    );
+
+    observer.observe(footerSentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    availableTagTreeLength,
+    noteFilter,
+    scrollContainerRef,
+    footerSentinelRef,
+  ]);
+
+  return { showHeaderBorder, setShowHeaderBorder, showFooterBorder };
+}
+
 type SidebarPaneProps = {
-  activeTags: string[];
+  activeTagPath: string | null;
   archivedCount: number;
   todoCount: number;
   trashedCount: number;
-  availableTags: string[];
+  availableTagTree: ContextualTagNode[];
   noteFilter: NoteFilter;
   onSelectAll(): void;
   onSelectToday(): void;
@@ -51,8 +217,263 @@ type SidebarPaneProps = {
   onSelectArchive(): void;
   onSelectTrash(): void;
   onEmptyTrash(): void;
-  onToggleTag(tag: string): void;
+  onDeleteTag(path: string): void;
+  onExportTag(path: string): void;
+  onRenameTag(fromPath: string, toPath: string): void;
+  onSetTagPinned(path: string, pinned: boolean): void;
+  onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
+  onSelectTagPath(tagPath: string): void;
 };
+
+async function showTagContextMenu(
+  event: MouseEvent<HTMLDivElement | HTMLButtonElement>,
+  node: ContextualTagNode,
+  ctx: {
+    onDeleteTag(path: string): void;
+    onExportTag(path: string): void;
+    onOpenRenameTagDialog(path: string): void;
+    onSetTagPinned(path: string, pinned: boolean): void;
+    onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
+  },
+) {
+  event.preventDefault();
+
+  const items: Array<
+    | CheckMenuItem
+    | { item: "Separator" }
+    | { id: string; text: string; action: () => void }
+  > = [
+    {
+      id: `rename-${node.path}`,
+      text: "Rename Tag...",
+      action: () => ctx.onOpenRenameTagDialog(node.path),
+    },
+    {
+      id: `delete-${node.path}`,
+      text: "Delete Tag",
+      action: () => {
+        void (async () => {
+          const confirmed = await ask(
+            `Delete "${node.path}" from all matching notes?`,
+            {
+              title: "Delete Tag",
+              kind: "warning",
+              okLabel: "Delete",
+              cancelLabel: "Cancel",
+            },
+          );
+          if (confirmed) {
+            ctx.onDeleteTag(node.path);
+          }
+        })();
+      },
+    },
+    {
+      id: `export-${node.path}`,
+      text: "Export Tag…",
+      action: () => ctx.onExportTag(node.path),
+    },
+  ];
+
+  if (node.children.length > 0 || node.depth === 0) {
+    items.push({ item: "Separator" as const });
+  }
+
+  if (node.depth === 0) {
+    items.push({
+      id: `pin-${node.path}`,
+      text: node.pinned ? "Unpin From Top" : "Pin To Top",
+      action: () => ctx.onSetTagPinned(node.path, !node.pinned),
+    });
+  }
+
+  if (node.children.length > 0) {
+    items.push(
+      await CheckMenuItem.new({
+        id: `hide-subtags-${node.path}`,
+        text: "Hide Subtag Notes",
+        checked: node.hideSubtagNotes,
+        action: () =>
+          ctx.onSetTagHideSubtagNotes(node.path, !node.hideSubtagNotes),
+      }),
+    );
+  }
+
+  const menu = await Menu.new({ items });
+
+  try {
+    await menu.popup(new LogicalPosition(event.clientX, event.clientY));
+  } finally {
+    await menu.close();
+  }
+}
+
+function TagTree({
+  activeTagPath,
+  expandedTagPaths,
+  nodes,
+  onDeleteTag,
+  onExportTag,
+  onOpenRenameTagDialog,
+  onSetTagHideSubtagNotes,
+  onSetTagPinned,
+  onToggleExpanded,
+  onSelectTagPath,
+}: {
+  activeTagPath: string | null;
+  expandedTagPaths: Set<string>;
+  nodes: ContextualTagNode[];
+  onDeleteTag(path: string): void;
+  onExportTag(path: string): void;
+  onOpenRenameTagDialog(path: string): void;
+  onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
+  onSetTagPinned(path: string, pinned: boolean): void;
+  onToggleExpanded(path: string): void;
+  onSelectTagPath(path: string): void;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {nodes.map((node) => {
+        const isActive = activeTagPath === node.path;
+        const hasChildren = node.children.length > 0;
+        const isExpanded = expandedTagPaths.has(node.path);
+
+        return (
+          <div key={node.path}>
+            <div
+              className={cn(
+                "rounded-md pr-2",
+                isActive && "bg-primary/25 text-secondary-foreground",
+              )}
+              onContextMenu={(event) =>
+                void showTagContextMenu(event, node, {
+                  onDeleteTag,
+                  onExportTag,
+                  onOpenRenameTagDialog,
+                  onSetTagPinned,
+                  onSetTagHideSubtagNotes,
+                })
+              }
+            >
+              <div
+                className="flex items-center"
+                style={{ paddingLeft: `${4 + node.depth * 12}px` }}
+              >
+                {hasChildren ? (
+                  <button
+                    className="flex size-5 shrink-0 items-center justify-center"
+                    onClick={() => onToggleExpanded(node.path)}
+                    type="button"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "size-3 transition-transform",
+                        isExpanded ? "rotate-90" : "rotate-0",
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <span className="inline-block size-5 shrink-0" />
+                )}
+                <button
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-xs"
+                  onClick={() => onSelectTagPath(node.path)}
+                  type="button"
+                >
+                  <span className="truncate">{node.label}</span>
+                  <span className="text-muted-foreground ml-auto shrink-0 text-[11px]">
+                    {node.inclusiveNoteCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+            {hasChildren && isExpanded ? (
+              <TagTree
+                activeTagPath={activeTagPath}
+                expandedTagPaths={expandedTagPaths}
+                nodes={node.children}
+                onDeleteTag={onDeleteTag}
+                onExportTag={onExportTag}
+                onOpenRenameTagDialog={onOpenRenameTagDialog}
+                onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
+                onSetTagPinned={onSetTagPinned}
+                onToggleExpanded={onToggleExpanded}
+                onSelectTagPath={onSelectTagPath}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RenameTagDialog({
+  open,
+  renameError,
+  renameHasChanged,
+  renameInputRef,
+  renameInputValue,
+  renameSourcePath,
+  onClose,
+  onInputChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  renameError: string | null;
+  renameHasChanged: boolean;
+  renameInputRef: RefObject<HTMLInputElement | null>;
+  renameInputValue: string;
+  renameSourcePath: string;
+  onClose: () => void;
+  onInputChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: { preventDefault(): void }) => void;
+}) {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogPortal keepMounted={false}>
+        <DialogBackdrop />
+        <DialogPopup className="w-full max-w-md p-6">
+          <DialogTitle className="text-base font-semibold">
+            Rename Tag
+          </DialogTitle>
+          <DialogDescription className="mt-2">
+            Rename <code>{renameSourcePath}</code> across all matching notes.
+          </DialogDescription>
+          <form className="mt-4 flex flex-col gap-4" onSubmit={onSubmit}>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-muted-foreground text-xs font-medium">
+                New Tag Path
+              </span>
+              <Input
+                aria-invalid={renameError ? "true" : "false"}
+                onChange={(event) => onInputChange(event.target.value)}
+                ref={renameInputRef}
+                value={renameInputValue}
+              />
+              {renameError ? (
+                <span className="text-destructive text-xs">{renameError}</span>
+              ) : null}
+            </label>
+            <div className="mt-2 flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!renameHasChanged || !!renameError}
+                type="submit"
+              >
+                Rename
+              </Button>
+            </div>
+          </form>
+        </DialogPopup>
+      </DialogPortal>
+    </DialogRoot>
+  );
+}
 
 async function showTrashContextMenu(
   event: MouseEvent<HTMLButtonElement>,
@@ -96,11 +517,11 @@ function useSyncState() {
 }
 
 export function SidebarPane({
-  activeTags,
+  activeTagPath,
   archivedCount,
   todoCount,
   trashedCount,
-  availableTags,
+  availableTagTree,
   noteFilter,
   onSelectAll,
   onSelectToday,
@@ -108,249 +529,298 @@ export function SidebarPane({
   onSelectArchive,
   onSelectTrash,
   onEmptyTrash,
-  onToggleTag,
+  onDeleteTag,
+  onExportTag,
+  onRenameTag,
+  onSetTagPinned,
+  onSetTagHideSubtagNotes,
+  onSelectTagPath,
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [showHeaderBorder, setShowHeaderBorder] = useState(false);
-  const [showFooterBorder, setShowFooterBorder] = useState(false);
   const [notesOpen, setNotesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameSourcePath, setRenameSourcePath] = useState("");
+  const [renameInputValue, setRenameInputValue] = useState("");
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const footerSentinelRef = useRef<HTMLDivElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const { expandedTagPaths, setExpandedTagPaths } =
+    useExpandedTagPaths(availableTagTree);
+  const { showHeaderBorder, setShowHeaderBorder, showFooterBorder } =
+    useSidebarBorders({
+      availableTagTreeLength: availableTagTree.length,
+      noteFilter,
+      scrollContainerRef,
+      footerSentinelRef,
+    });
 
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    setShowHeaderBorder((scrollContainer?.scrollTop ?? 0) > 0);
-  }, [availableTags.length, noteFilter]);
-
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    const footerSentinel = footerSentinelRef.current;
-    if (!scrollContainer || !footerSentinel) {
-      setShowFooterBorder(false);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowFooterBorder(!entry?.isIntersecting);
-      },
-      {
-        root: scrollContainer,
-        threshold: 1,
-      },
-    );
-
-    observer.observe(footerSentinel);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [availableTags.length, noteFilter]);
+  const normalizedRenameTarget = canonicalizeTagPath(renameInputValue.trim());
+  const renameHasChanged =
+    normalizedRenameTarget != null &&
+    normalizedRenameTarget !== renameSourcePath;
+  const renameError = renameErrorMessage(
+    renameInputValue,
+    normalizedRenameTarget,
+  );
+  useRenameInputFocus(renameDialogOpen, renameInputRef);
 
   const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
     showTrashContextMenu(event, onEmptyTrash).catch(() => {});
   };
 
-  return (
-    <aside className="bg-sidebar flex h-full min-h-0 flex-col">
-      <header
-        className={cn(
-          "flex h-13 shrink-0 items-center justify-end px-3",
-          showHeaderBorder && "border-divider border-b",
-        )}
-      >
-        <div className="relative z-40 flex gap-1">
-          <Button
-            aria-label={`Sync: ${syncState}`}
-            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            size="icon-sm"
-            variant="ghost"
-            onClick={() => setSyncDialogOpen(true)}
-          >
-            {syncState === "connected" && (
-              <CloudCheck className="size-[1.2rem]" />
-            )}
-            {syncState === "needsUnlock" && (
-              <CloudAlert className="size-[1.2rem] text-amber-500" />
-            )}
-            {(syncState === "syncing" ||
-              syncState === "connecting" ||
-              syncState === "authenticating") && (
-              <CloudSync className="size-[1.2rem] animate-pulse" />
-            )}
-            {syncState === "error" && (
-              <CloudAlert className="text-destructive size-[1.2rem]" />
-            )}
-            {syncState === "disconnected" && (
-              <CloudOff className="size-[1.2rem]" />
-            )}
-          </Button>
-          <SyncDialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen} />
-          <Button
-            aria-label="Settings"
-            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            onClick={() => openSettings(true)}
-            size="icon-sm"
-            variant="ghost"
-          >
-            <Settings2 className="size-[1.2rem]" />
-          </Button>
-        </div>
-      </header>
-      <nav
-        className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-2 pt-3"
-        onScroll={(event) => {
-          setShowHeaderBorder(event.currentTarget.scrollTop > 0);
-        }}
-        ref={scrollContainerRef}
-      >
-        <section>
-          <button
-            className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
-            onClick={() => {
-              setNotesOpen((current) => !current);
-            }}
-            type="button"
-          >
-            <span className="leading-none">Notes</span>
-            <ChevronRight
-              className={cn(
-                "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-                notesOpen ? "rotate-90" : "rotate-0",
-              )}
-            />
-          </button>
-          <div
-            className={cn(
-              "grid overflow-hidden transition-all duration-200 ease-out",
-              notesOpen
-                ? "grid-rows-[1fr] pt-1 opacity-100"
-                : "grid-rows-[0fr] opacity-0",
-            )}
-          >
-            <div className="min-h-0">
-              <button
-                className={sidebarItemClasses(noteFilter === "all", isFocused)}
-                onClick={onSelectAll}
-                type="button"
-              >
-                <FileTextIcon className="text-primary size-4 shrink-0" />
-                All Notes
-              </button>
-              <button
-                className={sidebarItemClasses(
-                  noteFilter === "today",
-                  isFocused,
-                )}
-                onClick={onSelectToday}
-                type="button"
-              >
-                <CalendarDays className="text-primary size-4 shrink-0" />
-                Today
-              </button>
-              <button
-                className={sidebarItemClasses(noteFilter === "todo", isFocused)}
-                onClick={onSelectTodo}
-                type="button"
-              >
-                {todoCount > 0 ? (
-                  <Square className="text-primary size-4 shrink-0" />
-                ) : (
-                  <CheckSquare className="text-primary size-4 shrink-0" />
-                )}
-                Todo
-              </button>
-              {(archivedCount > 0 || noteFilter === "archive") && (
-                <button
-                  className={sidebarItemClasses(
-                    noteFilter === "archive",
-                    isFocused,
-                  )}
-                  onClick={onSelectArchive}
-                  type="button"
-                >
-                  <Archive className="text-primary size-4 shrink-0" />
-                  Archive
-                </button>
-              )}
-              {(trashedCount > 0 || noteFilter === "trash") && (
-                <button
-                  className={sidebarItemClasses(
-                    noteFilter === "trash",
-                    isFocused,
-                  )}
-                  onClick={onSelectTrash}
-                  onContextMenu={(event) => handleTrashContextMenu(event)}
-                  type="button"
-                >
-                  <Trash2 className="text-primary size-4 shrink-0" />
-                  Trash
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
+  const closeRenameDialog = () => {
+    resetRenameDialog({
+      setRenameDialogOpen,
+      setRenameSourcePath,
+      setRenameInputValue,
+    });
+  };
 
-        {availableTags.length > 0 ? (
+  const handleRenameDialogSubmit = (event: { preventDefault(): void }) => {
+    submitRenameDialog({
+      event,
+      renameHasChanged,
+      normalizedRenameTarget,
+      renameSourcePath,
+      onRenameTag,
+      onClose: closeRenameDialog,
+    });
+  };
+
+  return (
+    <>
+      <aside className="bg-sidebar flex h-full min-h-0 flex-col">
+        <header
+          className={cn(
+            "flex h-13 shrink-0 items-center justify-end px-3",
+            showHeaderBorder && "border-divider border-b",
+          )}
+        >
+          <div className="relative z-40 flex gap-1">
+            <Button
+              aria-label={`Sync: ${syncState}`}
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setSyncDialogOpen(true)}
+            >
+              {syncState === "connected" && (
+                <CloudCheck className="size-[1.2rem]" />
+              )}
+              {syncState === "needsUnlock" && (
+                <CloudAlert className="size-[1.2rem] text-amber-500" />
+              )}
+              {(syncState === "syncing" ||
+                syncState === "connecting" ||
+                syncState === "authenticating") && (
+                <CloudSync className="size-[1.2rem] animate-pulse" />
+              )}
+              {syncState === "error" && (
+                <CloudAlert className="text-destructive size-[1.2rem]" />
+              )}
+              {syncState === "disconnected" && (
+                <CloudOff className="size-[1.2rem]" />
+              )}
+            </Button>
+            <SyncDialog
+              open={syncDialogOpen}
+              onOpenChange={setSyncDialogOpen}
+            />
+            <Button
+              aria-label="Settings"
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={() => openSettings(true)}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <Settings2 className="size-[1.2rem]" />
+            </Button>
+          </div>
+        </header>
+        <nav
+          className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-2 pt-3"
+          onScroll={(event) => {
+            setShowHeaderBorder(event.currentTarget.scrollTop > 0);
+          }}
+          ref={scrollContainerRef}
+        >
           <section>
             <button
               className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
               onClick={() => {
-                setTagsOpen((current) => !current);
+                setNotesOpen((current) => !current);
               }}
               type="button"
             >
-              <span className="leading-none">Tags</span>
+              <span className="leading-none">Notes</span>
               <ChevronRight
                 className={cn(
                   "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-                  tagsOpen ? "rotate-90" : "rotate-0",
+                  notesOpen ? "rotate-90" : "rotate-0",
                 )}
               />
             </button>
             <div
               className={cn(
                 "grid overflow-hidden transition-all duration-200 ease-out",
-                tagsOpen
-                  ? "grid-rows-[1fr] pt-2 opacity-100"
+                notesOpen
+                  ? "grid-rows-[1fr] pt-1 opacity-100"
                   : "grid-rows-[0fr] opacity-0",
               )}
             >
               <div className="min-h-0">
-                <div className="flex flex-wrap gap-2 pl-1">
-                  {availableTags.map((tag) => {
-                    const isActive = activeTags.includes(tag);
-
-                    return (
-                      <button
-                        className={cn(
-                          "rounded-md px-2 py-1 text-xs font-medium transition-colors",
-                          isActive
-                            ? "bg-primary/25 text-secondary-foreground"
-                            : "bg-accent text-secondary-foreground hover:bg-accent/80",
-                        )}
-                        key={tag}
-                        onClick={() => onToggleTag(tag)}
-                        type="button"
-                      >
-                        #{tag}
-                      </button>
-                    );
-                  })}
-                </div>
+                <button
+                  className={sidebarItemClasses(
+                    noteFilter === "all",
+                    isFocused,
+                  )}
+                  onClick={onSelectAll}
+                  type="button"
+                >
+                  <FileTextIcon className="text-primary size-4 shrink-0" />
+                  All Notes
+                </button>
+                <button
+                  className={sidebarItemClasses(
+                    noteFilter === "today",
+                    isFocused,
+                  )}
+                  onClick={onSelectToday}
+                  type="button"
+                >
+                  <CalendarDays className="text-primary size-4 shrink-0" />
+                  Today
+                </button>
+                <button
+                  className={sidebarItemClasses(
+                    noteFilter === "todo",
+                    isFocused,
+                  )}
+                  onClick={onSelectTodo}
+                  type="button"
+                >
+                  {todoCount > 0 ? (
+                    <Square className="text-primary size-4 shrink-0" />
+                  ) : (
+                    <CheckSquare className="text-primary size-4 shrink-0" />
+                  )}
+                  Todo
+                </button>
+                {(archivedCount > 0 || noteFilter === "archive") && (
+                  <button
+                    className={sidebarItemClasses(
+                      noteFilter === "archive",
+                      isFocused,
+                    )}
+                    onClick={onSelectArchive}
+                    type="button"
+                  >
+                    <Archive className="text-primary size-4 shrink-0" />
+                    Archive
+                  </button>
+                )}
+                {(trashedCount > 0 || noteFilter === "trash") && (
+                  <button
+                    className={sidebarItemClasses(
+                      noteFilter === "trash",
+                      isFocused,
+                    )}
+                    onClick={onSelectTrash}
+                    onContextMenu={(event) => handleTrashContextMenu(event)}
+                    type="button"
+                  >
+                    <Trash2 className="text-primary size-4 shrink-0" />
+                    Trash
+                  </button>
+                )}
               </div>
             </div>
           </section>
-        ) : null}
-        <div className="h-px shrink-0" ref={footerSentinelRef} />
-      </nav>
 
-      {showFooterBorder ? <div className="border-divider border-t" /> : null}
-    </aside>
+          {availableTagTree.length > 0 ? (
+            <section>
+              <button
+                className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
+                onClick={() => {
+                  setTagsOpen((current) => !current);
+                }}
+                type="button"
+              >
+                <span className="leading-none">Tags</span>
+                <ChevronRight
+                  className={cn(
+                    "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
+                    tagsOpen ? "rotate-90" : "rotate-0",
+                  )}
+                />
+              </button>
+              <div
+                className={cn(
+                  "grid overflow-hidden transition-all duration-200 ease-out",
+                  tagsOpen
+                    ? "grid-rows-[1fr] pt-2 opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="min-h-0">
+                  <TagTree
+                    activeTagPath={activeTagPath}
+                    expandedTagPaths={expandedTagPaths}
+                    nodes={availableTagTree}
+                    onDeleteTag={onDeleteTag}
+                    onExportTag={onExportTag}
+                    onOpenRenameTagDialog={(path) => {
+                      setRenameSourcePath(path);
+                      setRenameInputValue(path);
+                      setRenameDialogOpen(true);
+                    }}
+                    onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
+                    onSetTagPinned={onSetTagPinned}
+                    onToggleExpanded={(path) => {
+                      setExpandedTagPaths((current) => {
+                        const next = new Set(current);
+                        if (next.has(path)) {
+                          next.delete(path);
+                        } else {
+                          next.add(path);
+                        }
+                        return next;
+                      });
+                    }}
+                    onSelectTagPath={onSelectTagPath}
+                  />
+                </div>
+              </div>
+            </section>
+          ) : null}
+          <div className="h-px shrink-0" ref={footerSentinelRef} />
+        </nav>
+
+        {showFooterBorder ? <div className="border-divider border-t" /> : null}
+      </aside>
+
+      <RenameTagDialog
+        open={renameDialogOpen}
+        renameError={renameError}
+        renameHasChanged={renameHasChanged}
+        renameInputRef={renameInputRef}
+        renameInputValue={renameInputValue}
+        renameSourcePath={renameSourcePath}
+        onClose={closeRenameDialog}
+        onInputChange={setRenameInputValue}
+        onOpenChange={(open) => {
+          setRenameDialogOpen(open);
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+        onSubmit={handleRenameDialogSubmit}
+      />
+    </>
   );
 }

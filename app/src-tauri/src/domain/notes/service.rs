@@ -1,10 +1,14 @@
-use crate::domain::common::text::{extract_tags, title_from_markdown};
+use crate::domain::common::text::{
+    canonicalize_tag_path, extract_tags, render_tag_token, rewrite_tag_path_in_markdown,
+    title_from_markdown,
+};
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::*;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 
 const INITIAL_NOTES_PAGE_SIZE: usize = 40;
+const TAG_REWRITE_WARN_THRESHOLD: usize = 100;
 
 pub struct NoteService;
 
@@ -27,6 +31,10 @@ fn generate_note_id() -> String {
     format!("note-{}", now_millis())
 }
 
+fn validate_tag_path(path: &str) -> Result<String, NoteError> {
+    canonicalize_tag_path(path).ok_or(NoteError::InvalidTagPath)
+}
+
 /// Build the default markdown content for a new note.
 fn default_markdown(tags: &[String]) -> String {
     if tags.is_empty() {
@@ -34,10 +42,14 @@ fn default_markdown(tags: &[String]) -> String {
     } else {
         let tag_line = tags
             .iter()
-            .map(|t| format!("#{t}"))
+            .filter_map(|tag| render_tag_token(tag))
             .collect::<Vec<_>>()
             .join(" ");
-        format!("# \n\n{tag_line}")
+        if tag_line.is_empty() {
+            "# ".to_string()
+        } else {
+            format!("# \n\n{tag_line}")
+        }
     }
 }
 
@@ -59,7 +71,7 @@ impl NoteService {
             NoteQueryInput {
                 note_filter: NoteFilterInput::All,
                 search_query: String::new(),
-                active_tags: Vec::new(),
+                active_tag_path: None,
                 limit: INITIAL_NOTES_PAGE_SIZE,
                 offset: 0,
                 sort_field: NoteSortField::ModifiedAt,
@@ -182,6 +194,149 @@ impl NoteService {
         repo.note_by_id(&input.note_id)?.ok_or(NoteError::NotFound)
     }
 
+    pub fn rename_tag(
+        repo: &dyn NoteRepository,
+        input: RenameTagInput,
+    ) -> Result<Vec<String>, NoteError> {
+        let from_path = validate_tag_path(&input.from_path)?;
+        let to_path = validate_tag_path(&input.to_path)?;
+        if from_path == to_path {
+            return Ok(Vec::new());
+        }
+
+        let note_ids = repo.note_ids_with_direct_tag(&from_path)?;
+        log::info!(
+            "[tags] rename requested from={} to={} candidate_notes={}",
+            from_path,
+            to_path,
+            note_ids.len()
+        );
+        if note_ids.is_empty() {
+            return Err(NoteError::TagNotFound);
+        }
+
+        let mut affected = Vec::new();
+        for note_id in note_ids {
+            let (markdown, readonly) = repo.note_markdown_and_readonly(&note_id)?;
+            if readonly {
+                return Err(NoteError::ReadOnly);
+            }
+            let rewritten = rewrite_tag_path_in_markdown(&markdown, &from_path, Some(&to_path))
+                .ok_or(NoteError::InvalidTagPath)?;
+            if rewritten == markdown {
+                continue;
+            }
+
+            let title = title_from_markdown(&rewritten);
+            repo.update_note_markdown_preserving_modified_at(&note_id, &title, &rewritten)?;
+            repo.upsert_search_document(&note_id, &title, &rewritten)?;
+            repo.replace_tags(&note_id, &rewritten)?;
+            affected.push(note_id);
+        }
+
+        if affected.len() >= TAG_REWRITE_WARN_THRESHOLD {
+            log::warn!(
+                "[tags] rename affected many notes from={} to={} affected={}",
+                from_path,
+                to_path,
+                affected.len()
+            );
+        } else {
+            log::info!(
+                "[tags] rename completed from={} to={} affected={}",
+                from_path,
+                to_path,
+                affected.len()
+            );
+        }
+
+        Ok(affected)
+    }
+
+    pub fn delete_tag(
+        repo: &dyn NoteRepository,
+        input: DeleteTagInput,
+    ) -> Result<Vec<String>, NoteError> {
+        let path = validate_tag_path(&input.path)?;
+        let note_ids = repo.note_ids_with_direct_tag(&path)?;
+        log::info!(
+            "[tags] delete requested path={} candidate_notes={}",
+            path,
+            note_ids.len()
+        );
+        if note_ids.is_empty() {
+            return Err(NoteError::TagNotFound);
+        }
+
+        let mut affected = Vec::new();
+        for note_id in note_ids {
+            let (markdown, readonly) = repo.note_markdown_and_readonly(&note_id)?;
+            if readonly {
+                return Err(NoteError::ReadOnly);
+            }
+            let rewritten = rewrite_tag_path_in_markdown(&markdown, &path, None)
+                .ok_or(NoteError::InvalidTagPath)?;
+            if rewritten == markdown {
+                continue;
+            }
+
+            let title = title_from_markdown(&rewritten);
+            repo.update_note_markdown_preserving_modified_at(&note_id, &title, &rewritten)?;
+            repo.upsert_search_document(&note_id, &title, &rewritten)?;
+            repo.replace_tags(&note_id, &rewritten)?;
+            affected.push(note_id);
+        }
+
+        if affected.len() >= TAG_REWRITE_WARN_THRESHOLD {
+            log::warn!(
+                "[tags] delete affected many notes path={} affected={}",
+                path,
+                affected.len()
+            );
+        } else {
+            log::info!(
+                "[tags] delete completed path={} affected={}",
+                path,
+                affected.len()
+            );
+        }
+
+        Ok(affected)
+    }
+
+    pub fn set_tag_pinned(
+        repo: &dyn NoteRepository,
+        input: SetTagPinnedInput,
+    ) -> Result<(), NoteError> {
+        let path = validate_tag_path(&input.path)?;
+        if input.pinned && path.contains('/') {
+            return Err(NoteError::TagNotPinnable);
+        }
+        log::info!("[tags] set pinned path={} pinned={}", path, input.pinned);
+        let updated = repo.set_tag_pinned(&path, input.pinned)?;
+        if updated == 0 {
+            return Err(NoteError::TagNotFound);
+        }
+        Ok(())
+    }
+
+    pub fn set_hide_subtag_notes(
+        repo: &dyn NoteRepository,
+        input: SetHideSubtagNotesInput,
+    ) -> Result<(), NoteError> {
+        let path = validate_tag_path(&input.path)?;
+        log::info!(
+            "[tags] set hide_subtag_notes path={} hide_subtag_notes={}",
+            path,
+            input.hide_subtag_notes
+        );
+        let updated = repo.set_tag_hide_subtag_notes(&path, input.hide_subtag_notes)?;
+        if updated == 0 {
+            return Err(NoteError::TagNotFound);
+        }
+        Ok(())
+    }
+
     pub fn archive_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
@@ -297,8 +452,27 @@ impl NoteService {
 
     pub fn export_notes(
         repo: &dyn NoteRepository,
-        input: ExportNotesInput,
+        mut input: ExportNotesInput,
     ) -> Result<usize, NoteError> {
+        if input.export_dir.trim().is_empty() {
+            return Err(NoteError::InvalidExportInput);
+        }
+
+        match input.export_mode {
+            ExportModeInput::NoteFilter => {
+                if input.note_filter.is_none() {
+                    return Err(NoteError::InvalidExportInput);
+                }
+            }
+            ExportModeInput::Tag => {
+                let tag_path = input
+                    .tag_path
+                    .as_deref()
+                    .ok_or(NoteError::InvalidExportInput)?;
+                input.tag_path = Some(validate_tag_path(tag_path)?);
+            }
+        }
+
         repo.export_notes(&input)
     }
 
@@ -311,7 +485,7 @@ impl NoteService {
 mod tests {
     use super::*;
     use std::cell::RefCell;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     // ── Pure validation / normalization tests ────────────────────────────
 
@@ -355,6 +529,8 @@ mod tests {
     struct MockNoteRepository {
         notes: RefCell<HashMap<String, NoteRecord>>,
         last_open_note_id: RefCell<Option<String>>,
+        pinned_tags: RefCell<HashSet<String>>,
+        hide_subtag_notes_tags: RefCell<HashSet<String>>,
     }
 
     impl MockNoteRepository {
@@ -362,6 +538,8 @@ mod tests {
             Self {
                 notes: RefCell::new(HashMap::new()),
                 last_open_note_id: RefCell::new(None),
+                pinned_tags: RefCell::new(HashSet::new()),
+                hide_subtag_notes_tags: RefCell::new(HashSet::new()),
             }
         }
 
@@ -488,7 +666,32 @@ mod tests {
             Ok(())
         }
 
+        fn note_ids_with_direct_tag(&self, path: &str) -> Result<Vec<String>, NoteError> {
+            let notes = self.notes.borrow();
+            let mut note_ids = notes
+                .values()
+                .filter(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                .map(|record| record.id.clone())
+                .collect::<Vec<_>>();
+            note_ids.sort();
+            Ok(note_ids)
+        }
+
         fn update_note_title_only(
+            &self,
+            note_id: &str,
+            title: &str,
+            markdown: &str,
+        ) -> Result<(), NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            if let Some(record) = notes.get_mut(note_id) {
+                record.title = title.to_string();
+                record.markdown = markdown.to_string();
+            }
+            Ok(())
+        }
+
+        fn update_note_markdown_preserving_modified_at(
             &self,
             note_id: &str,
             title: &str,
@@ -595,6 +798,48 @@ mod tests {
             Ok(())
         }
 
+        fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError> {
+            let exists = self
+                .notes
+                .borrow()
+                .values()
+                .any(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                || self.pinned_tags.borrow().contains(path);
+
+            if !exists {
+                return Ok(0);
+            }
+
+            let mut pinned_tags = self.pinned_tags.borrow_mut();
+            if pinned {
+                pinned_tags.insert(path.to_string());
+            } else {
+                pinned_tags.remove(path);
+            }
+            Ok(1)
+        }
+
+        fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError> {
+            let exists = self
+                .notes
+                .borrow()
+                .values()
+                .any(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                || self.hide_subtag_notes_tags.borrow().contains(path);
+
+            if !exists {
+                return Ok(0);
+            }
+
+            let mut hidden_tags = self.hide_subtag_notes_tags.borrow_mut();
+            if hide {
+                hidden_tags.insert(path.to_string());
+            } else {
+                hidden_tags.remove(path);
+            }
+            Ok(1)
+        }
+
         fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError> {
             let notes = self.notes.borrow();
             Ok(notes
@@ -651,7 +896,8 @@ mod tests {
     fn create_note_inserts_and_returns_record() {
         let repo = MockNoteRepository::new();
 
-        let record = NoteService::create_note(&repo, &[], None).expect("create_note should succeed");
+        let record =
+            NoteService::create_note(&repo, &[], None).expect("create_note should succeed");
 
         assert!(record.id.starts_with("note-"));
         assert!(record.markdown.starts_with("# "));
@@ -681,6 +927,24 @@ mod tests {
             repo.last_open_note_id.borrow().as_deref(),
             Some(record.id.as_str())
         );
+    }
+
+    #[test]
+    fn create_note_renders_wrapped_tags_when_needed() {
+        let repo = MockNoteRepository::new();
+
+        let record = NoteService::create_note(
+            &repo,
+            &[
+                "project alpha".to_string(),
+                "work/project alpha".to_string(),
+            ],
+            None,
+        )
+        .expect("create_note should succeed");
+
+        assert!(record.markdown.contains("#project alpha#"));
+        assert!(record.markdown.contains("#work/project alpha#"));
     }
 
     // ── save_note ───────────────────────────────────────────────────────
@@ -959,4 +1223,117 @@ mod tests {
         assert!(record.readonly);
     }
 
+    #[test]
+    fn rename_tag_rewrites_matching_notes_without_touching_modified_at() {
+        let repo = MockNoteRepository::new().with_note(make_note(
+            "n1",
+            "# Hello\n\n#work/project alpha# and #work/project alpha#",
+        ));
+        let original_modified_at = repo.notes.borrow()["n1"].modified_at;
+
+        let affected = NoteService::rename_tag(
+            &repo,
+            RenameTagInput {
+                from_path: "work/project alpha".to_string(),
+                to_path: "work/client alpha".to_string(),
+            },
+        )
+        .unwrap();
+
+        let note = repo.notes.borrow()["n1"].clone();
+        assert_eq!(affected, vec!["n1".to_string()]);
+        assert_eq!(note.modified_at, original_modified_at);
+        assert!(note.markdown.contains("#work/client alpha#"));
+        assert!(!note.markdown.contains("#work/project alpha#"));
+    }
+
+    #[test]
+    fn delete_tag_removes_matching_tag_from_notes() {
+        let repo = MockNoteRepository::new().with_note(make_note(
+            "n1",
+            "# Hello\n\n#work/project alpha# #work/client beta#",
+        ));
+
+        let affected = NoteService::delete_tag(
+            &repo,
+            DeleteTagInput {
+                path: "work/project alpha".to_string(),
+            },
+        )
+        .unwrap();
+
+        let note = repo.notes.borrow()["n1"].clone();
+        assert_eq!(affected, vec!["n1".to_string()]);
+        assert!(!note.markdown.contains("#work/project alpha#"));
+        assert!(note.markdown.contains("#work/client beta#"));
+    }
+
+    #[test]
+    fn rename_tag_rejects_readonly_notes() {
+        let mut note = make_note("n1", "# Hello\n\n#work/project alpha#");
+        note.readonly = true;
+        let repo = MockNoteRepository::new().with_note(note);
+
+        let result = NoteService::rename_tag(
+            &repo,
+            RenameTagInput {
+                from_path: "work/project alpha".to_string(),
+                to_path: "work/client alpha".to_string(),
+            },
+        );
+
+        assert!(matches!(result, Err(NoteError::ReadOnly)));
+    }
+
+    #[test]
+    fn set_tag_pinned_rejects_subtags() {
+        let repo =
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
+
+        let result = NoteService::set_tag_pinned(
+            &repo,
+            SetTagPinnedInput {
+                path: "work/project alpha".to_string(),
+                pinned: true,
+            },
+        );
+
+        assert!(matches!(result, Err(NoteError::TagNotPinnable)));
+    }
+
+    #[test]
+    fn set_tag_pinned_updates_root_tag_metadata() {
+        let repo = MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work"));
+
+        NoteService::set_tag_pinned(
+            &repo,
+            SetTagPinnedInput {
+                path: "work".to_string(),
+                pinned: true,
+            },
+        )
+        .unwrap();
+
+        assert!(repo.pinned_tags.borrow().contains("work"));
+    }
+
+    #[test]
+    fn set_hide_subtag_notes_updates_tag_metadata() {
+        let repo =
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
+
+        NoteService::set_hide_subtag_notes(
+            &repo,
+            SetHideSubtagNotesInput {
+                path: "work/project alpha".to_string(),
+                hide_subtag_notes: true,
+            },
+        )
+        .unwrap();
+
+        assert!(repo
+            .hide_subtag_notes_tags
+            .borrow()
+            .contains("work/project alpha"));
+    }
 }

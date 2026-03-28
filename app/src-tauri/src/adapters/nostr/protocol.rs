@@ -1,6 +1,8 @@
-use crate::domain::common::text::strip_title_line;
-use crate::domain::common::time::{now_millis, now_secs};
+use std::collections::HashSet;
+
 use crate::domain::blob::service::extract_attachment_hashes;
+use crate::domain::common::text::{canonicalize_tag_path, strip_title_line};
+use crate::domain::common::time::{now_millis, now_secs};
 use crate::domain::relay::model::{PublishNoteInput, PublishResult, PublishShortNoteInput};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -20,11 +22,28 @@ fn ensure_publishable_markdown(markdown: &str) -> Result<(), AppError> {
     }
 }
 
+fn normalize_publish_tags(tags: &[String]) -> Result<Vec<String>, AppError> {
+    let mut normalized = Vec::new();
+    let mut seen = HashSet::new();
+
+    for tag in tags {
+        let canonical = canonicalize_tag_path(tag)
+            .ok_or_else(|| AppError::custom(format!("Invalid publish tag: {tag}")))?;
+
+        if seen.insert(canonical.clone()) {
+            normalized.push(canonical);
+        }
+    }
+
+    Ok(normalized)
+}
+
 pub async fn publish_note(
     app: &AppHandle,
     input: PublishNoteInput,
 ) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
+    let publish_tags = normalize_publish_tags(&input.tags)?;
     if input
         .image
         .as_deref()
@@ -85,7 +104,7 @@ pub async fn publish_note(
     if let Some(ref image) = input.image {
         event_tags.push(Tag::custom(TagKind::custom("image"), vec![image.clone()]));
     }
-    for t in &input.tags {
+    for t in &publish_tags {
         event_tags.push(Tag::hashtag(t));
     }
 
@@ -138,6 +157,7 @@ pub async fn publish_short_note(
     input: PublishShortNoteInput,
 ) -> Result<PublishResult, AppError> {
     let note_id = &input.note_id;
+    let publish_tags = normalize_publish_tags(&input.tags)?;
 
     let (keys, content, relay_urls) = {
         let conn = crate::db::database_connection(app)?;
@@ -171,7 +191,7 @@ pub async fn publish_short_note(
     };
 
     let mut event_tags: Vec<Tag> = Vec::new();
-    for t in &input.tags {
+    for t in &publish_tags {
         event_tags.push(Tag::hashtag(t));
     }
 
@@ -218,6 +238,30 @@ pub async fn publish_short_note(
         fail_count,
         relay_count,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_publish_tags;
+
+    #[test]
+    fn normalize_publish_tags_canonicalizes_and_dedupes() {
+        let tags = normalize_publish_tags(&[
+            "Roadmap".to_string(),
+            "roadmap".to_string(),
+            "Work/Project Alpha".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(tags, vec!["roadmap", "work/project alpha"]);
+    }
+
+    #[test]
+    fn normalize_publish_tags_rejects_invalid_tags() {
+        let error = normalize_publish_tags(&["123".to_string()]).unwrap_err();
+
+        assert_eq!(error.to_string(), "Invalid publish tag: 123");
+    }
 }
 
 pub async fn delete_published_note(

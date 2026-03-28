@@ -17,6 +17,7 @@ import { $isCodeNode } from "@lexical/code";
 import { invoke } from "@tauri-apps/api/core";
 import { mergeRegister } from "@lexical/utils";
 import { createLoadScopedRequestGate } from "../lib/note-load-state";
+import { matchTagCompletionAtEnd, renderTagToken } from "../lib/tags";
 
 type MenuState = {
   query: string;
@@ -26,27 +27,6 @@ type MenuState = {
   leadOffset: number;
   replaceableLength: number;
 };
-
-// Matches #<word> at cursor position, returns match info or null.
-// Trigger character must appear after whitespace, start of text, or open paren.
-function matchHashtag(textUpToCursor: string): {
-  matchingString: string;
-  leadOffset: number;
-  replaceableLength: number;
-} | null {
-  const match =
-    /(?:^|\s|\()#([^\s#.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;]{1,75})$/.exec(
-      textUpToCursor,
-    );
-  if (!match) return null;
-  const matchingString = match[1];
-  const leadOffset = match.index + match[0].length - matchingString.length - 1;
-  return {
-    matchingString,
-    leadOffset,
-    replaceableLength: matchingString.length + 1, // includes the #
-  };
-}
 
 function TagMenuItem({
   isSelected,
@@ -117,7 +97,9 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
         if (!$isRangeSelection(selection)) return;
         const node = selection.anchor.getNode();
         if (!$isTextNode(node)) return;
-        const replacement = `#${tag} `;
+        const renderedTag = renderTagToken(tag);
+        if (!renderedTag) return;
+        const replacement = `${renderedTag} `;
         node.spliceText(menu.leadOffset, menu.replaceableLength, replacement);
         node.select(
           menu.leadOffset + replacement.length,
@@ -205,16 +187,14 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
     (
       tags: string[],
       requestVersion: number,
-      match: NonNullable<ReturnType<typeof matchHashtag>>,
+      match: NonNullable<ReturnType<typeof matchTagCompletionAtEnd>>,
       anchorKey: string,
     ) => {
       if (!requestGateRef.current.isCurrent(requestVersion)) {
         return;
       }
 
-      const filtered = tags.filter(
-        (t) => t !== match.matchingString.toLowerCase(),
-      );
+      const filtered = tags.filter((tag) => tag !== match.matchingString);
       if (filtered.length === 0) {
         closeMenu();
         return;
@@ -261,7 +241,7 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
   const searchAndShowMenu = useCallback(
     async (
       requestVersion: number,
-      match: NonNullable<ReturnType<typeof matchHashtag>>,
+      match: NonNullable<ReturnType<typeof matchTagCompletionAtEnd>>,
       anchorKey: string,
     ) => {
       try {
@@ -306,13 +286,13 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
 
         const fullText = anchorNode.getTextContent();
         const textUpToCursor = fullText.slice(0, anchor.offset);
-        const match = matchHashtag(textUpToCursor);
+        const match = matchTagCompletionAtEnd(textUpToCursor);
 
         // Only show menu when caret is at the end of the tag
         const charAfterCursor = fullText[anchor.offset] as string | undefined;
         if (
           charAfterCursor != null &&
-          /[^\s.,+*?$@|{}()^\-[\]\\/!%'"~=<>_:;#]/.test(charAfterCursor)
+          /[\p{L}\p{N}_/-]/u.test(charAfterCursor)
         ) {
           closeMenu();
           if (debounceRef.current) clearTimeout(debounceRef.current);

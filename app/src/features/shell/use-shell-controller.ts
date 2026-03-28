@@ -12,9 +12,13 @@ import {
 } from "@/features/settings/store/use-ui-store";
 
 import {
+  deleteTag,
   exportNotes,
   loadNote,
+  renameTag,
   resolveNoteConflict,
+  setHideSubtagNotes,
+  setTagPinned,
 } from "@/shared/api/invoke";
 import {
   type LoadedNote,
@@ -27,8 +31,13 @@ import { usePublishState } from "@/features/publishing";
 
 import { useNoteQueries } from "@/features/notes/hooks/use-note-queries";
 import { useNoteMutations } from "@/features/notes/hooks/use-note-mutations";
+import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
+
+function matchesTagScope(tags: string[], tagPath: string) {
+  return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
+}
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
@@ -52,6 +61,7 @@ export function useShellController() {
   >(null);
   const [isResolveConflictPending, setIsResolveConflictPending] =
     useState(false);
+  const [isTagMutationPending, setIsTagMutationPending] = useState(false);
 
   const publish = usePublishState();
   const {
@@ -79,14 +89,14 @@ export function useShellController() {
   const isSavingRef = useRef(false);
 
   const queryClient = useQueryClient();
-  const activeTags = useShellStore((state) => state.activeTags);
+  const activeTagPath = useShellStore((state) => state.activeTagPath);
   const draftMarkdown = useShellStore((state) => state.draftMarkdown);
   const draftNoteId = useShellStore((state) => state.draftNoteId);
   const noteFilter = useShellStore((state) => state.noteFilter);
   const searchQuery = useShellStore((state) => state.searchQuery);
   const selectedNoteId = useShellStore((state) => state.selectedNoteId);
   const setDraft = useShellStore((state) => state.setDraft);
-  const setActiveTags = useShellStore((state) => state.setActiveTags);
+  const setActiveTagPath = useShellStore((state) => state.setActiveTagPath);
   const setNoteFilter = useShellStore((state) => state.setNoteFilter);
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
   const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
@@ -109,13 +119,14 @@ export function useShellController() {
     noteQuery,
     noteConflictQuery,
     currentNotes,
-    availableTags,
+    availableTagPaths,
+    availableTagTree,
     totalNoteCount,
     activeNpub,
     initialSelectedNoteId,
   } = useNoteQueries({
     noteFilter,
-    activeTags,
+    activeTagPath,
     searchQuery,
     sortField: noteSortField,
     sortDirection: noteSortDirection,
@@ -166,19 +177,16 @@ export function useShellController() {
     setSyncEditorRevision,
   });
 
-  // --- Active tags cleanup when available tags change ---
+  // --- Active tag cleanup when available tags change ---
   useEffect(() => {
-    if (activeTags.length === 0) {
+    if (!activeTagPath) {
       return;
     }
 
-    const nextActiveTags = activeTags.filter((tag) =>
-      availableTags.includes(tag),
-    );
-    if (nextActiveTags.length !== activeTags.length) {
-      setActiveTags(nextActiveTags);
+    if (!availableTagPaths.includes(activeTagPath)) {
+      setActiveTagPath(null);
     }
-  }, [activeTags, availableTags, setActiveTags]);
+  }, [activeTagPath, availableTagPaths, setActiveTagPath]);
 
   // --- Sync draft from loaded note ---
   useEffect(() => {
@@ -441,7 +449,7 @@ export function useShellController() {
     }
 
     flushCurrentDraft();
-    const tagsForNewNote = [...activeTags];
+    const tagsForNewNote = activeTagPath ? [activeTagPath] : [];
     if (noteFilter !== "today" && noteFilter !== "todo") {
       setNoteFilter("all");
     }
@@ -493,13 +501,168 @@ export function useShellController() {
     emptyTrashMutation.mutate();
   };
 
-  const handleToggleTag = (tag: string) => {
-    if (activeTags.includes(tag)) {
-      setActiveTags(activeTags.filter((activeTag) => activeTag !== tag));
+  const handleSelectTagPath = (tagPath: string) => {
+    if (activeTagPath === tagPath) {
+      setActiveTagPath(null);
       return;
     }
 
-    setActiveTags([...activeTags, tag]);
+    setActiveTagPath(tagPath);
+  };
+
+  const syncSelectedNoteAfterTagRewrite = async (affectedNoteIds: string[]) => {
+    if (!selectedNoteId || !affectedNoteIds.includes(selectedNoteId)) {
+      await queryClient.invalidateQueries({ queryKey: ["note"] });
+      return;
+    }
+
+    const refreshedNote = await loadNote(selectedNoteId);
+    queryClient.setQueryData(["note", refreshedNote.id], refreshedNote);
+    setDraft(refreshedNote.id, refreshedNote.markdown);
+    setSyncEditorRevision((revision) => revision + 1);
+  };
+
+  const handleRenameTag = (fromPath: string, toPath: string) => {
+    if (isTagMutationPending) {
+      return;
+    }
+
+    void (async () => {
+      setIsTagMutationPending(true);
+
+      try {
+        if (
+          currentNote &&
+          isCurrentNoteConflicted &&
+          currentNote.tags.includes(fromPath)
+        ) {
+          toast.error(
+            "Resolve the current note conflict before renaming this tag.",
+            {
+              id: "rename-tag-conflict-error",
+            },
+          );
+          return;
+        }
+
+        if (
+          currentNote &&
+          draftNoteId === currentNote.id &&
+          currentNote.tags.includes(fromPath)
+        ) {
+          await flushCurrentDraftAsync();
+        }
+
+        const affectedNoteIds = await renameTag({ fromPath, toPath });
+        const nextPath = canonicalizeTagPath(toPath) ?? toPath;
+        setActiveTagPath(activeTagPath === fromPath ? nextPath : activeTagPath);
+
+        await Promise.all([
+          invalidateNotes(),
+          invalidateContextualTags(),
+          syncSelectedNoteAfterTagRewrite(affectedNoteIds),
+        ]);
+
+        toast.success("Tag renamed.", { id: "rename-tag-success" });
+      } catch (error) {
+        toastErrorHandler("Couldn't rename tag", "rename-tag-error")(error);
+      } finally {
+        setIsTagMutationPending(false);
+      }
+    })();
+  };
+
+  const handleDeleteTag = (path: string) => {
+    if (isTagMutationPending) {
+      return;
+    }
+
+    void (async () => {
+      setIsTagMutationPending(true);
+
+      try {
+        if (
+          currentNote &&
+          isCurrentNoteConflicted &&
+          currentNote.tags.includes(path)
+        ) {
+          toast.error(
+            "Resolve the current note conflict before deleting this tag.",
+            {
+              id: "delete-tag-conflict-error",
+            },
+          );
+          return;
+        }
+
+        if (
+          currentNote &&
+          draftNoteId === currentNote.id &&
+          currentNote.tags.includes(path)
+        ) {
+          await flushCurrentDraftAsync();
+        }
+
+        const affectedNoteIds = await deleteTag({ path });
+        if (activeTagPath === path) {
+          setActiveTagPath(null);
+        }
+
+        await Promise.all([
+          invalidateNotes(),
+          invalidateContextualTags(),
+          syncSelectedNoteAfterTagRewrite(affectedNoteIds),
+        ]);
+
+        toast.success("Tag deleted.", { id: "delete-tag-success" });
+      } catch (error) {
+        toastErrorHandler("Couldn't delete tag", "delete-tag-error")(error);
+      } finally {
+        setIsTagMutationPending(false);
+      }
+    })();
+  };
+
+  const handleSetTagPinned = (path: string, pinned: boolean) => {
+    if (isTagMutationPending) {
+      return;
+    }
+
+    void (async () => {
+      setIsTagMutationPending(true);
+      try {
+        await setTagPinned({ path, pinned });
+        await invalidateContextualTags();
+      } catch (error) {
+        toastErrorHandler(
+          "Couldn't update tag pin",
+          "set-tag-pinned-error",
+        )(error);
+      } finally {
+        setIsTagMutationPending(false);
+      }
+    })();
+  };
+
+  const handleSetHideSubtagNotes = (path: string, hideSubtagNotes: boolean) => {
+    if (isTagMutationPending) {
+      return;
+    }
+
+    void (async () => {
+      setIsTagMutationPending(true);
+      try {
+        await setHideSubtagNotes({ path, hideSubtagNotes });
+        await Promise.all([invalidateNotes(), invalidateContextualTags()]);
+      } catch (error) {
+        toastErrorHandler(
+          "Couldn't update tag visibility",
+          "set-hide-subtag-notes-error",
+        )(error);
+      } finally {
+        setIsTagMutationPending(false);
+      }
+    })();
   };
 
   const handleSelectNote = (noteId: string) => {
@@ -680,9 +843,12 @@ export function useShellController() {
       try {
         const selected = await open({ directory: true, title: "Export notes" });
         if (!selected) return;
+        await flushCurrentDraftAsync();
 
         const count = await exportNotes({
-          noteFilter: noteFilter,
+          exportMode: "note_filter",
+          noteFilter,
+          preserveTags: true,
           exportDir: selected as string,
         });
 
@@ -691,6 +857,39 @@ export function useShellController() {
         });
       } catch (error) {
         toastErrorHandler("Couldn't export notes", "export-notes-error")(error);
+      }
+    })();
+  };
+
+  const handleExportTag = (tagPath: string) => {
+    void (async () => {
+      try {
+        const selected = await open({
+          directory: true,
+          title: `Export ${tagPath}`,
+        });
+        if (!selected) return;
+
+        if (
+          currentNote &&
+          draftNoteId === currentNote.id &&
+          matchesTagScope(currentNote.tags, tagPath)
+        ) {
+          await flushCurrentDraftAsync();
+        }
+
+        const count = await exportNotes({
+          exportMode: "tag",
+          tagPath,
+          preserveTags: true,
+          exportDir: selected as string,
+        });
+
+        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
+          id: "export-tag-success",
+        });
+      } catch (error) {
+        toastErrorHandler("Couldn't export tag", "export-tag-error")(error);
       }
     })();
   };
@@ -706,18 +905,23 @@ export function useShellController() {
     handleDeleteNotePermanently,
     handleEmptyTrash,
     handleExportNotes,
+    handleExportTag,
     handleRestoreFromTrash,
     handleRestoreNote,
+    handleDeleteTag,
     handleSelectAll,
     handleSelectArchive,
     handleSelectTrash,
     handleTrashNote,
+    handleRenameTag,
     handleSelectNote,
+    handleSetHideSubtagNotes,
+    handleSetTagPinned,
     handleSelectToday,
     handleSelectTodo,
     handleSetNotePinned,
     handleSetNoteReadonly,
-    handleToggleTag,
+    handleSelectTagPath,
     async handleResolveCurrentNoteConflict() {
       if (!currentNote) {
         return;
@@ -1018,7 +1222,7 @@ export function useShellController() {
 
   const notesPaneProps = useMemo(
     () => ({
-      activeTags,
+      activeTagPath,
       creatingNoteId: creatingSelectedNoteId,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
@@ -1068,7 +1272,7 @@ export function useShellController() {
       totalNoteCount,
     }),
     [
-      activeTags,
+      activeTagPath,
       creatingSelectedNoteId,
       currentNotes,
       displayedSelectedNoteId,
@@ -1090,8 +1294,9 @@ export function useShellController() {
 
   const sidebarPaneProps = useMemo(
     () => ({
-      activeTags,
-      availableTags,
+      activeTagPath,
+      availableTagPaths,
+      availableTagTree,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
       todoCount: todoCountQuery.data ?? 0,
       trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
@@ -1116,12 +1321,22 @@ export function useShellController() {
         setFocusedPane("sidebar");
         latestRef.current.handleSelectTrash();
       },
+      onDeleteTag: (path: string) => latestRef.current.handleDeleteTag(path),
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
-      onToggleTag: (tag: string) => latestRef.current.handleToggleTag(tag),
+      onExportTag: (path: string) => latestRef.current.handleExportTag(path),
+      onRenameTag: (fromPath: string, toPath: string) =>
+        latestRef.current.handleRenameTag(fromPath, toPath),
+      onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
+        latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
+      onSetTagPinned: (path: string, pinned: boolean) =>
+        latestRef.current.handleSetTagPinned(path, pinned),
+      onSelectTagPath: (tagPath: string) =>
+        latestRef.current.handleSelectTagPath(tagPath),
     }),
     [
-      activeTags,
-      availableTags,
+      activeTagPath,
+      availableTagPaths,
+      availableTagTree,
       bootstrapQuery.data?.archivedCount,
       bootstrapQuery.data?.trashedCount,
       noteFilter,

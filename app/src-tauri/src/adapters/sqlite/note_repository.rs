@@ -1,13 +1,15 @@
-use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 
-use crate::domain::common::text::{extract_tags, preview_from_markdown};
+use crate::domain::common::text::{extract_tags, preview_from_markdown, strip_tags_from_markdown};
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
-    ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NoteFilterInput, NotePagePayload,
-    NoteQueryInput, NoteSortDirection, NoteSortField, NoteSummary, SearchResult,
+    ContextualTagNode, ContextualTagsInput, ContextualTagsPayload, ExportModeInput,
+    ExportNotesInput, NoteFilterInput, NotePagePayload, NoteQueryInput, NoteSortDirection,
+    NoteSortField, NoteSummary, SearchResult,
 };
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 
@@ -77,16 +79,35 @@ fn escape_like_pattern(token: &str) -> String {
     escaped
 }
 
-fn normalized_active_tags(tags: &[String]) -> Vec<String> {
-    let mut unique_tags = BTreeSet::new();
-    for tag in tags {
-        let trimmed = tag.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        unique_tags.insert(trimmed.to_ascii_lowercase());
+fn normalized_active_tag_path(tag: Option<&str>) -> Option<String> {
+    let trimmed = tag?.trim();
+    if trimmed.is_empty() {
+        return None;
     }
-    unique_tags.into_iter().collect()
+    Some(trimmed.to_ascii_lowercase())
+}
+
+fn direct_tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>, NoteError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT t.path
+             FROM note_tag_links l
+             JOIN tags t ON t.id = l.tag_id
+             WHERE l.note_id = ?1 AND l.is_direct = 1
+             ORDER BY t.path ASC",
+        )
+        .map_err(map_err)?;
+
+    let rows = statement
+        .query_map(params![note_id], |row| row.get::<_, String>(0))
+        .map_err(map_err)?;
+
+    let mut tags = Vec::new();
+    for row in rows {
+        tags.push(row.map_err(map_err)?);
+    }
+
+    Ok(tags)
 }
 
 fn sanitize_filename(title: &str) -> String {
@@ -125,6 +146,71 @@ fn sanitize_filename(title: &str) -> String {
         result.chars().take(200).collect()
     } else {
         result
+    }
+}
+
+fn export_markdown(markdown: &str, preserve_tags: bool) -> String {
+    if preserve_tags {
+        markdown.to_string()
+    } else {
+        strip_tags_from_markdown(markdown)
+    }
+}
+
+fn matching_direct_export_tag<'a>(
+    direct_tags: &'a [String],
+    selected_path: &str,
+) -> Option<&'a str> {
+    direct_tags
+        .iter()
+        .filter(|tag| {
+            tag.as_str() == selected_path
+                || tag
+                    .strip_prefix(selected_path)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+        })
+        .max_by(|left, right| {
+            left.matches('/')
+                .count()
+                .cmp(&right.matches('/').count())
+                .then_with(|| right.cmp(left))
+        })
+        .map(String::as_str)
+}
+
+fn export_relative_directory_for_tag_scope(
+    direct_tags: &[String],
+    selected_path: &str,
+) -> Option<PathBuf> {
+    let selected_tag = matching_direct_export_tag(direct_tags, selected_path)?;
+    if selected_tag == selected_path {
+        return Some(PathBuf::new());
+    }
+
+    let relative = selected_tag
+        .strip_prefix(selected_path)?
+        .strip_prefix('/')?;
+    let mut path = PathBuf::new();
+    for segment in relative.split('/') {
+        path.push(segment);
+    }
+    Some(path)
+}
+
+fn next_export_filename(
+    used_names: &mut HashMap<String, usize>,
+    directory: &Path,
+    title: &str,
+) -> String {
+    let base = sanitize_filename(title);
+    let key = format!("{}::{base}", directory.display());
+    let entry = used_names.entry(key).or_insert(0);
+    *entry += 1;
+
+    if *entry == 1 {
+        format!("{base}.md")
+    } else {
+        format!("{base} {entry}.md")
     }
 }
 
@@ -261,6 +347,59 @@ fn append_note_view_clauses(
     }
 }
 
+#[derive(Debug, Clone)]
+struct ContextualTagRow {
+    path: String,
+    depth: usize,
+    pinned: bool,
+    hide_subtag_notes: bool,
+    direct_note_count: usize,
+    inclusive_note_count: usize,
+}
+
+fn build_contextual_tag_tree(rows: Vec<ContextualTagRow>) -> Vec<ContextualTagNode> {
+    let mut children_by_parent: HashMap<Option<String>, Vec<ContextualTagRow>> = HashMap::new();
+
+    for row in rows {
+        let parent = row
+            .path
+            .rsplit_once('/')
+            .map(|(parent, _)| parent.to_string());
+        children_by_parent.entry(parent).or_default().push(row);
+    }
+
+    fn build_children(
+        parent: Option<String>,
+        children_by_parent: &mut HashMap<Option<String>, Vec<ContextualTagRow>>,
+    ) -> Vec<ContextualTagNode> {
+        let mut rows = children_by_parent.remove(&parent).unwrap_or_default();
+        rows.sort_by(|left, right| {
+            right
+                .pinned
+                .cmp(&left.pinned)
+                .then_with(|| left.path.cmp(&right.path))
+        });
+
+        rows.into_iter()
+            .map(|row| {
+                let path = row.path.clone();
+                ContextualTagNode {
+                    label: path.rsplit('/').next().unwrap_or(&path).to_string(),
+                    path: path.clone(),
+                    depth: row.depth,
+                    pinned: row.pinned,
+                    hide_subtag_notes: row.hide_subtag_notes,
+                    direct_note_count: row.direct_note_count,
+                    inclusive_note_count: row.inclusive_note_count,
+                    children: build_children(Some(path), children_by_parent),
+                }
+            })
+            .collect()
+    }
+
+    build_children(None, &mut children_by_parent)
+}
+
 // ── Row mappers ─────────────────────────────────────────────────────
 
 fn row_to_note_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<NoteRecord> {
@@ -382,21 +521,31 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     }
 
     fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError> {
+        direct_tags_for_note(self.conn, note_id)
+    }
+
+    fn note_ids_with_direct_tag(&self, path: &str) -> Result<Vec<String>, NoteError> {
         let mut statement = self
             .conn
-            .prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")
+            .prepare(
+                "SELECT l.note_id
+                 FROM note_tag_links l
+                 JOIN tags t ON t.id = l.tag_id
+                 WHERE l.is_direct = 1 AND t.path = ?1
+                 ORDER BY l.note_id ASC",
+            )
             .map_err(map_err)?;
 
         let rows = statement
-            .query_map(params![note_id], |row| row.get::<_, String>(0))
+            .query_map(params![path], |row| row.get::<_, String>(0))
             .map_err(map_err)?;
 
-        let mut tags = Vec::new();
+        let mut note_ids = Vec::new();
         for row in rows {
-            tags.push(row.map_err(map_err)?);
+            note_ids.push(row.map_err(map_err)?);
         }
 
-        Ok(tags)
+        Ok(note_ids)
     }
 
     fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError> {
@@ -469,6 +618,29 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .conn
             .execute(
                 "UPDATE notes SET title = ?1, markdown = ?2 WHERE id = ?3",
+                params![title, markdown, note_id],
+            )
+            .map_err(map_err)?;
+
+        if updated == 0 {
+            return Err(NoteError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    fn update_note_markdown_preserving_modified_at(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+    ) -> Result<(), NoteError> {
+        let updated = self
+            .conn
+            .execute(
+                "UPDATE notes
+                 SET title = ?1, markdown = ?2, locally_modified = 1
+                 WHERE id = ?3",
                 params![title, markdown, note_id],
             )
             .map_err(map_err)?;
@@ -614,68 +786,31 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
     fn replace_tags(&self, note_id: &str, markdown: &str) -> Result<(), NoteError> {
         let next_tags = extract_tags(markdown);
-        let current_tags = self.tags_for_note(note_id)?;
+        let current_tags = direct_tags_for_note(self.conn, note_id)?;
 
         if current_tags == next_tags {
             return Ok(());
         }
+        crate::adapters::sqlite::tag_index::rebuild_note_tag_index(self.conn, note_id, markdown)
+            .map_err(map_err)
+    }
 
-        // Both vecs are sorted and unique -- linear scan to find diffs
-        let mut ci = 0;
-        let mut ni = 0;
+    fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE tags SET pinned = ?1, updated_at = ?2 WHERE path = ?3",
+                params![i32::from(pinned), now_millis(), path],
+            )
+            .map_err(map_err)
+    }
 
-        while ci < current_tags.len() && ni < next_tags.len() {
-            match current_tags[ci].cmp(&next_tags[ni]) {
-                std::cmp::Ordering::Less => {
-                    // In current but not next -- remove
-                    self.conn
-                        .execute(
-                            "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
-                            params![note_id, &current_tags[ci]],
-                        )
-                        .map_err(map_err)?;
-                    ci += 1;
-                }
-                std::cmp::Ordering::Greater => {
-                    // In next but not current -- add
-                    self.conn
-                        .execute(
-                            "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-                            params![note_id, &next_tags[ni]],
-                        )
-                        .map_err(map_err)?;
-                    ni += 1;
-                }
-                std::cmp::Ordering::Equal => {
-                    ci += 1;
-                    ni += 1;
-                }
-            }
-        }
-
-        // Remaining current tags were removed
-        while ci < current_tags.len() {
-            self.conn
-                .execute(
-                    "DELETE FROM note_tags WHERE note_id = ?1 AND tag = ?2",
-                    params![note_id, &current_tags[ci]],
-                )
-                .map_err(map_err)?;
-            ci += 1;
-        }
-
-        // Remaining next tags are new
-        while ni < next_tags.len() {
-            self.conn
-                .execute(
-                    "INSERT INTO note_tags (note_id, tag) VALUES (?1, ?2)",
-                    params![note_id, &next_tags[ni]],
-                )
-                .map_err(map_err)?;
-            ni += 1;
-        }
-
-        Ok(())
+    fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE tags SET hide_subtag_notes = ?1, updated_at = ?2 WHERE path = ?3",
+                params![i32::from(hide), now_millis(), path],
+            )
+            .map_err(map_err)
     }
 
     // ── Queries ───────────────────────────────────────────────────────
@@ -684,7 +819,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         let limit = input.limit.clamp(1, MAX_NOTES_PAGE_SIZE);
         let search_tokens = search_tokens_from_query(&input.search_query);
         let search_mode = search_mode_from_tokens(&search_tokens);
-        let active_tags = normalized_active_tags(&input.active_tags);
+        let active_tag_path = normalized_active_tag_path(input.active_tag_path.as_deref());
 
         let mut sql = String::from(
             "SELECT n.id, n.title, n.markdown, n.edited_at, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
@@ -738,13 +873,16 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 
         append_note_view_clauses(&mut clauses, &mut values, input.note_filter);
 
-        for tag in &active_tags {
+        if let Some(tag) = &active_tag_path {
             clauses.push(
                 "EXISTS (
                    SELECT 1
-                   FROM note_tags nt_filter
-                   WHERE nt_filter.note_id = n.id
-                     AND nt_filter.tag = ?
+                   FROM note_tag_links l_filter
+                   JOIN tags t_filter ON t_filter.id = l_filter.tag_id
+                   JOIN tags t_selected ON t_selected.path = ?
+                   WHERE l_filter.note_id = n.id
+                     AND t_filter.path = t_selected.path
+                     AND (t_selected.hide_subtag_notes = 0 OR l_filter.is_direct = 1)
                  )"
                 .to_string(),
             );
@@ -902,12 +1040,14 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT tag, COUNT(*) AS freq,
-                        CASE WHEN tag LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
-                 FROM note_tags
-                 WHERE tag LIKE ?1 ESCAPE '\\'
-                 GROUP BY tag
-                 ORDER BY rank ASC, freq DESC, tag ASC
+                "SELECT t.path,
+                        SUM(CASE WHEN l.is_direct = 1 THEN 1 ELSE 0 END) AS freq,
+                        CASE WHEN t.path LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
+                 FROM tags t
+                 LEFT JOIN note_tag_links l ON l.tag_id = t.id
+                 WHERE t.path LIKE ?1 ESCAPE '\\'
+                 GROUP BY t.id, t.path
+                 ORDER BY rank ASC, freq DESC, t.path ASC
                  LIMIT 20",
             )
             .map_err(map_err)?;
@@ -931,9 +1071,15 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         input: &ContextualTagsInput,
     ) -> Result<ContextualTagsPayload, NoteError> {
         let mut sql = String::from(
-            "SELECT DISTINCT nt.tag
+            "SELECT t.path,
+                    t.depth,
+                    t.pinned,
+                    t.hide_subtag_notes,
+                    SUM(CASE WHEN l.is_direct = 1 THEN 1 ELSE 0 END) AS direct_note_count,
+                    COUNT(*) AS inclusive_note_count
              FROM notes n
-             JOIN note_tags nt ON nt.note_id = n.id",
+             JOIN note_tag_links l ON l.note_id = n.id
+             JOIN tags t ON t.id = l.tag_id",
         );
         let mut clauses = Vec::new();
         let mut values = Vec::new();
@@ -945,12 +1091,22 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             sql.push_str(&clauses.join(" AND "));
         }
 
-        sql.push_str(" ORDER BY nt.tag ASC");
+        sql.push_str(
+            " GROUP BY t.id, t.path, t.depth, t.pinned, t.hide_subtag_notes
+              ORDER BY t.pinned DESC, t.path ASC",
+        );
 
         let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
         let rows = statement
             .query_map(params_from_iter(values.iter()), |row| {
-                row.get::<_, String>(0)
+                Ok(ContextualTagRow {
+                    path: row.get(0)?,
+                    depth: row.get::<_, i64>(1)? as usize,
+                    pinned: row.get::<_, i64>(2)? != 0,
+                    hide_subtag_notes: row.get::<_, i64>(3)? != 0,
+                    direct_note_count: row.get::<_, i64>(4)? as usize,
+                    inclusive_note_count: row.get::<_, i64>(5)? as usize,
+                })
             })
             .map_err(map_err)?;
 
@@ -959,7 +1115,9 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             tags.push(row.map_err(map_err)?);
         }
 
-        Ok(ContextualTagsPayload { tags })
+        Ok(ContextualTagsPayload {
+            roots: build_contextual_tag_tree(tags),
+        })
     }
 
     fn todo_count(&self) -> Result<i64, NoteError> {
@@ -973,42 +1131,100 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     }
 
     fn export_notes(&self, input: &ExportNotesInput) -> Result<usize, NoteError> {
-        let mut sql = String::from("SELECT n.title, n.markdown FROM notes n WHERE ");
-        let mut clauses = Vec::new();
-        let mut values = Vec::new();
+        let export_dir = PathBuf::from(&input.export_dir);
+        std::fs::create_dir_all(&export_dir)
+            .map_err(|e| NoteError::Storage(format!("Failed to create export directory: {e}")))?;
 
-        append_note_view_clauses(&mut clauses, &mut values, input.note_filter);
-
-        sql.push_str(&clauses.join(" AND "));
-        sql.push_str(" ORDER BY n.edited_at DESC");
-
-        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
-        let rows = statement
-            .query_map(params_from_iter(values.iter()), |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(map_err)?;
-
-        let export_dir = std::path::PathBuf::from(&input.export_dir);
-        let mut used_names: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
+        let mut used_names: HashMap<String, usize> = HashMap::new();
         let mut count = 0;
 
-        for row in rows {
-            let (title, markdown) = row.map_err(map_err)?;
-            let base = sanitize_filename(&title);
+        match input.export_mode {
+            ExportModeInput::NoteFilter => {
+                let note_filter = input.note_filter.ok_or(NoteError::InvalidExportInput)?;
+                let mut sql = String::from("SELECT n.title, n.markdown FROM notes n WHERE ");
+                let mut clauses = Vec::new();
+                let mut values = Vec::new();
 
-            let entry = used_names.entry(base.clone()).or_insert(0);
-            *entry += 1;
-            let filename = if *entry == 1 {
-                format!("{base}.md")
-            } else {
-                format!("{base} {entry}.md")
-            };
+                append_note_view_clauses(&mut clauses, &mut values, note_filter);
 
-            std::fs::write(export_dir.join(&filename), &markdown)
-                .map_err(|e| NoteError::Storage(format!("Failed to write {filename}: {e}")))?;
-            count += 1;
+                sql.push_str(&clauses.join(" AND "));
+                sql.push_str(" ORDER BY n.edited_at DESC");
+
+                let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
+                let rows = statement
+                    .query_map(params_from_iter(values.iter()), |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    })
+                    .map_err(map_err)?;
+
+                for row in rows {
+                    let (title, markdown) = row.map_err(map_err)?;
+                    let filename = next_export_filename(&mut used_names, &export_dir, &title);
+                    let content = export_markdown(&markdown, input.preserve_tags);
+
+                    std::fs::write(export_dir.join(&filename), content).map_err(|e| {
+                        NoteError::Storage(format!("Failed to write {filename}: {e}"))
+                    })?;
+                    count += 1;
+                }
+            }
+            ExportModeInput::Tag => {
+                let selected_path = input
+                    .tag_path
+                    .as_deref()
+                    .ok_or(NoteError::InvalidExportInput)?;
+                let mut statement = self
+                    .conn
+                    .prepare(
+                        "SELECT n.id, n.title, n.markdown
+                         FROM notes n
+                         WHERE n.archived_at IS NULL
+                           AND n.deleted_at IS NULL
+                           AND EXISTS (
+                             SELECT 1
+                             FROM note_tag_links l
+                             JOIN tags t ON t.id = l.tag_id
+                             WHERE l.note_id = n.id
+                               AND l.is_direct = 1
+                               AND (t.path = ?1 OR t.path LIKE ?2 ESCAPE '\\')
+                           )
+                         ORDER BY n.edited_at DESC",
+                    )
+                    .map_err(map_err)?;
+
+                let rows = statement
+                    .query_map(
+                        params![selected_path, format!("{selected_path}/%")],
+                        |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, String>(1)?,
+                                row.get::<_, String>(2)?,
+                            ))
+                        },
+                    )
+                    .map_err(map_err)?;
+
+                for row in rows {
+                    let (note_id, title, markdown) = row.map_err(map_err)?;
+                    let direct_tags = direct_tags_for_note(self.conn, &note_id)?;
+                    let relative_directory =
+                        export_relative_directory_for_tag_scope(&direct_tags, selected_path)
+                            .ok_or(NoteError::InvalidExportInput)?;
+                    let target_directory = export_dir.join(relative_directory);
+                    std::fs::create_dir_all(&target_directory).map_err(|e| {
+                        NoteError::Storage(format!("Failed to create export directory: {e}"))
+                    })?;
+
+                    let filename = next_export_filename(&mut used_names, &target_directory, &title);
+                    let content = export_markdown(&markdown, input.preserve_tags);
+
+                    std::fs::write(target_directory.join(&filename), content).map_err(|e| {
+                        NoteError::Storage(format!("Failed to write {filename}: {e}"))
+                    })?;
+                    count += 1;
+                }
+            }
         }
 
         Ok(count)
@@ -1058,5 +1274,151 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .optional()
             .map_err(map_err)?
             .ok_or_else(|| NoteError::Storage("No Nostr identity configured.".to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup_export_repo() -> (Connection, PathBuf) {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE notes (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                markdown TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                modified_at INTEGER NOT NULL,
+                edited_at INTEGER NOT NULL,
+                archived_at INTEGER,
+                deleted_at INTEGER,
+                pinned_at INTEGER,
+                readonly INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE tags (
+                id INTEGER PRIMARY KEY,
+                path TEXT NOT NULL UNIQUE,
+                depth INTEGER NOT NULL,
+                pinned INTEGER NOT NULL DEFAULT 0,
+                hide_subtag_notes INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE note_tag_links (
+                note_id TEXT NOT NULL,
+                tag_id INTEGER NOT NULL,
+                is_direct INTEGER NOT NULL
+            );
+            ",
+        )
+        .unwrap();
+
+        let export_dir = std::env::temp_dir().join(format!(
+            "comet-export-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&export_dir).unwrap();
+
+        (conn, export_dir)
+    }
+
+    fn insert_tag(conn: &Connection, id: i64, path: &str) {
+        conn.execute(
+            "INSERT INTO tags (id, path, depth) VALUES (?1, ?2, ?3)",
+            params![id, path, path.matches('/').count() as i64],
+        )
+        .unwrap();
+    }
+
+    fn insert_note(conn: &Connection, id: &str, title: &str, markdown: &str, edited_at: i64) {
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at)
+             VALUES (?1, ?2, ?3, 1, 1, ?4)",
+            params![id, title, markdown, edited_at],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn export_tag_scope_places_notes_in_deepest_matching_direct_folder() {
+        let (conn, export_dir) = setup_export_repo();
+        insert_tag(&conn, 1, "work");
+        insert_tag(&conn, 2, "work/project");
+        insert_tag(&conn, 3, "work/project/mobile");
+
+        insert_note(&conn, "n1", "Parent", "# Parent\n\n#work", 10);
+        insert_note(&conn, "n2", "Child", "# Child\n\n#work/project", 20);
+        insert_note(
+            &conn,
+            "n3",
+            "Deep",
+            "# Deep\n\n#work #work/project/mobile",
+            30,
+        );
+
+        conn.execute(
+            "INSERT INTO note_tag_links (note_id, tag_id, is_direct) VALUES
+             ('n1', 1, 1),
+             ('n2', 2, 1),
+             ('n3', 1, 1),
+             ('n3', 3, 1)",
+            [],
+        )
+        .unwrap();
+
+        let repo = SqliteNoteRepository::new(&conn);
+        let count = repo
+            .export_notes(&ExportNotesInput {
+                export_mode: ExportModeInput::Tag,
+                note_filter: None,
+                tag_path: Some("work".to_string()),
+                preserve_tags: true,
+                export_dir: export_dir.to_string_lossy().into_owned(),
+            })
+            .unwrap();
+
+        assert_eq!(count, 3);
+        assert!(export_dir.join("Parent.md").exists());
+        assert!(export_dir.join("project").join("Child.md").exists());
+        assert!(export_dir
+            .join("project")
+            .join("mobile")
+            .join("Deep.md")
+            .exists());
+
+        let _ = std::fs::remove_dir_all(export_dir);
+    }
+
+    #[test]
+    fn export_notes_can_strip_inline_tags() {
+        let (conn, export_dir) = setup_export_repo();
+        insert_note(
+            &conn,
+            "n1",
+            "Tagged",
+            "# Tagged\n\n#work #project alpha#",
+            10,
+        );
+
+        let repo = SqliteNoteRepository::new(&conn);
+        let count = repo
+            .export_notes(&ExportNotesInput {
+                export_mode: ExportModeInput::NoteFilter,
+                note_filter: Some(NoteFilterInput::All),
+                tag_path: None,
+                preserve_tags: false,
+                export_dir: export_dir.to_string_lossy().into_owned(),
+            })
+            .unwrap();
+
+        assert_eq!(count, 1);
+        let exported = std::fs::read_to_string(export_dir.join("Tagged.md")).unwrap();
+        assert!(!exported.contains("#work"));
+        assert!(!exported.contains("#project alpha#"));
+
+        let _ = std::fs::remove_dir_all(export_dir);
     }
 }

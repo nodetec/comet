@@ -80,3 +80,19 @@ pub fn read_theme(
 ) -> Result<crate::infra::themes::ThemeData, AppError> {
     crate::infra::themes::read_theme(&app, &theme_id)
 }
+
+#[tauri::command]
+pub fn get_tag_index_diagnostics(
+    app: AppHandle,
+) -> Result<crate::adapters::sqlite::tag_index::TagIndexDiagnostics, AppError> {
+    let conn = crate::db::database_connection(&app)?;
+    crate::adapters::sqlite::tag_index::tag_index_diagnostics(&conn)
+}
+
+#[tauri::command]
+pub fn repair_tag_index(
+    app: AppHandle,
+) -> Result<crate::adapters::sqlite::tag_index::TagIndexDiagnostics, AppError> {
+    let mut conn = crate::db::database_connection(&app)?;
+    crate::adapters::sqlite::tag_index::repair_tag_index(&mut conn)
+}

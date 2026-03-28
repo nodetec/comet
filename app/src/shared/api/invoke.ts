@@ -6,13 +6,18 @@ import {
   type BootstrapPayload,
   type ContextualTagsInput,
   type ContextualTagsPayload,
+  type DeleteTagInput,
+  type ExportNotesInput,
   type NoteConflictInfo,
   type LoadedNote,
-  type NoteFilter,
   type NotePagePayload,
   type NoteQueryInput,
   type PublishNoteInput,
   type PublishShortNoteInput,
+  type RenameTagInput,
+  type SetHideSubtagNotesInput,
+  type SetTagPinnedInput,
+  type TagIndexDiagnostics,
 } from "./types";
 
 export const NOTE_PAGE_SIZE = 40;
@@ -38,6 +43,14 @@ export async function getBootstrap() {
 
 export async function getTodoCount() {
   return invoke<number>("todo_count");
+}
+
+export async function getTagIndexDiagnostics() {
+  return invoke<TagIndexDiagnostics>("get_tag_index_diagnostics");
+}
+
+export async function repairTagIndex() {
+  return invoke<TagIndexDiagnostics>("repair_tag_index");
 }
 
 export async function queryNotes(input: NoteQueryInput) {
@@ -85,6 +98,22 @@ export async function setNoteReadonly(input: {
   readonly: boolean;
 }) {
   return invoke<LoadedNote>("set_note_readonly", { input });
+}
+
+export async function renameTag(input: RenameTagInput) {
+  return invoke<string[]>("rename_tag", { input });
+}
+
+export async function deleteTag(input: DeleteTagInput) {
+  return invoke<string[]>("delete_tag", { input });
+}
+
+export async function setTagPinned(input: SetTagPinnedInput) {
+  return invoke("set_tag_pinned", { input });
+}
+
+export async function setHideSubtagNotes(input: SetHideSubtagNotesInput) {
+  return invoke("set_hide_subtag_notes", { input });
 }
 
 export async function archiveNote(noteId: string) {
@@ -138,9 +167,6 @@ export async function resolveNoteConflict(
   return invoke("resolve_note_conflict", { deleteSelected, noteId });
 }
 
-export async function exportNotes(input: {
-  noteFilter: NoteFilter;
-  exportDir: string;
-}) {
+export async function exportNotes(input: ExportNotesInput) {
   return invoke<number>("export_notes", { input });
 }

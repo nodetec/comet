@@ -21,11 +21,11 @@ type SearchResult = {
 type SearchMode = "notes" | "tags";
 
 type CommandPaletteProps = {
-  availableTags: string[];
+  availableTagPaths: string[];
   open: boolean;
   onOpenChange(open: boolean): void;
   onSelectNote(noteId: string): void;
-  onToggleTag(tag: string): void;
+  onSelectTagPath(tagPath: string): void;
 };
 
 function useDebouncedSearch(
@@ -72,11 +72,11 @@ function useDebouncedSearch(
 }
 
 export function CommandPalette({
-  availableTags,
+  availableTagPaths,
   open,
   onOpenChange,
   onSelectNote,
-  onToggleTag,
+  onSelectTagPath,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [noteResults, setNoteResults] = useState<SearchResult[]>([]);
@@ -90,7 +90,7 @@ export function CommandPalette({
     mode === "notes" ? query.trim() : query.trim().slice(1).trim();
 
   const displayedTags =
-    mode === "tags" && !searchTerm ? availableTags : tagResults;
+    mode === "tags" && !searchTerm ? availableTagPaths : tagResults;
 
   const hasResults =
     mode === "tags" ? displayedTags.length > 0 : noteResults.length > 0;
@@ -120,8 +120,8 @@ export function CommandPalette({
     onOpenChange(false);
   };
 
-  const handleSelectTag = (tag: string) => {
-    onToggleTag(tag);
+  const handleSelectTag = (tagPath: string) => {
+    onSelectTagPath(tagPath);
     onOpenChange(false);
   };
 

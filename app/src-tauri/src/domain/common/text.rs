@@ -1,4 +1,11 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TagOccurrence {
+    pub start: usize,
+    pub end: usize,
+    pub canonical_path: String,
+}
 
 /// Extract the title from the first H1 heading in markdown.
 pub fn title_from_markdown(markdown: &str) -> String {
@@ -129,11 +136,86 @@ pub fn strip_markdown_syntax(line: &str) -> String {
     s
 }
 
+/// Canonicalize a tag path without surrounding `#` delimiters.
+///
+/// Returns `None` when the input violates the phase-1 tag contract.
+pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
+    let mut canonical_segments = Vec::new();
+
+    for segment in raw.split('/') {
+        let normalized = segment.split_whitespace().collect::<Vec<_>>().join(" ");
+        let trimmed = normalized.trim();
+
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let mut has_letter = false;
+        for character in trimmed.chars() {
+            if character.is_alphabetic() {
+                has_letter = true;
+            }
+
+            if !(character.is_alphanumeric() || matches!(character, '_' | '-' | ' ')) {
+                return None;
+            }
+        }
+
+        if !has_letter {
+            return None;
+        }
+
+        canonical_segments.push(trimmed.to_lowercase());
+    }
+
+    if canonical_segments.is_empty() {
+        return None;
+    }
+
+    Some(canonical_segments.join("/"))
+}
+
+/// Render a canonical tag path back into authored markdown syntax.
+pub fn render_tag_token(path: &str) -> Option<String> {
+    let canonical = canonicalize_tag_path(path)?;
+    if canonical.contains(' ') {
+        Some(format!("#{canonical}#"))
+    } else {
+        Some(format!("#{canonical}"))
+    }
+}
+
+pub fn ancestor_tag_paths(path: &str) -> Vec<String> {
+    let canonical = match canonicalize_tag_path(path) {
+        Some(value) => value,
+        None => return Vec::new(),
+    };
+
+    let segments = canonical.split('/').collect::<Vec<_>>();
+    if segments.len() <= 1 {
+        return Vec::new();
+    }
+
+    let mut ancestors = Vec::with_capacity(segments.len() - 1);
+    for depth in 1..segments.len() {
+        ancestors.push(segments[..depth].join("/"));
+    }
+    ancestors
+}
+
 /// Extract hashtags from markdown, ignoring code blocks, inline code, and link
-/// destinations. Returns a sorted, deduplicated, lowercased list.
+/// destinations. Returns a sorted, deduplicated list of canonical direct tags.
 pub fn extract_tags(markdown: &str) -> Vec<String> {
-    let bytes = markdown.as_bytes();
     let mut tags = BTreeSet::new();
+    for occurrence in extract_tag_occurrences(markdown) {
+        tags.insert(occurrence.canonical_path);
+    }
+    tags.into_iter().collect()
+}
+
+pub fn extract_tag_occurrences(markdown: &str) -> Vec<TagOccurrence> {
+    let bytes = markdown.as_bytes();
+    let mut occurrences = Vec::new();
     let mut index = 0;
     let mut fence_char: u8 = 0;
     let mut fence_len: usize = 0;
@@ -234,39 +316,231 @@ pub fn extract_tags(markdown: &str) -> Vec<String> {
             continue;
         }
 
-        if index > 0 && is_tag_char(bytes[index - 1]) {
+        if is_hash_escaped(bytes, index) || !has_valid_tag_boundary(markdown, index) {
             index += 1;
             continue;
         }
 
-        let tag_start = index + 1;
-        if tag_start >= bytes.len() || !is_tag_char(bytes[tag_start]) {
-            index += 1;
+        if let Some(occurrence) = parse_wrapped_tag(markdown, index) {
+            index = occurrence.end;
+            occurrences.push(occurrence);
             continue;
         }
 
-        let mut tag_end = tag_start;
-        while tag_end < bytes.len() && is_tag_char(bytes[tag_end]) {
-            tag_end += 1;
+        if let Some(occurrence) = parse_simple_tag(markdown, index) {
+            index = occurrence.end;
+            occurrences.push(occurrence);
+            continue;
         }
 
-        // Skip tags that are purely numeric (e.g. #2, #123)
-        if bytes[tag_start..tag_end]
-            .iter()
-            .any(u8::is_ascii_alphabetic)
-        {
-            let mut tag = String::from_utf8_lossy(&bytes[tag_start..tag_end]).into_owned();
-            tag.make_ascii_lowercase();
-            tags.insert(tag);
-        }
-        index = tag_end;
+        index += 1;
     }
 
-    tags.into_iter().collect()
+    occurrences
 }
 
-fn is_tag_char(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
+fn is_hash_escaped(bytes: &[u8], index: usize) -> bool {
+    let mut slash_count = 0;
+    let mut current = index;
+
+    while current > 0 && bytes[current - 1] == b'\\' {
+        slash_count += 1;
+        current -= 1;
+    }
+
+    slash_count % 2 == 1
+}
+
+fn has_valid_tag_boundary(markdown: &str, hash_index: usize) -> bool {
+    let Some(previous) = markdown[..hash_index].chars().next_back() else {
+        return true;
+    };
+
+    !(is_boundary_disallowed_tag_char(previous) || matches!(previous, '/' | ':' | '.'))
+}
+
+fn is_boundary_disallowed_tag_char(character: char) -> bool {
+    character.is_alphanumeric() || matches!(character, '_' | '-')
+}
+
+fn is_simple_tag_body_char(character: char) -> bool {
+    character.is_alphanumeric() || matches!(character, '_' | '-' | '/')
+}
+
+fn is_wrapped_tag_body_char(character: char) -> bool {
+    character != '\n'
+        && character != '\r'
+        && (character.is_alphanumeric()
+            || matches!(character, '_' | '-' | '/')
+            || character.is_whitespace())
+}
+
+fn parse_wrapped_tag(markdown: &str, start_index: usize) -> Option<TagOccurrence> {
+    let rest = &markdown[start_index + 1..];
+    let mut first_char = true;
+
+    for (offset, character) in rest.char_indices() {
+        if first_char && character.is_whitespace() {
+            return None;
+        }
+        first_char = false;
+
+        if character == '#' {
+            if offset == 0 {
+                return None;
+            }
+
+            let candidate = &rest[..offset];
+            let canonical = canonicalize_tag_path(candidate)?;
+            let next_index = start_index + 1 + offset + 1;
+            if has_invalid_wrapped_trailing_boundary(markdown, next_index) {
+                return None;
+            }
+            return Some(TagOccurrence {
+                start: start_index,
+                end: next_index,
+                canonical_path: canonical,
+            });
+        }
+
+        if !is_wrapped_tag_body_char(character) {
+            return None;
+        }
+    }
+
+    None
+}
+
+fn has_invalid_wrapped_trailing_boundary(markdown: &str, next_index: usize) -> bool {
+    let Some(next) = markdown[next_index..].chars().next() else {
+        return false;
+    };
+
+    next.is_alphanumeric() || matches!(next, '_' | '-' | '/' | ':' | '.')
+}
+
+fn parse_simple_tag(markdown: &str, start_index: usize) -> Option<TagOccurrence> {
+    let rest = &markdown[start_index + 1..];
+    let mut consumed_end = None;
+
+    for (offset, character) in rest.char_indices() {
+        if is_simple_tag_body_char(character) {
+            consumed_end = Some(offset + character.len_utf8());
+            continue;
+        }
+        break;
+    }
+
+    let consumed_end = consumed_end?;
+    let end_index = start_index + 1 + consumed_end;
+    let candidate = &markdown[start_index + 1..end_index];
+    let canonical = canonicalize_tag_path(candidate)?;
+
+    if has_invalid_simple_trailing_text(markdown, end_index) {
+        return None;
+    }
+
+    Some(TagOccurrence {
+        start: start_index,
+        end: end_index,
+        canonical_path: canonical,
+    })
+}
+
+fn has_invalid_simple_trailing_text(markdown: &str, end_index: usize) -> bool {
+    let mut characters = markdown[end_index..].chars();
+    let Some(next) = characters.next() else {
+        return false;
+    };
+
+    if !next.is_whitespace() {
+        return false;
+    }
+
+    for character in characters {
+        if matches!(character, '\n' | '\r') {
+            return false;
+        }
+
+        if character.is_whitespace() {
+            continue;
+        }
+
+        return character != '#'
+            && (character.is_alphanumeric() || matches!(character, '_' | '-' | '/'));
+    }
+
+    false
+}
+
+pub fn rewrite_tag_path_in_markdown(
+    markdown: &str,
+    from_path: &str,
+    to_path: Option<&str>,
+) -> Option<String> {
+    let from_canonical = canonicalize_tag_path(from_path)?;
+    let to_canonical = match to_path {
+        Some(path) => Some(canonicalize_tag_path(path)?),
+        None => None,
+    };
+
+    let occurrences = extract_tag_occurrences(markdown);
+    if occurrences.is_empty() {
+        return Some(markdown.to_string());
+    }
+
+    let mut existing_non_source = HashSet::new();
+    for occurrence in &occurrences {
+        if occurrence.canonical_path != from_canonical {
+            existing_non_source.insert(occurrence.canonical_path.clone());
+        }
+    }
+
+    let mut output = String::with_capacity(markdown.len());
+    let mut cursor = 0;
+    let mut destination_emitted = to_canonical
+        .as_ref()
+        .is_some_and(|destination| existing_non_source.contains(destination));
+
+    for occurrence in occurrences {
+        output.push_str(&markdown[cursor..occurrence.start]);
+
+        if occurrence.canonical_path == from_canonical {
+            if let Some(destination) = &to_canonical {
+                if !destination_emitted {
+                    if let Some(rendered) = render_tag_token(destination) {
+                        output.push_str(&rendered);
+                    }
+                    destination_emitted = true;
+                }
+            }
+        } else {
+            output.push_str(&markdown[occurrence.start..occurrence.end]);
+        }
+
+        cursor = occurrence.end;
+    }
+
+    output.push_str(&markdown[cursor..]);
+    Some(output)
+}
+
+pub fn strip_tags_from_markdown(markdown: &str) -> String {
+    let occurrences = extract_tag_occurrences(markdown);
+    if occurrences.is_empty() {
+        return markdown.to_string();
+    }
+
+    let mut output = String::with_capacity(markdown.len());
+    let mut cursor = 0;
+
+    for occurrence in occurrences {
+        output.push_str(&markdown[cursor..occurrence.start]);
+        cursor = occurrence.end;
+    }
+
+    output.push_str(&markdown[cursor..]);
+    output
 }
 
 /// Strip the leading H1 title line from markdown, returning the body.
@@ -285,6 +559,39 @@ pub fn strip_title_line(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct TagFixtureCorpus {
+        path_cases: Vec<TagPathCase>,
+        entity_cases: Vec<TagEntityCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct TagPathCase {
+        raw: String,
+        canonical: Option<String>,
+        rendered: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    struct TagEntityCase {
+        text: String,
+        #[serde(rename = "match")]
+        entity_match: Option<TagEntityFixture>,
+    }
+
+    #[derive(Deserialize)]
+    struct TagEntityFixture {
+        start: usize,
+        end: usize,
+        canonical: String,
+    }
+
+    fn shared_tag_fixtures() -> TagFixtureCorpus {
+        serde_json::from_str(include_str!("../../../../src/shared/lib/tag-fixtures.json")).unwrap()
+    }
 
     #[test]
     fn strip_title_line_removes_h1_and_keeps_body() {
@@ -385,7 +692,7 @@ mod tests {
 
     #[test]
     fn extract_tags_ignores_tags_inside_inline_code() {
-        let markdown = "Use `#config` for settings and #real outside code";
+        let markdown = "Use `#config` for settings and (#real).";
         assert_eq!(extract_tags(markdown), vec!["real".to_string()]);
     }
 
@@ -410,5 +717,202 @@ mod tests {
     #[test]
     fn title_from_markdown_empty_h1_returns_empty() {
         assert_eq!(title_from_markdown("# \n\nBody"), "");
+    }
+
+    #[test]
+    fn canonicalize_tag_path_normalizes_segments() {
+        assert_eq!(
+            canonicalize_tag_path("Work/ project   alpha "),
+            Some("work/project alpha".to_string())
+        );
+    }
+
+    #[test]
+    fn canonicalize_tag_path_rejects_empty_or_number_only_segments() {
+        assert_eq!(canonicalize_tag_path("work//project"), None);
+        assert_eq!(canonicalize_tag_path("123"), None);
+        assert_eq!(canonicalize_tag_path("journal/2026"), None);
+    }
+
+    #[test]
+    fn render_tag_token_wraps_multi_word_paths() {
+        assert_eq!(render_tag_token("roadmap"), Some("#roadmap".to_string()));
+        assert_eq!(
+            render_tag_token("work/project alpha"),
+            Some("#work/project alpha#".to_string())
+        );
+    }
+
+    #[test]
+    fn shared_fixture_corpus_stays_in_sync_with_rust_parser() {
+        let fixtures = shared_tag_fixtures();
+
+        for test_case in fixtures.path_cases {
+            assert_eq!(canonicalize_tag_path(&test_case.raw), test_case.canonical);
+            assert_eq!(render_tag_token(&test_case.raw), test_case.rendered);
+        }
+
+        for test_case in fixtures.entity_cases {
+            let occurrences = extract_tag_occurrences(&test_case.text);
+
+            if let Some(expected) = test_case.entity_match {
+                assert_eq!(
+                    occurrences,
+                    vec![TagOccurrence {
+                        start: expected.start,
+                        end: expected.end,
+                        canonical_path: expected.canonical,
+                    }]
+                );
+            } else {
+                assert!(occurrences.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn ancestor_tag_paths_returns_all_ancestors() {
+        assert_eq!(
+            ancestor_tag_paths("work/project/mobile"),
+            vec!["work".to_string(), "work/project".to_string()]
+        );
+        assert!(ancestor_tag_paths("work").is_empty());
+    }
+
+    #[test]
+    fn extract_tags_supports_simple_wrapped_and_nested_tags() {
+        let markdown = [
+            "#RoadMap",
+            "#work/project",
+            "#project alpha#",
+            "#work/project alpha#",
+            "#roadmap",
+            "#work/project",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_tags(&markdown),
+            vec![
+                "project alpha".to_string(),
+                "roadmap".to_string(),
+                "work/project".to_string(),
+                "work/project alpha".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_tags_rejects_invalid_and_ambiguous_forms() {
+        let markdown = [
+            "#123",
+            "#project alpha",
+            "#work//project",
+            "#!/bin/bash",
+            "\\#not-a-tag",
+            "https://example.com/#frag",
+        ]
+        .join("\n");
+
+        assert_eq!(extract_tags(&markdown), Vec::<String>::new());
+    }
+
+    #[test]
+    fn extract_tags_keeps_multiple_tags_on_same_line() {
+        let markdown = "#roadmap #work/project";
+        assert_eq!(
+            extract_tags(markdown),
+            vec!["roadmap".to_string(), "work/project".to_string()]
+        );
+    }
+
+    #[test]
+    fn extract_tags_accepts_wrapped_nested_segments_with_spacing() {
+        let markdown = "#work/ project alpha #";
+        assert_eq!(
+            extract_tags(markdown),
+            vec!["work/project alpha".to_string()]
+        );
+    }
+
+    #[test]
+    fn extract_tags_lowercases_unicode() {
+        let markdown = "#Café";
+        assert_eq!(extract_tags(markdown), vec!["café".to_string()]);
+    }
+
+    #[test]
+    fn extract_tag_occurrences_tracks_spans_and_paths() {
+        let markdown = "hello #roadmap, and #project alpha#";
+        assert_eq!(
+            extract_tag_occurrences(markdown),
+            vec![
+                TagOccurrence {
+                    start: 6,
+                    end: 14,
+                    canonical_path: "roadmap".to_string(),
+                },
+                TagOccurrence {
+                    start: 20,
+                    end: 35,
+                    canonical_path: "project alpha".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_renames_exact_direct_occurrences() {
+        let markdown = "hello #roadmap and #work/project alpha#";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "work/project alpha", Some("work/mobile")),
+            Some("hello #roadmap and #work/mobile".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_deletes_exact_direct_occurrences() {
+        let markdown = "hello #roadmap and #project alpha#";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "project alpha", None),
+            Some("hello #roadmap and ".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_dedupes_rename_target_when_already_present() {
+        let markdown = "#roadmap #project alpha#";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "project alpha", Some("roadmap")),
+            Some("#roadmap ".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_ignores_code_contexts() {
+        let markdown = "Use `#roadmap` and #roadmap";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "roadmap", Some("plan")),
+            Some("Use `#roadmap` and #plan".to_string())
+        );
+    }
+
+    #[test]
+    fn strip_tags_from_markdown_removes_authored_tags_only() {
+        let markdown = [
+            "# Title",
+            "",
+            "#work #project alpha#",
+            "",
+            "Keep `#inline-code#` and [link](https://example.com/#hash).",
+        ]
+        .join("\n");
+
+        let stripped = strip_tags_from_markdown(&markdown);
+
+        assert!(!stripped.contains("#work"));
+        assert!(!stripped.contains("#project alpha#"));
+        assert!(stripped.contains("`#inline-code#`"));
+        assert!(stripped.contains("https://example.com/#hash"));
     }
 }

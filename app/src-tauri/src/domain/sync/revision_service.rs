@@ -116,9 +116,14 @@ pub fn build_pending_note_revision(
     let parent_revision_ids =
         current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
 
-    let note_tags = {
-        let mut stmt =
-            conn.prepare("SELECT tag FROM note_tags WHERE note_id = ?1 ORDER BY tag ASC")?;
+    let direct_tag_paths = {
+        let mut stmt = conn.prepare(
+            "SELECT t.path
+             FROM note_tag_links l
+             JOIN tags t ON t.id = l.tag_id
+             WHERE l.note_id = ?1 AND l.is_direct = 1
+             ORDER BY t.path ASC",
+        )?;
         let rows = stmt.query_map(params![note_id], |row| row.get(0))?;
         rows.collect::<Result<Vec<String>, _>>()?
     };
@@ -184,7 +189,7 @@ pub fn build_pending_note_revision(
         deleted_at,
         pinned_at,
         readonly,
-        &note_tags,
+        &direct_tag_paths,
     )?;
     let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
 
@@ -200,7 +205,7 @@ pub fn build_pending_note_revision(
             deleted_at,
             pinned_at,
             readonly,
-            tags: &note_tags,
+            tags: &direct_tag_paths,
             blob_tags: &blob_tags,
             entity_type: "note",
             parent_revision_ids: &parent_revision_ids,
@@ -393,15 +398,11 @@ mod tests {
         account_migrations().to_latest(&mut conn).unwrap();
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
-             VALUES ('note-1', 'Title', '# Title\n\nBody', 100, 200, 200, 1)",
+             VALUES ('note-1', 'Title', '# Title\n\n#alpha #beta', 100, 200, 200, 1)",
             [],
         )
         .unwrap();
-        conn.execute(
-            "INSERT INTO note_tags (note_id, tag) VALUES ('note-1', 'alpha'), ('note-1', 'beta')",
-            [],
-        )
-        .unwrap();
+        crate::adapters::sqlite::tag_index::ensure_tag_index_ready(&mut conn).unwrap();
         conn
     }
 
@@ -457,12 +458,7 @@ mod tests {
 
         assert_eq!(
             blob_tag.as_slice(),
-            vec![
-                "blob".to_string(),
-                hash,
-                ciphertext_hash,
-                key_hex,
-            ]
+            vec!["blob".to_string(), hash, ciphertext_hash, key_hex,]
         );
     }
 
