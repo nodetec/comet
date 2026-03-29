@@ -57,6 +57,10 @@ function notesHeading(noteFilter: NoteFilter, activeTagPath: string | null) {
     return "Today";
   }
 
+  if (noteFilter === "untagged") {
+    return "Untagged";
+  }
+
   return "Notes";
 }
 

@@ -24,6 +24,7 @@ import {
   CloudCheck,
   FileTextIcon,
   Hash,
+  Inbox,
   Pin,
   Settings2,
   Trash2,
@@ -278,6 +279,7 @@ type SidebarPaneProps = {
   onSelectAll(): void;
   onSelectToday(): void;
   onSelectTodo(): void;
+  onSelectUntagged(): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
   onEmptyTrash(): void;
@@ -552,6 +554,7 @@ function NotesSection({
   onSelectArchive,
   onSelectToday,
   onSelectTodo,
+  onSelectUntagged,
   onSelectTrash,
   onToggleNotesChildren,
   todoCount,
@@ -567,6 +570,7 @@ function NotesSection({
   onSelectArchive: () => void;
   onSelectToday: () => void;
   onSelectTodo: () => void;
+  onSelectUntagged: () => void;
   onSelectTrash: () => void;
   onToggleNotesChildren: () => void;
   todoCount: number;
@@ -642,6 +646,21 @@ function NotesSection({
                   )
                 }
                 label="Todo"
+              />
+            </SidebarIndentedContent>
+          </button>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "untagged" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectUntagged}
+            type="button"
+          >
+            <SidebarIndentedContent indentLevel={1}>
+              <SidebarRowContent
+                icon={<Inbox className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
+                label="Untagged"
               />
             </SidebarIndentedContent>
           </button>
@@ -734,6 +753,7 @@ export function SidebarPane({
   onSelectAll,
   onSelectToday,
   onSelectTodo,
+  onSelectUntagged,
   onSelectArchive,
   onSelectTrash,
   onEmptyTrash,
@@ -864,6 +884,7 @@ export function SidebarPane({
             onSelectArchive={onSelectArchive}
             onSelectToday={onSelectToday}
             onSelectTodo={onSelectTodo}
+            onSelectUntagged={onSelectUntagged}
             onSelectTrash={onSelectTrash}
             onToggleNotesChildren={() => {
               setNotesChildrenOpen((current) => !current);

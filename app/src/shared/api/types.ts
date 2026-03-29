@@ -1,4 +1,10 @@
-export type NoteFilter = "all" | "today" | "todo" | "archive" | "trash";
+export type NoteFilter =
+  | "all"
+  | "today"
+  | "todo"
+  | "untagged"
+  | "archive"
+  | "trash";
 
 export type NoteSummary = {
   archivedAt: number | null;

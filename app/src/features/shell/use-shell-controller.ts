@@ -463,7 +463,12 @@ export function useShellController() {
     flushCurrentDraft();
     const tagsForNewNote =
       tagViewActive && activeTagPath ? [activeTagPath] : [];
-    if (!tagViewActive && noteFilter !== "today" && noteFilter !== "todo") {
+    if (
+      !tagViewActive &&
+      noteFilter !== "today" &&
+      noteFilter !== "todo" &&
+      noteFilter !== "untagged"
+    ) {
       setNoteFilter("all");
     }
     setSearchQuery("");
@@ -499,6 +504,12 @@ export function useShellController() {
     clearSelectionIfNotActive();
     setTagViewActive(false);
     setNoteFilter("todo");
+  };
+
+  const handleSelectUntagged = () => {
+    clearSelectionIfNotActive();
+    setTagViewActive(false);
+    setNoteFilter("untagged");
   };
 
   const handleSelectArchive = () => {
@@ -958,6 +969,7 @@ export function useShellController() {
     handleSetTagPinned,
     handleSelectToday,
     handleSelectTodo,
+    handleSelectUntagged,
     handleSetNotePinned,
     handleSetNoteReadonly,
     handleSelectTagPath,
@@ -1353,6 +1365,10 @@ export function useShellController() {
       onSelectTodo: () => {
         setFocusedPane("sidebar");
         latestRef.current.handleSelectTodo();
+      },
+      onSelectUntagged: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectUntagged();
       },
       onSelectArchive: () => {
         setFocusedPane("sidebar");
