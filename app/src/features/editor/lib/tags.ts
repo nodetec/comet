@@ -284,11 +284,7 @@ export function matchTagCompletionAtEnd(
   }
 
   if (!body) {
-    return {
-      matchingString: "",
-      leadOffset: hashIndex,
-      replaceableLength: 1,
-    };
+    return null;
   }
 
   const canonical = canonicalizeTagPartial(body);

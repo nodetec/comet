@@ -60,6 +60,7 @@ describe("editor tag helpers", () => {
   });
 
   it("rejects invalid completion candidates", () => {
+    expect(matchTagCompletionAtEnd("hello #")).toBeNull();
     expect(matchTagCompletionAtEnd(String.raw`hello \#roadmap`)).toBeNull();
     expect(matchTagCompletionAtEnd("hello #!/bin")).toBeNull();
     expect(matchTagCompletionAtEnd("hello #work//proj")).toBeNull();
