@@ -61,15 +61,13 @@ const SIDEBAR_COLLAPSE_TRANSITION = {
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
   if (isActive && isFocused) {
-    stateClass =
-      "bg-sidebar-primary/50 text-sidebar-primary-foreground [&_svg]:text-sidebar-primary-foreground";
+    stateClass = "bg-sidebar-primary/50";
   } else if (isActive) {
-    stateClass =
-      "bg-sidebar-muted/80 text-sidebar-muted-foreground [&_svg]:text-sidebar-muted-foreground";
+    stateClass = "bg-sidebar-muted/80";
   } else {
-    stateClass = "text-sidebar-foreground";
+    stateClass = "";
   }
-  return `flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm transition-colors ${stateClass}`;
+  return `text-sidebar-foreground flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm transition-colors ${stateClass}`;
 }
 
 function SidebarIndentedContent({
@@ -486,7 +484,16 @@ function TagTree({
                       </button>
                     ) : undefined
                   }
-                  icon={<Hash className={SIDEBAR_TAG_ICON_CLASS_NAME} />}
+                  icon={
+                    <Hash
+                      className={cn(
+                        "size-4 shrink-0",
+                        isActive
+                          ? "text-sidebar-foreground"
+                          : SIDEBAR_TAG_ICON_CLASS_NAME,
+                      )}
+                    />
+                  }
                   label={node.label}
                   status={
                     node.pinned ? (

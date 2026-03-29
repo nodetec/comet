@@ -53,7 +53,7 @@ body {
   --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.5rem;
   --sidebar: oklch(27.7% 0.006 271.21);
-  --sidebar-foreground: oklch(75.2% 0.006 286.26);
+  --sidebar-foreground: oklch(84% 0.006 286.26);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--primary);
