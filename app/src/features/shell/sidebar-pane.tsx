@@ -12,6 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
+import { motion } from "framer-motion";
 import {
   Archive,
   CalendarDays,
@@ -52,6 +53,10 @@ const SIDEBAR_ITEM_ICON_CLASS_NAME = "text-sidebar-item-icon size-4 shrink-0";
 const SIDEBAR_TAG_ICON_CLASS_NAME = "text-sidebar-tag-icon size-4 shrink-0";
 const SIDEBAR_ITEM_STATUS_ICON_CLASS_NAME =
   "text-sidebar-item-icon/80 size-3 shrink-0 fill-current";
+const SIDEBAR_COLLAPSE_TRANSITION = {
+  duration: 0.26,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
 
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
@@ -110,6 +115,42 @@ function SidebarRowContent({
         {status}
       </span>
     </div>
+  );
+}
+
+function SidebarCollapse({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <motion.div
+      animate={
+        open
+          ? {
+              height: "auto",
+              opacity: 1,
+              visibility: "visible",
+            }
+          : {
+              height: 0,
+              opacity: 0,
+              transitionEnd: {
+                visibility: "hidden",
+              },
+            }
+      }
+      className="overflow-hidden"
+      initial={false}
+      style={{
+        visibility: open ? "visible" : "hidden",
+      }}
+      transition={SIDEBAR_COLLAPSE_TRANSITION}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -455,7 +496,7 @@ function TagTree({
                 />
               </SidebarIndentedContent>
             </div>
-            {hasChildren && isExpanded ? (
+            <SidebarCollapse open={hasChildren && isExpanded}>
               <TagTree
                 activeTagPath={activeTagPath}
                 expandedTagPaths={expandedTagPaths}
@@ -469,7 +510,7 @@ function TagTree({
                 onToggleExpanded={onToggleExpanded}
                 onSelectTagPath={onSelectTagPath}
               />
-            ) : null}
+            </SidebarCollapse>
           </div>
         );
       })}
@@ -584,106 +625,110 @@ function NotesSection({
   };
 
   return (
-    <section className="space-y-0.5">
-      <div
-        className={sidebarItemClasses(
-          noteFilter === "all" && !noteSectionHasActiveTag,
-          isFocused,
-        )}
-        onClick={onSelectAll}
-      >
-        <SidebarRowContent
-          chevron={
+    <section className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5">
+        <div
+          className={sidebarItemClasses(
+            noteFilter === "all" && !noteSectionHasActiveTag,
+            isFocused,
+          )}
+          onClick={onSelectAll}
+        >
+          <SidebarRowContent
+            chevron={
+              <button
+                className="flex size-5 items-center justify-center rounded-sm"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleNotesChildren();
+                }}
+                type="button"
+              >
+                <ChevronRight
+                  className={cn(
+                    "size-4 transition-transform",
+                    notesChildrenOpen ? "rotate-90" : "rotate-0",
+                  )}
+                />
+              </button>
+            }
+            icon={<FileTextIcon className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
+            label="Notes"
+          />
+        </div>
+        <SidebarCollapse open={notesChildrenOpen}>
+          <div className="flex flex-col gap-0.5">
             <button
-              className="flex size-5 items-center justify-center rounded-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleNotesChildren();
-              }}
+              className={sidebarItemClasses(
+                noteFilter === "today" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectToday}
               type="button"
             >
-              <ChevronRight
-                className={cn(
-                  "size-4 transition-transform",
-                  notesChildrenOpen ? "rotate-90" : "rotate-0",
-                )}
-              />
+              <SidebarIndentedContent indentLevel={1}>
+                <SidebarRowContent
+                  icon={
+                    <CalendarDays className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
+                  }
+                  label="Today"
+                />
+              </SidebarIndentedContent>
             </button>
-          }
-          icon={<FileTextIcon className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
-          label="Notes"
-        />
+            <button
+              className={sidebarItemClasses(
+                noteFilter === "todo" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectTodo}
+              type="button"
+            >
+              <SidebarIndentedContent indentLevel={1}>
+                <SidebarRowContent
+                  icon={
+                    todoCount > 0 ? (
+                      <Square className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
+                    ) : (
+                      <CheckSquare className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
+                    )
+                  }
+                  label="Todo"
+                />
+              </SidebarIndentedContent>
+            </button>
+            <button
+              className={sidebarItemClasses(
+                noteFilter === "pinned" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectPinned}
+              type="button"
+            >
+              <SidebarIndentedContent indentLevel={1}>
+                <SidebarRowContent
+                  icon={<Pin className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
+                  label="Pinned"
+                />
+              </SidebarIndentedContent>
+            </button>
+            <button
+              className={sidebarItemClasses(
+                noteFilter === "untagged" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectUntagged}
+              type="button"
+            >
+              <SidebarIndentedContent indentLevel={1}>
+                <SidebarRowContent
+                  icon={<Inbox className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
+                  label="Untagged"
+                />
+              </SidebarIndentedContent>
+            </button>
+          </div>
+        </SidebarCollapse>
       </div>
-      {notesChildrenOpen ? (
-        <>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "today" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectToday}
-            type="button"
-          >
-            <SidebarIndentedContent indentLevel={1}>
-              <SidebarRowContent
-                icon={<CalendarDays className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
-                label="Today"
-              />
-            </SidebarIndentedContent>
-          </button>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "todo" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectTodo}
-            type="button"
-          >
-            <SidebarIndentedContent indentLevel={1}>
-              <SidebarRowContent
-                icon={
-                  todoCount > 0 ? (
-                    <Square className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
-                  ) : (
-                    <CheckSquare className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
-                  )
-                }
-                label="Todo"
-              />
-            </SidebarIndentedContent>
-          </button>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "pinned" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectPinned}
-            type="button"
-          >
-            <SidebarIndentedContent indentLevel={1}>
-              <SidebarRowContent
-                icon={<Pin className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
-                label="Pinned"
-              />
-            </SidebarIndentedContent>
-          </button>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "untagged" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectUntagged}
-            type="button"
-          >
-            <SidebarIndentedContent indentLevel={1}>
-              <SidebarRowContent
-                icon={<Inbox className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
-                label="Untagged"
-              />
-            </SidebarIndentedContent>
-          </button>
-        </>
-      ) : null}
       {(archivedCount > 0 || noteFilter === "archive") && (
         <button
           className={sidebarItemClasses(
