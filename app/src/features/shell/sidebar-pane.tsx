@@ -22,6 +22,7 @@ import {
   CloudSync,
   CloudCheck,
   FileTextIcon,
+  Pin,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -369,7 +370,7 @@ function TagTree({
               }
             >
               <div
-                className="flex items-center"
+                className="flex w-full items-center"
                 style={{ paddingLeft: `${12 + indentLevel * 12}px` }}
               >
                 {hasChildren ? (
@@ -391,11 +392,11 @@ function TagTree({
                 ) : (
                   <span className="inline-block size-5 shrink-0" />
                 )}
-                <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <div className="flex min-w-0 flex-1 items-center text-left">
                   <span className="truncate">{node.label}</span>
-                  <span className="text-muted-foreground ml-auto shrink-0 text-[11px]">
-                    {node.inclusiveNoteCount}
-                  </span>
+                  {node.pinned ? (
+                    <Pin className="text-primary/80 ml-auto size-3 shrink-0 fill-current" />
+                  ) : null}
                 </div>
               </div>
             </div>
