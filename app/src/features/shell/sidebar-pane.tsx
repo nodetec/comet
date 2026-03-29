@@ -857,10 +857,11 @@ export function SidebarPane({
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
+  const notesChildrenOpen = useUIStore((s) => s.sidebarNotesChildrenOpen);
+  const setNotesChildrenOpen = useUIStore((s) => s.setSidebarNotesChildrenOpen);
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [notesChildrenOpen, setNotesChildrenOpen] = useState(true);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSourcePath, setRenameSourcePath] = useState("");
   const [renameInputValue, setRenameInputValue] = useState("");
@@ -1038,7 +1039,7 @@ export function SidebarPane({
             onSelectUntagged={onSelectUntagged}
             onSelectTrash={onSelectTrash}
             onToggleNotesChildren={() => {
-              setNotesChildrenOpen((current) => !current);
+              setNotesChildrenOpen(!notesChildrenOpen);
             }}
             todoCount={todoCount}
             trashedCount={trashedCount}

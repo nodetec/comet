@@ -35,6 +35,9 @@ type UIStore = {
   expandedSidebarTagPaths: string[];
   setExpandedSidebarTagPaths(paths: string[]): void;
 
+  sidebarNotesChildrenOpen: boolean;
+  setSidebarNotesChildrenOpen(open: boolean): void;
+
   themeName: string;
   setThemeName(name: string): void;
 };
@@ -93,6 +96,11 @@ export const useUIStore = create<UIStore>()(
       setExpandedSidebarTagPaths: (expandedSidebarTagPaths) => {
         set({ expandedSidebarTagPaths });
       },
+
+      sidebarNotesChildrenOpen: true,
+      setSidebarNotesChildrenOpen: (sidebarNotesChildrenOpen) => {
+        set({ sidebarNotesChildrenOpen });
+      },
     }),
     {
       name: "comet-ui",
@@ -103,6 +111,7 @@ export const useUIStore = create<UIStore>()(
         themeName: state.themeName,
         noteSortPrefs: state.noteSortPrefs,
         expandedSidebarTagPaths: state.expandedSidebarTagPaths,
+        sidebarNotesChildrenOpen: state.sidebarNotesChildrenOpen,
       }),
     },
   ),

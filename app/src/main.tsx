@@ -54,9 +54,9 @@ createRoot(document.querySelector("#root") as HTMLElement).render(
       <App />
       {import.meta.env.DEV ? (
         <ReactQueryDevtools
-          buttonPosition="top-right"
+          buttonPosition="bottom-left"
           initialIsOpen={false}
-          position="right"
+          position="left"
         />
       ) : null}
     </QueryClientProvider>
