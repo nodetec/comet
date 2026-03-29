@@ -11,7 +11,7 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { CheckMenuItem, Menu } from "@tauri-apps/api/menu";
+import { Menu } from "@tauri-apps/api/menu";
 import { motion } from "framer-motion";
 import {
   Archive,
@@ -354,22 +354,35 @@ async function showTagContextMenu(
     onExportTag(path: string): void;
     onOpenRenameTagDialog(path: string): void;
     onSetTagPinned(path: string, pinned: boolean): void;
-    onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
   },
 ) {
   event.preventDefault();
   const isRootTag = !node.path.includes("/");
 
   const items: Array<
-    | CheckMenuItem
-    | { item: "Separator" }
-    | { id: string; text: string; action: () => void }
-  > = [
+    { item: "Separator" } | { id: string; text: string; action: () => void }
+  > = [];
+
+  if (isRootTag) {
+    items.push({
+      id: `pin-${node.path}`,
+      text: node.pinned ? "Unpin Tag" : "Pin Tag",
+      action: () => ctx.onSetTagPinned(node.path, !node.pinned),
+    });
+  }
+
+  items.push(
     {
       id: `rename-${node.path}`,
-      text: "Rename Tag...",
+      text: "Rename Tag",
       action: () => ctx.onOpenRenameTagDialog(node.path),
     },
+    {
+      id: `export-${node.path}`,
+      text: "Export Tag",
+      action: () => ctx.onExportTag(node.path),
+    },
+    { item: "Separator" as const },
     {
       id: `delete-${node.path}`,
       text: "Delete Tag",
@@ -390,36 +403,7 @@ async function showTagContextMenu(
         })();
       },
     },
-    {
-      id: `export-${node.path}`,
-      text: "Export Tag…",
-      action: () => ctx.onExportTag(node.path),
-    },
-  ];
-
-  if (node.children.length > 0 || isRootTag) {
-    items.push({ item: "Separator" as const });
-  }
-
-  if (isRootTag) {
-    items.push({
-      id: `pin-${node.path}`,
-      text: node.pinned ? "Unpin From Top" : "Pin To Top",
-      action: () => ctx.onSetTagPinned(node.path, !node.pinned),
-    });
-  }
-
-  if (node.children.length > 0) {
-    items.push(
-      await CheckMenuItem.new({
-        id: `hide-subtags-${node.path}`,
-        text: "Hide Subtag Notes",
-        checked: node.hideSubtagNotes,
-        action: () =>
-          ctx.onSetTagHideSubtagNotes(node.path, !node.hideSubtagNotes),
-      }),
-    );
-  }
+  );
 
   const menu = await Menu.new({ items });
 
@@ -438,7 +422,6 @@ function TagTree({
   onDeleteTag,
   onExportTag,
   onOpenRenameTagDialog,
-  onSetTagHideSubtagNotes,
   onSetTagPinned,
   onToggleExpanded,
   onSelectTagPath,
@@ -451,7 +434,6 @@ function TagTree({
   onDeleteTag(path: string): void;
   onExportTag(path: string): void;
   onOpenRenameTagDialog(path: string): void;
-  onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
   onSetTagPinned(path: string, pinned: boolean): void;
   onToggleExpanded(path: string): void;
   onSelectTagPath(path: string): void;
@@ -477,7 +459,6 @@ function TagTree({
                   onExportTag,
                   onOpenRenameTagDialog,
                   onSetTagPinned,
-                  onSetTagHideSubtagNotes,
                 })
               }
               ref={(element) => onTagRowRef(node.path, element)}
@@ -531,7 +512,6 @@ function TagTree({
                 onDeleteTag={onDeleteTag}
                 onExportTag={onExportTag}
                 onOpenRenameTagDialog={onOpenRenameTagDialog}
-                onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={onToggleExpanded}
                 onSelectTagPath={onSelectTagPath}
@@ -852,7 +832,6 @@ export function SidebarPane({
   onExportTag,
   onRenameTag,
   onSetTagPinned,
-  onSetTagHideSubtagNotes,
   onSelectTagPath,
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
@@ -1059,7 +1038,6 @@ export function SidebarPane({
                   setRenameInputValue(path);
                   setRenameDialogOpen(true);
                 }}
-                onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={toggleExpandedTagPath}
                 onSelectTagPath={handleSelectSidebarTagPath}
