@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type MouseEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -22,6 +23,7 @@ import {
   CloudSync,
   CloudCheck,
   FileTextIcon,
+  Hash,
   Pin,
   Settings2,
   Trash2,
@@ -55,6 +57,33 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
     stateClass = "text-secondary-foreground";
   }
   return `flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors ${stateClass}`;
+}
+
+function SidebarRowContent({
+  chevron,
+  icon,
+  label,
+  status,
+}: {
+  chevron?: ReactNode;
+  icon?: ReactNode;
+  label: ReactNode;
+  status?: ReactNode;
+}) {
+  return (
+    <div className="grid w-full min-w-0 grid-cols-[1.25rem_1rem_minmax(0,1fr)_1rem] items-center gap-3">
+      <span className="flex size-5 shrink-0 items-center justify-center">
+        {chevron}
+      </span>
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        {icon}
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        {status}
+      </span>
+    </div>
+  );
 }
 
 function renameErrorMessage(input: string, normalizedTarget: string | null) {
@@ -354,10 +383,7 @@ function TagTree({
         return (
           <div key={node.path}>
             <div
-              className={cn(
-                sidebarItemClasses(isActive, isFocused),
-                "group pr-2",
-              )}
+              className={cn(sidebarItemClasses(isActive, isFocused), "group")}
               onClick={() => onSelectTagPath(node.path)}
               onContextMenu={(event) =>
                 void showTagContextMenu(event, node, {
@@ -370,34 +396,37 @@ function TagTree({
               }
             >
               <div
-                className="flex w-full items-center"
-                style={{ paddingLeft: `${12 + indentLevel * 12}px` }}
+                className="w-full"
+                style={{ paddingLeft: `${indentLevel * 12}px` }}
               >
-                {hasChildren ? (
-                  <button
-                    className="flex size-5 shrink-0 items-center justify-center rounded-sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleExpanded(node.path);
-                    }}
-                    type="button"
-                  >
-                    <ChevronRight
-                      className={cn(
-                        "size-3 transition-transform",
-                        isExpanded ? "rotate-90" : "rotate-0",
-                      )}
-                    />
-                  </button>
-                ) : (
-                  <span className="inline-block size-5 shrink-0" />
-                )}
-                <div className="flex min-w-0 flex-1 items-center text-left">
-                  <span className="truncate">{node.label}</span>
-                  {node.pinned ? (
-                    <Pin className="text-primary/80 ml-auto size-3 shrink-0 fill-current" />
-                  ) : null}
-                </div>
+                <SidebarRowContent
+                  chevron={
+                    hasChildren ? (
+                      <button
+                        className="flex size-5 items-center justify-center rounded-sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleExpanded(node.path);
+                        }}
+                        type="button"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "size-4 transition-transform",
+                            isExpanded ? "rotate-90" : "rotate-0",
+                          )}
+                        />
+                      </button>
+                    ) : undefined
+                  }
+                  icon={<Hash className="text-primary size-4 shrink-0" />}
+                  label={node.label}
+                  status={
+                    node.pinned ? (
+                      <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+                    ) : undefined
+                  }
+                />
               </div>
             </div>
             {hasChildren && isExpanded ? (
@@ -530,8 +559,10 @@ function NotesSection({
         onClick={onSelectAll}
         type="button"
       >
-        <FileTextIcon className="text-primary size-4 shrink-0" />
-        Notes
+        <SidebarRowContent
+          icon={<FileTextIcon className="text-primary size-4 shrink-0" />}
+          label="Notes"
+        />
       </button>
       <button
         className={sidebarItemClasses(
@@ -541,8 +572,10 @@ function NotesSection({
         onClick={onSelectToday}
         type="button"
       >
-        <CalendarDays className="text-primary size-4 shrink-0" />
-        Today
+        <SidebarRowContent
+          icon={<CalendarDays className="text-primary size-4 shrink-0" />}
+          label="Today"
+        />
       </button>
       <button
         className={sidebarItemClasses(
@@ -552,12 +585,16 @@ function NotesSection({
         onClick={onSelectTodo}
         type="button"
       >
-        {todoCount > 0 ? (
-          <Square className="text-primary size-4 shrink-0" />
-        ) : (
-          <CheckSquare className="text-primary size-4 shrink-0" />
-        )}
-        Todo
+        <SidebarRowContent
+          icon={
+            todoCount > 0 ? (
+              <Square className="text-primary size-4 shrink-0" />
+            ) : (
+              <CheckSquare className="text-primary size-4 shrink-0" />
+            )
+          }
+          label="Todo"
+        />
       </button>
       {(archivedCount > 0 || noteFilter === "archive") && (
         <button
@@ -568,8 +605,10 @@ function NotesSection({
           onClick={onSelectArchive}
           type="button"
         >
-          <Archive className="text-primary size-4 shrink-0" />
-          Archive
+          <SidebarRowContent
+            icon={<Archive className="text-primary size-4 shrink-0" />}
+            label="Archive"
+          />
         </button>
       )}
       {(trashedCount > 0 || noteFilter === "trash") && (
@@ -582,8 +621,10 @@ function NotesSection({
           onContextMenu={(event) => handleTrashContextMenu(event)}
           type="button"
         >
-          <Trash2 className="text-primary size-4 shrink-0" />
-          Trash
+          <SidebarRowContent
+            icon={<Trash2 className="text-primary size-4 shrink-0" />}
+            label="Trash"
+          />
         </button>
       )}
     </section>
