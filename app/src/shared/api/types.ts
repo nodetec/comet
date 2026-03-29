@@ -2,6 +2,7 @@ export type NoteFilter =
   | "all"
   | "today"
   | "todo"
+  | "pinned"
   | "untagged"
   | "archive"
   | "trash";

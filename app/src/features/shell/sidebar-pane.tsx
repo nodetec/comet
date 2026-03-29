@@ -279,6 +279,7 @@ type SidebarPaneProps = {
   onSelectAll(): void;
   onSelectToday(): void;
   onSelectTodo(): void;
+  onSelectPinned(): void;
   onSelectUntagged(): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
@@ -554,6 +555,7 @@ function NotesSection({
   onSelectArchive,
   onSelectToday,
   onSelectTodo,
+  onSelectPinned,
   onSelectUntagged,
   onSelectTrash,
   onToggleNotesChildren,
@@ -570,6 +572,7 @@ function NotesSection({
   onSelectArchive: () => void;
   onSelectToday: () => void;
   onSelectTodo: () => void;
+  onSelectPinned: () => void;
   onSelectUntagged: () => void;
   onSelectTrash: () => void;
   onToggleNotesChildren: () => void;
@@ -646,6 +649,21 @@ function NotesSection({
                   )
                 }
                 label="Todo"
+              />
+            </SidebarIndentedContent>
+          </button>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "pinned" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectPinned}
+            type="button"
+          >
+            <SidebarIndentedContent indentLevel={1}>
+              <SidebarRowContent
+                icon={<Pin className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
+                label="Pinned"
               />
             </SidebarIndentedContent>
           </button>
@@ -753,6 +771,7 @@ export function SidebarPane({
   onSelectAll,
   onSelectToday,
   onSelectTodo,
+  onSelectPinned,
   onSelectUntagged,
   onSelectArchive,
   onSelectTrash,
@@ -884,6 +903,7 @@ export function SidebarPane({
             onSelectArchive={onSelectArchive}
             onSelectToday={onSelectToday}
             onSelectTodo={onSelectTodo}
+            onSelectPinned={onSelectPinned}
             onSelectUntagged={onSelectUntagged}
             onSelectTrash={onSelectTrash}
             onToggleNotesChildren={() => {

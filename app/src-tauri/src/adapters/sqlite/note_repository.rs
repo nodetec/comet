@@ -337,6 +337,11 @@ fn append_note_view_clauses(
             clauses.push("n.deleted_at IS NULL".to_string());
             clauses.push("n.markdown LIKE '%- [ ] %'".to_string());
         }
+        NoteFilterInput::Pinned => {
+            clauses.push("n.archived_at IS NULL".to_string());
+            clauses.push("n.deleted_at IS NULL".to_string());
+            clauses.push("n.pinned_at IS NOT NULL".to_string());
+        }
         NoteFilterInput::Untagged => {
             clauses.push("n.archived_at IS NULL".to_string());
             clauses.push("n.deleted_at IS NULL".to_string());

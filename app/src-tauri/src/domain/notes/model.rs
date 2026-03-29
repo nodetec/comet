@@ -101,6 +101,7 @@ pub enum NoteFilterInput {
     All,
     Today,
     Todo,
+    Pinned,
     Untagged,
     Archive,
     Trash,

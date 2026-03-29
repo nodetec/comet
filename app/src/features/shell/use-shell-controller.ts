@@ -467,6 +467,7 @@ export function useShellController() {
       !tagViewActive &&
       noteFilter !== "today" &&
       noteFilter !== "todo" &&
+      noteFilter !== "pinned" &&
       noteFilter !== "untagged"
     ) {
       setNoteFilter("all");
@@ -504,6 +505,12 @@ export function useShellController() {
     clearSelectionIfNotActive();
     setTagViewActive(false);
     setNoteFilter("todo");
+  };
+
+  const handleSelectPinned = () => {
+    clearSelectionIfNotActive();
+    setTagViewActive(false);
+    setNoteFilter("pinned");
   };
 
   const handleSelectUntagged = () => {
@@ -969,6 +976,7 @@ export function useShellController() {
     handleSetTagPinned,
     handleSelectToday,
     handleSelectTodo,
+    handleSelectPinned,
     handleSelectUntagged,
     handleSetNotePinned,
     handleSetNoteReadonly,
@@ -1365,6 +1373,10 @@ export function useShellController() {
       onSelectTodo: () => {
         setFocusedPane("sidebar");
         latestRef.current.handleSelectTodo();
+      },
+      onSelectPinned: () => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectPinned();
       },
       onSelectUntagged: () => {
         setFocusedPane("sidebar");
