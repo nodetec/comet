@@ -69,12 +69,17 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuOpenRef = useRef(false);
   const requestGateRef = useRef(createLoadScopedRequestGate());
 
   // Reset selection when menu changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [menu?.tags]);
+
+  useEffect(() => {
+    menuOpenRef.current = menu !== null;
+  }, [menu]);
 
   const closeMenu = useCallback(() => {
     setMenu(null);
@@ -258,65 +263,77 @@ export default function TagCompletionPlugin({ loadKey }: { loadKey: string }) {
 
   // Trigger detection on editor updates
   useEffect(() => {
-    return editor.registerUpdateListener(({ editorState }) => {
-      editorState.read(() => {
-        const selection = $getSelection();
-        if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
-          closeMenu();
-          return;
-        }
+    return editor.registerUpdateListener(
+      ({ editorState, dirtyElements, dirtyLeaves }) => {
+        const contentChanged = dirtyElements.size > 0 || dirtyLeaves.size > 0;
 
-        const anchor = selection.anchor;
-        const anchorNode = anchor.getNode();
-        if (!$isTextNode(anchorNode)) {
-          closeMenu();
-          return;
-        }
-
-        // Skip code contexts
-        const parent = anchorNode.getParent();
-        if (parent && $isCodeNode(parent)) {
-          closeMenu();
-          return;
-        }
-        if ((anchorNode.getFormat() & IS_CODE) !== 0) {
-          closeMenu();
-          return;
-        }
-
-        const fullText = anchorNode.getTextContent();
-        const textUpToCursor = fullText.slice(0, anchor.offset);
-        const match = matchTagCompletionAtEnd(textUpToCursor);
-
-        // Only show menu when caret is at the end of the tag
-        const charAfterCursor = fullText[anchor.offset] as string | undefined;
-        if (
-          charAfterCursor != null &&
-          /[\p{L}\p{N}_/-]/u.test(charAfterCursor)
-        ) {
-          closeMenu();
+        if (!contentChanged) {
+          if (menuOpenRef.current) {
+            closeMenu();
+          }
           if (debounceRef.current) clearTimeout(debounceRef.current);
           return;
         }
 
-        if (!match) {
-          closeMenu();
+        editorState.read(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+            closeMenu();
+            return;
+          }
+
+          const anchor = selection.anchor;
+          const anchorNode = anchor.getNode();
+          if (!$isTextNode(anchorNode)) {
+            closeMenu();
+            return;
+          }
+
+          // Skip code contexts
+          const parent = anchorNode.getParent();
+          if (parent && $isCodeNode(parent)) {
+            closeMenu();
+            return;
+          }
+          if ((anchorNode.getFormat() & IS_CODE) !== 0) {
+            closeMenu();
+            return;
+          }
+
+          const fullText = anchorNode.getTextContent();
+          const textUpToCursor = fullText.slice(0, anchor.offset);
+          const match = matchTagCompletionAtEnd(textUpToCursor);
+
+          // Only show menu when caret is at the end of the tag
+          const charAfterCursor = fullText[anchor.offset] as string | undefined;
+          if (
+            charAfterCursor != null &&
+            /[\p{L}\p{N}_/-]/u.test(charAfterCursor)
+          ) {
+            closeMenu();
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            return;
+          }
+
+          if (!match) {
+            closeMenu();
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            return;
+          }
+
+          const anchorKey = anchorNode.getKey();
+
+          // Debounce the search
           if (debounceRef.current) clearTimeout(debounceRef.current);
-          return;
-        }
-
-        const anchorKey = anchorNode.getKey();
-
-        // Debounce the search
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        const requestVersion = requestGateRef.current.issue();
-        debounceRef.current = setTimeout(
-          // eslint-disable-next-line sonarjs/no-nested-functions -- minimal wrapper for setTimeout
-          () => void searchAndShowMenu(requestVersion, match, anchorKey),
-          150,
-        );
-      });
-    });
+          const requestVersion = requestGateRef.current.issue();
+          debounceRef.current = setTimeout(
+            // eslint-disable-next-line sonarjs/no-nested-functions -- minimal wrapper for setTimeout
+            () => void searchAndShowMenu(requestVersion, match, anchorKey),
+            150,
+          );
+        });
+      },
+    );
   }, [editor, closeMenu, searchAndShowMenu]);
 
   // Cleanup debounce on unmount
