@@ -9,6 +9,16 @@ export type TagCompletionMatch = {
   replaceableLength: number;
 };
 
+function stripTrailingTagSeparators(raw: string) {
+  let normalized = raw.trim();
+
+  while (normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1).trimEnd();
+  }
+
+  return normalized;
+}
+
 function isTagSegmentChar(character: string) {
   return /[\p{L}\p{N}_-]/u.test(character);
 }
@@ -101,7 +111,12 @@ function hasInvalidSimpleTrailingText(text: string, endIndex: number) {
 }
 
 export function canonicalizeTagPath(raw: string): string | null {
-  const segments = raw.split("/");
+  const normalizedRaw = stripTrailingTagSeparators(raw);
+  if (!normalizedRaw) {
+    return null;
+  }
+
+  const segments = normalizedRaw.split("/");
   const canonicalSegments: string[] = [];
 
   for (const segment of segments) {
@@ -194,7 +209,10 @@ function parseSimpleTag(
     return null;
   }
 
-  if (hasInvalidSimpleTrailingText(text, end)) {
+  if (
+    !candidate.trimEnd().endsWith("/") &&
+    hasInvalidSimpleTrailingText(text, end)
+  ) {
     return null;
   }
 

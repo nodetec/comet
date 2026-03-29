@@ -10,6 +10,7 @@ import {
 import {
   ChevronDown,
   GitMergeConflict,
+  Hash,
   PenBoxIcon,
   Pin,
   Search,
@@ -42,30 +43,33 @@ import {
 
 function notesHeading(noteFilter: NoteFilter, activeTagPath: string | null) {
   if (activeTagPath) {
-    return `#${activeTagPath}`;
+    return {
+      label: activeTagPath,
+      showTagIcon: true,
+    };
   }
 
   if (noteFilter === "archive") {
-    return "Archive";
+    return { label: "Archive", showTagIcon: false };
   }
 
   if (noteFilter === "trash") {
-    return "Trash";
+    return { label: "Trash", showTagIcon: false };
   }
 
   if (noteFilter === "today") {
-    return "Today";
+    return { label: "Today", showTagIcon: false };
   }
 
   if (noteFilter === "pinned") {
-    return "Pinned";
+    return { label: "Pinned", showTagIcon: false };
   }
 
   if (noteFilter === "untagged") {
-    return "Untagged";
+    return { label: "Untagged", showTagIcon: false };
   }
 
-  return "Notes";
+  return { label: "Notes", showTagIcon: false };
 }
 
 type NotesPaneProps = {
@@ -598,6 +602,10 @@ export function NotesPane({
     () => normalizeHighlightWords(searchWords),
     [searchWords],
   );
+  const heading = useMemo(
+    () => notesHeading(noteFilter, activeTagPath),
+    [activeTagPath, noteFilter],
+  );
 
   const applySearchQuery = useCallback(
     (nextQuery: string) => {
@@ -724,8 +732,11 @@ export function NotesPane({
                   }}
                   type="button"
                 >
-                  <h2 className="min-w-0 truncate font-medium">
-                    {notesHeading(noteFilter, activeTagPath)}
+                  <h2 className="flex min-w-0 items-center gap-1 truncate font-medium">
+                    {heading.showTagIcon ? (
+                      <Hash className="text-sidebar-tag-icon size-3.5 shrink-0" />
+                    ) : null}
+                    <span className="min-w-0 truncate">{heading.label}</span>
                   </h2>
                   <ChevronDown className="text-muted-foreground size-4 shrink-0" />
                 </button>

@@ -66,6 +66,12 @@ describe("editor tag helpers", () => {
     expect(matchTagCompletionAtEnd("hello #work//proj")).toBeNull();
   });
 
+  it("normalizes trailing slashes in canonical tag paths", () => {
+    expect(canonicalizeTagPath("work/")).toBe("work");
+    expect(canonicalizeTagPath("work///")).toBe("work");
+    expect(canonicalizeTagPath("work/project/")).toBe("work/project");
+  });
+
   it("normalizes tag partials for backend search", () => {
     expect(canonicalizeTagPartial("Work/ project  al")).toBe("work/project al");
     expect(canonicalizeTagPartial("work/")).toBe("work/");

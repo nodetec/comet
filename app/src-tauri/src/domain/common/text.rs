@@ -140,9 +140,14 @@ pub fn strip_markdown_syntax(line: &str) -> String {
 ///
 /// Returns `None` when the input violates the phase-1 tag contract.
 pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
+    let trimmed = strip_trailing_tag_separators(raw);
+    if trimmed.is_empty() {
+        return None;
+    }
+
     let mut canonical_segments = Vec::new();
 
-    for segment in raw.split('/') {
+    for segment in trimmed.split('/') {
         let normalized = segment.split_whitespace().collect::<Vec<_>>().join(" ");
         let trimmed = normalized.trim();
 
@@ -173,6 +178,16 @@ pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
     }
 
     Some(canonical_segments.join("/"))
+}
+
+fn strip_trailing_tag_separators(raw: &str) -> &str {
+    let mut trimmed = raw.trim();
+
+    while let Some(next) = trimmed.strip_suffix('/') {
+        trimmed = next.trim_end();
+    }
+
+    trimmed
 }
 
 /// Render a canonical tag path back into authored markdown syntax.
@@ -436,7 +451,8 @@ fn parse_simple_tag(markdown: &str, start_index: usize) -> Option<TagOccurrence>
     let candidate = &markdown[start_index + 1..end_index];
     let canonical = canonicalize_tag_path(candidate)?;
 
-    if has_invalid_simple_trailing_text(markdown, end_index) {
+    if !candidate.trim_end().ends_with('/') && has_invalid_simple_trailing_text(markdown, end_index)
+    {
         return None;
     }
 
@@ -725,6 +741,11 @@ mod tests {
             canonicalize_tag_path("Work/ project   alpha "),
             Some("work/project alpha".to_string())
         );
+        assert_eq!(canonicalize_tag_path("work/"), Some("work".to_string()));
+        assert_eq!(
+            canonicalize_tag_path("work/project/"),
+            Some("work/project".to_string())
+        );
     }
 
     #[test]
@@ -784,6 +805,7 @@ mod tests {
         let markdown = [
             "#RoadMap",
             "#work/project",
+            "#work/",
             "#project alpha#",
             "#work/project alpha#",
             "#roadmap",
@@ -796,6 +818,7 @@ mod tests {
             vec![
                 "project alpha".to_string(),
                 "roadmap".to_string(),
+                "work".to_string(),
                 "work/project".to_string(),
                 "work/project alpha".to_string(),
             ]

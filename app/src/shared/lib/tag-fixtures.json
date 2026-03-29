@@ -11,6 +11,11 @@
       "rendered": "#work/project alpha#"
     },
     {
+      "raw": "work/",
+      "canonical": "work",
+      "rendered": "#work"
+    },
+    {
       "raw": "123",
       "canonical": null,
       "rendered": null
@@ -49,6 +54,14 @@
         "start": 6,
         "end": 26,
         "canonical": "work/project alpha"
+      }
+    },
+    {
+      "text": "hello #work/ there",
+      "match": {
+        "start": 6,
+        "end": 12,
+        "canonical": "work"
       }
     },
     {
