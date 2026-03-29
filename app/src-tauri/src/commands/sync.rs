@@ -322,10 +322,9 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
     manager.stop().await;
 
     let conn = database_connection(&app)?;
+    crate::adapters::sqlite::tag_index::clear_tag_index(&conn)?;
     conn.execute_batch(
         "DELETE FROM notes_fts;
-         DELETE FROM note_tag_links;
-         DELETE FROM tags;
          DELETE FROM notes;
          DELETE FROM blob_meta;
          DELETE FROM pending_deletions;

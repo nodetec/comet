@@ -507,27 +507,26 @@ pub fn rewrite_tag_path_in_markdown(
 
     let mut existing_non_source = HashSet::new();
     for occurrence in &occurrences {
-        if occurrence.canonical_path != from_canonical {
+        if !tag_path_matches_subtree(&occurrence.canonical_path, &from_canonical) {
             existing_non_source.insert(occurrence.canonical_path.clone());
         }
     }
 
     let mut output = String::with_capacity(markdown.len());
     let mut cursor = 0;
-    let mut destination_emitted = to_canonical
-        .as_ref()
-        .is_some_and(|destination| existing_non_source.contains(destination));
+    let mut emitted_destinations = existing_non_source;
 
     for occurrence in occurrences {
         output.push_str(&markdown[cursor..occurrence.start]);
 
-        if occurrence.canonical_path == from_canonical {
+        if tag_path_matches_subtree(&occurrence.canonical_path, &from_canonical) {
             if let Some(destination) = &to_canonical {
-                if !destination_emitted {
-                    if let Some(rendered) = render_tag_token(destination) {
+                let suffix = &occurrence.canonical_path[from_canonical.len()..];
+                let rewritten_path = format!("{destination}{suffix}");
+                if emitted_destinations.insert(rewritten_path.clone()) {
+                    if let Some(rendered) = render_tag_token(&rewritten_path) {
                         output.push_str(&rendered);
                     }
-                    destination_emitted = true;
                 }
             }
         } else {
@@ -539,6 +538,13 @@ pub fn rewrite_tag_path_in_markdown(
 
     output.push_str(&markdown[cursor..]);
     Some(output)
+}
+
+fn tag_path_matches_subtree(path: &str, root: &str) -> bool {
+    path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 pub fn strip_tags_from_markdown(markdown: &str) -> String {
@@ -917,6 +923,24 @@ mod tests {
         assert_eq!(
             rewrite_tag_path_in_markdown(markdown, "roadmap", Some("plan")),
             Some("Use `#roadmap` and #plan".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_renames_descendant_tags_in_subtree() {
+        let markdown = "#work/project alpha# #work/client beta#";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "work", Some("personal")),
+            Some("#personal/project alpha# #personal/client beta#".to_string())
+        );
+    }
+
+    #[test]
+    fn rewrite_tag_path_in_markdown_deletes_descendant_tags_in_subtree() {
+        let markdown = "#work/project alpha# #roadmap";
+        assert_eq!(
+            rewrite_tag_path_in_markdown(markdown, "work", None),
+            Some(" #roadmap".to_string())
         );
     }
 

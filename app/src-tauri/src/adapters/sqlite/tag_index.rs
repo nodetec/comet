@@ -92,8 +92,7 @@ pub fn rebuild_tag_index(conn: &mut Connection) -> Result<(), AppError> {
     set_app_setting(conn, TAG_INDEX_STATUS_KEY, "rebuilding")?;
 
     let transaction = conn.transaction()?;
-    transaction.execute("DELETE FROM note_tag_links", [])?;
-    transaction.execute("DELETE FROM tags", [])?;
+    clear_tag_index_with(&transaction)?;
 
     let notes = {
         let mut statement = transaction.prepare("SELECT id, markdown FROM notes")?;
@@ -119,6 +118,28 @@ pub fn rebuild_tag_index(conn: &mut Connection) -> Result<(), AppError> {
         TAG_INDEX_LAST_REBUILT_AT_KEY,
         &crate::domain::common::time::now_millis().to_string(),
     )?;
+
+    Ok(())
+}
+
+pub fn clear_tag_index(conn: &Connection) -> Result<(), rusqlite::Error> {
+    clear_tag_index_with(conn)
+}
+
+fn clear_tag_index_with(conn: &impl TagIndexConn) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM note_tag_links", [])?;
+
+    loop {
+        let deleted = conn.execute(
+            "DELETE FROM tags
+             WHERE depth = (SELECT MAX(depth) FROM tags)",
+            [],
+        )?;
+
+        if deleted == 0 {
+            break;
+        }
+    }
 
     Ok(())
 }
@@ -349,5 +370,49 @@ mod tests {
         assert_eq!(diagnostics.direct_link_count, 2);
         assert_eq!(diagnostics.link_count, 3);
         assert!(diagnostics.last_rebuilt_at.is_some());
+    }
+
+    #[test]
+    fn clear_tag_index_handles_nested_tags_with_restrict_fk() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+             CREATE TABLE tags (
+               id INTEGER PRIMARY KEY,
+               path TEXT NOT NULL UNIQUE,
+               parent_id INTEGER REFERENCES tags(id) ON DELETE RESTRICT,
+               last_segment TEXT NOT NULL,
+               depth INTEGER NOT NULL,
+               pinned INTEGER NOT NULL DEFAULT 0,
+               hide_subtag_notes INTEGER NOT NULL DEFAULT 0,
+               icon TEXT,
+               created_at INTEGER NOT NULL,
+               updated_at INTEGER NOT NULL
+             );
+             CREATE TABLE note_tag_links (
+               note_id TEXT NOT NULL,
+               tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+               is_direct INTEGER NOT NULL,
+               PRIMARY KEY (note_id, tag_id)
+             );
+             INSERT INTO tags (id, path, parent_id, last_segment, depth, created_at, updated_at)
+             VALUES
+               (1, 'work', NULL, 'work', 1, 1, 1),
+               (2, 'work/project', 1, 'project', 2, 1, 1),
+               (3, 'work/project/mobile', 2, 'mobile', 3, 1, 1);",
+        )
+        .unwrap();
+
+        clear_tag_index(&conn).unwrap();
+
+        let remaining_tags: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))
+            .unwrap();
+        let remaining_links: i64 = conn
+            .query_row("SELECT COUNT(*) FROM note_tag_links", [], |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(remaining_tags, 0);
+        assert_eq!(remaining_links, 0);
     }
 }

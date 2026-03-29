@@ -536,20 +536,20 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         direct_tags_for_note(self.conn, note_id)
     }
 
-    fn note_ids_with_direct_tag(&self, path: &str) -> Result<Vec<String>, NoteError> {
+    fn note_ids_with_direct_tag_subtree(&self, path: &str) -> Result<Vec<String>, NoteError> {
         let mut statement = self
             .conn
             .prepare(
                 "SELECT l.note_id
                  FROM note_tag_links l
                  JOIN tags t ON t.id = l.tag_id
-                 WHERE l.is_direct = 1 AND t.path = ?1
+                 WHERE l.is_direct = 1 AND (t.path = ?1 OR t.path LIKE ?2)
                  ORDER BY l.note_id ASC",
             )
             .map_err(map_err)?;
 
         let rows = statement
-            .query_map(params![path], |row| row.get::<_, String>(0))
+            .query_map(params![path, format!("{path}/%")], |row| row.get::<_, String>(0))
             .map_err(map_err)?;
 
         let mut note_ids = Vec::new();
@@ -807,6 +807,18 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
+    fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError> {
+        self.conn
+            .query_row(
+                "SELECT pinned FROM tags WHERE path = ?1",
+                params![path],
+                |row| Ok(row.get::<_, i64>(0)? != 0),
+            )
+            .optional()
+            .map_err(map_err)
+            .map(|value| value.unwrap_or(false))
+    }
+
     fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError> {
         self.conn
             .execute(
@@ -1056,7 +1068,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                         SUM(CASE WHEN l.is_direct = 1 THEN 1 ELSE 0 END) AS freq,
                         CASE WHEN t.path LIKE ?2 ESCAPE '\\' THEN 0 ELSE 1 END AS rank
                  FROM tags t
-                 LEFT JOIN note_tag_links l ON l.tag_id = t.id
+                 JOIN note_tag_links l ON l.tag_id = t.id
                  WHERE t.path LIKE ?1 ESCAPE '\\'
                  GROUP BY t.id, t.path
                  ORDER BY rank ASC, freq DESC, t.path ASC
@@ -1432,5 +1444,30 @@ mod tests {
         assert!(!exported.contains("#project alpha#"));
 
         let _ = std::fs::remove_dir_all(export_dir);
+    }
+
+    #[test]
+    fn search_tags_excludes_orphaned_rows_but_keeps_linked_ancestors() {
+        let (conn, _export_dir) = setup_export_repo();
+        insert_tag(&conn, 1, "work");
+        insert_tag(&conn, 2, "work/project");
+        insert_tag(&conn, 3, "orphaned");
+
+        insert_note(&conn, "n1", "Tagged", "# Tagged\n\n#work/project", 10);
+        conn.execute(
+            "INSERT INTO note_tag_links (note_id, tag_id, is_direct) VALUES
+             ('n1', 2, 1),
+             ('n1', 1, 0)",
+            [],
+        )
+        .unwrap();
+
+        let repo = SqliteNoteRepository::new(&conn);
+        let results = repo.search_tags("or").unwrap();
+        assert!(!results.iter().any(|tag| tag == "orphaned"));
+
+        let work_results = repo.search_tags("work").unwrap();
+        assert!(work_results.iter().any(|tag| tag == "work"));
+        assert!(work_results.iter().any(|tag| tag == "work/project"));
     }
 }

@@ -204,7 +204,8 @@ impl NoteService {
             return Ok(Vec::new());
         }
 
-        let note_ids = repo.note_ids_with_direct_tag(&from_path)?;
+        let was_pinned = repo.tag_is_pinned(&from_path)?;
+        let note_ids = repo.note_ids_with_direct_tag_subtree(&from_path)?;
         log::info!(
             "[tags] rename requested from={} to={} candidate_notes={}",
             from_path,
@@ -250,6 +251,11 @@ impl NoteService {
             );
         }
 
+        if was_pinned {
+            let _ = repo.set_tag_pinned(&from_path, false)?;
+            let _ = repo.set_tag_pinned(&to_path, true)?;
+        }
+
         Ok(affected)
     }
 
@@ -258,7 +264,7 @@ impl NoteService {
         input: DeleteTagInput,
     ) -> Result<Vec<String>, NoteError> {
         let path = validate_tag_path(&input.path)?;
-        let note_ids = repo.note_ids_with_direct_tag(&path)?;
+        let note_ids = repo.note_ids_with_direct_tag_subtree(&path)?;
         log::info!(
             "[tags] delete requested path={} candidate_notes={}",
             path,
@@ -666,11 +672,15 @@ mod tests {
             Ok(())
         }
 
-        fn note_ids_with_direct_tag(&self, path: &str) -> Result<Vec<String>, NoteError> {
+        fn note_ids_with_direct_tag_subtree(&self, path: &str) -> Result<Vec<String>, NoteError> {
             let notes = self.notes.borrow();
             let mut note_ids = notes
                 .values()
-                .filter(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                .filter(|record| {
+                    extract_tags(&record.markdown)
+                        .iter()
+                        .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
+                })
                 .map(|record| record.id.clone())
                 .collect::<Vec<_>>();
             note_ids.sort();
@@ -798,12 +808,20 @@ mod tests {
             Ok(())
         }
 
+        fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError> {
+            Ok(self.pinned_tags.borrow().contains(path))
+        }
+
         fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError> {
             let exists = self
                 .notes
                 .borrow()
                 .values()
-                .any(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                .any(|record| {
+                    extract_tags(&record.markdown)
+                        .iter()
+                        .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
+                })
                 || self.pinned_tags.borrow().contains(path);
 
             if !exists {
@@ -824,7 +842,11 @@ mod tests {
                 .notes
                 .borrow()
                 .values()
-                .any(|record| extract_tags(&record.markdown).iter().any(|tag| tag == path))
+                .any(|record| {
+                    extract_tags(&record.markdown)
+                        .iter()
+                        .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
+                })
                 || self.hide_subtag_notes_tags.borrow().contains(path);
 
             if !exists {
@@ -1266,6 +1288,81 @@ mod tests {
         assert_eq!(affected, vec!["n1".to_string()]);
         assert!(!note.markdown.contains("#work/project alpha#"));
         assert!(note.markdown.contains("#work/client beta#"));
+    }
+
+    #[test]
+    fn rename_tag_rewrites_descendant_tags_in_subtree() {
+        let repo = MockNoteRepository::new().with_note(make_note(
+            "n1",
+            "# Hello\n\n#work/project alpha# #work/client beta#",
+        ));
+
+        let affected = NoteService::rename_tag(
+            &repo,
+            RenameTagInput {
+                from_path: "work".to_string(),
+                to_path: "personal".to_string(),
+            },
+        )
+        .unwrap();
+
+        let note = repo.notes.borrow()["n1"].clone();
+        assert_eq!(affected, vec!["n1".to_string()]);
+        assert!(note.markdown.contains("#personal/project alpha#"));
+        assert!(note.markdown.contains("#personal/client beta#"));
+        assert!(!note.markdown.contains("#work/project alpha#"));
+        assert!(!note.markdown.contains("#work/client beta#"));
+    }
+
+    #[test]
+    fn rename_tag_preserves_pinned_state() {
+        let repo = MockNoteRepository::new().with_note(make_note(
+            "n1",
+            "# Hello\n\n#work/project alpha#",
+        ));
+
+        NoteService::set_tag_pinned(
+            &repo,
+            SetTagPinnedInput {
+                path: "work".to_string(),
+                pinned: true,
+            },
+        )
+        .unwrap();
+
+        let affected = NoteService::rename_tag(
+            &repo,
+            RenameTagInput {
+                from_path: "work".to_string(),
+                to_path: "personal".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(affected, vec!["n1".to_string()]);
+        assert!(!repo.pinned_tags.borrow().contains("work"));
+        assert!(repo.pinned_tags.borrow().contains("personal"));
+    }
+
+    #[test]
+    fn delete_tag_removes_descendant_tags_in_subtree() {
+        let repo = MockNoteRepository::new().with_note(make_note(
+            "n1",
+            "# Hello\n\n#work/project alpha# #roadmap",
+        ));
+
+        let affected = NoteService::delete_tag(
+            &repo,
+            DeleteTagInput {
+                path: "work".to_string(),
+            },
+        )
+        .unwrap();
+
+        let note = repo.notes.borrow()["n1"].clone();
+        assert_eq!(affected, vec!["n1".to_string()]);
+        assert!(!note.markdown.contains("#work/project alpha#"));
+        assert!(note.markdown.contains("#roadmap"));
     }
 
     #[test]

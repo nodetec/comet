@@ -160,7 +160,7 @@ pub fn account_migrations() -> Migrations<'static> {
             "CREATE TABLE tags (
                id INTEGER PRIMARY KEY,
                path TEXT NOT NULL UNIQUE,
-               parent_id INTEGER REFERENCES tags(id) ON DELETE RESTRICT,
+               parent_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
                last_segment TEXT NOT NULL,
                depth INTEGER NOT NULL,
                pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),

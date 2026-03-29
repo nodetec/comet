@@ -33,7 +33,7 @@ pub trait NoteRepository {
     fn note_markdown(&self, note_id: &str) -> Result<String, NoteError>;
     fn note_markdown_and_readonly(&self, note_id: &str) -> Result<(String, bool), NoteError>;
     fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError>;
-    fn note_ids_with_direct_tag(&self, path: &str) -> Result<Vec<String>, NoteError>;
+    fn note_ids_with_direct_tag_subtree(&self, path: &str) -> Result<Vec<String>, NoteError>;
     fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError>;
 
     // ── Note writes ─────────────────────────────────────────────────────
@@ -85,6 +85,7 @@ pub trait NoteRepository {
     ) -> Result<(), NoteError>;
     fn delete_search_document(&self, note_id: &str) -> Result<(), NoteError>;
     fn replace_tags(&self, note_id: &str, markdown: &str) -> Result<(), NoteError>;
+    fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError>;
     fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError>;
     fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError>;
 
