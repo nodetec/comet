@@ -924,11 +924,21 @@ export function SidebarPane({
     }
 
     const element = tagRowRefs.current.get(pendingScrollTagPath);
-    if (!element) {
+    const scrollContainer = scrollContainerRef.current;
+    if (!element || !scrollContainer) {
       return;
     }
 
-    element.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const isFullyVisible =
+      elementRect.top >= containerRect.top &&
+      elementRect.bottom <= containerRect.bottom;
+
+    if (!isFullyVisible) {
+      element.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
     setPendingScrollTagPath(null);
   }, [expandedTagPaths, pendingScrollTagPath]);
 
@@ -949,6 +959,11 @@ export function SidebarPane({
       onRenameTag,
       onClose: closeRenameDialog,
     });
+  };
+
+  const handleSelectSidebarTagPath = (tagPath: string) => {
+    setPendingScrollTagPath(tagPath);
+    onSelectTagPath(tagPath);
   };
 
   return (
@@ -1046,7 +1061,7 @@ export function SidebarPane({
                 onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={toggleExpandedTagPath}
-                onSelectTagPath={onSelectTagPath}
+                onSelectTagPath={handleSelectSidebarTagPath}
                 onTagRowRef={(path, element) => {
                   if (element) {
                     tagRowRefs.current.set(path, element);
@@ -1055,6 +1070,7 @@ export function SidebarPane({
                   }
                 }}
               />
+              <div className="h-4 shrink-0" />
             </section>
           ) : null}
           <div className="h-px shrink-0" ref={footerSentinelRef} />
