@@ -46,6 +46,8 @@ import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
+const SIDEBAR_CHILD_INDENT_PX = 12;
+
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
   if (isActive && isFocused) {
@@ -56,7 +58,24 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   } else {
     stateClass = "text-secondary-foreground";
   }
-  return `flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors ${stateClass}`;
+  return `flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm transition-colors ${stateClass}`;
+}
+
+function SidebarIndentedContent({
+  indentLevel,
+  children,
+}: {
+  indentLevel: number;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="w-full"
+      style={{ paddingLeft: `${indentLevel * SIDEBAR_CHILD_INDENT_PX}px` }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function SidebarRowContent({
@@ -78,7 +97,9 @@ function SidebarRowContent({
       <span className="flex size-4 shrink-0 items-center justify-center">
         {icon}
       </span>
-      <span className="min-w-0 truncate">{label}</span>
+      <span className="flex min-w-0 items-center leading-none">
+        <span className="block min-w-0 translate-y-px truncate">{label}</span>
+      </span>
       <span className="flex size-4 shrink-0 items-center justify-center">
         {status}
       </span>
@@ -395,10 +416,7 @@ function TagTree({
                 })
               }
             >
-              <div
-                className="w-full"
-                style={{ paddingLeft: `${indentLevel * 12}px` }}
-              >
+              <SidebarIndentedContent indentLevel={indentLevel}>
                 <SidebarRowContent
                   chevron={
                     hasChildren ? (
@@ -427,7 +445,7 @@ function TagTree({
                     ) : undefined
                   }
                 />
-              </div>
+              </SidebarIndentedContent>
             </div>
             {hasChildren && isExpanded ? (
               <TagTree
@@ -594,12 +612,12 @@ function NotesSection({
             onClick={onSelectToday}
             type="button"
           >
-            <div style={{ paddingLeft: "12px" }}>
+            <SidebarIndentedContent indentLevel={1}>
               <SidebarRowContent
                 icon={<CalendarDays className="text-primary size-4 shrink-0" />}
                 label="Today"
               />
-            </div>
+            </SidebarIndentedContent>
           </button>
           <button
             className={sidebarItemClasses(
@@ -609,7 +627,7 @@ function NotesSection({
             onClick={onSelectTodo}
             type="button"
           >
-            <div style={{ paddingLeft: "12px" }}>
+            <SidebarIndentedContent indentLevel={1}>
               <SidebarRowContent
                 icon={
                   todoCount > 0 ? (
@@ -620,7 +638,7 @@ function NotesSection({
                 }
                 label="Todo"
               />
-            </div>
+            </SidebarIndentedContent>
           </button>
         </>
       ) : null}
