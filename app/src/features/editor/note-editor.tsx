@@ -37,6 +37,7 @@ import ScrollCenterCurrentLinePlugin from "./plugins/scroll-center-current-line-
 import BlockBreakoutPlugin from "./plugins/block-breakout-plugin";
 import HeadingAnchorPlugin from "./plugins/heading-anchor-plugin";
 import LinkClickPlugin from "./plugins/link-click-plugin";
+import HashtagClickPlugin from "./plugins/hashtag-click-plugin";
 import LinkPastePlugin from "./plugins/link-paste-plugin";
 import AutoLinkPlugin from "./plugins/autolink-plugin";
 import MarkdownCopyPlugin from "./plugins/markdown-copy-plugin";
@@ -220,6 +221,7 @@ function EditorInner({
       <BlockBreakoutPlugin />
       <HeadingAnchorPlugin />
       <LinkClickPlugin />
+      <HashtagClickPlugin />
       <LinkPastePlugin />
       <AutoLinkPlugin />
       <MarkdownCopyPlugin />

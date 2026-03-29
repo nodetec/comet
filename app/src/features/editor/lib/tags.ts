@@ -158,6 +158,18 @@ export function renderTagToken(path: string): string | null {
   return canonical.includes(" ") ? `#${canonical}#` : `#${canonical}`;
 }
 
+export function canonicalizeAuthoredTagToken(token: string): string | null {
+  if (!token.startsWith("#")) {
+    return null;
+  }
+
+  if (token.length > 1 && token.endsWith("#")) {
+    return canonicalizeTagPath(token.slice(1, -1));
+  }
+
+  return canonicalizeTagPath(token.slice(1));
+}
+
 function parseWrappedTag(
   text: string,
   startIndex: number,

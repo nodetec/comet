@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import fixtures from "@/shared/lib/tag-fixtures.json";
 
 import {
+  canonicalizeAuthoredTagToken,
   canonicalizeTagPartial,
   canonicalizeTagPath,
   findTagEntityMatch,
@@ -70,6 +71,14 @@ describe("editor tag helpers", () => {
     expect(canonicalizeTagPath("work/")).toBe("work");
     expect(canonicalizeTagPath("work///")).toBe("work");
     expect(canonicalizeTagPath("work/project/")).toBe("work/project");
+  });
+
+  it("canonicalizes authored tag tokens", () => {
+    expect(canonicalizeAuthoredTagToken("#roadmap")).toBe("roadmap");
+    expect(canonicalizeAuthoredTagToken("#project alpha#")).toBe(
+      "project alpha",
+    );
+    expect(canonicalizeAuthoredTagToken("#work/")).toBe("work");
   });
 
   it("normalizes tag partials for backend search", () => {

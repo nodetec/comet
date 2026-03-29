@@ -91,7 +91,8 @@ const theme: EditorThemeClasses = {
   code: "bg-accent/30 rounded-lg p-4 font-mono text-sm block mb-2 overflow-x-auto",
   codeHighlight: codeHighlightClasses,
   image: "",
-  hashtag: "bg-accent text-accent-foreground rounded-md px-1.5 py-0.5",
+  hashtag:
+    "bg-accent text-accent-foreground rounded-md px-1.5 py-0.5 cursor-pointer",
   hr: "comet-hr",
   tableScrollableWrapper: "comet-table-wrapper",
   table: "border-separate border-spacing-0 comet-table",

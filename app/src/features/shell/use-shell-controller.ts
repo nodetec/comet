@@ -34,6 +34,10 @@ import { useNoteMutations } from "@/features/notes/hooks/use-note-mutations";
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
+import {
+  FOCUS_TAG_PATH_EVENT,
+  type FocusTagPathDetail,
+} from "@/shared/lib/tag-navigation";
 
 function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
@@ -453,6 +457,24 @@ export function useShellController() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    const handleFocusTagPath = (event: Event) => {
+      const customEvent = event as CustomEvent<FocusTagPathDetail>;
+      const tagPath = canonicalizeTagPath(customEvent.detail?.tagPath ?? "");
+      if (!tagPath) {
+        return;
+      }
+
+      setFocusedPane("sidebar");
+      latestRef.current.handleSelectTagPath(tagPath);
+    };
+
+    window.addEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
+    return () => {
+      window.removeEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
+    };
+  }, [setFocusedPane]);
 
   // --- Handlers ---
   const handleCreateNote = (source: "keyboard" | "pointer") => {

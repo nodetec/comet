@@ -47,6 +47,10 @@ import { SyncDialog } from "@/features/sync";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  FOCUS_TAG_PATH_EVENT,
+  type FocusTagPathDetail,
+} from "@/shared/lib/tag-navigation";
 
 const SIDEBAR_CHILD_INDENT_PX = 12;
 const SIDEBAR_ITEM_ICON_CLASS_NAME = "text-sidebar-item-icon size-4 shrink-0";
@@ -114,6 +118,17 @@ function SidebarRowContent({
       </span>
     </div>
   );
+}
+
+function ancestorSidebarTagPaths(path: string) {
+  const segments = path.split("/");
+  const ancestors: string[] = [];
+
+  for (let depth = 1; depth < segments.length; depth += 1) {
+    ancestors.push(segments.slice(0, depth).join("/"));
+  }
+
+  return ancestors;
 }
 
 function SidebarCollapse({
@@ -427,6 +442,7 @@ function TagTree({
   onSetTagPinned,
   onToggleExpanded,
   onSelectTagPath,
+  onTagRowRef,
 }: {
   activeTagPath: string | null;
   expandedTagPaths: Set<string>;
@@ -439,6 +455,7 @@ function TagTree({
   onSetTagPinned(path: string, pinned: boolean): void;
   onToggleExpanded(path: string): void;
   onSelectTagPath(path: string): void;
+  onTagRowRef(path: string, element: HTMLDivElement | null): void;
 }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -452,6 +469,7 @@ function TagTree({
           <div key={node.path}>
             <div
               className={cn(sidebarItemClasses(isActive, isFocused), "group")}
+              data-comet-sidebar-tag-path={node.path}
               onClick={() => onSelectTagPath(node.path)}
               onContextMenu={(event) =>
                 void showTagContextMenu(event, node, {
@@ -462,6 +480,7 @@ function TagTree({
                   onSetTagHideSubtagNotes,
                 })
               }
+              ref={(element) => onTagRowRef(node.path, element)}
             >
               <SidebarIndentedContent indentLevel={indentLevel}>
                 <SidebarRowContent
@@ -516,6 +535,7 @@ function TagTree({
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={onToggleExpanded}
                 onSelectTagPath={onSelectTagPath}
+                onTagRowRef={onTagRowRef}
               />
             </SidebarCollapse>
           </div>
@@ -844,9 +864,13 @@ export function SidebarPane({
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSourcePath, setRenameSourcePath] = useState("");
   const [renameInputValue, setRenameInputValue] = useState("");
+  const [pendingScrollTagPath, setPendingScrollTagPath] = useState<
+    string | null
+  >(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const footerSentinelRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const tagRowRefs = useRef(new Map<string, HTMLDivElement | null>());
   const { showHeaderBorder, setShowHeaderBorder, showFooterBorder } =
     useSidebarBorders({
       availableTagTreeLength: availableTagTree.length,
@@ -865,8 +889,48 @@ export function SidebarPane({
   );
   const { expandedTagPaths, toggleExpandedTagPath } =
     usePersistedExpandedTagPaths(availableTagPaths);
+  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
+  const setExpandedSidebarTagPaths = useUIStore(
+    (s) => s.setExpandedSidebarTagPaths,
+  );
   useRenameInputFocus(renameDialogOpen, renameInputRef);
   const noteSectionHasActiveTag = activeTagPath !== null;
+
+  useEffect(() => {
+    const handleFocusTagPath = (event: Event) => {
+      const customEvent = event as CustomEvent<FocusTagPathDetail>;
+      const tagPath = canonicalizeTagPath(customEvent.detail?.tagPath ?? "");
+      if (!tagPath || !availableTagPaths.includes(tagPath)) {
+        return;
+      }
+
+      const nextExpanded = new Set(expandedSidebarTagPaths);
+      for (const ancestor of ancestorSidebarTagPaths(tagPath)) {
+        nextExpanded.add(ancestor);
+      }
+      setExpandedSidebarTagPaths([...nextExpanded]);
+      setPendingScrollTagPath(tagPath);
+    };
+
+    window.addEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
+    return () => {
+      window.removeEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
+    };
+  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
+
+  useEffect(() => {
+    if (!pendingScrollTagPath) {
+      return;
+    }
+
+    const element = tagRowRefs.current.get(pendingScrollTagPath);
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    setPendingScrollTagPath(null);
+  }, [expandedTagPaths, pendingScrollTagPath]);
 
   const closeRenameDialog = () => {
     resetRenameDialog({
@@ -983,6 +1047,13 @@ export function SidebarPane({
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={toggleExpandedTagPath}
                 onSelectTagPath={onSelectTagPath}
+                onTagRowRef={(path, element) => {
+                  if (element) {
+                    tagRowRefs.current.set(path, element);
+                  } else {
+                    tagRowRefs.current.delete(path);
+                  }
+                }}
               />
             </section>
           ) : null}
