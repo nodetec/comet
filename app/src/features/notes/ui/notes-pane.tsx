@@ -57,7 +57,7 @@ function notesHeading(noteFilter: NoteFilter, activeTagPath: string | null) {
     return "Today";
   }
 
-  return "All Notes";
+  return "Notes";
 }
 
 type NotesPaneProps = {

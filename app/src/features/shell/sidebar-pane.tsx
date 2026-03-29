@@ -581,7 +581,7 @@ function NotesSection({
             type="button"
           >
             <FileTextIcon className="text-primary size-4 shrink-0" />
-            All Notes
+            Notes
           </button>
           <button
             className={sidebarItemClasses(
