@@ -32,6 +32,9 @@ type UIStore = {
   noteSortPrefs: Record<string, NoteSortPrefs>;
   setNoteSortPrefs(viewKey: string, prefs: Partial<NoteSortPrefs>): void;
 
+  expandedSidebarTagPaths: string[];
+  setExpandedSidebarTagPaths(paths: string[]): void;
+
   themeName: string;
   setThemeName(name: string): void;
 };
@@ -85,6 +88,11 @@ export const useUIStore = create<UIStore>()(
           };
         });
       },
+
+      expandedSidebarTagPaths: [],
+      setExpandedSidebarTagPaths: (expandedSidebarTagPaths) => {
+        set({ expandedSidebarTagPaths });
+      },
     }),
     {
       name: "comet-ui",
@@ -94,6 +102,7 @@ export const useUIStore = create<UIStore>()(
         editorSpellCheck: state.editorSpellCheck,
         themeName: state.themeName,
         noteSortPrefs: state.noteSortPrefs,
+        expandedSidebarTagPaths: state.expandedSidebarTagPaths,
       }),
     },
   ),

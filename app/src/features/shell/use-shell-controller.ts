@@ -190,10 +190,14 @@ export function useShellController() {
 
   // --- Sync draft from loaded note ---
   useEffect(() => {
+    if (!selectedNoteId) {
+      return;
+    }
+
     if (noteQuery.data && noteQuery.data.id !== draftNoteId) {
       setDraft(noteQuery.data.id, noteQuery.data.markdown);
     }
-  }, [draftNoteId, noteQuery.data, setDraft]);
+  }, [draftNoteId, noteQuery.data, selectedNoteId, setDraft]);
 
   // --- Hydrate initial selection ---
   useEffect(() => {
@@ -224,8 +228,10 @@ export function useShellController() {
     setSelectedNoteId,
   ]);
 
-  const currentNote = noteQuery.data;
-  const currentNoteConflict = noteConflictQuery.data;
+  const currentNote = selectedNoteId ? noteQuery.data : undefined;
+  const currentNoteConflict = selectedNoteId
+    ? noteConflictQuery.data
+    : undefined;
   const isCurrentNoteConflicted = (currentNoteConflict?.headCount ?? 0) > 1;
   const selectedConflictHead =
     currentNoteConflict?.heads.find(
@@ -505,6 +511,11 @@ export function useShellController() {
     if (activeTagPath === tagPath) {
       setActiveTagPath(null);
       return;
+    }
+
+    if (currentNote && !matchesTagScope(currentNote.tags, tagPath)) {
+      setSelectedNoteId(null);
+      setDraft("", "");
     }
 
     setActiveTagPath(tagPath);
@@ -1108,11 +1119,13 @@ export function useShellController() {
 
   // Freeze editor pane props while React Query is showing placeholder data
   // from the previous note, so the old note's content doesn't flash.
+  const holdPreviousEditorPane =
+    noteQuery.isPlaceholderData && selectedNoteId !== null;
   const editorPanePropsRef = useRef(nextEditorPaneProps);
-  if (!noteQuery.isPlaceholderData) {
+  if (!holdPreviousEditorPane) {
     editorPanePropsRef.current = nextEditorPaneProps;
   }
-  const editorPaneProps = noteQuery.isPlaceholderData
+  const editorPaneProps = holdPreviousEditorPane
     ? editorPanePropsRef.current
     : nextEditorPaneProps;
 

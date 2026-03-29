@@ -146,7 +146,9 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const noteQuery = useQuery({
     enabled: Boolean(selectedNoteId),
-    placeholderData: (previousData) => previousData,
+    placeholderData: selectedNoteId
+      ? (previousData) => previousData
+      : undefined,
     queryFn: () => loadNote(selectedNoteId!),
     queryKey: ["note", selectedNoteId],
   });

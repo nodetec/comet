@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent,
@@ -55,22 +56,6 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   return `flex w-full cursor-default items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm transition-colors ${stateClass}`;
 }
 
-function defaultExpandedTagPaths(nodes: ContextualTagNode[]) {
-  const next = new Set<string>();
-
-  const visit = (tagNodes: ContextualTagNode[]) => {
-    for (const node of tagNodes) {
-      if (node.depth <= 1) {
-        next.add(node.path);
-      }
-      visit(node.children);
-    }
-  };
-
-  visit(nodes);
-  return next;
-}
-
 function renameErrorMessage(input: string, normalizedTarget: string | null) {
   if (input.trim().length === 0) {
     return null;
@@ -117,18 +102,6 @@ function submitRenameDialog(params: {
 
   onRenameTag(renameSourcePath, normalizedRenameTarget);
   onClose();
-}
-
-function useExpandedTagPaths(availableTagTree: ContextualTagNode[]) {
-  const [expandedTagPaths, setExpandedTagPaths] = useState<Set<string>>(
-    () => new Set(),
-  );
-
-  useEffect(() => {
-    setExpandedTagPaths(defaultExpandedTagPaths(availableTagTree));
-  }, [availableTagTree]);
-
-  return { expandedTagPaths, setExpandedTagPaths };
 }
 
 function useRenameInputFocus(
@@ -206,6 +179,7 @@ function useSidebarBorders(params: {
 
 type SidebarPaneProps = {
   activeTagPath: string | null;
+  availableTagPaths: string[];
   archivedCount: number;
   todoCount: number;
   trashedCount: number;
@@ -518,6 +492,7 @@ function useSyncState() {
 
 export function SidebarPane({
   activeTagPath,
+  availableTagPaths,
   archivedCount,
   todoCount,
   trashedCount,
@@ -538,6 +513,10 @@ export function SidebarPane({
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
+  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
+  const setExpandedSidebarTagPaths = useUIStore(
+    (s) => s.setExpandedSidebarTagPaths,
+  );
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -549,8 +528,6 @@ export function SidebarPane({
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const footerSentinelRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const { expandedTagPaths, setExpandedTagPaths } =
-    useExpandedTagPaths(availableTagTree);
   const { showHeaderBorder, setShowHeaderBorder, showFooterBorder } =
     useSidebarBorders({
       availableTagTreeLength: availableTagTree.length,
@@ -567,7 +544,21 @@ export function SidebarPane({
     renameInputValue,
     normalizedRenameTarget,
   );
+  const expandedTagPaths = useMemo(
+    () => new Set(expandedSidebarTagPaths),
+    [expandedSidebarTagPaths],
+  );
   useRenameInputFocus(renameDialogOpen, renameInputRef);
+
+  useEffect(() => {
+    const nextExpandedTagPaths = expandedSidebarTagPaths.filter((path) =>
+      availableTagPaths.includes(path),
+    );
+
+    if (nextExpandedTagPaths.length !== expandedSidebarTagPaths.length) {
+      setExpandedSidebarTagPaths(nextExpandedTagPaths);
+    }
+  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
 
   const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
     showTrashContextMenu(event, onEmptyTrash).catch(() => {});
@@ -782,15 +773,13 @@ export function SidebarPane({
                     onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
                     onSetTagPinned={onSetTagPinned}
                     onToggleExpanded={(path) => {
-                      setExpandedTagPaths((current) => {
-                        const next = new Set(current);
-                        if (next.has(path)) {
-                          next.delete(path);
-                        } else {
-                          next.add(path);
-                        }
-                        return next;
-                      });
+                      const next = new Set(expandedSidebarTagPaths);
+                      if (next.has(path)) {
+                        next.delete(path);
+                      } else {
+                        next.add(path);
+                      }
+                      setExpandedSidebarTagPaths([...next]);
                     }}
                     onSelectTagPath={onSelectTagPath}
                   />
