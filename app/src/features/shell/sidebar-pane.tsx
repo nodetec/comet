@@ -22,7 +22,6 @@ import {
   CloudSync,
   CloudCheck,
   FileTextIcon,
-  Pin,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -349,7 +348,6 @@ function TagTree({
         const isActive = activeTagPath === node.path;
         const hasChildren = node.children.length > 0;
         const isExpanded = expandedTagPaths.has(node.path);
-        const isRootTag = !node.path.includes("/");
         const indentLevel = Math.max(0, node.depth - 1);
 
         return (
@@ -359,6 +357,7 @@ function TagTree({
                 sidebarItemClasses(isActive, isFocused),
                 "group pr-2",
               )}
+              onClick={() => onSelectTagPath(node.path)}
               onContextMenu={(event) =>
                 void showTagContextMenu(event, node, {
                   onDeleteTag,
@@ -376,7 +375,10 @@ function TagTree({
                 {hasChildren ? (
                   <button
                     className="flex size-5 shrink-0 items-center justify-center rounded-sm"
-                    onClick={() => onToggleExpanded(node.path)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleExpanded(node.path);
+                    }}
                     type="button"
                   >
                     <ChevronRight
@@ -389,39 +391,12 @@ function TagTree({
                 ) : (
                   <span className="inline-block size-5 shrink-0" />
                 )}
-                <button
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  onClick={() => onSelectTagPath(node.path)}
-                  type="button"
-                >
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   <span className="truncate">{node.label}</span>
-                </button>
-                {isRootTag ? (
-                  <button
-                    aria-label={node.pinned ? "Unpin tag" : "Pin tag"}
-                    className={cn(
-                      "text-muted-foreground hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded-sm transition-opacity",
-                      node.pinned
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100",
-                    )}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSetTagPinned(node.path, !node.pinned);
-                    }}
-                    type="button"
-                  >
-                    <Pin
-                      className={cn(
-                        "size-3.5",
-                        node.pinned ? "text-primary fill-current" : "",
-                      )}
-                    />
-                  </button>
-                ) : null}
-                <span className="text-muted-foreground shrink-0 text-[11px]">
-                  {node.inclusiveNoteCount}
-                </span>
+                  <span className="text-muted-foreground ml-auto shrink-0 text-[11px]">
+                    {node.inclusiveNoteCount}
+                  </span>
+                </div>
               </div>
             </div>
             {hasChildren && isExpanded ? (
@@ -518,14 +493,12 @@ function NotesSection({
   isFocused,
   noteFilter,
   noteSectionHasActiveTag,
-  notesOpen,
   onEmptyTrash,
   onSelectAll,
   onSelectArchive,
   onSelectToday,
   onSelectTodo,
   onSelectTrash,
-  onToggleOpen,
   todoCount,
   trashedCount,
 }: {
@@ -533,14 +506,12 @@ function NotesSection({
   isFocused: boolean;
   noteFilter: NoteFilter;
   noteSectionHasActiveTag: boolean;
-  notesOpen: boolean;
   onEmptyTrash: () => void;
   onSelectAll: () => void;
   onSelectArchive: () => void;
   onSelectToday: () => void;
   onSelectTodo: () => void;
   onSelectTrash: () => void;
-  onToggleOpen: () => void;
   todoCount: number;
   trashedCount: number;
 }) {
@@ -549,95 +520,71 @@ function NotesSection({
   };
 
   return (
-    <section>
+    <section className="space-y-0.5">
       <button
-        className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
-        onClick={onToggleOpen}
+        className={sidebarItemClasses(
+          noteFilter === "all" && !noteSectionHasActiveTag,
+          isFocused,
+        )}
+        onClick={onSelectAll}
         type="button"
       >
-        <span className="leading-none">Notes</span>
-        <ChevronRight
-          className={cn(
-            "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-            notesOpen ? "rotate-90" : "rotate-0",
-          )}
-        />
+        <FileTextIcon className="text-primary size-4 shrink-0" />
+        Notes
       </button>
-      <div
-        className={cn(
-          "grid overflow-hidden transition-all duration-200 ease-out",
-          notesOpen
-            ? "grid-rows-[1fr] pt-1 opacity-100"
-            : "grid-rows-[0fr] opacity-0",
+      <button
+        className={sidebarItemClasses(
+          noteFilter === "today" && !noteSectionHasActiveTag,
+          isFocused,
         )}
+        onClick={onSelectToday}
+        type="button"
       >
-        <div className="min-h-0">
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "all" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectAll}
-            type="button"
-          >
-            <FileTextIcon className="text-primary size-4 shrink-0" />
-            Notes
-          </button>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "today" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectToday}
-            type="button"
-          >
-            <CalendarDays className="text-primary size-4 shrink-0" />
-            Today
-          </button>
-          <button
-            className={sidebarItemClasses(
-              noteFilter === "todo" && !noteSectionHasActiveTag,
-              isFocused,
-            )}
-            onClick={onSelectTodo}
-            type="button"
-          >
-            {todoCount > 0 ? (
-              <Square className="text-primary size-4 shrink-0" />
-            ) : (
-              <CheckSquare className="text-primary size-4 shrink-0" />
-            )}
-            Todo
-          </button>
-          {(archivedCount > 0 || noteFilter === "archive") && (
-            <button
-              className={sidebarItemClasses(
-                noteFilter === "archive" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
-              onClick={onSelectArchive}
-              type="button"
-            >
-              <Archive className="text-primary size-4 shrink-0" />
-              Archive
-            </button>
+        <CalendarDays className="text-primary size-4 shrink-0" />
+        Today
+      </button>
+      <button
+        className={sidebarItemClasses(
+          noteFilter === "todo" && !noteSectionHasActiveTag,
+          isFocused,
+        )}
+        onClick={onSelectTodo}
+        type="button"
+      >
+        {todoCount > 0 ? (
+          <Square className="text-primary size-4 shrink-0" />
+        ) : (
+          <CheckSquare className="text-primary size-4 shrink-0" />
+        )}
+        Todo
+      </button>
+      {(archivedCount > 0 || noteFilter === "archive") && (
+        <button
+          className={sidebarItemClasses(
+            noteFilter === "archive" && !noteSectionHasActiveTag,
+            isFocused,
           )}
-          {(trashedCount > 0 || noteFilter === "trash") && (
-            <button
-              className={sidebarItemClasses(
-                noteFilter === "trash" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
-              onClick={onSelectTrash}
-              onContextMenu={(event) => handleTrashContextMenu(event)}
-              type="button"
-            >
-              <Trash2 className="text-primary size-4 shrink-0" />
-              Trash
-            </button>
+          onClick={onSelectArchive}
+          type="button"
+        >
+          <Archive className="text-primary size-4 shrink-0" />
+          Archive
+        </button>
+      )}
+      {(trashedCount > 0 || noteFilter === "trash") && (
+        <button
+          className={sidebarItemClasses(
+            noteFilter === "trash" && !noteSectionHasActiveTag,
+            isFocused,
           )}
-        </div>
-      </div>
+          onClick={onSelectTrash}
+          onContextMenu={(event) => handleTrashContextMenu(event)}
+          type="button"
+        >
+          <Trash2 className="text-primary size-4 shrink-0" />
+          Trash
+        </button>
+      )}
     </section>
   );
 }
@@ -709,8 +656,6 @@ export function SidebarPane({
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(true);
-  const [tagsOpen, setTagsOpen] = useState(true);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSourcePath, setRenameSourcePath] = useState("");
   const [renameInputValue, setRenameInputValue] = useState("");
@@ -808,7 +753,7 @@ export function SidebarPane({
           </div>
         </header>
         <nav
-          className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-2 pt-3"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-2 pt-3"
           onScroll={(event) => {
             setShowHeaderBorder(event.currentTarget.scrollTop > 0);
           }}
@@ -819,65 +764,35 @@ export function SidebarPane({
             isFocused={isFocused}
             noteFilter={noteFilter}
             noteSectionHasActiveTag={noteSectionHasActiveTag}
-            notesOpen={notesOpen}
             onEmptyTrash={onEmptyTrash}
             onSelectAll={onSelectAll}
             onSelectArchive={onSelectArchive}
             onSelectToday={onSelectToday}
             onSelectTodo={onSelectTodo}
             onSelectTrash={onSelectTrash}
-            onToggleOpen={() => {
-              setNotesOpen((current) => !current);
-            }}
             todoCount={todoCount}
             trashedCount={trashedCount}
           />
 
           {availableTagTree.length > 0 ? (
-            <section>
-              <button
-                className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
-                onClick={() => {
-                  setTagsOpen((current) => !current);
+            <section className="min-h-0 pt-1">
+              <TagTree
+                activeTagPath={activeTagPath}
+                expandedTagPaths={expandedTagPaths}
+                isFocused={isFocused}
+                nodes={availableTagTree}
+                onDeleteTag={onDeleteTag}
+                onExportTag={onExportTag}
+                onOpenRenameTagDialog={(path) => {
+                  setRenameSourcePath(path);
+                  setRenameInputValue(path);
+                  setRenameDialogOpen(true);
                 }}
-                type="button"
-              >
-                <span className="leading-none">Tags</span>
-                <ChevronRight
-                  className={cn(
-                    "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-                    tagsOpen ? "rotate-90" : "rotate-0",
-                  )}
-                />
-              </button>
-              <div
-                className={cn(
-                  "grid overflow-hidden transition-all duration-200 ease-out",
-                  tagsOpen
-                    ? "grid-rows-[1fr] pt-2 opacity-100"
-                    : "grid-rows-[0fr] opacity-0",
-                )}
-              >
-                <div className="min-h-0">
-                  <TagTree
-                    activeTagPath={activeTagPath}
-                    expandedTagPaths={expandedTagPaths}
-                    isFocused={isFocused}
-                    nodes={availableTagTree}
-                    onDeleteTag={onDeleteTag}
-                    onExportTag={onExportTag}
-                    onOpenRenameTagDialog={(path) => {
-                      setRenameSourcePath(path);
-                      setRenameInputValue(path);
-                      setRenameDialogOpen(true);
-                    }}
-                    onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
-                    onSetTagPinned={onSetTagPinned}
-                    onToggleExpanded={toggleExpandedTagPath}
-                    onSelectTagPath={onSelectTagPath}
-                  />
-                </div>
-              </div>
+                onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
+                onSetTagPinned={onSetTagPinned}
+                onToggleExpanded={toggleExpandedTagPath}
+                onSelectTagPath={onSelectTagPath}
+              />
             </section>
           ) : null}
           <div className="h-px shrink-0" ref={footerSentinelRef} />
