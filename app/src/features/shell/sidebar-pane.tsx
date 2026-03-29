@@ -177,6 +177,40 @@ function useSidebarBorders(params: {
   return { showHeaderBorder, setShowHeaderBorder, showFooterBorder };
 }
 
+function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
+  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
+  const setExpandedSidebarTagPaths = useUIStore(
+    (s) => s.setExpandedSidebarTagPaths,
+  );
+
+  const expandedTagPaths = useMemo(
+    () => new Set(expandedSidebarTagPaths),
+    [expandedSidebarTagPaths],
+  );
+
+  useEffect(() => {
+    const nextExpandedTagPaths = expandedSidebarTagPaths.filter((path) =>
+      availableTagPaths.includes(path),
+    );
+
+    if (nextExpandedTagPaths.length !== expandedSidebarTagPaths.length) {
+      setExpandedSidebarTagPaths(nextExpandedTagPaths);
+    }
+  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
+
+  const toggleExpandedTagPath = (path: string) => {
+    const next = new Set(expandedSidebarTagPaths);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+    }
+    setExpandedSidebarTagPaths([...next]);
+  };
+
+  return { expandedTagPaths, toggleExpandedTagPath };
+}
+
 type SidebarPaneProps = {
   activeTagPath: string | null;
   availableTagPaths: string[];
@@ -285,6 +319,7 @@ async function showTagContextMenu(
 function TagTree({
   activeTagPath,
   expandedTagPaths,
+  isFocused,
   nodes,
   onDeleteTag,
   onExportTag,
@@ -296,6 +331,7 @@ function TagTree({
 }: {
   activeTagPath: string | null;
   expandedTagPaths: Set<string>;
+  isFocused: boolean;
   nodes: ContextualTagNode[];
   onDeleteTag(path: string): void;
   onExportTag(path: string): void;
@@ -315,10 +351,7 @@ function TagTree({
         return (
           <div key={node.path}>
             <div
-              className={cn(
-                "rounded-md pr-2",
-                isActive && "bg-primary/25 text-secondary-foreground",
-              )}
+              className={cn(sidebarItemClasses(isActive, isFocused), "pr-2")}
               onContextMenu={(event) =>
                 void showTagContextMenu(event, node, {
                   onDeleteTag,
@@ -331,11 +364,11 @@ function TagTree({
             >
               <div
                 className="flex items-center"
-                style={{ paddingLeft: `${4 + node.depth * 12}px` }}
+                style={{ paddingLeft: `${12 + node.depth * 12}px` }}
               >
                 {hasChildren ? (
                   <button
-                    className="flex size-5 shrink-0 items-center justify-center"
+                    className="flex size-5 shrink-0 items-center justify-center rounded-sm"
                     onClick={() => onToggleExpanded(node.path)}
                     type="button"
                   >
@@ -350,7 +383,7 @@ function TagTree({
                   <span className="inline-block size-5 shrink-0" />
                 )}
                 <button
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-xs"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   onClick={() => onSelectTagPath(node.path)}
                   type="button"
                 >
@@ -365,6 +398,7 @@ function TagTree({
               <TagTree
                 activeTagPath={activeTagPath}
                 expandedTagPaths={expandedTagPaths}
+                isFocused={isFocused}
                 nodes={node.children}
                 onDeleteTag={onDeleteTag}
                 onExportTag={onExportTag}
@@ -449,6 +483,135 @@ function RenameTagDialog({
   );
 }
 
+function NotesSection({
+  archivedCount,
+  isFocused,
+  noteFilter,
+  noteSectionHasActiveTag,
+  notesOpen,
+  onEmptyTrash,
+  onSelectAll,
+  onSelectArchive,
+  onSelectToday,
+  onSelectTodo,
+  onSelectTrash,
+  onToggleOpen,
+  todoCount,
+  trashedCount,
+}: {
+  archivedCount: number;
+  isFocused: boolean;
+  noteFilter: NoteFilter;
+  noteSectionHasActiveTag: boolean;
+  notesOpen: boolean;
+  onEmptyTrash: () => void;
+  onSelectAll: () => void;
+  onSelectArchive: () => void;
+  onSelectToday: () => void;
+  onSelectTodo: () => void;
+  onSelectTrash: () => void;
+  onToggleOpen: () => void;
+  todoCount: number;
+  trashedCount: number;
+}) {
+  const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
+    showTrashContextMenu(event, onEmptyTrash).catch(() => {});
+  };
+
+  return (
+    <section>
+      <button
+        className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
+        onClick={onToggleOpen}
+        type="button"
+      >
+        <span className="leading-none">Notes</span>
+        <ChevronRight
+          className={cn(
+            "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
+            notesOpen ? "rotate-90" : "rotate-0",
+          )}
+        />
+      </button>
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-200 ease-out",
+          notesOpen
+            ? "grid-rows-[1fr] pt-1 opacity-100"
+            : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0">
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "all" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectAll}
+            type="button"
+          >
+            <FileTextIcon className="text-primary size-4 shrink-0" />
+            All Notes
+          </button>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "today" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectToday}
+            type="button"
+          >
+            <CalendarDays className="text-primary size-4 shrink-0" />
+            Today
+          </button>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "todo" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectTodo}
+            type="button"
+          >
+            {todoCount > 0 ? (
+              <Square className="text-primary size-4 shrink-0" />
+            ) : (
+              <CheckSquare className="text-primary size-4 shrink-0" />
+            )}
+            Todo
+          </button>
+          {(archivedCount > 0 || noteFilter === "archive") && (
+            <button
+              className={sidebarItemClasses(
+                noteFilter === "archive" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectArchive}
+              type="button"
+            >
+              <Archive className="text-primary size-4 shrink-0" />
+              Archive
+            </button>
+          )}
+          {(trashedCount > 0 || noteFilter === "trash") && (
+            <button
+              className={sidebarItemClasses(
+                noteFilter === "trash" && !noteSectionHasActiveTag,
+                isFocused,
+              )}
+              onClick={onSelectTrash}
+              onContextMenu={(event) => handleTrashContextMenu(event)}
+              type="button"
+            >
+              <Trash2 className="text-primary size-4 shrink-0" />
+              Trash
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 async function showTrashContextMenu(
   event: MouseEvent<HTMLButtonElement>,
   onEmptyTrash: () => void,
@@ -513,10 +676,6 @@ export function SidebarPane({
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
   const openSettings = useUIStore((s) => s.setSettingsOpen);
-  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
-  const setExpandedSidebarTagPaths = useUIStore(
-    (s) => s.setExpandedSidebarTagPaths,
-  );
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -544,25 +703,10 @@ export function SidebarPane({
     renameInputValue,
     normalizedRenameTarget,
   );
-  const expandedTagPaths = useMemo(
-    () => new Set(expandedSidebarTagPaths),
-    [expandedSidebarTagPaths],
-  );
+  const { expandedTagPaths, toggleExpandedTagPath } =
+    usePersistedExpandedTagPaths(availableTagPaths);
   useRenameInputFocus(renameDialogOpen, renameInputRef);
-
-  useEffect(() => {
-    const nextExpandedTagPaths = expandedSidebarTagPaths.filter((path) =>
-      availableTagPaths.includes(path),
-    );
-
-    if (nextExpandedTagPaths.length !== expandedSidebarTagPaths.length) {
-      setExpandedSidebarTagPaths(nextExpandedTagPaths);
-    }
-  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
-
-  const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
-    showTrashContextMenu(event, onEmptyTrash).catch(() => {});
-  };
+  const noteSectionHasActiveTag = activeTagPath !== null;
 
   const closeRenameDialog = () => {
     resetRenameDialog({
@@ -640,98 +784,24 @@ export function SidebarPane({
           }}
           ref={scrollContainerRef}
         >
-          <section>
-            <button
-              className="text-sidebar-foreground/70 group flex h-4 w-full items-center justify-between pl-1 text-left text-xs"
-              onClick={() => {
-                setNotesOpen((current) => !current);
-              }}
-              type="button"
-            >
-              <span className="leading-none">Notes</span>
-              <ChevronRight
-                className={cn(
-                  "size-3 shrink-0 self-center opacity-0 transition-all duration-200 group-hover:opacity-100",
-                  notesOpen ? "rotate-90" : "rotate-0",
-                )}
-              />
-            </button>
-            <div
-              className={cn(
-                "grid overflow-hidden transition-all duration-200 ease-out",
-                notesOpen
-                  ? "grid-rows-[1fr] pt-1 opacity-100"
-                  : "grid-rows-[0fr] opacity-0",
-              )}
-            >
-              <div className="min-h-0">
-                <button
-                  className={sidebarItemClasses(
-                    noteFilter === "all",
-                    isFocused,
-                  )}
-                  onClick={onSelectAll}
-                  type="button"
-                >
-                  <FileTextIcon className="text-primary size-4 shrink-0" />
-                  All Notes
-                </button>
-                <button
-                  className={sidebarItemClasses(
-                    noteFilter === "today",
-                    isFocused,
-                  )}
-                  onClick={onSelectToday}
-                  type="button"
-                >
-                  <CalendarDays className="text-primary size-4 shrink-0" />
-                  Today
-                </button>
-                <button
-                  className={sidebarItemClasses(
-                    noteFilter === "todo",
-                    isFocused,
-                  )}
-                  onClick={onSelectTodo}
-                  type="button"
-                >
-                  {todoCount > 0 ? (
-                    <Square className="text-primary size-4 shrink-0" />
-                  ) : (
-                    <CheckSquare className="text-primary size-4 shrink-0" />
-                  )}
-                  Todo
-                </button>
-                {(archivedCount > 0 || noteFilter === "archive") && (
-                  <button
-                    className={sidebarItemClasses(
-                      noteFilter === "archive",
-                      isFocused,
-                    )}
-                    onClick={onSelectArchive}
-                    type="button"
-                  >
-                    <Archive className="text-primary size-4 shrink-0" />
-                    Archive
-                  </button>
-                )}
-                {(trashedCount > 0 || noteFilter === "trash") && (
-                  <button
-                    className={sidebarItemClasses(
-                      noteFilter === "trash",
-                      isFocused,
-                    )}
-                    onClick={onSelectTrash}
-                    onContextMenu={(event) => handleTrashContextMenu(event)}
-                    type="button"
-                  >
-                    <Trash2 className="text-primary size-4 shrink-0" />
-                    Trash
-                  </button>
-                )}
-              </div>
-            </div>
-          </section>
+          <NotesSection
+            archivedCount={archivedCount}
+            isFocused={isFocused}
+            noteFilter={noteFilter}
+            noteSectionHasActiveTag={noteSectionHasActiveTag}
+            notesOpen={notesOpen}
+            onEmptyTrash={onEmptyTrash}
+            onSelectAll={onSelectAll}
+            onSelectArchive={onSelectArchive}
+            onSelectToday={onSelectToday}
+            onSelectTodo={onSelectTodo}
+            onSelectTrash={onSelectTrash}
+            onToggleOpen={() => {
+              setNotesOpen((current) => !current);
+            }}
+            todoCount={todoCount}
+            trashedCount={trashedCount}
+          />
 
           {availableTagTree.length > 0 ? (
             <section>
@@ -762,6 +832,7 @@ export function SidebarPane({
                   <TagTree
                     activeTagPath={activeTagPath}
                     expandedTagPaths={expandedTagPaths}
+                    isFocused={isFocused}
                     nodes={availableTagTree}
                     onDeleteTag={onDeleteTag}
                     onExportTag={onExportTag}
@@ -772,15 +843,7 @@ export function SidebarPane({
                     }}
                     onSetTagHideSubtagNotes={onSetTagHideSubtagNotes}
                     onSetTagPinned={onSetTagPinned}
-                    onToggleExpanded={(path) => {
-                      const next = new Set(expandedSidebarTagPaths);
-                      if (next.has(path)) {
-                        next.delete(path);
-                      } else {
-                        next.add(path);
-                      }
-                      setExpandedSidebarTagPaths([...next]);
-                    }}
+                    onToggleExpanded={toggleExpandedTagPath}
                     onSelectTagPath={onSelectTagPath}
                   />
                 </div>

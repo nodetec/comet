@@ -40,7 +40,11 @@ import {
   type NoteSummary,
 } from "@/shared/api/types";
 
-function notesHeading(noteFilter: NoteFilter) {
+function notesHeading(noteFilter: NoteFilter, activeTagPath: string | null) {
+  if (activeTagPath) {
+    return `#${activeTagPath}`;
+  }
+
   if (noteFilter === "archive") {
     return "Archive";
   }
@@ -622,7 +626,7 @@ export function NotesPane({
 
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
-  }, [filteredNotes.length, noteFilter, searchQuery]);
+  }, [activeTagPath, filteredNotes.length, noteFilter, searchQuery]);
 
   useEffect(() => {
     if (!inView || !hasMoreNotes) {
@@ -713,7 +717,7 @@ export function NotesPane({
                   type="button"
                 >
                   <h2 className="min-w-0 truncate font-medium">
-                    {notesHeading(noteFilter)}
+                    {notesHeading(noteFilter, activeTagPath)}
                   </h2>
                   <ChevronDown className="text-muted-foreground size-4 shrink-0" />
                 </button>

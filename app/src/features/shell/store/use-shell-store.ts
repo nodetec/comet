@@ -13,6 +13,7 @@ type ShellStore = {
   noteFilter: NoteFilter;
   searchQuery: string;
   selectedNoteId: string | null;
+  tagViewActive: boolean;
   clearActiveTagPath(): void;
   setDraft(noteId: string, markdown: string): void;
   setActiveTagPath(tagPath: string | null): void;
@@ -20,6 +21,7 @@ type ShellStore = {
   setNoteFilter(filter: NoteFilter): void;
   setSearchQuery(query: string): void;
   setSelectedNoteId(noteId: string | null): void;
+  setTagViewActive(active: boolean): void;
 };
 
 export const useShellStore = create<ShellStore>((set) => ({
@@ -30,8 +32,9 @@ export const useShellStore = create<ShellStore>((set) => ({
   noteFilter: "all",
   searchQuery: "",
   selectedNoteId: null,
+  tagViewActive: false,
   clearActiveTagPath: () => {
-    set({ activeTagPath: null });
+    set({ activeTagPath: null, tagViewActive: false });
   },
   setDraft: (noteId, markdown) => {
     set({ draftMarkdown: markdown, draftNoteId: noteId });
@@ -50,5 +53,8 @@ export const useShellStore = create<ShellStore>((set) => ({
   },
   setSelectedNoteId: (selectedNoteId) => {
     set({ selectedNoteId });
+  },
+  setTagViewActive: (tagViewActive) => {
+    set({ tagViewActive });
   },
 }));

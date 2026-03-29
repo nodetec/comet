@@ -95,14 +95,18 @@ export function useShellController() {
   const noteFilter = useShellStore((state) => state.noteFilter);
   const searchQuery = useShellStore((state) => state.searchQuery);
   const selectedNoteId = useShellStore((state) => state.selectedNoteId);
+  const tagViewActive = useShellStore((state) => state.tagViewActive);
   const setDraft = useShellStore((state) => state.setDraft);
   const setActiveTagPath = useShellStore((state) => state.setActiveTagPath);
   const setNoteFilter = useShellStore((state) => state.setNoteFilter);
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
   const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
+  const setTagViewActive = useShellStore((state) => state.setTagViewActive);
   const setFocusedPane = useShellStore((state) => state.setFocusedPane);
 
-  const sortViewKey = noteFilter;
+  const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
+  const visibleActiveTagPath = tagViewActive ? activeTagPath : null;
+  const sortViewKey = effectiveNoteFilter;
   const sortPrefs =
     useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
     defaultNoteSortPrefs;
@@ -127,6 +131,7 @@ export function useShellController() {
   } = useNoteQueries({
     noteFilter,
     activeTagPath,
+    tagViewActive,
     searchQuery,
     sortField: noteSortField,
     sortDirection: noteSortDirection,
@@ -155,7 +160,7 @@ export function useShellController() {
     selectedNoteId,
     draftNoteId,
     draftMarkdown,
-    noteFilter,
+    noteFilter: effectiveNoteFilter,
     activeNpub,
     isSavingRef,
     setSelectedNoteId,
@@ -185,8 +190,9 @@ export function useShellController() {
 
     if (!availableTagPaths.includes(activeTagPath)) {
       setActiveTagPath(null);
+      setTagViewActive(false);
     }
-  }, [activeTagPath, availableTagPaths, setActiveTagPath]);
+  }, [activeTagPath, availableTagPaths, setActiveTagPath, setTagViewActive]);
 
   // --- Sync draft from loaded note ---
   useEffect(() => {
@@ -455,8 +461,9 @@ export function useShellController() {
     }
 
     flushCurrentDraft();
-    const tagsForNewNote = activeTagPath ? [activeTagPath] : [];
-    if (noteFilter !== "today" && noteFilter !== "todo") {
+    const tagsForNewNote =
+      tagViewActive && activeTagPath ? [activeTagPath] : [];
+    if (!tagViewActive && noteFilter !== "today" && noteFilter !== "todo") {
       setNoteFilter("all");
     }
     setSearchQuery("");
@@ -465,7 +472,7 @@ export function useShellController() {
     setEditorFocusMode(source === "pointer" ? "pointerup" : "immediate");
     createNoteMutation.mutate({
       tags: tagsForNewNote,
-      markdown: noteFilter === "todo" ? "- [ ] " : undefined,
+      markdown: effectiveNoteFilter === "todo" ? "- [ ] " : undefined,
     });
   };
 
@@ -478,28 +485,33 @@ export function useShellController() {
 
   const handleSelectAll = () => {
     clearSelectionIfNotActive();
+    setTagViewActive(false);
     setNoteFilter("all");
   };
 
   const handleSelectToday = () => {
     clearSelectionIfNotActive();
+    setTagViewActive(false);
     setNoteFilter("today");
   };
 
   const handleSelectTodo = () => {
     clearSelectionIfNotActive();
+    setTagViewActive(false);
     setNoteFilter("todo");
   };
 
   const handleSelectArchive = () => {
     setSelectedNoteId(null);
     setDraft("", "");
+    setTagViewActive(false);
     setNoteFilter("archive");
   };
 
   const handleSelectTrash = () => {
     setSelectedNoteId(null);
     setDraft("", "");
+    setTagViewActive(false);
     setNoteFilter("trash");
   };
 
@@ -508,8 +520,7 @@ export function useShellController() {
   };
 
   const handleSelectTagPath = (tagPath: string) => {
-    if (activeTagPath === tagPath) {
-      setActiveTagPath(null);
+    if (tagViewActive && activeTagPath === tagPath) {
       return;
     }
 
@@ -518,6 +529,7 @@ export function useShellController() {
       setDraft("", "");
     }
 
+    setTagViewActive(true);
     setActiveTagPath(tagPath);
   };
 
@@ -617,6 +629,7 @@ export function useShellController() {
         const affectedNoteIds = await deleteTag({ path });
         if (activeTagPath === path) {
           setActiveTagPath(null);
+          setTagViewActive(false);
         }
 
         await Promise.all([
@@ -852,16 +865,31 @@ export function useShellController() {
   const handleExportNotes = () => {
     void (async () => {
       try {
-        const selected = await open({ directory: true, title: "Export notes" });
+        const selected = await open({
+          directory: true,
+          title:
+            tagViewActive && activeTagPath
+              ? `Export ${activeTagPath}`
+              : "Export notes",
+        });
         if (!selected) return;
         await flushCurrentDraftAsync();
 
-        const count = await exportNotes({
-          exportMode: "note_filter",
-          noteFilter,
-          preserveTags: true,
-          exportDir: selected as string,
-        });
+        const count = await exportNotes(
+          tagViewActive && activeTagPath
+            ? {
+                exportMode: "tag",
+                tagPath: activeTagPath,
+                preserveTags: true,
+                exportDir: selected as string,
+              }
+            : {
+                exportMode: "note_filter",
+                noteFilter,
+                preserveTags: true,
+                exportDir: selected as string,
+              },
+        );
 
         toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
           id: "export-notes-success",
@@ -1235,7 +1263,7 @@ export function useShellController() {
 
   const notesPaneProps = useMemo(
     () => ({
-      activeTagPath,
+      activeTagPath: visibleActiveTagPath,
       creatingNoteId: creatingSelectedNoteId,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
@@ -1248,7 +1276,7 @@ export function useShellController() {
       onChangeSortDirection: (direction: NoteSortDirection) =>
         setNoteSortPrefs(sortViewKey, { direction }),
       isMutatingNote,
-      noteFilter,
+      noteFilter: effectiveNoteFilter,
       onArchiveNote: (noteId: string) =>
         latestRef.current.handleArchiveNote(noteId),
       onChangeSearch: setSearchQuery,
@@ -1285,13 +1313,13 @@ export function useShellController() {
       totalNoteCount,
     }),
     [
-      activeTagPath,
+      visibleActiveTagPath,
       creatingSelectedNoteId,
       currentNotes,
       displayedSelectedNoteId,
+      effectiveNoteFilter,
       isCreatingNote,
       isMutatingNote,
-      noteFilter,
       noteSortDirection,
       noteSortField,
       notesQuery.hasNextPage,
@@ -1307,7 +1335,7 @@ export function useShellController() {
 
   const sidebarPaneProps = useMemo(
     () => ({
-      activeTagPath,
+      activeTagPath: visibleActiveTagPath,
       availableTagPaths,
       availableTagTree,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
@@ -1343,11 +1371,12 @@ export function useShellController() {
         latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
       onSetTagPinned: (path: string, pinned: boolean) =>
         latestRef.current.handleSetTagPinned(path, pinned),
-      onSelectTagPath: (tagPath: string) =>
-        latestRef.current.handleSelectTagPath(tagPath),
+      onSelectTagPath: (tagPath: string) => {
+        setFocusedPane("sidebar");
+        latestRef.current.handleSelectTagPath(tagPath);
+      },
     }),
     [
-      activeTagPath,
       availableTagPaths,
       availableTagTree,
       bootstrapQuery.data?.archivedCount,
@@ -1355,6 +1384,7 @@ export function useShellController() {
       noteFilter,
       setFocusedPane,
       todoCountQuery.data,
+      visibleActiveTagPath,
     ],
   );
 

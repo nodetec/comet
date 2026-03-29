@@ -39,6 +39,7 @@ function flattenTagPaths(nodes: ContextualTagNode[]): string[] {
 export interface NoteQueryParams {
   noteFilter: NoteFilter;
   activeTagPath: string | null;
+  tagViewActive: boolean;
   searchQuery: string;
   sortField: NoteSortField;
   sortDirection: NoteSortDirection;
@@ -49,6 +50,7 @@ export function useNoteQueries(params: NoteQueryParams) {
   const {
     noteFilter,
     activeTagPath,
+    tagViewActive,
     searchQuery,
     sortField,
     sortDirection,
@@ -57,6 +59,8 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const normalizedQuery = searchQuery.trim();
   const normalizedActiveTagPath = activeTagPath?.trim() || null;
+  const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
+  const effectiveActiveTagPath = tagViewActive ? normalizedActiveTagPath : null;
 
   const bootstrapQuery = useQuery({
     queryKey: ["bootstrap"],
@@ -72,26 +76,26 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const initialSelectedNoteId = bootstrapQuery.data?.selectedNoteId ?? null;
   const isDefaultNotesView =
-    noteFilter === "all" &&
+    effectiveNoteFilter === "all" &&
     normalizedQuery === "" &&
-    normalizedActiveTagPath === null &&
+    effectiveActiveTagPath === null &&
     sortField === "modified_at" &&
     sortDirection === "newest";
 
   const notesQueryInput = useMemo<NoteQueryInput>(
     () => ({
-      activeTagPath: normalizedActiveTagPath,
+      activeTagPath: effectiveActiveTagPath,
       limit: NOTE_PAGE_SIZE,
-      noteFilter,
+      noteFilter: effectiveNoteFilter,
       offset: 0,
       searchQuery: normalizedQuery,
       sortField,
       sortDirection,
     }),
     [
-      normalizedActiveTagPath,
+      effectiveActiveTagPath,
+      effectiveNoteFilter,
       normalizedQuery,
-      noteFilter,
       sortField,
       sortDirection,
     ],
@@ -130,13 +134,10 @@ export function useNoteQueries(params: NoteQueryParams) {
 
   const contextualTagsQuery = useQuery({
     enabled: bootstrapQuery.isSuccess,
-    initialData:
-      noteFilter === "all" && bootstrapQuery.data
-        ? bootstrapQuery.data.initialTags
-        : undefined,
+    initialData: bootstrapQuery.data?.initialTags,
     placeholderData: (previousData) => previousData,
-    queryFn: () => getContextualTags({ noteFilter }),
-    queryKey: ["contextual-tags", noteFilter],
+    queryFn: () => getContextualTags({ noteFilter: "all" }),
+    queryKey: ["contextual-tags"],
   });
   const availableTagTree = contextualTagsQuery.data?.roots ?? EMPTY_TAG_TREE;
   const availableTagPaths = useMemo(
