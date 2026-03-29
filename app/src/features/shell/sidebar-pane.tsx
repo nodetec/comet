@@ -47,16 +47,21 @@ import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 const SIDEBAR_CHILD_INDENT_PX = 12;
+const SIDEBAR_ITEM_ICON_CLASS_NAME = "text-sidebar-item-icon size-4 shrink-0";
+const SIDEBAR_TAG_ICON_CLASS_NAME = "text-sidebar-tag-icon size-4 shrink-0";
+const SIDEBAR_ITEM_STATUS_ICON_CLASS_NAME =
+  "text-sidebar-item-icon/80 size-3 shrink-0 fill-current";
 
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
   if (isActive && isFocused) {
     stateClass =
-      "bg-primary/50 text-primary-foreground [&_svg]:text-primary-foreground";
+      "bg-sidebar-primary/50 text-sidebar-primary-foreground [&_svg]:text-sidebar-primary-foreground";
   } else if (isActive) {
-    stateClass = "bg-accent/80 text-secondary-foreground";
+    stateClass =
+      "bg-sidebar-muted/80 text-sidebar-muted-foreground [&_svg]:text-sidebar-muted-foreground";
   } else {
-    stateClass = "text-secondary-foreground";
+    stateClass = "text-sidebar-foreground";
   }
   return `flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm transition-colors ${stateClass}`;
 }
@@ -437,11 +442,11 @@ function TagTree({
                       </button>
                     ) : undefined
                   }
-                  icon={<Hash className="text-primary size-4 shrink-0" />}
+                  icon={<Hash className={SIDEBAR_TAG_ICON_CLASS_NAME} />}
                   label={node.label}
                   status={
                     node.pinned ? (
-                      <Pin className="text-primary/80 size-3 shrink-0 fill-current" />
+                      <Pin className={SIDEBAR_ITEM_STATUS_ICON_CLASS_NAME} />
                     ) : undefined
                   }
                 />
@@ -598,7 +603,7 @@ function NotesSection({
               />
             </button>
           }
-          icon={<FileTextIcon className="text-primary size-4 shrink-0" />}
+          icon={<FileTextIcon className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
           label="Notes"
         />
       </div>
@@ -614,7 +619,7 @@ function NotesSection({
           >
             <SidebarIndentedContent indentLevel={1}>
               <SidebarRowContent
-                icon={<CalendarDays className="text-primary size-4 shrink-0" />}
+                icon={<CalendarDays className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
                 label="Today"
               />
             </SidebarIndentedContent>
@@ -631,9 +636,9 @@ function NotesSection({
               <SidebarRowContent
                 icon={
                   todoCount > 0 ? (
-                    <Square className="text-primary size-4 shrink-0" />
+                    <Square className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
                   ) : (
-                    <CheckSquare className="text-primary size-4 shrink-0" />
+                    <CheckSquare className={SIDEBAR_ITEM_ICON_CLASS_NAME} />
                   )
                 }
                 label="Todo"
@@ -652,7 +657,7 @@ function NotesSection({
           type="button"
         >
           <SidebarRowContent
-            icon={<Archive className="text-primary size-4 shrink-0" />}
+            icon={<Archive className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
             label="Archive"
           />
         </button>
@@ -668,7 +673,7 @@ function NotesSection({
           type="button"
         >
           <SidebarRowContent
-            icon={<Trash2 className="text-primary size-4 shrink-0" />}
+            icon={<Trash2 className={SIDEBAR_ITEM_ICON_CLASS_NAME} />}
             label="Trash"
           />
         </button>
@@ -803,7 +808,7 @@ export function SidebarPane({
           <div className="relative z-40 flex gap-1">
             <Button
               aria-label={`Sync: ${syncState}`}
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               size="icon-sm"
               variant="ghost"
               onClick={() => setSyncDialogOpen(true)}
@@ -832,7 +837,7 @@ export function SidebarPane({
             />
             <Button
               aria-label="Settings"
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               onClick={() => openSettings(true)}
               size="icon-sm"
               variant="ghost"
