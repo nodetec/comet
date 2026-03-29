@@ -523,12 +523,14 @@ function NotesSection({
   isFocused,
   noteFilter,
   noteSectionHasActiveTag,
+  notesChildrenOpen,
   onEmptyTrash,
   onSelectAll,
   onSelectArchive,
   onSelectToday,
   onSelectTodo,
   onSelectTrash,
+  onToggleNotesChildren,
   todoCount,
   trashedCount,
 }: {
@@ -536,12 +538,14 @@ function NotesSection({
   isFocused: boolean;
   noteFilter: NoteFilter;
   noteSectionHasActiveTag: boolean;
+  notesChildrenOpen: boolean;
   onEmptyTrash: () => void;
   onSelectAll: () => void;
   onSelectArchive: () => void;
   onSelectToday: () => void;
   onSelectTodo: () => void;
   onSelectTrash: () => void;
+  onToggleNotesChildren: () => void;
   todoCount: number;
   trashedCount: number;
 }) {
@@ -551,51 +555,75 @@ function NotesSection({
 
   return (
     <section className="space-y-0.5">
-      <button
+      <div
         className={sidebarItemClasses(
           noteFilter === "all" && !noteSectionHasActiveTag,
           isFocused,
         )}
         onClick={onSelectAll}
-        type="button"
       >
         <SidebarRowContent
+          chevron={
+            <button
+              className="flex size-5 items-center justify-center rounded-sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleNotesChildren();
+              }}
+              type="button"
+            >
+              <ChevronRight
+                className={cn(
+                  "size-4 transition-transform",
+                  notesChildrenOpen ? "rotate-90" : "rotate-0",
+                )}
+              />
+            </button>
+          }
           icon={<FileTextIcon className="text-primary size-4 shrink-0" />}
           label="Notes"
         />
-      </button>
-      <button
-        className={sidebarItemClasses(
-          noteFilter === "today" && !noteSectionHasActiveTag,
-          isFocused,
-        )}
-        onClick={onSelectToday}
-        type="button"
-      >
-        <SidebarRowContent
-          icon={<CalendarDays className="text-primary size-4 shrink-0" />}
-          label="Today"
-        />
-      </button>
-      <button
-        className={sidebarItemClasses(
-          noteFilter === "todo" && !noteSectionHasActiveTag,
-          isFocused,
-        )}
-        onClick={onSelectTodo}
-        type="button"
-      >
-        <SidebarRowContent
-          icon={
-            todoCount > 0 ? (
-              <Square className="text-primary size-4 shrink-0" />
-            ) : (
-              <CheckSquare className="text-primary size-4 shrink-0" />
-            )
-          }
-          label="Todo"
-        />
-      </button>
+      </div>
+      {notesChildrenOpen ? (
+        <>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "today" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectToday}
+            type="button"
+          >
+            <div style={{ paddingLeft: "12px" }}>
+              <SidebarRowContent
+                icon={<CalendarDays className="text-primary size-4 shrink-0" />}
+                label="Today"
+              />
+            </div>
+          </button>
+          <button
+            className={sidebarItemClasses(
+              noteFilter === "todo" && !noteSectionHasActiveTag,
+              isFocused,
+            )}
+            onClick={onSelectTodo}
+            type="button"
+          >
+            <div style={{ paddingLeft: "12px" }}>
+              <SidebarRowContent
+                icon={
+                  todoCount > 0 ? (
+                    <Square className="text-primary size-4 shrink-0" />
+                  ) : (
+                    <CheckSquare className="text-primary size-4 shrink-0" />
+                  )
+                }
+                label="Todo"
+              />
+            </div>
+          </button>
+        </>
+      ) : null}
       {(archivedCount > 0 || noteFilter === "archive") && (
         <button
           className={sidebarItemClasses(
@@ -698,6 +726,7 @@ export function SidebarPane({
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [notesChildrenOpen, setNotesChildrenOpen] = useState(true);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSourcePath, setRenameSourcePath] = useState("");
   const [renameInputValue, setRenameInputValue] = useState("");
@@ -806,12 +835,16 @@ export function SidebarPane({
             isFocused={isFocused}
             noteFilter={noteFilter}
             noteSectionHasActiveTag={noteSectionHasActiveTag}
+            notesChildrenOpen={notesChildrenOpen}
             onEmptyTrash={onEmptyTrash}
             onSelectAll={onSelectAll}
             onSelectArchive={onSelectArchive}
             onSelectToday={onSelectToday}
             onSelectTodo={onSelectTodo}
             onSelectTrash={onSelectTrash}
+            onToggleNotesChildren={() => {
+              setNotesChildrenOpen((current) => !current);
+            }}
             todoCount={todoCount}
             trashedCount={trashedCount}
           />
