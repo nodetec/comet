@@ -1,5 +1,7 @@
 # Orbiting Library Catalog
 
+#archives/library #stations/culture
+
 New arrivals this quarter:
 
 - oral histories from the first belt foundries
@@ -8,5 +10,3 @@ New arrivals this quarter:
 - one private donation of annotated star charts
 
 Cataloging takes longer in orbit because everyone wants to tell a story before they hand over the box.
-
-#archives/library #stations/culture

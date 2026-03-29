@@ -1,5 +1,7 @@
 # Perihelion Supply Letter
 
+#operations #supply chain#
+
 To Operations,
 
 Please stop ordering heat-sensitive adhesive in the same container group as the outer hull patches.
@@ -7,5 +9,3 @@ Yes, the labels are clear. No, the labels do not help after perihelion swing whe
 
 Regards,
 Dock Receiving
-
-#operations #supply chain#

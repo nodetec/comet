@@ -1,5 +1,7 @@
 # Mars Orbit Cargo Manifest
 
+#missions/mars #logistics
+
 Transfer ring inbound:
 
 - three pallets of pressure valves
@@ -8,5 +10,3 @@ Transfer ring inbound:
 - six sealed mail bags
 
 One customs flag on the valve shipment because the serial format does not match the export stub.
-
-#missions/mars #logistics

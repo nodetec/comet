@@ -1,5 +1,7 @@
 # Eclipse Tour Brochure
 
+#tourism #luna orbit#
+
 Welcome to the shortest luxury experience in cislunar travel.
 Our eclipse deck offers:
 
@@ -8,5 +10,3 @@ Our eclipse deck offers:
 - live narration from a retired orbital pilot
 
 No refund if clouds are impossible because there are no clouds here.
-
-#tourism #luna orbit#

@@ -1,5 +1,7 @@
 # Quiet Sky Protocol
 
+#operations #observatories #policy
+
 Observatory traffic should stop treating every bright anomaly like an emergency.
 Quiet Sky Protocol proposal:
 
@@ -8,5 +10,3 @@ Quiet Sky Protocol proposal:
 - reserve all-hands alerts for collision or comms risk
 
 The current habit burns attention faster than it saves equipment.
-
-#operations #observatories #policy

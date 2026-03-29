@@ -1,5 +1,7 @@
 # Ceres Dock Union Minutes
 
+#stations/ceres #operations #crew/policy
+
 Attendance was strong and tempers were short.
 Main points:
 
@@ -8,5 +10,3 @@ Main points:
 - management wants another month before revisiting berth assignments
 
 No vote tonight. Another meeting scheduled after the freight audit.
-
-#stations/ceres #operations #crew/policy

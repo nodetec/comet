@@ -180,7 +180,7 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_note_tag_links_tag_id_note_id ON note_tag_links(tag_id, note_id);
              CREATE INDEX idx_note_tag_links_tag_id_direct_note_id ON note_tag_links(tag_id, is_direct, note_id);
              CREATE INDEX idx_note_tag_links_note_id_direct ON note_tag_links(note_id, is_direct);
-             INSERT INTO app_settings (key, value) VALUES ('tag_index_version', 'bear_tags_v1')
+             INSERT INTO app_settings (key, value) VALUES ('tag_index_version', 'tag_paths_v1')
                ON CONFLICT(key) DO UPDATE SET value = excluded.value;
              INSERT INTO app_settings (key, value) VALUES ('tag_index_status', 'pending')
                ON CONFLICT(key) DO UPDATE SET value = excluded.value;",

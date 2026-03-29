@@ -255,7 +255,7 @@ CREATE INDEX idx_sync_heads_mtime ON sync_heads(mtime DESC);
 
 INSERT INTO app_settings (key, value) VALUES
   ('last_open_note_id', 'note-01-luna-range-calibration'),
-  ('tag_index_version', 'bear_tags_v1'),
+  ('tag_index_version', 'tag_paths_v1'),
   ('tag_index_status', 'ready'),
   ('blossom_url', 'https://media.comet.md');
 

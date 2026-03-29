@@ -10,7 +10,7 @@ use crate::error::AppError;
 const TAG_INDEX_VERSION_KEY: &str = "tag_index_version";
 const TAG_INDEX_STATUS_KEY: &str = "tag_index_status";
 const TAG_INDEX_LAST_REBUILT_AT_KEY: &str = "tag_index_last_rebuilt_at";
-const TAG_INDEX_VERSION: &str = "bear_tags_v1";
+const TAG_INDEX_VERSION: &str = "tag_paths_v1";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
