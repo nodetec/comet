@@ -22,6 +22,7 @@ import {
   CloudSync,
   CloudCheck,
   FileTextIcon,
+  Pin,
   Settings2,
   Trash2,
 } from "lucide-react";
@@ -245,6 +246,7 @@ async function showTagContextMenu(
   },
 ) {
   event.preventDefault();
+  const isRootTag = !node.path.includes("/");
 
   const items: Array<
     | CheckMenuItem
@@ -283,11 +285,11 @@ async function showTagContextMenu(
     },
   ];
 
-  if (node.children.length > 0 || node.depth === 0) {
+  if (node.children.length > 0 || isRootTag) {
     items.push({ item: "Separator" as const });
   }
 
-  if (node.depth === 0) {
+  if (isRootTag) {
     items.push({
       id: `pin-${node.path}`,
       text: node.pinned ? "Unpin From Top" : "Pin To Top",
@@ -347,11 +349,16 @@ function TagTree({
         const isActive = activeTagPath === node.path;
         const hasChildren = node.children.length > 0;
         const isExpanded = expandedTagPaths.has(node.path);
+        const isRootTag = !node.path.includes("/");
+        const indentLevel = Math.max(0, node.depth - 1);
 
         return (
           <div key={node.path}>
             <div
-              className={cn(sidebarItemClasses(isActive, isFocused), "pr-2")}
+              className={cn(
+                sidebarItemClasses(isActive, isFocused),
+                "group pr-2",
+              )}
               onContextMenu={(event) =>
                 void showTagContextMenu(event, node, {
                   onDeleteTag,
@@ -364,7 +371,7 @@ function TagTree({
             >
               <div
                 className="flex items-center"
-                style={{ paddingLeft: `${12 + node.depth * 12}px` }}
+                style={{ paddingLeft: `${12 + indentLevel * 12}px` }}
               >
                 {hasChildren ? (
                   <button
@@ -388,10 +395,33 @@ function TagTree({
                   type="button"
                 >
                   <span className="truncate">{node.label}</span>
-                  <span className="text-muted-foreground ml-auto shrink-0 text-[11px]">
-                    {node.inclusiveNoteCount}
-                  </span>
                 </button>
+                {isRootTag ? (
+                  <button
+                    aria-label={node.pinned ? "Unpin tag" : "Pin tag"}
+                    className={cn(
+                      "text-muted-foreground hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded-sm transition-opacity",
+                      node.pinned
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100",
+                    )}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSetTagPinned(node.path, !node.pinned);
+                    }}
+                    type="button"
+                  >
+                    <Pin
+                      className={cn(
+                        "size-3.5",
+                        node.pinned ? "text-primary fill-current" : "",
+                      )}
+                    />
+                  </button>
+                ) : null}
+                <span className="text-muted-foreground shrink-0 text-[11px]">
+                  {node.inclusiveNoteCount}
+                </span>
               </div>
             </div>
             {hasChildren && isExpanded ? (
