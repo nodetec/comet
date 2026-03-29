@@ -5,36 +5,48 @@ set -eu
 APP_DIR="${HOME}/Library/Application Support/md.comet-alpha.dev"
 APP_DB_PATH="${APP_DIR}/app.db"
 KEYCHAIN_SERVICE="comet"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+TEST_NOTES_DIR="${SCRIPT_DIR}/test-notes"
+GENERATED_SQL_PATH="$(mktemp -t comet-seed-notes.XXXXXX.sql)"
+TEMP_DB_PATH=""
+
+cleanup() {
+  rm -f "$GENERATED_SQL_PATH"
+  if [ -n "$TEMP_DB_PATH" ]; then
+    rm -f "$TEMP_DB_PATH" "${TEMP_DB_PATH}-shm" "${TEMP_DB_PATH}-wal"
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+if [ ! -d "$TEST_NOTES_DIR" ]; then
+  echo "No test notes directory found at: $TEST_NOTES_DIR"
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "node is required to generate seed data"
+  exit 1
+fi
 
 if [ ! -f "$APP_DB_PATH" ]; then
   echo "No app database found at: $APP_DB_PATH"
   exit 1
 fi
 
-ACTIVE_NPUB="$(sqlite3 "$APP_DB_PATH" "SELECT npub FROM accounts WHERE is_active = 1 LIMIT 1;")"
-if [ -z "$ACTIVE_NPUB" ]; then
+ACTIVE_ACCOUNT_ROW="$(sqlite3 -separator '|' "$APP_DB_PATH" "SELECT public_key, npub FROM accounts WHERE is_active = 1 LIMIT 1;")"
+if [ -z "$ACTIVE_ACCOUNT_ROW" ]; then
   echo "No active account configured in: $APP_DB_PATH"
   exit 1
 fi
 
-ACCOUNT_DIR="${APP_DIR}/accounts/${ACTIVE_NPUB}"
+PUBLIC_KEY="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f1)"
+NPUB="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f2)"
+
+ACCOUNT_DIR="${APP_DIR}/accounts/${NPUB}"
 DB_PATH="${ACCOUNT_DIR}/comet.db"
 
 mkdir -p "$(dirname "$DB_PATH")"
-
-if [ ! -f "$DB_PATH" ]; then
-  echo "No database found at: $DB_PATH"
-  exit 1
-fi
-
-IDENTITY_ROW="$(sqlite3 -separator '|' "$DB_PATH" "SELECT public_key, npub FROM nostr_identity LIMIT 1;")"
-if [ -z "$IDENTITY_ROW" ]; then
-  echo "No nostr identity found in: $DB_PATH"
-  exit 1
-fi
-
-PUBLIC_KEY="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f1)"
-NPUB="$(printf '%s' "$IDENTITY_ROW" | cut -d'|' -f2)"
 KEYCHAIN_ACCOUNT="nostr-nsec:${PUBLIC_KEY}"
 NSEC="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null || true)"
 
@@ -46,29 +58,24 @@ fi
 ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
 
 NOW_MS="$(($(date +%s) * 1000))"
-MINUTE_MS=60000
-HOUR_MS=3600000
-DAY_MS=86400000
 
-PINNED_AT="$((NOW_MS - 20 * MINUTE_MS))"
-RECENT_AT="$((NOW_MS - 45 * MINUTE_MS))"
-RESEARCH_AT="$((NOW_MS - 3 * HOUR_MS))"
-UNCATEGORIZED_AT="$((NOW_MS - 6 * HOUR_MS))"
-EMPTY_AT="$((NOW_MS - 9 * HOUR_MS))"
-TITLE_MATCH_AT="$((NOW_MS - 12 * HOUR_MS))"
-SHORT_QUERY_AT="$((NOW_MS - 18 * HOUR_MS))"
-DEEP_MATCH_AT="$((NOW_MS - 27 * HOUR_MS))"
-PERSONAL_AT="$((NOW_MS - 3 * DAY_MS))"
-ARCHIVED_AT="$((NOW_MS - 2 * DAY_MS))"
+node "$SCRIPT_DIR/generate-seed-notes.mjs" "$TEST_NOTES_DIR" "$NOW_MS" >"$GENERATED_SQL_PATH"
+TEMP_DB_PATH="$(mktemp "${ACCOUNT_DIR}/comet.seed.XXXXXX.db")"
 
-sqlite3 "$DB_PATH" <<SQL
+sqlite3 "$TEMP_DB_PATH" <<SQL
 PRAGMA foreign_keys = OFF;
 
 BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS notes_fts;
 DROP TABLE IF EXISTS notes;
+DROP TABLE IF EXISTS sync_heads;
+DROP TABLE IF EXISTS sync_revision_parents;
+DROP TABLE IF EXISTS sync_revisions;
+DROP TABLE IF EXISTS sync_relay_state;
+DROP TABLE IF EXISTS sync_relays;
 DROP TABLE IF EXISTS note_tag_links;
+DROP TABLE IF EXISTS note_tags;
 DROP TABLE IF EXISTS tags;
 DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
@@ -114,6 +121,7 @@ CREATE TABLE notes (
   nostr_d_tag TEXT,
   published_at INTEGER,
   sync_event_id TEXT,
+  current_rev TEXT,
   edited_at INTEGER,
   locally_modified INTEGER NOT NULL DEFAULT 0,
   deleted_at INTEGER,
@@ -122,12 +130,12 @@ CREATE TABLE notes (
 );
 
 CREATE TABLE blob_uploads (
-  hash TEXT NOT NULL,
+  object_hash TEXT NOT NULL,
   server_url TEXT NOT NULL,
   encrypted INTEGER NOT NULL DEFAULT 0,
   size_bytes INTEGER NOT NULL DEFAULT 0,
   uploaded_at INTEGER NOT NULL,
-  PRIMARY KEY (hash, server_url)
+  PRIMARY KEY (object_hash, server_url)
 );
 
 CREATE TABLE blob_meta (
@@ -153,7 +161,7 @@ CREATE TABLE nostr_identity (
 CREATE TABLE tags (
   id INTEGER PRIMARY KEY,
   path TEXT NOT NULL UNIQUE,
-  parent_id INTEGER REFERENCES tags(id) ON DELETE RESTRICT,
+  parent_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
   last_segment TEXT NOT NULL,
   depth INTEGER NOT NULL,
   pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
@@ -168,6 +176,52 @@ CREATE TABLE note_tag_links (
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   is_direct INTEGER NOT NULL CHECK (is_direct IN (0, 1)),
   PRIMARY KEY (note_id, tag_id)
+);
+
+CREATE TABLE sync_relays (
+  relay_url TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE sync_relay_state (
+  relay_url TEXT PRIMARY KEY REFERENCES sync_relays(relay_url) ON DELETE CASCADE,
+  checkpoint_seq INTEGER,
+  snapshot_seq INTEGER,
+  last_synced_at INTEGER,
+  min_payload_mtime INTEGER,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE sync_revisions (
+  recipient TEXT NOT NULL,
+  d_tag TEXT NOT NULL,
+  rev TEXT NOT NULL,
+  op TEXT NOT NULL CHECK (op IN ('put', 'del')),
+  mtime INTEGER NOT NULL,
+  entity_type TEXT,
+  payload_event_id TEXT,
+  payload_retained INTEGER NOT NULL DEFAULT 1 CHECK (payload_retained IN (0, 1)),
+  relay_url TEXT,
+  stored_seq INTEGER,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (recipient, d_tag, rev)
+);
+
+CREATE TABLE sync_revision_parents (
+  recipient TEXT NOT NULL,
+  d_tag TEXT NOT NULL,
+  rev TEXT NOT NULL,
+  parent_rev TEXT NOT NULL,
+  PRIMARY KEY (recipient, d_tag, rev, parent_rev)
+);
+
+CREATE TABLE sync_heads (
+  recipient TEXT NOT NULL,
+  d_tag TEXT NOT NULL,
+  rev TEXT NOT NULL,
+  op TEXT NOT NULL CHECK (op IN ('put', 'del')),
+  mtime INTEGER NOT NULL,
+  PRIMARY KEY (recipient, d_tag, rev)
 );
 
 CREATE VIRTUAL TABLE notes_fts USING fts5(
@@ -189,240 +243,21 @@ CREATE INDEX idx_tags_depth_path ON tags(depth, path);
 CREATE INDEX idx_note_tag_links_tag_id_note_id ON note_tag_links(tag_id, note_id);
 CREATE INDEX idx_note_tag_links_tag_id_direct_note_id ON note_tag_links(tag_id, is_direct, note_id);
 CREATE INDEX idx_note_tag_links_note_id_direct ON note_tag_links(note_id, is_direct);
+CREATE INDEX idx_sync_revisions_scope ON sync_revisions(recipient, d_tag);
+CREATE INDEX idx_sync_revisions_rev ON sync_revisions(rev);
+CREATE INDEX idx_sync_revisions_mtime ON sync_revisions(mtime DESC);
+CREATE INDEX idx_sync_revision_parents_rev ON sync_revision_parents(recipient, d_tag, rev);
+CREATE INDEX idx_sync_revision_parents_parent_rev ON sync_revision_parents(recipient, d_tag, parent_rev);
+CREATE INDEX idx_sync_heads_scope ON sync_heads(recipient, d_tag);
+CREATE INDEX idx_sync_heads_mtime ON sync_heads(mtime DESC);
 
-INSERT INTO notebooks (id, name, created_at, updated_at) VALUES
-  ('notebook-ideas', 'Ideas', $NOW_MS, $NOW_MS),
-  ('notebook-writing', 'Writing', $NOW_MS, $NOW_MS),
-  ('notebook-research', 'Research', $NOW_MS, $NOW_MS),
-  ('notebook-product', 'Product', $NOW_MS, $NOW_MS),
-  ('notebook-personal', 'Personal', $NOW_MS, $NOW_MS);
-
-INSERT INTO notes (
-  id,
-  title,
-  markdown,
-  notebook_id,
-  created_at,
-  modified_at,
-  edited_at,
-  archived_at,
-  pinned_at
-) VALUES
-  (
-    'note-pinned-trail',
-    'A calmer trail',
-    '# A calmer trail
-
-Comet should feel quiet, local, and dependable.
-
-- Resume the thread quickly
-- Keep the surface simple
-- Let the note structure stay light
-
-#product #design
-',
-    'notebook-ideas',
-    $PINNED_AT,
-    $PINNED_AT,
-    $PINNED_AT,
-    NULL,
-    $PINNED_AT
-  ),
-  (
-    'note-writing-draft',
-    'Launch draft',
-    '# Launch draft
-
-Opening copy for the first public explanation of Comet.
-
-## Angle
-
-Local notes. Calm UI. Clear trail.
-
-#writing #launch
-',
-    'notebook-writing',
-    $RECENT_AT,
-    $RECENT_AT,
-    $RECENT_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-deep-match',
-    'Search snippet torture test',
-    '# Search snippet torture test
-
-The first paragraph is intentionally quiet and generic.
-It should not explain the match by itself.
-
-We want to verify that search result cards show context from deeper in the note body,
-especially when the matching phrase appears much later in the document than the opening lines.
-The phrase velvet horizon appears here in the middle of a longer sentence so the snippet builder
-has to pull useful context around it without clipping the word or returning a useless fragment.
-
-#search #testing
-',
-    'notebook-product',
-    $DEEP_MATCH_AT,
-    $DEEP_MATCH_AT,
-    $DEEP_MATCH_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-title-only-match',
-    'Velvet horizon memo',
-    '# Velvet horizon memo
-
-This body intentionally avoids the searched phrase after the title.
-Use this note to verify title highlighting while the card can still fall back to its normal preview.
-
-#writing #memo
-',
-    'notebook-writing',
-    $TITLE_MATCH_AT,
-    $TITLE_MATCH_AT,
-    $TITLE_MATCH_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-short-query',
-    'AI notes',
-    '# AI notes
-
-AI is still a meaningful two-letter query for this app.
-This note exists to exercise the short-query LIKE fallback and editor highlights.
-
-#ai #tools
-',
-    'notebook-research',
-    $SHORT_QUERY_AT,
-    $SHORT_QUERY_AT,
-    $SHORT_QUERY_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-research',
-    'Research notes on note-taking apps',
-    '# Research notes on note-taking apps
-
-Bear is loved for feel.
-Obsidian is loved for ownership.
-There is room in the middle.
-
-#research #market
-',
-    'notebook-research',
-    $RESEARCH_AT,
-    $RESEARCH_AT,
-    $RESEARCH_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-uncategorized',
-    'Loose thread',
-    '# Loose thread
-
-This note is intentionally outside a notebook so the uncategorized path stays exercised.
-
-#inbox
-',
-    NULL,
-    $UNCATEGORIZED_AT,
-    $UNCATEGORIZED_AT,
-    $UNCATEGORIZED_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-empty',
-    'Untitled note',
-    '',
-    NULL,
-    $EMPTY_AT,
-    $EMPTY_AT,
-    $EMPTY_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-personal',
-    'Weekend reset',
-    '# Weekend reset
-
-Buy groceries, clean the desk, and leave time to read in the afternoon.
-
-#personal #home
-',
-    'notebook-personal',
-    $PERSONAL_AT,
-    $PERSONAL_AT,
-    $PERSONAL_AT,
-    NULL,
-    NULL
-  ),
-  (
-    'note-archived',
-    'Old archived draft',
-    '# Old archived draft
-
-This one exists to exercise archive and restore flows.
-
-#archive #draft
-',
-    'notebook-writing',
-    $ARCHIVED_AT,
-    $ARCHIVED_AT,
-    $ARCHIVED_AT,
-    $ARCHIVED_AT,
-    NULL
-  );
+.read $GENERATED_SQL_PATH
 
 INSERT INTO app_settings (key, value) VALUES
-  ('last_open_note_id', 'note-writing-draft'),
+  ('last_open_note_id', 'note-01-luna-range-calibration'),
   ('tag_index_version', 'bear_tags_v1'),
   ('tag_index_status', 'ready'),
   ('blossom_url', 'https://media.comet.md');
-
-INSERT INTO tags (id, path, parent_id, last_segment, depth, created_at, updated_at) VALUES
-  (1, 'ai', NULL, 'ai', 1, $NOW_MS, $NOW_MS),
-  (2, 'archive', NULL, 'archive', 1, $NOW_MS, $NOW_MS),
-  (3, 'design', NULL, 'design', 1, $NOW_MS, $NOW_MS),
-  (4, 'draft', NULL, 'draft', 1, $NOW_MS, $NOW_MS),
-  (5, 'home', NULL, 'home', 1, $NOW_MS, $NOW_MS),
-  (6, 'inbox', NULL, 'inbox', 1, $NOW_MS, $NOW_MS),
-  (7, 'launch', NULL, 'launch', 1, $NOW_MS, $NOW_MS),
-  (8, 'market', NULL, 'market', 1, $NOW_MS, $NOW_MS),
-  (9, 'memo', NULL, 'memo', 1, $NOW_MS, $NOW_MS),
-  (10, 'personal', NULL, 'personal', 1, $NOW_MS, $NOW_MS),
-  (11, 'product', NULL, 'product', 1, $NOW_MS, $NOW_MS),
-  (12, 'research', NULL, 'research', 1, $NOW_MS, $NOW_MS),
-  (13, 'search', NULL, 'search', 1, $NOW_MS, $NOW_MS),
-  (14, 'testing', NULL, 'testing', 1, $NOW_MS, $NOW_MS),
-  (15, 'tools', NULL, 'tools', 1, $NOW_MS, $NOW_MS),
-  (16, 'writing', NULL, 'writing', 1, $NOW_MS, $NOW_MS);
-
-INSERT INTO note_tag_links (note_id, tag_id, is_direct) VALUES
-  ('note-pinned-trail', 3, 1),
-  ('note-pinned-trail', 11, 1),
-  ('note-deep-match', 13, 1),
-  ('note-deep-match', 14, 1),
-  ('note-title-only-match', 9, 1),
-  ('note-writing-draft', 7, 1),
-  ('note-writing-draft', 16, 1),
-  ('note-short-query', 1, 1),
-  ('note-short-query', 15, 1),
-  ('note-research', 8, 1),
-  ('note-research', 12, 1),
-  ('note-uncategorized', 6, 1),
-  ('note-personal', 5, 1),
-  ('note-personal', 10, 1),
-  ('note-archived', 2, 1),
-  ('note-archived', 4, 1);
 
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
@@ -437,13 +272,16 @@ INSERT INTO relays (url, kind, created_at) VALUES
   ('wss://relay.comet.md', 'sync', $NOW_MS),
   ('wss://relay.damus.io', 'publish', $NOW_MS);
 
-COMMIT;
+PRAGMA user_version = 5;
 
--- Tell rusqlite_migration that the canonical account schema has been applied
-PRAGMA user_version = 1;
+COMMIT;
 
 PRAGMA foreign_keys = ON;
 SQL
+
+rm -f "$DB_PATH" "${DB_PATH}-shm" "${DB_PATH}-wal"
+mv "$TEMP_DB_PATH" "$DB_PATH"
+TEMP_DB_PATH=""
 
 security add-generic-password \
   -U \
@@ -456,3 +294,4 @@ rm -rf "$ATTACHMENTS_DIR"
 mkdir -p "$ATTACHMENTS_DIR"
 
 echo "Seeded Comet database at: $DB_PATH"
+echo "Loaded 50 markdown fixtures from: $TEST_NOTES_DIR"
