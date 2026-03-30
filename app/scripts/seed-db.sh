@@ -35,6 +35,11 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "cargo is required to seed initial revisions"
+  exit 1
+fi
+
 if [ ! -f "$APP_DB_PATH" ]; then
   echo "No app database found at: $APP_DB_PATH"
   exit 1
@@ -287,6 +292,12 @@ COMMIT;
 
 PRAGMA foreign_keys = ON;
 SQL
+
+cargo run \
+  --quiet \
+  --manifest-path "$SCRIPT_DIR/../src-tauri/Cargo.toml" \
+  --bin seed-revisions \
+  -- "$TEMP_DB_PATH" "$NSEC"
 
 rm -f "$DB_PATH" "${DB_PATH}-shm" "${DB_PATH}-wal"
 mv "$TEMP_DB_PATH" "$DB_PATH"

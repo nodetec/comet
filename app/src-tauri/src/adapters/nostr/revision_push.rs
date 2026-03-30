@@ -3,8 +3,8 @@ use crate::adapters::sqlite::sync_repository::get_blossom_url;
 use crate::db::database_connection;
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::revision_service::{
-    build_pending_note_deletion_revision, build_pending_note_revision,
-    persist_local_deletion_revision, persist_local_note_revision,
+    build_materialized_note_revision_for_publish, build_pending_note_deletion_revision,
+    build_pending_note_revision, persist_local_deletion_revision, persist_local_note_revision,
 };
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -25,8 +25,15 @@ pub async fn push_note_revision(
     let recipient = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
-        let pending = build_pending_note_revision(&conn, keys, &recipient, note_id)?;
-        persist_local_note_revision(&conn, &pending)?;
+        let pending = if let Some(existing) =
+            build_materialized_note_revision_for_publish(&conn, keys, &recipient, note_id)?
+        {
+            existing
+        } else {
+            let pending = build_pending_note_revision(&conn, keys, &recipient, note_id)?;
+            persist_local_note_revision(&conn, &pending)?;
+            pending
+        };
         crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
     };
 

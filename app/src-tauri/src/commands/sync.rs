@@ -198,7 +198,8 @@ pub struct SyncInfo {
     preferred_relay_url: Option<String>,
     blossom_url: Option<String>,
     npub: Option<String>,
-    synced_notes: i64,
+    revision_managed_notes: i64,
+    relay_backed_notes: i64,
     pending_notes: i64,
     total_notes: i64,
     checkpoint_seq: Option<i64>,
@@ -229,7 +230,12 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         })
         .optional()?;
 
-    let synced_notes: i64 = conn.query_row(
+    let revision_managed_notes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE current_rev IS NOT NULL AND archived_at IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
+    let relay_backed_notes: i64 = conn.query_row(
         "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND archived_at IS NULL",
         [],
         |row| row.get(0),
@@ -269,7 +275,8 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         preferred_relay_url,
         blossom_url,
         npub,
-        synced_notes,
+        revision_managed_notes,
+        relay_backed_notes,
         pending_notes,
         total_notes,
         checkpoint_seq,

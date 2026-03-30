@@ -34,7 +34,8 @@ type SyncInfo = {
   preferredRelayUrl: string | null;
   blossomUrl: string | null;
   npub: string | null;
-  syncedNotes: number;
+  revisionManagedNotes: number;
+  relayBackedNotes: number;
   pendingNotes: number;
   totalNotes: number;
   checkpointSeq: number | null;
@@ -155,14 +156,20 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
 
       <InfoRow
         icon={<HardDrive className="size-3.5" />}
-        label="Notes synced"
-        value={`${info.syncedNotes} / ${info.totalNotes}`}
+        label="Revision-managed"
+        value={`${info.revisionManagedNotes} / ${info.totalNotes}`}
+      />
+
+      <InfoRow
+        icon={<CloudCheck className="size-3.5" />}
+        label="Relay-backed"
+        value={`${info.relayBackedNotes} / ${info.totalNotes}`}
       />
 
       {info.pendingNotes > 0 ? (
         <InfoRow
           icon={<CloudSync className="size-3.5" />}
-          label="Pending sync"
+          label="Pending upload"
           value={
             <span className="text-warning">{info.pendingNotes} unsynced</span>
           }

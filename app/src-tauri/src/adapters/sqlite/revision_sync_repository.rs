@@ -294,7 +294,6 @@ pub fn get_sync_head(
     .map_err(Into::into)
 }
 
-#[cfg(test)]
 pub fn list_sync_revision_parents(
     conn: &Connection,
     recipient: &str,

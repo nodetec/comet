@@ -5,6 +5,7 @@ mod domain;
 mod error;
 mod infra;
 mod ports;
+pub mod tools;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
