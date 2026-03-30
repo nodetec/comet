@@ -799,7 +799,7 @@ export function EditorPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
-          showHeaderBorder && !findOpen && "border-divider border-b",
+          showHeaderBorder && !findOpen && "border-separator border-b",
         )}
       >
         <div className="min-w-0 flex-1">
@@ -832,7 +832,7 @@ export function EditorPane({
       ) : null}
 
       {findOpen && noteId && (
-        <div className="border-divider flex shrink-0 items-center gap-2 border-b px-3 pb-4">
+        <div className="border-separator flex shrink-0 items-center gap-2 border-b px-3 pb-4">
           <label className="border-input/60 focus-within:border-primary relative flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-1">
             <Search className="text-muted-foreground size-3.5 shrink-0" />
             <input
@@ -960,7 +960,7 @@ export function EditorPane({
       )}
 
       {noteId && hasConflict ? (
-        <div className="border-divider bg-background/95 shrink-0 border-t backdrop-blur">
+        <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">
           <div className="flex h-13 items-center justify-between gap-4 px-4">
             <div className="min-w-0">
               <p className="text-foreground truncate text-xs font-medium">

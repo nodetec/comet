@@ -9,6 +9,7 @@ import type {
   SerializedLexicalNode,
   Spread,
 } from "lexical";
+import { cn } from "@/shared/lib/utils";
 import {
   $applyNodeReplacement,
   $createParagraphNode,
@@ -42,7 +43,10 @@ function CopyUrlButton({ url }: { url: string }) {
 
   return (
     <button
-      className="hover:text-foreground flex min-w-0 flex-1 items-center gap-1.5 truncate text-left transition-colors"
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-1.5 truncate text-left transition-colors",
+        copied ? "text-success" : "hover:text-foreground",
+      )}
       onClick={(e) => {
         e.stopPropagation();
         void navigator.clipboard.writeText(url);
@@ -53,7 +57,9 @@ function CopyUrlButton({ url }: { url: string }) {
       type="button"
     >
       {copied ? (
-        <CheckIcon className="h-3 w-3 flex-none text-green-500" />
+        <span className="border-success-border bg-success text-success-foreground flex h-4 w-4 flex-none items-center justify-center rounded-sm border">
+          <CheckIcon className="h-3 w-3" />
+        </span>
       ) : (
         <CopyIcon className="h-3 w-3 flex-none" />
       )}

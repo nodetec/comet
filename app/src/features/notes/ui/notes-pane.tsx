@@ -130,7 +130,7 @@ function handleCreateButtonClick(
 }
 
 const HIGHLIGHT_CLASS_NAME =
-  "bg-yellow-300 text-background rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
+  "bg-search-match text-search-match-foreground rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
 const MAX_HIGHLIGHT_MATCHES_PER_BLOCK = 24;
 
 function normalizeHighlightWords(searchWords: string[]) {
@@ -428,7 +428,7 @@ function noteRowClassName(params: {
     "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
     isActive ? "bg-accent/50" : "",
     isActive && focusedPane === "notes" && !isSearchFocused
-      ? "before:bg-primary/60 before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
+      ? "before:bg-note-focus-indicator before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
       : "",
   ].join(" ");
 }
@@ -676,7 +676,7 @@ export function NotesPane({
       <header
         className={[
           "h-13 w-full shrink-0 px-3",
-          showHeaderBorder ? "border-divider border-b" : "",
+          showHeaderBorder ? "border-separator border-b" : "",
         ].join(" ")}
       >
         <div className="flex h-full items-center justify-between">

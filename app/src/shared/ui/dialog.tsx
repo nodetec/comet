@@ -16,7 +16,7 @@ function DialogBackdrop({
   return (
     <Dialog.Backdrop
       className={cn(
-        "pointer-events-auto fixed inset-0 z-50 bg-black/30 transition-opacity duration-200 data-[closed]:opacity-0 data-[open]:opacity-100",
+        "bg-overlay-backdrop pointer-events-auto fixed inset-0 z-50 transition-opacity duration-200 data-[closed]:opacity-0 data-[open]:opacity-100",
         className,
       )}
       {...props}

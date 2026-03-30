@@ -157,7 +157,7 @@ export function AccountSwitcherDialog({
     if (isError) {
       return (
         <div className="space-y-3">
-          <p className="text-sm text-red-500">
+          <p className="text-destructive text-sm">
             {errorMessage(error, "Couldn't load accounts.")}
           </p>
           <div className="flex justify-end">
@@ -271,7 +271,7 @@ export function AccountSwitcherDialog({
         )}
 
         {isSwitchAccountError ? (
-          <p className="mt-3 text-xs text-red-500">
+          <p className="text-destructive mt-3 text-xs">
             {errorMessage(switchAccountError, "Couldn't switch accounts.")}
           </p>
         ) : null}

@@ -175,7 +175,7 @@ function SyncRelaySection({
               <button
                 type="button"
                 onClick={() => removeSyncMutation.mutate(relay.url)}
-                className="text-muted-foreground transition-colors hover:text-red-500"
+                className="text-muted-foreground hover:text-destructive transition-colors"
                 title="Remove relay"
               >
                 <X className="size-3.5" />
@@ -370,7 +370,7 @@ function PublishRelaysSection({
               <button
                 type="button"
                 onClick={() => removeMutation.mutate(relay.url)}
-                className="text-muted-foreground transition-colors hover:text-red-500"
+                className="text-muted-foreground hover:text-destructive transition-colors"
                 title="Remove relay"
               >
                 <X className="size-3.5" />
@@ -440,7 +440,7 @@ function RelayUrlForm({
         }}
         autoFocus
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
       <div className="flex gap-2">
         <Button
           size="xs"

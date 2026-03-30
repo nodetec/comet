@@ -11,8 +11,8 @@ const HIGHLIGHT_STYLES = `
 }
 
 ::highlight(${ACTIVE_HIGHLIGHT_NAME}) {
-  background-color: rgb(253 224 71);
-  color: var(--background);
+  background-color: var(--search-match);
+  color: var(--search-match-foreground);
 }
 `;
 

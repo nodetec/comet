@@ -1,6 +1,7 @@
 import type { Transformer } from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
+import { $isCometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import type { ElementNode, LexicalNode } from "lexical";
 import {
   $createParagraphNode,
@@ -329,14 +330,27 @@ export function $importMarkdownFromHTML(
  * - one empty paragraph also exports as `\n\n`
  * - additional empty paragraphs export as additional blank lines
  */
+function isSoftBreakLeadNode(node: LexicalNode): boolean {
+  return $isParagraphNode(node) || $isHeadingNode(node);
+}
+
+function isInterruptingTopLevelBlock(node: LexicalNode): boolean {
+  return (
+    isSoftBreakLeadNode(node) ||
+    $isQuoteNode(node) ||
+    $isCodeNode(node) ||
+    $isListNode(node) ||
+    $isCometHorizontalRuleNode(node)
+  );
+}
+
 function canUseSoftBreakSeparator(
   previousNode: LexicalNode,
   nextNode: LexicalNode,
 ): boolean {
-  const previousIsTextLike =
-    $isParagraphNode(previousNode) || $isHeadingNode(previousNode);
-  const nextIsTextLike = $isParagraphNode(nextNode) || $isHeadingNode(nextNode);
-  return previousIsTextLike && nextIsTextLike;
+  return (
+    isSoftBreakLeadNode(previousNode) && isInterruptingTopLevelBlock(nextNode)
+  );
 }
 
 function separatorBetweenTopLevelBlocks(

@@ -4,6 +4,7 @@ import { initAttachmentsBasePath } from "@/shared/lib/attachments";
 
 import {
   type AccountSummary,
+  type AppStatus,
   type BootstrapPayload,
   type ContextualTagsInput,
   type ContextualTagsPayload,
@@ -16,6 +17,8 @@ import {
   type PublishNoteInput,
   type PublishShortNoteInput,
   type RenameTagInput,
+  type ThemeData,
+  type ThemeSummary,
   type SetHideSubtagNotesInput,
   type SetTagPinnedInput,
   type SecretStorageStatus,
@@ -45,6 +48,18 @@ export async function getBootstrap() {
 
 export async function getTodoCount() {
   return invoke<number>("todo_count");
+}
+
+export async function getAppStatus() {
+  return invoke<AppStatus>("app_status");
+}
+
+export async function listThemes() {
+  return invoke<ThemeSummary[]>("list_themes");
+}
+
+export async function readTheme(themeId: string) {
+  return invoke<ThemeData>("read_theme", { themeId });
 }
 
 export async function getTagIndexDiagnostics() {

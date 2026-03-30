@@ -65,7 +65,7 @@ const SIDEBAR_COLLAPSE_TRANSITION = {
 function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   let stateClass: string;
   if (isActive && isFocused) {
-    stateClass = "bg-sidebar-primary/50";
+    stateClass = "bg-sidebar-active-focus";
   } else if (isActive) {
     stateClass = "bg-sidebar-muted/80";
   } else {
@@ -952,13 +952,13 @@ export function SidebarPane({
         <header
           className={cn(
             "flex h-13 shrink-0 items-center justify-end px-3",
-            showHeaderBorder && "border-divider border-b",
+            showHeaderBorder && "border-separator border-b",
           )}
         >
           <div className="relative z-40 flex gap-1">
             <Button
               aria-label={`Sync: ${syncState}`}
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-sidebar-muted-foreground hover:bg-accent hover:text-accent-foreground"
               size="icon-sm"
               variant="ghost"
               onClick={() => setSyncDialogOpen(true)}
@@ -967,7 +967,7 @@ export function SidebarPane({
                 <CloudCheck className="size-[1.2rem]" />
               )}
               {syncState === "needsUnlock" && (
-                <CloudAlert className="size-[1.2rem] text-amber-500" />
+                <CloudAlert className="text-warning size-[1.2rem]" />
               )}
               {(syncState === "syncing" ||
                 syncState === "connecting" ||
@@ -987,7 +987,7 @@ export function SidebarPane({
             />
             <Button
               aria-label="Settings"
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-sidebar-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => openSettings(true)}
               size="icon-sm"
               variant="ghost"
@@ -1055,7 +1055,9 @@ export function SidebarPane({
           <div className="h-px shrink-0" ref={footerSentinelRef} />
         </nav>
 
-        {showFooterBorder ? <div className="border-divider border-t" /> : null}
+        {showFooterBorder ? (
+          <div className="border-separator border-t" />
+        ) : null}
       </aside>
 
       <RenameTagDialog

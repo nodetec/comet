@@ -1,30 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-import { getTagIndexDiagnostics, repairTagIndex } from "@/shared/api/invoke";
+import {
+  getAppStatus,
+  getTagIndexDiagnostics,
+  listThemes,
+  repairTagIndex,
+} from "@/shared/api/invoke";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
+import { SYSTEM_THEME_ID } from "@/shared/theme/schema";
 
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { Button } from "@/shared/ui/button";
 
 import { SettingRow } from "./setting-row";
-
-type AppStatus = {
-  version: string;
-  appDatabasePath: string;
-  accountPath: string;
-  databasePath: string;
-  attachmentsPath: string;
-  themesPath: string;
-  activeNpub: string;
-};
-
-type ThemeSummary = {
-  id: string;
-  name: string;
-};
 
 export function GeneralSettings() {
   const queryClient = useQueryClient();
@@ -33,12 +23,12 @@ export function GeneralSettings() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["app_status"],
-    queryFn: () => invoke<AppStatus>("app_status"),
+    queryFn: getAppStatus,
   });
 
   const { data: themes = [] } = useQuery({
     queryKey: ["themes"],
-    queryFn: () => invoke<ThemeSummary[]>("list_themes"),
+    queryFn: listThemes,
   });
 
   const { data: tagIndexDiagnostics } = useQuery({
@@ -107,14 +97,19 @@ export function GeneralSettings() {
       <div>
         <SettingRow
           label="Theme"
-          description="Choose a color theme"
+          description="Choose a color theme or follow your system setting"
           border={false}
         >
           <select
             className="bg-muted text-foreground rounded-md border px-2 py-1 text-sm outline-none"
-            value={themeName}
-            onChange={(e) => setThemeName(e.target.value)}
+            value={themeName ?? SYSTEM_THEME_ID}
+            onChange={(e) =>
+              setThemeName(
+                e.target.value === SYSTEM_THEME_ID ? null : e.target.value,
+              )
+            }
           >
+            <option value={SYSTEM_THEME_ID}>System</option>
             {themes.map((theme) => (
               <option key={theme.id} value={theme.id}>
                 {theme.name}

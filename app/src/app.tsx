@@ -151,7 +151,7 @@ function App() {
             <SidebarPane {...sidebarPaneProps} />
           </Section>
           <Bar
-            className="bg-divider z-30 cursor-col-resize"
+            className="bg-separator z-30 cursor-col-resize"
             expandInteractiveArea={{ left: 5, right: 5 }}
             size={1}
           />

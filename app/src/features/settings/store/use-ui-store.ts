@@ -38,8 +38,8 @@ type UIStore = {
   sidebarNotesChildrenOpen: boolean;
   setSidebarNotesChildrenOpen(open: boolean): void;
 
-  themeName: string;
-  setThemeName(name: string): void;
+  themeName: string | null;
+  setThemeName(name: string | null): void;
 };
 
 export const useUIStore = create<UIStore>()(
@@ -70,7 +70,7 @@ export const useUIStore = create<UIStore>()(
         set({ editorSpellCheck });
       },
 
-      themeName: "default",
+      themeName: null,
       setThemeName: (themeName) => {
         set({ themeName });
       },

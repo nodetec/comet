@@ -61,7 +61,7 @@ export function SettingsDialog() {
             <X className="size-4" />
           </DialogClose>
           <nav className="bg-sidebar flex max-w-64 min-w-64 shrink-0 flex-col border-r px-2 pt-6">
-            <DialogTitle className="text-muted-foreground mb-3 px-3 text-xs font-semibold tracking-wide uppercase">
+            <DialogTitle className="text-sidebar-muted-foreground mb-3 px-3 text-xs font-semibold tracking-wide uppercase">
               Settings
             </DialogTitle>
             {tabs.map((tab) => (
@@ -70,8 +70,8 @@ export function SettingsDialog() {
                 className={[
                   "flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                   activeTab === tab.id
-                    ? "bg-accent/80 text-secondary-foreground"
-                    : "text-muted-foreground",
+                    ? "bg-sidebar-muted text-sidebar-foreground"
+                    : "text-sidebar-muted-foreground",
                 ].join(" ")}
                 onClick={() => setTab(tab.id)}
                 type="button"

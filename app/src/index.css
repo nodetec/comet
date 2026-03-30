@@ -4,6 +4,7 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/nunito-sans";
 @import "@fontsource-variable/figtree";
+@import "./shared/theme/system-theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -28,69 +29,50 @@ body {
 }
 
 :root {
-  --background: oklch(23.48% 0.004 264.49);
-  --foreground: oklch(0.906 0.001 197.14);
-  --card: oklch(23.48% 0.004 264.49);
-  --card-foreground: oklch(0.906 0.001 197.14);
-  --popover: oklch(23.48% 0.004 264.49);
-  --popover-foreground: oklch(0.906 0.001 197.14);
-  --primary: oklch(64.71% 0.194 252.09);
-  --primary-foreground: oklch(0.906 0.001 197.14);
-  --secondary: oklch(0.255 0.01 255);
-  --secondary-foreground: oklch(86.22% 0.007 286.26);
-  --muted: oklch(0.306 0.004 286.19);
-  --muted-foreground: oklch(64.83% 0.007 286.19);
-  --accent: oklch(38.83% 0.005 236.63);
-  --accent-foreground: oklch(83.12% 0.007 286.25);
-  --destructive: oklch(0.68 0.18 24);
-  --border: oklch(38.83% 0.005 236.63);
-  --input: oklch(38.83% 0.005 236.63);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.5rem;
-  --sidebar: oklch(27.7% 0.006 271.21);
-  --sidebar-foreground: oklch(84% 0.006 286.26);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--primary);
-  --sidebar-accent-foreground: var(--primary-foreground);
-  --sidebar-muted: var(--accent);
-  --sidebar-muted-foreground: var(--secondary-foreground);
-  --sidebar-item-icon: var(--sidebar-foreground);
-  --sidebar-tag-icon: oklch(56% 0.006 286.26);
-  --sidebar-border: oklch(14.48% 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
-  --divider: oklch(14.48% 0 0);
-  --editor-text: oklch(0.906 0.001 197.14);
-  --editor-caret: #6cb4ee;
-  --editor-selection: rgba(108, 180, 238, 0.18);
-  --heading-color: oklch(0.883 0.02 233.88);
 }
 
 @theme inline {
   --font-sans: "Figtree Variable", sans-serif;
-  --color-divider: var(--divider);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-syntax-link: var(--syntax-link);
+  --color-syntax-selector: var(--syntax-selector);
+  --color-syntax-regex: var(--syntax-regex);
+  --color-syntax-foreground: var(--syntax-foreground);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-constant: var(--syntax-constant);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-comment: var(--syntax-comment);
+  --color-syntax-type: var(--syntax-type);
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-attribute: var(--syntax-attribute);
+  --color-syntax-atrule: var(--syntax-atrule);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-surface: var(--success-surface);
+  --color-success-border: var(--success-border);
+  --color-warning-border: var(--warning-border);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning: var(--warning);
+  --color-search-match-foreground: var(--search-match-foreground);
+  --color-search-match: var(--search-match);
+  --color-markdown-highlight-foreground: var(--markdown-highlight-foreground);
+  --color-markdown-highlight: var(--markdown-highlight);
+  --color-control-thumb: var(--control-thumb);
+  --color-overlay-backdrop: var(--overlay-backdrop);
+  --color-separator: var(--separator);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-active-focus: var(--sidebar-active-focus);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-muted: var(--sidebar-muted);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-item-icon: var(--sidebar-item-icon);
   --color-sidebar-tag-icon: var(--sidebar-tag-icon);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  --color-blockquote-accent: var(--blockquote-accent);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -107,6 +89,7 @@ body {
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-note-focus-indicator: var(--note-focus-indicator);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -154,6 +137,15 @@ body {
   padding-left: max(3.5rem, calc((100% - 41rem) / 2));
   padding-right: max(3.5rem, calc((100% - 41rem) / 2));
   padding-top: 0.25rem;
+}
+
+.comet-editor-content mark {
+  background: var(--markdown-highlight);
+  color: var(--markdown-highlight-foreground);
+  border-radius: 0.2rem;
+  padding: 0 0.08rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .comet-table-wrapper {

@@ -61,7 +61,7 @@ function stateLabel(state: SyncInfo["state"]): {
     case "needsUnlock": {
       return {
         label: "Needs Unlock",
-        icon: <CloudAlert className="size-4 text-amber-500" />,
+        icon: <CloudAlert className="text-warning size-4" />,
       };
     }
     case "syncing": {
@@ -164,7 +164,7 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
           icon={<CloudSync className="size-3.5" />}
           label="Pending sync"
           value={
-            <span className="text-amber-400">{info.pendingNotes} unsynced</span>
+            <span className="text-warning">{info.pendingNotes} unsynced</span>
           }
         />
       ) : null}

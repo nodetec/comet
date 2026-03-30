@@ -232,7 +232,7 @@ export function ProfileSettings() {
             protection.
           </p>
           {moveSecretToKeychainMutation.isError ? (
-            <p className="text-xs text-red-500">
+            <p className="text-destructive text-xs">
               {errorMessage(
                 moveSecretToKeychainMutation.error,
                 "Couldn't move secret to OS keychain",
@@ -317,7 +317,7 @@ export function ProfileSettings() {
         </div>
 
         {switchAccountMutation.isError ? (
-          <p className="mt-3 text-xs text-red-500">
+          <p className="text-destructive mt-3 text-xs">
             {errorMessage(switchAccountMutation.error, "Switch failed")}
           </p>
         ) : null}
@@ -354,7 +354,7 @@ export function ProfileSettings() {
               </span>
             </label>
             {addAccountMutation.isError ? (
-              <p className="text-xs text-red-500">
+              <p className="text-destructive text-xs">
                 {errorMessage(addAccountMutation.error, "Add account failed")}
               </p>
             ) : null}

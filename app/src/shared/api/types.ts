@@ -74,6 +74,29 @@ export type SecretStorageStatus = {
   storage: "database" | "keychain";
 };
 
+export type AppStatus = {
+  version: string;
+  appDatabasePath: string;
+  accountPath: string;
+  databasePath: string;
+  attachmentsPath: string;
+  themesPath: string;
+  activeNpub: string;
+};
+
+export type ThemeAppearance = "dark" | "light";
+
+export type ThemeData = {
+  appearance: ThemeAppearance;
+  name: string;
+  colors: Record<string, string>;
+};
+
+export type ThemeSummary = {
+  id: string;
+  name: string;
+};
+
 export type TagIndexDiagnostics = {
   version: string | null;
   status: string | null;

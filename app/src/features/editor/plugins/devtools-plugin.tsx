@@ -298,7 +298,7 @@ function TreeDebugPane({
         viewClassName={treeViewClassName}
       />
       {timeTravelActive ? (
-        <div className="comet-lexical-tree-panel border-divider order-5 self-stretch border-t px-3 pt-3 pb-3">
+        <div className="comet-lexical-tree-panel border-separator order-5 self-stretch border-t px-3 pt-3 pb-3">
           <Button
             className="w-auto justify-center"
             onClick={onToggleTimeTravelPlayback}
@@ -328,15 +328,19 @@ function TreeDebugPane({
           </Button>
         </div>
       ) : null}
-      <div className="border-divider order-6 flex justify-start border-t px-3 pt-3 pb-3">
+      <div className="border-separator order-6 flex justify-start border-t px-3 pt-3 pb-3">
         <Button
-          className="w-auto justify-center"
+          className={cn(
+            "w-auto justify-center",
+            (copiedAction === "tree" || copiedAction === "dom") &&
+              "border-success-border bg-success-surface text-success hover:bg-success-surface",
+          )}
           onClick={onCopyDebugData}
           size="sm"
           variant="outline"
         >
           {copiedAction === "tree" || copiedAction === "dom" ? (
-            <Check className="size-3.5 text-green-600" />
+            <Check className="text-success size-3.5" />
           ) : (
             <Copy />
           )}
@@ -359,8 +363,8 @@ function TreeDebugPane({
 
 function TimeTravelWarning() {
   return (
-    <div className="border-divider border-b px-3 py-2">
-      <div className="flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-300">
+    <div className="border-separator border-b px-3 py-2">
+      <div className="border-warning-border bg-warning-surface text-warning flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs">
         <TriangleAlertIcon className="size-3.5 shrink-0" />
         <span>Editor is read-only while time travel is active.</span>
       </div>
@@ -442,7 +446,7 @@ function DebugPanel({
           </div>
         </div>
       </div>
-      <div className="border-divider border-b" />
+      <div className="border-separator border-b" />
       {timeTravelActive ? <TimeTravelWarning /> : null}
       <div
         className={cn(
@@ -483,15 +487,19 @@ function DebugPanel({
         </div>
       </div>
       {activePane === "markdown" ? (
-        <div className="border-divider border-t p-3 pt-0">
+        <div className="border-separator border-t p-3 pt-0">
           <Button
-            className="mt-3 w-full justify-center"
+            className={cn(
+              "mt-3 w-full justify-center",
+              copiedAction === activePane &&
+                "border-success-border bg-success-surface text-success hover:bg-success-surface",
+            )}
             onClick={onCopyDebugData}
             size="sm"
             variant="outline"
           >
             {copiedAction === activePane ? (
-              <Check className="size-3.5 text-green-600" />
+              <Check className="text-success size-3.5" />
             ) : (
               <Copy />
             )}

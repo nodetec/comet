@@ -1,6 +1,9 @@
 import { $convertFromMarkdownString } from "@lexical/markdown";
 import { $createCodeNode, CodeNode } from "@lexical/code";
-import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
+import {
+  $createCometHorizontalRuleNode,
+  CometHorizontalRuleNode,
+} from "../nodes/comet-horizontal-rule-node";
 import {
   $createListAnchorNode,
   ListAnchorNode,
@@ -255,6 +258,65 @@ describe("markdown editor pipeline", () => {
         "then have the same or another agent implement the spec",
       ].join("\n"),
     );
+  });
+
+  it("exports a blockquote after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      const quote = $createQuoteNode();
+      const quoteParagraph = $createParagraphNode();
+      quoteParagraph.append($createTextNode("Quoted"));
+      quote.append(quoteParagraph);
+
+      root.append(lead, quote);
+    });
+
+    expect(markdown).toBe(["Lead", "> Quoted"].join("\n"));
+  });
+
+  it("exports a fenced code block after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      const code = $createCodeNode("ts");
+      code.append($createTextNode("console.log('hi');"));
+
+      root.append(lead, code);
+    });
+
+    expect(markdown).toBe(
+      ["Lead", "```ts", "console.log('hi');", "```"].join("\n"),
+    );
+  });
+
+  it("exports a horizontal rule after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      root.append(lead, $createCometHorizontalRuleNode());
+    });
+
+    expect(markdown).toBe(["Lead", "---"].join("\n"));
+  });
+
+  it("exports a list after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      const list = $createListNode("bullet");
+      const item = $createListItemNode();
+      item.append($createTextNode("Item"));
+      list.append(item);
+
+      root.append(lead, list);
+    });
+
+    expect(markdown).toBe(["Lead", "- Item"].join("\n"));
   });
 
   it("preserves trailing blank lines inside code fences on clipboard export", () => {
