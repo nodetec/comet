@@ -60,7 +60,7 @@ function decodeVarInt(buf) {
   while (1) {
     if (buf.length === 0) throw Error("parse ends prematurely");
     let byte = buf.shift();
-    res = (res << 7) | (byte & 127);
+    res = res * 128 + (byte & 127);
     if ((byte & 128) === 0) break;
   }
 
@@ -73,8 +73,8 @@ function encodeVarInt(n) {
   let o = [];
 
   while (n !== 0) {
-    o.push(n & 127);
-    n >>>= 7;
+    o.push(n % 128);
+    n = Math.floor(n / 128);
   }
 
   o.reverse();

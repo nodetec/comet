@@ -48,4 +48,30 @@ describe("createNegentropySession", () => {
 
     expect(finalNeed).toContain(REV_B);
   });
+
+  test("converges for identical sets with millisecond timestamps", async () => {
+    const base = 1_773_656_717_000;
+    const step = 2_634_000;
+    const items = Array.from({ length: 50 }, (_, index) => ({
+      id: (index + 1).toString(16).padStart(64, "0"),
+      timestamp: base + index * step,
+    }));
+
+    const left = createNegentropySession(items);
+    const right = createNegentropySession(items);
+
+    let message: string | null = await left.initiate();
+    let rounds = 0;
+    while (message !== null && rounds < 10) {
+      rounds += 1;
+      const server = await right.reconcile(message);
+      const client = await left.reconcile(server.nextMessage ?? "");
+      message = client.nextMessage;
+      expect(client.have).toEqual([]);
+      expect(client.need).toEqual([]);
+    }
+
+    expect(rounds).toBeLessThan(10);
+    expect(message).toBeNull();
+  });
 });
