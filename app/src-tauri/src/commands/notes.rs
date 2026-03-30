@@ -151,6 +151,10 @@ pub async fn get_note_conflict(
     note_id: String,
 ) -> Result<Option<NoteConflictInfo>, AppError> {
     let conn = database_connection(&app)?;
+    if !crate::adapters::tauri::key_store::is_current_identity_unlocked(&app, &conn)? {
+        return Ok(None);
+    }
+
     let current_note: Option<(Option<String>, String, String)> = conn
         .query_row(
             "SELECT current_rev, title, markdown FROM notes WHERE id = ?1",
