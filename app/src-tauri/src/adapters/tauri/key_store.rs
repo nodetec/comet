@@ -41,6 +41,15 @@ fn current_identity_public_key(conn: &Connection) -> Result<String, AppError> {
     .ok_or_else(|| AppError::custom("No Nostr identity configured."))
 }
 
+fn current_identity_db_nsec(conn: &Connection) -> Result<Option<String>, AppError> {
+    conn.query_row("SELECT nsec FROM nostr_identity LIMIT 1", [], |row| {
+        row.get::<_, Option<String>>(0)
+    })
+    .optional()
+    .map(|value| value.flatten())
+    .map_err(Into::into)
+}
+
 fn cache_state(app: &AppHandle) -> tauri::State<'_, UnlockedNostrKeys> {
     app.state::<UnlockedNostrKeys>()
 }
@@ -70,7 +79,10 @@ fn cache_account_keys(app: &AppHandle, public_key: &str, keys: &Keys) -> Result<
 
 pub fn is_current_identity_unlocked(app: &AppHandle, conn: &Connection) -> Result<bool, AppError> {
     let public_key = current_identity_public_key(conn)?;
-    Ok(cached_keys_for_account(app, &public_key)?.is_some())
+    Ok(
+        cached_keys_for_account(app, &public_key)?.is_some()
+            || current_identity_db_nsec(conn)?.is_some(),
+    )
 }
 
 pub fn store_account_nsec(
@@ -146,6 +158,23 @@ pub fn keys_for_current_identity(
     conn: &Connection,
 ) -> Result<(Keys, String), AppError> {
     let public_key = current_identity_public_key(conn)?;
+
+    if let Some(keys) = cached_keys_for_account(app, &public_key)? {
+        return Ok((keys, public_key));
+    }
+
+    if let Some(nsec) = current_identity_db_nsec(conn)? {
+        let keys =
+            Keys::parse(&nsec).map_err(|e| AppError::custom(format!("Invalid secret key: {e}")))?;
+        if keys.public_key().to_hex() != public_key {
+            return Err(AppError::custom(format!(
+                "Stored secret does not match account {public_key}."
+            )));
+        }
+        cache_account_keys(app, &public_key, &keys)?;
+        return Ok((keys, public_key));
+    }
+
     let keys = keys_for_account(app, &public_key)?;
     Ok((keys, public_key))
 }

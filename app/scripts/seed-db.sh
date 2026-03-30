@@ -161,6 +161,7 @@ CREATE TABLE pending_deletions (
 CREATE TABLE nostr_identity (
   public_key TEXT NOT NULL,
   npub       TEXT NOT NULL,
+  nsec       TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -263,14 +264,16 @@ INSERT INTO app_settings (key, value) VALUES
   ('last_open_note_id', 'note-01-luna-range-calibration'),
   ('tag_index_version', 'tag_paths_v1'),
   ('tag_index_status', 'ready'),
+  ('nsec_storage', 'database'),
   ('blossom_url', 'https://media.comet.md');
 
 INSERT INTO notes_fts (note_id, title, markdown)
 SELECT id, title, markdown FROM notes;
 
-INSERT INTO nostr_identity (public_key, npub, created_at) VALUES (
+INSERT INTO nostr_identity (public_key, npub, nsec, created_at) VALUES (
   '$PUBLIC_KEY',
   '$NPUB',
+  '$NSEC',
   $NOW_MS
 );
 
@@ -278,7 +281,7 @@ INSERT INTO relays (url, kind, created_at) VALUES
   ('wss://relay.comet.md', 'sync', $NOW_MS),
   ('wss://relay.damus.io', 'publish', $NOW_MS);
 
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 
 COMMIT;
 

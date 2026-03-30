@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
@@ -15,6 +15,10 @@ type AccountSummary = {
   publicKey: string;
   npub: string;
   isActive: boolean;
+};
+
+type SecretStorageStatus = {
+  storage: "database" | "keychain";
 };
 
 type AccountChangePreparedDetail = {
@@ -73,8 +77,10 @@ function preserveSettingsAcrossReload() {
 }
 
 export function ProfileSettings() {
+  const queryClient = useQueryClient();
   const [addingAccount, setAddingAccount] = useState(false);
   const [nsec, setNsec] = useState("");
+  const [storeInKeychain, setStoreInKeychain] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedNsecPublicKey, setCopiedNsecPublicKey] = useState<string | null>(
     null,
@@ -87,13 +93,27 @@ export function ProfileSettings() {
     queryFn: () => invoke<AccountSummary[]>("list_accounts"),
   });
 
+  const { data: secretStorageStatus } = useQuery({
+    queryKey: ["secret-storage-status"],
+    queryFn: () => invoke<SecretStorageStatus>("get_secret_storage_status"),
+  });
+
   const activeAccount = accounts.find((account) => account.isActive) ?? null;
   const npub = activeAccount?.npub ?? "";
 
   const addAccountMutation = useMutation({
-    mutationFn: async (value: string) => {
+    mutationFn: async ({
+      value,
+      storeInKeychain,
+    }: {
+      value: string;
+      storeInKeychain: boolean;
+    }) => {
       await prepareForAccountChange();
-      return invoke<AccountSummary>("add_account", { nsec: value });
+      return invoke<AccountSummary>("add_account", {
+        nsec: value,
+        storeInKeychain,
+      });
     },
     onSuccess: () => {
       preserveSettingsAcrossReload();
@@ -139,6 +159,17 @@ export function ProfileSettings() {
     },
   });
 
+  const moveSecretToKeychainMutation = useMutation({
+    mutationFn: async () =>
+      invoke<SecretStorageStatus>("move_secret_to_keychain"),
+    onSuccess: async () => {
+      toast.success("Moved secret to OS keychain.");
+      await queryClient.invalidateQueries({
+        queryKey: ["secret-storage-status"],
+      });
+    },
+  });
+
   const isAccountChangePending =
     accountChangePending ||
     addAccountMutation.isPending ||
@@ -158,7 +189,7 @@ export function ProfileSettings() {
     if (!trimmed || !beginAccountChange()) {
       return;
     }
-    addAccountMutation.mutate(trimmed);
+    addAccountMutation.mutate({ value: trimmed, storeInKeychain });
   };
 
   const handleSwitchAccount = (publicKey: string) => {
@@ -187,6 +218,11 @@ export function ProfileSettings() {
 
   const truncated =
     npub.length > 20 ? `${npub.slice(0, 12)}...${npub.slice(-8)}` : npub;
+
+  const secretStorageLabel =
+    secretStorageStatus?.storage === "keychain"
+      ? "OS keychain"
+      : "Account database";
 
   if (isLoading) {
     return (
@@ -223,6 +259,47 @@ export function ProfileSettings() {
               )}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-4 text-sm font-medium">Security</h3>
+
+        <div className="bg-muted/40 space-y-3 rounded-lg border px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Secret storage</div>
+              <p className="text-muted-foreground text-xs">
+                Current location: {secretStorageLabel}
+              </p>
+            </div>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => moveSecretToKeychainMutation.mutate()}
+              disabled={
+                moveSecretToKeychainMutation.isPending ||
+                secretStorageStatus?.storage === "keychain"
+              }
+            >
+              {moveSecretToKeychainMutation.isPending
+                ? "Moving..."
+                : "Move To OS Keychain"}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Database storage avoids startup keychain prompts but is less secure
+            at rest. OS keychain storage is recommended for stronger local
+            protection.
+          </p>
+          {moveSecretToKeychainMutation.isError ? (
+            <p className="text-xs text-red-500">
+              {errorMessage(
+                moveSecretToKeychainMutation.error,
+                "Couldn't move secret to OS keychain",
+              )}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -322,6 +399,20 @@ export function ProfileSettings() {
               placeholder="nsec1..."
               className="bg-muted w-full rounded border px-2 py-1 font-mono text-sm"
             />
+            <label className="flex items-start gap-2 text-xs">
+              <input
+                checked={storeInKeychain}
+                className="mt-0.5"
+                onChange={(event) =>
+                  setStoreInKeychain(event.currentTarget.checked)
+                }
+                type="checkbox"
+              />
+              <span className="text-muted-foreground">
+                Store this secret in the OS keychain instead of the account
+                database.
+              </span>
+            </label>
             {addAccountMutation.isError ? (
               <p className="text-xs text-red-500">
                 {errorMessage(addAccountMutation.error, "Add account failed")}
@@ -341,6 +432,7 @@ export function ProfileSettings() {
                 onClick={() => {
                   setAddingAccount(false);
                   setNsec("");
+                  setStoreInKeychain(false);
                   addAccountMutation.reset();
                 }}
                 disabled={isAccountChangePending}

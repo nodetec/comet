@@ -4,7 +4,7 @@ use crate::adapters::sqlite::connection::{
 };
 use crate::adapters::sqlite::identity_repository as nostr;
 use crate::domain::accounts::error::AccountError;
-use crate::domain::accounts::model::{AccountRecord, AccountSummary};
+use crate::domain::accounts::model::{AccountRecord, AccountSummary, SecretStorageStatus};
 use crate::domain::common::time::now_millis;
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -32,7 +32,11 @@ pub fn list_accounts(app: &AppHandle) -> Result<Vec<AccountSummary>, AppError> {
     Ok(rows)
 }
 
-pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppError> {
+pub fn add_account(
+    app: &AppHandle,
+    nsec: &str,
+    store_in_keychain: bool,
+) -> Result<AccountSummary, AppError> {
     let staged_dir = staged_account_dir(app)?;
     fs::create_dir_all(&staged_dir)?;
     let staged_db_path = staged_dir.join(ACCOUNT_DATABASE_FILE);
@@ -44,10 +48,27 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
         crate::adapters::sqlite::migrations::account_migrations().to_latest(&mut account_conn)?;
         let identity = nostr::import_nsec(&account_conn, nsec)?;
         nostr::ensure_default_settings(&account_conn)?;
+        nostr::set_nsec_storage(
+            &account_conn,
+            if store_in_keychain {
+                nostr::NSEC_STORAGE_KEYCHAIN
+            } else {
+                nostr::NSEC_STORAGE_DATABASE
+            },
+        )?;
 
         let mut account = account_identity_record(&account_conn, &staged_db_path)?.ok_or(
             AccountError::Storage("Failed to initialize account identity".into()),
         )?;
+        if store_in_keychain {
+            crate::adapters::tauri::key_store::store_account_nsec(
+                app,
+                &account.public_key,
+                &identity.nsec,
+            )?;
+            stored_key_public_key = Some(account.public_key.clone());
+            nostr::clear_stored_nsec(&account_conn)?;
+        }
         drop(account_conn);
 
         let mut app_conn = app_database_connection(app)?;
@@ -64,12 +85,6 @@ pub fn add_account(app: &AppHandle, nsec: &str) -> Result<AccountSummary, AppErr
 
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
-        crate::adapters::tauri::key_store::store_account_nsec(
-            app,
-            &account.public_key,
-            &identity.nsec,
-        )?;
-        stored_key_public_key = Some(account.public_key.clone());
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
         register_account(&mut app_conn, &account, None, true)?;
 
@@ -108,6 +123,54 @@ pub fn switch_account(app: &AppHandle, public_key: &str) -> Result<AccountSummar
     })
 }
 
+pub fn get_account_nsec(app: &AppHandle, public_key: &str) -> Result<String, AppError> {
+    let conn = app_database_connection(app)?;
+    let account =
+        load_account_record_by_public_key(app, &conn, public_key)?.ok_or(AccountError::NotFound)?;
+    ensure_account_database_ready(&account)?;
+    let account_conn = Connection::open(&account.db_path)?;
+
+    if let Some(nsec) = nostr::get_stored_nsec(&account_conn)? {
+        return Ok(nsec);
+    }
+
+    crate::adapters::tauri::key_store::load_account_nsec(app, public_key)
+}
+
+pub fn current_secret_storage_status(app: &AppHandle) -> Result<SecretStorageStatus, AppError> {
+    let account = crate::adapters::sqlite::connection::active_account(app)?;
+    let conn = Connection::open(&account.db_path)?;
+    let storage = nostr::get_nsec_storage(&conn)?.unwrap_or_else(|| {
+        match nostr::get_stored_nsec(&conn) {
+            Ok(Some(_)) => nostr::NSEC_STORAGE_DATABASE.to_string(),
+            _ => nostr::NSEC_STORAGE_KEYCHAIN.to_string(),
+        }
+    });
+
+    Ok(SecretStorageStatus { storage })
+}
+
+pub fn move_current_account_nsec_to_keychain(
+    app: &AppHandle,
+) -> Result<SecretStorageStatus, AppError> {
+    let account = crate::adapters::sqlite::connection::active_account(app)?;
+    let conn = Connection::open(&account.db_path)?;
+    let Some(nsec) = nostr::get_stored_nsec(&conn)? else {
+        nostr::set_nsec_storage(&conn, nostr::NSEC_STORAGE_KEYCHAIN)?;
+        return Ok(SecretStorageStatus {
+            storage: nostr::NSEC_STORAGE_KEYCHAIN.to_string(),
+        });
+    };
+
+    crate::adapters::tauri::key_store::store_account_nsec(app, &account.public_key, &nsec)?;
+    nostr::clear_stored_nsec(&conn)?;
+    nostr::set_nsec_storage(&conn, nostr::NSEC_STORAGE_KEYCHAIN)?;
+
+    Ok(SecretStorageStatus {
+        storage: nostr::NSEC_STORAGE_KEYCHAIN.to_string(),
+    })
+}
+
 pub(crate) fn create_initial_account(
     app: &AppHandle,
     app_conn: &mut Connection,
@@ -115,13 +178,13 @@ pub(crate) fn create_initial_account(
     let staged_dir = staged_account_dir(app)?;
     fs::create_dir_all(&staged_dir)?;
     let mut moved_target_dir: Option<PathBuf> = None;
-    let mut stored_key_public_key: Option<String> = None;
 
     let creation_result = (|| -> Result<AccountRecord, AppError> {
         let staged_db_path = staged_dir.join(ACCOUNT_DATABASE_FILE);
         let mut account_conn = Connection::open(&staged_db_path)?;
         crate::adapters::sqlite::migrations::account_migrations().to_latest(&mut account_conn)?;
-        let identity = nostr::create_identity(&account_conn)?;
+        let _identity = nostr::create_identity(&account_conn)?;
+        nostr::set_nsec_storage(&account_conn, nostr::NSEC_STORAGE_DATABASE)?;
 
         let mut account = account_identity_record(&account_conn, &staged_db_path)?.ok_or(
             AccountError::Storage("Failed to initialize account identity".into()),
@@ -139,13 +202,6 @@ pub(crate) fn create_initial_account(
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
 
-        crate::adapters::tauri::key_store::store_account_nsec(
-            app,
-            &account.public_key,
-            &identity.nsec,
-        )?;
-        stored_key_public_key = Some(account.public_key.clone());
-
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
         register_account(app_conn, &account, None, true)?;
         Ok(account)
@@ -157,9 +213,6 @@ pub(crate) fn create_initial_account(
     if creation_result.is_err() {
         if let Some(target_dir) = moved_target_dir.filter(|dir| dir.exists()) {
             let _ = fs::remove_dir_all(target_dir);
-        }
-        if let Some(public_key) = stored_key_public_key.as_deref() {
-            crate::adapters::tauri::key_store::remove_account_nsec(app, public_key);
         }
     }
 

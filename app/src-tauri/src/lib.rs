@@ -90,6 +90,8 @@ pub fn run() {
             // Accounts
             commands::accounts::list_accounts,
             commands::accounts::get_account_nsec,
+            commands::accounts::get_secret_storage_status,
+            commands::accounts::move_secret_to_keychain,
             commands::accounts::add_account,
             commands::accounts::switch_account,
             // Sync & Relays

@@ -22,3 +22,9 @@ pub struct AccountSummary {
     pub npub: String,
     pub is_active: bool,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretStorageStatus {
+    pub storage: String,
+}

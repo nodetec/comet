@@ -185,5 +185,10 @@ pub fn account_migrations() -> Migrations<'static> {
              INSERT INTO app_settings (key, value) VALUES ('tag_index_status', 'pending')
                ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
         ),
+        M::up(
+            "ALTER TABLE nostr_identity ADD COLUMN nsec TEXT;
+             INSERT INTO app_settings (key, value) VALUES ('nsec_storage', 'keychain')
+               ON CONFLICT(key) DO NOTHING;",
+        ),
     ])
 }

@@ -1,6 +1,6 @@
 use crate::adapters::nostr::sync_manager::SyncManager;
 use crate::db;
-use crate::domain::accounts::model::AccountSummary;
+use crate::domain::accounts::model::{AccountSummary, SecretStorageStatus};
 use crate::error::AppError;
 use crate::infra::cache::RenderedHtmlCache;
 use tauri::{AppHandle, Manager};
@@ -28,19 +28,28 @@ pub fn list_accounts(app: AppHandle) -> Result<Vec<AccountSummary>, AppError> {
 
 #[tauri::command]
 pub fn get_account_nsec(app: AppHandle, public_key: String) -> Result<String, AppError> {
-    let account_exists = db::list_accounts(&app)?
-        .into_iter()
-        .any(|account| account.public_key == public_key);
-    if !account_exists {
-        return Err(AppError::custom(format!("Unknown account: {public_key}")));
-    }
-
-    crate::adapters::tauri::key_store::load_account_nsec(&app, &public_key)
+    db::get_account_nsec(&app, &public_key)
 }
 
 #[tauri::command]
-pub async fn add_account(app: AppHandle, nsec: String) -> Result<AccountSummary, AppError> {
-    run_account_change(&app, || db::add_account(&app, &nsec)).await
+pub fn get_secret_storage_status(app: AppHandle) -> Result<SecretStorageStatus, AppError> {
+    db::current_secret_storage_status(&app)
+}
+
+#[tauri::command]
+pub async fn move_secret_to_keychain(
+    app: AppHandle,
+) -> Result<SecretStorageStatus, AppError> {
+    run_account_change(&app, || db::move_current_account_nsec_to_keychain(&app)).await
+}
+
+#[tauri::command]
+pub async fn add_account(
+    app: AppHandle,
+    nsec: String,
+    store_in_keychain: bool,
+) -> Result<AccountSummary, AppError> {
+    run_account_change(&app, || db::add_account(&app, &nsec, store_in_keychain)).await
 }
 
 #[tauri::command]
