@@ -231,18 +231,18 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         .optional()?;
 
     let revision_managed_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE current_rev IS NOT NULL AND archived_at IS NULL",
+        "SELECT COUNT(*) FROM notes WHERE current_rev IS NOT NULL AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
     let relay_backed_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND archived_at IS NULL",
+        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
 
     let total_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE archived_at IS NULL",
+        "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
