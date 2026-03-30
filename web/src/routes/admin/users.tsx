@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { PubkeyValue } from "~/components/admin/pubkey-value";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -19,6 +20,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { DataTable } from "~/components/admin/data-table";
 import { deleteUserData, listUsers } from "~/server/admin/users";
+import { shortNpub } from "~/lib/pubkeys";
 import { formatBytes, usagePercent, usageColor } from "~/lib/utils";
 
 export const Route = createFileRoute("/admin/users")({
@@ -59,7 +61,7 @@ function UsersPage() {
         queryClient.invalidateQueries({ queryKey: ["admin", "stats"] }),
       ]);
       toast.success(
-        `Deleted data for ${pubkey.slice(0, 12)}... (${result.deletedRelayEvents + result.deletedRevisionEvents + result.deletedLegacyEvents} events, ${result.deletedBlobs} blobs, ${result.releasedSharedBlobs} shared releases)`,
+        `Deleted data for ${shortNpub(pubkey)} (${result.deletedRelayEvents + result.deletedRevisionEvents + result.deletedLegacyEvents} events, ${result.deletedBlobs} blobs, ${result.releasedSharedBlobs} shared releases)`,
       );
     },
     onError: (error) => {
@@ -73,12 +75,8 @@ function UsersPage() {
     () => [
       {
         accessorKey: "pubkey",
-        header: "Pubkey",
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            {row.original.pubkey.slice(0, 16)}...
-          </span>
-        ),
+        header: "Identity",
+        cell: ({ row }) => <PubkeyValue pubkey={row.original.pubkey} />,
       },
       {
         accessorKey: "storageUsedBytes",

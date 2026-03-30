@@ -27,7 +27,8 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "~/components/ui/chart";
-import { formatBytes, kindLabel, shortPubkey } from "~/lib/utils";
+import { shortNpub } from "~/lib/pubkeys";
+import { formatBytes, kindLabel } from "~/lib/utils";
 
 const PIE_COLORS = [
   "var(--chart-1)",
@@ -237,7 +238,7 @@ export function StorageByUserChart({ data }: { data?: StorageByUserData[] }) {
     const config: ChartConfig = {};
     for (let i = 0; i < data.length; i++) {
       config[`user-${i}`] = {
-        label: shortPubkey(data[i].pubkey),
+        label: shortNpub(data[i].pubkey),
         color: PIE_COLORS[i % PIE_COLORS.length],
       };
     }
@@ -246,7 +247,7 @@ export function StorageByUserChart({ data }: { data?: StorageByUserData[] }) {
 
   const barData = useMemo(() => {
     return (data ?? []).map((item, i) => ({
-      pubkey: shortPubkey(item.pubkey),
+      pubkey: shortNpub(item.pubkey),
       storage: item.storage,
       fill: PIE_COLORS[i % PIE_COLORS.length],
     }));

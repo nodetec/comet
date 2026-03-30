@@ -3,11 +3,13 @@ import { useMemo, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
+import { PubkeyValue } from "~/components/admin/pubkey-value";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { DataTable } from "~/components/admin/data-table";
 import { listEvents } from "~/server/admin/events";
+import { resolvePubkeyInput } from "~/lib/pubkeys";
 import { formatTimestamp, kindLabel } from "~/lib/utils";
 
 export const Route = createFileRoute("/admin/events")({
@@ -31,8 +33,11 @@ function EventsPage() {
   if (kindFilter && !Number.isNaN(Number(kindFilter))) {
     params.kind = Number(kindFilter);
   }
-  if (pubkeyFilter && /^[a-f0-9]{64}$/.test(pubkeyFilter)) {
-    params.pubkey = pubkeyFilter;
+  if (pubkeyFilter) {
+    const resolvedPubkey = resolvePubkeyInput(pubkeyFilter);
+    if (resolvedPubkey) {
+      params.pubkey = resolvedPubkey;
+    }
   }
 
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
@@ -75,12 +80,8 @@ function EventsPage() {
       },
       {
         accessorKey: "pubkey",
-        header: "Pubkey",
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            {row.original.pubkey.slice(0, 12)}...
-          </span>
-        ),
+        header: "Identity",
+        cell: ({ row }) => <PubkeyValue pubkey={row.original.pubkey} />,
       },
       {
         accessorKey: "content",
@@ -134,7 +135,7 @@ function EventsPage() {
           className="sm:w-40"
         />
         <Input
-          placeholder="Filter by pubkey (64-char hex)..."
+          placeholder="Filter by npub or hex pubkey..."
           value={pubkeyFilter}
           onChange={(e) => setPubkeyFilter(e.target.value)}
           className="flex-1"

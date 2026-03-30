@@ -8,6 +8,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PubkeyValue } from "~/components/admin/pubkey-value";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -93,13 +94,7 @@ function BlobsPage() {
           return (
             <div className="flex flex-wrap gap-1">
               {owners.map((pk) => (
-                <Badge
-                  key={pk}
-                  variant="secondary"
-                  className="font-mono text-xs"
-                >
-                  {pk.slice(0, 12)}...
-                </Badge>
+                <PubkeyValue key={pk} pubkey={pk} variant="badge" />
               ))}
             </div>
           );

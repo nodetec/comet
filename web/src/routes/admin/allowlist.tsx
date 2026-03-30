@@ -26,13 +26,14 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { DataTable } from "~/components/admin/data-table";
-import { nip19 } from "nostr-tools";
+import { PubkeyValue } from "~/components/admin/pubkey-value";
 import {
   listAllowedUsers,
   allowUser,
   revokeUser,
   setStorageLimit,
 } from "~/server/admin/allowlist";
+import { resolvePubkeyInput } from "~/lib/pubkeys";
 import { formatBytes, usagePercent, usageColor } from "~/lib/utils";
 
 export const Route = createFileRoute("/admin/allowlist")({
@@ -46,21 +47,6 @@ type AllowedPubkey = {
   createdAt: number;
   storageUsedBytes: number;
 };
-
-/** Resolve an npub or hex string to a hex pubkey, or null if invalid. */
-function resolveToHex(input: string): string | null {
-  const trimmed = input.trim();
-  if (/^[a-f0-9]{64}$/.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("npub1")) {
-    try {
-      const { type, data } = nip19.decode(trimmed);
-      if (type === "npub") return data;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
 
 function StorageLimitEditor({
   pubkey,
@@ -114,11 +100,11 @@ function StorageLimitEditor({
           <DialogHeader>
             <DialogTitle>Storage Limit</DialogTitle>
             <DialogDescription>
-              Set a custom storage limit for{" "}
-              <code className="text-xs">{pubkey.pubkey.slice(0, 16)}...</code>
+              Set a custom storage limit for:
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            <PubkeyValue pubkey={pubkey.pubkey} />
             <div className="flex items-center gap-2">
               <Input
                 type="number"
@@ -183,7 +169,7 @@ function AllowlistPage() {
 
   function handleAdd(e: FormEvent) {
     e.preventDefault();
-    const hex = resolveToHex(newPubkey);
+    const hex = resolvePubkeyInput(newPubkey);
     if (hex) {
       addMutation.mutate(hex);
     }
@@ -193,12 +179,8 @@ function AllowlistPage() {
     () => [
       {
         accessorKey: "pubkey",
-        header: "Pubkey",
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">
-            {row.original.pubkey.slice(0, 16)}...
-          </span>
-        ),
+        header: "Identity",
+        cell: ({ row }) => <PubkeyValue pubkey={row.original.pubkey} />,
       },
       {
         accessorKey: "storageUsedBytes",
@@ -313,7 +295,7 @@ function AllowlistPage() {
             />
             <Button
               type="submit"
-              disabled={!resolveToHex(newPubkey) || addMutation.isPending}
+              disabled={!resolvePubkeyInput(newPubkey) || addMutation.isPending}
             >
               <Plus className="mr-1 h-4 w-4" />
               Add

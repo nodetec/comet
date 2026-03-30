@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Wifi } from "lucide-react";
-import { Badge } from "~/components/ui/badge";
+import { PubkeyValue } from "~/components/admin/pubkey-value";
 import { DataTable } from "~/components/admin/data-table";
 import { listConnections } from "~/server/admin/connections";
 
@@ -27,7 +27,7 @@ const columns: ColumnDef<ConnectionEntry>[] = [
   },
   {
     accessorKey: "authedPubkeys",
-    header: "Authenticated Pubkeys",
+    header: "Authenticated Identities",
     cell: ({ row }) => {
       const pubkeys = row.original.authedPubkeys;
       if (pubkeys.length === 0) {
@@ -40,9 +40,7 @@ const columns: ColumnDef<ConnectionEntry>[] = [
       return (
         <div className="flex flex-wrap gap-1">
           {pubkeys.map((pk) => (
-            <Badge key={pk} variant="secondary" className="font-mono text-xs">
-              {pk.slice(0, 12)}...
-            </Badge>
+            <PubkeyValue key={pk} pubkey={pk} variant="badge" />
           ))}
         </div>
       );
