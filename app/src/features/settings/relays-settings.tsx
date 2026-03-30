@@ -428,6 +428,7 @@ function RelayUrlForm({
   return (
     <div className="space-y-2">
       <input
+        autoCapitalize="off"
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}

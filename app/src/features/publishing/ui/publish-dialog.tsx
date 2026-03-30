@@ -203,6 +203,7 @@ function PublishDialogContent({
               </button>
             ))}
             <input
+              autoCapitalize="off"
               className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
               onChange={(e) => {
                 setTagInput(e.target.value);
@@ -349,6 +350,7 @@ function PublishShortNoteDialogContent({
               </button>
             ))}
             <input
+              autoCapitalize="off"
               className="min-w-[80px] flex-1 bg-transparent py-0.5 text-sm outline-none"
               onChange={(e) => {
                 setTagInput(e.target.value);

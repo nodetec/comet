@@ -6,6 +6,7 @@ import { cn } from "@/shared/lib/utils";
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <InputPrimitive
+      autoCapitalize="off"
       type={type}
       data-slot="input"
       className={cn(

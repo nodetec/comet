@@ -684,6 +684,7 @@ export function NotesPane({
             <label className="relative z-40 w-full">
               <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
               <input
+                autoCapitalize="off"
                 className="border-input/60 placeholder:text-muted-foreground focus:border-primary h-8 w-full rounded-md border bg-transparent py-1 pr-8 pl-9 text-sm outline-none"
                 onBlur={() => setIsSearchFocused(false)}
                 onChange={(event) => onChangeSearch(event.currentTarget.value)}

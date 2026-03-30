@@ -649,6 +649,7 @@ export function EditorPane({
           <label className="border-input/60 focus-within:border-primary relative flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-1">
             <Search className="text-muted-foreground size-3.5 shrink-0" />
             <input
+              autoCapitalize="off"
               ref={findInputRef}
               className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
               placeholder="Search…"

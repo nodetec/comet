@@ -329,6 +329,7 @@ export function ProfileSettings() {
               identity.
             </p>
             <input
+              autoCapitalize="off"
               type="password"
               value={nsec}
               onChange={(e) => {
