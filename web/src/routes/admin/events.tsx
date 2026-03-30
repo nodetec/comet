@@ -1,24 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Trash2 } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { DataTable } from "~/components/admin/data-table";
-import { listEvents, deleteEvents } from "~/server/admin/events";
+import { listEvents } from "~/server/admin/events";
 import { formatTimestamp, kindLabel } from "~/lib/utils";
 
 export const Route = createFileRoute("/admin/events")({
@@ -30,20 +19,21 @@ type EventEntry = {
   pubkey: string;
   kind: number;
   createdAt: number;
-  firstSeen: number;
   content: string;
+  source: "relay" | "revision";
 };
 
 function EventsPage() {
-  const queryClient = useQueryClient();
   const [kindFilter, setKindFilter] = useState("");
   const [pubkeyFilter, setPubkeyFilter] = useState("");
 
   const params: { kind?: number; pubkey?: string } = {};
-  if (kindFilter && !isNaN(Number(kindFilter)))
+  if (kindFilter && !Number.isNaN(Number(kindFilter))) {
     params.kind = Number(kindFilter);
-  if (pubkeyFilter && /^[a-f0-9]{64}$/.test(pubkeyFilter))
+  }
+  if (pubkeyFilter && /^[a-f0-9]{64}$/.test(pubkeyFilter)) {
     params.pubkey = pubkeyFilter;
+  }
 
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useInfiniteQuery({
@@ -54,39 +44,10 @@ function EventsPage() {
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     });
 
-  const deleteMutation = useMutation({
-    mutationFn: (ids: string[]) => deleteEvents({ data: { ids } }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["admin", "events"] }),
-  });
-
-  const allEvents = data?.pages.flatMap((p) => p.events) ?? [];
+  const allEvents = data?.pages.flatMap((page) => page.events) ?? [];
 
   const columns = useMemo<ColumnDef<EventEntry>[]>(
     () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && "indeterminate")
-            }
-            onCheckedChange={(value) =>
-              table.toggleAllPageRowsSelected(!!value)
-            }
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-      },
       {
         accessorKey: "id",
         header: "ID",
@@ -100,7 +61,16 @@ function EventsPage() {
         accessorKey: "kind",
         header: "Kind",
         cell: ({ row }) => (
-          <Badge variant="secondary">{kindLabel(row.original.kind)}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">{kindLabel(row.original.kind)}</Badge>
+            <Badge
+              variant={
+                row.original.source === "revision" ? "outline" : "secondary"
+              }
+            >
+              {row.original.source === "revision" ? "Revision" : "Relay"}
+            </Badge>
+          </div>
         ),
       },
       {
@@ -146,7 +116,7 @@ function EventsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
         <p className="text-muted-foreground text-sm">
-          Browse stored Nostr events
+          Browse stored relay and revision events
           {allEvents.length > 0 && (
             <span className="ml-1">
               ({allEvents.length}
@@ -174,43 +144,11 @@ function EventsPage() {
       <DataTable
         columns={columns}
         data={allEvents}
-        getRowId={(row) => row.id}
-        enableRowSelection
-        emptyMessage="No events found."
+        getRowId={(row) => `${row.source}:${row.id}`}
+        emptyMessage="No relay or revision events found."
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => fetchNextPage()}
-        actionBar={({ selectedRows, clearSelection }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions
-                {selectedRows.length > 0 && (
-                  <span className="text-muted-foreground ml-1">
-                    ({selectedRows.length})
-                  </span>
-                )}
-                <ChevronDown className="ml-1 h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={selectedRows.length === 0 || deleteMutation.isPending}
-                onClick={async () => {
-                  await deleteMutation.mutateAsync(
-                    selectedRows.map((r) => r.id),
-                  );
-                  clearSelection();
-                }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete {selectedRows.length} event
-                {selectedRows.length !== 1 ? "s" : ""}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       />
     </div>
   );

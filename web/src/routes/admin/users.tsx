@@ -1,12 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Users } from "lucide-react";
+import { ArrowUpDown, Trash2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import { DataTable } from "~/components/admin/data-table";
-import { listUsers } from "~/server/admin/users";
+import { deleteUserData, listUsers } from "~/server/admin/users";
 import { formatBytes, usagePercent, usageColor } from "~/lib/utils";
 
 export const Route = createFileRoute("/admin/users")({
@@ -21,11 +33,38 @@ type UserEntry = {
   eventCount: number;
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return error.message;
+  }
+
+  return "User data deletion failed";
+}
+
 function UsersPage() {
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () => listUsers(),
     refetchInterval: 10000,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (pubkey: string) => deleteUserData({ data: { pubkey } }),
+    onSuccess: async (result, pubkey) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "events"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "stats"] }),
+      ]);
+      toast.success(
+        `Deleted data for ${pubkey.slice(0, 12)}... (${result.deletedRelayEvents + result.deletedRevisionEvents + result.deletedLegacyEvents} events, ${result.deletedBlobs} blobs, ${result.releasedSharedBlobs} shared releases)`,
+      );
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
   });
 
   const defaultLimit = data?.defaultStorageLimitBytes ?? 1024 * 1024 * 1024;
@@ -102,8 +141,46 @@ function UsersPage() {
           </span>
         ),
       },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="text-destructive h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all user data?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete all stored events for this user and remove
+                  all blob ownership. Shared blobs owned by other users will be
+                  kept. Current counts:{" "}
+                  {row.original.eventCount.toLocaleString()} events,{" "}
+                  {row.original.blobCount.toLocaleString()} blobs.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteMutation.mutate(row.original.pubkey)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete Data
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ),
+      },
     ],
-    [defaultLimit],
+    [defaultLimit, deleteMutation],
   );
 
   return (

@@ -1,13 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
-import { count, desc, sql, eq } from "drizzle-orm";
+import { count, sql, eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { assertAdmin } from "~/server/middleware";
-import { events, blobs, blobOwners, users } from "@comet/data";
+import { blobs, blobOwners, users } from "@comet/data";
+import {
+  buildStoredEventsByKindQuery,
+  buildStoredEventsCountQuery,
+  buildStoredEventsOverTimeQuery,
+  type StoredEventsByKindRow,
+  type StoredEventsOverTimeRow,
+} from "~/server/admin/stored-events";
 
 export const getStats = createServerFn({ method: "GET" }).handler(async () => {
   assertAdmin();
   const [[eventRow], [blobRow], [blobSizeRow], [userRow]] = await Promise.all([
-    db.select({ val: count() }).from(events),
+    db.execute<{ val: number | string }>(buildStoredEventsCountQuery()),
     db.select({ val: count() }).from(blobs),
     db
       .select({ val: sql<number>`COALESCE(SUM(${blobs.size}), 0)` })
@@ -25,14 +32,11 @@ export const getStats = createServerFn({ method: "GET" }).handler(async () => {
 export const getEventsByKind = createServerFn({ method: "GET" }).handler(
   async () => {
     assertAdmin();
-    const rows = await db
-      .select({ kind: events.kind, count: count() })
-      .from(events)
-      .groupBy(events.kind)
-      .orderBy(desc(count()))
-      .limit(10);
+    const rows = await db.execute<StoredEventsByKindRow>(
+      buildStoredEventsByKindQuery(10),
+    );
     return {
-      data: rows.map((r) => ({ kind: r.kind, count: Number(r.count) })),
+      data: rows.map((r) => ({ kind: Number(r.kind), count: Number(r.count) })),
     };
   },
 );
@@ -41,15 +45,9 @@ export const getEventsOverTime = createServerFn({ method: "GET" }).handler(
   async () => {
     assertAdmin();
     const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
-    const rows = await db
-      .select({
-        day: sql<string>`TO_CHAR(TO_TIMESTAMP(${events.createdAt}), 'YYYY-MM-DD')`,
-        count: count(),
-      })
-      .from(events)
-      .where(sql`${events.createdAt} >= ${thirtyDaysAgo}`)
-      .groupBy(sql`TO_CHAR(TO_TIMESTAMP(${events.createdAt}), 'YYYY-MM-DD')`)
-      .orderBy(sql`TO_CHAR(TO_TIMESTAMP(${events.createdAt}), 'YYYY-MM-DD')`);
+    const rows = await db.execute<StoredEventsOverTimeRow>(
+      buildStoredEventsOverTimeQuery(thirtyDaysAgo),
+    );
     return {
       data: rows.map((r) => ({ date: r.day, events: Number(r.count) })),
     };

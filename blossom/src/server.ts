@@ -9,7 +9,7 @@ import { createObjectStorage, type ObjectStorage } from "./object-storage";
 
 const corsHeaderEntries = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, HEAD, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, PUT, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Access-Control-Expose-Headers":
     "Content-Length, Content-Type, X-Content-Sha256",
@@ -308,6 +308,9 @@ export async function createBlossomServer(
 
       // Admin blob deletion — ADMIN_TOKEN auth (no Nostr signing required)
       const adminBlobMatch = url.pathname.match(/^\/admin\/([a-f0-9]{64})$/);
+      const adminUserBlobMatch = url.pathname.match(
+        /^\/admin\/users\/([a-f0-9]{64})\/blobs$/,
+      );
       if (request.method === "DELETE" && adminBlobMatch) {
         console.log(
           `[blossom] admin delete request hash=${shortHash(adminBlobMatch[1])}`,
@@ -328,6 +331,64 @@ export async function createBlossomServer(
         await objectStorage.deleteBlob(sha256);
         await blobDb.deleteBlob(db, sha256);
         return json({ deleted: true });
+      }
+
+      if (request.method === "DELETE" && adminUserBlobMatch) {
+        const pubkey = adminUserBlobMatch[1];
+        console.log(
+          `[blossom] admin purge blobs request pubkey=${shortPubkey(pubkey)}`,
+        );
+        const adminToken = process.env.ADMIN_TOKEN;
+        if (!adminToken) {
+          return json({ error: "admin not configured" }, 503);
+        }
+        const auth = request.headers.get("authorization");
+        if (auth !== `Bearer ${adminToken}`) {
+          return json({ error: "unauthorized" }, 401);
+        }
+
+        const ownedBlobs = await blobDb.listBlobsByPubkey(db, pubkey);
+        let deletedBlobs = 0;
+        let releasedSharedBlobs = 0;
+        let deletedBytes = 0;
+
+        for (const blob of ownedBlobs) {
+          const ownerCount = await blobDb.getOwnerCount(db, blob.sha256);
+
+          if (ownerCount <= 1) {
+            await objectStorage.deleteBlob(blob.sha256);
+            const removal = await blobDb.removeOwner(db, blob.sha256, pubkey);
+            if (removal === "removed") {
+              throw new Error(
+                `blob owner set changed during purge for ${blob.sha256}`,
+              );
+            }
+            if (removal === "removed_last_owner") {
+              await blobDb.deleteBlob(db, blob.sha256);
+              deletedBlobs += 1;
+              deletedBytes += blob.size;
+            }
+            continue;
+          }
+
+          const removal = await blobDb.removeOwner(db, blob.sha256, pubkey);
+          if (removal === "removed_last_owner") {
+            await objectStorage.deleteBlob(blob.sha256);
+            await blobDb.deleteBlob(db, blob.sha256);
+            deletedBlobs += 1;
+            deletedBytes += blob.size;
+          } else if (removal === "removed") {
+            releasedSharedBlobs += 1;
+          }
+        }
+
+        return json({
+          pubkey,
+          processedBlobs: ownedBlobs.length,
+          deletedBlobs,
+          releasedSharedBlobs,
+          deletedBytes,
+        });
       }
 
       if (request.method === "DELETE" && blobSha256) {

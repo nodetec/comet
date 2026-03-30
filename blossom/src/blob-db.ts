@@ -94,6 +94,15 @@ export async function listBlobsByPubkey(
   }));
 }
 
+export async function getOwnerCount(db: DB, sha256: string): Promise<number> {
+  const rows = await db
+    .select({ value: count() })
+    .from(blobOwners)
+    .where(eq(blobOwners.sha256, sha256));
+
+  return Number(rows[0]?.value ?? 0);
+}
+
 export async function removeOwner(
   db: DB,
   sha256: string,

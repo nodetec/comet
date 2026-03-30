@@ -1,8 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "~/server/db";
 import { assertAdmin } from "~/server/middleware";
-import { events } from "@comet/data";
+import {
+  buildStoredEventsListQuery,
+  parseStoredEventCursor,
+  type StoredEventRow,
+} from "~/server/admin/stored-events";
 
 export const listEvents = createServerFn({ method: "GET" })
   .inputValidator(
@@ -11,53 +14,36 @@ export const listEvents = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     assertAdmin();
     const limit = 50;
-    const conditions = [];
-    if (data.kind !== undefined) conditions.push(eq(events.kind, data.kind));
-    if (data.pubkey !== undefined)
-      conditions.push(eq(events.pubkey, data.pubkey));
-    if (data.cursor !== undefined)
-      conditions.push(lt(events.firstSeen, Number(data.cursor)));
 
-    let query = db
-      .select({
-        id: events.id,
-        pubkey: events.pubkey,
-        kind: events.kind,
-        createdAt: events.createdAt,
-        firstSeen: events.firstSeen,
-        content: events.content,
-      })
-      .from(events)
-      .$dynamic();
+    const rows = await db.execute<StoredEventRow>(
+      buildStoredEventsListQuery({
+        kind: data.kind,
+        pubkey: data.pubkey,
+        cursor: parseStoredEventCursor(data.cursor),
+        limit,
+      }),
+    );
 
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    const rows = await query.orderBy(desc(events.firstSeen)).limit(limit);
-
-    const items = rows.map((r) => ({
-      id: r.id,
-      pubkey: r.pubkey,
-      kind: r.kind,
-      createdAt: r.createdAt,
-      firstSeen: r.firstSeen,
+    const items = rows.map((row) => ({
+      id: row.id,
+      pubkey: row.pubkey,
+      kind: Number(row.kind),
+      createdAt: Number(row.created_at),
       content:
-        r.content.length > 200 ? r.content.slice(0, 200) + "\u2026" : r.content,
+        row.content.length > 200
+          ? row.content.slice(0, 200) + "\u2026"
+          : row.content,
+      source: row.source,
     }));
+
     const nextCursor =
       items.length === limit
-        ? String(items[items.length - 1].firstSeen)
+        ? JSON.stringify({
+            createdAt: items[items.length - 1].createdAt,
+            id: items[items.length - 1].id,
+            source: items[items.length - 1].source,
+          })
         : undefined;
 
     return { events: items, nextCursor };
-  });
-
-export const deleteEvents = createServerFn({ method: "POST" })
-  .inputValidator((data: { ids: string[] }) => data)
-  .handler(async ({ data }) => {
-    assertAdmin();
-    if (!data.ids?.length) return { deleted: 0 };
-    await db.delete(events).where(inArray(events.id, data.ids));
-    return { deleted: data.ids.length };
   });

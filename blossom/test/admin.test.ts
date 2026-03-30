@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { startTestBlossom, type BlossomTestContext } from "./helpers";
+import * as blobDb from "../src/blob-db";
+import { computeSha256Hex } from "../src/blob";
+import {
+  allowStorageForPubkey,
+  createAuthHeader,
+  createSigner,
+  startTestBlossom,
+  type BlossomTestContext,
+} from "./helpers";
 
 const ADMIN_TOKEN = "test-admin-token";
 let ctx: BlossomTestContext | undefined;
@@ -42,5 +50,65 @@ describe("DELETE /admin/:sha256", () => {
       headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
     });
     expect(res.status).toBe(404);
+  });
+
+  test("purges all blobs for a pubkey while preserving shared blobs", async () => {
+    const owner = createSigner();
+    const other = createSigner();
+    await allowStorageForPubkey(ctx!.db, owner.pubkey);
+    await allowStorageForPubkey(ctx!.db, other.pubkey);
+
+    const sharedBody = new TextEncoder().encode("shared blob");
+    const sharedSha = await computeSha256Hex(sharedBody);
+    const exclusiveBody = new TextEncoder().encode("exclusive blob");
+    const exclusiveSha = await computeSha256Hex(exclusiveBody);
+
+    await fetch(`${ctx!.baseUrl}/upload`, {
+      method: "PUT",
+      headers: {
+        Authorization: createAuthHeader(owner, "upload"),
+        "Content-Type": "text/plain",
+      },
+      body: sharedBody,
+    });
+    await fetch(`${ctx!.baseUrl}/upload`, {
+      method: "PUT",
+      headers: {
+        Authorization: createAuthHeader(other, "upload"),
+        "Content-Type": "text/plain",
+      },
+      body: sharedBody,
+    });
+    await fetch(`${ctx!.baseUrl}/upload`, {
+      method: "PUT",
+      headers: {
+        Authorization: createAuthHeader(owner, "upload"),
+        "Content-Type": "text/plain",
+      },
+      body: exclusiveBody,
+    });
+
+    const res = await fetch(
+      `${ctx!.baseUrl}/admin/users/${owner.pubkey}/blobs`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      pubkey: owner.pubkey,
+      processedBlobs: 2,
+      deletedBlobs: 1,
+      releasedSharedBlobs: 1,
+      deletedBytes: exclusiveBody.byteLength,
+    });
+
+    expect(ctx!.objectStorage.deletedKeys).toEqual([exclusiveSha]);
+    expect(await blobDb.getBlob(ctx!.db, exclusiveSha)).toBeNull();
+    expect(await blobDb.getBlob(ctx!.db, sharedSha)).not.toBeNull();
+    expect(await blobDb.hasOwner(ctx!.db, sharedSha, owner.pubkey)).toBe(false);
+    expect(await blobDb.hasOwner(ctx!.db, sharedSha, other.pubkey)).toBe(true);
   });
 });
