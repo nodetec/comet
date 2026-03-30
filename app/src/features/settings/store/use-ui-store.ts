@@ -8,6 +8,8 @@ export type NoteSortPrefs = {
   direction: NoteSortDirection;
 };
 
+export type SettingsTab = "general" | "theme" | "editor" | "profile" | "relays";
+
 export const defaultNoteSortPrefs: NoteSortPrefs = {
   field: "modified_at",
   direction: "newest",
@@ -20,8 +22,8 @@ type UIStore = {
   settingsOpen: boolean;
   setSettingsOpen(open: boolean): void;
 
-  settingsTab: "general" | "editor" | "profile" | "relays";
-  setSettingsTab(tab: "general" | "editor" | "profile" | "relays"): void;
+  settingsTab: SettingsTab;
+  setSettingsTab(tab: SettingsTab): void;
 
   editorFontSize: number;
   setEditorFontSize(size: number): void;

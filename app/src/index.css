@@ -9,7 +9,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Figtree Variable", sans-serif;
+  --font-sans: var(--ui-font);
   --font-editor:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
 }
@@ -33,7 +33,7 @@ body {
 }
 
 @theme inline {
-  --font-sans: "Figtree Variable", sans-serif;
+  --font-sans: var(--ui-font);
   --color-syntax-link: var(--syntax-link);
   --color-syntax-selector: var(--syntax-selector);
   --color-syntax-regex: var(--syntax-regex);

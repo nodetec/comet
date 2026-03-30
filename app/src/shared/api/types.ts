@@ -89,6 +89,7 @@ export type ThemeAppearance = "dark" | "light";
 export type ThemeData = {
   appearance: ThemeAppearance;
   name: string;
+  uiFont: string;
   colors: Record<string, string>;
 };
 

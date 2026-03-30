@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Info, PenLine, Radio, User, X } from "lucide-react";
+import { Info, Palette, PenLine, Radio, User, X } from "lucide-react";
 
 import {
   DialogRoot,
@@ -15,9 +15,11 @@ import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";
 import { ProfileSettings } from "./profile-settings";
 import { RelaysSettings } from "./relays-settings";
+import { ThemeSettings } from "./theme-settings";
 
 const tabs = [
   { id: "general" as const, label: "General", icon: Info },
+  { id: "theme" as const, label: "Theme", icon: Palette },
   { id: "editor" as const, label: "Editor", icon: PenLine },
   { id: "profile" as const, label: "Profile", icon: User },
   { id: "relays" as const, label: "Relays", icon: Radio },
@@ -83,6 +85,7 @@ export function SettingsDialog() {
           </nav>
           <main className="flex-1 overflow-y-auto px-14 py-6">
             {activeTab === "general" && <GeneralSettings />}
+            {activeTab === "theme" && <ThemeSettings />}
             {activeTab === "editor" && <EditorSettings />}
             {activeTab === "profile" && <ProfileSettings />}
             {activeTab === "relays" && <RelaysSettings />}

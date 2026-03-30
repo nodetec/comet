@@ -1,3 +1,5 @@
+import type { SettingsTab } from "@/features/settings/store/use-ui-store";
+
 const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
   "comet:reopen-settings-after-account-change";
 
@@ -45,9 +47,7 @@ export async function prepareForAccountChange(): Promise<void> {
   });
 }
 
-export function preserveSettingsAcrossReload(
-  tab: "general" | "editor" | "profile" | "relays",
-) {
+export function preserveSettingsAcrossReload(tab: SettingsTab) {
   try {
     window.sessionStorage.setItem(
       REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY,

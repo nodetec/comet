@@ -6,10 +6,14 @@ import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { THEME_COLOR_KEYS } from "@/shared/theme/schema";
 
 const CACHE_KEY = "comet-theme-cache";
+const DEFAULT_UI_FONT = '"Figtree Variable", sans-serif';
 
-function applyTheme(theme: Pick<ThemeData, "appearance" | "colors">) {
+function applyTheme(
+  theme: Pick<ThemeData, "appearance" | "colors" | "uiFont">,
+) {
   const root = document.documentElement;
   root.style.colorScheme = theme.appearance;
+  root.style.setProperty("--ui-font", theme.uiFont);
   for (const [key, value] of Object.entries(theme.colors)) {
     root.style.setProperty(`--${key}`, value);
   }
@@ -18,6 +22,7 @@ function applyTheme(theme: Pick<ThemeData, "appearance" | "colors">) {
 function clearTheme() {
   const root = document.documentElement;
   root.style.removeProperty("color-scheme");
+  root.style.removeProperty("--ui-font");
   for (const key of THEME_COLOR_KEYS) {
     root.style.removeProperty(`--${key}`);
   }
@@ -35,6 +40,7 @@ function readCachedTheme() {
     const parsed = JSON.parse(cached) as {
       appearance?: unknown;
       colors?: unknown;
+      uiFont?: unknown;
     };
 
     if (
@@ -48,6 +54,10 @@ function readCachedTheme() {
     return {
       appearance: parsed.appearance,
       colors: parsed.colors as Record<string, string>,
+      uiFont:
+        typeof parsed.uiFont === "string" && parsed.uiFont.trim().length > 0
+          ? parsed.uiFont
+          : DEFAULT_UI_FONT,
     };
   } catch {
     return null;

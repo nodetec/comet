@@ -22,6 +22,7 @@ const lightTheme = JSON.parse(await fs.readFile(lightThemePath, "utf8"));
 function themeBlock(theme) {
   return [
     `  color-scheme: ${theme.appearance};`,
+    `  --ui-font: ${theme.uiFont};`,
     ...Object.entries(theme.colors).map(
       ([key, value]) => `  --${key}: ${value};`,
     ),

@@ -1,6 +1,7 @@
 {
   "appearance": "dark",
   "name": "Dark",
+  "uiFont": "\"Figtree Variable\", sans-serif",
   "colors": {
     "background": "#1d1e20",
     "foreground": "#dfe0e0",

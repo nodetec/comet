@@ -5,30 +5,19 @@ import { toast } from "sonner";
 import {
   getAppStatus,
   getTagIndexDiagnostics,
-  listThemes,
   repairTagIndex,
 } from "@/shared/api/invoke";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
-import { SYSTEM_THEME_ID } from "@/shared/theme/schema";
-
-import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { Button } from "@/shared/ui/button";
 
 import { SettingRow } from "./setting-row";
 
 export function GeneralSettings() {
   const queryClient = useQueryClient();
-  const themeName = useUIStore((s) => s.themeName);
-  const setThemeName = useUIStore((s) => s.setThemeName);
 
   const { data, isLoading } = useQuery({
     queryKey: ["app_status"],
     queryFn: getAppStatus,
-  });
-
-  const { data: themes = [] } = useQuery({
-    queryKey: ["themes"],
-    queryFn: listThemes,
   });
 
   const { data: tagIndexDiagnostics } = useQuery({
@@ -71,7 +60,6 @@ export function GeneralSettings() {
     { label: "Account", value: data.accountPath },
     { label: "Database", value: data.databasePath },
     { label: "Attachments", value: data.attachmentsPath },
-    { label: "Themes", value: data.themesPath },
   ];
 
   const tagIndexDescription = tagIndexDiagnostics
@@ -95,28 +83,6 @@ export function GeneralSettings() {
   return (
     <div className="space-y-8">
       <div>
-        <SettingRow
-          label="Theme"
-          description="Choose a color theme or follow your system setting"
-          border={false}
-        >
-          <select
-            className="bg-muted text-foreground rounded-md border px-2 py-1 text-sm outline-none"
-            value={themeName ?? SYSTEM_THEME_ID}
-            onChange={(e) =>
-              setThemeName(
-                e.target.value === SYSTEM_THEME_ID ? null : e.target.value,
-              )
-            }
-          >
-            <option value={SYSTEM_THEME_ID}>System</option>
-            {themes.map((theme) => (
-              <option key={theme.id} value={theme.id}>
-                {theme.name}
-              </option>
-            ))}
-          </select>
-        </SettingRow>
         <SettingRow
           label="Tag Index"
           description={tagIndexDescription}

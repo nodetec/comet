@@ -1,6 +1,7 @@
 /* Generated from src/shared/theme/themes/dark.json and light.json. */
 :root {
   color-scheme: dark;
+  --ui-font: "Figtree Variable", sans-serif;
   --background: #1d1e20;
   --foreground: #dfe0e0;
   --card: #1d1e20;
@@ -68,6 +69,7 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
+    --ui-font: "Figtree Variable", sans-serif;
     --background: #f4f5f8;
     --foreground: #191b1d;
     --card: #f4f5f8;

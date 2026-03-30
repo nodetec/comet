@@ -16,6 +16,8 @@ describe("bundled themes", () => {
       expect(theme.appearance === "dark" || theme.appearance === "light").toBe(
         true,
       );
+      expect(typeof theme.uiFont).toBe("string");
+      expect(theme.uiFont.trim().length).toBeGreaterThan(0);
       expect(new Set(Object.keys(theme.colors))).toEqual(expectedKeys);
     });
   }

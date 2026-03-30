@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 
 const DARK_THEME_ID: &str = "dark";
 const LIGHT_THEME_ID: &str = "light";
+const DEFAULT_UI_FONT: &str = r#""Figtree Variable", sans-serif"#;
 const THEME_COLOR_KEYS: &[&str] = &[
     "background",
     "foreground",
@@ -92,7 +93,13 @@ pub enum ThemeAppearance {
 pub struct ThemeData {
     pub appearance: ThemeAppearance,
     pub name: String,
+    #[serde(rename = "uiFont", default = "default_ui_font")]
+    pub ui_font: String,
     pub colors: HashMap<String, String>,
+}
+
+fn default_ui_font() -> String {
+    DEFAULT_UI_FONT.to_string()
 }
 
 fn themes_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
@@ -110,6 +117,12 @@ fn parse_theme(theme_id: &str, contents: &str) -> Result<ThemeData, AppError> {
 }
 
 fn validate_theme_data(theme_id: &str, data: &ThemeData) -> Result<(), AppError> {
+    if data.ui_font.trim().is_empty() {
+        return Err(AppError::custom(format!(
+            "Theme '{theme_id}' does not match the theme schema (uiFont must not be empty)"
+        )));
+    }
+
     let actual_keys: Vec<&str> = data.colors.keys().map(String::as_str).collect();
     let missing_keys: Vec<&str> = THEME_COLOR_KEYS
         .iter()
