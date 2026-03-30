@@ -37,10 +37,6 @@ pub fn upsert_from_sync(
 
     if let Some((_, local_modified)) = &existing {
         if *local_modified >= note.modified_at {
-            eprintln!(
-                "[sync] skip upsert note={} local_modified={} remote_modified={}",
-                note.id, local_modified, note.modified_at
-            );
             // Local version is same or newer — just update sync_event_id
             conn.execute(
                 "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",

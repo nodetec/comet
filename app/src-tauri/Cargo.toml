@@ -53,7 +53,6 @@ url = "2"
 tauri-plugin-log = "2.8.0"
 tauri-plugin-opener = "2"
 tauri-plugin-secure-storage = "1.4.0"
-negentropy = "0.5.0"
 
 [dev-dependencies]
 postgres = "0.19"

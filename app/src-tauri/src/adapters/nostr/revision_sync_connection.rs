@@ -1,6 +1,4 @@
-use crate::adapters::nostr::revision_bootstrap::{
-    bootstrap_relay_connection, RevisionBootstrapResult,
-};
+use crate::adapters::nostr::revision_bootstrap::bootstrap_relay_connection;
 use crate::adapters::nostr::revision_push::{push_deletion_revision, push_note_revision};
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
@@ -37,7 +35,7 @@ pub(super) async fn run_revision_sync_connection(
         keys
     };
 
-    set_state(state, SyncState::Syncing, app).await;
+    set_state(state, SyncState::Connecting, app).await;
 
     let mut active_bootstrap = None;
     let mut bootstrap_errors = Vec::new();
@@ -45,7 +43,6 @@ pub(super) async fn run_revision_sync_connection(
     for relay_url in &configured_relay_urls {
         match bootstrap_relay_connection(app, relay_url).await {
             Ok(bootstrap) => {
-                log_bootstrap_result(app, relay_url, &bootstrap);
                 if active_bootstrap.is_none() {
                     active_bootstrap = Some((relay_url.clone(), bootstrap));
                 }
@@ -83,15 +80,20 @@ pub(super) async fn run_revision_sync_connection(
         .filter(|configured| configured != &relay_url)
         .collect::<Vec<_>>();
 
+    set_state(state, SyncState::Syncing, app).await;
     connection
         .send_changes("sync", &recipient, snapshot_seq, true)
         .await?;
 
     flush_pending_local_changes(app, &relay_url, &backup_relay_urls, &keys).await?;
+    // Bootstrap and any initial local replay are complete at this point. Keep
+    // the UI in a steady connected state while the live CHANGES stream stays
+    // open rather than pulsing indefinitely until the relay sends EOSE.
+    set_state(state, SyncState::Connected, app).await;
 
     let mut pending_pushes: HashMap<String, tokio::time::Instant> = HashMap::new();
     let debounce_duration = Duration::from_secs(2);
-    let mut connected = false;
+    let mut connected = true;
 
     loop {
         let next_wake = pending_pushes.values().min().copied();
@@ -250,20 +252,6 @@ async fn flush_pending_local_changes(
 
     Ok(())
 }
-
-fn log_bootstrap_result(app: &AppHandle, relay_url: &str, bootstrap: &RevisionBootstrapResult) {
-    sync_log(
-        app,
-        &format!(
-            "revision bootstrap relay={} snapshot_seq={} have={} need={}",
-            relay_url,
-            bootstrap.snapshot_seq,
-            bootstrap.have.len(),
-            bootstrap.need.len()
-        ),
-    );
-}
-
 async fn handle_revision_push_command(
     app: &AppHandle,
     active_relay_url: &str,

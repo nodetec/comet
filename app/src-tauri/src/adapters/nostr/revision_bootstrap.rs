@@ -13,15 +13,21 @@ use nostr_sdk::prelude::Keys;
 use rusqlite::Connection;
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::time::timeout;
 use url::Url;
+
+const BOOTSTRAP_MESSAGE_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct RevisionBootstrapResult {
     pub connection: RevisionRelayConnection,
     // `NEG-STATUS.snapshot_seq`: the relay sequence boundary that separates the
     // negotiated head snapshot from the live `CHANGES` tail that follows it.
     pub snapshot_seq: i64,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub have: Vec<String>,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub need: Vec<String>,
     pub recipient: String,
 }
@@ -57,8 +63,14 @@ pub async fn bootstrap_with_keys(
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<RevisionBootstrapResult, AppError> {
-    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, &mut invalidate_cache, |_| {})
-        .await
+    bootstrap_with_keys_and_changes(
+        db_path,
+        keys,
+        relay_ws_url,
+        &mut invalidate_cache,
+        |_| {},
+    )
+    .await
 }
 
 async fn bootstrap_with_keys_and_changes(
@@ -94,7 +106,13 @@ async fn bootstrap_with_keys_and_changes(
     let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
     connection.send_neg_open("bootstrap", &recipient).await?;
 
-    let snapshot_seq = match connection.recv_message().await? {
+    let snapshot_seq = match recv_bootstrap_message(
+        &mut connection,
+        relay_ws_url,
+        "NEG-STATUS",
+    )
+    .await?
+    {
         RevisionRelayIncomingMessage::NegStatus {
             subscription_id,
             strategy,
@@ -130,20 +148,27 @@ async fn bootstrap_with_keys_and_changes(
     let mut have = BTreeSet::new();
     let mut need = BTreeSet::new();
 
-    while let Some(payload) = message {
-        connection.send_neg_msg("bootstrap", &payload).await?;
-        let response = connection.recv_message().await?;
+    while let Some(outgoing_payload) = message {
+        connection
+            .send_neg_msg("bootstrap", &outgoing_payload)
+            .await?;
+        let response = recv_bootstrap_message(
+            &mut connection,
+            relay_ws_url,
+            "NEG-MSG",
+        )
+        .await?;
         match response {
             RevisionRelayIncomingMessage::NegMsg {
                 subscription_id,
-                payload,
+                payload: incoming_payload,
             } => {
                 if subscription_id != "bootstrap" {
                     return Err(AppError::custom(format!(
                         "Unexpected NEG-MSG subscription id: {subscription_id}"
                     )));
                 }
-                let result = negentropy.reconcile_with_ids_hex(&payload)?;
+                let result = negentropy.reconcile_with_ids_hex(&incoming_payload)?;
                 have.extend(result.have);
                 need.extend(result.need);
                 message = result.next_message_hex;
@@ -162,7 +187,7 @@ async fn bootstrap_with_keys_and_changes(
     }
 
     connection.send_neg_close("bootstrap").await?;
-    match connection.recv_message().await? {
+    match recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-CLOSE").await? {
         RevisionRelayIncomingMessage::Closed {
             subscription_id, ..
         } if subscription_id == "bootstrap" => {}
@@ -273,6 +298,19 @@ async fn bootstrap_with_keys_and_changes(
         need,
         recipient,
     })
+}
+
+async fn recv_bootstrap_message(
+    connection: &mut RevisionRelayConnection,
+    relay_ws_url: &str,
+    step: &str,
+) -> Result<RevisionRelayIncomingMessage, AppError> {
+    match timeout(BOOTSTRAP_MESSAGE_TIMEOUT, connection.recv_message()).await {
+        Ok(result) => result,
+        Err(_) => Err(AppError::custom(format!(
+            "Timed out waiting for revision relay during bootstrap ({step}) on {relay_ws_url}"
+        ))),
+    }
 }
 
 pub fn relay_http_url_from_ws(relay_ws_url: &str) -> Result<String, AppError> {
