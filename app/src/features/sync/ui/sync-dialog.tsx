@@ -42,6 +42,20 @@ type SyncInfo = {
   blobsStored: number;
 };
 
+function isActiveSyncState(state: SyncInfo["state"]) {
+  return (
+    typeof state === "string" &&
+    (state === "connecting" ||
+      state === "authenticating" ||
+      state === "syncing")
+  );
+}
+
+function syncPercentage(info: SyncInfo) {
+  if (info.totalNotes <= 0) return 100;
+  return Math.round((info.relayBackedNotes / info.totalNotes) * 100);
+}
+
 function stateLabel(state: SyncInfo["state"]): {
   label: string;
   icon: React.ReactNode;
@@ -121,84 +135,107 @@ function InfoRow({
 }
 
 function SyncInfoPanel({ info }: { info: SyncInfo }) {
+  const percentage = syncPercentage(info);
+
   return (
-    <div className="divide-accent/30 divide-y">
-      {info.activeRelayUrl ? (
-        <InfoRow
-          icon={<Database className="size-3.5" />}
-          label="Active relay"
-          value={info.activeRelayUrl.replace(/^wss?:\/\//, "")}
-        />
-      ) : (
-        <InfoRow
-          icon={<Database className="size-3.5" />}
-          label="Active relay"
-          value={<span className="text-muted-foreground">Not configured</span>}
-        />
-      )}
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Synced</span>
+          <span className="text-secondary-foreground font-medium">
+            {percentage}%
+          </span>
+        </div>
+        <div className="bg-accent/40 h-2 overflow-hidden rounded-full">
+          <div
+            className="bg-foreground h-full rounded-full transition-[width] duration-300 ease-out"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
 
-      {info.relayUrls.length > 0 ? (
+      <div className="divide-accent/30 divide-y">
+        {info.activeRelayUrl ? (
+          <InfoRow
+            icon={<Database className="size-3.5" />}
+            label="Active relay"
+            value={info.activeRelayUrl.replace(/^wss?:\/\//, "")}
+          />
+        ) : (
+          <InfoRow
+            icon={<Database className="size-3.5" />}
+            label="Active relay"
+            value={
+              <span className="text-muted-foreground">Not configured</span>
+            }
+          />
+        )}
+
+        {info.relayUrls.length > 0 ? (
+          <InfoRow
+            icon={<Database className="size-3.5" />}
+            label="Configured relays"
+            value={info.relayUrls.length}
+          />
+        ) : null}
+
+        {info.preferredRelayUrl &&
+        info.preferredRelayUrl !== info.activeRelayUrl ? (
+          <InfoRow
+            icon={<Database className="size-3.5" />}
+            label="Preferred relay"
+            value={info.preferredRelayUrl.replace(/^wss?:\/\//, "")}
+          />
+        ) : null}
+
         <InfoRow
-          icon={<Database className="size-3.5" />}
-          label="Configured relays"
-          value={info.relayUrls.length}
+          icon={<HardDrive className="size-3.5" />}
+          label="Revision-managed"
+          value={`${info.revisionManagedNotes} / ${info.totalNotes}`}
         />
-      ) : null}
 
-      {info.preferredRelayUrl &&
-      info.preferredRelayUrl !== info.activeRelayUrl ? (
         <InfoRow
-          icon={<Database className="size-3.5" />}
-          label="Preferred relay"
-          value={info.preferredRelayUrl.replace(/^wss?:\/\//, "")}
+          icon={<CloudCheck className="size-3.5" />}
+          label="Relay-backed"
+          value={`${info.relayBackedNotes} / ${info.totalNotes}`}
         />
-      ) : null}
 
-      <InfoRow
-        icon={<HardDrive className="size-3.5" />}
-        label="Revision-managed"
-        value={`${info.revisionManagedNotes} / ${info.totalNotes}`}
-      />
+        {info.pendingChanges > 0 ? (
+          <InfoRow
+            icon={<CloudSync className="size-3.5" />}
+            label="Pending changes"
+            value={
+              <span className="text-warning">
+                {info.pendingChanges} unsynced
+              </span>
+            }
+          />
+        ) : null}
 
-      <InfoRow
-        icon={<CloudCheck className="size-3.5" />}
-        label="Relay-backed"
-        value={`${info.relayBackedNotes} / ${info.totalNotes}`}
-      />
+        {info.blossomUrl ? (
+          <InfoRow
+            icon={<Image className="size-3.5" />}
+            label="Blobs"
+            value={`${info.blobsStored} on ${info.blossomUrl.replace(/^https?:\/\//, "")}`}
+          />
+        ) : null}
 
-      {info.pendingChanges > 0 ? (
-        <InfoRow
-          icon={<CloudSync className="size-3.5" />}
-          label="Pending changes"
-          value={
-            <span className="text-warning">{info.pendingChanges} unsynced</span>
-          }
-        />
-      ) : null}
+        {info.npub ? (
+          <InfoRow
+            icon={<Key className="size-3.5" />}
+            label="Identity"
+            value={`${info.npub.slice(0, 16)}…`}
+          />
+        ) : null}
 
-      {info.blossomUrl ? (
-        <InfoRow
-          icon={<Image className="size-3.5" />}
-          label="Blobs"
-          value={`${info.blobsStored} on ${info.blossomUrl.replace(/^https?:\/\//, "")}`}
-        />
-      ) : null}
-
-      {info.npub ? (
-        <InfoRow
-          icon={<Key className="size-3.5" />}
-          label="Identity"
-          value={`${info.npub.slice(0, 16)}…`}
-        />
-      ) : null}
-
-      {info.checkpointSeq == null ? null : (
-        <InfoRow
-          icon={<CloudSync className="size-3.5" />}
-          label="Relay checkpoint"
-          value={info.checkpointSeq}
-        />
-      )}
+        {info.checkpointSeq == null ? null : (
+          <InfoRow
+            icon={<CloudSync className="size-3.5" />}
+            label="Relay checkpoint"
+            value={info.checkpointSeq}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -228,6 +265,24 @@ export function SyncDialog({
   useEffect(() => {
     if (!open) return;
     const unlisten = listen("sync-status", () => {
+      void refreshInfo();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !info || !isActiveSyncState(info.state)) return;
+    const timer = window.setInterval(() => {
+      void refreshInfo();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [open, info]);
+
+  useEffect(() => {
+    if (!open) return;
+    const unlisten = listen("sync-remote-change", () => {
       void refreshInfo();
     });
     return () => {
