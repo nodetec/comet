@@ -36,7 +36,7 @@ type SyncInfo = {
   npub: string | null;
   revisionManagedNotes: number;
   relayBackedNotes: number;
-  pendingNotes: number;
+  pendingChanges: number;
   totalNotes: number;
   checkpointSeq: number | null;
   blobsStored: number;
@@ -166,12 +166,12 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
         value={`${info.relayBackedNotes} / ${info.totalNotes}`}
       />
 
-      {info.pendingNotes > 0 ? (
+      {info.pendingChanges > 0 ? (
         <InfoRow
           icon={<CloudSync className="size-3.5" />}
-          label="Pending upload"
+          label="Pending changes"
           value={
-            <span className="text-warning">{info.pendingNotes} unsynced</span>
+            <span className="text-warning">{info.pendingChanges} unsynced</span>
           }
         />
       ) : null}

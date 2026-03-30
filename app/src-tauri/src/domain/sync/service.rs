@@ -8,6 +8,10 @@ pub fn delete_note_from_sync(
     note_id: &str,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<(), AppError> {
+    conn.execute(
+        "DELETE FROM pending_deletions WHERE entity_id = ?1",
+        params![note_id],
+    )?;
     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])?;
     conn.execute("DELETE FROM notes WHERE id = ?1", params![note_id])?;
     invalidate_cache(note_id);
@@ -27,21 +31,19 @@ pub fn upsert_from_sync(
         );
     }
 
-    let existing: Option<(String, i64)> = conn
+    let existing: Option<(String, bool)> = conn
         .query_row(
-            "SELECT id, modified_at FROM notes WHERE id = ?1",
+            "SELECT id, locally_modified != 0 FROM notes WHERE id = ?1",
             params![note.id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()?;
 
-    if let Some((_, local_modified)) = &existing {
-        if *local_modified >= note.modified_at {
-            // Local version is same or newer — just update sync_event_id
-            conn.execute(
-                "UPDATE notes SET sync_event_id = ?1 WHERE id = ?2",
-                params![sync_event_id, note.id],
-            )?;
+    if let Some((_, locally_modified)) = &existing {
+        if *locally_modified {
+            // Preserve the visible local note while the revision graph records
+            // the conflicting remote head. A clean local note can be safely
+            // materialized from the remote revision even if wall clocks drift.
             return Ok(None);
         }
     }
@@ -167,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn upsert_skips_when_local_is_newer() {
+    fn upsert_overwrites_clean_local_note_even_if_remote_timestamp_is_older() {
         let conn = setup_db();
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -182,6 +184,32 @@ mod tests {
 
         let note = make_synced_note("note-1", 3000);
         let result = upsert_from_sync(&conn, &note, "evt-3").unwrap();
+        assert_eq!(result, Some("note-1".to_string()));
+
+        let title: String = conn
+            .query_row("SELECT title FROM notes WHERE id = 'note-1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(title, "Title note-1");
+    }
+
+    #[test]
+    fn upsert_skips_when_local_note_is_dirty() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1)",
+            params!["note-1", "Local Title", "Local body", 1000, 5000, 5000],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Local Title", "Local body"],
+        )
+        .unwrap();
+
+        let note = make_synced_note("note-1", 9000);
+        let result = upsert_from_sync(&conn, &note, "evt-4").unwrap();
         assert_eq!(result, None);
 
         let title: String = conn
@@ -193,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn delete_note_removes_note_and_fts() {
+    fn delete_note_removes_note_fts_and_pending_deletion() {
         let conn = setup_db();
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -203,6 +231,11 @@ mod tests {
         conn.execute(
             "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
             params!["note-1", "Title", "Body"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+            params!["note-1", 3000],
         )
         .unwrap();
 
@@ -218,9 +251,17 @@ mod tests {
         let fts_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
             .unwrap();
+        let pending_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pending_deletions",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
 
         assert_eq!(notes_count, 0);
         assert_eq!(fts_count, 0);
+        assert_eq!(pending_count, 0);
         assert_eq!(invalidated.as_deref(), Some("note-1"));
     }
 }

@@ -200,7 +200,7 @@ pub struct SyncInfo {
     npub: Option<String>,
     revision_managed_notes: i64,
     relay_backed_notes: i64,
-    pending_notes: i64,
+    pending_changes: i64,
     total_notes: i64,
     checkpoint_seq: Option<i64>,
     blobs_stored: i64,
@@ -247,8 +247,10 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         |row| row.get(0),
     )?;
 
-    let pending_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE locally_modified = 1",
+    let pending_changes: i64 = conn.query_row(
+        "SELECT
+            (SELECT COUNT(*) FROM notes WHERE locally_modified = 1) +
+            (SELECT COUNT(*) FROM pending_deletions)",
         [],
         |row| row.get(0),
     )?;
@@ -277,7 +279,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         npub,
         revision_managed_notes,
         relay_backed_notes,
-        pending_notes,
+        pending_changes,
         total_notes,
         checkpoint_seq,
         blobs_stored,
