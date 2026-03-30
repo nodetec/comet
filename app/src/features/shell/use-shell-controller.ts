@@ -1074,7 +1074,9 @@ export function useShellController() {
       archivedAt: currentNote?.archivedAt ?? null,
       deletedAt: currentNote?.deletedAt ?? null,
       focusMode:
-        currentNote && currentNote.id === selectedNoteId
+        currentNote &&
+        currentNote.id === selectedNoteId &&
+        !isCreatingNoteTransition
           ? editorFocusMode
           : ("none" as const),
       html:
@@ -1169,6 +1171,7 @@ export function useShellController() {
       displayedSelectedNoteId,
       editorFocusMode,
       isDeletePublishedNotePending,
+      isCreatingNoteTransition,
       isCreatingNote,
       isPublishNotePending,
       isPublishShortNotePending,

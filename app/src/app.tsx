@@ -40,24 +40,39 @@ function App() {
     sidebarPaneProps,
   } = useShellController();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const handleCreateNoteShortcut = notesPaneProps.onCreateNote;
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
 
-      if (event.key === "o") {
-        event.preventDefault();
-        setCommandPaletteOpen((open) => !open);
-      } else if (event.key === "k") {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent("comet:focus-search"));
+      const key = event.key.toLowerCase();
+      switch (key) {
+        case "n": {
+          event.preventDefault();
+          handleCreateNoteShortcut("keyboard");
+          break;
+        }
+        case "o": {
+          event.preventDefault();
+          setCommandPaletteOpen((open) => !open);
+          break;
+        }
+        case "k": {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("comet:focus-search"));
+          break;
+        }
+        default: {
+          break;
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [handleCreateNoteShortcut]);
 
   useEffect(() => {
     if (readyToRevealWindow && !hasCompletedStartupReveal) {
