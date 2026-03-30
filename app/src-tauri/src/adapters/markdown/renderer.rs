@@ -21,10 +21,6 @@ pub fn markdown_to_lexical_html(markdown: &str) -> String {
     postprocess_html(&html)
 }
 
-pub fn markdown_to_lexical_html_for_paste(markdown: &str) -> String {
-    markdown_to_lexical_html(markdown)
-}
-
 fn options<'a>() -> Options<'a> {
     let mut options = Options::default();
 
@@ -278,10 +274,10 @@ mod tests {
 
     #[test]
     fn test_paste_mode_turns_each_blank_line_into_empty_paragraph() {
-        let html = markdown_to_lexical_html_for_paste("alpha\n\nbeta");
+        let html = markdown_to_lexical_html("alpha\n\nbeta");
         assert_eq!(html.matches("<p><br></p>").count(), 1, "Paste HTML: {html}");
 
-        let html = markdown_to_lexical_html_for_paste("alpha\n\n\nbeta");
+        let html = markdown_to_lexical_html("alpha\n\n\nbeta");
         assert_eq!(html.matches("<p><br></p>").count(), 2, "Paste HTML: {html}");
     }
 

@@ -31,6 +31,7 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
+import { renderMarkdownToHtml } from "@/shared/api/invoke";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
@@ -342,6 +343,130 @@ function useFindBar({
   };
 }
 
+type ResolvedEditorHtmlParams = {
+  html: string | null;
+  isNewNote: boolean;
+  loadKey: string | null;
+  markdown: string;
+  noteId: string | null;
+};
+
+type ResolvedEditorHtmlState = {
+  html: string | null;
+  loadKey: string | null;
+  ready: boolean;
+};
+
+function shouldRenderEditorMarkdownAsHtml({
+  html,
+  isNewNote,
+  markdown,
+  noteId,
+}: Omit<ResolvedEditorHtmlParams, "loadKey">): boolean {
+  if (!noteId || html !== null) {
+    return false;
+  }
+
+  if (!markdown.trim()) {
+    return false;
+  }
+
+  if (isNewNote && markdown === "- [ ] ") {
+    return false;
+  }
+
+  return true;
+}
+
+function useResolvedEditorHtml({
+  html,
+  isNewNote,
+  loadKey,
+  markdown,
+  noteId,
+}: ResolvedEditorHtmlParams): ResolvedEditorHtmlState {
+  const latestParamsRef = useRef({
+    html,
+    isNewNote,
+    markdown,
+    noteId,
+  });
+
+  useEffect(() => {
+    latestParamsRef.current = {
+      html,
+      isNewNote,
+      markdown,
+      noteId,
+    };
+  }, [html, isNewNote, markdown, noteId]);
+
+  const [state, setState] = useState<ResolvedEditorHtmlState>(() => ({
+    html,
+    loadKey,
+    ready: !shouldRenderEditorMarkdownAsHtml({
+      html,
+      isNewNote,
+      markdown,
+      noteId,
+    }),
+  }));
+
+  useEffect(() => {
+    const {
+      html: latestHtml,
+      isNewNote: latestIsNewNote,
+      markdown: latestMarkdown,
+      noteId: latestNoteId,
+    } = latestParamsRef.current;
+
+    if (
+      !shouldRenderEditorMarkdownAsHtml({
+        html: latestHtml,
+        isNewNote: latestIsNewNote,
+        markdown: latestMarkdown,
+        noteId: latestNoteId,
+      })
+    ) {
+      setState({ html: latestHtml, loadKey, ready: true });
+      return;
+    }
+
+    let cancelled = false;
+    setState({ html: null, loadKey, ready: false });
+
+    void renderMarkdownToHtml(latestMarkdown)
+      .then((resolvedHtml) => {
+        if (cancelled) {
+          return;
+        }
+        setState({ html: resolvedHtml, loadKey, ready: true });
+      })
+      .catch((error) => {
+        console.error("[editor:init] markdown render failed", error);
+        if (cancelled) {
+          return;
+        }
+        // Fall back to Lexical's direct markdown import if backend rendering fails.
+        setState({ html: null, loadKey, ready: true });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadKey]);
+
+  if (html !== null) {
+    return { html, loadKey, ready: true };
+  }
+
+  if (state.loadKey !== loadKey) {
+    return { html: null, loadKey, ready: false };
+  }
+
+  return state;
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
@@ -455,6 +580,68 @@ export function EditorPane({
 
   const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
     useEditorScrollHeader(noteId, scrollContainerRef);
+  const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
+  const resolvedEditorHtml = useResolvedEditorHtml({
+    html,
+    isNewNote,
+    loadKey: editorLoadKey,
+    markdown,
+    noteId,
+  });
+  const isEditorReady = resolvedEditorHtml.ready;
+  let editorContent: React.ReactNode = null;
+
+  if (noteId) {
+    if (isViewingDeletedConflictHead) {
+      editorContent = (
+        <div className="flex min-h-full items-center justify-center px-6">
+          <div className="max-w-sm text-center">
+            <p className="text-foreground text-sm font-medium">
+              This version deletes the note
+            </p>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Choose Delete note to apply this version and remove the note from
+              sync.
+            </p>
+          </div>
+        </div>
+      );
+    } else if (isEditorReady) {
+      editorContent = (
+        <NoteEditor
+          devtoolsContainer={devtoolsContainer}
+          focusMode={focusMode}
+          html={resolvedEditorHtml.html}
+          isNew={isNewNote}
+          loadKey={editorLoadKey ?? noteId}
+          markdown={markdown}
+          onChange={onChange}
+          onEditorFocusChange={(focused) => {
+            if (focused) {
+              setFocusedPane("editor");
+            }
+          }}
+          onFocusHandled={onFocusHandled}
+          onSearchMatchCountChange={
+            isUsingEditorFindSearch ? setFindMatchCount : undefined
+          }
+          readOnly={isReadOnly}
+          ref={editorRef}
+          searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
+          searchActiveMatchIndex={
+            isUsingEditorFindSearch ? activeFindMatchIndex : null
+          }
+          searchQuery={editorSearchQuery}
+          searchScrollRevision={
+            isUsingEditorFindSearch ? findScrollRevision : undefined
+          }
+          toolbarContainer={toolbarContainer}
+        />
+      );
+    } else {
+      editorContent = <div className="min-h-full" />;
+    }
+  }
 
   const openEditorMenu = useCallback(
     async (position: LogicalPosition) => {
@@ -746,49 +933,7 @@ export function EditorPane({
         >
           {noteId ? (
             <div className="relative flex min-h-full w-full flex-col">
-              {isViewingDeletedConflictHead ? (
-                <div className="flex min-h-full items-center justify-center px-6">
-                  <div className="max-w-sm text-center">
-                    <p className="text-foreground text-sm font-medium">
-                      This version deletes the note
-                    </p>
-                    <p className="text-muted-foreground mt-2 text-sm">
-                      Choose Delete note to apply this version and remove the
-                      note from sync.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <NoteEditor
-                  devtoolsContainer={devtoolsContainer}
-                  focusMode={focusMode}
-                  html={html}
-                  isNew={isNewNote}
-                  loadKey={editorKey ?? noteId}
-                  markdown={markdown}
-                  onChange={onChange}
-                  onEditorFocusChange={(focused) => {
-                    if (focused) {
-                      setFocusedPane("editor");
-                    }
-                  }}
-                  onFocusHandled={onFocusHandled}
-                  onSearchMatchCountChange={
-                    isUsingEditorFindSearch ? setFindMatchCount : undefined
-                  }
-                  readOnly={isReadOnly}
-                  ref={editorRef}
-                  searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
-                  searchActiveMatchIndex={
-                    isUsingEditorFindSearch ? activeFindMatchIndex : null
-                  }
-                  searchQuery={editorSearchQuery}
-                  searchScrollRevision={
-                    isUsingEditorFindSearch ? findScrollRevision : undefined
-                  }
-                  toolbarContainer={toolbarContainer}
-                />
-              )}
+              {editorContent}
             </div>
           ) : (
             <div className="flex h-full items-center justify-center">

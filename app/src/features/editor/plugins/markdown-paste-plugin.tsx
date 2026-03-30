@@ -24,7 +24,7 @@ import {
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
-import { renderMarkdownForPaste } from "@/shared/api/invoke";
+import { renderMarkdownToHtml } from "@/shared/api/invoke";
 import { parseSingleChecklistItemContent } from "../lib/checklist-paste";
 import {
   normalizeImportedCodeBlocksFromMarkdown,
@@ -423,7 +423,7 @@ async function processMarkdownPasteRender(params: {
 
   let html: string;
   try {
-    html = await renderMarkdownForPaste(text);
+    html = await renderMarkdownToHtml(text);
   } catch (error) {
     console.error("[editor:paste] markdown render failed", error);
     insertFallbackMarkdownText(

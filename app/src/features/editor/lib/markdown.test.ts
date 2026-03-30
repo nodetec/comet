@@ -18,7 +18,12 @@ import {
   ListItemNode,
   ListNode,
 } from "@lexical/list";
-import { HeadingNode, QuoteNode, $createQuoteNode } from "@lexical/rich-text";
+import {
+  HeadingNode,
+  QuoteNode,
+  $createHeadingNode,
+  $createQuoteNode,
+} from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import {
   $createParagraphNode,
@@ -217,6 +222,39 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["A", "", "", "B"].join("\n"));
+  });
+
+  it("exports adjacent top-level blocks with single newlines when no spacer paragraphs are present", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const heading = $createHeadingNode("h1");
+      heading.append($createTextNode("Spec driven development"));
+
+      const first = $createParagraphNode();
+      first.append($createTextNode("first let’s work on a spec for a feature"));
+
+      const second = $createParagraphNode();
+      second.append(
+        $createTextNode("work with the agent to create the spec first"),
+      );
+
+      const third = $createParagraphNode();
+      third.append(
+        $createTextNode(
+          "then have the same or another agent implement the spec",
+        ),
+      );
+
+      root.append(heading, first, second, third);
+    });
+
+    expect(markdown).toBe(
+      [
+        "# Spec driven development",
+        "first let’s work on a spec for a feature",
+        "work with the agent to create the spec first",
+        "then have the same or another agent implement the spec",
+      ].join("\n"),
+    );
   });
 
   it("preserves trailing blank lines inside code fences on clipboard export", () => {

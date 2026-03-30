@@ -79,8 +79,8 @@ export async function loadNote(noteId: string) {
   return note;
 }
 
-export async function renderMarkdownForPaste(markdown: string) {
-  return invoke<string>("render_markdown_for_paste", { markdown });
+export async function renderMarkdownToHtml(markdown: string) {
+  return invoke<string>("render_markdown_to_html", { markdown });
 }
 
 export async function getNoteConflict(noteId: string) {

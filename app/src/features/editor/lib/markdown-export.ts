@@ -104,6 +104,28 @@ function exportTopLevelElements(
   return null;
 }
 
+export function $convertTopLevelElementToMarkdown(
+  node: LexicalNode,
+  transformers: Array<Transformer>,
+): string | null {
+  const byType = transformersByType(transformers);
+  const elementTransformers = [...byType.multilineElement, ...byType.element];
+  const textTransformers = byType.textFormat
+    .filter((transformer) => transformer.format.length === 1)
+    // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig targets ES2020, so toSorted() is unavailable here
+    .sort(
+      (a, b) =>
+        Number(a.format.includes("code")) - Number(b.format.includes("code")),
+    );
+
+  return exportTopLevelElements(
+    node,
+    elementTransformers,
+    textTransformers,
+    byType.textMatch,
+  );
+}
+
 function exportChildren(
   node: ElementNode,
   textTransformers: Array<TextFormatTransformer>,

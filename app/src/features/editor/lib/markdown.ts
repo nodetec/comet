@@ -12,48 +12,16 @@ import {
   $isTextNode,
 } from "lexical";
 import { $isCodeNode } from "@lexical/code";
-import { $isQuoteNode } from "@lexical/rich-text";
-import { $convertToMarkdownStringNormalized } from "./markdown-export";
+import { $isHeadingNode, $isQuoteNode } from "@lexical/rich-text";
+import { $convertTopLevelElementToMarkdown } from "./markdown-export";
 
 // Patterns matching block-level markdown structures that should NOT be merged
 // with adjacent lines (mirrors Lexical's internal normalizeMarkdown logic).
 const CODE_FENCE_RE = /^(`{3,}|~{3,})/;
 const CODE_SINGLE_LINE_RE = /^(`{3,})[^`]+\1$/;
 
-/**
- * Tracks code fence state properly: a closing fence must use the same
- * character and be at least as long as the opening fence (CommonMark spec).
- */
-type FenceState = { char: string; length: number } | null;
-
 const CLIPBOARD_EMAIL_LINK_RE =
   /\[([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\]\(mailto:\1\)/g;
-
-function updateFenceState(line: string, current: FenceState): FenceState {
-  const trimmed = line.trimStart();
-
-  // Skip single-line fenced code (```code```)
-  if (CODE_SINGLE_LINE_RE.test(line)) return current;
-
-  const match = CODE_FENCE_RE.exec(trimmed);
-  if (!match) return current;
-
-  const fenceChar = match[1][0]; // '`' or '~'
-  const fenceLen = match[1].length;
-
-  if (current === null) {
-    // Opening fence
-    return { char: fenceChar, length: fenceLen };
-  }
-
-  // Closing fence: must match char and be >= length
-  if (fenceChar === current.char && fenceLen >= current.length) {
-    return null;
-  }
-
-  // Not a valid close — still inside the code block
-  return current;
-}
 
 /**
  * Returns true if the node is an empty paragraph (no children, or a single
@@ -361,121 +329,68 @@ export function $importMarkdownFromHTML(
  * - one empty paragraph also exports as `\n\n`
  * - additional empty paragraphs export as additional blank lines
  */
-/**
- * Split Lexical's exported markdown string into content blocks,
- * respecting code fences (uses \n\n between them).
- */
-function splitExportedIntoBlocks(exported: string): string[] {
-  const exportedBlocks: string[] = [];
-  const exportedLines = exported.split("\n");
-  let currentBlock: string[] = [];
-  let exportFence: FenceState = null;
-  let i = 0;
-
-  while (i < exportedLines.length) {
-    const line = exportedLines[i];
-    exportFence = updateFenceState(line, exportFence);
-
-    if (exportFence === null && line.trim() === "" && currentBlock.length > 0) {
-      // Skip consecutive blank lines outside fences
-      while (
-        i + 1 < exportedLines.length &&
-        exportedLines[i + 1].trim() === ""
-      ) {
-        i++;
-      }
-      exportedBlocks.push(currentBlock.join("\n"));
-      currentBlock = [];
-    } else {
-      currentBlock.push(line);
-    }
-    i++;
-  }
-
-  if (currentBlock.length > 0) {
-    exportedBlocks.push(currentBlock.join("\n"));
-  }
-
-  return exportedBlocks;
+function canUseSoftBreakSeparator(
+  previousNode: LexicalNode,
+  nextNode: LexicalNode,
+): boolean {
+  const previousIsTextLike =
+    $isParagraphNode(previousNode) || $isHeadingNode(previousNode);
+  const nextIsTextLike = $isParagraphNode(nextNode) || $isHeadingNode(nextNode);
+  return previousIsTextLike && nextIsTextLike;
 }
 
-function classifyTopLevelChildren(children: LexicalNode[]): {
-  contentCount: number;
-  isEmpty: boolean[];
-} {
-  const isEmpty: boolean[] = [];
-  let contentCount = 0;
-
-  for (const child of children) {
-    const empty = isEmptyParagraph(child);
-    isEmpty.push(empty);
-    if (!empty) {
-      contentCount++;
-    }
-  }
-
-  return { contentCount, isEmpty };
-}
-
-function separatorBeforeContentBlock(
-  blockIdx: number,
+function separatorBetweenTopLevelBlocks(
+  previousNode: LexicalNode,
+  nextNode: LexicalNode,
   pendingEmptyParagraphs: number,
 ): string {
-  if (blockIdx === 0) {
-    return pendingEmptyParagraphs > 0
-      ? "\n".repeat(pendingEmptyParagraphs)
-      : "";
+  if (pendingEmptyParagraphs > 0) {
+    return "\n".repeat(pendingEmptyParagraphs + 1);
   }
 
-  return "\n".repeat(Math.max(2, pendingEmptyParagraphs + 1));
-}
-
-function trailingNewlinesAfterContent(
-  blockIdx: number,
-  pendingEmptyParagraphs: number,
-): string {
-  if (blockIdx === 0 || pendingEmptyParagraphs === 0) {
-    return "";
-  }
-
-  return "\n".repeat(pendingEmptyParagraphs + 1);
+  return canUseSoftBreakSeparator(previousNode, nextNode) ? "\n" : "\n\n";
 }
 
 export function $exportMarkdown(transformers: Array<Transformer>): string {
   const root = $getRoot();
   const children = root.getChildren();
-  const { contentCount, isEmpty } = classifyTopLevelChildren(children);
-
-  const exported = $convertToMarkdownStringNormalized(
-    transformers,
-    undefined,
-    false,
-  );
-
-  const exportedBlocks = splitExportedIntoBlocks(exported);
-
-  if (exportedBlocks.length !== contentCount) {
-    return exported;
-  }
-
   let result = "";
-  let blockIdx = 0;
   let pendingEmptyParagraphs = 0;
+  let previousContentNode: LexicalNode | null = null;
 
-  for (let i = 0; i < children.length; i++) {
-    if (isEmpty[i]) {
+  for (const child of children) {
+    if (isEmptyParagraph(child)) {
       pendingEmptyParagraphs++;
       continue;
     }
 
-    result += separatorBeforeContentBlock(blockIdx, pendingEmptyParagraphs);
-    result += exportedBlocks[blockIdx];
-    blockIdx++;
+    const blockMarkdown = $convertTopLevelElementToMarkdown(
+      child,
+      transformers,
+    );
+    if (blockMarkdown == null) {
+      continue;
+    }
+
+    result +=
+      previousContentNode === null
+        ? "\n".repeat(pendingEmptyParagraphs)
+        : separatorBetweenTopLevelBlocks(
+            previousContentNode,
+            child,
+            pendingEmptyParagraphs,
+          );
+
+    result += blockMarkdown;
+    previousContentNode = child;
     pendingEmptyParagraphs = 0;
   }
 
-  result += trailingNewlinesAfterContent(blockIdx, pendingEmptyParagraphs);
-  return blockIdx === 0 ? "" : result;
+  if (previousContentNode !== null && pendingEmptyParagraphs > 0) {
+    result += "\n".repeat(pendingEmptyParagraphs + 1);
+  }
+
+  return previousContentNode === null ? "" : result;
 }
 
 /**
