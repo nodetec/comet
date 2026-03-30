@@ -77,4 +77,37 @@ describe("validateBlossomAuth", () => {
       reason: "sha256 mismatch in x tag",
     });
   });
+
+  test("accepts multiple x tags when all required hashes are present", () => {
+    const result = validateBlossomAuth(
+      createAuthHeader({}, [
+        ["t", "upload"],
+        ["x", "a".repeat(64)],
+        ["x", "b".repeat(64)],
+      ]),
+      "upload",
+      { sha256s: ["a".repeat(64), "b".repeat(64)] },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.hashes).toEqual(["a".repeat(64), "b".repeat(64)]);
+    }
+  });
+
+  test("rejects when any required batch hash is missing", () => {
+    const result = validateBlossomAuth(
+      createAuthHeader({}, [
+        ["t", "upload"],
+        ["x", "a".repeat(64)],
+      ]),
+      "upload",
+      { sha256s: ["a".repeat(64), "b".repeat(64)] },
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "sha256 mismatch in x tags",
+    });
+  });
 });

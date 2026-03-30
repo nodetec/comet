@@ -6,7 +6,7 @@ export const KIND_BLOSSOM_AUTH = 24242;
 export type BlossomAction = "delete" | "list" | "upload";
 
 export type BlossomAuthResult =
-  | { ok: true; pubkey: string }
+  | { ok: true; pubkey: string; hashes: string[] }
   | { ok: false; reason: string };
 
 function decodeAuthHeader(authHeader: string): string {
@@ -16,7 +16,7 @@ function decodeAuthHeader(authHeader: string): string {
 export function validateBlossomAuth(
   authHeader: string | undefined,
   expectedAction: BlossomAction,
-  options?: { sha256?: string },
+  options?: { sha256?: string; sha256s?: string[] },
 ): BlossomAuthResult {
   if (authHeader?.startsWith("Nostr ") !== true) {
     return { ok: false, reason: "missing or invalid Authorization header" };
@@ -66,12 +66,28 @@ export function validateBlossomAuth(
     };
   }
 
+  const hashTags = nostrEvent.tags
+    .filter(([tag]) => tag === "x")
+    .map(([, value]) => value)
+    .filter((value): value is string => typeof value === "string");
+
   if (options?.sha256) {
-    const hashTag = nostrEvent.tags.find(([tag]) => tag === "x");
-    if (hashTag?.[1] !== options.sha256) {
+    if (!hashTags.includes(options.sha256)) {
       return { ok: false, reason: "sha256 mismatch in x tag" };
     }
   }
 
-  return { ok: true, pubkey: nostrEvent.pubkey };
+  if (options?.sha256s && options.sha256s.length > 0) {
+    const missingHashes = options.sha256s.filter(
+      (hash) => !hashTags.includes(hash),
+    );
+    if (missingHashes.length > 0) {
+      return {
+        ok: false,
+        reason: "sha256 mismatch in x tags",
+      };
+    }
+  }
+
+  return { ok: true, pubkey: nostrEvent.pubkey, hashes: hashTags };
 }

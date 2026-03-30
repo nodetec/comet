@@ -17,6 +17,15 @@ type UploadResponse = {
   uploaded: number;
 };
 
+type UploadBatchResponse = {
+  results: Array<{
+    part: string;
+    status: number;
+    descriptor?: UploadResponse;
+    error?: string;
+  }>;
+};
+
 let ctx: BlossomTestContext | undefined;
 
 describe("blossom integration", () => {
@@ -254,5 +263,147 @@ describe("blossom integration", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "forbidden" });
     expect(ctx!.objectStorage.uploadCount).toBe(0);
+  });
+
+  test("uploads multiple blobs in a single batch request", async () => {
+    const signer = createSigner();
+    await allowStorageForPubkey(ctx!.db, signer.pubkey);
+
+    const firstBody = new TextEncoder().encode("batch one");
+    const secondBody = new TextEncoder().encode("batch two");
+    const firstSha256 = await computeSha256Hex(firstBody);
+    const secondSha256 = await computeSha256Hex(secondBody);
+
+    const formData = new FormData();
+    formData.set(
+      "manifest",
+      JSON.stringify({
+        uploads: [
+          {
+            part: "file-1",
+            sha256: firstSha256,
+            size: firstBody.byteLength,
+            type: "text/plain",
+            filename: "one.txt",
+          },
+          {
+            part: "file-2",
+            sha256: secondSha256,
+            size: secondBody.byteLength,
+            type: "text/plain",
+            filename: "two.txt",
+          },
+        ],
+      }),
+    );
+    formData.set(
+      "file-1",
+      new File([firstBody], "one.txt", { type: "text/plain" }),
+    );
+    formData.set(
+      "file-2",
+      new File([secondBody], "two.txt", { type: "text/plain" }),
+    );
+
+    const response = await fetch(`${ctx!.baseUrl}/upload-batch`, {
+      method: "POST",
+      headers: {
+        Authorization: createAuthHeader(signer, "upload", {
+          sha256s: [firstSha256, secondSha256],
+        }),
+      },
+      body: formData,
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as UploadBatchResponse;
+    expect(payload.results).toHaveLength(2);
+    expect(payload.results[0]?.part).toBe("file-1");
+    expect(payload.results[0]?.status).toBe(200);
+    expect(payload.results[0]?.descriptor?.sha256).toBe(firstSha256);
+    expect(payload.results[0]?.descriptor?.size).toBe(firstBody.byteLength);
+    expect(payload.results[0]?.descriptor?.type).toStartWith("text/plain");
+    expect(payload.results[0]?.descriptor?.url).toBe(
+      `https://cdn.test/blossom/${firstSha256}`,
+    );
+    expect(payload.results[1]?.part).toBe("file-2");
+    expect(payload.results[1]?.status).toBe(200);
+    expect(payload.results[1]?.descriptor?.sha256).toBe(secondSha256);
+    expect(payload.results[1]?.descriptor?.size).toBe(secondBody.byteLength);
+    expect(payload.results[1]?.descriptor?.type).toStartWith("text/plain");
+    expect(payload.results[1]?.descriptor?.url).toBe(
+      `https://cdn.test/blossom/${secondSha256}`,
+    );
+    expect(ctx!.objectStorage.uploadCount).toBe(2);
+  });
+
+  test("returns partial success for batch uploads when later blobs exceed the storage limit", async () => {
+    const signer = createSigner();
+    await allowStorageForPubkey(ctx!.db, signer.pubkey, 10);
+
+    const firstBody = new TextEncoder().encode("12345");
+    const secondBody = new TextEncoder().encode("678901");
+    const firstSha256 = await computeSha256Hex(firstBody);
+    const secondSha256 = await computeSha256Hex(secondBody);
+
+    const formData = new FormData();
+    formData.set(
+      "manifest",
+      JSON.stringify({
+        uploads: [
+          {
+            part: "file-1",
+            sha256: firstSha256,
+            size: firstBody.byteLength,
+            type: "text/plain",
+          },
+          {
+            part: "file-2",
+            sha256: secondSha256,
+            size: secondBody.byteLength,
+            type: "text/plain",
+          },
+        ],
+      }),
+    );
+    formData.set(
+      "file-1",
+      new File([firstBody], "one.txt", { type: "text/plain" }),
+    );
+    formData.set(
+      "file-2",
+      new File([secondBody], "two.txt", { type: "text/plain" }),
+    );
+
+    const response = await fetch(`${ctx!.baseUrl}/upload-batch`, {
+      method: "POST",
+      headers: {
+        Authorization: createAuthHeader(signer, "upload", {
+          sha256s: [firstSha256, secondSha256],
+        }),
+      },
+      body: formData,
+    });
+
+    expect(response.status).toBe(207);
+    const payload = (await response.json()) as UploadBatchResponse;
+    expect(payload.results).toEqual([
+      {
+        part: "file-1",
+        status: 200,
+        descriptor: expect.objectContaining({
+          sha256: firstSha256,
+          size: firstBody.byteLength,
+        }),
+      },
+      {
+        part: "file-2",
+        status: 507,
+        error: "storage limit exceeded",
+      },
+    ]);
+    expect(ctx!.objectStorage.uploadCount).toBe(1);
+    expect(await blobDb.getBlob(ctx!.db, firstSha256)).not.toBeNull();
+    expect(await blobDb.getBlob(ctx!.db, secondSha256)).toBeNull();
   });
 });

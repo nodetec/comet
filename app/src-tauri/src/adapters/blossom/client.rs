@@ -5,6 +5,7 @@ use chacha20poly1305::{
 };
 use nostr_sdk::prelude::*;
 use reqwest::{header::LOCATION, redirect::Policy, Url};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 fn short_hash(hash: &str) -> &str {
@@ -13,6 +14,55 @@ fn short_hash(hash: &str) -> &str {
 
 fn blossom_log(message: &str) {
     eprintln!("[blossom] {message}");
+}
+
+#[derive(Debug)]
+pub struct BlossomBatchUploadItem {
+    pub part: String,
+    pub ciphertext_hash: String,
+    pub ciphertext: Vec<u8>,
+    pub content_type: String,
+}
+
+#[derive(Debug)]
+pub struct BlossomBatchUploadResult {
+    pub part: String,
+    pub status: u16,
+    pub ciphertext_hash: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct BlossomBatchUploadManifestItem<'a> {
+    part: &'a str,
+    sha256: &'a str,
+    size: usize,
+    #[serde(rename = "type")]
+    content_type: &'a str,
+    filename: String,
+}
+
+#[derive(Serialize)]
+struct BlossomBatchUploadManifest<'a> {
+    uploads: Vec<BlossomBatchUploadManifestItem<'a>>,
+}
+
+#[derive(Deserialize)]
+struct BlossomBatchUploadResponse {
+    results: Vec<BlossomBatchUploadResponseItem>,
+}
+
+#[derive(Deserialize)]
+struct BlossomBatchUploadResponseItem {
+    part: String,
+    status: u16,
+    descriptor: Option<BlossomUploadDescriptor>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct BlossomUploadDescriptor {
+    sha256: String,
 }
 
 /// Upload an encrypted blob to a Blossom server.
@@ -85,6 +135,134 @@ pub async fn upload_blob(
         short_hash(&ciphertext_hash)
     ));
     Ok(ciphertext_hash)
+}
+
+pub async fn upload_blobs_batch(
+    client: &reqwest::Client,
+    blossom_url: &str,
+    uploads: &[BlossomBatchUploadItem],
+    keys: &Keys,
+) -> Result<Vec<BlossomBatchUploadResult>, AppError> {
+    if uploads.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    blossom_log(&format!(
+        "encrypted batch upload start blobs={} url={}",
+        uploads.len(),
+        blossom_url
+    ));
+
+    let hashes = uploads
+        .iter()
+        .map(|upload| upload.ciphertext_hash.clone())
+        .collect::<Vec<_>>();
+    let auth_header = sign_blossom_auth_hashes(keys, "upload", &hashes, blossom_url)?;
+    let boundary = format!(
+        "comet-blossom-{}",
+        crate::domain::common::time::now_millis()
+    );
+    let manifest = BlossomBatchUploadManifest {
+        uploads: uploads
+            .iter()
+            .map(|upload| BlossomBatchUploadManifestItem {
+                part: &upload.part,
+                sha256: &upload.ciphertext_hash,
+                size: upload.ciphertext.len(),
+                content_type: &upload.content_type,
+                filename: format!("{}.bin", upload.part),
+            })
+            .collect(),
+    };
+    let manifest_json = serde_json::to_string(&manifest)
+        .map_err(|e| AppError::custom(format!("Failed to encode Blossom batch manifest: {e}")))?;
+
+    let mut body = Vec::new();
+    append_multipart_text_part(&mut body, &boundary, "manifest", &manifest_json);
+    for upload in uploads {
+        append_multipart_file_part(
+            &mut body,
+            &boundary,
+            &upload.part,
+            &format!("{}.bin", upload.part),
+            &upload.content_type,
+            &upload.ciphertext,
+        );
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+
+    let url = format!("{}/upload-batch", blossom_url.trim_end_matches('/'));
+    let resp = client
+        .post(&url)
+        .header("Authorization", auth_header)
+        .header(
+            "Content-Type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| {
+            blossom_log(&format!("encrypted batch upload request failed error={e}"));
+            AppError::custom(format!("Blossom batch upload failed: {e}"))
+        })?;
+
+    blossom_log(&format!(
+        "encrypted batch upload response status={}",
+        resp.status()
+    ));
+
+    if matches!(resp.status().as_u16(), 404 | 405 | 501) {
+        return Err(AppError::custom(format!(
+            "Blossom batch upload unsupported ({})",
+            resp.status()
+        )));
+    }
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        blossom_log(&format!(
+            "encrypted batch upload failed status={} body={}",
+            status, body
+        ));
+        return Err(AppError::custom(format!(
+            "Blossom batch upload failed ({status}): {body}"
+        )));
+    }
+
+    let response_body = resp.text().await.map_err(|e| {
+        AppError::custom(format!("Failed to read Blossom batch upload response: {e}"))
+    })?;
+    let payload: BlossomBatchUploadResponse =
+        serde_json::from_str(&response_body).map_err(|e| {
+            AppError::custom(format!(
+                "Failed to parse Blossom batch upload response: {e}"
+            ))
+        })?;
+
+    let results = payload
+        .results
+        .into_iter()
+        .map(|result| BlossomBatchUploadResult {
+            part: result.part,
+            status: result.status,
+            ciphertext_hash: result.descriptor.map(|descriptor| descriptor.sha256),
+            error: result.error,
+        })
+        .collect::<Vec<_>>();
+
+    blossom_log(&format!(
+        "encrypted batch upload ok blobs={} statuses={}",
+        results.len(),
+        results
+            .iter()
+            .map(|result| result.status.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    ));
+
+    Ok(results)
 }
 
 /// Delete a stored Blossom object by its server object hash.
@@ -271,6 +449,15 @@ fn sign_blossom_auth(
     blob_hash: &str,
     blossom_url: &str,
 ) -> Result<String, AppError> {
+    sign_blossom_auth_hashes(keys, action, &[blob_hash.to_string()], blossom_url)
+}
+
+fn sign_blossom_auth_hashes(
+    keys: &Keys,
+    action: &str,
+    blob_hashes: &[String],
+    blossom_url: &str,
+) -> Result<String, AppError> {
     let now = crate::domain::common::time::now_secs() as u64;
     let expiration = now + 300;
 
@@ -279,13 +466,20 @@ fn sign_blossom_auth(
         .and_then(|u| u.host_str().map(String::from))
         .unwrap_or_else(|| blossom_url.to_string());
 
+    let mut tags = vec![
+        Tag::custom(TagKind::custom("t"), vec![action.to_string()]),
+        Tag::custom(TagKind::custom("expiration"), vec![expiration.to_string()]),
+        Tag::custom(TagKind::custom("server"), vec![domain.clone()]),
+    ];
+    for blob_hash in blob_hashes {
+        tags.push(Tag::custom(
+            TagKind::custom("x"),
+            vec![blob_hash.to_string()],
+        ));
+    }
+
     let event = EventBuilder::new(Kind::Custom(24242), format!("{action} blob"))
-        .tags(vec![
-            Tag::custom(TagKind::custom("t"), vec![action.to_string()]),
-            Tag::custom(TagKind::custom("x"), vec![blob_hash.to_string()]),
-            Tag::custom(TagKind::custom("expiration"), vec![expiration.to_string()]),
-            Tag::custom(TagKind::custom("server"), vec![domain.clone()]),
-        ])
+        .tags(tags)
         .sign_with_keys(keys)
         .map_err(|e| AppError::custom(format!("Failed to sign Blossom auth: {e}")))?;
 
@@ -297,4 +491,31 @@ fn sign_blossom_auth(
     };
 
     Ok(format!("Nostr {encoded}"))
+}
+
+fn append_multipart_text_part(body: &mut Vec<u8>, boundary: &str, name: &str, value: &str) {
+    body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+    body.extend_from_slice(
+        format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+    );
+    body.extend_from_slice(value.as_bytes());
+    body.extend_from_slice(b"\r\n");
+}
+
+fn append_multipart_file_part(
+    body: &mut Vec<u8>,
+    boundary: &str,
+    name: &str,
+    filename: &str,
+    content_type: &str,
+    bytes: &[u8],
+) {
+    body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
+    body.extend_from_slice(
+        format!("Content-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n")
+            .as_bytes(),
+    );
+    body.extend_from_slice(format!("Content-Type: {content_type}\r\n\r\n").as_bytes());
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(b"\r\n");
 }

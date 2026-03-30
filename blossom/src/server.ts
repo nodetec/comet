@@ -32,6 +32,40 @@ export type BlossomRuntime = {
   stop: () => Promise<void>;
 };
 
+type BlobDescriptor = {
+  url: string;
+  sha256: string;
+  size: number;
+  type: string;
+  uploaded: number;
+};
+
+type UploadBatchManifestItem = {
+  part: string;
+  sha256: string;
+  size?: number;
+  type?: string;
+  filename?: string;
+};
+
+type UploadBatchManifest = {
+  uploads: UploadBatchManifestItem[];
+};
+
+type StoreBlobSuccess = {
+  ok: true;
+  descriptor: BlobDescriptor;
+  additionalUsage: number;
+  alreadyOwned: boolean;
+  existingBlob: boolean;
+};
+
+type StoreBlobFailure = {
+  ok: false;
+  status: number;
+  body: Record<string, unknown>;
+};
+
 function parsePort(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -93,6 +127,93 @@ function shortHash(hash: string): string {
 
 function shortPubkey(pubkey: string): string {
   return pubkey.slice(0, 12);
+}
+
+function normalizeMimeType(value: string): string {
+  return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+function buildBlobDescriptor(
+  objectStorage: ObjectStorage,
+  sha256: string,
+  size: number,
+  type: string | null,
+  uploaded: number,
+): BlobDescriptor {
+  return {
+    url: objectStorage.getPublicUrl(sha256),
+    sha256,
+    size,
+    type: type ?? "application/octet-stream",
+    uploaded,
+  };
+}
+
+async function storeBlobForPubkey(
+  db: DB,
+  objectStorage: ObjectStorage,
+  pubkey: string,
+  data: Uint8Array,
+  contentType: string,
+  currentUsage: number,
+  storageLimitBytes: number,
+): Promise<StoreBlobSuccess | StoreBlobFailure> {
+  const sha256 = await computeSha256Hex(data);
+  const [existingBlob, alreadyOwned] = await Promise.all([
+    blobDb.getBlob(db, sha256),
+    blobDb.hasOwner(db, sha256, pubkey),
+  ]);
+
+  const additionalUsage = alreadyOwned ? 0 : data.byteLength;
+  if (currentUsage + additionalUsage > storageLimitBytes) {
+    return {
+      ok: false,
+      status: 507,
+      body: {
+        error: "storage limit exceeded",
+        usage: currentUsage,
+        limit: storageLimitBytes,
+        required: additionalUsage,
+      },
+    };
+  }
+
+  if (!existingBlob) {
+    try {
+      await objectStorage.uploadBlob(sha256, data, contentType);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error(
+        `[blossom] storage upload failed hash=${shortHash(sha256)} pubkey=${shortPubkey(pubkey)} error=${err.name}: ${err.message}`,
+      );
+      return {
+        ok: false,
+        status: 500,
+        body: { error: "storage upload failed" },
+      };
+    }
+  } else {
+    console.log(
+      `[blossom] upload skipped object-storage write hash=${shortHash(sha256)} reason=existing-blob`,
+    );
+  }
+
+  await blobDb.insertBlob(db, sha256, data.byteLength, contentType, pubkey);
+  const uploaded = existingBlob?.uploaded_at ?? Math.floor(Date.now() / 1000);
+
+  return {
+    ok: true,
+    descriptor: buildBlobDescriptor(
+      objectStorage,
+      sha256,
+      data.byteLength,
+      contentType,
+      uploaded,
+    ),
+    additionalUsage,
+    alreadyOwned,
+    existingBlob: existingBlob !== null,
+  };
 }
 
 async function truncateAll(db: DB): Promise<void> {
@@ -236,13 +357,10 @@ export async function createBlossomServer(
           `[blossom] upload parsed pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} bytes=${data.byteLength} type=${contentType}`,
         );
 
-        const [currentUsage, storageLimit, existingBlob, alreadyOwned] =
-          await Promise.all([
-            blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey),
-            blobDb.getPubkeyAccessPolicy(db, auth.pubkey),
-            blobDb.getBlob(db, sha256),
-            blobDb.hasOwner(db, sha256, auth.pubkey),
-          ]);
+        const [currentUsage, storageLimit] = await Promise.all([
+          blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey),
+          blobDb.getPubkeyAccessPolicy(db, auth.pubkey),
+        ]);
 
         if (!storageLimit.allowed) {
           console.warn(
@@ -251,59 +369,200 @@ export async function createBlossomServer(
           return json({ error: "forbidden" }, 403);
         }
         console.log(
-          `[blossom] upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes} already_owned=${alreadyOwned} existing_blob=${existingBlob !== null}`,
+          `[blossom] upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes}`,
         );
 
-        const additionalUsage = alreadyOwned ? 0 : data.byteLength;
-        if (currentUsage + additionalUsage > storageLimit.storageLimitBytes) {
-          console.warn(
-            `[blossom] upload over-limit pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} usage=${currentUsage} required=${additionalUsage} limit=${storageLimit.storageLimitBytes}`,
-          );
-          return json(
-            {
-              error: "storage limit exceeded",
-              usage: currentUsage,
-              limit: storageLimit.storageLimitBytes,
-              required: additionalUsage,
-            },
-            507,
-          );
-        }
-
-        if (!existingBlob) {
-          try {
-            await objectStorage.uploadBlob(sha256, data, contentType);
-          } catch (e) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            console.error(
-              `[blossom] storage upload failed hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} error=${err.name}: ${err.message}`,
-            );
-            return json({ error: "storage upload failed" }, 500);
-          }
-        } else {
-          console.log(
-            `[blossom] upload skipped object-storage write hash=${shortHash(sha256)} reason=existing-blob`,
-          );
-        }
-
-        await blobDb.insertBlob(
+        const stored = await storeBlobForPubkey(
           db,
-          sha256,
-          data.byteLength,
+          objectStorage,
+          auth.pubkey,
+          data,
           contentType,
+          currentUsage,
+          storageLimit.storageLimitBytes,
+        );
+        if (!stored.ok) {
+          if (stored.status === 507) {
+            console.warn(
+              `[blossom] upload over-limit pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes}`,
+            );
+          }
+          return json(stored.body, stored.status);
+        }
+
+        console.log(
+          `[blossom] upload metadata stored hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} url=${stored.descriptor.url}`,
+        );
+
+        return json(stored.descriptor);
+      }
+
+      if (request.method === "POST" && url.pathname === "/upload-batch") {
+        console.log(`[blossom] batch upload request path=/upload-batch`);
+
+        let formData: FormData;
+        try {
+          formData = await request.formData();
+        } catch {
+          return json({ error: "invalid multipart form data" }, 400);
+        }
+
+        const manifestValue = formData.get("manifest");
+        if (manifestValue === null) {
+          return json({ error: "missing manifest" }, 400);
+        }
+
+        const manifestText =
+          typeof manifestValue === "string"
+            ? manifestValue
+            : manifestValue instanceof Blob
+              ? await manifestValue.text()
+              : null;
+        if (manifestText === null) {
+          return json({ error: "invalid manifest" }, 400);
+        }
+
+        let manifest: UploadBatchManifest;
+        try {
+          manifest = JSON.parse(manifestText) as UploadBatchManifest;
+        } catch {
+          return json({ error: "invalid manifest json" }, 400);
+        }
+
+        if (!Array.isArray(manifest.uploads) || manifest.uploads.length === 0) {
+          return json(
+            { error: "manifest uploads must be a non-empty array" },
+            400,
+          );
+        }
+
+        const hashes = manifest.uploads.map((item) => item.sha256);
+        const auth = validateBlossomAuth(
+          request.headers.get("authorization") ?? undefined,
+          "upload",
+          { sha256s: hashes },
+        );
+        if (!auth.ok) {
+          console.warn(
+            `[blossom] batch upload auth failed reason=${auth.reason}`,
+          );
+          return json({ error: auth.reason }, 401);
+        }
+
+        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
+          db,
           auth.pubkey,
         );
+        if (!accessPolicy.allowed) {
+          console.warn(
+            `[blossom] batch upload forbidden pubkey=${shortPubkey(auth.pubkey)} reason=not-allowlisted`,
+          );
+          return json({ error: "forbidden" }, 403);
+        }
+
+        const parsedUploads = [];
+        for (const item of manifest.uploads) {
+          if (
+            typeof item.part !== "string" ||
+            typeof item.sha256 !== "string" ||
+            item.part.length === 0 ||
+            item.sha256.length !== 64
+          ) {
+            return json({ error: "invalid manifest upload item" }, 400);
+          }
+
+          const part = formData.get(item.part);
+          if (!(part instanceof Blob)) {
+            return json(
+              { error: `missing file part for manifest item "${item.part}"` },
+              400,
+            );
+          }
+
+          const data = new Uint8Array(await part.arrayBuffer());
+          const computedSha256 = await computeSha256Hex(data);
+          if (computedSha256 !== item.sha256) {
+            return json(
+              { error: `sha256 mismatch for manifest item "${item.part}"` },
+              400,
+            );
+          }
+
+          if (item.size !== undefined && item.size !== data.byteLength) {
+            return json(
+              { error: `size mismatch for manifest item "${item.part}"` },
+              400,
+            );
+          }
+
+          const contentType =
+            part.type || (item.type ?? "application/octet-stream");
+          if (
+            item.type !== undefined &&
+            part.type &&
+            normalizeMimeType(item.type) !== normalizeMimeType(part.type)
+          ) {
+            return json(
+              {
+                error: `content-type mismatch for manifest item "${item.part}"`,
+              },
+              400,
+            );
+          }
+
+          parsedUploads.push({
+            part: item.part,
+            sha256: item.sha256,
+            data,
+            contentType,
+          });
+        }
+
+        let usage = await blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey);
         console.log(
-          `[blossom] upload metadata stored hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} url=${objectStorage.getPublicUrl(sha256)}`,
+          `[blossom] batch upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${usage} limit=${accessPolicy.storageLimitBytes} uploads=${parsedUploads.length}`,
         );
 
-        return json({
-          url: objectStorage.getPublicUrl(sha256),
-          sha256,
-          size: data.byteLength,
-          type: contentType,
-          uploaded: Math.floor(Date.now() / 1000),
-        });
+        const results: Array<{
+          part: string;
+          status: number;
+          descriptor?: BlobDescriptor;
+          error?: string;
+        }> = [];
+
+        for (const item of parsedUploads) {
+          const stored = await storeBlobForPubkey(
+            db,
+            objectStorage,
+            auth.pubkey,
+            item.data,
+            item.contentType,
+            usage,
+            accessPolicy.storageLimitBytes,
+          );
+
+          if (!stored.ok) {
+            results.push({
+              part: item.part,
+              status: stored.status,
+              error:
+                typeof stored.body.error === "string"
+                  ? stored.body.error
+                  : "upload failed",
+            });
+            continue;
+          }
+
+          usage += stored.additionalUsage;
+          results.push({
+            part: item.part,
+            status: 200,
+            descriptor: stored.descriptor,
+          });
+        }
+
+        const hasFailures = results.some((result) => result.status !== 200);
+        return json({ results }, hasFailures ? 207 : 200);
       }
 
       // Admin blob deletion — ADMIN_TOKEN auth (no Nostr signing required)

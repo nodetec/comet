@@ -9,9 +9,18 @@ use crate::domain::sync::revision_service::{
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, OptionalExtension};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use tauri::AppHandle;
 
 use super::sync_manager::sync_log;
+
+const BLOSSOM_BATCH_UPLOAD_CONCURRENCY: usize = 4;
+
+pub struct PreparedNoteRevisionPublish {
+    pub note_id: String,
+    pub event: Event,
+}
 
 pub async fn push_note_revision(
     app: &AppHandle,
@@ -20,8 +29,456 @@ pub async fn push_note_revision(
     keys: &Keys,
     note_id: &str,
 ) -> Result<(), AppError> {
-    maybe_upload_note_attachments(app, note_id, keys).await?;
+    let prepared = prepare_note_revision_publish(app, keys, note_id).await?;
+    let event = prepared.event;
 
+    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
+
+    mark_note_revision_published(app, note_id, &event.id.to_hex())?;
+
+    sync_log(
+        app,
+        &format!(
+            "pushed revision note {note_id} to {}/{} relays",
+            fanout.success_count, fanout.relay_count
+        ),
+    );
+    Ok(())
+}
+
+pub async fn prepare_note_revision_publish(
+    app: &AppHandle,
+    keys: &Keys,
+    note_id: &str,
+) -> Result<PreparedNoteRevisionPublish, AppError> {
+    maybe_upload_note_attachments(app, note_id, keys).await?;
+    build_prepared_note_revision_publish(app, keys, note_id)
+}
+
+pub async fn prepare_note_revision_publishes_batch(
+    app: &AppHandle,
+    keys: &Keys,
+    note_ids: &[String],
+) -> Vec<(String, Result<PreparedNoteRevisionPublish, AppError>)> {
+    let upload_summary = match maybe_upload_note_attachments_batch(app, note_ids, keys).await {
+        Ok(summary) => summary,
+        Err(error) => {
+            return note_ids
+                .iter()
+                .cloned()
+                .map(|note_id| (note_id, Err(AppError::custom(error.to_string()))))
+                .collect();
+        }
+    };
+
+    note_ids
+        .iter()
+        .cloned()
+        .map(|note_id| {
+            if let Some(message) = upload_summary.note_error(&note_id) {
+                return (note_id, Err(AppError::custom(message)));
+            }
+
+            let result = build_prepared_note_revision_publish(app, keys, &note_id);
+            (note_id, result)
+        })
+        .collect()
+}
+
+pub async fn push_note_revisions_batch(
+    app: &AppHandle,
+    active_relay_url: &str,
+    backup_relay_urls: &[String],
+    keys: &Keys,
+    note_ids: &[String],
+) -> Result<(), AppError> {
+    if note_ids.is_empty() {
+        return Ok(());
+    }
+
+    let prepared_results = prepare_note_revision_publishes_batch(app, keys, note_ids).await;
+    let mut prepared_publishes = Vec::new();
+
+    for (note_id, result) in prepared_results {
+        match result {
+            Ok(prepared) => prepared_publishes.push(prepared),
+            Err(error) => {
+                sync_log(app, &format!("revision push error: {note_id}: {error}"));
+            }
+        }
+    }
+
+    if prepared_publishes.is_empty() {
+        return Ok(());
+    }
+
+    let events = prepared_publishes
+        .iter()
+        .map(|prepared| prepared.event.clone())
+        .collect::<Vec<_>>();
+
+    match send_events_to_relays_batch(active_relay_url, backup_relay_urls, keys, &events).await {
+        Ok(fanout) => {
+            for prepared in prepared_publishes {
+                let event_id = prepared.event.id.to_hex();
+                let success_count = fanout.success_counts.get(&event_id).copied().unwrap_or(0);
+
+                if success_count > 0 {
+                    match mark_note_revision_published(app, &prepared.note_id, &event_id) {
+                        Ok(()) => {
+                            sync_log(
+                                app,
+                                &format!(
+                                    "pushed revision note {} to {}/{} relays",
+                                    prepared.note_id, success_count, fanout.relay_count
+                                ),
+                            );
+                        }
+                        Err(error) => {
+                            sync_log(
+                                app,
+                                &format!(
+                                    "revision push finalize error: {}: {}",
+                                    prepared.note_id, error
+                                ),
+                            );
+                        }
+                    }
+                } else if let Some(message) = fanout.rejection_messages.get(&event_id) {
+                    sync_log(
+                        app,
+                        &format!(
+                            "revision push error: {}: relay rejected event: {}",
+                            prepared.note_id, message
+                        ),
+                    );
+                } else {
+                    sync_log(
+                        app,
+                        &format!(
+                            "revision push error: {}: event failed on every configured sync relay",
+                            prepared.note_id
+                        ),
+                    );
+                }
+            }
+
+            Ok(())
+        }
+        Err(error) => {
+            for prepared in prepared_publishes {
+                sync_log(
+                    app,
+                    &format!("revision push error: {}: {}", prepared.note_id, error),
+                );
+            }
+
+            Err(error)
+        }
+    }
+}
+
+struct BatchAttachmentUploadSummary {
+    note_hashes: HashMap<String, Vec<String>>,
+    failed_hash_errors: HashMap<String, String>,
+}
+
+struct PendingAttachmentUpload {
+    plaintext_hash: String,
+    ciphertext_hash: String,
+    ciphertext: Vec<u8>,
+    encryption_key: String,
+    plaintext_size: usize,
+}
+
+impl BatchAttachmentUploadSummary {
+    fn note_error(&self, note_id: &str) -> Option<String> {
+        let hashes = self.note_hashes.get(note_id)?;
+        let failures = hashes
+            .iter()
+            .filter_map(|hash| {
+                self.failed_hash_errors
+                    .get(hash)
+                    .map(|error| format!("{} ({error})", &hash[..8.min(hash.len())]))
+            })
+            .collect::<Vec<_>>();
+
+        if failures.is_empty() {
+            None
+        } else {
+            Some(format!(
+                "Attachment upload failed for note {note_id}: {}",
+                failures.join(", ")
+            ))
+        }
+    }
+}
+
+async fn maybe_upload_note_attachments_batch(
+    app: &AppHandle,
+    note_ids: &[String],
+    keys: &Keys,
+) -> Result<BatchAttachmentUploadSummary, AppError> {
+    let (blossom_url, note_hashes) = {
+        let conn = database_connection(app)?;
+        let blossom_url = get_blossom_url(&conn);
+        let mut note_hashes = HashMap::<String, Vec<String>>::new();
+        let mut stmt = conn.prepare("SELECT markdown FROM notes WHERE id = ?1")?;
+
+        for note_id in note_ids {
+            let markdown: String = stmt.query_row(params![note_id], |row| row.get(0))?;
+            let attachment_hashes = extract_attachment_hashes(&markdown)
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            note_hashes.insert(note_id.clone(), attachment_hashes);
+        }
+
+        (blossom_url, note_hashes)
+    };
+
+    let total_attachment_refs = note_hashes.values().map(Vec::len).sum::<usize>();
+    if total_attachment_refs == 0 {
+        return Ok(BatchAttachmentUploadSummary {
+            note_hashes,
+            failed_hash_errors: HashMap::new(),
+        });
+    }
+
+    let Some(blossom_url) = blossom_url else {
+        sync_log(
+            app,
+            &format!(
+                "revision blossom batch skip notes={} attachments={} but no blossom url configured",
+                note_ids.len(),
+                total_attachment_refs
+            ),
+        );
+        return Ok(BatchAttachmentUploadSummary {
+            note_hashes,
+            failed_hash_errors: HashMap::new(),
+        });
+    };
+
+    let unique_hashes = note_hashes
+        .values()
+        .flat_map(|hashes| hashes.iter().cloned())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    sync_log(
+        app,
+        &format!(
+            "revision blossom batch upload notes={} attachment_refs={} unique_attachments={} concurrency={} url={}",
+            note_ids.len(),
+            total_attachment_refs,
+            unique_hashes.len(),
+            BLOSSOM_BATCH_UPLOAD_CONCURRENCY,
+            blossom_url
+        ),
+    );
+
+    let http_client = reqwest::Client::new();
+    let pubkey_hex = keys.public_key().to_hex();
+    let mut uploaded = 0usize;
+    let mut reused = 0usize;
+    let mut failed_hash_errors = HashMap::new();
+    let mut pending_uploads = Vec::new();
+
+    for hash in &unique_hashes {
+        let existing: Option<(String, String)> = {
+            let conn = database_connection(app)?;
+            conn.query_row(
+                "SELECT ciphertext_hash, encryption_key
+                 FROM blob_meta
+                 WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                params![hash, blossom_url, pubkey_hex],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+        };
+
+        if let Some((ciphertext_hash, _)) = existing {
+            let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
+            let exists = http_client
+                .head(&head_url)
+                .send()
+                .await
+                .map(|response| response.status().is_success())
+                .unwrap_or(false);
+
+            if exists {
+                reused += 1;
+                continue;
+            }
+
+            let conn = database_connection(app)?;
+            conn.execute(
+                "DELETE FROM blob_meta WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+                params![hash, blossom_url, pubkey_hex],
+            )?;
+        }
+
+        let (blob_data, _) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
+            .ok_or_else(|| {
+                AppError::custom(format!(
+                    "Local attachment missing for revision sync: {hash}"
+                ))
+            })?;
+        let (ciphertext, encryption_key) =
+            crate::adapters::blossom::client::encrypt_blob(&blob_data)?;
+        let ciphertext_hash = format!("{:x}", Sha256::digest(&ciphertext));
+        pending_uploads.push(PendingAttachmentUpload {
+            plaintext_hash: hash.clone(),
+            ciphertext_hash,
+            ciphertext,
+            encryption_key,
+            plaintext_size: blob_data.len(),
+        });
+    }
+
+    if !pending_uploads.is_empty() {
+        let batch_items = pending_uploads
+            .iter()
+            .enumerate()
+            .map(
+                |(index, upload)| crate::adapters::blossom::client::BlossomBatchUploadItem {
+                    part: format!("file-{}", index + 1),
+                    ciphertext_hash: upload.ciphertext_hash.clone(),
+                    ciphertext: upload.ciphertext.clone(),
+                    content_type: "application/octet-stream".to_string(),
+                },
+            )
+            .collect::<Vec<_>>();
+
+        match crate::adapters::blossom::client::upload_blobs_batch(
+            &http_client,
+            &blossom_url,
+            &batch_items,
+            keys,
+        )
+        .await
+        {
+            Ok(results) => {
+                let upload_by_part = batch_items
+                    .iter()
+                    .zip(pending_uploads.iter())
+                    .map(|(item, upload)| (item.part.as_str(), upload))
+                    .collect::<HashMap<_, _>>();
+
+                for result in results {
+                    let Some(upload) = upload_by_part.get(result.part.as_str()) else {
+                        continue;
+                    };
+
+                    if result.status == 200 {
+                        let ciphertext_hash = result
+                            .ciphertext_hash
+                            .unwrap_or_else(|| upload.ciphertext_hash.clone());
+                        persist_attachment_upload_metadata(
+                            app,
+                            &blossom_url,
+                            &pubkey_hex,
+                            upload,
+                            &ciphertext_hash,
+                        )?;
+                        uploaded += 1;
+                    } else {
+                        let error = result
+                            .error
+                            .unwrap_or_else(|| format!("batch upload failed ({})", result.status));
+                        sync_log(
+                            app,
+                            &format!(
+                                "revision blossom batch error plaintext={}: {}",
+                                &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
+                                error
+                            ),
+                        );
+                        failed_hash_errors.insert(upload.plaintext_hash.clone(), error);
+                    }
+                }
+            }
+            Err(error) if error.to_string().contains("batch upload unsupported") => {
+                sync_log(
+                    app,
+                    "revision blossom batch upload unsupported, falling back to single uploads",
+                );
+
+                for upload in pending_uploads {
+                    match crate::adapters::blossom::client::upload_blob(
+                        &http_client,
+                        &blossom_url,
+                        upload.ciphertext.clone(),
+                        keys,
+                    )
+                    .await
+                    {
+                        Ok(ciphertext_hash) => {
+                            persist_attachment_upload_metadata(
+                                app,
+                                &blossom_url,
+                                &pubkey_hex,
+                                &upload,
+                                &ciphertext_hash,
+                            )?;
+                            uploaded += 1;
+                        }
+                        Err(error) => {
+                            sync_log(
+                                app,
+                                &format!(
+                                    "revision blossom batch error plaintext={}: {}",
+                                    &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
+                                    error
+                                ),
+                            );
+                            failed_hash_errors
+                                .insert(upload.plaintext_hash.clone(), error.to_string());
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                for upload in pending_uploads {
+                    sync_log(
+                        app,
+                        &format!(
+                            "revision blossom batch error plaintext={}: {}",
+                            &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
+                            error
+                        ),
+                    );
+                    failed_hash_errors.insert(upload.plaintext_hash.clone(), error.to_string());
+                }
+            }
+        }
+    }
+
+    sync_log(
+        app,
+        &format!(
+            "revision blossom batch ready notes={} uploaded={} reused={} failed={}",
+            note_ids.len(),
+            uploaded,
+            reused,
+            failed_hash_errors.len()
+        ),
+    );
+
+    Ok(BatchAttachmentUploadSummary {
+        note_hashes,
+        failed_hash_errors,
+    })
+}
+
+fn build_prepared_note_revision_publish(
+    app: &AppHandle,
+    keys: &Keys,
+    note_id: &str,
+) -> Result<PreparedNoteRevisionPublish, AppError> {
     let recipient = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
@@ -37,21 +494,22 @@ pub async fn push_note_revision(
         crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
     };
 
-    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
+    Ok(PreparedNoteRevisionPublish {
+        note_id: note_id.to_string(),
+        event,
+    })
+}
 
+pub fn mark_note_revision_published(
+    app: &AppHandle,
+    note_id: &str,
+    event_id_hex: &str,
+) -> Result<(), AppError> {
     let conn = database_connection(app)?;
     conn.execute(
         "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
-        rusqlite::params![event.id.to_hex(), note_id],
+        rusqlite::params![event_id_hex, note_id],
     )?;
-
-    sync_log(
-        app,
-        &format!(
-            "pushed revision note {note_id} to {}/{} relays",
-            fanout.success_count, fanout.relay_count
-        ),
-    );
     Ok(())
 }
 
@@ -215,6 +673,38 @@ async fn maybe_upload_note_attachments(
     Ok(())
 }
 
+fn persist_attachment_upload_metadata(
+    app: &AppHandle,
+    blossom_url: &str,
+    pubkey_hex: &str,
+    upload: &PendingAttachmentUpload,
+    ciphertext_hash: &str,
+) -> Result<(), AppError> {
+    let conn = database_connection(app)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            upload.plaintext_hash,
+            blossom_url,
+            pubkey_hex,
+            ciphertext_hash,
+            upload.encryption_key
+        ],
+    )?;
+    conn.execute(
+        "INSERT OR REPLACE INTO blob_uploads (object_hash, server_url, encrypted, size_bytes, uploaded_at)
+         VALUES (?1, ?2, 1, ?3, ?4)",
+        params![
+            ciphertext_hash,
+            blossom_url,
+            upload.plaintext_size as i64,
+            crate::domain::common::time::now_millis()
+        ],
+    )?;
+    Ok(())
+}
+
 pub async fn push_deletion_revision(
     app: &AppHandle,
     active_relay_url: &str,
@@ -259,6 +749,12 @@ pub async fn push_deletion_revision(
 struct RelayFanoutResult {
     success_count: usize,
     relay_count: usize,
+}
+
+pub struct BatchRelayFanoutResult {
+    pub success_counts: HashMap<String, usize>,
+    pub rejection_messages: HashMap<String, String>,
+    pub relay_count: usize,
 }
 
 async fn send_event_to_relays(
@@ -312,6 +808,63 @@ async fn send_event_to_relays(
     })
 }
 
+pub async fn send_events_to_relays_batch(
+    active_relay_url: &str,
+    backup_relay_urls: &[String],
+    keys: &Keys,
+    events: &[Event],
+) -> Result<BatchRelayFanoutResult, AppError> {
+    let mut success_counts = HashMap::<String, usize>::new();
+    let mut rejection_messages = HashMap::<String, String>::new();
+    let relay_count = 1 + backup_relay_urls.len();
+    let relay_urls = std::iter::once(active_relay_url)
+        .chain(backup_relay_urls.iter().map(String::as_str))
+        .collect::<Vec<_>>();
+
+    let mut any_success = false;
+
+    for relay_url in relay_urls {
+        match RevisionRelayConnection::connect_authenticated(relay_url, keys).await {
+            Ok(mut connection) => match send_events_on_connection(&mut connection, events).await {
+                Ok(result) => {
+                    if !result.accepted_event_ids.is_empty() {
+                        any_success = true;
+                    }
+                    for event_id in result.accepted_event_ids {
+                        *success_counts.entry(event_id).or_insert(0) += 1;
+                    }
+                    for (event_id, message) in result.rejected_event_ids {
+                        rejection_messages.entry(event_id).or_insert(message);
+                    }
+                }
+                Err(error) => {
+                    eprintln!("[sync] revision batch push error relay={relay_url}: {error}");
+                }
+            },
+            Err(error) => {
+                eprintln!("[sync] revision batch connect error relay={relay_url}: {error}");
+            }
+        }
+    }
+
+    if !any_success {
+        return Err(AppError::custom(
+            "Revision push failed on every configured sync relay",
+        ));
+    }
+
+    Ok(BatchRelayFanoutResult {
+        success_counts,
+        rejection_messages,
+        relay_count,
+    })
+}
+
+struct RelayBatchConnectionResult {
+    accepted_event_ids: HashSet<String>,
+    rejected_event_ids: HashMap<String, String>,
+}
+
 async fn send_event_on_connection(
     connection: &mut RevisionRelayConnection,
     event: &Event,
@@ -335,6 +888,67 @@ async fn send_event_on_connection(
             "Unexpected relay publish response: {other:?}"
         ))),
     }
+}
+
+async fn send_events_on_connection(
+    connection: &mut RevisionRelayConnection,
+    events: &[Event],
+) -> Result<RelayBatchConnectionResult, AppError> {
+    let mut pending_event_ids = events
+        .iter()
+        .map(|event| event.id.to_hex())
+        .collect::<HashSet<_>>();
+    let mut accepted_event_ids = HashSet::new();
+    let mut rejected_event_ids = HashMap::new();
+
+    for event in events {
+        connection.send_event(event).await?;
+    }
+
+    while !pending_event_ids.is_empty() {
+        match connection.recv_message().await? {
+            RevisionRelayIncomingMessage::Ok {
+                event_id,
+                accepted: true,
+                ..
+            } => {
+                if pending_event_ids.remove(&event_id) {
+                    accepted_event_ids.insert(event_id);
+                }
+            }
+            RevisionRelayIncomingMessage::Ok {
+                event_id,
+                accepted: false,
+                message,
+            } if message.starts_with("duplicate:") => {
+                if pending_event_ids.remove(&event_id) {
+                    accepted_event_ids.insert(event_id);
+                }
+            }
+            RevisionRelayIncomingMessage::Ok {
+                event_id,
+                accepted: false,
+                message,
+            } => {
+                if pending_event_ids.remove(&event_id) {
+                    rejected_event_ids.insert(event_id, message);
+                }
+            }
+            RevisionRelayIncomingMessage::Notice(message) => {
+                eprintln!("[sync] revision batch relay notice: {message}");
+            }
+            other => {
+                return Err(AppError::custom(format!(
+                    "Unexpected relay batch publish response: {other:?}"
+                )));
+            }
+        }
+    }
+
+    Ok(RelayBatchConnectionResult {
+        accepted_event_ids,
+        rejected_event_ids,
+    })
 }
 
 #[cfg(test)]

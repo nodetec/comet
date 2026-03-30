@@ -53,6 +53,7 @@ export function createAuthHeader(
     created_at?: number;
     expiration?: number;
     sha256?: string;
+    sha256s?: string[];
     overrides?: Partial<NostrEvent>;
   } = {},
 ): string {
@@ -62,6 +63,9 @@ export function createAuthHeader(
   }
   if (options.sha256) {
     tags.push(["x", options.sha256]);
+  }
+  for (const sha256 of options.sha256s ?? []) {
+    tags.push(["x", sha256]);
   }
 
   const event = finalizeEvent(
