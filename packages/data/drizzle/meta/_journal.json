@@ -85,6 +85,13 @@
       "when": 1774419000000,
       "tag": "0011_index_sync_revisions_entity_type",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1774915200000,
+      "tag": "0012_drop_users_table",
+      "breakpoints": true
     }
   ]
 }

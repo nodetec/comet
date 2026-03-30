@@ -118,18 +118,6 @@ export const inviteCodes = pgTable("invite_codes", {
     .default(sql`(EXTRACT(EPOCH FROM NOW())::BIGINT)`),
 });
 
-export const users = pgTable("users", {
-  pubkey: text("pubkey").primaryKey(),
-  inviteCodeId: integer("invite_code_id").references(() => inviteCodes.id, {
-    onDelete: "set null",
-  }),
-  storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }),
-  expiresAt: bigint("expires_at", { mode: "number" }),
-  createdAt: bigint("created_at", { mode: "number" })
-    .notNull()
-    .default(sql`(EXTRACT(EPOCH FROM NOW())::BIGINT)`),
-});
-
 export const blobs = pgTable("blobs", {
   sha256: text("sha256").primaryKey(),
   size: bigint("size", { mode: "number" }).notNull(),

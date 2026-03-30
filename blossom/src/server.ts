@@ -97,7 +97,7 @@ function shortPubkey(pubkey: string): string {
 
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
-    rawSql`TRUNCATE blob_owners, blobs, relay_allowed_users, users, invite_codes CASCADE`,
+    rawSql`TRUNCATE blob_owners, blobs, relay_allowed_users, invite_codes CASCADE`,
   );
 }
 

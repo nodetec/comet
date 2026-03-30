@@ -16,7 +16,7 @@ interface StatsCardsProps {
 const statCards = [
   { key: "events" as const, label: "Stored Events", icon: FileText },
   { key: "blobs" as const, label: "Blobs", icon: HardDrive },
-  { key: "users" as const, label: "Users", icon: Users },
+  { key: "users" as const, label: "Authorized Users", icon: Users },
   { key: "blobStorage" as const, label: "Blob Storage", icon: Database },
 ];
 

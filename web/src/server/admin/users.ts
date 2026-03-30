@@ -10,12 +10,12 @@ import {
   deletedEvents,
   events,
   relayEvents,
+  relayAllowedUsers,
   syncChanges,
   syncHeads,
   syncPayloads,
   syncRevisionParents,
   syncRevisions,
-  users,
 } from "@comet/data";
 import { DEFAULT_STORAGE_LIMIT_BYTES } from "~/lib/utils";
 import { getAdminErrorMessage } from "~/server/admin/http";
@@ -25,15 +25,15 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
   const [blobStats, eventCounts] = await Promise.all([
     db
       .select({
-        pubkey: users.pubkey,
-        storageLimitBytes: users.storageLimitBytes,
+        pubkey: relayAllowedUsers.pubkey,
+        storageLimitBytes: relayAllowedUsers.storageLimitBytes,
         storageUsedBytes: sql<number>`COALESCE(SUM(${blobs.size}), 0)`,
         blobCount: sql<number>`COUNT(DISTINCT ${blobOwners.sha256})`,
       })
-      .from(users)
-      .leftJoin(blobOwners, eq(blobOwners.pubkey, users.pubkey))
+      .from(relayAllowedUsers)
+      .leftJoin(blobOwners, eq(blobOwners.pubkey, relayAllowedUsers.pubkey))
       .leftJoin(blobs, eq(blobs.sha256, blobOwners.sha256))
-      .groupBy(users.pubkey, users.storageLimitBytes)
+      .groupBy(relayAllowedUsers.pubkey, relayAllowedUsers.storageLimitBytes)
       .orderBy(sql`COALESCE(SUM(${blobs.size}), 0) DESC`),
     db.execute<{ user_pubkey: string; event_count: number | string }>(sql`
       WITH event_counts AS (
