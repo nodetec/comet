@@ -66,6 +66,15 @@ type StoreBlobFailure = {
   body: Record<string, unknown>;
 };
 
+type ParsedBatchUpload = {
+  part: string;
+  sha256: string;
+  data: Uint8Array;
+  contentType: string;
+};
+
+const BATCH_UPLOAD_STORAGE_CONCURRENCY = 4;
+
 function parsePort(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -131,6 +140,35 @@ function shortPubkey(pubkey: string): string {
 
 function normalizeMimeType(value: string): string {
   return value.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function runWorker(): Promise<void> {
+    for (;;) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
 }
 
 function buildBlobDescriptor(
@@ -460,7 +498,7 @@ export async function createBlossomServer(
           return json({ error: "forbidden" }, 403);
         }
 
-        const parsedUploads = [];
+        const parsedUploads: ParsedBatchUpload[] = [];
         for (const item of manifest.uploads) {
           if (
             typeof item.part !== "string" ||
@@ -523,6 +561,95 @@ export async function createBlossomServer(
           `[blossom] batch upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${usage} limit=${accessPolicy.storageLimitBytes} uploads=${parsedUploads.length}`,
         );
 
+        const batchUploadedAt = Math.floor(Date.now() / 1000);
+        const plannedOwnedHashes = new Set<string>();
+        const plannedExistingHashes = new Set<string>();
+        const uniqueNewUploads = new Map<
+          string,
+          { data: Uint8Array; contentType: string }
+        >();
+        const batchPlans = [];
+
+        for (const item of parsedUploads) {
+          const existingBlob = plannedExistingHashes.has(item.sha256)
+            ? { uploaded_at: batchUploadedAt }
+            : await blobDb.getBlob(db, item.sha256);
+          const alreadyOwned = plannedOwnedHashes.has(item.sha256)
+            ? true
+            : await blobDb.hasOwner(db, item.sha256, auth.pubkey);
+          const additionalUsage = alreadyOwned ? 0 : item.data.byteLength;
+
+          if (usage + additionalUsage > accessPolicy.storageLimitBytes) {
+            batchPlans.push({
+              item,
+              ok: false as const,
+              status: 507,
+              error: "storage limit exceeded",
+            });
+            continue;
+          }
+
+          usage += additionalUsage;
+          plannedOwnedHashes.add(item.sha256);
+          plannedExistingHashes.add(item.sha256);
+
+          const needsStorageWrite =
+            existingBlob === null && !uniqueNewUploads.has(item.sha256);
+          if (needsStorageWrite) {
+            uniqueNewUploads.set(item.sha256, {
+              data: item.data,
+              contentType: item.contentType,
+            });
+          }
+
+          batchPlans.push({
+            item,
+            ok: true as const,
+            needsStorageWrite,
+            uploadedAt: existingBlob?.uploaded_at ?? batchUploadedAt,
+          });
+        }
+
+        console.log(
+          `[blossom] batch upload plan pubkey=${shortPubkey(auth.pubkey)} planned=${batchPlans.length} new_blobs=${uniqueNewUploads.size} concurrency=${BATCH_UPLOAD_STORAGE_CONCURRENCY}`,
+        );
+
+        const storageStartedAt = Date.now();
+        const storageWriteEntries = Array.from(uniqueNewUploads.entries());
+        const storageWriteResults = await mapWithConcurrency(
+          storageWriteEntries,
+          BATCH_UPLOAD_STORAGE_CONCURRENCY,
+          async ([sha256, upload]) => {
+            try {
+              await objectStorage.uploadBlob(
+                sha256,
+                upload.data,
+                upload.contentType,
+              );
+              return { sha256, ok: true as const };
+            } catch (error) {
+              const err =
+                error instanceof Error ? error : new Error(String(error));
+              console.error(
+                `[blossom] batch storage upload failed hash=${shortHash(sha256)} pubkey=${shortPubkey(auth.pubkey)} error=${err.name}: ${err.message}`,
+              );
+              return {
+                sha256,
+                ok: false as const,
+                error: "storage upload failed",
+              };
+            }
+          },
+        );
+        const failedStorageWrites = new Map(
+          storageWriteResults
+            .filter((result) => !result.ok)
+            .map((result) => [result.sha256, result.error]),
+        );
+        console.log(
+          `[blossom] batch storage uploads ready pubkey=${shortPubkey(auth.pubkey)} blobs=${storageWriteEntries.length} failed=${failedStorageWrites.size} elapsed_ms=${Date.now() - storageStartedAt}`,
+        );
+
         const results: Array<{
           part: string;
           status: number;
@@ -530,34 +657,43 @@ export async function createBlossomServer(
           error?: string;
         }> = [];
 
-        for (const item of parsedUploads) {
-          const stored = await storeBlobForPubkey(
-            db,
-            objectStorage,
-            auth.pubkey,
-            item.data,
-            item.contentType,
-            usage,
-            accessPolicy.storageLimitBytes,
-          );
-
-          if (!stored.ok) {
+        for (const plan of batchPlans) {
+          if (!plan.ok) {
             results.push({
-              part: item.part,
-              status: stored.status,
-              error:
-                typeof stored.body.error === "string"
-                  ? stored.body.error
-                  : "upload failed",
+              part: plan.item.part,
+              status: plan.status,
+              error: plan.error,
             });
             continue;
           }
 
-          usage += stored.additionalUsage;
+          if (failedStorageWrites.has(plan.item.sha256)) {
+            results.push({
+              part: plan.item.part,
+              status: 500,
+              error: failedStorageWrites.get(plan.item.sha256),
+            });
+            continue;
+          }
+
+          await blobDb.insertBlob(
+            db,
+            plan.item.sha256,
+            plan.item.data.byteLength,
+            plan.item.contentType,
+            auth.pubkey,
+          );
+
           results.push({
-            part: item.part,
+            part: plan.item.part,
             status: 200,
-            descriptor: stored.descriptor,
+            descriptor: buildBlobDescriptor(
+              objectStorage,
+              plan.item.sha256,
+              plan.item.data.byteLength,
+              plan.item.contentType,
+              plan.uploadedAt,
+            ),
           });
         }
 

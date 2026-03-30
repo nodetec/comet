@@ -190,5 +190,22 @@ pub fn account_migrations() -> Migrations<'static> {
              INSERT INTO app_settings (key, value) VALUES ('nsec_storage', 'keychain')
                ON CONFLICT(key) DO NOTHING;",
         ),
+        M::up(
+            "CREATE TABLE pending_blob_uploads (
+               plaintext_hash  TEXT PRIMARY KEY,
+               server_url      TEXT NOT NULL,
+               pubkey          TEXT NOT NULL,
+               ciphertext_hash TEXT NOT NULL,
+               encryption_key  TEXT NOT NULL,
+               ciphertext      BLOB NOT NULL,
+               content_type    TEXT NOT NULL DEFAULT 'application/octet-stream',
+               size_bytes      INTEGER NOT NULL,
+               last_error      TEXT,
+               created_at      INTEGER NOT NULL,
+               updated_at      INTEGER NOT NULL
+             );
+             CREATE INDEX idx_pending_blob_uploads_updated_at
+               ON pending_blob_uploads(updated_at DESC);",
+        ),
     ])
 }

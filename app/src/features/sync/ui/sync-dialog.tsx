@@ -40,6 +40,7 @@ type SyncInfo = {
   totalNotes: number;
   checkpointSeq: number | null;
   blobsStored: number;
+  failedBlobUploads: number;
 };
 
 function isActiveSyncState(state: SyncInfo["state"]) {
@@ -220,6 +221,18 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
           />
         ) : null}
 
+        {info.failedBlobUploads > 0 ? (
+          <InfoRow
+            icon={<Image className="text-warning size-3.5" />}
+            label="Failed blob uploads"
+            value={
+              <span className="text-warning">
+                {info.failedBlobUploads} queued for retry
+              </span>
+            }
+          />
+        ) : null}
+
         {info.npub ? (
           <InfoRow
             icon={<Key className="size-3.5" />}
@@ -283,6 +296,16 @@ export function SyncDialog({
   useEffect(() => {
     if (!open) return;
     const unlisten = listen("sync-remote-change", () => {
+      void refreshInfo();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const unlisten = listen("sync-progress", () => {
       void refreshInfo();
     });
     return () => {

@@ -204,6 +204,7 @@ pub struct SyncInfo {
     total_notes: i64,
     checkpoint_seq: Option<i64>,
     blobs_stored: i64,
+    failed_blob_uploads: i64,
 }
 
 #[tauri::command]
@@ -268,6 +269,11 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
 
     let blobs_stored: i64 =
         conn.query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))?;
+    let failed_blob_uploads: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pending_blob_uploads WHERE last_error IS NOT NULL",
+        [],
+        |row| row.get(0),
+    )?;
 
     Ok(SyncInfo {
         state,
@@ -283,6 +289,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         total_notes,
         checkpoint_seq,
         blobs_stored,
+        failed_blob_uploads,
     })
 }
 
@@ -346,6 +353,7 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
         "DELETE FROM notes_fts;
          DELETE FROM notes;
          DELETE FROM blob_meta;
+         DELETE FROM pending_blob_uploads;
          DELETE FROM pending_deletions;
          DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
     )?;

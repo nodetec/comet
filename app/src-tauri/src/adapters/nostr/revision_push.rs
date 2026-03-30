@@ -11,11 +11,10 @@ use nostr_sdk::prelude::*;
 use rusqlite::{params, OptionalExtension};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use tauri::AppHandle;
+use std::time::Instant;
+use tauri::{AppHandle, Emitter};
 
 use super::sync_manager::sync_log;
-
-const BLOSSOM_BATCH_UPLOAD_CONCURRENCY: usize = 4;
 
 pub struct PreparedNoteRevisionPublish {
     pub note_id: String,
@@ -116,34 +115,97 @@ pub async fn push_note_revisions_batch(
         .iter()
         .map(|prepared| prepared.event.clone())
         .collect::<Vec<_>>();
+    let event_note_ids = prepared_publishes
+        .iter()
+        .map(|prepared| (prepared.event.id.to_hex(), prepared.note_id.clone()))
+        .collect::<HashMap<_, _>>();
+    let ack_total = prepared_publishes.len();
+    let mut acked = 0usize;
 
-    match send_events_to_relays_batch(active_relay_url, backup_relay_urls, keys, &events).await {
+    let publish_future = send_events_to_relays_batch(
+        active_relay_url,
+        backup_relay_urls,
+        keys,
+        &events,
+        |event_id| {
+            let Some(note_id) = event_note_ids.get(event_id) else {
+                return;
+            };
+
+            if let Err(error) = mark_note_revision_published(app, note_id, event_id) {
+                sync_log(
+                    app,
+                    &format!("revision push finalize error: {}: {}", note_id, error),
+                );
+                return;
+            }
+
+            acked += 1;
+            sync_log(
+                app,
+                &format!("revision relay ack {acked}/{ack_total} note={note_id}"),
+            );
+            let _ = app.emit("sync-progress", ());
+        },
+    );
+    let blob_flush_future = flush_pending_blob_uploads(app, keys);
+    let parallel_started_at = Instant::now();
+    sync_log(
+        app,
+        &format!(
+            "revision parallel start notes={} publishable={} relay={}",
+            note_ids.len(),
+            prepared_publishes.len(),
+            active_relay_url
+        ),
+    );
+    let ((fanout_result, publish_ms), (blob_flush_result, blob_ms)) = tokio::join!(
+        async {
+            let started_at = Instant::now();
+            let result = publish_future.await;
+            (result, started_at.elapsed().as_millis())
+        },
+        async {
+            let started_at = Instant::now();
+            let result = blob_flush_future.await;
+            (result, started_at.elapsed().as_millis())
+        }
+    );
+    let total_ms = parallel_started_at.elapsed().as_millis();
+    let overlap_ms = publish_ms
+        .saturating_add(blob_ms)
+        .saturating_sub(total_ms);
+    sync_log(
+        app,
+        &format!(
+            "revision parallel complete notes={} total_ms={} publish_ms={} blob_ms={} overlap_ms={}",
+            prepared_publishes.len(),
+            total_ms,
+            publish_ms,
+            blob_ms,
+            overlap_ms
+        ),
+    );
+
+    if let Err(error) = blob_flush_result {
+        sync_log(app, &format!("revision blossom queue error: {error}"));
+    }
+    let _ = app.emit("sync-progress", ());
+
+    match fanout_result {
         Ok(fanout) => {
             for prepared in prepared_publishes {
                 let event_id = prepared.event.id.to_hex();
                 let success_count = fanout.success_counts.get(&event_id).copied().unwrap_or(0);
 
                 if success_count > 0 {
-                    match mark_note_revision_published(app, &prepared.note_id, &event_id) {
-                        Ok(()) => {
-                            sync_log(
-                                app,
-                                &format!(
-                                    "pushed revision note {} to {}/{} relays",
-                                    prepared.note_id, success_count, fanout.relay_count
-                                ),
-                            );
-                        }
-                        Err(error) => {
-                            sync_log(
-                                app,
-                                &format!(
-                                    "revision push finalize error: {}: {}",
-                                    prepared.note_id, error
-                                ),
-                            );
-                        }
-                    }
+                    sync_log(
+                        app,
+                        &format!(
+                            "pushed revision note {} to {}/{} relays",
+                            prepared.note_id, success_count, fanout.relay_count
+                        ),
+                    );
                 } else if let Some(message) = fanout.rejection_messages.get(&event_id) {
                     sync_log(
                         app,
@@ -178,20 +240,22 @@ pub async fn push_note_revisions_batch(
     }
 }
 
-struct BatchAttachmentUploadSummary {
+struct BatchAttachmentQueueSummary {
     note_hashes: HashMap<String, Vec<String>>,
     failed_hash_errors: HashMap<String, String>,
 }
 
 struct PendingAttachmentUpload {
     plaintext_hash: String,
+    server_url: String,
     ciphertext_hash: String,
     ciphertext: Vec<u8>,
     encryption_key: String,
+    content_type: String,
     plaintext_size: usize,
 }
 
-impl BatchAttachmentUploadSummary {
+impl BatchAttachmentQueueSummary {
     fn note_error(&self, note_id: &str) -> Option<String> {
         let hashes = self.note_hashes.get(note_id)?;
         let failures = hashes
@@ -218,7 +282,8 @@ async fn maybe_upload_note_attachments_batch(
     app: &AppHandle,
     note_ids: &[String],
     keys: &Keys,
-) -> Result<BatchAttachmentUploadSummary, AppError> {
+) -> Result<BatchAttachmentQueueSummary, AppError> {
+    let queued_started_at = Instant::now();
     let (blossom_url, note_hashes) = {
         let conn = database_connection(app)?;
         let blossom_url = get_blossom_url(&conn);
@@ -240,7 +305,7 @@ async fn maybe_upload_note_attachments_batch(
 
     let total_attachment_refs = note_hashes.values().map(Vec::len).sum::<usize>();
     if total_attachment_refs == 0 {
-        return Ok(BatchAttachmentUploadSummary {
+        return Ok(BatchAttachmentQueueSummary {
             note_hashes,
             failed_hash_errors: HashMap::new(),
         });
@@ -255,7 +320,7 @@ async fn maybe_upload_note_attachments_batch(
                 total_attachment_refs
             ),
         );
-        return Ok(BatchAttachmentUploadSummary {
+        return Ok(BatchAttachmentQueueSummary {
             note_hashes,
             failed_hash_errors: HashMap::new(),
         });
@@ -271,23 +336,29 @@ async fn maybe_upload_note_attachments_batch(
     sync_log(
         app,
         &format!(
-            "revision blossom batch upload notes={} attachment_refs={} unique_attachments={} concurrency={} url={}",
+            "revision blossom batch queue notes={} attachment_refs={} unique_attachments={} url={}",
             note_ids.len(),
             total_attachment_refs,
             unique_hashes.len(),
-            BLOSSOM_BATCH_UPLOAD_CONCURRENCY,
             blossom_url
         ),
     );
 
     let http_client = reqwest::Client::new();
     let pubkey_hex = keys.public_key().to_hex();
-    let mut uploaded = 0usize;
     let mut reused = 0usize;
     let mut failed_hash_errors = HashMap::new();
-    let mut pending_uploads = Vec::new();
+    let mut queued = 0usize;
 
     for hash in &unique_hashes {
+        if let Some(pending_upload) =
+            load_pending_blob_upload(app, hash, &blossom_url, &pubkey_hex)?
+        {
+            persist_attachment_blob_meta(app, &pubkey_hex, &pending_upload)?;
+            queued += 1;
+            continue;
+        }
+
         let existing: Option<(String, String)> = {
             let conn = database_connection(app)?;
             conn.query_row(
@@ -321,154 +392,45 @@ async fn maybe_upload_note_attachments_batch(
             )?;
         }
 
-        let (blob_data, _) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
-            .ok_or_else(|| {
-                AppError::custom(format!(
-                    "Local attachment missing for revision sync: {hash}"
-                ))
-            })?;
+        let Some((blob_data, _)) =
+            crate::adapters::filesystem::attachments::read_blob(app, hash)?
+        else {
+            failed_hash_errors.insert(
+                hash.clone(),
+                format!("Local attachment missing for revision sync: {hash}"),
+            );
+            continue;
+        };
         let (ciphertext, encryption_key) =
             crate::adapters::blossom::client::encrypt_blob(&blob_data)?;
         let ciphertext_hash = format!("{:x}", Sha256::digest(&ciphertext));
-        pending_uploads.push(PendingAttachmentUpload {
+        let upload = PendingAttachmentUpload {
             plaintext_hash: hash.clone(),
+            server_url: blossom_url.clone(),
             ciphertext_hash,
             ciphertext,
             encryption_key,
+            content_type: "application/octet-stream".to_string(),
             plaintext_size: blob_data.len(),
-        });
-    }
-
-    if !pending_uploads.is_empty() {
-        let batch_items = pending_uploads
-            .iter()
-            .enumerate()
-            .map(
-                |(index, upload)| crate::adapters::blossom::client::BlossomBatchUploadItem {
-                    part: format!("file-{}", index + 1),
-                    ciphertext_hash: upload.ciphertext_hash.clone(),
-                    ciphertext: upload.ciphertext.clone(),
-                    content_type: "application/octet-stream".to_string(),
-                },
-            )
-            .collect::<Vec<_>>();
-
-        match crate::adapters::blossom::client::upload_blobs_batch(
-            &http_client,
-            &blossom_url,
-            &batch_items,
-            keys,
-        )
-        .await
-        {
-            Ok(results) => {
-                let upload_by_part = batch_items
-                    .iter()
-                    .zip(pending_uploads.iter())
-                    .map(|(item, upload)| (item.part.as_str(), upload))
-                    .collect::<HashMap<_, _>>();
-
-                for result in results {
-                    let Some(upload) = upload_by_part.get(result.part.as_str()) else {
-                        continue;
-                    };
-
-                    if result.status == 200 {
-                        let ciphertext_hash = result
-                            .ciphertext_hash
-                            .unwrap_or_else(|| upload.ciphertext_hash.clone());
-                        persist_attachment_upload_metadata(
-                            app,
-                            &blossom_url,
-                            &pubkey_hex,
-                            upload,
-                            &ciphertext_hash,
-                        )?;
-                        uploaded += 1;
-                    } else {
-                        let error = result
-                            .error
-                            .unwrap_or_else(|| format!("batch upload failed ({})", result.status));
-                        sync_log(
-                            app,
-                            &format!(
-                                "revision blossom batch error plaintext={}: {}",
-                                &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
-                                error
-                            ),
-                        );
-                        failed_hash_errors.insert(upload.plaintext_hash.clone(), error);
-                    }
-                }
-            }
-            Err(error) if error.to_string().contains("batch upload unsupported") => {
-                sync_log(
-                    app,
-                    "revision blossom batch upload unsupported, falling back to single uploads",
-                );
-
-                for upload in pending_uploads {
-                    match crate::adapters::blossom::client::upload_blob(
-                        &http_client,
-                        &blossom_url,
-                        upload.ciphertext.clone(),
-                        keys,
-                    )
-                    .await
-                    {
-                        Ok(ciphertext_hash) => {
-                            persist_attachment_upload_metadata(
-                                app,
-                                &blossom_url,
-                                &pubkey_hex,
-                                &upload,
-                                &ciphertext_hash,
-                            )?;
-                            uploaded += 1;
-                        }
-                        Err(error) => {
-                            sync_log(
-                                app,
-                                &format!(
-                                    "revision blossom batch error plaintext={}: {}",
-                                    &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
-                                    error
-                                ),
-                            );
-                            failed_hash_errors
-                                .insert(upload.plaintext_hash.clone(), error.to_string());
-                        }
-                    }
-                }
-            }
-            Err(error) => {
-                for upload in pending_uploads {
-                    sync_log(
-                        app,
-                        &format!(
-                            "revision blossom batch error plaintext={}: {}",
-                            &upload.plaintext_hash[..8.min(upload.plaintext_hash.len())],
-                            error
-                        ),
-                    );
-                    failed_hash_errors.insert(upload.plaintext_hash.clone(), error.to_string());
-                }
-            }
-        }
+        };
+        persist_attachment_blob_meta(app, &pubkey_hex, &upload)?;
+        queue_pending_blob_upload(app, &pubkey_hex, &upload, None)?;
+        queued += 1;
     }
 
     sync_log(
         app,
         &format!(
-            "revision blossom batch ready notes={} uploaded={} reused={} failed={}",
+            "revision blossom batch queued notes={} queued={} reused={} failed={} queue_ms={}",
             note_ids.len(),
-            uploaded,
+            queued,
             reused,
-            failed_hash_errors.len()
+            failed_hash_errors.len(),
+            queued_started_at.elapsed().as_millis()
         ),
     );
 
-    Ok(BatchAttachmentUploadSummary {
+    Ok(BatchAttachmentQueueSummary {
         note_hashes,
         failed_hash_errors,
     })
@@ -675,33 +637,287 @@ async fn maybe_upload_note_attachments(
 
 fn persist_attachment_upload_metadata(
     app: &AppHandle,
-    blossom_url: &str,
     pubkey_hex: &str,
     upload: &PendingAttachmentUpload,
-    ciphertext_hash: &str,
+) -> Result<(), AppError> {
+    let conn = database_connection(app)?;
+    persist_attachment_blob_meta(app, pubkey_hex, upload)?;
+    conn.execute(
+        "INSERT OR REPLACE INTO blob_uploads (object_hash, server_url, encrypted, size_bytes, uploaded_at)
+         VALUES (?1, ?2, 1, ?3, ?4)",
+        params![
+            &upload.ciphertext_hash,
+            &upload.server_url,
+            upload.plaintext_size as i64,
+            crate::domain::common::time::now_millis()
+        ],
+    )?;
+    conn.execute(
+        "DELETE FROM pending_blob_uploads WHERE plaintext_hash = ?1",
+        params![&upload.plaintext_hash],
+    )?;
+    Ok(())
+}
+
+fn persist_attachment_blob_meta(
+    app: &AppHandle,
+    pubkey_hex: &str,
+    upload: &PendingAttachmentUpload,
 ) -> Result<(), AppError> {
     let conn = database_connection(app)?;
     conn.execute(
         "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
-            upload.plaintext_hash,
-            blossom_url,
+            &upload.plaintext_hash,
+            &upload.server_url,
             pubkey_hex,
-            ciphertext_hash,
-            upload.encryption_key
+            &upload.ciphertext_hash,
+            &upload.encryption_key
         ],
     )?;
+    Ok(())
+}
+
+fn queue_pending_blob_upload(
+    app: &AppHandle,
+    pubkey_hex: &str,
+    upload: &PendingAttachmentUpload,
+    last_error: Option<&str>,
+) -> Result<(), AppError> {
+    let now = crate::domain::common::time::now_millis();
+    let conn = database_connection(app)?;
     conn.execute(
-        "INSERT OR REPLACE INTO blob_uploads (object_hash, server_url, encrypted, size_bytes, uploaded_at)
-         VALUES (?1, ?2, 1, ?3, ?4)",
+        "INSERT INTO pending_blob_uploads (
+           plaintext_hash,
+           server_url,
+           pubkey,
+           ciphertext_hash,
+           encryption_key,
+           ciphertext,
+           content_type,
+           size_bytes,
+           last_error,
+           created_at,
+           updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
+         ON CONFLICT(plaintext_hash) DO UPDATE SET
+           server_url = excluded.server_url,
+           pubkey = excluded.pubkey,
+           ciphertext_hash = excluded.ciphertext_hash,
+           encryption_key = excluded.encryption_key,
+           ciphertext = excluded.ciphertext,
+           content_type = excluded.content_type,
+           size_bytes = excluded.size_bytes,
+           last_error = excluded.last_error,
+           updated_at = excluded.updated_at",
         params![
-            ciphertext_hash,
-            blossom_url,
+            &upload.plaintext_hash,
+            &upload.server_url,
+            pubkey_hex,
+            &upload.ciphertext_hash,
+            &upload.encryption_key,
+            &upload.ciphertext,
+            &upload.content_type,
             upload.plaintext_size as i64,
-            crate::domain::common::time::now_millis()
+            last_error,
+            now
         ],
     )?;
+    Ok(())
+}
+
+fn load_pending_blob_upload(
+    app: &AppHandle,
+    plaintext_hash: &str,
+    server_url: &str,
+    pubkey_hex: &str,
+) -> Result<Option<PendingAttachmentUpload>, AppError> {
+    let conn = database_connection(app)?;
+    conn.query_row(
+        "SELECT ciphertext_hash, encryption_key, ciphertext, content_type, size_bytes
+         FROM pending_blob_uploads
+         WHERE plaintext_hash = ?1 AND server_url = ?2 AND pubkey = ?3",
+        params![plaintext_hash, server_url, pubkey_hex],
+        |row| {
+            Ok(PendingAttachmentUpload {
+                plaintext_hash: plaintext_hash.to_string(),
+                server_url: server_url.to_string(),
+                ciphertext_hash: row.get(0)?,
+                encryption_key: row.get(1)?,
+                ciphertext: row.get(2)?,
+                content_type: row.get(3)?,
+                plaintext_size: row.get::<_, i64>(4)? as usize,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn list_pending_blob_uploads(
+    app: &AppHandle,
+    pubkey_hex: &str,
+) -> Result<Vec<PendingAttachmentUpload>, AppError> {
+    let conn = database_connection(app)?;
+    let mut stmt = conn.prepare(
+        "SELECT plaintext_hash, server_url, ciphertext_hash, encryption_key, ciphertext, content_type, size_bytes
+         FROM pending_blob_uploads
+         WHERE pubkey = ?1
+         ORDER BY updated_at ASC, plaintext_hash ASC",
+    )?;
+    let rows = stmt.query_map(params![pubkey_hex], |row| {
+        Ok(PendingAttachmentUpload {
+            plaintext_hash: row.get(0)?,
+            server_url: row.get(1)?,
+            ciphertext_hash: row.get(2)?,
+            encryption_key: row.get(3)?,
+            ciphertext: row.get(4)?,
+            content_type: row.get(5)?,
+            plaintext_size: row.get::<_, i64>(6)? as usize,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), AppError> {
+    let pubkey_hex = keys.public_key().to_hex();
+    let pending_uploads = list_pending_blob_uploads(app, &pubkey_hex)?;
+    if pending_uploads.is_empty() {
+        return Ok(());
+    }
+
+    let uploads_by_server = pending_uploads.into_iter().fold(
+        HashMap::<String, Vec<PendingAttachmentUpload>>::new(),
+        |mut groups, upload| {
+            groups.entry(upload.server_url.clone()).or_default().push(upload);
+            groups
+        },
+    );
+
+    let http_client = reqwest::Client::new();
+
+    for (server_url, uploads) in uploads_by_server {
+        let server_flush_started_at = Instant::now();
+        sync_log(
+            app,
+            &format!(
+                "revision blossom queued upload blobs={} url={}",
+                uploads.len(),
+                server_url
+            ),
+        );
+
+        let batch_items = uploads
+            .iter()
+            .enumerate()
+            .map(
+                |(index, upload)| crate::adapters::blossom::client::BlossomBatchUploadItem {
+                    part: format!("file-{}", index + 1),
+                    ciphertext_hash: upload.ciphertext_hash.clone(),
+                    ciphertext: upload.ciphertext.clone(),
+                    content_type: upload.content_type.clone(),
+                },
+            )
+            .collect::<Vec<_>>();
+
+        let upload_by_part = batch_items
+            .iter()
+            .zip(uploads.iter())
+            .map(|(item, upload)| (item.part.as_str(), upload))
+            .collect::<HashMap<_, _>>();
+
+        let mut uploaded = 0usize;
+        let mut failed = 0usize;
+
+        match crate::adapters::blossom::client::upload_blobs_batch(
+            &http_client,
+            &server_url,
+            &batch_items,
+            keys,
+        )
+        .await
+        {
+            Ok(results) => {
+                for result in results {
+                    let Some(upload) = upload_by_part.get(result.part.as_str()) else {
+                        continue;
+                    };
+
+                    if result.status == 200 {
+                        persist_attachment_upload_metadata(app, &pubkey_hex, upload)?;
+                        uploaded += 1;
+                    } else {
+                        failed += 1;
+                        queue_pending_blob_upload(
+                            app,
+                            &pubkey_hex,
+                            upload,
+                            Some(
+                                result
+                                    .error
+                                    .as_deref()
+                                    .unwrap_or("batch upload failed"),
+                            ),
+                        )?;
+                    }
+                }
+            }
+            Err(error) if error.to_string().contains("batch upload unsupported") => {
+                sync_log(
+                    app,
+                    "revision blossom batch upload unsupported, falling back to single uploads",
+                );
+                for upload in uploads {
+                    match crate::adapters::blossom::client::upload_blob(
+                        &http_client,
+                        &server_url,
+                        upload.ciphertext.clone(),
+                        keys,
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            persist_attachment_upload_metadata(app, &pubkey_hex, &upload)?;
+                            uploaded += 1;
+                        }
+                        Err(error) => {
+                            failed += 1;
+                            queue_pending_blob_upload(
+                                app,
+                                &pubkey_hex,
+                                &upload,
+                                Some(&error.to_string()),
+                            )?;
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                for upload in uploads {
+                    failed += 1;
+                    queue_pending_blob_upload(
+                        app,
+                        &pubkey_hex,
+                        &upload,
+                        Some(&error.to_string()),
+                    )?;
+                }
+            }
+        }
+
+        sync_log(
+            app,
+            &format!(
+                "revision blossom queued upload ready blobs={} uploaded={} failed={} elapsed_ms={}",
+                batch_items.len(),
+                uploaded,
+                failed,
+                server_flush_started_at.elapsed().as_millis()
+            ),
+        );
+    }
+
     Ok(())
 }
 
@@ -813,6 +1029,7 @@ pub async fn send_events_to_relays_batch(
     backup_relay_urls: &[String],
     keys: &Keys,
     events: &[Event],
+    mut on_first_success: impl FnMut(&str),
 ) -> Result<BatchRelayFanoutResult, AppError> {
     let mut success_counts = HashMap::<String, usize>::new();
     let mut rejection_messages = HashMap::<String, String>::new();
@@ -825,14 +1042,17 @@ pub async fn send_events_to_relays_batch(
 
     for relay_url in relay_urls {
         match RevisionRelayConnection::connect_authenticated(relay_url, keys).await {
-            Ok(mut connection) => match send_events_on_connection(&mut connection, events).await {
+            Ok(mut connection) => match send_events_on_connection(&mut connection, events, |event_id| {
+                let entry = success_counts.entry(event_id.to_string()).or_insert(0);
+                if *entry == 0 {
+                    any_success = true;
+                    on_first_success(event_id);
+                }
+                *entry += 1;
+            })
+            .await
+            {
                 Ok(result) => {
-                    if !result.accepted_event_ids.is_empty() {
-                        any_success = true;
-                    }
-                    for event_id in result.accepted_event_ids {
-                        *success_counts.entry(event_id).or_insert(0) += 1;
-                    }
                     for (event_id, message) in result.rejected_event_ids {
                         rejection_messages.entry(event_id).or_insert(message);
                     }
@@ -861,7 +1081,6 @@ pub async fn send_events_to_relays_batch(
 }
 
 struct RelayBatchConnectionResult {
-    accepted_event_ids: HashSet<String>,
     rejected_event_ids: HashMap<String, String>,
 }
 
@@ -893,12 +1112,12 @@ async fn send_event_on_connection(
 async fn send_events_on_connection(
     connection: &mut RevisionRelayConnection,
     events: &[Event],
+    mut on_accepted: impl FnMut(&str),
 ) -> Result<RelayBatchConnectionResult, AppError> {
     let mut pending_event_ids = events
         .iter()
         .map(|event| event.id.to_hex())
         .collect::<HashSet<_>>();
-    let mut accepted_event_ids = HashSet::new();
     let mut rejected_event_ids = HashMap::new();
 
     for event in events {
@@ -913,7 +1132,7 @@ async fn send_events_on_connection(
                 ..
             } => {
                 if pending_event_ids.remove(&event_id) {
-                    accepted_event_ids.insert(event_id);
+                    on_accepted(&event_id);
                 }
             }
             RevisionRelayIncomingMessage::Ok {
@@ -922,7 +1141,7 @@ async fn send_events_on_connection(
                 message,
             } if message.starts_with("duplicate:") => {
                 if pending_event_ids.remove(&event_id) {
-                    accepted_event_ids.insert(event_id);
+                    on_accepted(&event_id);
                 }
             }
             RevisionRelayIncomingMessage::Ok {
@@ -946,7 +1165,6 @@ async fn send_events_on_connection(
     }
 
     Ok(RelayBatchConnectionResult {
-        accepted_event_ids,
         rejected_event_ids,
     })
 }

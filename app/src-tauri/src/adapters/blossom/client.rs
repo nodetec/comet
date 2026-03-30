@@ -28,7 +28,6 @@ pub struct BlossomBatchUploadItem {
 pub struct BlossomBatchUploadResult {
     pub part: String,
     pub status: u16,
-    pub ciphertext_hash: Option<String>,
     pub error: Option<String>,
 }
 
@@ -56,13 +55,7 @@ struct BlossomBatchUploadResponse {
 struct BlossomBatchUploadResponseItem {
     part: String,
     status: u16,
-    descriptor: Option<BlossomUploadDescriptor>,
     error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct BlossomUploadDescriptor {
-    sha256: String,
 }
 
 /// Upload an encrypted blob to a Blossom server.
@@ -247,7 +240,6 @@ pub async fn upload_blobs_batch(
         .map(|result| BlossomBatchUploadResult {
             part: result.part,
             status: result.status,
-            ciphertext_hash: result.descriptor.map(|descriptor| descriptor.sha256),
             error: result.error,
         })
         .collect::<Vec<_>>();
