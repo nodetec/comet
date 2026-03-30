@@ -1,7 +1,7 @@
 //! Markdown → Lexical-compatible HTML renderer using comrak.
 //!
-//! Produces HTML that Lexical's `$generateNodesFromDOM` can consume directly,
-//! matching the output of the marked.js pipeline in the frontend.
+//! Produces HTML that Lexical's `$generateNodesFromDOM` can consume directly
+//! for both stored note loads and frontend paste imports.
 
 use comrak::options::{Extension, Options, Parse, Render};
 use comrak::Arena;
@@ -19,6 +19,10 @@ pub fn markdown_to_lexical_html(markdown: &str) -> String {
     comrak::format_html(root, &opts, &mut html).expect("HTML rendering failed");
 
     postprocess_html(&html)
+}
+
+pub fn markdown_to_lexical_html_for_paste(markdown: &str) -> String {
+    markdown_to_lexical_html(markdown)
 }
 
 fn options<'a>() -> Options<'a> {
@@ -98,14 +102,11 @@ fn is_bare_heading_line(line: &str) -> bool {
     (1..=6).contains(&len) && bytes.iter().all(|&b| b == b'#')
 }
 
-/// Preprocess blank lines into `<p><br></p>` markers, matching the frontend's
-/// `emptyParagraphPreprocess` hook.
+/// Preprocess blank lines into `<p><br></p>` markers.
 ///
 /// Also escapes bare hash lines (`#`, `##`, …) so comrak treats them as
 /// literal text instead of empty headings.
-///
-/// First blank line in a group = standard block separator.
-/// Each additional blank = empty paragraph marker.
+
 fn preprocess_blank_lines(markdown: &str) -> String {
     let lines: Vec<&str> = markdown.split('\n').collect();
     let mut result: Vec<Cow<'_, str>> = Vec::with_capacity(lines.len());
@@ -161,13 +162,13 @@ fn preprocess_blank_lines(markdown: &str) -> String {
                 blank_count += 1;
                 i += 1;
             }
-            // First blank = standard separator
-            result.push(Cow::Borrowed(""));
-            // Additional blanks = empty paragraphs
-            for _ in 1..blank_count {
-                result.push(Cow::Borrowed("<p><br></p>"));
+            // Every blank line becomes a visible empty paragraph in the editor.
+            // This keeps the WYSIWYG view aligned with the stored markdown.
+            for _ in 0..blank_count {
                 result.push(Cow::Borrowed(""));
+                result.push(Cow::Borrowed("<p><br></p>"));
             }
+            result.push(Cow::Borrowed(""));
         } else if is_bare_heading_line(line) {
             // Escape bare hash lines so comrak renders them as text
             result.push(Cow::Owned(format!(r"\{line}")));
@@ -264,9 +265,24 @@ mod tests {
         let html = markdown_to_lexical_html("hello\n\n\n\nworld");
         let count = html.matches("<p><br></p>").count();
         assert_eq!(
-            count, 2,
-            "Expected 2 empty paragraphs, got {count}. HTML: {html}"
+            count, 3,
+            "Expected 3 empty paragraphs, got {count}. HTML: {html}"
         );
+    }
+
+    #[test]
+    fn test_single_separator_is_visible_in_editor() {
+        let html = markdown_to_lexical_html("alpha\n\nbeta");
+        assert_eq!(html.matches("<p><br></p>").count(), 1, "HTML: {html}");
+    }
+
+    #[test]
+    fn test_paste_mode_turns_each_blank_line_into_empty_paragraph() {
+        let html = markdown_to_lexical_html_for_paste("alpha\n\nbeta");
+        assert_eq!(html.matches("<p><br></p>").count(), 1, "Paste HTML: {html}");
+
+        let html = markdown_to_lexical_html_for_paste("alpha\n\n\nbeta");
+        assert_eq!(html.matches("<p><br></p>").count(), 2, "Paste HTML: {html}");
     }
 
     #[test]

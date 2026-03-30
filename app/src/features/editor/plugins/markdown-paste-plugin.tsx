@@ -1,25 +1,30 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $createCodeNode, $isCodeNode } from "@lexical/code";
 import { $isListItemNode, $isListNode } from "@lexical/list";
 import {
   PASTE_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
+  $createParagraphNode,
+  $createRangeSelection,
   $createTextNode,
   $getSelection,
   $isRangeSelection,
   $getRoot,
+  $getNodeByKey,
   $isElementNode,
   $isDecoratorNode,
   $isParagraphNode,
+  $setSelection,
   $isTextNode,
   $isLineBreakNode,
   type LexicalNode,
+  type PointType,
 } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
-import { markdownToDOM } from "../lib/marked-import";
+import { renderMarkdownForPaste } from "@/shared/api/invoke";
 import { parseSingleChecklistItemContent } from "../lib/checklist-paste";
 import {
   normalizeImportedCodeBlocksFromMarkdown,
@@ -118,6 +123,67 @@ function isSelectionInsideChecklistItem(
 
   const parentList = listItemNode.getParent();
   return $isListNode(parentList) && parentList.getListType() === "check";
+}
+
+type SelectionPointSnapshot = {
+  key: PointType["key"];
+  offset: number;
+  type: PointType["type"];
+};
+
+type RangeSelectionSnapshot = {
+  anchor: SelectionPointSnapshot;
+  focus: SelectionPointSnapshot;
+};
+
+function captureSelectionSnapshot(
+  selection: ReturnType<typeof $getSelection>,
+): RangeSelectionSnapshot | null {
+  if (!$isRangeSelection(selection)) {
+    return null;
+  }
+
+  return {
+    anchor: {
+      key: selection.anchor.key,
+      offset: selection.anchor.offset,
+      type: selection.anchor.type,
+    },
+    focus: {
+      key: selection.focus.key,
+      offset: selection.focus.offset,
+      type: selection.focus.type,
+    },
+  };
+}
+
+function restoreSelectionSnapshot(
+  snapshot: RangeSelectionSnapshot | null,
+): boolean {
+  if (snapshot === null) {
+    return false;
+  }
+
+  if (
+    $getNodeByKey(snapshot.anchor.key) === null ||
+    $getNodeByKey(snapshot.focus.key) === null
+  ) {
+    return false;
+  }
+
+  const selection = $createRangeSelection();
+  selection.anchor.set(
+    snapshot.anchor.key,
+    snapshot.anchor.offset,
+    snapshot.anchor.type,
+  );
+  selection.focus.set(
+    snapshot.focus.key,
+    snapshot.focus.offset,
+    snapshot.focus.type,
+  );
+  $setSelection(selection);
+  return true;
 }
 
 function insertBlockNodes(nodes: LexicalNode[]): void {
@@ -276,8 +342,128 @@ function trimBoundaryEmptyParagraphs(
   return start === 0 && end === nodes.length ? nodes : nodes.slice(start, end);
 }
 
-export default function MarkdownPastePlugin() {
+function insertFallbackPlainText(
+  text: string,
+  selectionSnapshot: RangeSelectionSnapshot | null,
+): void {
+  restoreSelectionSnapshot(selectionSnapshot);
+  const selection = $getSelection();
+  if ($isRangeSelection(selection)) {
+    selection.insertRawText(text);
+    return;
+  }
+
+  const paragraph = $createParagraphNode();
+  if (text.length > 0) {
+    paragraph.append($createTextNode(text));
+  }
+  $getRoot().append(paragraph);
+}
+
+function htmlToDOM(html: string): Document {
+  return new DOMParser().parseFromString(
+    `<!DOCTYPE html><html><body>${html}</body></html>`,
+    "text/html",
+  );
+}
+
+type LoadKeyRef = { current: string };
+
+function insertRenderedMarkdown(
+  editor: ReturnType<typeof useLexicalComposerContext>[0],
+  html: string,
+  text: string,
+  selectionSnapshot: RangeSelectionSnapshot | null,
+  pasteLoadKey: string,
+  currentLoadKeyRef: LoadKeyRef,
+): void {
+  editor.update(() => {
+    if (currentLoadKeyRef.current !== pasteLoadKey) {
+      return;
+    }
+
+    restoreSelectionSnapshot(selectionSnapshot);
+
+    const dom = htmlToDOM(html);
+    const allNodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
+    normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
+    // Filter to block-level nodes only — $generateNodesFromDOM may
+    // produce stray TextNodes from whitespace between HTML tags
+    const filteredNodes = allNodes.filter(isBlockLevelNode);
+    const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
+    insertBlockNodes(nodes);
+  });
+}
+
+function insertFallbackMarkdownText(
+  editor: ReturnType<typeof useLexicalComposerContext>[0],
+  text: string,
+  selectionSnapshot: RangeSelectionSnapshot | null,
+  pasteLoadKey: string,
+  currentLoadKeyRef: LoadKeyRef,
+): void {
+  if (currentLoadKeyRef.current !== pasteLoadKey) {
+    return;
+  }
+
+  editor.update(() => {
+    insertFallbackPlainText(text, selectionSnapshot);
+  });
+}
+
+async function processMarkdownPasteRender(params: {
+  currentLoadKeyRef: LoadKeyRef;
+  editor: ReturnType<typeof useLexicalComposerContext>[0];
+  pasteLoadKey: string;
+  selectionSnapshot: RangeSelectionSnapshot | null;
+  text: string;
+}): Promise<void> {
+  const { currentLoadKeyRef, editor, pasteLoadKey, selectionSnapshot, text } =
+    params;
+
+  let html: string;
+  try {
+    html = await renderMarkdownForPaste(text);
+  } catch (error) {
+    console.error("[editor:paste] markdown render failed", error);
+    insertFallbackMarkdownText(
+      editor,
+      text,
+      selectionSnapshot,
+      pasteLoadKey,
+      currentLoadKeyRef,
+    );
+    return;
+  }
+
+  if (currentLoadKeyRef.current !== pasteLoadKey) {
+    return;
+  }
+
+  insertRenderedMarkdown(
+    editor,
+    html,
+    text,
+    selectionSnapshot,
+    pasteLoadKey,
+    currentLoadKeyRef,
+  );
+}
+
+interface MarkdownPastePluginProps {
+  loadKey: string;
+}
+
+export default function MarkdownPastePlugin({
+  loadKey,
+}: MarkdownPastePluginProps) {
   const [editor] = useLexicalComposerContext();
+  const currentLoadKeyRef = useRef(loadKey);
+  const pasteQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    currentLoadKeyRef.current = loadKey;
+  }, [loadKey]);
 
   useEffect(() => {
     return editor.registerCommand(
@@ -334,6 +520,8 @@ export default function MarkdownPastePlugin() {
         const checklistContent = isSelectionInsideChecklistItem(selection)
           ? parseSingleChecklistItemContent(text)
           : null;
+        const selectionSnapshot = captureSelectionSnapshot(selection);
+        const pasteLoadKey = currentLoadKeyRef.current;
 
         event.preventDefault();
 
@@ -351,27 +539,28 @@ export default function MarkdownPastePlugin() {
 
         const singleFencedCodeBlock = parseSingleFencedCodeBlock(text);
 
-        editor.update(() => {
-          if (singleFencedCodeBlock) {
+        if (singleFencedCodeBlock) {
+          editor.update(() => {
             const codeNode = $createCodeNode(singleFencedCodeBlock.language);
             if (singleFencedCodeBlock.code.length > 0) {
               codeNode.append($createTextNode(singleFencedCodeBlock.code));
             }
             insertBlockNodes([codeNode]);
-            return;
-          }
+          });
+          return true;
+        }
 
-          const dom = markdownToDOM(text, { paste: true });
-          const allNodes = normalizeImportedNodes(
-            $generateNodesFromDOM(editor, dom),
+        pasteQueueRef.current = pasteQueueRef.current
+          .catch(() => {})
+          .then(() =>
+            processMarkdownPasteRender({
+              currentLoadKeyRef: currentLoadKeyRef as LoadKeyRef,
+              editor,
+              pasteLoadKey,
+              selectionSnapshot,
+              text,
+            }),
           );
-          normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
-          // Filter to block-level nodes only — $generateNodesFromDOM may
-          // produce stray TextNodes from whitespace between HTML tags
-          const filteredNodes = allNodes.filter(isBlockLevelNode);
-          const nodes = trimBoundaryEmptyParagraphs(filteredNodes, text);
-          insertBlockNodes(nodes);
-        });
 
         return true;
       },

@@ -176,7 +176,7 @@ describe("markdown editor pipeline", () => {
     expect(secondText).toBe("fn same() {}");
   });
 
-  it("collapses storage-only blank paragraphs on clipboard export", () => {
+  it("preserves visible spacer paragraphs on clipboard export", () => {
     const markdown = exportClipboardMarkdownFromEditor((root) => {
       const before = $createParagraphNode();
       before.append($createTextNode("A"));
@@ -190,6 +190,33 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["A", "", "```", "x", "```", "", "B"].join("\n"));
+  });
+
+  it("exports a single visible spacer paragraph as a standard separator", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const title = $createParagraphNode();
+      title.append($createTextNode("A"));
+      const spacer = $createParagraphNode();
+      const body = $createParagraphNode();
+      body.append($createTextNode("B"));
+      root.append(title, spacer, body);
+    });
+
+    expect(markdown).toBe(["A", "", "B"].join("\n"));
+  });
+
+  it("exports multiple visible spacer paragraphs as multiple blank lines", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const title = $createParagraphNode();
+      title.append($createTextNode("A"));
+      const spacerOne = $createParagraphNode();
+      const spacerTwo = $createParagraphNode();
+      const body = $createParagraphNode();
+      body.append($createTextNode("B"));
+      root.append(title, spacerOne, spacerTwo, body);
+    });
+
+    expect(markdown).toBe(["A", "", "", "B"].join("\n"));
   });
 
   it("preserves trailing blank lines inside code fences on clipboard export", () => {

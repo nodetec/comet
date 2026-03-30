@@ -146,6 +146,11 @@ pub fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError
 }
 
 #[tauri::command]
+pub fn render_markdown_for_paste(markdown: String) -> String {
+    crate::adapters::markdown::renderer::markdown_to_lexical_html_for_paste(&markdown)
+}
+
+#[tauri::command]
 pub async fn get_note_conflict(
     app: AppHandle,
     note_id: String,

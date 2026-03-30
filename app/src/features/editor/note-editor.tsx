@@ -225,7 +225,7 @@ function EditorInner({
       <LinkPastePlugin />
       <AutoLinkPlugin />
       <MarkdownCopyPlugin />
-      <MarkdownPastePlugin />
+      <MarkdownPastePlugin loadKey={loadKey} />
       <YouTubeEmbedPlugin />
       <ImageDropPlugin />
       <SearchHighlightPlugin

@@ -355,9 +355,11 @@ export function $importMarkdownFromHTML(
 /**
  * Exports the Lexical editor state to markdown.
  *
- * Each empty paragraph in the AST becomes a blank line (`\n`). Content blocks
- * are separated by `\n` (no extra blank line — the empty paragraph nodes
- * provide the visual spacing, matching Bear/Obsidian behavior).
+ * Empty paragraphs are now the visible representation of markdown blank lines.
+ * Between content blocks:
+ * - zero empty paragraphs still export as a standard markdown separator (`\n\n`)
+ * - one empty paragraph also exports as `\n\n`
+ * - additional empty paragraphs export as additional blank lines
  */
 /**
  * Split Lexical's exported markdown string into content blocks,
@@ -397,18 +399,52 @@ function splitExportedIntoBlocks(exported: string): string[] {
   return exportedBlocks;
 }
 
-export function $exportMarkdown(transformers: Array<Transformer>): string {
-  const root = $getRoot();
-  const children = root.getChildren();
-
-  // Single pass: classify each child as empty or content, count content nodes.
+function classifyTopLevelChildren(children: LexicalNode[]): {
+  contentCount: number;
+  isEmpty: boolean[];
+} {
   const isEmpty: boolean[] = [];
   let contentCount = 0;
+
   for (const child of children) {
     const empty = isEmptyParagraph(child);
     isEmpty.push(empty);
-    if (!empty) contentCount++;
+    if (!empty) {
+      contentCount++;
+    }
   }
+
+  return { contentCount, isEmpty };
+}
+
+function separatorBeforeContentBlock(
+  blockIdx: number,
+  pendingEmptyParagraphs: number,
+): string {
+  if (blockIdx === 0) {
+    return pendingEmptyParagraphs > 0
+      ? "\n".repeat(pendingEmptyParagraphs)
+      : "";
+  }
+
+  return "\n".repeat(Math.max(2, pendingEmptyParagraphs + 1));
+}
+
+function trailingNewlinesAfterContent(
+  blockIdx: number,
+  pendingEmptyParagraphs: number,
+): string {
+  if (blockIdx === 0 || pendingEmptyParagraphs === 0) {
+    return "";
+  }
+
+  return "\n".repeat(pendingEmptyParagraphs + 1);
+}
+
+export function $exportMarkdown(transformers: Array<Transformer>): string {
+  const root = $getRoot();
+  const children = root.getChildren();
+  const { contentCount, isEmpty } = classifyTopLevelChildren(children);
 
   const exported = $convertToMarkdownStringNormalized(
     transformers,
@@ -424,71 +460,30 @@ export function $exportMarkdown(transformers: Array<Transformer>): string {
 
   let result = "";
   let blockIdx = 0;
+  let pendingEmptyParagraphs = 0;
 
   for (let i = 0; i < children.length; i++) {
     if (isEmpty[i]) {
-      result += "\n";
-    } else {
-      if (blockIdx > 0) {
-        result += "\n\n";
-      }
-      result += exportedBlocks[blockIdx];
-      blockIdx++;
+      pendingEmptyParagraphs++;
+      continue;
     }
+
+    result += separatorBeforeContentBlock(blockIdx, pendingEmptyParagraphs);
+    result += exportedBlocks[blockIdx];
+    blockIdx++;
+    pendingEmptyParagraphs = 0;
   }
 
-  return result;
+  result += trailingNewlinesAfterContent(blockIdx, pendingEmptyParagraphs);
+  return blockIdx === 0 ? "" : result;
 }
 
 /**
- * Exports markdown for the clipboard. The storage format uses extra newlines
- * for empty paragraphs (Bear/Obsidian behavior):
- *   \n\n = standard block separator
- *   \n\n\n = separator + 1 empty paragraph
- *   \n\n\n\n = separator + 2 empty paragraphs
- *
- * Standard markdown only needs \n\n between blocks. We reduce runs of 3+
- * newlines by 1 (collapsing the extra empty paragraphs), but preserve \n\n
- * separators and all newlines inside code fences.
+ * Exports markdown for the clipboard. Clipboard markdown now matches the stored
+ * markdown representation so copy/paste preserves the visible blank lines.
  */
 export function $exportMarkdownForClipboard(
   transformers: Array<Transformer>,
 ): string {
-  const stored = $exportMarkdown(transformers);
-
-  const lines = stored.split("\n");
-  const result: string[] = [];
-  let fence: FenceState = null;
-  let blankRun = 0;
-
-  const flushBlankRun = (insideFence: boolean) => {
-    let output: number;
-    if (insideFence) {
-      output = blankRun;
-    } else {
-      output = blankRun <= 1 ? blankRun : blankRun - 1;
-    }
-    for (let j = 0; j < output; j++) {
-      result.push("");
-    }
-    blankRun = 0;
-  };
-
-  for (const line of lines) {
-    if (line.trim() === "") {
-      blankRun++;
-      continue;
-    }
-
-    // The blank run belongs to the region before this line. Use the current
-    // fence state, not the next one, so blanks before an opening fence are
-    // normalized as regular block separators.
-    flushBlankRun(fence !== null);
-    result.push(line);
-    fence = updateFenceState(line, fence);
-  }
-
-  flushBlankRun(fence !== null);
-
-  return result.join("\n").replace(CLIPBOARD_EMAIL_LINK_RE, "$1");
+  return $exportMarkdown(transformers).replace(CLIPBOARD_EMAIL_LINK_RE, "$1");
 }
