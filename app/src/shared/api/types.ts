@@ -64,6 +64,16 @@ export type BootstrapPayload = {
   trashedCount: number;
 };
 
+export type AccountSummary = {
+  publicKey: string;
+  npub: string;
+  isActive: boolean;
+};
+
+export type SecretStorageStatus = {
+  storage: "database" | "keychain";
+};
+
 export type TagIndexDiagnostics = {
   version: string | null;
   status: string | null;

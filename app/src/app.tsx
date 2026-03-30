@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Toaster } from "@/shared/ui/sonner";
+import { AccountSwitcherDialog } from "@/features/settings/account-switcher-dialog";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
@@ -39,6 +40,7 @@ function App() {
     retryBootstrap,
     sidebarPaneProps,
   } = useShellController();
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const handleCreateNoteShortcut = notesPaneProps.onCreateNote;
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
@@ -52,6 +54,11 @@ function App() {
         case "n": {
           event.preventDefault();
           handleCreateNoteShortcut("keyboard");
+          break;
+        }
+        case "s": {
+          event.preventDefault();
+          setAccountSwitcherOpen((open) => !open);
           break;
         }
         case "o": {
@@ -239,6 +246,10 @@ function App() {
         onOpenChange={setCommandPaletteOpen}
         onSelectNote={notesPaneProps.onSelectNote}
         onSelectTagPath={sidebarPaneProps.onSelectTagPath}
+      />
+      <AccountSwitcherDialog
+        open={accountSwitcherOpen}
+        onOpenChange={setAccountSwitcherOpen}
       />
       <SettingsDialog />
       <Toaster closeButton position="bottom-right" richColors />

@@ -1,80 +1,23 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
 import { Check, Copy } from "lucide-react";
 
+import {
+  addAccount,
+  getAccountNsec,
+  getSecretStorageStatus,
+  listAccounts,
+  moveSecretToKeychain,
+  switchAccount,
+} from "@/shared/api/invoke";
 import { Button } from "@/shared/ui/button";
 import { errorMessage } from "@/shared/lib/utils";
-
-const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
-  "comet:reopen-settings-after-account-change";
-
-type AccountSummary = {
-  publicKey: string;
-  npub: string;
-  isActive: boolean;
-};
-
-type SecretStorageStatus = {
-  storage: "database" | "keychain";
-};
-
-type AccountChangePreparedDetail = {
-  ok: boolean;
-  message?: string;
-};
-
-async function prepareForAccountChange(): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      window.removeEventListener(
-        "comet:account-change-prepared",
-        handlePrepared as EventListener,
-      );
-      reject(new Error("Timed out while saving the current draft."));
-    }, 5000);
-
-    const handlePrepared = (event: Event) => {
-      const customEvent = event as CustomEvent<AccountChangePreparedDetail>;
-      window.clearTimeout(timeoutId);
-      window.removeEventListener(
-        "comet:account-change-prepared",
-        handlePrepared as EventListener,
-      );
-
-      if (customEvent.detail?.ok) {
-        resolve();
-        return;
-      }
-
-      reject(
-        new Error(
-          customEvent.detail?.message ?? "Couldn't save the current draft.",
-        ),
-      );
-    };
-
-    window.addEventListener(
-      "comet:account-change-prepared",
-      handlePrepared as EventListener,
-      { once: true },
-    );
-    window.dispatchEvent(new CustomEvent("comet:prepare-account-change"));
-  });
-}
-
-function preserveSettingsAcrossReload() {
-  try {
-    window.sessionStorage.setItem(
-      REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY,
-      "profile",
-    );
-  } catch {
-    // Ignore session storage failures and fall back to a normal reload.
-  }
-}
+import {
+  prepareForAccountChange,
+  preserveSettingsAcrossReload,
+} from "@/features/settings/lib/account-change";
 
 export function ProfileSettings() {
   const queryClient = useQueryClient();
@@ -90,12 +33,12 @@ export function ProfileSettings() {
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ["accounts"],
-    queryFn: () => invoke<AccountSummary[]>("list_accounts"),
+    queryFn: listAccounts,
   });
 
   const { data: secretStorageStatus } = useQuery({
     queryKey: ["secret-storage-status"],
-    queryFn: () => invoke<SecretStorageStatus>("get_secret_storage_status"),
+    queryFn: getSecretStorageStatus,
   });
 
   const activeAccount = accounts.find((account) => account.isActive) ?? null;
@@ -110,13 +53,10 @@ export function ProfileSettings() {
       storeInKeychain: boolean;
     }) => {
       await prepareForAccountChange();
-      return invoke<AccountSummary>("add_account", {
-        nsec: value,
-        storeInKeychain,
-      });
+      return addAccount({ nsec: value, storeInKeychain });
     },
     onSuccess: () => {
-      preserveSettingsAcrossReload();
+      preserveSettingsAcrossReload("profile");
       window.location.reload();
     },
     onSettled: () => {
@@ -128,10 +68,10 @@ export function ProfileSettings() {
   const switchAccountMutation = useMutation({
     mutationFn: async (publicKey: string) => {
       await prepareForAccountChange();
-      return invoke<AccountSummary>("switch_account", { publicKey });
+      return switchAccount(publicKey);
     },
     onSuccess: () => {
-      preserveSettingsAcrossReload();
+      preserveSettingsAcrossReload("profile");
       window.location.reload();
     },
     onSettled: () => {
@@ -142,7 +82,7 @@ export function ProfileSettings() {
 
   const copyNsecMutation = useMutation({
     mutationFn: async (publicKey: string) => {
-      const nsec = await invoke<string>("get_account_nsec", { publicKey });
+      const nsec = await getAccountNsec(publicKey);
       await writeText(nsec);
       return publicKey;
     },
@@ -160,8 +100,7 @@ export function ProfileSettings() {
   });
 
   const moveSecretToKeychainMutation = useMutation({
-    mutationFn: async () =>
-      invoke<SecretStorageStatus>("move_secret_to_keychain"),
+    mutationFn: moveSecretToKeychain,
     onSuccess: async () => {
       toast.success("Moved secret to OS keychain.");
       await queryClient.invalidateQueries({

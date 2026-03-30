@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { initAttachmentsBasePath } from "@/shared/lib/attachments";
 
 import {
+  type AccountSummary,
   type BootstrapPayload,
   type ContextualTagsInput,
   type ContextualTagsPayload,
@@ -17,6 +18,7 @@ import {
   type RenameTagInput,
   type SetHideSubtagNotesInput,
   type SetTagPinnedInput,
+  type SecretStorageStatus,
   type TagIndexDiagnostics,
 } from "./types";
 
@@ -169,4 +171,31 @@ export async function resolveNoteConflict(
 
 export async function exportNotes(input: ExportNotesInput) {
   return invoke<number>("export_notes", { input });
+}
+
+export async function listAccounts() {
+  return invoke<AccountSummary[]>("list_accounts");
+}
+
+export async function addAccount(input: {
+  nsec: string;
+  storeInKeychain: boolean;
+}) {
+  return invoke<AccountSummary>("add_account", input);
+}
+
+export async function switchAccount(publicKey: string) {
+  return invoke<AccountSummary>("switch_account", { publicKey });
+}
+
+export async function getAccountNsec(publicKey: string) {
+  return invoke<string>("get_account_nsec", { publicKey });
+}
+
+export async function getSecretStorageStatus() {
+  return invoke<SecretStorageStatus>("get_secret_storage_status");
+}
+
+export async function moveSecretToKeychain() {
+  return invoke<SecretStorageStatus>("move_secret_to_keychain");
 }
