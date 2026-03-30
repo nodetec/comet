@@ -295,8 +295,7 @@ pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppEr
     let conn = database_connection(&app)?;
     if enabled {
         let uses_keychain_storage =
-            crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?
-                .as_deref()
+            crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?.as_deref()
                 == Some(crate::adapters::sqlite::identity_repository::NSEC_STORAGE_KEYCHAIN);
 
         if uses_keychain_storage {

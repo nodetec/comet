@@ -37,9 +37,7 @@ pub fn get_secret_storage_status(app: AppHandle) -> Result<SecretStorageStatus, 
 }
 
 #[tauri::command]
-pub async fn move_secret_to_keychain(
-    app: AppHandle,
-) -> Result<SecretStorageStatus, AppError> {
+pub async fn move_secret_to_keychain(app: AppHandle) -> Result<SecretStorageStatus, AppError> {
     run_account_change(&app, || db::move_current_account_nsec_to_keychain(&app)).await
 }
 

@@ -79,10 +79,8 @@ fn cache_account_keys(app: &AppHandle, public_key: &str, keys: &Keys) -> Result<
 
 pub fn is_current_identity_unlocked(app: &AppHandle, conn: &Connection) -> Result<bool, AppError> {
     let public_key = current_identity_public_key(conn)?;
-    Ok(
-        cached_keys_for_account(app, &public_key)?.is_some()
-            || current_identity_db_nsec(conn)?.is_some(),
-    )
+    Ok(cached_keys_for_account(app, &public_key)?.is_some()
+        || current_identity_db_nsec(conn)?.is_some())
 }
 
 pub fn store_account_nsec(

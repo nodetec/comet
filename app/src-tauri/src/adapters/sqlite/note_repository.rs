@@ -549,7 +549,9 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)?;
 
         let rows = statement
-            .query_map(params![path, format!("{path}/%")], |row| row.get::<_, String>(0))
+            .query_map(params![path, format!("{path}/%")], |row| {
+                row.get::<_, String>(0)
+            })
             .map_err(map_err)?;
 
         let mut note_ids = Vec::new();

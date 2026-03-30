@@ -100,14 +100,12 @@ pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
             .as_deref()
             == Some("true");
         let uses_keychain_storage =
-            crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?
-                .as_deref()
+            crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?.as_deref()
                 == Some(crate::adapters::sqlite::identity_repository::NSEC_STORAGE_KEYCHAIN);
-        let should_disable_sync =
-            has_relay
-                && enabled
-                && uses_keychain_storage
-                && !crate::adapters::tauri::key_store::is_current_identity_unlocked(app, &conn)?;
+        let should_disable_sync = has_relay
+            && enabled
+            && uses_keychain_storage
+            && !crate::adapters::tauri::key_store::is_current_identity_unlocked(app, &conn)?;
         (has_relay, enabled, should_disable_sync)
     };
 

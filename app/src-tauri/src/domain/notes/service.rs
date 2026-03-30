@@ -813,16 +813,11 @@ mod tests {
         }
 
         fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError> {
-            let exists = self
-                .notes
-                .borrow()
-                .values()
-                .any(|record| {
-                    extract_tags(&record.markdown)
-                        .iter()
-                        .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
-                })
-                || self.pinned_tags.borrow().contains(path);
+            let exists = self.notes.borrow().values().any(|record| {
+                extract_tags(&record.markdown)
+                    .iter()
+                    .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
+            }) || self.pinned_tags.borrow().contains(path);
 
             if !exists {
                 return Ok(0);
@@ -838,16 +833,11 @@ mod tests {
         }
 
         fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError> {
-            let exists = self
-                .notes
-                .borrow()
-                .values()
-                .any(|record| {
-                    extract_tags(&record.markdown)
-                        .iter()
-                        .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
-                })
-                || self.hide_subtag_notes_tags.borrow().contains(path);
+            let exists = self.notes.borrow().values().any(|record| {
+                extract_tags(&record.markdown)
+                    .iter()
+                    .any(|tag| tag == path || tag.starts_with(&format!("{path}/")))
+            }) || self.hide_subtag_notes_tags.borrow().contains(path);
 
             if !exists {
                 return Ok(0);
@@ -1316,10 +1306,8 @@ mod tests {
 
     #[test]
     fn rename_tag_preserves_pinned_state() {
-        let repo = MockNoteRepository::new().with_note(make_note(
-            "n1",
-            "# Hello\n\n#work/project alpha#",
-        ));
+        let repo =
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
 
         NoteService::set_tag_pinned(
             &repo,
@@ -1346,10 +1334,8 @@ mod tests {
 
     #[test]
     fn delete_tag_removes_descendant_tags_in_subtree() {
-        let repo = MockNoteRepository::new().with_note(make_note(
-            "n1",
-            "# Hello\n\n#work/project alpha# #roadmap",
-        ));
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("n1", "# Hello\n\n#work/project alpha# #roadmap"));
 
         let affected = NoteService::delete_tag(
             &repo,

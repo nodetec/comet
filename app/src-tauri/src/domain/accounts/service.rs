@@ -140,12 +140,11 @@ pub fn get_account_nsec(app: &AppHandle, public_key: &str) -> Result<String, App
 pub fn current_secret_storage_status(app: &AppHandle) -> Result<SecretStorageStatus, AppError> {
     let account = crate::adapters::sqlite::connection::active_account(app)?;
     let conn = Connection::open(&account.db_path)?;
-    let storage = nostr::get_nsec_storage(&conn)?.unwrap_or_else(|| {
-        match nostr::get_stored_nsec(&conn) {
+    let storage =
+        nostr::get_nsec_storage(&conn)?.unwrap_or_else(|| match nostr::get_stored_nsec(&conn) {
             Ok(Some(_)) => nostr::NSEC_STORAGE_DATABASE.to_string(),
             _ => nostr::NSEC_STORAGE_KEYCHAIN.to_string(),
-        }
-    });
+        });
 
     Ok(SecretStorageStatus { storage })
 }
