@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/shared/ui/button";
 import { Switch } from "@/shared/ui/switch";
@@ -53,7 +54,18 @@ function SyncToggle() {
       invoke("set_sync_enabled", { enabled: newEnabled }),
     onMutate: async (newEnabled) => {
       await queryClient.cancelQueries({ queryKey: ["sync-enabled"] });
+      const previousEnabled = queryClient.getQueryData<boolean>([
+        "sync-enabled",
+      ]);
       queryClient.setQueryData(["sync-enabled"], newEnabled);
+      return { previousEnabled };
+    },
+    onError: (error, _newEnabled, context) => {
+      queryClient.setQueryData(["sync-enabled"], context?.previousEnabled);
+      toast.error(errorMessage(error, "Couldn't update sync."));
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["sync-enabled"] });
     },
   });
 

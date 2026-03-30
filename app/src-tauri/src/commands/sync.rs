@@ -293,6 +293,17 @@ pub fn is_sync_enabled(app: AppHandle) -> Result<bool, AppError> {
 #[tauri::command]
 pub async fn set_sync_enabled(app: AppHandle, enabled: bool) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
+    if enabled {
+        let uses_keychain_storage =
+            crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?
+                .as_deref()
+                == Some(crate::adapters::sqlite::identity_repository::NSEC_STORAGE_KEYCHAIN);
+
+        if uses_keychain_storage {
+            let _ = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
+        }
+    }
+
     conn.execute(
         "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_enabled', ?1)",
         rusqlite::params![if enabled { "true" } else { "false" }],
