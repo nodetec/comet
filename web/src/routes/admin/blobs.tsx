@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -36,6 +37,14 @@ type BlobEntry = {
   owners: string[];
 };
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return error.message;
+  }
+
+  return "Blob deletion failed";
+}
+
 function BlobsPage() {
   const queryClient = useQueryClient();
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
@@ -50,9 +59,15 @@ function BlobsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (sha256: string) => deleteBlob({ data: { sha256 } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+    onSuccess: async (_, sha256) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "blobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "stats"] }),
+      ]);
+      toast.success(`Deleted blob ${sha256.slice(0, 12)}...`);
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
     },
   });
 
