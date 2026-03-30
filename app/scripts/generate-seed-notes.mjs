@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { attachmentsByNoteSlug } from "./seed-attachments.mjs";
 
 const notesDir = process.argv[2];
 const nowMs = Number(process.argv[3]);
@@ -8,6 +9,11 @@ if (!notesDir || Number.isNaN(nowMs)) {
   console.error("usage: node generate-seed-notes.mjs <notes-dir> <now-ms>");
   process.exit(1);
 }
+
+const testAttachmentsDir = path.join(
+  path.dirname(notesDir),
+  "test-attachments",
+);
 
 const PINNED_BASENAMES = new Set([
   "01-luna-range-calibration",
@@ -327,6 +333,15 @@ function chooseNotebookId(tags, basename) {
   return "notebook-science";
 }
 
+function appendAttachmentMarkdown(markdown, title, attachment) {
+  const trimmed = markdown.trimEnd();
+  const imageMarkdown = `![${title} reference image](${attachment.uri})`;
+  if (!trimmed) {
+    return `${imageMarkdown}\n`;
+  }
+  return `${trimmed}\n\n${imageMarkdown}\n`;
+}
+
 const files = fs
   .readdirSync(notesDir)
   .filter((file) => file.endsWith(".md"))
@@ -339,15 +354,20 @@ if (files.length !== 50) {
 
 const hourMs = 60 * 60 * 1000;
 const minuteMs = 60 * 1000;
+const attachments = attachmentsByNoteSlug(testAttachmentsDir);
 
 const notes = files.map((file, index) => {
   const basename = file.replace(/\.md$/u, "");
   const noteId = `note-${basename}`;
-  const markdown = fs
+  const sourceMarkdown = fs
     .readFileSync(path.join(notesDir, file), "utf8")
     .replaceAll("\r\n", "\n");
+  const title = titleFromMarkdown(sourceMarkdown, basename);
+  const attachment = attachments.get(basename);
+  const markdown = attachment
+    ? appendAttachmentMarkdown(sourceMarkdown, title, attachment)
+    : sourceMarkdown;
   const tags = extractTags(markdown);
-  const title = titleFromMarkdown(markdown, basename);
   const editedAt =
     nowMs - (index * 7 * hourMs + (index % 5) * 19 * minuteMs + hourMs);
   const archivedAt = ARCHIVED_BASENAMES.has(basename) ? editedAt : null;

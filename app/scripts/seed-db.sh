@@ -7,6 +7,7 @@ APP_DB_PATH="${APP_DIR}/app.db"
 KEYCHAIN_SERVICE="comet"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 TEST_NOTES_DIR="${SCRIPT_DIR}/test-notes"
+TEST_ATTACHMENTS_DIR="${SCRIPT_DIR}/test-attachments"
 GENERATED_SQL_PATH="$(mktemp -t comet-seed-notes.XXXXXX.sql)"
 TEMP_DB_PATH=""
 
@@ -21,6 +22,11 @@ trap cleanup EXIT INT TERM
 
 if [ ! -d "$TEST_NOTES_DIR" ]; then
   echo "No test notes directory found at: $TEST_NOTES_DIR"
+  exit 1
+fi
+
+if [ ! -d "$TEST_ATTACHMENTS_DIR" ]; then
+  echo "No test attachments directory found at: $TEST_ATTACHMENTS_DIR"
   exit 1
 fi
 
@@ -292,6 +298,7 @@ security add-generic-password \
 
 rm -rf "$ATTACHMENTS_DIR"
 mkdir -p "$ATTACHMENTS_DIR"
+node "$SCRIPT_DIR/install-seed-attachments.mjs" "$TEST_ATTACHMENTS_DIR" "$ATTACHMENTS_DIR" >/dev/null
 
 echo "Seeded Comet database at: $DB_PATH"
 echo "Loaded 50 markdown fixtures from: $TEST_NOTES_DIR"
