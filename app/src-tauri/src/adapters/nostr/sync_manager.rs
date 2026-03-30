@@ -99,25 +99,14 @@ pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
             .flatten()
             .as_deref()
             == Some("true");
-        let unlocked = if has_relay && enabled {
-            crate::adapters::tauri::key_store::is_current_identity_unlocked(app, &conn)?
-        } else {
-            false
-        };
-        (has_relay, enabled, unlocked)
+        (has_relay, enabled)
     };
 
     let manager = app.state::<SyncManager>();
-    let (has_relay, enabled, unlocked) = readiness;
+    let (has_relay, enabled) = readiness;
 
     if !has_relay || !enabled {
         manager.stop().await;
-        return Ok(());
-    }
-
-    if !unlocked {
-        manager.stop().await;
-        set_state(&manager.state, SyncState::NeedsUnlock, app).await;
         return Ok(());
     }
 
