@@ -66,6 +66,7 @@ describe("relay integration > retention", () => {
         current_head_negentropy: true,
         changes_feed: true,
         recipient_scoped: true,
+        batch_fetch: true,
         retention: {
           min_payload_mtime: 1_800_000_000_000,
         },
