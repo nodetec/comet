@@ -37,6 +37,7 @@ import { type ChangesEventMessage, isChangesRequestMessage } from "./changes";
 export type EventMessage = ["EVENT", NostrEvent];
 export type AuthMessage = ["AUTH", NostrEvent];
 export type ReqMessage = ["REQ", string, ...RelayFilter[]];
+export type ReqBatchMessage = ["REQ-BATCH", string, ...RelayFilter[]];
 export type CloseMessage = ["CLOSE", string];
 export type OkMessage = ["OK", string, boolean, string];
 export type NoticeMessage = ["NOTICE", string];
@@ -52,6 +53,7 @@ export type ClientMessage =
   | EventMessage
   | AuthMessage
   | ReqMessage
+  | ReqBatchMessage
   | CloseMessage;
 
 export type ServerMessage =
@@ -65,6 +67,7 @@ export type ServerMessage =
   | NegErrMessage
   | NegStatusMessage
   | ["EVENT", string, NostrEvent]
+  | ["EVENTS", string, NostrEvent[]]
   | ["CHANGES", string, "EOSE", number]
   | ["CHANGES", string, "ERR", string];
 
@@ -109,6 +112,27 @@ function isReqMessage(value: unknown): value is ReqMessage {
 
 function isReqCommand(value: unknown): value is unknown[] {
   return Array.isArray(value) && value[0] === "REQ";
+}
+
+function isReqBatchMessage(value: unknown): value is ReqBatchMessage {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    value[0] === "REQ-BATCH" &&
+    typeof value[1] === "string" &&
+    value
+      .slice(2)
+      .every(
+        (filter) =>
+          typeof filter === "object" &&
+          filter !== null &&
+          !Array.isArray(filter),
+      )
+  );
+}
+
+function isReqBatchCommand(value: unknown): value is unknown[] {
+  return Array.isArray(value) && value[0] === "REQ-BATCH";
 }
 
 function isCloseMessage(value: unknown): value is CloseMessage {
@@ -273,36 +297,82 @@ export function createClientMessageHandler(options: {
       ];
     }
 
+    if (isReqBatchCommand(parsed) && !isReqBatchMessage(parsed)) {
+      return [
+        [
+          "NOTICE",
+          "invalid: REQ-BATCH requires a string subscription id and object filters",
+        ],
+      ];
+    }
+
     if (isReqMessage(parsed)) {
+      const message = parsed as ReqMessage;
       if (options.access.privateMode) {
         const auth = isAuthorizedForRevisionFilters(
-          parsed.slice(2) as RelayFilter[],
+          message.slice(2) as RelayFilter[],
           options.connections.getAuthedPubkeys(context.connectionId),
         );
         if (!auth.authorized) {
-          return [["CLOSED", parsed[1], auth.reason]];
+          return [["CLOSED", message[1], auth.reason]];
         }
       }
 
       const revisionEvents = await options.revisionStore.queryRevisionEvents(
-        parsed.slice(2) as RelayFilter[],
+        message.slice(2) as RelayFilter[],
       );
       const compactedRevisionIds =
         await options.revisionStore.queryCompactedRevisionIds(
-          parsed.slice(2) as RelayFilter[],
+          message.slice(2) as RelayFilter[],
         );
       return [
         ...revisionEvents.map(
-          (event): ServerMessage => ["EVENT", parsed[1], event],
+          (event): ServerMessage => ["EVENT", message[1], event],
         ),
         ...compactedRevisionIds.map(
           (rev): ServerMessage => [
             "EVENT-STATUS",
-            parsed[1],
+            message[1],
             { rev, status: "payload_compacted" },
           ],
         ),
-        ["EOSE", parsed[1]],
+        ["EOSE", message[1]],
+      ];
+    }
+
+    if (isReqBatchMessage(parsed)) {
+      const message = parsed as ReqBatchMessage;
+      if (options.access.privateMode) {
+        const auth = isAuthorizedForRevisionFilters(
+          message.slice(2) as RelayFilter[],
+          options.connections.getAuthedPubkeys(context.connectionId),
+        );
+        if (!auth.authorized) {
+          return [["CLOSED", message[1], auth.reason]];
+        }
+      }
+
+      const revisionEvents = await options.revisionStore.queryRevisionEvents(
+        message.slice(2) as RelayFilter[],
+      );
+      const compactedRevisionIds =
+        await options.revisionStore.queryCompactedRevisionIds(
+          message.slice(2) as RelayFilter[],
+        );
+      const eventBatches = chunkEvents(revisionEvents);
+
+      return [
+        ...eventBatches.map(
+          (events): ServerMessage => ["EVENTS", message[1], events],
+        ),
+        ...compactedRevisionIds.map(
+          (rev): ServerMessage => [
+            "EVENT-STATUS",
+            message[1],
+            { rev, status: "payload_compacted" },
+          ],
+        ),
+        ["EOSE", message[1]],
       ];
     }
 
@@ -406,4 +476,16 @@ export function createClientMessageHandler(options: {
 
     return [["NOTICE", "unsupported: message routing skeleton only"]];
   };
+}
+
+const MAX_EVENTS_PER_BATCH = 128;
+
+function chunkEvents(events: NostrEvent[]): NostrEvent[][] {
+  const batches: NostrEvent[][] = [];
+
+  for (let index = 0; index < events.length; index += MAX_EVENTS_PER_BATCH) {
+    batches.push(events.slice(index, index + MAX_EVENTS_PER_BATCH));
+  }
+
+  return batches;
 }

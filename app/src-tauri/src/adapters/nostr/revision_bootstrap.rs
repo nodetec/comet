@@ -9,7 +9,7 @@ use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::revision_apply_service::apply_remote_revision_event;
 use crate::domain::sync::revision_negentropy::{RevisionNegentropyItem, RevisionNegentropySession};
 use crate::error::AppError;
-use nostr_sdk::prelude::Keys;
+use nostr_sdk::prelude::{Event, Keys};
 use rusqlite::Connection;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -200,10 +200,17 @@ async fn bootstrap_with_keys_and_changes(
 
     let need = need.into_iter().collect::<Vec<_>>();
     if !need.is_empty() {
-        connection
-            .send_req_revisions("bootstrap-fetch", &recipient, &need)
-            .await?;
+        if relay_info.revision_sync.batch_fetch {
+            connection
+                .send_req_revisions_batch("bootstrap-fetch", &recipient, &need)
+                .await?;
+        } else {
+            connection
+                .send_req_revisions("bootstrap-fetch", &recipient, &need)
+                .await?;
+        }
 
+        let mut fetched_events = Vec::<Event>::new();
         let mut compacted_revisions = Vec::new();
 
         loop {
@@ -217,18 +224,19 @@ async fn bootstrap_with_keys_and_changes(
                             "Unexpected revision fetch subscription id: {subscription_id}"
                         )));
                     }
-
-                    let conn = open_sync_db(db_path)?;
-                    if let Some(change) = apply_remote_revision_event(
-                        &conn,
-                        relay_ws_url,
-                        keys,
-                        &event,
-                        None,
-                        &mut invalidate_cache,
-                    )? {
-                        on_change(change);
+                    fetched_events.push(event);
+                }
+                RevisionRelayIncomingMessage::EventsBatch {
+                    subscription_id,
+                    events,
+                } => {
+                    if subscription_id != "bootstrap-fetch" {
+                        return Err(AppError::custom(format!(
+                            "Unexpected batched revision fetch subscription id: {subscription_id}"
+                        )));
                     }
+
+                    fetched_events.extend(events);
                 }
                 RevisionRelayIncomingMessage::EventStatus {
                     subscription_id,
@@ -276,6 +284,32 @@ async fn bootstrap_with_keys_and_changes(
                 compacted_revisions.join(", "),
                 retention_hint
             )));
+        }
+
+        if !fetched_events.is_empty() {
+            let mut conn = open_sync_db(db_path)?;
+            let tx = conn.transaction()?;
+            let mut invalidated_notes = BTreeSet::new();
+            let mut applied_changes = Vec::new();
+
+            for event in &fetched_events {
+                if let Some(change) =
+                    apply_remote_revision_event(&tx, relay_ws_url, keys, event, None, |note_id| {
+                        invalidated_notes.insert(note_id.to_string());
+                    })?
+                {
+                    applied_changes.push(change);
+                }
+            }
+
+            tx.commit()?;
+
+            for note_id in invalidated_notes {
+                invalidate_cache(&note_id);
+            }
+            for change in applied_changes {
+                on_change(change);
+            }
         }
     }
 

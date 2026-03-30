@@ -23,6 +23,7 @@ This site now focuses only on the current sync design direction.
 
 - [Revision Gift Wrap](/specs/revision-gift-wrap/) defines the outer sync envelope for immutable encrypted revisions.
 - [Revision Negentropy](/specs/revision-negentropy/) defines bootstrap and repair sync over logical revision identities.
+- [Revision Batch Fetch](/specs/revision-batch-fetch/) defines Comet's batched payload download extension after negentropy.
 - [Revision Changes Feed](/specs/revision-changes-feed/) defines the live relay tail over immutable revision events.
 
 ## Scope

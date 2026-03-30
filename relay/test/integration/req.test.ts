@@ -112,4 +112,52 @@ describe("relay integration > req", () => {
       "invalid: REQ requires a string subscription id and object filters",
     ]);
   });
+
+  test("returns batched revision events for REQ-BATCH", async () => {
+    const ctx = await startTestRevisionRelay(39463);
+    contexts.push(ctx);
+
+    const trace = traceOptions(ctx, "client");
+    const ws = await connectWs(ctx.port, trace);
+    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
+    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2");
+
+    for (const event of [firstEvent, secondEvent]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
+
+    sendJson(
+      ws,
+      [
+        "REQ-BATCH",
+        "filter-batch",
+        {
+          kinds: [REVISION_SYNC_EVENT_KIND],
+          "#p": ["recipient-1"],
+          "#r": [REV_A, REV_B],
+        },
+      ],
+      trace,
+    );
+
+    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+      ["EVENTS", "filter-batch", [firstEvent, secondEvent]],
+      ["EOSE", "filter-batch"],
+    ]);
+  });
+
+  test("returns NOTICE for malformed REQ-BATCH filters", async () => {
+    const ctx = await startTestRevisionRelay(39464);
+    contexts.push(ctx);
+
+    const trace = traceOptions(ctx, "client");
+    const ws = await connectWs(ctx.port, trace);
+
+    sendJson(ws, ["REQ-BATCH", "bad-req-batch", "not-an-object"], trace);
+    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+      "NOTICE",
+      "invalid: REQ-BATCH requires a string subscription id and object filters",
+    ]);
+  });
 });

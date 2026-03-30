@@ -35,6 +35,8 @@ pub struct RevisionRelaySyncInfo {
     pub current_head_negentropy: bool,
     pub changes_feed: bool,
     pub recipient_scoped: bool,
+    #[serde(default)]
+    pub batch_fetch: bool,
     pub retention: RevisionRelayRetentionInfo,
 }
 
@@ -61,6 +63,10 @@ pub enum RevisionRelayIncomingMessage {
     Event {
         subscription_id: String,
         event: Event,
+    },
+    EventsBatch {
+        subscription_id: String,
+        events: Vec<Event>,
     },
     EventStatus {
         subscription_id: String,
@@ -167,6 +173,24 @@ impl RevisionRelayConnection {
     ) -> Result<(), AppError> {
         self.send_json(serde_json::json!([
             "REQ",
+            subscription_id,
+            {
+                "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
+                "#p": [recipient],
+                "#r": revision_ids,
+            }
+        ]))
+        .await
+    }
+
+    pub async fn send_req_revisions_batch(
+        &mut self,
+        subscription_id: &str,
+        recipient: &str,
+        revision_ids: &[String],
+    ) -> Result<(), AppError> {
+        self.send_json(serde_json::json!([
+            "REQ-BATCH",
             subscription_id,
             {
                 "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
@@ -399,6 +423,26 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 event,
             })
         }
+        Some("EVENTS") => {
+            let events_json = arr
+                .get(2)
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| AppError::custom("Missing events in EVENTS response"))?;
+            let mut events = Vec::with_capacity(events_json.len());
+            for event_json in events_json {
+                let event = Event::from_json(event_json.to_string())
+                    .map_err(|e| AppError::custom(format!("Invalid relay event in EVENTS: {e}")))?;
+                events.push(event);
+            }
+            Ok(RevisionRelayIncomingMessage::EventsBatch {
+                subscription_id: arr
+                    .get(1)
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                events,
+            })
+        }
         Some("EVENT-STATUS") => Ok(RevisionRelayIncomingMessage::EventStatus {
             subscription_id: arr
                 .get(1)
@@ -562,6 +606,36 @@ mod tests {
                 assert_eq!(event.kind, Kind::GiftWrap);
             }
             _ => panic!("expected EVENT message"),
+        }
+    }
+
+    #[test]
+    fn parses_events_batch_message() {
+        let event = serde_json::json!({
+            "id": "0000000000000000000000000000000000000000000000000000000000000001",
+            "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
+            "created_at": 1700000000,
+            "kind": 1059,
+            "tags": [["p","recipient"],["d","doc"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["m","1700000000000"],["op","put"],["t","note"],["v","2"]],
+            "content": "ciphertext",
+            "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
+        });
+
+        let message = parse_relay_message(
+            &serde_json::json!(["EVENTS", "fetch-1", [event]]).to_string(),
+        )
+        .unwrap();
+
+        match message {
+            RevisionRelayIncomingMessage::EventsBatch {
+                subscription_id,
+                events,
+            } => {
+                assert_eq!(subscription_id, "fetch-1");
+                assert_eq!(events.len(), 1);
+                assert_eq!(events[0].kind, Kind::Custom(1059));
+            }
+            other => panic!("unexpected message: {other:?}"),
         }
     }
 
