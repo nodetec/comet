@@ -194,19 +194,10 @@ pub async fn push_note_revisions_batch(
 
     match fanout_result {
         Ok(fanout) => {
+            let failed_count = ack_total.saturating_sub(fanout.success_counts.len());
             for prepared in prepared_publishes {
                 let event_id = prepared.event.id.to_hex();
-                let success_count = fanout.success_counts.get(&event_id).copied().unwrap_or(0);
-
-                if success_count > 0 {
-                    sync_log(
-                        app,
-                        &format!(
-                            "pushed revision note {} to {}/{} relays",
-                            prepared.note_id, success_count, fanout.relay_count
-                        ),
-                    );
-                } else if let Some(message) = fanout.rejection_messages.get(&event_id) {
+                if let Some(message) = fanout.rejection_messages.get(&event_id) {
                     sync_log(
                         app,
                         &format!(
@@ -224,6 +215,17 @@ pub async fn push_note_revisions_batch(
                     );
                 }
             }
+
+            sync_log(
+                app,
+                &format!(
+                    "revision relay publish complete acked={}/{} failed={} relays={}",
+                    acked,
+                    ack_total,
+                    failed_count,
+                    fanout.relay_count
+                ),
+            );
 
             Ok(())
         }
