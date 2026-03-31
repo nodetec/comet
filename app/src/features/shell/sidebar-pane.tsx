@@ -958,7 +958,7 @@ export function SidebarPane({
           <div className="relative z-40 flex gap-1">
             <Button
               aria-label={`Sync: ${syncState}`}
-              className="text-sidebar-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               size="icon-sm"
               variant="ghost"
               onClick={() => setSyncDialogOpen(true)}
@@ -987,7 +987,7 @@ export function SidebarPane({
             />
             <Button
               aria-label="Settings"
-              className="text-sidebar-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => openSettings(true)}
               size="icon-sm"
               variant="ghost"
