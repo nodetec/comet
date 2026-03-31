@@ -239,9 +239,7 @@ body {
 
 .comet-list-item--check > .comet-list {
   margin-top: 0.25rem;
-  margin-left: calc(
-    var(--comet-list-marker-width) + var(--comet-list-marker-gap)
-  ) !important;
+  margin-left: 0 !important;
   display: flow-root;
 }
 
@@ -261,8 +259,9 @@ body {
     var(--comet-list-marker-width) + var(--comet-list-marker-gap)
   );
   list-style: none !important;
+  position: relative;
   margin-left: 0 !important;
-  padding-left: 0 !important;
+  padding-left: var(--comet-list-gutter) !important;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   outline: none;
@@ -277,13 +276,13 @@ body {
   position: relative;
   display: inline-block;
   width: 0;
-  height: 1em;
+  margin-left: calc(-1 * var(--comet-list-gutter));
   margin-right: var(--comet-list-gutter);
   overflow: visible;
   cursor: pointer;
   color: transparent;
   font-size: inherit;
-  line-height: 1em;
+  line-height: inherit;
   text-decoration: none !important;
   user-select: text;
   vertical-align: baseline;
