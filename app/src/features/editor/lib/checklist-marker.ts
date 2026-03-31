@@ -20,8 +20,10 @@ import {
   type ListAnchorNode,
 } from "../nodes/list-anchor-node";
 import {
+  CHECKLIST_LEFT_CURSOR_ANCHOR,
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
+  isChecklistLeftCursorAnchorTextContent,
   isChecklistCursorAnchorTextContent,
   isChecklistPlaceholderTextContent,
   stripChecklistPlaceholders,
@@ -79,6 +81,15 @@ function isChecklistMarkerSpacingTextNode(node: LexicalNode): node is TextNode {
     $isTextNode(node) &&
     (isChecklistPlaceholderTextContent(node.getTextContent()) ||
       isChecklistCursorAnchorTextContent(node.getTextContent()))
+  );
+}
+
+function isChecklistLeadingCursorAnchorTextNode(
+  node: LexicalNode | null | undefined,
+): node is TextNode {
+  return (
+    $isTextNode(node) &&
+    isChecklistLeftCursorAnchorTextContent(node.getTextContent())
   );
 }
 
@@ -213,9 +224,12 @@ function ensurePrimaryAnchor(
 
   changed = removeNodes(anchors.slice(1)) || changed;
 
-  const firstChild = listItemNode.getFirstChild();
-  if (firstChild && !firstChild.is(primaryAnchor)) {
-    firstChild.insertBefore(primaryAnchor);
+  const previousSibling = primaryAnchor.getPreviousSibling();
+  if (
+    previousSibling != null &&
+    !isChecklistLeadingCursorAnchorTextNode(previousSibling)
+  ) {
+    listItemNode.getFirstChild()?.insertBefore(primaryAnchor);
     changed = true;
   }
 
@@ -226,6 +240,42 @@ function ensurePrimaryAnchor(
   }
 
   return { changed, primaryAnchor };
+}
+
+function syncLeadingCursorAnchorNodes(
+  primaryAnchor: ListAnchorNode,
+  leadingCursorNodes: TextNode[],
+  desiredText: string | null,
+): boolean {
+  if (desiredText == null) {
+    return removeNodes(leadingCursorNodes);
+  }
+
+  let changed = false;
+  const primaryLeadingCursor = leadingCursorNodes[0] ?? null;
+  if (primaryLeadingCursor == null) {
+    const previousNode = $createTextNode(desiredText);
+    previousNode.toggleUnmergeable();
+    primaryAnchor.insertBefore(previousNode);
+    changed = true;
+  } else {
+    if (primaryLeadingCursor.getTextContent() !== desiredText) {
+      primaryLeadingCursor.setTextContent(desiredText);
+      changed = true;
+    }
+
+    if (!primaryLeadingCursor.isUnmergeable()) {
+      primaryLeadingCursor.toggleUnmergeable();
+      changed = true;
+    }
+
+    if (!primaryAnchor.getPreviousSibling()?.is(primaryLeadingCursor)) {
+      primaryAnchor.insertBefore(primaryLeadingCursor);
+      changed = true;
+    }
+  }
+
+  return removeNodes(leadingCursorNodes.slice(1)) || changed;
 }
 
 function syncPlaceholderNodes(
@@ -271,12 +321,22 @@ export function normalizeChecklistItemMarker(
   listItemNode: ListItemNode,
 ): boolean {
   const anchors = listAnchorChildren(listItemNode);
+  const leadingCursorNodes = listItemNode
+    .getChildren()
+    .filter(isChecklistLeadingCursorAnchorTextNode);
   const placeholderNodes = listItemNode
     .getChildren()
-    .filter(isChecklistMarkerSpacingTextNode);
+    .filter(
+      (child): child is TextNode =>
+        isChecklistMarkerSpacingTextNode(child) &&
+        !isChecklistLeadingCursorAnchorTextNode(child),
+    );
 
   if (!shouldChecklistItemHaveMarker(listItemNode)) {
-    return clearChecklistMarkerArtifacts(anchors, placeholderNodes);
+    return (
+      clearChecklistMarkerArtifacts(anchors, placeholderNodes) ||
+      removeNodes(leadingCursorNodes)
+    );
   }
 
   const { changed: anchorChanged, primaryAnchor } = ensurePrimaryAnchor(
@@ -285,21 +345,28 @@ export function normalizeChecklistItemMarker(
   );
   const hasMeaningfulContent = hasMeaningfulChecklistContent(listItemNode);
   const hasNestedLists = listItemNode.getChildren().some($isListNode);
+  let desiredLeadingText: string | null = null;
   let desiredText: string | null = null;
 
   if (hasMeaningfulContent) {
+    desiredLeadingText = CHECKLIST_LEFT_CURSOR_ANCHOR;
     desiredText = CHECKLIST_CURSOR_ANCHOR;
   } else if (!hasNestedLists) {
     desiredText = CHECKLIST_PLACEHOLDER;
   }
 
+  const leadingChanged = syncLeadingCursorAnchorNodes(
+    primaryAnchor,
+    leadingCursorNodes,
+    desiredLeadingText,
+  );
   const placeholderChanged = syncPlaceholderNodes(
     primaryAnchor,
     placeholderNodes,
     desiredText,
   );
 
-  return anchorChanged || placeholderChanged;
+  return anchorChanged || leadingChanged || placeholderChanged;
 }
 
 export function $isChecklistListItem(

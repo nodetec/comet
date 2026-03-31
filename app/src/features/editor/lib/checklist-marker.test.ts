@@ -26,6 +26,7 @@ import {
   normalizeChecklistItemMarker,
 } from "./checklist-marker";
 import {
+  CHECKLIST_LEFT_CURSOR_ANCHOR,
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
   $convertChecklistItemToParagraph,
@@ -44,8 +45,7 @@ function createTestEditor() {
 describe("normalizeChecklistItemMarker", () => {
   it("prepends a marker to checklist items with visible content", () => {
     const editor = createTestEditor();
-    let firstChildType = "";
-    let secondChildText = "";
+    let childSummary: Array<{ type: string; text: string }> = [];
 
     editor.update(
       () => {
@@ -56,14 +56,20 @@ describe("normalizeChecklistItemMarker", () => {
         $getRoot().append(checklist);
 
         normalizeChecklistItemMarker(item);
-        firstChildType = item.getFirstChildOrThrow().getType();
-        secondChildText = item.getChildren()[1]?.getTextContent() ?? "";
+        childSummary = item.getChildren().map((child) => ({
+          type: child.getType(),
+          text: child.getTextContent(),
+        }));
       },
       { discrete: true },
     );
 
-    expect(firstChildType).toBe("list-anchor");
-    expect(secondChildText).toBe(CHECKLIST_CURSOR_ANCHOR);
+    expect(childSummary).toEqual([
+      { type: "text", text: CHECKLIST_LEFT_CURSOR_ANCHOR },
+      { type: "list-anchor", text: "" },
+      { type: "text", text: CHECKLIST_CURSOR_ANCHOR },
+      { type: "text", text: "Task" },
+    ]);
   });
 
   it("keeps markers off wrapper-only checklist items", () => {
@@ -118,6 +124,7 @@ describe("normalizeChecklistItemMarker", () => {
     );
 
     expect(childSummary).toEqual([
+      { type: "text", text: CHECKLIST_LEFT_CURSOR_ANCHOR },
       { type: "list-anchor", text: "" },
       { type: "text", text: CHECKLIST_CURSOR_ANCHOR },
       { type: "text", text: "Parent" },
@@ -227,8 +234,8 @@ describe("normalizeChecklistItemMarker", () => {
 
   it("keeps list anchors token-mode across writable updates", () => {
     const editor = createTestEditor();
-    let mode = "";
-    let anchorText = "";
+    let leadingText = "";
+    let anchorMode = "";
 
     editor.update(
       () => {
@@ -239,23 +246,24 @@ describe("normalizeChecklistItemMarker", () => {
         checklist.append(item);
         $getRoot().append(checklist);
 
-        anchor.setAnchorText("\u200B");
+        normalizeChecklistItemMarker(item);
 
-        const latestAnchor = item.getFirstChild();
-        if (!$isListAnchorNode(latestAnchor) || !$isTextNode(latestAnchor)) {
+        const leadingNode = item.getFirstChild();
+        const latestAnchor = item.getChildren().find($isListAnchorNode);
+        if (!$isTextNode(leadingNode) || !$isListAnchorNode(latestAnchor)) {
           throw new Error(
-            "expected latest child to be a list anchor text node",
+            "expected left cursor anchor and list anchor children",
           );
         }
 
-        mode = latestAnchor.getMode();
-        anchorText = latestAnchor.getAnchorText();
+        leadingText = leadingNode.getTextContent();
+        anchorMode = latestAnchor.getMode();
       },
       { discrete: true },
     );
 
-    expect(mode).toBe("token");
-    expect(anchorText).toBe("\u200B");
+    expect(leadingText).toBe(CHECKLIST_LEFT_CURSOR_ANCHOR);
+    expect(anchorMode).toBe("token");
   });
 
   it("converts an item to a paragraph when marker and text are deleted together", () => {
@@ -273,7 +281,7 @@ describe("normalizeChecklistItemMarker", () => {
 
         normalizeChecklistItemMarker(item);
 
-        const marker = item.getFirstChild();
+        const marker = item.getChildren().find($isListAnchorNode);
         const text = item
           .getChildren()
           .find(

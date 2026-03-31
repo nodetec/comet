@@ -22,6 +22,7 @@ import {
 // Empty checklist items need a visible-width placeholder so the caret has
 // somewhere to render when the item contains no real text yet.
 const LEGACY_CHECKLIST_PLACEHOLDER = "\u200B";
+export const CHECKLIST_LEFT_CURSOR_ANCHOR = "\u2062";
 export const CHECKLIST_CURSOR_ANCHOR = "\u2060";
 export const CHECKLIST_PLACEHOLDER = "\u00A0";
 type ChecklistParagraphSelection = "end" | "start" | "none";
@@ -32,8 +33,15 @@ export function isChecklistPlaceholderTextContent(text: string): boolean {
   );
 }
 
+export function isChecklistLeftCursorAnchorTextContent(text: string): boolean {
+  return text === CHECKLIST_LEFT_CURSOR_ANCHOR;
+}
+
 export function isChecklistCursorAnchorTextContent(text: string): boolean {
-  return text === CHECKLIST_CURSOR_ANCHOR;
+  return (
+    text === CHECKLIST_CURSOR_ANCHOR ||
+    isChecklistLeftCursorAnchorTextContent(text)
+  );
 }
 
 export function stripChecklistPlaceholders(text: string): string {
@@ -41,6 +49,8 @@ export function stripChecklistPlaceholders(text: string): string {
     .split(CHECKLIST_PLACEHOLDER)
     .join("")
     .split(LEGACY_CHECKLIST_PLACEHOLDER)
+    .join("")
+    .split(CHECKLIST_LEFT_CURSOR_ANCHOR)
     .join("")
     .split(CHECKLIST_CURSOR_ANCHOR)
     .join("");
@@ -54,7 +64,10 @@ function getOffsetAfterStrippingChecklistPlaceholders(
   let removedCount = 0;
 
   for (let i = 0; i < boundedOffset; i++) {
-    if (isChecklistPlaceholderTextContent(text[i] ?? "")) {
+    if (
+      isChecklistPlaceholderTextContent(text[i] ?? "") ||
+      isChecklistCursorAnchorTextContent(text[i] ?? "")
+    ) {
       removedCount++;
     }
   }
@@ -493,6 +506,7 @@ export function $normalizeChecklistPlaceholderTextNode(
     ![
       CHECKLIST_PLACEHOLDER,
       LEGACY_CHECKLIST_PLACEHOLDER,
+      CHECKLIST_LEFT_CURSOR_ANCHOR,
       CHECKLIST_CURSOR_ANCHOR,
     ].some((specialText) => text.includes(specialText)) ||
     isChecklistPlaceholderTextContent(text) ||

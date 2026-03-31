@@ -23,6 +23,7 @@ import {
 } from "../lib/checklist-marker";
 import { $outdentListItemPreservingOrder } from "../lib/list-outdent";
 import {
+  isChecklistLeftCursorAnchorTextContent,
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
   $convertChecklistItemToParagraph,
@@ -50,7 +51,6 @@ export default function ChecklistMarkerPlugin() {
     focusKey: string;
     focusOffset: number;
   } | null>(null);
-  const rangeSelectionTouchesMarkerRef = useRef(false);
 
   useEffect(() => {
     const setCollapsedSelectionOnTextNode = (
@@ -130,12 +130,21 @@ export default function ChecklistMarkerPlugin() {
     const getChecklistEditingTextNode = (
       listItem: ListItemNode,
     ): import("lexical").TextNode | null => {
+      let sawListAnchor = false;
+
       for (const child of listItem.getChildren()) {
         if ($isListAnchorNode(child)) {
+          sawListAnchor = true;
           continue;
         }
 
         if ($isTextNode(child)) {
+          if (
+            !sawListAnchor &&
+            isChecklistLeftCursorAnchorTextContent(child.getTextContent())
+          ) {
+            continue;
+          }
           return child;
         }
       }
@@ -321,7 +330,6 @@ export default function ChecklistMarkerPlugin() {
 
     const handleMouseDown = (event: MouseEvent) => {
       const clickZone = getChecklistClickZone(event.target, event.clientX);
-      rangeSelectionTouchesMarkerRef.current = clickZone?.zone === "marker";
       if (clickZone?.zone === "gutter") {
         event.preventDefault();
         event.stopPropagation();
@@ -364,12 +372,6 @@ export default function ChecklistMarkerPlugin() {
         event.preventDefault();
         event.stopPropagation();
       }
-    };
-
-    const handleMouseUp = (event: MouseEvent) => {
-      const clickZone = getChecklistClickZone(event.target, event.clientX);
-      rangeSelectionTouchesMarkerRef.current =
-        rangeSelectionTouchesMarkerRef.current || clickZone?.zone === "marker";
     };
 
     const handleClick = (event: MouseEvent) => {
@@ -418,14 +420,13 @@ export default function ChecklistMarkerPlugin() {
           continue;
         }
 
-        if (rangeSelectionTouchesMarkerRef.current) {
+        if (isEmptyChecklistLeafItem(listItem)) {
           $convertChecklistItemToParagraph(listItem, "start");
         } else {
           normalizeChecklistItemMarker(listItem);
         }
       }
 
-      rangeSelectionTouchesMarkerRef.current = false;
       return true;
     };
 
@@ -495,10 +496,6 @@ export default function ChecklistMarkerPlugin() {
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {
-          const selection = $getSelection();
-          if (!$isRangeSelection(selection) || selection.isCollapsed()) {
-            rangeSelectionTouchesMarkerRef.current = false;
-          }
           normalizeSelectionAwayFromChecklistMarker();
           return false;
         },
@@ -522,20 +519,14 @@ export default function ChecklistMarkerPlugin() {
       ),
       editor.registerRootListener((root, prevRoot) => {
         prevRoot?.removeEventListener("mousedown", handleMouseDown, true);
-        prevRoot?.removeEventListener("mouseup", handleMouseUp, true);
         prevRoot?.removeEventListener("click", handleClick);
         root?.addEventListener("mousedown", handleMouseDown, true);
-        root?.addEventListener("mouseup", handleMouseUp, true);
         root?.addEventListener("click", handleClick);
       }),
       () => {
-        rangeSelectionTouchesMarkerRef.current = false;
         editor
           .getRootElement()
           ?.removeEventListener("mousedown", handleMouseDown, true);
-        editor
-          .getRootElement()
-          ?.removeEventListener("mouseup", handleMouseUp, true);
         editor.getRootElement()?.removeEventListener("click", handleClick);
       },
     );
