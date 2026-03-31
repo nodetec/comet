@@ -73,6 +73,7 @@ body {
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-blockquote-accent: var(--blockquote-accent);
+  --color-editor-checkbox-border: var(--editor-checkbox-border);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -258,6 +259,7 @@ body {
   --comet-list-gutter: calc(
     var(--comet-list-marker-width) + var(--comet-list-marker-gap)
   );
+  --comet-list-marker-border: var(--editor-checkbox-border);
   list-style: none !important;
   position: relative;
   margin-left: 0 !important;
@@ -294,7 +296,7 @@ body {
   left: 0;
   width: var(--comet-list-marker-width);
   height: var(--comet-list-marker-width);
-  border: 1px solid var(--input);
+  border: 1px solid var(--comet-list-marker-border);
   border-radius: 4px;
   background-color: var(--background);
   box-sizing: border-box;
