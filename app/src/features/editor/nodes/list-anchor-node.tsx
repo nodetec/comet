@@ -8,6 +8,7 @@ import type {
 import { TextNode } from "lexical";
 
 const MARKER_TEXT = "\u200B";
+const TOKEN_MODE = 1;
 
 export type SerializedListAnchorNode = SerializedTextNode;
 
@@ -21,7 +22,7 @@ export class ListAnchorNode extends TextNode {
   }
 
   static importJSON(): ListAnchorNode {
-    return $createListAnchorNode();
+    return new ListAnchorNode();
   }
 
   static importDOM(): DOMConversionMap | null {
@@ -30,6 +31,7 @@ export class ListAnchorNode extends TextNode {
 
   constructor(text = MARKER_TEXT, key?: NodeKey) {
     super(text, key);
+    this.__mode = TOKEN_MODE;
   }
 
   exportJSON(): SerializedListAnchorNode {

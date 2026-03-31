@@ -2,6 +2,7 @@ import type { Transformer } from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
 import { $isCometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
+import { TRANSFORMERS } from "../transformers";
 import type { ElementNode, LexicalNode } from "lexical";
 import {
   $createParagraphNode,
@@ -132,6 +133,47 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
     }
 
     previousItem = child;
+  }
+}
+
+function normalizeImportedListItemLeadParagraph(node: LexicalNode): void {
+  if ($isElementNode(node)) {
+    for (const child of node.getChildren()) {
+      normalizeImportedListItemLeadParagraph(child);
+    }
+  }
+
+  if (!$isListItemNode(node) || node.getChildrenSize() < 2) {
+    return;
+  }
+
+  const firstChild = node.getFirstChild();
+  if (!$isParagraphNode(firstChild)) {
+    return;
+  }
+
+  for (const child of firstChild.getChildren()) {
+    firstChild.insertBefore(child);
+  }
+
+  firstChild.remove();
+
+  for (const child of node.getChildren()) {
+    if (!$isParagraphNode(child) || !isEmptyParagraph(child)) {
+      continue;
+    }
+
+    const previousSibling = child.getPreviousSibling();
+    const nextSibling = child.getNextSibling();
+    if (
+      previousSibling == null ||
+      nextSibling == null ||
+      $isParagraphNode(nextSibling)
+    ) {
+      continue;
+    }
+
+    child.remove();
   }
 }
 
@@ -282,9 +324,104 @@ export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   for (const node of nodes) {
     normalizeImportedQuoteSpacing(node);
     normalizeImportedChecklistNesting(node);
+    normalizeImportedListItemLeadParagraph(node);
   }
 
   return nodes;
+}
+
+function countLineFeeds(text: string): number {
+  return [...text].filter((char) => char === "\n").length;
+}
+
+function minimumSeparatorLineFeeds(
+  previousNode: LexicalNode,
+  nextNode: LexicalNode,
+): number {
+  return canUseSoftBreakSeparator(previousNode, nextNode) ? 1 : 2;
+}
+
+type TopLevelMarkdownMatch = {
+  markdown: string;
+  node: LexicalNode;
+  start: number;
+  end: number;
+};
+
+function matchTopLevelNodesToMarkdown(
+  nodes: LexicalNode[],
+  markdown: string,
+): TopLevelMarkdownMatch[] | null {
+  const matches: TopLevelMarkdownMatch[] = [];
+  let cursor = 0;
+
+  for (const node of nodes) {
+    const blockMarkdown = $convertTopLevelElementToMarkdown(node, TRANSFORMERS);
+    if (blockMarkdown == null) {
+      return null;
+    }
+
+    const start = markdown.indexOf(blockMarkdown, cursor);
+    if (start === -1) {
+      return null;
+    }
+
+    const end = start + blockMarkdown.length;
+    matches.push({ markdown: blockMarkdown, node, start, end });
+    cursor = end;
+  }
+
+  return matches;
+}
+
+export function normalizeImportedTopLevelSpacingFromMarkdown(
+  nodes: LexicalNode[],
+  markdown: string,
+): LexicalNode[] {
+  const contentNodes = nodes.filter((node) => !isEmptyParagraph(node));
+  if (contentNodes.length === 0) {
+    return nodes;
+  }
+
+  const matches = matchTopLevelNodesToMarkdown(contentNodes, markdown);
+  if (matches == null) {
+    return nodes;
+  }
+
+  const rebuiltNodes: LexicalNode[] = [];
+  const leadingLineFeeds = countLineFeeds(markdown.slice(0, matches[0].start));
+  for (let index = 0; index < leadingLineFeeds; index++) {
+    rebuiltNodes.push($createParagraphNode());
+  }
+
+  for (const [index, match] of matches.entries()) {
+    rebuiltNodes.push(match.node);
+
+    const nextMatch = matches[index + 1];
+    if (nextMatch == null) {
+      continue;
+    }
+
+    const separator = markdown.slice(match.end, nextMatch.start);
+    const separatorLineFeeds = countLineFeeds(separator);
+    const visibleSpacerCount = Math.max(
+      0,
+      separatorLineFeeds -
+        minimumSeparatorLineFeeds(match.node, nextMatch.node),
+    );
+
+    for (let spacerIndex = 0; spacerIndex < visibleSpacerCount; spacerIndex++) {
+      rebuiltNodes.push($createParagraphNode());
+    }
+  }
+
+  const trailingLineFeeds = countLineFeeds(markdown.slice(matches.at(-1).end));
+  const trailingSpacerCount = Math.max(0, trailingLineFeeds - 1);
+  for (let spacerIndex = 0; spacerIndex < trailingSpacerCount; spacerIndex++) {
+    rebuiltNodes.push($createParagraphNode());
+  }
+
+  return rebuiltNodes;
 }
 
 /**
@@ -303,8 +440,9 @@ export function $importMarkdownFromHTML(
     "text/html",
   );
   const t1 = performance.now();
-  const nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
+  let nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
   normalizeImportedCodeBlocksFromMarkdown(nodes, markdown);
+  nodes = normalizeImportedTopLevelSpacingFromMarkdown(nodes, markdown);
   const t2 = performance.now();
   const target = node ?? $getRoot();
   target.clear();
@@ -358,11 +496,9 @@ function separatorBetweenTopLevelBlocks(
   nextNode: LexicalNode,
   pendingEmptyParagraphs: number,
 ): string {
-  if (pendingEmptyParagraphs > 0) {
-    return "\n".repeat(pendingEmptyParagraphs + 1);
-  }
-
-  return canUseSoftBreakSeparator(previousNode, nextNode) ? "\n" : "\n\n";
+  return "\n".repeat(
+    minimumSeparatorLineFeeds(previousNode, nextNode) + pendingEmptyParagraphs,
+  );
 }
 
 export function $exportMarkdown(transformers: Array<Transformer>): string {

@@ -6,16 +6,29 @@ import {
   ListNode,
 } from "@lexical/list";
 import {
+  $createRangeSelection,
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isParagraphNode,
+  $isTextNode,
+  $setSelection,
   createEditor,
 } from "lexical";
-import { ListAnchorNode, $isListAnchorNode } from "../nodes/list-anchor-node";
-import { normalizeChecklistItemMarker } from "./checklist-marker";
+import {
+  ListAnchorNode,
+  $createListAnchorNode,
+  $isListAnchorNode,
+} from "../nodes/list-anchor-node";
+import {
+  getChecklistItemsWithSelectedMarkers,
+  isEmptyChecklistLeafItem,
+  normalizeChecklistItemMarker,
+} from "./checklist-marker";
 import {
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
+  $convertChecklistItemToParagraph,
 } from "./todo-shortcut";
 
 function createTestEditor() {
@@ -210,5 +223,95 @@ describe("normalizeChecklistItemMarker", () => {
     expect(firstPassChanged).toBe(true);
     expect(secondPassChanged).toBe(false);
     expect(childTypes).toEqual(["list-anchor", "text"]);
+  });
+
+  it("keeps list anchors token-mode across writable updates", () => {
+    const editor = createTestEditor();
+    let mode = "";
+    let anchorText = "";
+
+    editor.update(
+      () => {
+        const checklist = $createListNode("check");
+        const item = $createListItemNode(false);
+        const anchor = $createListAnchorNode();
+        item.append(anchor, $createTextNode("Task"));
+        checklist.append(item);
+        $getRoot().append(checklist);
+
+        anchor.setAnchorText("\u200B");
+
+        const latestAnchor = item.getFirstChild();
+        if (!$isListAnchorNode(latestAnchor) || !$isTextNode(latestAnchor)) {
+          throw new Error(
+            "expected latest child to be a list anchor text node",
+          );
+        }
+
+        mode = latestAnchor.getMode();
+        anchorText = latestAnchor.getAnchorText();
+      },
+      { discrete: true },
+    );
+
+    expect(mode).toBe("token");
+    expect(anchorText).toBe("\u200B");
+  });
+
+  it("converts an item to a paragraph when marker and text are deleted together", () => {
+    const editor = createTestEditor();
+    let topLevelTypes: string[] = [];
+    let paragraphIsEmpty = false;
+
+    editor.update(
+      () => {
+        const checklist = $createListNode("check");
+        const item = $createListItemNode(false);
+        item.append($createTextNode("Task"));
+        checklist.append(item);
+        $getRoot().append(checklist);
+
+        normalizeChecklistItemMarker(item);
+
+        const marker = item.getFirstChild();
+        const text = item
+          .getChildren()
+          .find(
+            (child) => $isTextNode(child) && child.getTextContent() === "Task",
+          );
+        if (!$isListAnchorNode(marker) || !$isTextNode(text)) {
+          throw new Error("expected normalized checklist marker and text");
+        }
+
+        const selection = $createRangeSelection();
+        selection.anchor.set(marker.getKey(), 0, "text");
+        selection.focus.set(text.getKey(), text.getTextContentSize(), "text");
+        $setSelection(selection);
+
+        const affectedItems = getChecklistItemsWithSelectedMarkers(selection);
+        selection.removeText();
+
+        for (const affectedItem of affectedItems) {
+          if (
+            affectedItem.isAttached() &&
+            isEmptyChecklistLeafItem(affectedItem)
+          ) {
+            $convertChecklistItemToParagraph(affectedItem, "start");
+          }
+        }
+
+        const rootChildren = $getRoot().getChildren();
+        topLevelTypes = rootChildren.map((child) => child.getType());
+        const onlyChild = rootChildren[0];
+        paragraphIsEmpty =
+          rootChildren.length === 1 &&
+          $isParagraphNode(onlyChild) &&
+          onlyChild.getChildrenSize() === 0;
+      },
+      { discrete: true },
+    );
+
+    expect(topLevelTypes).toEqual(["paragraph"]);
+    expect(paragraphIsEmpty).toBe(true);
   });
 });

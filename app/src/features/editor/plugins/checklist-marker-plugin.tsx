@@ -11,11 +11,13 @@ import {
   $setSelection,
   $isTextNode,
   KEY_BACKSPACE_COMMAND,
+  SELECTION_CHANGE_COMMAND,
   type LexicalNode,
 } from "lexical";
 import { $isListItemNode, $isListNode, ListItemNode } from "@lexical/list";
 import {
   findSingleCharacterChecklistTextNode,
+  getChecklistItemsWithSelectedMarkers,
   isEmptyChecklistLeafItem,
   normalizeChecklistItemMarker,
 } from "../lib/checklist-marker";
@@ -48,8 +50,24 @@ export default function ChecklistMarkerPlugin() {
     focusKey: string;
     focusOffset: number;
   } | null>(null);
+  const rangeSelectionTouchesMarkerRef = useRef(false);
 
   useEffect(() => {
+    const setCollapsedSelectionOnTextNode = (
+      textNode: import("lexical").TextNode,
+      offset: number,
+    ) => {
+      const boundedOffset = Math.min(offset, textNode.getTextContentSize());
+      const selection = $createRangeSelection();
+      selection.setTextNodeRange(
+        textNode,
+        boundedOffset,
+        textNode,
+        boundedOffset,
+      );
+      $setSelection(selection);
+    };
+
     const captureTextRangeSelection = () => {
       const selection = $getSelection();
       if (
@@ -109,29 +127,40 @@ export default function ChecklistMarkerPlugin() {
       }
     };
 
-    const selectChecklistEditingPosition = (listItem: ListItemNode) => {
-      const children = listItem.getChildren();
-
-      for (const child of children) {
+    const getChecklistEditingTextNode = (
+      listItem: ListItemNode,
+    ): import("lexical").TextNode | null => {
+      for (const child of listItem.getChildren()) {
         if ($isListAnchorNode(child)) {
           continue;
         }
 
         if ($isTextNode(child)) {
-          if (
-            isChecklistPlaceholderTextContent(child.getTextContent()) ||
-            isChecklistCursorAnchorTextContent(child.getTextContent())
-          ) {
-            syncChecklistMarkerSpacingText(listItem, child);
-            child.select(1, 1);
-            return;
-          }
-
-          child.select(0, 0);
-          return;
+          return child;
         }
       }
 
+      return null;
+    };
+
+    const selectChecklistEditingPosition = (listItem: ListItemNode) => {
+      const textNode = getChecklistEditingTextNode(listItem);
+      if ($isTextNode(textNode)) {
+        if (
+          isChecklistPlaceholderTextContent(textNode.getTextContent()) ||
+          isChecklistCursorAnchorTextContent(textNode.getTextContent())
+        ) {
+          syncChecklistMarkerSpacingText(listItem, textNode);
+          setCollapsedSelectionOnTextNode(
+            textNode,
+            textNode.getTextContentSize(),
+          );
+          return;
+        }
+
+        setCollapsedSelectionOnTextNode(textNode, 0);
+        return;
+      }
       listItem.selectEnd();
     };
 
@@ -174,7 +203,10 @@ export default function ChecklistMarkerPlugin() {
       }
 
       if (isChecklistCursorAnchorTextContent(anchorNode.getTextContent())) {
-        return selection.anchor.offset === anchorNode.getTextContentSize();
+        return (
+          selection.anchor.offset === 0 ||
+          selection.anchor.offset === anchorNode.getTextContentSize()
+        );
       }
 
       if (selection.anchor.offset !== 0) {
@@ -191,18 +223,63 @@ export default function ChecklistMarkerPlugin() {
       );
     };
 
-    const isMarkerTarget = (target: EventTarget | null): HTMLElement | null => {
-      if (!(target instanceof HTMLElement)) {
-        return null;
+    const normalizeSelectionAwayFromChecklistMarker = (): boolean => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+        return false;
       }
 
-      const marker = target.closest(".comet-list-anchor");
-      return marker instanceof HTMLElement ? marker : null;
+      const anchorNode = selection.anchor.getNode();
+
+      if (
+        selection.anchor.type === "text" &&
+        selection.focus.type === "text" &&
+        selection.anchor.key === selection.focus.key &&
+        $isListAnchorNode(anchorNode)
+      ) {
+        const nextSibling = anchorNode.getNextSibling();
+        if (!$isTextNode(nextSibling)) {
+          return false;
+        }
+
+        const offset =
+          isChecklistCursorAnchorTextContent(nextSibling.getTextContent()) ||
+          isChecklistPlaceholderTextContent(nextSibling.getTextContent())
+            ? nextSibling.getTextContentSize()
+            : 0;
+        setCollapsedSelectionOnTextNode(nextSibling, offset);
+        return true;
+      }
+
+      if (
+        selection.anchor.type === "element" &&
+        selection.focus.type === "element" &&
+        selection.anchor.key === selection.focus.key
+      ) {
+        const listItem = getChecklistItemFromNode(anchorNode);
+        if (listItem == null || selection.anchor.offset > 1) {
+          return false;
+        }
+
+        const textNode = getChecklistEditingTextNode(listItem);
+        if (!$isTextNode(textNode)) {
+          return false;
+        }
+
+        const offset =
+          isChecklistCursorAnchorTextContent(textNode.getTextContent()) ||
+          isChecklistPlaceholderTextContent(textNode.getTextContent())
+            ? textNode.getTextContentSize()
+            : 0;
+        setCollapsedSelectionOnTextNode(textNode, offset);
+        return true;
+      }
+
+      return false;
     };
 
-    const getChecklistGutterTarget = (
+    const getChecklistListItemElement = (
       target: EventTarget | null,
-      clientX: number,
     ): HTMLElement | null => {
       if (!(target instanceof HTMLElement)) {
         return null;
@@ -211,29 +288,46 @@ export default function ChecklistMarkerPlugin() {
       const listItemElement = target.closest(
         ".comet-list-item--check",
       ) as HTMLElement | null;
-      if (listItemElement == null || target !== listItemElement) {
+      return listItemElement instanceof HTMLElement ? listItemElement : null;
+    };
+
+    const getChecklistClickZone = (
+      target: EventTarget | null,
+      clientX: number,
+    ): { listItemElement: HTMLElement; zone: "gutter" | "marker" } | null => {
+      const listItemElement = getChecklistListItemElement(target);
+      if (listItemElement == null) {
         return null;
       }
 
-      const paddingLeft = Number.parseFloat(
-        window.getComputedStyle(listItemElement).paddingLeft,
+      const styles = window.getComputedStyle(listItemElement);
+      const paddingLeft = Number.parseFloat(styles.paddingLeft);
+      const markerWidth = Number.parseFloat(
+        styles.getPropertyValue("--comet-list-marker-width"),
       );
       const clickOffset =
         clientX - listItemElement.getBoundingClientRect().left;
-      return clickOffset <= paddingLeft ? listItemElement : null;
+
+      if (clickOffset <= markerWidth) {
+        return { listItemElement, zone: "marker" };
+      }
+
+      if (clickOffset <= paddingLeft) {
+        return { listItemElement, zone: "gutter" };
+      }
+
+      return null;
     };
 
     const handleMouseDown = (event: MouseEvent) => {
-      const listItemElement = getChecklistGutterTarget(
-        event.target,
-        event.clientX,
-      );
-      if (listItemElement != null) {
+      const clickZone = getChecklistClickZone(event.target, event.clientX);
+      rangeSelectionTouchesMarkerRef.current = clickZone?.zone === "marker";
+      if (clickZone?.zone === "gutter") {
         event.preventDefault();
         event.stopPropagation();
 
         editor.update(() => {
-          const node = $getNearestNodeFromDOMNode(listItemElement);
+          const node = $getNearestNodeFromDOMNode(clickZone.listItemElement);
           if (node == null) {
             return;
           }
@@ -252,8 +346,7 @@ export default function ChecklistMarkerPlugin() {
         return;
       }
 
-      const marker = isMarkerTarget(event.target);
-      if (!marker) {
+      if (clickZone?.zone !== "marker") {
         return;
       }
 
@@ -273,17 +366,23 @@ export default function ChecklistMarkerPlugin() {
       }
     };
 
+    const handleMouseUp = (event: MouseEvent) => {
+      const clickZone = getChecklistClickZone(event.target, event.clientX);
+      rangeSelectionTouchesMarkerRef.current =
+        rangeSelectionTouchesMarkerRef.current || clickZone?.zone === "marker";
+    };
+
     const handleClick = (event: MouseEvent) => {
-      const marker = isMarkerTarget(event.target);
+      const clickZone = getChecklistClickZone(event.target, event.clientX);
       editor.update(() => {
-        if (marker) {
-          const node = $getNearestNodeFromDOMNode(marker);
-          if (!$isListAnchorNode(node)) {
+        if (clickZone?.zone === "marker") {
+          const node = $getNearestNodeFromDOMNode(clickZone.listItemElement);
+          if (node == null) {
             return;
           }
 
-          const listItem = node.getParent();
-          if (!isChecklistListItem(listItem)) {
+          const listItem = getChecklistItemFromNode(node);
+          if (listItem == null) {
             return;
           }
 
@@ -301,84 +400,142 @@ export default function ChecklistMarkerPlugin() {
       });
     };
 
+    const handleExpandedChecklistBackspace = (
+      selection: import("lexical").RangeSelection,
+      event?: KeyboardEvent | null,
+    ): boolean => {
+      const selectedChecklistItems =
+        getChecklistItemsWithSelectedMarkers(selection);
+      if (selectedChecklistItems.length === 0) {
+        return false;
+      }
+
+      event?.preventDefault();
+      selection.removeText();
+
+      for (const listItem of selectedChecklistItems) {
+        if (!listItem.isAttached() || !isChecklistListItem(listItem)) {
+          continue;
+        }
+
+        if (rangeSelectionTouchesMarkerRef.current) {
+          $convertChecklistItemToParagraph(listItem, "start");
+        } else {
+          normalizeChecklistItemMarker(listItem);
+        }
+      }
+
+      rangeSelectionTouchesMarkerRef.current = false;
+      return true;
+    };
+
+    const handleCollapsedChecklistBackspace = (
+      selection: import("lexical").RangeSelection,
+      event?: KeyboardEvent | null,
+    ): boolean => {
+      const anchorNode = selection.anchor.getNode();
+      const listItem = getChecklistItemFromNode(anchorNode);
+      if (listItem == null) {
+        return false;
+      }
+
+      if (isCollapsedSelectionAtChecklistStart(listItem)) {
+        event?.preventDefault();
+
+        if (listItem.getChildren().some($isListNode)) {
+          $convertChecklistItemToParagraph(listItem, "start");
+        } else if ($outdentListItemPreservingOrder(listItem)) {
+          selectChecklistEditingPosition(listItem);
+        } else {
+          $convertChecklistItemToParagraph(listItem, "start");
+        }
+        return true;
+      }
+
+      if (isEmptyChecklistLeafItem(listItem)) {
+        event?.preventDefault();
+
+        if (!$outdentListItemPreservingOrder(listItem)) {
+          $convertChecklistItemToParagraph(listItem);
+        }
+        return true;
+      }
+
+      const singleCharacterNode =
+        findSingleCharacterChecklistTextNode(listItem);
+      if (singleCharacterNode == null) {
+        return false;
+      }
+
+      const anchorInsideSameChecklistItem =
+        singleCharacterNode.is(anchorNode) ||
+        listItem.is(anchorNode) ||
+        $findMatchingParent(
+          anchorNode,
+          (candidate): candidate is ListItemNode =>
+            isChecklistListItem(candidate) && candidate.is(listItem),
+        ) != null;
+
+      if (!anchorInsideSameChecklistItem) {
+        return false;
+      }
+
+      event?.preventDefault();
+      singleCharacterNode.remove();
+      normalizeChecklistItemMarker(listItem);
+      selectChecklistEditingPosition(listItem);
+
+      return true;
+    };
+
     return mergeRegister(
       editor.registerNodeTransform(ListItemNode, (listItemNode) => {
         normalizeChecklistItemMarker(listItemNode);
       }),
       editor.registerCommand(
+        SELECTION_CHANGE_COMMAND,
+        () => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection) || selection.isCollapsed()) {
+            rangeSelectionTouchesMarkerRef.current = false;
+          }
+          normalizeSelectionAwayFromChecklistMarker();
+          return false;
+        },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      editor.registerCommand(
         KEY_BACKSPACE_COMMAND,
         (event) => {
           const selection = $getSelection();
-          if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+          if (!$isRangeSelection(selection)) {
             return false;
           }
 
-          const anchorNode = selection.anchor.getNode();
-          const listItem = getChecklistItemFromNode(anchorNode);
-          if (listItem == null) {
-            return false;
+          if (!selection.isCollapsed()) {
+            return handleExpandedChecklistBackspace(selection, event);
           }
 
-          if (isCollapsedSelectionAtChecklistStart(listItem)) {
-            event?.preventDefault();
-
-            if (listItem.getChildren().some($isListNode)) {
-              $convertChecklistItemToParagraph(listItem, "start");
-            } else if ($outdentListItemPreservingOrder(listItem)) {
-              selectChecklistEditingPosition(listItem);
-            } else {
-              $convertChecklistItemToParagraph(listItem, "start");
-            }
-            return true;
-          }
-
-          if (isEmptyChecklistLeafItem(listItem)) {
-            event?.preventDefault();
-
-            if (!$outdentListItemPreservingOrder(listItem)) {
-              $convertChecklistItemToParagraph(listItem);
-            }
-            return true;
-          }
-
-          const singleCharacterNode =
-            findSingleCharacterChecklistTextNode(listItem);
-          if (singleCharacterNode == null) {
-            return false;
-          }
-
-          const anchorInsideSameChecklistItem =
-            singleCharacterNode.is(anchorNode) ||
-            listItem.is(anchorNode) ||
-            $findMatchingParent(
-              anchorNode,
-              (candidate): candidate is ListItemNode =>
-                isChecklistListItem(candidate) && candidate.is(listItem),
-            ) != null;
-
-          if (!anchorInsideSameChecklistItem) {
-            return false;
-          }
-
-          event?.preventDefault();
-          singleCharacterNode.remove();
-          normalizeChecklistItemMarker(listItem);
-          selectChecklistEditingPosition(listItem);
-
-          return true;
+          return handleCollapsedChecklistBackspace(selection, event);
         },
         COMMAND_PRIORITY_CRITICAL,
       ),
       editor.registerRootListener((root, prevRoot) => {
         prevRoot?.removeEventListener("mousedown", handleMouseDown, true);
+        prevRoot?.removeEventListener("mouseup", handleMouseUp, true);
         prevRoot?.removeEventListener("click", handleClick);
         root?.addEventListener("mousedown", handleMouseDown, true);
+        root?.addEventListener("mouseup", handleMouseUp, true);
         root?.addEventListener("click", handleClick);
       }),
       () => {
+        rangeSelectionTouchesMarkerRef.current = false;
         editor
           .getRootElement()
           ?.removeEventListener("mousedown", handleMouseDown, true);
+        editor
+          .getRootElement()
+          ?.removeEventListener("mouseup", handleMouseUp, true);
         editor.getRootElement()?.removeEventListener("click", handleClick);
       },
     );

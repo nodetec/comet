@@ -6,8 +6,10 @@ import {
 } from "@lexical/list";
 import {
   $isParagraphNode,
+  $isRangeSelection,
   $isTextNode,
   $createTextNode,
+  type RangeSelection,
   type TextNode,
   type LexicalNode,
 } from "lexical";
@@ -109,6 +111,37 @@ export function hasSelectedChecklistMarker(
   listItemNode: ListItemNode,
 ): boolean {
   return listAnchorChildren(listItemNode).length > 0;
+}
+
+export function getChecklistItemsWithSelectedMarkers(
+  selection: RangeSelection,
+): ListItemNode[] {
+  if (!$isRangeSelection(selection) || selection.isCollapsed()) {
+    return [];
+  }
+
+  const selectedItems: ListItemNode[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const node of selection.getNodes()) {
+    if (!$isListAnchorNode(node)) {
+      continue;
+    }
+
+    const listItem = node.getParent();
+    if (
+      !$isListItemNode(listItem) ||
+      !shouldChecklistItemHaveMarker(listItem) ||
+      seenKeys.has(listItem.getKey())
+    ) {
+      continue;
+    }
+
+    seenKeys.add(listItem.getKey());
+    selectedItems.push(listItem);
+  }
+
+  return selectedItems;
 }
 
 export function isEmptyChecklistLeafItem(listItemNode: ListItemNode): boolean {
