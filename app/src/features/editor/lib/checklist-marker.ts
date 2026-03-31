@@ -8,6 +8,7 @@ import {
   $isParagraphNode,
   $isTextNode,
   $createTextNode,
+  type TextNode,
   type LexicalNode,
 } from "lexical";
 import {
@@ -17,7 +18,10 @@ import {
   type ListAnchorNode,
 } from "../nodes/list-anchor-node";
 import {
+  CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
+  isChecklistCursorAnchorTextContent,
+  isChecklistPlaceholderTextContent,
   stripChecklistPlaceholders,
 } from "./todo-shortcut";
 
@@ -33,18 +37,15 @@ function isIgnorableWrapperChild(node: LexicalNode): boolean {
   }
 
   if ($isParagraphNode(node)) {
-    const children = node.getChildren();
     return (
-      children.length === 0 ||
-      (children.length === 1 &&
-        $isTextNode(children[0]) &&
-        /^\s*$/.test(children[0].getTextContent()))
+      stripChecklistPlaceholders(node.getTextContent()).trim().length === 0
     );
   }
 
   if ($isTextNode(node)) {
-    const text = node.getTextContent();
-    return text !== CHECKLIST_PLACEHOLDER && /^\s*$/.test(text);
+    return (
+      stripChecklistPlaceholders(node.getTextContent()).trim().length === 0
+    );
   }
 
   return false;
@@ -71,8 +72,12 @@ function listAnchorChildren(listItemNode: ListItemNode): ListAnchorNode[] {
   return listItemNode.getChildren().filter($isListAnchorNode);
 }
 
-function isPlaceholderTextNode(node: LexicalNode): boolean {
-  return $isTextNode(node) && node.getTextContent() === CHECKLIST_PLACEHOLDER;
+function isChecklistMarkerSpacingTextNode(node: LexicalNode): node is TextNode {
+  return (
+    $isTextNode(node) &&
+    (isChecklistPlaceholderTextContent(node.getTextContent()) ||
+      isChecklistCursorAnchorTextContent(node.getTextContent()))
+  );
 }
 
 function removeNodes(nodes: LexicalNode[]): boolean {
@@ -106,9 +111,49 @@ export function hasSelectedChecklistMarker(
   return listAnchorChildren(listItemNode).length > 0;
 }
 
+export function isEmptyChecklistLeafItem(listItemNode: ListItemNode): boolean {
+  return (
+    !listItemNode.getChildren().some($isListNode) &&
+    !hasMeaningfulChecklistContent(listItemNode)
+  );
+}
+
+export function findSingleCharacterChecklistTextNode(
+  listItemNode: ListItemNode,
+): TextNode | null {
+  if (listItemNode.getChildren().some($isListNode)) {
+    return null;
+  }
+
+  let candidate: TextNode | null = null;
+
+  for (const child of listItemNode.getChildren()) {
+    if ($isListAnchorNode(child) || isChecklistMarkerSpacingTextNode(child)) {
+      continue;
+    }
+
+    if (!$isTextNode(child)) {
+      return null;
+    }
+
+    const visibleText = stripChecklistPlaceholders(child.getTextContent());
+    if (visibleText.length !== 1) {
+      return null;
+    }
+
+    if (candidate !== null) {
+      return null;
+    }
+
+    candidate = child;
+  }
+
+  return candidate;
+}
+
 function clearChecklistMarkerArtifacts(
   anchors: ListAnchorNode[],
-  placeholderNodes: LexicalNode[],
+  placeholderNodes: TextNode[],
 ): boolean {
   const removedAnchors = removeNodes(anchors);
   const removedPlaceholders = removeNodes(placeholderNodes);
@@ -152,20 +197,38 @@ function ensurePrimaryAnchor(
 
 function syncPlaceholderNodes(
   primaryAnchor: ListAnchorNode,
-  placeholderNodes: LexicalNode[],
-  shouldKeepPlaceholder: boolean,
+  placeholderNodes: TextNode[],
+  desiredText: string | null,
 ): boolean {
-  if (!shouldKeepPlaceholder) {
+  if (desiredText == null) {
     return removeNodes(placeholderNodes);
   }
 
   let changed = false;
   const primaryPlaceholder = placeholderNodes[0] ?? null;
+  const shouldBeUnmergeable = desiredText === CHECKLIST_CURSOR_ANCHOR;
   if (primaryPlaceholder == null) {
-    primaryAnchor.insertAfter($createTextNode(CHECKLIST_PLACEHOLDER));
+    const nextNode = $createTextNode(desiredText);
+    if (shouldBeUnmergeable) {
+      nextNode.toggleUnmergeable();
+    }
+    primaryAnchor.insertAfter(nextNode);
     changed = true;
   } else {
-    primaryAnchor.insertAfter(primaryPlaceholder);
+    if (primaryPlaceholder.getTextContent() !== desiredText) {
+      primaryPlaceholder.setTextContent(desiredText);
+      changed = true;
+    }
+
+    if (primaryPlaceholder.isUnmergeable() !== shouldBeUnmergeable) {
+      primaryPlaceholder.toggleUnmergeable();
+      changed = true;
+    }
+
+    if (!primaryAnchor.getNextSibling()?.is(primaryPlaceholder)) {
+      primaryAnchor.insertAfter(primaryPlaceholder);
+      changed = true;
+    }
   }
 
   return removeNodes(placeholderNodes.slice(1)) || changed;
@@ -177,7 +240,7 @@ export function normalizeChecklistItemMarker(
   const anchors = listAnchorChildren(listItemNode);
   const placeholderNodes = listItemNode
     .getChildren()
-    .filter(isPlaceholderTextNode);
+    .filter(isChecklistMarkerSpacingTextNode);
 
   if (!shouldChecklistItemHaveMarker(listItemNode)) {
     return clearChecklistMarkerArtifacts(anchors, placeholderNodes);
@@ -187,11 +250,20 @@ export function normalizeChecklistItemMarker(
     listItemNode,
     anchors,
   );
+  const hasMeaningfulContent = hasMeaningfulChecklistContent(listItemNode);
+  const hasNestedLists = listItemNode.getChildren().some($isListNode);
+  let desiredText: string | null = null;
+
+  if (hasMeaningfulContent) {
+    desiredText = CHECKLIST_CURSOR_ANCHOR;
+  } else if (!hasNestedLists) {
+    desiredText = CHECKLIST_PLACEHOLDER;
+  }
+
   const placeholderChanged = syncPlaceholderNodes(
     primaryAnchor,
     placeholderNodes,
-    !hasMeaningfulChecklistContent(listItemNode) &&
-      !listItemNode.getChildren().some($isListNode),
+    desiredText,
   );
 
   return anchorChanged || placeholderChanged;

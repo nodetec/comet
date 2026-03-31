@@ -17,7 +17,7 @@ export class ListAnchorNode extends TextNode {
   }
 
   static clone(node: ListAnchorNode): ListAnchorNode {
-    return new ListAnchorNode(node.__key);
+    return new ListAnchorNode(node.__text, node.__key);
   }
 
   static importJSON(): ListAnchorNode {

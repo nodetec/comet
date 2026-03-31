@@ -2,11 +2,9 @@ import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { mergeRegister } from "@lexical/utils";
 import {
-  $createParagraphNode,
   $getSelection,
   $isRangeSelection,
   $isParagraphNode,
-  $isTextNode,
   COMMAND_PRIORITY_HIGH,
   // eslint-disable-next-line sonarjs/deprecation -- KEY_MODIFIER_COMMAND has no non-deprecated replacement in Lexical
   KEY_MODIFIER_COMMAND,
@@ -17,49 +15,15 @@ import {
   $isListNode,
   INSERT_CHECK_LIST_COMMAND,
 } from "@lexical/list";
-import { $isListAnchorNode } from "../nodes/list-anchor-node";
 import {
   $collapseChecklistPlaceholderSelection,
+  $convertChecklistItemToParagraph,
   $convertChecklistParagraphToNestedItem,
   $convertNestedChecklistItemToParagraph,
   $normalizeChecklistPlaceholderTextNode,
   $replaceEmptyParagraphWithChecklist,
   stripChecklistPlaceholders,
 } from "../lib/todo-shortcut";
-
-/**
- * Cmd+T toggles a checklist checkbox:
- * - On a checklist item -> converts to plain paragraph
- * - On an empty paragraph or a paragraph with no line breaks ->
- *   inserts a checklist item
- * - Otherwise -> does nothing (avoids mangling multi-line content)
- */
-function $convertChecklistItemToParagraph(
-  listItem: import("@lexical/list").ListItemNode,
-): void {
-  const paragraph = $createParagraphNode();
-  let hasVisibleContent = false;
-  for (const child of listItem.getChildren()) {
-    if ($isListAnchorNode(child)) continue;
-    if ($isTextNode(child)) {
-      const text = stripChecklistPlaceholders(child.getTextContent());
-      if (text.length === 0) {
-        continue;
-      }
-      if (text !== child.getTextContent()) {
-        child.setTextContent(text);
-      }
-    }
-    paragraph.append(child);
-    hasVisibleContent = true;
-  }
-  listItem.replace(paragraph);
-  if (hasVisibleContent) {
-    paragraph.selectEnd();
-  } else {
-    paragraph.selectStart();
-  }
-}
 
 function $findAncestorParagraph(
   node: import("lexical").LexicalNode,

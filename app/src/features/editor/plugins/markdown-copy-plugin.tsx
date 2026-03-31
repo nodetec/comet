@@ -28,6 +28,7 @@ import { YouTubeNode } from "../nodes/youtube-node";
 import { CLIPBOARD_TRANSFORMERS } from "../transformers";
 import { shouldCopyChecklistSelectionAsPlainText } from "../lib/checklist-clipboard";
 import { $exportMarkdownForClipboard } from "../lib/markdown";
+import { stripChecklistPlaceholders } from "../lib/todo-shortcut";
 
 const HEADLESS_NODES = [
   HeadingNode,
@@ -99,7 +100,7 @@ export default function MarkdownCopyPlugin() {
       event.preventDefault();
 
       const markdown = shouldCopyChecklistSelectionAsPlainText(selection)
-        ? selection.getTextContent()
+        ? stripChecklistPlaceholders(selection.getTextContent())
         : $selectionToMarkdown(editor);
       clipboardData.setData(
         "text/plain",

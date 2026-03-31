@@ -6,6 +6,7 @@ import {
   type ListType,
 } from "@lexical/list";
 import { $isElementNode, $isTextNode, type LexicalNode } from "lexical";
+import { stripChecklistPlaceholders } from "./todo-shortcut";
 
 function isIgnorableListItemContent(node: LexicalNode): boolean {
   if (node.getType() === "list-anchor") {
@@ -13,14 +14,16 @@ function isIgnorableListItemContent(node: LexicalNode): boolean {
   }
 
   if ($isTextNode(node)) {
-    return node.getTextContent().trim().length === 0;
+    return (
+      stripChecklistPlaceholders(node.getTextContent()).trim().length === 0
+    );
   }
 
   return (
     $isElementNode(node) &&
     !$isListNode(node) &&
     node.getChildrenSize() === 0 &&
-    node.getTextContent().trim().length === 0
+    stripChecklistPlaceholders(node.getTextContent()).trim().length === 0
   );
 }
 

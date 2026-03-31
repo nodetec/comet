@@ -19,6 +19,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  CHECKLIST_PLACEHOLDER,
+  $convertChecklistItemToParagraph,
   $convertChecklistParagraphToNestedItem,
   $convertNestedChecklistItemToParagraph,
   $isChecklistPlaceholderText,
@@ -84,7 +86,7 @@ describe("todo shortcut", () => {
     );
 
     expect(rootTypes).toEqual(["paragraph", "list"]);
-    expect(checklistTexts).toEqual(["\u200B", "asdf"]);
+    expect(checklistTexts).toEqual([CHECKLIST_PLACEHOLDER, "asdf"]);
     expect(selectionShape).toEqual({
       anchorType: "text",
       anchorOffset: 0,
@@ -137,7 +139,7 @@ describe("todo shortcut", () => {
     );
 
     expect(rootTypes).toEqual(["list"]);
-    expect(checklistTexts).toEqual(["\u200B"]);
+    expect(checklistTexts).toEqual([CHECKLIST_PLACEHOLDER]);
   });
 
   it("collapses the placeholder selection to a caret", () => {
@@ -299,6 +301,59 @@ describe("todo shortcut", () => {
     expect(parentText).toBe("Parent");
     expect(ownerChildTypes).toEqual(["text", "paragraph", "list"]);
     expect(nestedTexts).toEqual(["Sibling"]);
+  });
+
+  it("converts a parent checklist item to a paragraph and outdents child checklists", () => {
+    const editor = createTestEditor();
+    let rootTypes: string[] = [];
+    let paragraphText = "";
+    let checklistTexts: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+        const checklist = $createListNode("check");
+        const parent = $createListItemNode(false);
+        parent.append($createTextNode("Parent"));
+
+        const nestedList = $createListNode("check");
+        const child = $createListItemNode(false);
+        child.append($createTextNode("Child"));
+        const sibling = $createListItemNode(false);
+        sibling.append($createTextNode("Sibling"));
+        nestedList.append(child, sibling);
+
+        const trailing = $createListItemNode(false);
+        trailing.append($createTextNode("After"));
+
+        parent.append(nestedList);
+        checklist.append(parent, trailing);
+        root.append(checklist);
+
+        const paragraph = $convertChecklistItemToParagraph(parent, "start");
+        paragraphText = paragraph.getTextContent();
+        rootTypes = root.getChildren().map((node) => node.getType());
+
+        const nextChecklist = paragraph
+          .getNextSiblings()
+          .find(
+            (node): node is ListNode =>
+              $isListNode(node) && node.getListType() === "check",
+          );
+
+        checklistTexts = nextChecklist
+          ? nextChecklist
+              .getChildren()
+              .filter($isListItemNode)
+              .map((item) => item.getTextContent())
+          : [];
+      },
+      { discrete: true },
+    );
+
+    expect(rootTypes).toEqual(["paragraph", "list"]);
+    expect(paragraphText).toBe("Parent");
+    expect(checklistTexts).toEqual(["Child", "Sibling", "After"]);
   });
 
   it("converts a toggled-off nested checklist paragraph back into a nested checklist item", () => {

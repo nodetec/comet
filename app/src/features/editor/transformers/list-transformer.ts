@@ -18,7 +18,10 @@ import {
 } from "lexical";
 import { $isListAnchorNode } from "../nodes/list-anchor-node";
 import { hasSelectedChecklistMarker } from "../lib/checklist-marker";
-import { CHECKLIST_PLACEHOLDER } from "../lib/todo-shortcut";
+import {
+  isChecklistCursorAnchorTextContent,
+  isChecklistPlaceholderTextContent,
+} from "../lib/todo-shortcut";
 
 type ListExportOptions = {
   clipboard?: boolean;
@@ -84,7 +87,8 @@ function exportListItemContent(
             !$isListAnchorNode(child) &&
             !(
               $isTextNode(child) &&
-              child.getTextContent() === CHECKLIST_PLACEHOLDER
+              (isChecklistPlaceholderTextContent(child.getTextContent()) ||
+                isChecklistCursorAnchorTextContent(child.getTextContent()))
             ),
         ),
   } as unknown as ElementNode;
