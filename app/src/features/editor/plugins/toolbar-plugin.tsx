@@ -2,13 +2,9 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
-  $createNodeSelection,
   $createParagraphNode,
-  $getRoot,
   $getSelection,
-  $isNodeSelection,
   $isRangeSelection,
-  $setSelection,
   FORMAT_TEXT_COMMAND,
 } from "lexical";
 import { $createHeadingNode, type HeadingTagType } from "@lexical/rich-text";
@@ -31,13 +27,13 @@ import {
   Table,
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import { $createImageNode } from "../nodes/image-node";
 import { INSERT_TABLE_COMMAND } from "@lexical/table";
 import {
   DEFAULT_TOOLBAR_STATE,
   type BlockType,
   getToolbarStateFromSelection,
 } from "../lib/toolbar-state";
+import { $insertImportedImages } from "../lib/image-insert";
 
 const BLOCK_CYCLE: BlockType[] = ["paragraph", "h1", "h2", "h3"];
 const BLOCK_ICONS: Record<BlockType, React.ReactNode> = {
@@ -136,23 +132,10 @@ export default function ToolbarPlugin({
       ],
     });
     if (!sourcePath) return;
-    const { assetUrl, altText } = await importImage(sourcePath);
+    const result = await importImage(sourcePath);
 
     editor.update(() => {
-      const imageNode = $createImageNode({ src: assetUrl, altText });
-      const selection = $getSelection();
-      if ($isNodeSelection(selection)) {
-        const nodes = selection.getNodes();
-        const [lastNode] = nodes.slice(-1);
-        lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
-      } else if (selection) {
-        selection.insertNodes([imageNode]);
-      } else {
-        $getRoot().append(imageNode);
-      }
-      const nodeSelection = $createNodeSelection();
-      nodeSelection.add(imageNode.getKey());
-      $setSelection(nodeSelection);
+      $insertImportedImages([result]);
     });
   }, [editor]);
 

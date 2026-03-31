@@ -25,7 +25,12 @@ import { $isHeadingNode } from "@lexical/rich-text";
 import { $findMatchingParent } from "@lexical/utils";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { renderMarkdownToHtml } from "@/shared/api/invoke";
-import { parseSingleChecklistItemContent } from "../lib/checklist-paste";
+import { importImageBytes } from "@/shared/lib/attachments";
+import {
+  parseSingleChecklistItemContent,
+  replaceEmptyChecklistItemWithChecklistNodes,
+} from "../lib/checklist-paste";
+import { $insertImportedImages } from "../lib/image-insert";
 import {
   normalizeImportedCodeBlocksFromMarkdown,
   normalizeImportedNodes,
@@ -55,6 +60,14 @@ const MARKDOWN_PATTERNS = [
 const PLAIN_TEXT_INDICATORS = [
   /^https?:\/\/[^\s]+$/, // Single URL
 ];
+const SUPPORTED_CLIPBOARD_IMAGE_TYPES = new Set([
+  "image/gif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/svg+xml",
+  "image/webp",
+]);
 
 function isBlockLevelNode(node: LexicalNode): boolean {
   return $isElementNode(node) || $isDecoratorNode(node);
@@ -186,16 +199,36 @@ function restoreSelectionSnapshot(
   return true;
 }
 
-function insertBlockNodes(nodes: LexicalNode[]): void {
-  if (nodes.length === 0) return;
+function appendNodesToRoot(nodes: LexicalNode[]): void {
+  const root = $getRoot();
+  for (const node of nodes) {
+    root.append(node);
+  }
+}
 
-  const selection = $getSelection();
+function insertNodesAfterReference(
+  referenceNode: LexicalNode,
+  nodes: LexicalNode[],
+): void {
+  for (let index = 0; index < nodes.length; index++) {
+    const after = index === 0 ? referenceNode : nodes[index - 1];
+    after.insertAfter(nodes[index]);
+  }
+}
 
+function selectEndOfLastElement(nodes: LexicalNode[]): void {
+  const [lastNode] = nodes.slice(-1);
+  if ($isElementNode(lastNode)) {
+    lastNode.selectEnd();
+  }
+}
+
+function insertNodesAtRangeSelection(
+  selection: ReturnType<typeof $getSelection>,
+  nodes: LexicalNode[],
+): void {
   if (!$isRangeSelection(selection)) {
-    const root = $getRoot();
-    for (const node of nodes) {
-      root.append(node);
-    }
+    appendNodesToRoot(nodes);
     return;
   }
 
@@ -204,25 +237,90 @@ function insertBlockNodes(nodes: LexicalNode[]): void {
   }
 
   const anchorNode = selection.anchor.getNode();
+  const selectedChecklistItem = $findMatchingParent(
+    anchorNode,
+    $isListItemNode,
+  );
+  if (
+    selectedChecklistItem &&
+    replaceEmptyChecklistItemWithChecklistNodes(selectedChecklistItem, nodes)
+  ) {
+    return;
+  }
+
   const targetBlock = anchorNode.getTopLevelElementOrThrow();
-  const isEmptyBlock = isReplaceableEmptyBlockNode(targetBlock);
-
-  if (isEmptyBlock) {
+  if (isReplaceableEmptyBlockNode(targetBlock)) {
     targetBlock.replace(nodes[0]);
-    for (let i = 1; i < nodes.length; i++) {
-      nodes[i - 1].insertAfter(nodes[i]);
-    }
+    insertNodesAfterReference(nodes[0], nodes.slice(1));
   } else {
-    for (let i = 0; i < nodes.length; i++) {
-      const after = i === 0 ? targetBlock : nodes[i - 1];
-      after.insertAfter(nodes[i]);
-    }
+    insertNodesAfterReference(targetBlock, nodes);
   }
 
-  const [lastNode] = nodes.slice(-1);
-  if ($isElementNode(lastNode)) {
-    lastNode.selectEnd();
+  selectEndOfLastElement(nodes);
+}
+
+function insertBlockNodes(nodes: LexicalNode[]): void {
+  if (nodes.length === 0) return;
+
+  insertNodesAtRangeSelection($getSelection(), nodes);
+}
+
+function isSupportedClipboardImageFile(file: File): boolean {
+  return SUPPORTED_CLIPBOARD_IMAGE_TYPES.has(file.type.toLowerCase());
+}
+
+function listClipboardImageFiles(clipboardData: DataTransfer): File[] {
+  const imageItems = [...clipboardData.items]
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null)
+    .filter(isSupportedClipboardImageFile);
+
+  if (imageItems.length > 0) {
+    return imageItems;
   }
+
+  return [...clipboardData.files].filter(isSupportedClipboardImageFile);
+}
+
+async function importClipboardImage(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const fileName = file.name.trim();
+  const altText = fileName ? fileName.replace(/\.[^.]+$/, "") : "";
+  return importImageBytes(bytes, altText);
+}
+
+async function processClipboardImagePaste(params: {
+  currentLoadKeyRef: LoadKeyRef;
+  editor: ReturnType<typeof useLexicalComposerContext>[0];
+  files: File[];
+  pasteLoadKey: string;
+  selectionSnapshot: RangeSelectionSnapshot | null;
+}): Promise<void> {
+  const { currentLoadKeyRef, editor, files, pasteLoadKey, selectionSnapshot } =
+    params;
+
+  const results = await Promise.all(
+    files.map((file) =>
+      importClipboardImage(file).catch((error) => {
+        console.error("[editor:paste] image import failed", error);
+        return null;
+      }),
+    ),
+  );
+
+  if (currentLoadKeyRef.current !== pasteLoadKey) {
+    return;
+  }
+
+  editor.update(() => {
+    if (currentLoadKeyRef.current !== pasteLoadKey) {
+      return;
+    }
+
+    restoreSelectionSnapshot(selectionSnapshot);
+    $insertImportedImages(results);
+  });
 }
 
 // Check if content looks like JSON or JSONC (JSON with comments)
@@ -476,6 +574,22 @@ export default function MarkdownPastePlugin({
         const clipboardData = event.clipboardData;
         if (!clipboardData) {
           return false;
+        }
+
+        const imageFiles = listClipboardImageFiles(clipboardData);
+        if (imageFiles.length > 0) {
+          const selection = $getSelection();
+          const selectionSnapshot = captureSelectionSnapshot(selection);
+          const pasteLoadKey = currentLoadKeyRef.current;
+          event.preventDefault();
+          void processClipboardImagePaste({
+            currentLoadKeyRef: currentLoadKeyRef as LoadKeyRef,
+            editor,
+            files: imageFiles,
+            pasteLoadKey,
+            selectionSnapshot,
+          });
+          return true;
         }
 
         const text = clipboardData.getData("text/plain");

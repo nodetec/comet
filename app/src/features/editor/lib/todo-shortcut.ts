@@ -19,8 +19,11 @@ import {
   type ParagraphNode,
 } from "lexical";
 
-// Empty checklist items need a visible-width placeholder so the caret has
-// somewhere to render when the item contains no real text yet.
+// `\u200B` is only accepted here as a legacy checklist placeholder for old
+// content. Active checklist editing uses the dedicated markers below:
+// - left cursor anchor: `\u2062`
+// - cursor anchor: `\u2060`
+// - empty visible placeholder: `\u00A0`
 const LEGACY_CHECKLIST_PLACEHOLDER = "\u200B";
 export const CHECKLIST_LEFT_CURSOR_ANCHOR = "\u2062";
 export const CHECKLIST_CURSOR_ANCHOR = "\u2060";

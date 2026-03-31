@@ -7,6 +7,9 @@ pub enum BlobError {
     #[error("Unsupported image type: .{0}. Allowed: png, jpg, jpeg, gif, webp, svg")]
     UnsupportedType(String),
 
+    #[error("Unsupported image data. Allowed: png, jpg, jpeg, gif, webp, svg")]
+    UnsupportedData,
+
     #[error("{0}")]
     Storage(String),
 }

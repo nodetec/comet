@@ -21,17 +21,16 @@ import {
 } from "../nodes/comet-horizontal-rule-node";
 import { $isImageNode, ImageNode } from "../nodes/image-node";
 import { $isYouTubeNode, YouTubeNode } from "../nodes/youtube-node";
-
-/** Zero-width space used as cursor anchor beside the HR. */
-const ZWSP = "\u200B";
-
-/** Matches text nodes that contain only ZWSP cursor anchors (one or more). */
-const ZWSP_ONLY_RE = /^\u200B+$/;
+import {
+  INLINE_DECORATOR_ZWSP_ANCHOR,
+  ensureDecoratorCursorAnchors,
+  isDecoratorCursorAnchorText,
+} from "../lib/inline-decorator-anchor";
 
 function isAnchorText(
   node: ReturnType<typeof import("lexical").$getNodeByKey>,
 ): boolean {
-  return $isTextNode(node) && ZWSP_ONLY_RE.test(node.getTextContent());
+  return isDecoratorCursorAnchorText(node);
 }
 
 function $cleanupOrphanedAnchors(children: LexicalNode[]): boolean {
@@ -145,9 +144,9 @@ export default function HorizontalRuleCursorPlugin(): null {
           console.log("[HR] Wrapping root-level HR in paragraph with anchors");
           const p = $createParagraphNode();
           node.insertBefore(p);
-          p.append($createTextNode(ZWSP));
+          p.append($createTextNode(INLINE_DECORATOR_ZWSP_ANCHOR));
           p.append(node);
-          p.append($createTextNode(ZWSP));
+          p.append($createTextNode(INLINE_DECORATOR_ZWSP_ANCHOR));
           return;
         }
 
@@ -155,46 +154,31 @@ export default function HorizontalRuleCursorPlugin(): null {
         const prev = node.getPreviousSibling();
         if (!prev || !isAnchorText(prev)) {
           console.log("[HR] Adding left cursor anchor (zwsp TextNode)");
-          node.insertBefore($createTextNode(ZWSP));
+          node.insertBefore($createTextNode(INLINE_DECORATOR_ZWSP_ANCHOR));
         }
 
         const next = node.getNextSibling();
         if (!next || !isAnchorText(next)) {
           console.log("[HR] Adding right cursor anchor (zwsp TextNode)");
-          node.insertAfter($createTextNode(ZWSP));
+          node.insertAfter($createTextNode(INLINE_DECORATOR_ZWSP_ANCHOR));
         }
       },
     );
 
-    // Ensure images have zwsp cursor anchors when at the edge of a paragraph.
+    // Ensure images have zwsp cursor anchors when adjacent to non-text nodes
+    // like line breaks or other decorators, not only at paragraph edges.
     const removeImageTransform = editor.registerNodeTransform(
       ImageNode,
       (node) => {
-        const prev = node.getPreviousSibling();
-        if (!prev) {
-          node.insertBefore($createTextNode(ZWSP));
-        }
-
-        const next = node.getNextSibling();
-        if (!next) {
-          node.insertAfter($createTextNode(ZWSP));
-        }
+        ensureDecoratorCursorAnchors(node);
       },
     );
 
-    // Ensure YouTube embeds have zwsp cursor anchors at paragraph edges.
+    // Ensure YouTube embeds have the same inline cursor behavior.
     const removeYouTubeTransform = editor.registerNodeTransform(
       YouTubeNode,
       (node) => {
-        const prev = node.getPreviousSibling();
-        if (!prev) {
-          node.insertBefore($createTextNode(ZWSP));
-        }
-
-        const next = node.getNextSibling();
-        if (!next) {
-          node.insertAfter($createTextNode(ZWSP));
-        }
+        ensureDecoratorCursorAnchors(node);
       },
     );
 
@@ -252,7 +236,10 @@ export default function HorizontalRuleCursorPlugin(): null {
         if (anchor.type !== "text") return false;
 
         const textNode = anchor.getNode();
-        if (!$isTextNode(textNode) || textNode.getTextContent() !== ZWSP) {
+        if (
+          !$isTextNode(textNode) ||
+          textNode.getTextContent() !== INLINE_DECORATOR_ZWSP_ANCHOR
+        ) {
           return false;
         }
 

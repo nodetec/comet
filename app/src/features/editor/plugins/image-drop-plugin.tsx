@@ -1,16 +1,9 @@
 import { useEffect } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  $createNodeSelection,
-  $getRoot,
-  $getSelection,
-  $isNodeSelection,
-  $setSelection,
-  type LexicalEditor,
-} from "lexical";
+import { type LexicalEditor } from "lexical";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { IMAGE_EXTENSIONS, importImage } from "@/shared/lib/attachments";
-import { $createImageNode } from "../nodes/image-node";
+import { $insertImportedImages } from "../lib/image-insert";
 
 const IMAGE_EXTENSIONS_RE = new RegExp(
   String.raw`\.(${IMAGE_EXTENSIONS.join("|")})$`,
@@ -39,31 +32,6 @@ function focusCaretAtPoint(
       sel.removeAllRanges();
       sel.addRange(range);
     }
-  }
-}
-
-function $insertImportedImages(
-  results: (Awaited<ReturnType<typeof importImage>> | null)[],
-): void {
-  for (const result of results) {
-    if (!result) continue;
-    const imageNode = $createImageNode({
-      src: result.assetUrl,
-      altText: result.altText,
-    });
-    const selection = $getSelection();
-    if ($isNodeSelection(selection)) {
-      const nodes = selection.getNodes();
-      const [lastNode] = nodes.slice(-1);
-      lastNode.getTopLevelElementOrThrow().insertAfter(imageNode);
-    } else if (selection) {
-      selection.insertNodes([imageNode]);
-    } else {
-      $getRoot().append(imageNode);
-    }
-    const nodeSelection = $createNodeSelection();
-    nodeSelection.add(imageNode.getKey());
-    $setSelection(nodeSelection);
   }
 }
 

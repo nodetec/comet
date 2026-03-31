@@ -57,6 +57,7 @@ pub fn run() {
             commands::app::reveal_main_window,
             commands::app::get_attachments_dir,
             commands::app::import_image,
+            commands::app::import_image_bytes,
             commands::app::list_themes,
             commands::app::read_theme,
             commands::app::get_tag_index_diagnostics,

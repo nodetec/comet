@@ -16,5 +16,6 @@ pub trait BlobStorage {
     fn save_blob(&self, hash: &str, ext: &str, data: &[u8]) -> Result<(), BlobError>;
     fn delete_blob(&self, hash: &str) -> Result<bool, BlobError>;
     fn import_image(&self, source_path: &str) -> Result<ImportedImage, BlobError>;
+    fn import_image_bytes(&self, bytes: &[u8]) -> Result<ImportedImage, BlobError>;
     fn attachments_dir(&self) -> Result<String, BlobError>;
 }

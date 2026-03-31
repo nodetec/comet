@@ -69,6 +69,14 @@ pub fn import_image(
 }
 
 #[tauri::command]
+pub fn import_image_bytes(
+    app: AppHandle,
+    bytes: Vec<u8>,
+) -> Result<crate::adapters::filesystem::attachments::ImportedImage, AppError> {
+    crate::adapters::filesystem::attachments::import_image_bytes(&app, &bytes)
+}
+
+#[tauri::command]
 pub fn list_themes(app: AppHandle) -> Result<Vec<crate::infra::themes::ThemeSummary>, AppError> {
     crate::infra::themes::list_themes(&app)
 }

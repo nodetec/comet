@@ -296,9 +296,9 @@ function exportTextFormat(
   unclosedTags: Array<UnclosedTag>,
   unclosableTags?: Array<UnclosedTag>,
 ): string {
-  // Strip ZWSP cursor anchors — they're inserted beside inline decorator
-  // nodes (HR, images, YouTube) for cursor placement and must not leak into
-  // the stored markdown.
+  // Strip inline-decorator ZWSP cursor anchors. These are inserted beside
+  // HR/image/YouTube nodes for caret placement and must not leak into stored
+  // markdown. Checklist markers use a separate model and are handled elsewhere.
   let output = textContent.replace(/\u200B/g, "");
   if (!node.hasFormat("code")) {
     output = output.replace(/([*_`~\\])/g, String.raw`\$1`);

@@ -6,7 +6,6 @@ use tauri::AppHandle;
 use crate::error::AppError;
 
 /// Detect image format from magic bytes.
-#[cfg(test)]
 pub fn detect_image_extension(data: &[u8]) -> Option<String> {
     if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some("png".to_string())

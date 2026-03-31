@@ -1,6 +1,7 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+type ImportedAttachment = { uri: string; hash: string };
 
 const ATTACHMENT_PREFIX = "attachment://";
 
@@ -58,11 +59,24 @@ export function unresolveImageSrc(src: string): string {
 export async function importImage(
   sourcePath: string,
 ): Promise<{ assetUrl: string; altText: string }> {
-  const result = await invoke<{ uri: string; hash: string }>("import_image", {
+  const result = await invoke<ImportedAttachment>("import_image", {
     sourcePath,
   });
   const assetUrl = resolveImageSrc(result.uri);
   const fileName = sourcePath.split("/").pop() ?? "";
   const altText = fileName.replace(/\.[^.]+$/, "");
   return { assetUrl, altText };
+}
+
+export async function importImageBytes(
+  bytes: Uint8Array,
+  altText = "",
+): Promise<{ assetUrl: string; altText: string }> {
+  const result = await invoke<ImportedAttachment>("import_image_bytes", {
+    bytes: [...bytes],
+  });
+  return {
+    assetUrl: resolveImageSrc(result.uri),
+    altText,
+  };
 }
