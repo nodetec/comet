@@ -19,10 +19,41 @@ import {
   type ParagraphNode,
 } from "lexical";
 
-export const CHECKLIST_PLACEHOLDER = "\u200B";
+// Empty checklist items need a visible-width placeholder so the caret has
+// somewhere to render when the item contains no real text yet.
+const LEGACY_CHECKLIST_PLACEHOLDER = "\u200B";
+export const CHECKLIST_LEFT_CURSOR_ANCHOR = "\u2062";
+export const CHECKLIST_CURSOR_ANCHOR = "\u2060";
+export const CHECKLIST_PLACEHOLDER = "\u00A0";
+type ChecklistParagraphSelection = "end" | "start" | "none";
+
+export function isChecklistPlaceholderTextContent(text: string): boolean {
+  return (
+    text === CHECKLIST_PLACEHOLDER || text === LEGACY_CHECKLIST_PLACEHOLDER
+  );
+}
+
+export function isChecklistLeftCursorAnchorTextContent(text: string): boolean {
+  return text === CHECKLIST_LEFT_CURSOR_ANCHOR;
+}
+
+export function isChecklistCursorAnchorTextContent(text: string): boolean {
+  return (
+    text === CHECKLIST_CURSOR_ANCHOR ||
+    isChecklistLeftCursorAnchorTextContent(text)
+  );
+}
 
 export function stripChecklistPlaceholders(text: string): string {
-  return text.split(CHECKLIST_PLACEHOLDER).join("");
+  return text
+    .split(CHECKLIST_PLACEHOLDER)
+    .join("")
+    .split(LEGACY_CHECKLIST_PLACEHOLDER)
+    .join("")
+    .split(CHECKLIST_LEFT_CURSOR_ANCHOR)
+    .join("")
+    .split(CHECKLIST_CURSOR_ANCHOR)
+    .join("");
 }
 
 function getOffsetAfterStrippingChecklistPlaceholders(
@@ -33,7 +64,10 @@ function getOffsetAfterStrippingChecklistPlaceholders(
   let removedCount = 0;
 
   for (let i = 0; i < boundedOffset; i++) {
-    if (text[i] === CHECKLIST_PLACEHOLDER) {
+    if (
+      isChecklistPlaceholderTextContent(text[i] ?? "") ||
+      isChecklistCursorAnchorTextContent(text[i] ?? "")
+    ) {
       removedCount++;
     }
   }
@@ -44,7 +78,10 @@ function getOffsetAfterStrippingChecklistPlaceholders(
 export function $isChecklistPlaceholderText(
   node: LexicalNode | null | undefined,
 ): boolean {
-  return $isTextNode(node) && node.getTextContent() === CHECKLIST_PLACEHOLDER;
+  return (
+    $isTextNode(node) &&
+    isChecklistPlaceholderTextContent(node.getTextContent())
+  );
 }
 
 function isChecklist(node: LexicalNode | null | undefined): node is ListNode {
@@ -119,6 +156,154 @@ function $moveChecklistItemContentToParagraph(
   return hasVisibleContent;
 }
 
+export function $convertChecklistItemToParagraph(
+  listItemNode: ListItemNode,
+  selectionBehavior: ChecklistParagraphSelection = "end",
+): ParagraphNode {
+  const paragraph = $createParagraphNode();
+  const hasVisibleContent = $moveChecklistItemContentToParagraph(
+    listItemNode,
+    paragraph,
+  );
+  const parentList = listItemNode.getParent();
+
+  if ($isListNode(parentList) && parentList.getListType() === "check") {
+    moveChecklistItemContentToParagraphContext(
+      listItemNode,
+      parentList,
+      paragraph,
+    );
+  } else {
+    listItemNode.replace(paragraph);
+  }
+
+  selectConvertedChecklistParagraph(
+    paragraph,
+    hasVisibleContent,
+    selectionBehavior,
+  );
+
+  return paragraph;
+}
+
+function moveChecklistItemContentToParagraphContext(
+  listItemNode: ListItemNode,
+  parentList: ListNode,
+  paragraph: ParagraphNode,
+): void {
+  const hasBeforeSiblings = listItemNode.getPreviousSibling() !== null;
+  const nextSiblings = listItemNode.getNextSiblings().filter($isListItemNode);
+
+  if (hasBeforeSiblings) {
+    insertParagraphAfterChecklistList(parentList, paragraph);
+  } else {
+    insertParagraphBeforeChecklistList(parentList, paragraph);
+  }
+
+  const insertAfterNode = moveNestedChecklistChildrenAfterParagraph(
+    listItemNode,
+    paragraph,
+  );
+
+  if (hasBeforeSiblings) {
+    moveTrailingChecklistSiblingsToNewList(
+      parentList,
+      insertAfterNode,
+      nextSiblings,
+    );
+  }
+
+  listItemNode.remove();
+
+  if (!hasBeforeSiblings) {
+    mergePromotedChecklistWithRemainingSiblings(parentList, insertAfterNode);
+  }
+
+  if (parentList.isEmpty()) {
+    parentList.remove();
+  }
+}
+
+function insertParagraphAfterChecklistList(
+  parentList: ListNode,
+  paragraph: ParagraphNode,
+): void {
+  parentList.insertAfter(paragraph);
+}
+
+function insertParagraphBeforeChecklistList(
+  parentList: ListNode,
+  paragraph: ParagraphNode,
+): void {
+  parentList.insertBefore(paragraph);
+}
+
+function moveNestedChecklistChildrenAfterParagraph(
+  listItemNode: ListItemNode,
+  paragraph: ParagraphNode,
+): LexicalNode {
+  let insertAfterNode: LexicalNode = paragraph;
+
+  for (const child of listItemNode.getChildren()) {
+    if (!$isListNode(child)) {
+      continue;
+    }
+
+    insertAfterNode.insertAfter(child);
+    insertAfterNode = child;
+  }
+
+  return insertAfterNode;
+}
+
+function moveTrailingChecklistSiblingsToNewList(
+  parentList: ListNode,
+  insertAfterNode: LexicalNode,
+  nextSiblings: ListItemNode[],
+): void {
+  if (nextSiblings.length === 0) {
+    return;
+  }
+
+  const trailingList = $createListNode(parentList.getListType());
+  insertAfterNode.insertAfter(trailingList);
+  trailingList.append(...nextSiblings);
+}
+
+function mergePromotedChecklistWithRemainingSiblings(
+  parentList: ListNode,
+  insertAfterNode: LexicalNode,
+): void {
+  if (
+    !$isListNode(insertAfterNode) ||
+    insertAfterNode.getListType() !== parentList.getListType() ||
+    parentList.getChildrenSize() === 0
+  ) {
+    return;
+  }
+
+  insertAfterNode.append(...parentList.getChildren());
+}
+
+function selectConvertedChecklistParagraph(
+  paragraph: ParagraphNode,
+  hasVisibleContent: boolean,
+  selectionBehavior: ChecklistParagraphSelection,
+): void {
+  if (selectionBehavior === "start") {
+    paragraph.selectStart();
+    return;
+  }
+
+  if (selectionBehavior === "end") {
+    if (hasVisibleContent) {
+      paragraph.selectEnd();
+    } else {
+      paragraph.selectStart();
+    }
+  }
+}
+
 export function $convertNestedChecklistItemToParagraph(
   listItemNode: ListItemNode,
 ): boolean {
@@ -132,37 +317,40 @@ export function $convertNestedChecklistItemToParagraph(
   ) {
     return false;
   }
+  $convertChecklistItemToParagraph(listItemNode);
+  return true;
+}
+
+export function $outdentNestedChecklistItemToParagraph(
+  listItemNode: ListItemNode,
+  selectionBehavior: ChecklistParagraphSelection = "start",
+): boolean {
+  const parentList = listItemNode.getParent();
+  const ownerItem = parentList?.getParent();
+  const outerList = ownerItem?.getParent();
+
+  if (
+    !$isListNode(parentList) ||
+    parentList.getListType() !== "check" ||
+    !$isListItemNode(ownerItem) ||
+    !$isListNode(outerList)
+  ) {
+    return false;
+  }
 
   const paragraph = $createParagraphNode();
   const hasVisibleContent = $moveChecklistItemContentToParagraph(
     listItemNode,
     paragraph,
   );
-  const hasBeforeSiblings = listItemNode.getPreviousSibling() !== null;
-  const nextSiblings = listItemNode.getNextSiblings().filter($isListItemNode);
+  const nextOuterSiblings = ownerItem.getNextSiblings().filter($isListItemNode);
 
-  if (hasBeforeSiblings) {
-    parentList.insertAfter(paragraph);
-  } else {
-    parentList.insertBefore(paragraph);
-  }
-
-  let insertAfterNode: LexicalNode = paragraph;
-
-  for (const child of listItemNode.getChildren()) {
-    if (!$isListNode(child)) {
-      continue;
-    }
-
-    insertAfterNode.insertAfter(child);
-    insertAfterNode = child;
-  }
-
-  if (hasBeforeSiblings && nextSiblings.length > 0) {
-    const trailingList = $createListNode(parentList.getListType());
-    insertAfterNode.insertAfter(trailingList);
-    trailingList.append(...nextSiblings);
-  }
+  outerList.insertAfter(paragraph);
+  moveTrailingChecklistSiblingsToNewList(
+    outerList,
+    paragraph,
+    nextOuterSiblings,
+  );
 
   listItemNode.remove();
 
@@ -170,11 +358,11 @@ export function $convertNestedChecklistItemToParagraph(
     parentList.remove();
   }
 
-  if (hasVisibleContent) {
-    paragraph.selectEnd();
-  } else {
-    paragraph.selectStart();
-  }
+  selectConvertedChecklistParagraph(
+    paragraph,
+    hasVisibleContent,
+    selectionBehavior,
+  );
 
   return true;
 }
@@ -361,8 +549,14 @@ export function $normalizeChecklistPlaceholderTextNode(
   const text = textNode.getTextContent();
   const normalizedText = stripChecklistPlaceholders(text);
   if (
-    !text.includes(CHECKLIST_PLACEHOLDER) ||
-    text === CHECKLIST_PLACEHOLDER ||
+    ![
+      CHECKLIST_PLACEHOLDER,
+      LEGACY_CHECKLIST_PLACEHOLDER,
+      CHECKLIST_LEFT_CURSOR_ANCHOR,
+      CHECKLIST_CURSOR_ANCHOR,
+    ].some((specialText) => text.includes(specialText)) ||
+    isChecklistPlaceholderTextContent(text) ||
+    isChecklistCursorAnchorTextContent(text) ||
     !isChecklistTextNode(textNode)
   ) {
     return false;

@@ -34,6 +34,7 @@
     "sidebar-border": "#0a0a0a",
     "separator": "#0a0a0a",
     "editor-text": "#dfe0e0",
+    "editor-checkbox-border": "#c2c5c7",
     "editor-caret": "#6cb4ee",
     "editor-selection": "#6cb4ee2e",
     "heading-color": "#ccdbe4",

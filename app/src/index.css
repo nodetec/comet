@@ -73,6 +73,7 @@ body {
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
   --color-blockquote-accent: var(--blockquote-accent);
+  --color-editor-checkbox-border: var(--editor-checkbox-border);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -239,6 +240,7 @@ body {
 
 .comet-list-item--check > .comet-list {
   margin-top: 0.25rem;
+  margin-left: 0 !important;
   display: flow-root;
 }
 
@@ -254,13 +256,12 @@ body {
 .comet-list-item--check {
   --comet-list-marker-gap: 6px;
   --comet-list-marker-width: 16px;
-  --comet-list-gutter: 1.4rem;
-  --comet-list-marker-left: calc(
-    var(--comet-list-gutter) - var(--comet-list-marker-width) -
-      var(--comet-list-marker-gap)
+  --comet-list-gutter: calc(
+    var(--comet-list-marker-width) + var(--comet-list-marker-gap)
   );
-  position: relative;
+  --comet-list-marker-border: var(--editor-checkbox-border);
   list-style: none !important;
+  position: relative;
   margin-left: 0 !important;
   padding-left: var(--comet-list-gutter) !important;
   overflow-wrap: anywhere;
@@ -273,31 +274,59 @@ body {
   font-size: 0;
 }
 
-.comet-list-item--check::before {
+.comet-list-anchor {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  margin-left: calc(-1 * var(--comet-list-gutter));
+  margin-right: var(--comet-list-gutter);
+  overflow: visible;
+  cursor: pointer;
+  color: transparent;
+  font-size: inherit;
+  text-decoration: none !important;
+  user-select: text;
+  vertical-align: baseline;
+}
+
+.comet-list-anchor::before {
   content: "";
   position: absolute;
-  top: calc((1lh - 16px) / 2);
-  left: var(--comet-list-marker-left);
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--input);
+  top: calc((100% - var(--comet-list-marker-width)) / 2);
+  left: 0;
+  width: var(--comet-list-marker-width);
+  height: var(--comet-list-marker-width);
+  border: 1px solid var(--comet-list-marker-border);
   border-radius: 4px;
   background-color: var(--background);
   box-sizing: border-box;
-  cursor: pointer;
-  z-index: 1;
   transition:
     background-color 0.1s,
     border-color 0.1s;
 }
 
-.comet-list-item--check-checked::before {
+.comet-list-item--check-checked > .comet-list-anchor::before {
   border-color: var(--primary);
   background-color: var(--primary);
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 6 9 17l-5-5'/%3e%3c/svg%3e");
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.comet-list-item--check-checked > :not(.comet-list):not(.comet-list-anchor) {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+.comet-list-anchor::selection {
+  background: transparent;
+  color: transparent;
+}
+
+.comet-list-anchor::-moz-selection {
+  background: transparent;
+  color: transparent;
 }
 
 .comet-list-item--nested {

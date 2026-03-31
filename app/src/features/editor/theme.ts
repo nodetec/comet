@@ -75,7 +75,7 @@ const theme: EditorThemeClasses = {
     ul: "comet-list comet-list--unordered",
     listitem: "comet-list-item leading-[1.6] tracking-wide mb-1",
     listitemChecked:
-      "comet-list-item leading-[1.6] tracking-wide mb-1 comet-list-item--check comet-list-item--check-checked line-through text-muted-foreground",
+      "comet-list-item leading-[1.6] tracking-wide mb-1 comet-list-item--check comet-list-item--check-checked",
     listitemUnchecked:
       "comet-list-item leading-[1.6] tracking-wide mb-1 comet-list-item--check",
   },

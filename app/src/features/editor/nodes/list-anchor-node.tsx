@@ -7,7 +7,8 @@ import type {
 } from "lexical";
 import { TextNode } from "lexical";
 
-const ZWSP = "\u200B";
+const MARKER_TEXT = "\u200B";
+const TOKEN_MODE = 1;
 
 export type SerializedListAnchorNode = SerializedTextNode;
 
@@ -17,19 +18,20 @@ export class ListAnchorNode extends TextNode {
   }
 
   static clone(node: ListAnchorNode): ListAnchorNode {
-    return new ListAnchorNode(node.__key);
+    return new ListAnchorNode(node.__text, node.__key);
   }
 
   static importJSON(): ListAnchorNode {
-    return $createListAnchorNode();
+    return new ListAnchorNode();
   }
 
   static importDOM(): DOMConversionMap | null {
     return null;
   }
 
-  constructor(key?: NodeKey) {
-    super(ZWSP, key);
+  constructor(text = MARKER_TEXT, key?: NodeKey) {
+    super(text, key);
+    this.__mode = TOKEN_MODE;
   }
 
   exportJSON(): SerializedListAnchorNode {
@@ -58,23 +60,39 @@ export class ListAnchorNode extends TextNode {
     return "";
   }
 
+  canInsertTextBefore(): boolean {
+    return false;
+  }
+
+  canInsertTextAfter(): boolean {
+    return false;
+  }
+
+  isTextEntity(): true {
+    return true;
+  }
+
   getAnchorText(): string {
     return this.getLatest().__text;
   }
 
-  resetAnchorText(): this {
+  setAnchorText(text: string): this {
     const self = this.getWritable();
-    self.__text = ZWSP;
+    self.__text = text;
     return self;
   }
 }
 
 export function $createListAnchorNode(): ListAnchorNode {
-  return new ListAnchorNode();
+  return new ListAnchorNode(MARKER_TEXT);
 }
 
 export function $isListAnchorNode(
   node: LexicalNode | null | undefined,
 ): node is ListAnchorNode {
   return node instanceof ListAnchorNode;
+}
+
+export function getChecklistMarkerText(): string {
+  return MARKER_TEXT;
 }

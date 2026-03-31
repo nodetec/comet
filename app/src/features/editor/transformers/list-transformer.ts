@@ -17,7 +17,15 @@ import {
   type LexicalNode,
 } from "lexical";
 import { $isListAnchorNode } from "../nodes/list-anchor-node";
-import { CHECKLIST_PLACEHOLDER } from "../lib/todo-shortcut";
+import { hasSelectedChecklistMarker } from "../lib/checklist-marker";
+import {
+  isChecklistCursorAnchorTextContent,
+  isChecklistPlaceholderTextContent,
+} from "../lib/todo-shortcut";
+
+type ListExportOptions = {
+  clipboard?: boolean;
+};
 
 type BulletMarker = "-" | "*";
 
@@ -79,7 +87,8 @@ function exportListItemContent(
             !$isListAnchorNode(child) &&
             !(
               $isTextNode(child) &&
-              child.getTextContent() === CHECKLIST_PLACEHOLDER
+              (isChecklistPlaceholderTextContent(child.getTextContent()) ||
+                isChecklistCursorAnchorTextContent(child.getTextContent()))
             ),
         ),
   } as unknown as ElementNode;
@@ -91,6 +100,7 @@ function exportListNode(
   listNode: ListNode,
   exportChildren: (node: ElementNode) => string,
   depth = 0,
+  options: ListExportOptions = {},
 ): string {
   const output: string[] = [];
   let ordinal = 0;
@@ -111,16 +121,24 @@ function exportListNode(
 
     const indent = " ".repeat(depth * 2);
     if (!hasOnlyNestedLists || nestedLists.length === 0) {
+      const includePrefix =
+        listNode.getListType() !== "check" ||
+        !options.clipboard ||
+        hasSelectedChecklistMarker(child);
       output.push(
-        indent +
-          listItemPrefix(listNode, child, ordinal, bulletMarker) +
-          content,
+        includePrefix
+          ? indent +
+              listItemPrefix(listNode, child, ordinal, bulletMarker) +
+              content
+          : indent + content,
       );
       ordinal++;
     }
 
     for (const nestedList of nestedLists) {
-      output.push(exportListNode(nestedList, exportChildren, depth + 1));
+      output.push(
+        exportListNode(nestedList, exportChildren, depth + 1, options),
+      );
     }
   }
 
@@ -157,6 +175,17 @@ function exportList(
   return exportListNode(node, exportChildren, 0);
 }
 
+function exportListForClipboard(
+  node: LexicalNode,
+  exportChildren: (node: ElementNode) => string,
+): string | null {
+  if (!$isListNode(node)) {
+    return null;
+  }
+
+  return exportListNode(node, exportChildren, 0, { clipboard: true });
+}
+
 export const UNORDERED_LIST: ElementTransformer = {
   ...BUILTIN_UNORDERED_LIST,
   export: exportList,
@@ -165,6 +194,11 @@ export const UNORDERED_LIST: ElementTransformer = {
 export const CHECK_LIST: ElementTransformer = {
   ...BUILTIN_CHECK_LIST,
   export: exportList,
+};
+
+export const CLIPBOARD_CHECK_LIST: ElementTransformer = {
+  ...BUILTIN_CHECK_LIST,
+  export: exportListForClipboard,
 };
 
 export const ORDERED_LIST: ElementTransformer = {

@@ -38,6 +38,7 @@ export const THEME_COLOR_KEYS = [
   "sidebar-border",
   "separator",
   "editor-text",
+  "editor-checkbox-border",
   "editor-caret",
   "editor-selection",
   "heading-color",

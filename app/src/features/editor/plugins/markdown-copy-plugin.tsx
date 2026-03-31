@@ -25,8 +25,11 @@ import { LinkNode } from "@lexical/link";
 import { HashtagNode } from "../nodes/hashtag-node";
 import { ImageNode } from "../nodes/image-node";
 import { YouTubeNode } from "../nodes/youtube-node";
-import { TRANSFORMERS } from "../transformers";
+import { CLIPBOARD_TRANSFORMERS } from "../transformers";
+import { shouldCopyChecklistSelectionAsPlainText } from "../lib/checklist-clipboard";
+import { removeExpandedChecklistSelection } from "../lib/checklist-marker";
 import { $exportMarkdownForClipboard } from "../lib/markdown";
+import { stripChecklistPlaceholders } from "../lib/todo-shortcut";
 
 const HEADLESS_NODES = [
   HeadingNode,
@@ -78,7 +81,7 @@ function $selectionToMarkdown(
 
   let markdown = "";
   headless.getEditorState().read(() => {
-    markdown = $exportMarkdownForClipboard(TRANSFORMERS);
+    markdown = $exportMarkdownForClipboard(CLIPBOARD_TRANSFORMERS);
   });
   return markdown;
 }
@@ -97,7 +100,9 @@ export default function MarkdownCopyPlugin() {
 
       event.preventDefault();
 
-      const markdown = $selectionToMarkdown(editor);
+      const markdown = shouldCopyChecklistSelectionAsPlainText(selection)
+        ? stripChecklistPlaceholders(selection.getTextContent())
+        : $selectionToMarkdown(editor);
       clipboardData.setData(
         "text/plain",
         markdown || selection.getTextContent(),
@@ -132,7 +137,10 @@ export default function MarkdownCopyPlugin() {
         if (handled) {
           editor.update(() => {
             const selection = $getSelection();
-            if ($isRangeSelection(selection)) {
+            if (
+              $isRangeSelection(selection) &&
+              !removeExpandedChecklistSelection(selection)
+            ) {
               selection.removeText();
             }
           });

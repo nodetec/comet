@@ -32,6 +32,7 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isParagraphNode,
   createEditor,
 } from "lexical";
 import { describe, expect, it, vi } from "vitest";
@@ -54,12 +55,14 @@ vi.mock("@/shared/lib/attachments", () => ({
 
 import { $createImageNode, ImageNode } from "../nodes/image-node";
 import { $createYouTubeNode, YouTubeNode } from "../nodes/youtube-node";
-import { TRANSFORMERS } from "../transformers";
+import { CLIPBOARD_TRANSFORMERS, TRANSFORMERS } from "../transformers";
 import {
   $exportMarkdown,
   $exportMarkdownForClipboard,
-  normalizeImportedNodes,
   normalizeImportedCodeBlocksFromMarkdown,
+  normalizeImportedNodes,
+  normalizeImportedTopLevelListSpacingMarkers,
+  normalizeImportedTopLevelSpacingFromMarkdown,
 } from "./markdown";
 
 const TEST_NODES = [
@@ -119,7 +122,7 @@ function exportClipboardMarkdownFromEditor(
       const root = $getRoot();
       root.clear();
       setup(root);
-      output = $exportMarkdownForClipboard(TRANSFORMERS);
+      output = $exportMarkdownForClipboard(CLIPBOARD_TRANSFORMERS);
     },
     { discrete: true },
   );
@@ -197,7 +200,7 @@ describe("markdown editor pipeline", () => {
       root.append(before, extraGapBefore, code, extraGapAfter, after);
     });
 
-    expect(markdown).toBe(["A", "", "```", "x", "```", "", "B"].join("\n"));
+    expect(markdown).toBe(["A", "", "```", "x", "```", "", "", "B"].join("\n"));
   });
 
   it("exports a single visible spacer paragraph as a standard separator", () => {
@@ -389,6 +392,18 @@ describe("markdown editor pipeline", () => {
     expect(markdown).toBe("- [ ] ");
   });
 
+  it("exports checklist clipboard text with markdown when the marker is selected", () => {
+    const markdown = exportClipboardMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const item = $createListItemNode(false);
+      item.append($createListAnchorNode(), $createTextNode("Task"));
+      checklist.append(item);
+      root.append(checklist);
+    });
+
+    expect(markdown).toBe("- [ ] Task");
+  });
+
   it("preserves separate top-level bullet lists after a checklist", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const checklist = $createListNode("check");
@@ -405,6 +420,24 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["- [ ] Task", "", "* Bullet"].join("\n"));
+  });
+
+  it("exports a visible spacer paragraph after a list as an extra newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const item = $createListItemNode(false);
+      item.append($createTextNode("Task"));
+      checklist.append(item);
+
+      const spacer = $createParagraphNode();
+
+      const paragraph = $createParagraphNode();
+      paragraph.append($createTextNode("After"));
+
+      root.append(checklist, spacer, paragraph);
+    });
+
+    expect(markdown).toBe("- [ ] Task\n\n\nAfter");
   });
 
   it("preserves separate top-level checklists in the same list run", () => {
@@ -471,6 +504,267 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("unwraps imported lead paragraphs inside list items with nested blocks", () => {
+    const editor = createTestEditor();
+    let checklistChildTypes: string[] = [];
+    let bulletChildTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const checklist = $createListNode("check");
+        const checkItem = $createListItemNode(false);
+        const checkLeadParagraph = $createParagraphNode();
+        checkLeadParagraph.append($createTextNode("Parent"));
+        const checkSpacerParagraph = $createParagraphNode();
+        const nestedCheckList = $createListNode("bullet");
+        const nestedCheckItem = $createListItemNode();
+        nestedCheckItem.append($createTextNode("Child"));
+        nestedCheckList.append(nestedCheckItem);
+        checkItem.append(
+          checkLeadParagraph,
+          checkSpacerParagraph,
+          nestedCheckList,
+        );
+        checklist.append(checkItem);
+
+        const bulletList = $createListNode("bullet");
+        const bulletItem = $createListItemNode();
+        const bulletLeadParagraph = $createParagraphNode();
+        bulletLeadParagraph.append($createTextNode("Bullet parent"));
+        const bulletSpacerParagraph = $createParagraphNode();
+        const nestedBulletList = $createListNode("number");
+        const nestedBulletItem = $createListItemNode();
+        nestedBulletItem.append($createTextNode("Nested"));
+        nestedBulletList.append(nestedBulletItem);
+        bulletItem.append(
+          bulletLeadParagraph,
+          bulletSpacerParagraph,
+          nestedBulletList,
+        );
+        bulletList.append(bulletItem);
+
+        root.append(checklist, bulletList);
+
+        normalizeImportedNodes(root.getChildren());
+
+        checklistChildTypes = checkItem
+          .getChildren()
+          .map((child) => child.getType());
+        bulletChildTypes = bulletItem
+          .getChildren()
+          .map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(checklistChildTypes).toEqual(["text", "list"]);
+    expect(bulletChildTypes).toEqual(["text", "list"]);
+    expect(checklistChildTypes.includes("paragraph")).toBe(false);
+    expect(bulletChildTypes.includes("paragraph")).toBe(false);
+  });
+
+  it("rebuilds no visible spacer after a list from markdown separators", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const checklist = $createListNode("check");
+        const checklistItem = $createListItemNode(false);
+        checklistItem.append($createTextNode("Task"));
+        checklist.append(checklistItem);
+
+        const spacer = $createParagraphNode();
+
+        const paragraph = $createParagraphNode();
+        paragraph.append($createTextNode("After"));
+
+        const bulletList = $createListNode("bullet");
+        const bulletItem = $createListItemNode();
+        bulletItem.append($createTextNode("Bullet"));
+        bulletList.append(bulletItem);
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [checklist, spacer, paragraph, $createParagraphNode(), bulletList],
+          ["- [ ] Task", "", "After", "- Bullet"].join("\n"),
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "list"]);
+  });
+
+  it("preserves a visible spacer after a list when markdown encodes it", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+    let firstParagraphEmpty = false;
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const checklist = $createListNode("check");
+        const checklistItem = $createListItemNode(false);
+        checklistItem.append($createTextNode("Task"));
+        checklist.append(checklistItem);
+
+        const spacer = $createParagraphNode();
+
+        const paragraph = $createParagraphNode();
+        paragraph.append($createTextNode("After"));
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [checklist, spacer, paragraph],
+          "- [ ] Task\n\n\nAfter",
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+        const firstParagraph = root.getChildren()[1];
+        firstParagraphEmpty =
+          $isParagraphNode(firstParagraph) &&
+          firstParagraph.getChildrenSize() === 0;
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "paragraph"]);
+    expect(firstParagraphEmpty).toBe(true);
+  });
+
+  it("preserves a visible spacer between top-level checklists", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const firstChecklist = $createListNode("check");
+        const firstItem = $createListItemNode(false);
+        firstItem.append($createTextNode("First"));
+        firstChecklist.append(firstItem);
+
+        const spacer = $createParagraphNode();
+
+        const secondChecklist = $createListNode("check");
+        const secondItem = $createListItemNode(false);
+        secondItem.append($createTextNode("Second"));
+        secondChecklist.append(secondItem);
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [firstChecklist, spacer, secondChecklist],
+          ["- [ ] First", "", "", "* [ ] Second"].join("\n"),
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "list"]);
+  });
+
+  it("preserves a visible spacer between a checklist and bullet list", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const checklist = $createListNode("check");
+        const checklistItem = $createListItemNode(false);
+        checklistItem.append($createTextNode("Task"));
+        checklist.append(checklistItem);
+
+        const spacer = $createParagraphNode();
+
+        const bulletList = $createListNode("bullet");
+        const bulletItem = $createListItemNode();
+        bulletItem.append($createTextNode("Bullet"));
+        bulletList.append(bulletItem);
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [checklist, spacer, bulletList],
+          ["- [ ] Task", "", "", "* Bullet"].join("\n"),
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "list"]);
+  });
+
+  it("removes one baseline empty paragraph between imported top-level lists", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const firstChecklist = $createListNode("check");
+        const firstChecklistItem = $createListItemNode(false);
+        firstChecklistItem.append($createTextNode("test"));
+        firstChecklist.append(firstChecklistItem);
+
+        const secondChecklist = $createListNode("check");
+        const secondChecklistItem = $createListItemNode(false);
+        secondChecklistItem.append($createTextNode("asdf"));
+        secondChecklist.append(secondChecklistItem);
+
+        const firstBulletList = $createListNode("bullet");
+        const firstBulletItem = $createListItemNode();
+        firstBulletItem.append($createTextNode("test"));
+        firstBulletList.append(firstBulletItem);
+
+        const secondBulletList = $createListNode("bullet");
+        const secondBulletItem = $createListItemNode();
+        secondBulletItem.append($createTextNode("asdf"));
+        secondBulletList.append(secondBulletItem);
+
+        const normalized = normalizeImportedTopLevelListSpacingMarkers([
+          firstChecklist,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          secondChecklist,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          $createParagraphNode(),
+          firstBulletList,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          $createParagraphNode(),
+          secondBulletList,
+        ]);
+        $getRoot().append(...normalized);
+        childTypes = $getRoot()
+          .getChildren()
+          .map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual([
+      "list",
+      "paragraph",
+      "list",
+      "paragraph",
+      "paragraph",
+      "list",
+      "paragraph",
+      "paragraph",
+      "list",
+    ]);
   });
 
   it("exports plain email autolinks as bare email text", () => {

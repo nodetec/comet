@@ -6,10 +6,12 @@ import {
   $getRoot,
   $setSelection,
   CLEAR_HISTORY_COMMAND,
+  $createTextNode,
 } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $createListItemNode, $createListNode } from "@lexical/list";
 import { $importMarkdownFromHTML } from "../lib/markdown";
+import { CHECKLIST_PLACEHOLDER } from "../lib/todo-shortcut";
 import { TRANSFORMERS } from "../transformers";
 
 interface InitialContentPluginProps {
@@ -56,9 +58,11 @@ export default function InitialContentPlugin({
           root.clear();
           const checkList = $createListNode("check");
           const checkItem = $createListItemNode(false);
+          const placeholder = $createTextNode(CHECKLIST_PLACEHOLDER);
+          checkItem.append(placeholder);
           checkList.append(checkItem);
           root.append(checkList);
-          checkItem.selectEnd();
+          placeholder.select(0, 1);
         } else if (!markdown.trim()) {
           const root = $getRoot();
           root.clear();
