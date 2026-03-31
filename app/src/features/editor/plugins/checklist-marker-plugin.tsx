@@ -202,7 +202,7 @@ export default function ChecklistMarkerPlugin() {
           .filter((child): child is import("@lexical/list").ListNode =>
             $isListNode(child),
           );
-        const lastNestedList = nestedLists.at(-1);
+        const [lastNestedList] = nestedLists.slice(-1);
         if (!lastNestedList) {
           return current;
         }
@@ -210,7 +210,7 @@ export default function ChecklistMarkerPlugin() {
         const nestedItems = lastNestedList
           .getChildren()
           .filter($isListItemNode);
-        const lastNestedItem = nestedItems.at(-1);
+        const [lastNestedItem] = nestedItems.slice(-1);
         if (!lastNestedItem) {
           return current;
         }
@@ -242,7 +242,7 @@ export default function ChecklistMarkerPlugin() {
         const siblingItems = previousTopLevelSibling
           .getChildren()
           .filter($isListItemNode);
-        const lastSiblingItem = siblingItems.at(-1);
+        const [lastSiblingItem] = siblingItems.slice(-1);
         return lastSiblingItem
           ? getDeepestVisibleListItem(lastSiblingItem)
           : null;

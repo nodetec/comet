@@ -41,6 +41,7 @@ const THEME_COLOR_KEYS: &[&str] = &[
     "sidebar-border",
     "separator",
     "editor-text",
+    "editor-checkbox-border",
     "editor-caret",
     "editor-selection",
     "heading-color",
