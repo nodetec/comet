@@ -156,9 +156,7 @@ pub async fn push_note_revisions_batch(
         }
     );
     let total_ms = parallel_started_at.elapsed().as_millis();
-    let overlap_ms = publish_ms
-        .saturating_add(blob_ms)
-        .saturating_sub(total_ms);
+    let overlap_ms = publish_ms.saturating_add(blob_ms).saturating_sub(total_ms);
     sync_log(
         app,
         &format!(
@@ -181,21 +179,10 @@ pub async fn push_note_revisions_batch(
             let failed_count = ack_total.saturating_sub(fanout.success_counts.len());
             for prepared in prepared_publishes {
                 let event_id = prepared.event.id.to_hex();
-                if let Some(message) = fanout.rejection_messages.get(&event_id) {
+                if let Some(message) = batch_publish_failure_message(&event_id, &fanout) {
                     sync_log(
                         app,
-                        &format!(
-                            "revision push error: {}: relay rejected event: {}",
-                            prepared.note_id, message
-                        ),
-                    );
-                } else {
-                    sync_log(
-                        app,
-                        &format!(
-                            "revision push error: {}: event failed on every configured sync relay",
-                            prepared.note_id
-                        ),
+                        &format!("revision push error: {}: {}", prepared.note_id, message),
                     );
                 }
             }
@@ -204,10 +191,7 @@ pub async fn push_note_revisions_batch(
                 app,
                 &format!(
                     "revision relay publish complete acked={}/{} failed={} relays={}",
-                    acked,
-                    ack_total,
-                    failed_count,
-                    fanout.relay_count
+                    acked, ack_total, failed_count, fanout.relay_count
                 ),
             );
 
@@ -224,6 +208,21 @@ pub async fn push_note_revisions_batch(
             Err(error)
         }
     }
+}
+
+fn batch_publish_failure_message(
+    event_id: &str,
+    fanout: &BatchRelayFanoutResult,
+) -> Option<String> {
+    if fanout.success_counts.contains_key(event_id) {
+        return None;
+    }
+
+    if let Some(message) = fanout.rejection_messages.get(event_id) {
+        return Some(format!("relay rejected event: {message}"));
+    }
+
+    Some("event failed on every configured sync relay".to_string())
 }
 
 struct BatchAttachmentQueueSummary {
@@ -378,8 +377,7 @@ async fn maybe_upload_note_attachments_batch(
             )?;
         }
 
-        let Some((blob_data, _)) =
-            crate::adapters::filesystem::attachments::read_blob(app, hash)?
+        let Some((blob_data, _)) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
         else {
             failed_hash_errors.insert(
                 hash.clone(),
@@ -460,7 +458,6 @@ pub fn mark_note_revision_published(
     )?;
     Ok(())
 }
-
 
 fn persist_attachment_upload_metadata(
     app: &AppHandle,
@@ -617,7 +614,10 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
     let uploads_by_server = pending_uploads.into_iter().fold(
         HashMap::<String, Vec<PendingAttachmentUpload>>::new(),
         |mut groups, upload| {
-            groups.entry(upload.server_url.clone()).or_default().push(upload);
+            groups
+                .entry(upload.server_url.clone())
+                .or_default()
+                .push(upload);
             groups
         },
     );
@@ -680,12 +680,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
                             app,
                             &pubkey_hex,
                             upload,
-                            Some(
-                                result
-                                    .error
-                                    .as_deref()
-                                    .unwrap_or("batch upload failed"),
-                            ),
+                            Some(result.error.as_deref().unwrap_or("batch upload failed")),
                         )?;
                     }
                 }
@@ -723,12 +718,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
             Err(error) => {
                 for upload in uploads {
                     failed += 1;
-                    queue_pending_blob_upload(
-                        app,
-                        &pubkey_hex,
-                        &upload,
-                        Some(&error.to_string()),
-                    )?;
+                    queue_pending_blob_upload(app, &pubkey_hex, &upload, Some(&error.to_string()))?;
                 }
             }
         }
@@ -748,10 +738,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
     Ok(())
 }
 
-pub async fn retry_pending_blob_uploads(
-    app: &AppHandle,
-    keys: &Keys,
-) -> Result<(), AppError> {
+pub async fn retry_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), AppError> {
     flush_pending_blob_uploads(app, keys).await
 }
 
@@ -876,25 +863,27 @@ pub async fn send_events_to_relays_batch(
 
     for relay_url in relay_urls {
         match RevisionRelayConnection::connect_authenticated(relay_url, keys).await {
-            Ok(mut connection) => match send_events_on_connection(&mut connection, events, |event_id| {
-                let entry = success_counts.entry(event_id.to_string()).or_insert(0);
-                if *entry == 0 {
-                    any_success = true;
-                    on_first_success(event_id);
-                }
-                *entry += 1;
-            })
-            .await
-            {
-                Ok(result) => {
-                    for (event_id, message) in result.rejected_event_ids {
-                        rejection_messages.entry(event_id).or_insert(message);
+            Ok(mut connection) => {
+                match send_events_on_connection(&mut connection, events, |event_id| {
+                    let entry = success_counts.entry(event_id.to_string()).or_insert(0);
+                    if *entry == 0 {
+                        any_success = true;
+                        on_first_success(event_id);
+                    }
+                    *entry += 1;
+                })
+                .await
+                {
+                    Ok(result) => {
+                        for (event_id, message) in result.rejected_event_ids {
+                            rejection_messages.entry(event_id).or_insert(message);
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("[sync] revision batch push error relay={relay_url}: {error}");
                     }
                 }
-                Err(error) => {
-                    eprintln!("[sync] revision batch push error relay={relay_url}: {error}");
-                }
-            },
+            }
             Err(error) => {
                 eprintln!("[sync] revision batch connect error relay={relay_url}: {error}");
             }
@@ -998,9 +987,7 @@ async fn send_events_on_connection(
         }
     }
 
-    Ok(RelayBatchConnectionResult {
-        rejected_event_ids,
-    })
+    Ok(RelayBatchConnectionResult { rejected_event_ids })
 }
 
 #[cfg(test)]
@@ -1107,6 +1094,51 @@ mod tests {
         );
 
         private_backup.stop();
+    }
+
+    #[test]
+    fn batch_publish_failure_message_ignores_rejections_after_any_success() {
+        let fanout = BatchRelayFanoutResult {
+            success_counts: HashMap::from([("event-1".to_string(), 1usize)]),
+            rejection_messages: HashMap::from([(
+                "event-1".to_string(),
+                "blocked by another relay".to_string(),
+            )]),
+            relay_count: 2,
+        };
+
+        assert_eq!(batch_publish_failure_message("event-1", &fanout), None);
+    }
+
+    #[test]
+    fn batch_publish_failure_message_returns_rejection_when_no_relay_accepts() {
+        let fanout = BatchRelayFanoutResult {
+            success_counts: HashMap::new(),
+            rejection_messages: HashMap::from([(
+                "event-1".to_string(),
+                "invalid signature".to_string(),
+            )]),
+            relay_count: 1,
+        };
+
+        assert_eq!(
+            batch_publish_failure_message("event-1", &fanout),
+            Some("relay rejected event: invalid signature".to_string())
+        );
+    }
+
+    #[test]
+    fn batch_publish_failure_message_reports_total_relay_failure_without_rejection() {
+        let fanout = BatchRelayFanoutResult {
+            success_counts: HashMap::new(),
+            rejection_messages: HashMap::new(),
+            relay_count: 1,
+        };
+
+        assert_eq!(
+            batch_publish_failure_message("event-1", &fanout),
+            Some("event failed on every configured sync relay".to_string())
+        );
     }
 
     struct TestRevisionRelay {

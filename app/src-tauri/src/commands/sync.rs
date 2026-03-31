@@ -454,22 +454,30 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM blob_uploads", [], |row| row.get(0))
             .unwrap();
         let pending_blob_uploads: i64 = conn
-            .query_row("SELECT COUNT(*) FROM pending_blob_uploads", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM pending_blob_uploads", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let pending_deletions: i64 = conn
-            .query_row("SELECT COUNT(*) FROM pending_deletions", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM pending_deletions", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let sync_revisions: i64 = conn
             .query_row("SELECT COUNT(*) FROM sync_revisions", [], |row| row.get(0))
             .unwrap();
         let sync_revision_parents: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_revision_parents", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM sync_revision_parents", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let sync_heads: i64 = conn
             .query_row("SELECT COUNT(*) FROM sync_heads", [], |row| row.get(0))
             .unwrap();
         let sync_relay_state: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_relay_state", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM sync_relay_state", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let sync_relays: i64 = conn
             .query_row("SELECT COUNT(*) FROM sync_relays", [], |row| row.get(0))
