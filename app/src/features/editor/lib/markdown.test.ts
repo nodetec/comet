@@ -349,6 +349,10 @@ describe("markdown editor pipeline", () => {
     expect(markdown).toBe(["> first", ">", "> second"].join("\n"));
   });
 
+  it("round-trips markdown blockquotes", () => {
+    expect(roundtripMarkdown("> quoted")).toBe("> quoted");
+  });
+
   it("exports nested bullet lists under checklist items without converting them", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const checklist = $createListNode("check");

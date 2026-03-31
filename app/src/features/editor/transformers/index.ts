@@ -2,6 +2,7 @@ import {
   CHECK_LIST,
   ELEMENT_TRANSFORMERS,
   ORDERED_LIST,
+  QUOTE as BUILTIN_QUOTE,
   TEXT_FORMAT_TRANSFORMERS,
   UNORDERED_LIST,
   type ElementTransformer,
@@ -81,6 +82,7 @@ function isEmptyParagraphChild(
  * We export each block child separated by `>\n>` to maintain paragraphs.
  */
 const QUOTE: ElementTransformer = {
+  ...BUILTIN_QUOTE,
   dependencies: [QuoteNode],
   export: (node, traverseChildren) => {
     if (!$isQuoteNode(node)) {
@@ -128,9 +130,6 @@ const QUOTE: ElementTransformer = {
 
     return lines.join("\n");
   },
-  regExp: /^>\s/,
-  replace: () => {},
-  type: "element",
 };
 
 // Filter out Lexical's built-in QUOTE from ELEMENT_TRANSFORMERS since we
