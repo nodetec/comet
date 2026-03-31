@@ -1,5 +1,7 @@
 use crate::adapters::nostr::revision_bootstrap::bootstrap_relay_connection;
-use crate::adapters::nostr::revision_push::{push_deletion_revision, push_note_revisions_batch};
+use crate::adapters::nostr::revision_push::{
+    push_deletion_revision, push_note_revisions_batch, retry_pending_blob_uploads,
+};
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
 };
@@ -14,6 +16,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, watch, Mutex};
 
 use super::sync_manager::{set_state, sync_log};
+
+const BLOB_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub(super) async fn run_revision_sync_connection(
     app: &AppHandle,
@@ -85,6 +89,7 @@ pub(super) async fn run_revision_sync_connection(
         .send_changes("sync", &recipient, snapshot_seq, true)
         .await?;
 
+    retry_pending_blob_uploads(app, &keys).await?;
     flush_pending_local_changes(app, &relay_url, &backup_relay_urls, &keys).await?;
     // Bootstrap and any initial local replay are complete at this point. Keep
     // the UI in a steady connected state while the live CHANGES stream stays
@@ -93,56 +98,45 @@ pub(super) async fn run_revision_sync_connection(
 
     let mut pending_pushes: HashMap<String, tokio::time::Instant> = HashMap::new();
     let debounce_duration = Duration::from_secs(2);
+    let mut next_blob_retry_at = tokio::time::Instant::now() + BLOB_RETRY_INTERVAL;
     let mut connected = true;
 
     loop {
-        let next_wake = pending_pushes.values().min().copied();
-        if let Some(next_wake) = next_wake {
-            let debounce_sleep = tokio::time::sleep_until(next_wake);
-            tokio::pin!(debounce_sleep);
-            tokio::select! {
-                () = &mut debounce_sleep => {}
-                cmd = push_rx.recv() => {
-                    handle_revision_push_command(
-                        app,
-                        &relay_url,
-                        &backup_relay_urls,
-                        &keys,
-                        cmd,
-                        &mut pending_pushes,
-                        debounce_duration,
-                    ).await?;
-                    continue;
-                }
-                _ = shutdown_rx.changed() => return Ok(()),
-                incoming = connection.recv_message() => {
-                    handle_revision_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
-                    continue;
-                }
+        let next_note_wake = pending_pushes.values().min().copied();
+        let next_wake = next_note_wake
+            .map(|deadline| deadline.min(next_blob_retry_at))
+            .unwrap_or(next_blob_retry_at);
+        let wake_sleep = tokio::time::sleep_until(next_wake);
+        tokio::pin!(wake_sleep);
+        tokio::select! {
+            () = &mut wake_sleep => {}
+            cmd = push_rx.recv() => {
+                handle_revision_push_command(
+                    app,
+                    &relay_url,
+                    &backup_relay_urls,
+                    &keys,
+                    cmd,
+                    &mut pending_pushes,
+                    debounce_duration,
+                ).await?;
+                continue;
             }
-        } else {
-            tokio::select! {
-                cmd = push_rx.recv() => {
-                    handle_revision_push_command(
-                        app,
-                        &relay_url,
-                        &backup_relay_urls,
-                        &keys,
-                        cmd,
-                        &mut pending_pushes,
-                        debounce_duration,
-                    ).await?;
-                    continue;
-                }
-                _ = shutdown_rx.changed() => return Ok(()),
-                incoming = connection.recv_message() => {
-                    handle_revision_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
-                    continue;
-                }
+            _ = shutdown_rx.changed() => return Ok(()),
+            incoming = connection.recv_message() => {
+                handle_revision_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
+                continue;
             }
         }
 
         let now = tokio::time::Instant::now();
+        if now >= next_blob_retry_at {
+            if let Err(error) = retry_pending_blob_uploads(app, &keys).await {
+                sync_log(app, &format!("revision blob retry error: {error}"));
+            }
+            next_blob_retry_at = now + BLOB_RETRY_INTERVAL;
+        }
+
         let ready: Vec<String> = pending_pushes
             .iter()
             .filter(|(_, deadline)| **deadline <= now)

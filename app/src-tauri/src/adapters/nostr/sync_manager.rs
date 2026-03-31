@@ -102,31 +102,27 @@ pub async fn start_if_ready(app: &AppHandle) -> Result<(), AppError> {
         let uses_keychain_storage =
             crate::adapters::sqlite::identity_repository::get_nsec_storage(&conn)?.as_deref()
                 == Some(crate::adapters::sqlite::identity_repository::NSEC_STORAGE_KEYCHAIN);
-        let should_disable_sync = has_relay
+        let needs_unlock = has_relay
             && enabled
             && uses_keychain_storage
             && !crate::adapters::tauri::key_store::is_current_identity_unlocked(app, &conn)?;
-        (has_relay, enabled, should_disable_sync)
+        (has_relay, enabled, needs_unlock)
     };
 
     let manager = app.state::<SyncManager>();
-    let (has_relay, enabled, should_disable_sync) = readiness;
+    let (has_relay, enabled, needs_unlock) = readiness;
 
     if !has_relay || !enabled {
         manager.stop().await;
         return Ok(());
     }
 
-    if should_disable_sync {
-        let conn = crate::db::database_connection(app)?;
-        conn.execute(
-            "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('sync_enabled', 'false')",
-            [],
-        )?;
+    if needs_unlock {
         manager.stop().await;
+        set_state(&manager.state, SyncState::NeedsUnlock, app).await;
         sync_log(
             app,
-            "sync disabled because this session has not enabled a keychain-backed account",
+            "sync paused until the keychain-backed account is unlocked",
         );
         return Ok(());
     }

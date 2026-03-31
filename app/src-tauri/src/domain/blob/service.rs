@@ -120,6 +120,9 @@ pub fn cleanup_orphaned_blobs(
     let mut del_uploads_stmt = conn
         .prepare("DELETE FROM blob_uploads WHERE object_hash = ?1")
         .ok();
+    let mut del_pending_uploads_stmt = conn
+        .prepare("DELETE FROM pending_blob_uploads WHERE plaintext_hash = ?1")
+        .ok();
 
     for hash in orphaned_hashes {
         let mut object_hashes = Vec::new();
@@ -134,6 +137,9 @@ pub fn cleanup_orphaned_blobs(
             }
         }
         if let Some(ref mut stmt) = del_meta_stmt {
+            let _ = stmt.execute(params![hash]);
+        }
+        if let Some(ref mut stmt) = del_pending_uploads_stmt {
             let _ = stmt.execute(params![hash]);
         }
         if let Some(ref mut stmt) = del_uploads_stmt {
