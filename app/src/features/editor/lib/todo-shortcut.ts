@@ -321,6 +321,52 @@ export function $convertNestedChecklistItemToParagraph(
   return true;
 }
 
+export function $outdentNestedChecklistItemToParagraph(
+  listItemNode: ListItemNode,
+  selectionBehavior: ChecklistParagraphSelection = "start",
+): boolean {
+  const parentList = listItemNode.getParent();
+  const ownerItem = parentList?.getParent();
+  const outerList = ownerItem?.getParent();
+
+  if (
+    !$isListNode(parentList) ||
+    parentList.getListType() !== "check" ||
+    !$isListItemNode(ownerItem) ||
+    !$isListNode(outerList)
+  ) {
+    return false;
+  }
+
+  const paragraph = $createParagraphNode();
+  const hasVisibleContent = $moveChecklistItemContentToParagraph(
+    listItemNode,
+    paragraph,
+  );
+  const nextOuterSiblings = ownerItem.getNextSiblings().filter($isListItemNode);
+
+  outerList.insertAfter(paragraph);
+  moveTrailingChecklistSiblingsToNewList(
+    outerList,
+    paragraph,
+    nextOuterSiblings,
+  );
+
+  listItemNode.remove();
+
+  if (parentList.isEmpty()) {
+    parentList.remove();
+  }
+
+  selectConvertedChecklistParagraph(
+    paragraph,
+    hasVisibleContent,
+    selectionBehavior,
+  );
+
+  return true;
+}
+
 function $moveChildrenToListItem(
   paragraphNode: ParagraphNode,
   nestedItem: ListItemNode,

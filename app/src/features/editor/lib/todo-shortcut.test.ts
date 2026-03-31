@@ -23,6 +23,7 @@ import {
   $convertChecklistItemToParagraph,
   $convertChecklistParagraphToNestedItem,
   $convertNestedChecklistItemToParagraph,
+  $outdentNestedChecklistItemToParagraph,
   $isChecklistPlaceholderText,
   $collapseChecklistPlaceholderSelection,
   $normalizeChecklistPlaceholderTextNode,
@@ -420,5 +421,64 @@ describe("todo shortcut", () => {
     expect(topLevelTexts).toEqual(["Parent", "Next"]);
     expect(ownerChildTypes).toEqual(["text", "list"]);
     expect(nestedTexts).toEqual(["Child"]);
+  });
+
+  it("outdents a nested checklist item into a paragraph", () => {
+    const editor = createTestEditor();
+    let rootTypes: string[] = [];
+    let parentText = "";
+    let paragraphText = "";
+    let nestedTexts: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+        const checklist = $createListNode("check");
+        const parent = $createListItemNode(false);
+        parent.append($createTextNode("Parent"));
+
+        const nestedList = $createListNode("check");
+        const child = $createListItemNode(false);
+        child.append($createTextNode("Child"));
+        const sibling = $createListItemNode(false);
+        sibling.append($createTextNode("Sibling"));
+        nestedList.append(child, sibling);
+
+        const trailing = $createListItemNode(false);
+        trailing.append($createTextNode("After"));
+
+        parent.append(nestedList);
+        checklist.append(parent, trailing);
+        root.append(checklist);
+
+        expect($outdentNestedChecklistItemToParagraph(child, "start")).toBe(
+          true,
+        );
+
+        rootTypes = root.getChildren().map((node) => node.getType());
+        paragraphText =
+          root.getChildren().find($isParagraphNode)?.getTextContent() ?? "";
+        parentText =
+          parent.getChildren().find($isTextNode)?.getTextContent() ?? "";
+        const remainingNestedList = parent
+          .getChildren()
+          .find(
+            (node): node is ListNode =>
+              $isListNode(node) && node.getListType() === "check",
+          );
+        nestedTexts = remainingNestedList
+          ? remainingNestedList
+              .getChildren()
+              .filter($isListItemNode)
+              .map((item) => item.getTextContent())
+          : [];
+      },
+      { discrete: true },
+    );
+
+    expect(rootTypes).toEqual(["list", "paragraph", "list"]);
+    expect(parentText).toBe("Parent");
+    expect(paragraphText).toBe("Child");
+    expect(nestedTexts).toEqual(["Sibling"]);
   });
 });

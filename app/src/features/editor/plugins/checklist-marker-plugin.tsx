@@ -4,12 +4,15 @@ import { $findMatchingParent, mergeRegister } from "@lexical/utils";
 import {
   COMMAND_PRIORITY_CRITICAL,
   $createRangeSelection,
+  $isElementNode,
   $getNodeByKey,
   $getNearestNodeFromDOMNode,
   $getSelection,
   $isRangeSelection,
   $setSelection,
   $isTextNode,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_BACKSPACE_COMMAND,
   SELECTION_CHANGE_COMMAND,
   type LexicalNode,
@@ -27,6 +30,7 @@ import {
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
   $convertChecklistItemToParagraph,
+  $outdentNestedChecklistItemToParagraph,
   isChecklistCursorAnchorTextContent,
   isChecklistPlaceholderTextContent,
 } from "../lib/todo-shortcut";
@@ -188,6 +192,194 @@ export default function ChecklistMarkerPlugin() {
       return isChecklistListItem(parent) ? parent : null;
     };
 
+    const getDeepestVisibleListItem = (
+      listItem: ListItemNode,
+    ): ListItemNode => {
+      let current = listItem;
+
+      while (true) {
+        const nestedLists = current
+          .getChildren()
+          .filter((child): child is import("@lexical/list").ListNode =>
+            $isListNode(child),
+          );
+        const lastNestedList = nestedLists.at(-1);
+        if (!lastNestedList) {
+          return current;
+        }
+
+        const nestedItems = lastNestedList
+          .getChildren()
+          .filter($isListItemNode);
+        const lastNestedItem = nestedItems.at(-1);
+        if (!lastNestedItem) {
+          return current;
+        }
+
+        current = lastNestedItem;
+      }
+    };
+
+    const getChecklistLineAbove = (
+      listItem: ListItemNode,
+    ): LexicalNode | null => {
+      const previousSibling = listItem.getPreviousSibling();
+      if ($isListItemNode(previousSibling)) {
+        return getDeepestVisibleListItem(previousSibling);
+      }
+
+      const parentList = listItem.getParent();
+      const ownerItem = parentList?.getParent();
+      if ($isListItemNode(ownerItem)) {
+        return ownerItem;
+      }
+
+      if (!$isListNode(parentList)) {
+        return null;
+      }
+
+      const previousTopLevelSibling = parentList.getPreviousSibling();
+      if ($isListNode(previousTopLevelSibling)) {
+        const siblingItems = previousTopLevelSibling
+          .getChildren()
+          .filter($isListItemNode);
+        const lastSiblingItem = siblingItems.at(-1);
+        return lastSiblingItem
+          ? getDeepestVisibleListItem(lastSiblingItem)
+          : null;
+      }
+
+      return previousTopLevelSibling;
+    };
+
+    const getFirstVisibleListItem = (
+      listNode: import("@lexical/list").ListNode,
+    ): ListItemNode | null => {
+      const listItem = listNode.getChildren().find($isListItemNode);
+      const firstListItem = listItem;
+      if (!firstListItem) {
+        return null;
+      }
+
+      let current = firstListItem;
+      while (getChecklistEditingTextNode(current) == null) {
+        const nestedList = current
+          .getChildren()
+          .find((child): child is import("@lexical/list").ListNode =>
+            $isListNode(child),
+          );
+        if (!nestedList) {
+          return current;
+        }
+
+        const nestedItem = nestedList.getChildren().find($isListItemNode);
+        if (!nestedItem) {
+          return current;
+        }
+
+        current = nestedItem;
+      }
+
+      return current;
+    };
+
+    const selectVisibleLineEnd = (node: LexicalNode) => {
+      if (!isChecklistListItem(node)) {
+        node.selectEnd();
+        return;
+      }
+
+      const listItem = node;
+      let lastDirectTextNode: import("lexical").TextNode | null = null;
+
+      for (const child of listItem.getChildren()) {
+        if ($isListNode(child)) {
+          break;
+        }
+
+        if (
+          $isTextNode(child) &&
+          !isChecklistLeftCursorAnchorTextContent(child.getTextContent()) &&
+          !isChecklistCursorAnchorTextContent(child.getTextContent())
+        ) {
+          lastDirectTextNode = child;
+        }
+      }
+
+      if ($isTextNode(lastDirectTextNode)) {
+        setCollapsedSelectionOnTextNode(
+          lastDirectTextNode,
+          lastDirectTextNode.getTextContentSize(),
+        );
+        return;
+      }
+
+      const editingTextNode = getChecklistEditingTextNode(listItem);
+      if ($isTextNode(editingTextNode)) {
+        setCollapsedSelectionOnTextNode(
+          editingTextNode,
+          editingTextNode.getTextContentSize(),
+        );
+        return;
+      }
+
+      listItem.selectEnd();
+    };
+
+    const isSelectionAtVisibleLineEnd = (
+      selection: import("lexical").RangeSelection,
+      node: LexicalNode,
+    ): boolean => {
+      if (
+        selection.anchor.type === "element" &&
+        selection.focus.type === "element" &&
+        selection.anchor.key === selection.focus.key &&
+        node.is(selection.anchor.getNode())
+      ) {
+        return (
+          $isElementNode(node) &&
+          selection.anchor.offset >= node.getChildrenSize()
+        );
+      }
+
+      if (
+        selection.anchor.type !== "text" ||
+        selection.focus.type !== "text" ||
+        selection.anchor.key !== selection.focus.key ||
+        !$isElementNode(node)
+      ) {
+        return false;
+      }
+
+      const lastDescendant = node.getLastDescendant();
+      return (
+        $isTextNode(lastDescendant) &&
+        selection.anchor.getNode().is(lastDescendant) &&
+        selection.anchor.offset === lastDescendant.getTextContentSize()
+      );
+    };
+
+    const getVisibleLineBelow = (node: LexicalNode): LexicalNode | null => {
+      const currentLine = isChecklistListItem(node)
+        ? node
+        : node.getTopLevelElementOrThrow();
+      const nextSibling = currentLine.getNextSibling();
+      if ($isListNode(nextSibling)) {
+        return getFirstVisibleListItem(nextSibling);
+      }
+
+      return nextSibling;
+    };
+
+    const selectVisibleLineStart = (node: LexicalNode) => {
+      if (isChecklistListItem(node)) {
+        selectChecklistEditingPosition(node);
+        return;
+      }
+
+      node.selectStart();
+    };
+
     const isCollapsedSelectionAtChecklistStart = (
       listItem: ListItemNode,
     ): boolean => {
@@ -263,14 +455,14 @@ export default function ChecklistMarkerPlugin() {
       if (
         selection.anchor.type === "element" &&
         selection.focus.type === "element" &&
-        selection.anchor.key === selection.focus.key
+        selection.anchor.key === selection.focus.key &&
+        isChecklistListItem(anchorNode)
       ) {
-        const listItem = getChecklistItemFromNode(anchorNode);
-        if (listItem == null || selection.anchor.offset > 1) {
+        if (selection.anchor.offset > 1) {
           return false;
         }
 
-        const textNode = getChecklistEditingTextNode(listItem);
+        const textNode = getChecklistEditingTextNode(anchorNode);
         if (!$isTextNode(textNode)) {
           return false;
         }
@@ -303,9 +495,17 @@ export default function ChecklistMarkerPlugin() {
     const getChecklistClickZone = (
       target: EventTarget | null,
       clientX: number,
+      clientY: number,
     ): { listItemElement: HTMLElement; zone: "gutter" | "marker" } | null => {
       const listItemElement = getChecklistListItemElement(target);
       if (listItemElement == null) {
+        return null;
+      }
+
+      const anchorElement = listItemElement.querySelector(
+        ":scope > .comet-list-anchor",
+      );
+      if (!(anchorElement instanceof HTMLElement)) {
         return null;
       }
 
@@ -314,8 +514,14 @@ export default function ChecklistMarkerPlugin() {
       const markerWidth = Number.parseFloat(
         styles.getPropertyValue("--comet-list-marker-width"),
       );
-      const clickOffset =
-        clientX - listItemElement.getBoundingClientRect().left;
+      const listItemRect = listItemElement.getBoundingClientRect();
+      const anchorRect = anchorElement.getBoundingClientRect();
+
+      if (clientY < anchorRect.top || clientY > anchorRect.bottom) {
+        return null;
+      }
+
+      const clickOffset = clientX - listItemRect.left;
 
       if (clickOffset <= markerWidth) {
         return { listItemElement, zone: "marker" };
@@ -329,7 +535,11 @@ export default function ChecklistMarkerPlugin() {
     };
 
     const handleMouseDown = (event: MouseEvent) => {
-      const clickZone = getChecklistClickZone(event.target, event.clientX);
+      const clickZone = getChecklistClickZone(
+        event.target,
+        event.clientX,
+        event.clientY,
+      );
       if (clickZone?.zone === "gutter") {
         event.preventDefault();
         event.stopPropagation();
@@ -375,7 +585,11 @@ export default function ChecklistMarkerPlugin() {
     };
 
     const handleClick = (event: MouseEvent) => {
-      const clickZone = getChecklistClickZone(event.target, event.clientX);
+      const clickZone = getChecklistClickZone(
+        event.target,
+        event.clientX,
+        event.clientY,
+      );
       editor.update(() => {
         if (clickZone?.zone === "marker") {
           const node = $getNearestNodeFromDOMNode(clickZone.listItemElement);
@@ -421,7 +635,9 @@ export default function ChecklistMarkerPlugin() {
         }
 
         if (isEmptyChecklistLeafItem(listItem)) {
-          $convertChecklistItemToParagraph(listItem, "start");
+          if (!$outdentNestedChecklistItemToParagraph(listItem, "start")) {
+            $convertChecklistItemToParagraph(listItem, "start");
+          }
         } else {
           normalizeChecklistItemMarker(listItem);
         }
@@ -489,6 +705,65 @@ export default function ChecklistMarkerPlugin() {
       return true;
     };
 
+    const handleChecklistLeftArrow = (
+      event?: KeyboardEvent | null,
+    ): boolean => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+        return false;
+      }
+
+      if (selection.anchor.type !== "text" || selection.focus.type !== "text") {
+        return false;
+      }
+
+      const anchorNode = selection.anchor.getNode();
+      if (
+        !$isTextNode(anchorNode) ||
+        !isChecklistCursorAnchorTextContent(anchorNode.getTextContent())
+      ) {
+        return false;
+      }
+
+      const listItem = getChecklistItemFromNode(anchorNode);
+      if (listItem == null) {
+        return false;
+      }
+
+      event?.preventDefault();
+      const lineAbove = getChecklistLineAbove(listItem);
+      if (lineAbove != null) {
+        selectVisibleLineEnd(lineAbove);
+      }
+      return true;
+    };
+
+    const handleChecklistRightArrow = (
+      event?: KeyboardEvent | null,
+    ): boolean => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+        return false;
+      }
+
+      const anchorNode = selection.anchor.getNode();
+      const currentLine = isChecklistListItem(anchorNode)
+        ? anchorNode
+        : anchorNode.getTopLevelElementOrThrow();
+      if (!isSelectionAtVisibleLineEnd(selection, currentLine)) {
+        return false;
+      }
+
+      const lineBelow = getVisibleLineBelow(currentLine);
+      if (!isChecklistListItem(lineBelow)) {
+        return false;
+      }
+
+      event?.preventDefault();
+      selectVisibleLineStart(lineBelow);
+      return true;
+    };
+
     return mergeRegister(
       editor.registerNodeTransform(ListItemNode, (listItemNode) => {
         normalizeChecklistItemMarker(listItemNode);
@@ -499,6 +774,16 @@ export default function ChecklistMarkerPlugin() {
           normalizeSelectionAwayFromChecklistMarker();
           return false;
         },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_LEFT_COMMAND,
+        (event) => handleChecklistLeftArrow(event),
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_RIGHT_COMMAND,
+        (event) => handleChecklistRightArrow(event),
         COMMAND_PRIORITY_CRITICAL,
       ),
       editor.registerCommand(
