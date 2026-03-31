@@ -21,15 +21,13 @@ import {
   $isListAnchorNode,
 } from "../nodes/list-anchor-node";
 import {
-  getChecklistItemsWithSelectedMarkers,
-  isEmptyChecklistLeafItem,
   normalizeChecklistItemMarker,
+  removeExpandedChecklistSelection,
 } from "./checklist-marker";
 import {
   CHECKLIST_LEFT_CURSOR_ANCHOR,
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
-  $convertChecklistItemToParagraph,
 } from "./todo-shortcut";
 
 function createTestEditor() {
@@ -266,10 +264,11 @@ describe("normalizeChecklistItemMarker", () => {
     expect(anchorMode).toBe("token");
   });
 
-  it("converts an item to a paragraph when marker and text are deleted together", () => {
+  it("removes selected checklist marker ranges the same way for backspace and cut", () => {
     const editor = createTestEditor();
     let topLevelTypes: string[] = [];
     let paragraphIsEmpty = false;
+    let handled = false;
 
     editor.update(
       () => {
@@ -296,17 +295,7 @@ describe("normalizeChecklistItemMarker", () => {
         selection.focus.set(text.getKey(), text.getTextContentSize(), "text");
         $setSelection(selection);
 
-        const affectedItems = getChecklistItemsWithSelectedMarkers(selection);
-        selection.removeText();
-
-        for (const affectedItem of affectedItems) {
-          if (
-            affectedItem.isAttached() &&
-            isEmptyChecklistLeafItem(affectedItem)
-          ) {
-            $convertChecklistItemToParagraph(affectedItem, "start");
-          }
-        }
+        handled = removeExpandedChecklistSelection(selection);
 
         const rootChildren = $getRoot().getChildren();
         topLevelTypes = rootChildren.map((child) => child.getType());
@@ -319,6 +308,7 @@ describe("normalizeChecklistItemMarker", () => {
       { discrete: true },
     );
 
+    expect(handled).toBe(true);
     expect(topLevelTypes).toEqual(["paragraph"]);
     expect(paragraphIsEmpty).toBe(true);
   });

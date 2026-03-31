@@ -20,9 +20,9 @@ import {
 import { $isListItemNode, $isListNode, ListItemNode } from "@lexical/list";
 import {
   findSingleCharacterChecklistTextNode,
-  getChecklistItemsWithSelectedMarkers,
   isEmptyChecklistLeafItem,
   normalizeChecklistItemMarker,
+  removeExpandedChecklistSelection,
 } from "../lib/checklist-marker";
 import { $outdentListItemPreservingOrder } from "../lib/list-outdent";
 import {
@@ -30,7 +30,6 @@ import {
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
   $convertChecklistItemToParagraph,
-  $outdentNestedChecklistItemToParagraph,
   isChecklistCursorAnchorTextContent,
   isChecklistPlaceholderTextContent,
 } from "../lib/todo-shortcut";
@@ -620,29 +619,11 @@ export default function ChecklistMarkerPlugin() {
       selection: import("lexical").RangeSelection,
       event?: KeyboardEvent | null,
     ): boolean => {
-      const selectedChecklistItems =
-        getChecklistItemsWithSelectedMarkers(selection);
-      if (selectedChecklistItems.length === 0) {
+      if (!removeExpandedChecklistSelection(selection)) {
         return false;
       }
 
       event?.preventDefault();
-      selection.removeText();
-
-      for (const listItem of selectedChecklistItems) {
-        if (!listItem.isAttached() || !isChecklistListItem(listItem)) {
-          continue;
-        }
-
-        if (isEmptyChecklistLeafItem(listItem)) {
-          if (!$outdentNestedChecklistItemToParagraph(listItem, "start")) {
-            $convertChecklistItemToParagraph(listItem, "start");
-          }
-        } else {
-          normalizeChecklistItemMarker(listItem);
-        }
-      }
-
       return true;
     };
 

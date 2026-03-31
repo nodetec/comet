@@ -61,6 +61,7 @@ import {
   $exportMarkdownForClipboard,
   normalizeImportedCodeBlocksFromMarkdown,
   normalizeImportedNodes,
+  normalizeImportedTopLevelListSpacingMarkers,
   normalizeImportedTopLevelSpacingFromMarkdown,
 } from "./markdown";
 
@@ -637,6 +638,133 @@ describe("markdown editor pipeline", () => {
 
     expect(childTypes).toEqual(["list", "paragraph", "paragraph"]);
     expect(firstParagraphEmpty).toBe(true);
+  });
+
+  it("preserves a visible spacer between top-level checklists", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const firstChecklist = $createListNode("check");
+        const firstItem = $createListItemNode(false);
+        firstItem.append($createTextNode("First"));
+        firstChecklist.append(firstItem);
+
+        const spacer = $createParagraphNode();
+
+        const secondChecklist = $createListNode("check");
+        const secondItem = $createListItemNode(false);
+        secondItem.append($createTextNode("Second"));
+        secondChecklist.append(secondItem);
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [firstChecklist, spacer, secondChecklist],
+          ["- [ ] First", "", "", "* [ ] Second"].join("\n"),
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "list"]);
+  });
+
+  it("preserves a visible spacer between a checklist and bullet list", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+
+        const checklist = $createListNode("check");
+        const checklistItem = $createListItemNode(false);
+        checklistItem.append($createTextNode("Task"));
+        checklist.append(checklistItem);
+
+        const spacer = $createParagraphNode();
+
+        const bulletList = $createListNode("bullet");
+        const bulletItem = $createListItemNode();
+        bulletItem.append($createTextNode("Bullet"));
+        bulletList.append(bulletItem);
+
+        const normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+          [checklist, spacer, bulletList],
+          ["- [ ] Task", "", "", "* Bullet"].join("\n"),
+        );
+        root.append(...normalized);
+        childTypes = root.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual(["list", "paragraph", "list"]);
+  });
+
+  it("removes one baseline empty paragraph between imported top-level lists", () => {
+    const editor = createTestEditor();
+    let childTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const firstChecklist = $createListNode("check");
+        const firstChecklistItem = $createListItemNode(false);
+        firstChecklistItem.append($createTextNode("test"));
+        firstChecklist.append(firstChecklistItem);
+
+        const secondChecklist = $createListNode("check");
+        const secondChecklistItem = $createListItemNode(false);
+        secondChecklistItem.append($createTextNode("asdf"));
+        secondChecklist.append(secondChecklistItem);
+
+        const firstBulletList = $createListNode("bullet");
+        const firstBulletItem = $createListItemNode();
+        firstBulletItem.append($createTextNode("test"));
+        firstBulletList.append(firstBulletItem);
+
+        const secondBulletList = $createListNode("bullet");
+        const secondBulletItem = $createListItemNode();
+        secondBulletItem.append($createTextNode("asdf"));
+        secondBulletList.append(secondBulletItem);
+
+        const normalized = normalizeImportedTopLevelListSpacingMarkers([
+          firstChecklist,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          secondChecklist,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          $createParagraphNode(),
+          firstBulletList,
+          $createParagraphNode(),
+          $createParagraphNode(),
+          $createParagraphNode(),
+          secondBulletList,
+        ]);
+        $getRoot().append(...normalized);
+        childTypes = $getRoot()
+          .getChildren()
+          .map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(childTypes).toEqual([
+      "list",
+      "paragraph",
+      "list",
+      "paragraph",
+      "paragraph",
+      "list",
+      "paragraph",
+      "paragraph",
+      "list",
+    ]);
   });
 
   it("exports plain email autolinks as bare email text", () => {

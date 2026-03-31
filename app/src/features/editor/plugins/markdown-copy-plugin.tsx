@@ -27,6 +27,7 @@ import { ImageNode } from "../nodes/image-node";
 import { YouTubeNode } from "../nodes/youtube-node";
 import { CLIPBOARD_TRANSFORMERS } from "../transformers";
 import { shouldCopyChecklistSelectionAsPlainText } from "../lib/checklist-clipboard";
+import { removeExpandedChecklistSelection } from "../lib/checklist-marker";
 import { $exportMarkdownForClipboard } from "../lib/markdown";
 import { stripChecklistPlaceholders } from "../lib/todo-shortcut";
 
@@ -136,7 +137,10 @@ export default function MarkdownCopyPlugin() {
         if (handled) {
           editor.update(() => {
             const selection = $getSelection();
-            if ($isRangeSelection(selection)) {
+            if (
+              $isRangeSelection(selection) &&
+              !removeExpandedChecklistSelection(selection)
+            ) {
               selection.removeText();
             }
           });

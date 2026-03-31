@@ -23,6 +23,8 @@ import {
   CHECKLIST_LEFT_CURSOR_ANCHOR,
   CHECKLIST_CURSOR_ANCHOR,
   CHECKLIST_PLACEHOLDER,
+  $convertChecklistItemToParagraph,
+  $outdentNestedChecklistItemToParagraph,
   isChecklistLeftCursorAnchorTextContent,
   isChecklistCursorAnchorTextContent,
   isChecklistPlaceholderTextContent,
@@ -153,6 +155,34 @@ export function getChecklistItemsWithSelectedMarkers(
   }
 
   return selectedItems;
+}
+
+export function removeExpandedChecklistSelection(
+  selection: RangeSelection,
+): boolean {
+  const selectedChecklistItems =
+    getChecklistItemsWithSelectedMarkers(selection);
+  if (selectedChecklistItems.length === 0) {
+    return false;
+  }
+
+  selection.removeText();
+
+  for (const listItem of selectedChecklistItems) {
+    if (!listItem.isAttached() || !shouldChecklistItemHaveMarker(listItem)) {
+      continue;
+    }
+
+    if (isEmptyChecklistLeafItem(listItem)) {
+      if (!$outdentNestedChecklistItemToParagraph(listItem, "start")) {
+        $convertChecklistItemToParagraph(listItem, "start");
+      }
+    } else {
+      normalizeChecklistItemMarker(listItem);
+    }
+  }
+
+  return true;
 }
 
 export function isEmptyChecklistLeafItem(listItemNode: ListItemNode): boolean {

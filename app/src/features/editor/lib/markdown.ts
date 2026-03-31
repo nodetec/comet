@@ -330,6 +330,43 @@ export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   return nodes;
 }
 
+export function normalizeImportedTopLevelListSpacingMarkers(
+  nodes: LexicalNode[],
+): LexicalNode[] {
+  const normalized: LexicalNode[] = [];
+  let skipUntil = -1;
+
+  for (const [index, node] of nodes.entries()) {
+    if (index < skipUntil) {
+      continue;
+    }
+
+    normalized.push(node);
+
+    if (!$isListNode(node)) {
+      continue;
+    }
+
+    let separatorEnd = index + 1;
+    while (
+      separatorEnd < nodes.length &&
+      isEmptyParagraph(nodes[separatorEnd])
+    ) {
+      separatorEnd++;
+    }
+
+    const nextNode = nodes[separatorEnd];
+    if (separatorEnd === index + 1 || !$isListNode(nextNode)) {
+      continue;
+    }
+
+    normalized.push(...nodes.slice(index + 2, separatorEnd));
+    skipUntil = separatorEnd;
+  }
+
+  return normalized;
+}
+
 function countLineFeeds(text: string): number {
   return [...text].filter((char) => char === "\n").length;
 }
@@ -415,7 +452,12 @@ export function normalizeImportedTopLevelSpacingFromMarkdown(
     }
   }
 
-  const trailingLineFeeds = countLineFeeds(markdown.slice(matches.at(-1).end));
+  const [lastMatch] = matches.slice(-1);
+  if (lastMatch == null) {
+    return rebuiltNodes;
+  }
+
+  const trailingLineFeeds = countLineFeeds(markdown.slice(lastMatch.end));
   const trailingSpacerCount = Math.max(0, trailingLineFeeds - 1);
   for (let spacerIndex = 0; spacerIndex < trailingSpacerCount; spacerIndex++) {
     rebuiltNodes.push($createParagraphNode());
@@ -441,6 +483,7 @@ export function $importMarkdownFromHTML(
   );
   const t1 = performance.now();
   let nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
+  nodes = normalizeImportedTopLevelListSpacingMarkers(nodes);
   normalizeImportedCodeBlocksFromMarkdown(nodes, markdown);
   nodes = normalizeImportedTopLevelSpacingFromMarkdown(nodes, markdown);
   const t2 = performance.now();
