@@ -282,7 +282,6 @@ body {
   cursor: pointer;
   color: transparent;
   font-size: inherit;
-  line-height: inherit;
   text-decoration: none !important;
   user-select: text;
   vertical-align: baseline;
