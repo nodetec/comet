@@ -1,5 +1,5 @@
 use crate::adapters::nostr::revision_bootstrap::bootstrap_relay_connection;
-use crate::adapters::nostr::revision_push::{push_deletion_revision, push_note_revision};
+use crate::adapters::nostr::revision_push::{push_deletion_revision, push_note_revisions_batch};
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
 };
@@ -151,11 +151,12 @@ pub(super) async fn run_revision_sync_connection(
 
         for note_id in &ready {
             pending_pushes.remove(note_id);
-            if let Err(error) =
-                push_note_revision(app, &relay_url, &backup_relay_urls, &keys, note_id).await
-            {
-                sync_log(app, &format!("revision push error: {note_id}: {error}"));
-            }
+        }
+
+        if let Err(error) =
+            push_note_revisions_batch(app, &relay_url, &backup_relay_urls, &keys, &ready).await
+        {
+            sync_log(app, &format!("revision push batch error: {error}"));
         }
     }
 }
@@ -221,37 +222,41 @@ async fn flush_pending_local_changes(
         ),
     );
 
+    let mut pending_note_ids = Vec::with_capacity(pending_notes);
+    let mut pending_deletion_ids = Vec::with_capacity(pending_deletions);
     for command in pending_commands {
         match command {
-            SyncCommand::PushNote(note_id) => {
-                if let Err(error) =
-                    push_note_revision(app, active_relay_url, backup_relay_urls, keys, &note_id)
-                        .await
-                {
-                    sync_log(app, &format!("revision push error: {note_id}: {error}"));
-                }
-            }
-            SyncCommand::PushDeletion(entity_id) => {
-                if let Err(error) = push_deletion_revision(
-                    app,
-                    active_relay_url,
-                    backup_relay_urls,
-                    keys,
-                    &entity_id,
-                )
-                .await
-                {
-                    sync_log(
-                        app,
-                        &format!("revision delete push error: {entity_id}: {error}"),
-                    );
-                }
-            }
+            SyncCommand::PushNote(note_id) => pending_note_ids.push(note_id),
+            SyncCommand::PushDeletion(entity_id) => pending_deletion_ids.push(entity_id),
         }
+    }
+
+    for entity_id in pending_deletion_ids {
+        if let Err(error) =
+            push_deletion_revision(app, active_relay_url, backup_relay_urls, keys, &entity_id).await
+        {
+            sync_log(
+                app,
+                &format!("revision delete push error: {entity_id}: {error}"),
+            );
+        }
+    }
+
+    if let Err(error) = push_note_revisions_batch(
+        app,
+        active_relay_url,
+        backup_relay_urls,
+        keys,
+        &pending_note_ids,
+    )
+    .await
+    {
+        sync_log(app, &format!("revision push batch error: {error}"));
     }
 
     Ok(())
 }
+
 async fn handle_revision_push_command(
     app: &AppHandle,
     active_relay_url: &str,

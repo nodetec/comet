@@ -621,10 +621,9 @@ mod tests {
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });
 
-        let message = parse_relay_message(
-            &serde_json::json!(["EVENTS", "fetch-1", [event]]).to_string(),
-        )
-        .unwrap();
+        let message =
+            parse_relay_message(&serde_json::json!(["EVENTS", "fetch-1", [event]]).to_string())
+                .unwrap();
 
         match message {
             RevisionRelayIncomingMessage::EventsBatch {

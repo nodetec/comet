@@ -63,14 +63,8 @@ pub async fn bootstrap_with_keys(
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<RevisionBootstrapResult, AppError> {
-    bootstrap_with_keys_and_changes(
-        db_path,
-        keys,
-        relay_ws_url,
-        &mut invalidate_cache,
-        |_| {},
-    )
-    .await
+    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, &mut invalidate_cache, |_| {})
+        .await
 }
 
 async fn bootstrap_with_keys_and_changes(
@@ -106,42 +100,37 @@ async fn bootstrap_with_keys_and_changes(
     let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
     connection.send_neg_open("bootstrap", &recipient).await?;
 
-    let snapshot_seq = match recv_bootstrap_message(
-        &mut connection,
-        relay_ws_url,
-        "NEG-STATUS",
-    )
-    .await?
-    {
-        RevisionRelayIncomingMessage::NegStatus {
-            subscription_id,
-            strategy,
-            snapshot_seq,
-        } => {
-            if subscription_id != "bootstrap" {
-                return Err(AppError::custom(format!(
-                    "Unexpected NEG-STATUS subscription id: {subscription_id}"
-                )));
+    let snapshot_seq =
+        match recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-STATUS").await? {
+            RevisionRelayIncomingMessage::NegStatus {
+                subscription_id,
+                strategy,
+                snapshot_seq,
+            } => {
+                if subscription_id != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected NEG-STATUS subscription id: {subscription_id}"
+                    )));
+                }
+                if strategy != relay_info.revision_sync.strategy {
+                    return Err(AppError::custom(format!(
+                        "Revision relay strategy mismatch: expected {}, got {strategy}",
+                        relay_info.revision_sync.strategy
+                    )));
+                }
+                snapshot_seq
             }
-            if strategy != relay_info.revision_sync.strategy {
+            RevisionRelayIncomingMessage::NegErr { message, .. } => {
                 return Err(AppError::custom(format!(
-                    "Revision relay strategy mismatch: expected {}, got {strategy}",
-                    relay_info.revision_sync.strategy
-                )));
+                    "Revision relay NEG-OPEN failed: {message}"
+                )))
             }
-            snapshot_seq
-        }
-        RevisionRelayIncomingMessage::NegErr { message, .. } => {
-            return Err(AppError::custom(format!(
-                "Revision relay NEG-OPEN failed: {message}"
-            )))
-        }
-        other => {
-            return Err(AppError::custom(format!(
-                "Unexpected relay response to NEG-OPEN: {other:?}"
-            )))
-        }
-    };
+            other => {
+                return Err(AppError::custom(format!(
+                    "Unexpected relay response to NEG-OPEN: {other:?}"
+                )))
+            }
+        };
 
     let mut negentropy = RevisionNegentropySession::new(&local_items, 0)?;
     let mut message = Some(negentropy.initiate_hex()?);
@@ -152,12 +141,7 @@ async fn bootstrap_with_keys_and_changes(
         connection
             .send_neg_msg("bootstrap", &outgoing_payload)
             .await?;
-        let response = recv_bootstrap_message(
-            &mut connection,
-            relay_ws_url,
-            "NEG-MSG",
-        )
-        .await?;
+        let response = recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-MSG").await?;
         match response {
             RevisionRelayIncomingMessage::NegMsg {
                 subscription_id,

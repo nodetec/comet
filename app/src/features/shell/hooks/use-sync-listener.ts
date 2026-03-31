@@ -3,6 +3,7 @@ import {
   type RefObject,
   type SetStateAction,
   useEffect,
+  useRef,
 } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
@@ -38,68 +39,104 @@ export function useSyncListener(deps: SyncListenerDeps) {
     isSavingRef,
     setSyncEditorRevision,
   } = deps;
+  const pendingBatchRef = useRef<{
+    deletedIds: Set<string>;
+    upsertedIds: Set<string>;
+  }>({
+    deletedIds: new Set(),
+    upsertedIds: new Set(),
+  });
+  const flushTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const unlisten = listen<{ noteId: string; action: string }>(
-      "sync-remote-change",
-      (event) => {
-        const { noteId, action } = event.payload;
-        void queryClient.invalidateQueries({ queryKey: ["notes"] });
+    const flushPendingBatch = () => {
+      flushTimerRef.current = null;
+
+      const deletedIds = new Set(pendingBatchRef.current.deletedIds);
+      const upsertedIds = new Set(pendingBatchRef.current.upsertedIds);
+      pendingBatchRef.current.deletedIds.clear();
+      pendingBatchRef.current.upsertedIds.clear();
+
+      if (deletedIds.size === 0 && upsertedIds.size === 0) {
+        return;
+      }
+
+      const changedIds = new Set([...deletedIds, ...upsertedIds]);
+      void queryClient.invalidateQueries({ queryKey: ["notes"] });
+      void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+      void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
+
+      for (const noteId of changedIds) {
         void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
         void queryClient.invalidateQueries({
           queryKey: ["note-conflict", noteId],
         });
-        void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
-        void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
-        // If the updated note is currently open, refetch then remount editor
-        // -- but only if the user isn't actively editing (unsaved draft)
-        const { draftNoteId: currentDraftId } = useShellStore.getState();
-        const hasPendingSave =
-          Boolean(pendingSaveTimeoutRef.current) || isSavingRef.current;
+      }
 
-        // If the currently open note was deleted remotely, close the editor
+      const { draftNoteId: currentDraftId, selectedNoteId: currentSelectedId } =
+        useShellStore.getState();
+      const currentOpenNoteId = currentDraftId ?? currentSelectedId;
+      const hasPendingSave =
+        Boolean(pendingSaveTimeoutRef.current) || isSavingRef.current;
+
+      if (currentOpenNoteId && deletedIds.has(currentOpenNoteId)) {
+        queryClient.removeQueries({
+          exact: true,
+          queryKey: ["note", currentOpenNoteId],
+        });
+        useShellStore.getState().setDraft("", "");
+        useShellStore.getState().setSelectedNoteId(null);
+        setSyncEditorRevision((r) => r + 1);
+        return;
+      }
+
+      if (currentDraftId && upsertedIds.has(currentDraftId)) {
+        void Promise.all([
+          queryClient.fetchQuery({
+            queryKey: ["note", currentDraftId],
+            queryFn: () => loadNote(currentDraftId),
+          }),
+          getNoteConflict(currentDraftId).catch(() => null),
+        ])
+          .then(([freshNote, conflict]) => {
+            if (conflict && conflict.headCount > 1) {
+              if (pendingSaveTimeoutRef.current !== null) {
+                window.clearTimeout(pendingSaveTimeoutRef.current);
+                pendingSaveTimeoutRef.current = null;
+              }
+              handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+              return;
+            }
+
+            if (!hasPendingSave) {
+              handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    const unlisten = listen<{ noteId: string; action: string }>(
+      "sync-remote-change",
+      (event) => {
+        const { noteId, action } = event.payload;
         if (action === "delete") {
-          const { selectedNoteId: currentSelectedId } =
-            useShellStore.getState();
-          if (currentDraftId === noteId || currentSelectedId === noteId) {
-            queryClient.removeQueries({
-              exact: true,
-              queryKey: ["note", noteId],
-            });
-            useShellStore.getState().setDraft("", "");
-            useShellStore.getState().setSelectedNoteId(null);
-            setSyncEditorRevision((r) => r + 1);
-          }
-          return;
+          pendingBatchRef.current.deletedIds.add(noteId);
+          pendingBatchRef.current.upsertedIds.delete(noteId);
+        } else if (action === "upsert") {
+          pendingBatchRef.current.upsertedIds.add(noteId);
         }
 
-        if (currentDraftId === noteId && action === "upsert") {
-          void Promise.all([
-            queryClient.fetchQuery({
-              queryKey: ["note", noteId],
-              queryFn: () => loadNote(noteId),
-            }),
-            getNoteConflict(noteId).catch(() => null),
-          ])
-            .then(([freshNote, conflict]) => {
-              if (conflict && conflict.headCount > 1) {
-                if (pendingSaveTimeoutRef.current !== null) {
-                  window.clearTimeout(pendingSaveTimeoutRef.current);
-                  pendingSaveTimeoutRef.current = null;
-                }
-                handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
-                return;
-              }
-
-              if (!hasPendingSave) {
-                handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
-              }
-            })
-            .catch(() => {});
+        if (flushTimerRef.current === null) {
+          flushTimerRef.current = window.setTimeout(flushPendingBatch, 100);
         }
       },
     );
     return () => {
+      if (flushTimerRef.current !== null) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
       void unlisten.then((fn) => fn());
     };
   }, [queryClient, pendingSaveTimeoutRef, isSavingRef, setSyncEditorRevision]);

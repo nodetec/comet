@@ -252,11 +252,9 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
             .unwrap();
         let pending_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM pending_deletions",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM pending_deletions", [], |row| {
+                row.get(0)
+            })
             .unwrap();
 
         assert_eq!(notes_count, 0);

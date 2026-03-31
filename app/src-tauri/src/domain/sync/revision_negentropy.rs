@@ -137,7 +137,11 @@ impl RevisionNegentropySession {
         self.is_initiator = true;
 
         let mut output = vec![PROTOCOL_VERSION];
-        output.extend(self.split_range(0, self.items.len(), Bound::with_timestamp(MAX_TIMESTAMP))?);
+        output.extend(self.split_range(
+            0,
+            self.items.len(),
+            Bound::with_timestamp(MAX_TIMESTAMP),
+        )?);
         Ok(hex::encode(output))
     }
 
@@ -177,9 +181,11 @@ impl RevisionNegentropySession {
 
         let bytes = hex::decode(message_hex)
             .map_err(|e| AppError::custom(format!("Invalid negentropy message hex: {e}")))?;
-        Ok(hex::encode(
-            self.reconcile_inner(&bytes, &mut Vec::new(), &mut Vec::new())?,
-        ))
+        Ok(hex::encode(self.reconcile_inner(
+            &bytes,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )?))
     }
 
     fn reconcile_inner(
@@ -270,9 +276,9 @@ impl RevisionNegentropySession {
                         let mut end_bound = curr_bound;
 
                         for (index, item) in self.items[lower..upper].iter().enumerate() {
-                            if self.exceeded_frame_size_limit(
-                                full_output.len() + response_ids.len(),
-                            ) {
+                            if self
+                                .exceeded_frame_size_limit(full_output.len() + response_ids.len())
+                            {
                                 end_bound = Bound::from_item(item);
                                 upper = lower + index;
                                 break;
