@@ -54,7 +54,7 @@ vi.mock("@/shared/lib/attachments", () => ({
 
 import { $createImageNode, ImageNode } from "../nodes/image-node";
 import { $createYouTubeNode, YouTubeNode } from "../nodes/youtube-node";
-import { TRANSFORMERS } from "../transformers";
+import { CLIPBOARD_TRANSFORMERS, TRANSFORMERS } from "../transformers";
 import {
   $exportMarkdown,
   $exportMarkdownForClipboard,
@@ -119,7 +119,7 @@ function exportClipboardMarkdownFromEditor(
       const root = $getRoot();
       root.clear();
       setup(root);
-      output = $exportMarkdownForClipboard(TRANSFORMERS);
+      output = $exportMarkdownForClipboard(CLIPBOARD_TRANSFORMERS);
     },
     { discrete: true },
   );
@@ -387,6 +387,18 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe("- [ ] ");
+  });
+
+  it("exports checklist clipboard text with markdown when the marker is selected", () => {
+    const markdown = exportClipboardMarkdownFromEditor((root) => {
+      const checklist = $createListNode("check");
+      const item = $createListItemNode(false);
+      item.append($createListAnchorNode(), $createTextNode("Task"));
+      checklist.append(item);
+      root.append(checklist);
+    });
+
+    expect(markdown).toBe("- [ ] Task");
   });
 
   it("preserves separate top-level bullet lists after a checklist", () => {

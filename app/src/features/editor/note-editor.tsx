@@ -23,6 +23,7 @@ import { TableExtension } from "@lexical/table";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
 import { ImageNode } from "./nodes/image-node";
 import { YouTubeNode } from "./nodes/youtube-node";
+import { ListAnchorNode } from "./nodes/list-anchor-node";
 
 import { searchWordsFromQuery } from "@/shared/lib/search";
 
@@ -53,6 +54,7 @@ import DevtoolsPlugin from "./plugins/devtools-plugin";
 import TableClickOutsidePlugin from "./plugins/table-click-outside-plugin";
 import TodoShortcutPlugin from "./plugins/todo-shortcut-plugin";
 import TagCompletionPlugin from "./plugins/tag-completion-plugin";
+import ChecklistMarkerPlugin from "./plugins/checklist-marker-plugin";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 type NoteEditorProps = {
@@ -240,6 +242,7 @@ function EditorInner({
 
       <HorizontalRuleCursorPlugin />
       <TableClickOutsidePlugin />
+      <ChecklistMarkerPlugin />
       <TodoShortcutPlugin />
       <TagCompletionPlugin loadKey={loadKey} />
       <DevtoolsPlugin portalContainer={devtoolsContainer} />
@@ -264,6 +267,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             ImageNode,
             YouTubeNode,
             CometHorizontalRuleNode,
+            ListAnchorNode,
           ],
           onError: (error: Error) => console.error("Lexical error:", error),
           dependencies: [

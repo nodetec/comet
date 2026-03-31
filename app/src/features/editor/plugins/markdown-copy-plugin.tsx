@@ -25,7 +25,8 @@ import { LinkNode } from "@lexical/link";
 import { HashtagNode } from "../nodes/hashtag-node";
 import { ImageNode } from "../nodes/image-node";
 import { YouTubeNode } from "../nodes/youtube-node";
-import { TRANSFORMERS } from "../transformers";
+import { CLIPBOARD_TRANSFORMERS } from "../transformers";
+import { shouldCopyChecklistSelectionAsPlainText } from "../lib/checklist-clipboard";
 import { $exportMarkdownForClipboard } from "../lib/markdown";
 
 const HEADLESS_NODES = [
@@ -78,7 +79,7 @@ function $selectionToMarkdown(
 
   let markdown = "";
   headless.getEditorState().read(() => {
-    markdown = $exportMarkdownForClipboard(TRANSFORMERS);
+    markdown = $exportMarkdownForClipboard(CLIPBOARD_TRANSFORMERS);
   });
   return markdown;
 }
@@ -97,7 +98,9 @@ export default function MarkdownCopyPlugin() {
 
       event.preventDefault();
 
-      const markdown = $selectionToMarkdown(editor);
+      const markdown = shouldCopyChecklistSelectionAsPlainText(selection)
+        ? selection.getTextContent()
+        : $selectionToMarkdown(editor);
       clipboardData.setData(
         "text/plain",
         markdown || selection.getTextContent(),

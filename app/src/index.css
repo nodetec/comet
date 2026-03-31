@@ -239,6 +239,9 @@ body {
 
 .comet-list-item--check > .comet-list {
   margin-top: 0.25rem;
+  margin-left: calc(
+    var(--comet-list-marker-width) + var(--comet-list-marker-gap)
+  ) !important;
   display: flow-root;
 }
 
@@ -254,15 +257,12 @@ body {
 .comet-list-item--check {
   --comet-list-marker-gap: 6px;
   --comet-list-marker-width: 16px;
-  --comet-list-gutter: 1.4rem;
-  --comet-list-marker-left: calc(
-    var(--comet-list-gutter) - var(--comet-list-marker-width) -
-      var(--comet-list-marker-gap)
+  --comet-list-gutter: calc(
+    var(--comet-list-marker-width) + var(--comet-list-marker-gap)
   );
-  position: relative;
   list-style: none !important;
   margin-left: 0 !important;
-  padding-left: var(--comet-list-gutter) !important;
+  padding-left: 0 !important;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   outline: none;
@@ -273,31 +273,55 @@ body {
   font-size: 0;
 }
 
-.comet-list-item--check::before {
+.comet-list-anchor {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  margin-right: var(--comet-list-gutter);
+  overflow: visible;
+  cursor: pointer;
+  color: transparent;
+  font-size: inherit;
+  line-height: 1em;
+  text-decoration: none !important;
+  user-select: text;
+  vertical-align: baseline;
+}
+
+.comet-list-anchor::before {
   content: "";
   position: absolute;
-  top: calc((1lh - 16px) / 2);
-  left: var(--comet-list-marker-left);
-  width: 16px;
-  height: 16px;
+  top: calc((100% - var(--comet-list-marker-width)) / 2);
+  left: 0;
+  width: var(--comet-list-marker-width);
+  height: var(--comet-list-marker-width);
   border: 1px solid var(--input);
   border-radius: 4px;
   background-color: var(--background);
   box-sizing: border-box;
-  cursor: pointer;
-  z-index: 1;
   transition:
     background-color 0.1s,
     border-color 0.1s;
 }
 
-.comet-list-item--check-checked::before {
+.comet-list-item--check-checked > .comet-list-anchor::before {
   border-color: var(--primary);
   background-color: var(--primary);
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 6 9 17l-5-5'/%3e%3c/svg%3e");
   background-size: 12px 12px;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.comet-list-anchor::selection {
+  background: transparent;
+  color: transparent;
+}
+
+.comet-list-anchor::-moz-selection {
+  background: transparent;
+  color: transparent;
 }
 
 .comet-list-item--nested {
