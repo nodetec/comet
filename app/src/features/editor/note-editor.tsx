@@ -86,7 +86,8 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
     cursor: "text",
   },
   ".cm-line": {
-    padding: "0",
+    paddingBlock: "0",
+    paddingRight: "2px",
     cursor: "text",
   },
   ".cm-cursor, .cm-dropCursor": {

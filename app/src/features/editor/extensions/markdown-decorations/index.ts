@@ -51,9 +51,36 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
   },
-  ".cm-md-blockquote": {
-    borderLeft: "3px solid var(--blockquote-accent)",
-    paddingLeft: "0.75em",
+  ".cm-md-bq": {
+    backgroundRepeat: "no-repeat",
+  },
+  ".cm-md-bq-1": {
+    paddingLeft: "1.5em",
+    backgroundImage:
+      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+    backgroundSize: "2px 100%",
+    backgroundPosition: "0.5em 0",
+  },
+  ".cm-md-bq-2": {
+    paddingLeft: "2.5em",
+    backgroundImage:
+      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+    backgroundSize: "2px 100%,2px 100%",
+    backgroundPosition: "0.5em 0,1.5em 0",
+  },
+  ".cm-md-bq-3": {
+    paddingLeft: "3.5em",
+    backgroundImage:
+      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+    backgroundSize: "2px 100%,2px 100%,2px 100%",
+    backgroundPosition: "0.5em 0,1.5em 0,2.5em 0",
+  },
+  ".cm-md-bq-4": {
+    paddingLeft: "4.5em",
+    backgroundImage:
+      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+    backgroundSize: "2px 100%,2px 100%,2px 100%,2px 100%",
+    backgroundPosition: "0.5em 0,1.5em 0,2.5em 0,3.5em 0",
   },
   ".cm-md-strikethrough": {
     textDecoration: "line-through",
@@ -61,8 +88,8 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-hr": {
     border: "none",
     borderTop: "1px solid var(--border)",
-    margin: "0.75em 0",
     display: "block",
+    margin: "0.5em 0",
   },
 });
 

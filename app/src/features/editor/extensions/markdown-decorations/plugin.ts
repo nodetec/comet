@@ -8,7 +8,10 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 
-import { handleBlockquote } from "@/features/editor/extensions/markdown-decorations/builders/blockquotes";
+import {
+  handleBlockquote,
+  handleQuoteMark,
+} from "@/features/editor/extensions/markdown-decorations/builders/blockquotes";
 import { handleEmphasis } from "@/features/editor/extensions/markdown-decorations/builders/emphasis";
 import { handleHeading } from "@/features/editor/extensions/markdown-decorations/builders/headings";
 import { handleHorizontalRule } from "@/features/editor/extensions/markdown-decorations/builders/horizontal-rules";
@@ -38,6 +41,7 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
   InlineCode: handleInlineCode,
   Link: handleLink,
   Blockquote: handleBlockquote,
+  QuoteMark: handleQuoteMark,
   HorizontalRule: handleHorizontalRule,
   Strikethrough: handleStrikethrough,
 };

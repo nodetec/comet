@@ -19,9 +19,8 @@ class HorizontalRuleWidget extends WidgetType {
   }
 }
 
-const hrWidget = Decoration.replace({
+const hrReplace = Decoration.replace({
   widget: new HorizontalRuleWidget(),
-  block: true,
 });
 
 export function handleHorizontalRule(
@@ -32,6 +31,6 @@ export function handleHorizontalRule(
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
 
   if (!onCursor) {
-    out.push({ from: node.from, to: node.to, decoration: hrWidget });
+    out.push({ from: node.from, to: node.to, decoration: hrReplace });
   }
 }
