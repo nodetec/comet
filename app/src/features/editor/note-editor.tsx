@@ -137,34 +137,58 @@ function findMatchAtIndex(
   return null;
 }
 
-function placeCursorFromSurfacePoint(
+function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
+  scrollContainer.scrollTop = scrollTop;
+  const lock = () => {
+    scrollContainer.scrollTop = scrollTop;
+  };
+  scrollContainer.addEventListener("scroll", lock);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollContainer.removeEventListener("scroll", lock);
+    });
+  });
+}
+
+function focusAndClickAtLine(
   view: EditorView,
   clientX: number,
   clientY: number,
 ): boolean {
-  const scrollContainer = view.dom.closest(
-    "[data-editor-scroll-container]",
-  ) as HTMLElement | null;
-  const scrollTop = scrollContainer?.scrollTop ?? 0;
   const contentRect = view.contentDOM.getBoundingClientRect();
   if (clientY < contentRect.top || clientY > contentRect.bottom) {
     return false;
   }
 
+  const scrollContainer = view.dom.closest(
+    "[data-editor-scroll-container]",
+  ) as HTMLElement | null;
+  const scrollTop = scrollContainer?.scrollTop ?? 0;
+
+  if (!view.hasFocus) {
+    view.focus();
+  }
+
+  if (scrollContainer) {
+    lockScrollPosition(scrollContainer, scrollTop);
+  }
+
+  // Clamp X into the content area and re-dispatch so CM places the cursor
   const targetX = Math.min(
     contentRect.right - 1,
     Math.max(contentRect.left + 1, clientX),
   );
-  const pos = view.posAtCoords({ x: targetX, y: clientY }, false);
-
-  view.dispatch({
-    selection: EditorSelection.cursor(pos),
-  });
-  view.focus();
-
-  if (scrollContainer) {
-    scrollContainer.scrollTop = scrollTop;
-  }
+  view.contentDOM.dispatchEvent(
+    new MouseEvent("mousedown", {
+      clientX: targetX,
+      clientY,
+      button: 0,
+      buttons: 1,
+      detail: 1,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 
   return true;
 }
@@ -256,11 +280,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
               if (!view.hasFocus) {
                 event.preventDefault();
-                return placeCursorFromSurfacePoint(
-                  view,
-                  event.clientX,
-                  event.clientY,
+
+                const scrollContainer = view.dom.closest(
+                  "[data-editor-scroll-container]",
+                ) as HTMLElement | null;
+                const scrollTop = scrollContainer?.scrollTop ?? 0;
+
+                view.focus();
+
+                if (scrollContainer) {
+                  lockScrollPosition(scrollContainer, scrollTop);
+                }
+
+                // Re-dispatch so CM's native mousedown handles cursor
+                // placement (hasFocus is now true, so our guard skips it)
+                view.contentDOM.dispatchEvent(
+                  new MouseEvent("mousedown", {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    button: event.button,
+                    buttons: event.buttons,
+                    detail: event.detail,
+                    bubbles: true,
+                    cancelable: true,
+                  }),
                 );
+
+                return true;
               }
 
               return false;
@@ -460,9 +506,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return;
             }
 
-            if (
-              placeCursorFromSurfacePoint(view, event.clientX, event.clientY)
-            ) {
+            if (focusAndClickAtLine(view, event.clientX, event.clientY)) {
               event.preventDefault();
               event.stopPropagation();
             }
@@ -487,9 +531,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return;
             }
 
-            if (
-              placeCursorFromSurfacePoint(view, event.clientX, event.clientY)
-            ) {
+            if (focusAndClickAtLine(view, event.clientX, event.clientY)) {
               event.preventDefault();
               event.stopPropagation();
             }
