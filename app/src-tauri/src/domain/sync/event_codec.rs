@@ -241,6 +241,24 @@ pub fn deleted_note_rumor(note_id: &str, pubkey: PublicKey) -> UnsignedEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct SharedEditorInvariantCorpus {
+        cases: Vec<SharedEditorInvariantFixture>,
+    }
+
+    #[derive(Deserialize)]
+    struct SharedEditorInvariantFixture {
+        id: String,
+        markdown: String,
+        support: String,
+        title: String,
+    }
+
+    fn shared_editor_invariant_fixtures() -> SharedEditorInvariantCorpus {
+        serde_json::from_str(include_str!("../../../../src/shared/lib/editor-invariant-fixtures.json")).unwrap()
+    }
 
     fn test_pubkey() -> PublicKey {
         Keys::generate().public_key()
@@ -301,6 +319,37 @@ mod tests {
                 .and_then(|tag| tag.content()),
             Some("note")
         );
+    }
+
+    #[test]
+    fn note_roundtrip_matches_lossless_shared_editor_invariant_fixtures() {
+        let pubkey = test_pubkey();
+
+        for fixture in shared_editor_invariant_fixtures()
+            .cases
+            .into_iter()
+            .filter(|fixture| fixture.support == "lossless")
+        {
+            let rumor = note_to_rumor(
+                &fixture.id,
+                &fixture.title,
+                &fixture.markdown,
+                1_000,
+                1_000,
+                1_000,
+                None,
+                None,
+                None,
+                false,
+                &[],
+                &[],
+                pubkey,
+            );
+
+            let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+            assert_eq!(parsed.markdown, fixture.markdown, "fixture {}", fixture.id);
+            assert_eq!(parsed.title, fixture.title, "fixture {}", fixture.id);
+        }
     }
 
     #[test]

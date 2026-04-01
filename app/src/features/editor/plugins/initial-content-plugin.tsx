@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { $convertFromMarkdownString } from "@lexical/markdown";
 import {
   $createParagraphNode,
   $getRoot,
@@ -10,7 +9,10 @@ import {
 } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $createListItemNode, $createListNode } from "@lexical/list";
-import { $importMarkdownFromHTML } from "../lib/markdown";
+import {
+  $importMarkdownFromHTML,
+  $importMarkdownToLexical,
+} from "../lib/markdown";
 import { CHECKLIST_PLACEHOLDER } from "../lib/todo-shortcut";
 import { TRANSFORMERS } from "../transformers";
 
@@ -82,9 +84,7 @@ export default function InitialContentPlugin({
             $setSelection(null);
           }
         } else {
-          const root = $getRoot();
-          root.clear();
-          $convertFromMarkdownString(markdown, TRANSFORMERS);
+          $importMarkdownToLexical(markdown, TRANSFORMERS);
           $setSelection(null);
         }
 

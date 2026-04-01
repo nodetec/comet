@@ -181,6 +181,25 @@ fn preprocess_blank_lines(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct SharedEditorInvariantCorpus {
+        cases: Vec<SharedEditorInvariantFixture>,
+    }
+
+    #[derive(Deserialize)]
+    struct SharedEditorInvariantFixture {
+        html: String,
+        id: String,
+        markdown: String,
+        support: String,
+    }
+
+    fn shared_editor_invariant_fixtures() -> SharedEditorInvariantCorpus {
+        serde_json::from_str(include_str!("../../../../src/shared/lib/editor-invariant-fixtures.json"))
+            .unwrap()
+    }
 
     #[test]
     fn test_bare_hashes_stay_as_text() {
@@ -426,5 +445,17 @@ mod tests {
         assert!(html.contains("RUST_BACKTRACE=1 cargo run"), "HTML: {html}");
         assert!(!html.contains("<pre><code"), "HTML: {html}");
         assert!(!html.contains("</code></pre>"), "HTML: {html}");
+    }
+
+    #[test]
+    fn test_lossless_shared_editor_invariant_fixtures_match_expected_html() {
+        for fixture in shared_editor_invariant_fixtures()
+            .cases
+            .into_iter()
+            .filter(|fixture| fixture.support == "lossless")
+        {
+            let html = markdown_to_lexical_html(&fixture.markdown);
+            assert_eq!(html.trim(), fixture.html, "fixture {}", fixture.id);
+        }
     }
 }

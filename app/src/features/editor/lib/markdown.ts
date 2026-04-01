@@ -1,4 +1,7 @@
-import type { Transformer } from "@lexical/markdown";
+import {
+  $convertFromMarkdownString,
+  type Transformer,
+} from "@lexical/markdown";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
 import { $isCometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
@@ -371,6 +374,79 @@ function countLineFeeds(text: string): number {
   return [...text].filter((char) => char === "\n").length;
 }
 
+function countLeadingSpaces(text: string): number {
+  let count = 0;
+  while (count < text.length && text[count] === " ") {
+    count++;
+  }
+  return count;
+}
+
+function isBareBlankQuoteLine(line: string): boolean {
+  return line.trim() === ">";
+}
+
+function checklistIndentForImport(line: string): number | null {
+  const checklistMatch = /^(\s*)[-*+]\s+\[(?:[ xX])\](?:\s|$)/.exec(line);
+  return checklistMatch ? (checklistMatch[1]?.length ?? 0) : null;
+}
+
+function isNestedListLine(line: string): boolean {
+  return /^(\s*)(?:[-*+]|\d+\.)\s+/.test(line);
+}
+
+function normalizeNestedChecklistIndentation(
+  lines: string[],
+  startIndex: number,
+  checklistIndent: number,
+): void {
+  for (
+    let nestedIndex = startIndex + 1;
+    nestedIndex < lines.length;
+    nestedIndex++
+  ) {
+    const nestedLine = lines[nestedIndex] ?? "";
+
+    if (nestedLine.trim() === "") {
+      continue;
+    }
+
+    const nestedIndent = countLeadingSpaces(nestedLine);
+    if (nestedIndent <= checklistIndent) {
+      break;
+    }
+
+    if (nestedIndent >= checklistIndent + 4 || !isNestedListLine(nestedLine)) {
+      continue;
+    }
+
+    lines[nestedIndex] =
+      " ".repeat(checklistIndent + 4) + nestedLine.trimStart();
+  }
+}
+
+function preprocessMarkdownForLexicalImport(markdown: string): string {
+  const lines = markdown.split("\n");
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index] ?? "";
+
+    if (isBareBlankQuoteLine(line)) {
+      lines[index] = `${line} `;
+      continue;
+    }
+
+    const checklistIndent = checklistIndentForImport(line);
+    if (checklistIndent === null) {
+      continue;
+    }
+
+    normalizeNestedChecklistIndentation(lines, index, checklistIndent);
+  }
+
+  return lines.join("\n");
+}
+
 function minimumSeparatorLineFeeds(
   previousNode: LexicalNode,
   nextNode: LexicalNode,
@@ -502,6 +578,26 @@ export function $importMarkdownFromHTML(
   }
 }
 
+export function $importMarkdownToLexical(
+  markdown: string,
+  transformers: Array<Transformer>,
+  node?: ElementNode,
+): void {
+  const normalizedMarkdown = preprocessMarkdownForLexicalImport(markdown);
+  const target = node ?? $getRoot();
+  target.clear();
+  $convertFromMarkdownString(normalizedMarkdown, transformers, target);
+  let normalized = normalizeImportedNodes(target.getChildren());
+  normalized = normalizeImportedTopLevelListSpacingMarkers(normalized);
+  normalizeImportedCodeBlocksFromMarkdown(normalized, normalizedMarkdown);
+  normalized = normalizeImportedTopLevelSpacingFromMarkdown(
+    normalized,
+    normalizedMarkdown,
+  );
+  target.clear();
+  target.append(...normalized);
+}
+
 /**
  * Exports the Lexical editor state to markdown.
  *
@@ -530,7 +626,9 @@ function canUseSoftBreakSeparator(
   nextNode: LexicalNode,
 ): boolean {
   return (
-    isSoftBreakLeadNode(previousNode) && isInterruptingTopLevelBlock(nextNode)
+    (isSoftBreakLeadNode(previousNode) &&
+      isInterruptingTopLevelBlock(nextNode)) ||
+    ($isCometHorizontalRuleNode(previousNode) && isSoftBreakLeadNode(nextNode))
   );
 }
 

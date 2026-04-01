@@ -13,7 +13,12 @@ import {
   $createCometHorizontalRuleNode,
 } from "../nodes/comet-horizontal-rule-node";
 import { $isQuoteNode, QuoteNode } from "@lexical/rich-text";
-import { $isElementNode, $isParagraphNode, $isTextNode } from "lexical";
+import {
+  $isElementNode,
+  $isLineBreakNode,
+  $isParagraphNode,
+  $isTextNode,
+} from "lexical";
 
 import { LINK } from "./link-transformer";
 import { CODE_BLOCK } from "./code-transformer";
@@ -29,19 +34,30 @@ import { TABLE, setTableTransformers } from "./table-transformer";
 
 const HORIZONTAL_RULE: ElementTransformer = {
   dependencies: [CometHorizontalRuleNode],
-  export: (node) => {
+  export: (node, traverseChildren) => {
     if ($isCometHorizontalRuleNode(node)) return "---";
     // Inline HR lives inside a paragraph with zwsp cursor anchors:
     // [zwsp, HR, zwsp] — check that all non-HR children are just anchors.
     if ($isParagraphNode(node)) {
       const children = node.getChildren();
-      if (children.some($isCometHorizontalRuleNode)) {
+      const hrIndex = children.findIndex($isCometHorizontalRuleNode);
+      if (hrIndex !== -1) {
         const allAnchorsOrHR = children.every(
           (c) =>
             $isCometHorizontalRuleNode(c) ||
-            ($isTextNode(c) && c.getTextContent() === "\u200B"),
+            $isLineBreakNode(c) ||
+            ($isTextNode(c) &&
+              (c.getTextContent() === "\u200B" ||
+                c.getTextContent().trim().length === 0)),
         );
         if (allAnchorsOrHR) return "---";
+
+        if (hrIndex === 0) {
+          const trailingMarkdown = traverseChildren(node).replace(/^\n+/, "");
+          if (trailingMarkdown.length > 0) {
+            return `---\n${trailingMarkdown}`;
+          }
+        }
       }
     }
     return null;
@@ -87,6 +103,14 @@ const QUOTE: ElementTransformer = {
   export: (node, traverseChildren) => {
     if (!$isQuoteNode(node)) {
       return null;
+    }
+
+    const hasParagraphChildren = node.getChildren().some($isParagraphNode);
+    if (!hasParagraphChildren) {
+      return traverseChildren(node)
+        .split("\n")
+        .map((line) => (line === "" || line === ">" ? ">" : `> ${line}`))
+        .join("\n");
     }
 
     const lines: string[] = [];
