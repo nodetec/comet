@@ -21,8 +21,6 @@ import {
   Ellipsis,
   Lock,
   PencilOff,
-  PanelBottomOpen,
-  PanelBottomClose,
   Search,
   X,
 } from "lucide-react";
@@ -31,7 +29,6 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
-import { renderMarkdownToHtml } from "@/shared/api/invoke";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
@@ -40,13 +37,11 @@ import { type NoteConflictInfo } from "@/shared/api/types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
+  autoFocusEditor: boolean;
   deletedAt: number | null;
   editorKey: string | null;
-  focusMode: "none" | "immediate" | "pointerup";
-  html: string | null;
   isDeletePublishedNotePending: boolean;
   isResolveConflictPending: boolean;
-  isNewNote: boolean;
   markdown: string;
   modifiedAt: number;
   noteConflict: NoteConflictInfo | null;
@@ -57,6 +52,7 @@ type EditorPaneProps = {
   readonly: boolean;
   selectedConflictRevisionId: string | null;
   searchQuery: string;
+  onAutoFocusEditorHandled(): void;
   onDeletePublishedNote(): void;
   onDuplicateNote(): void;
   onOpenPublishDialog(): void;
@@ -65,7 +61,6 @@ type EditorPaneProps = {
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
   onLoadConflictHead(revisionId: string, markdown: string | null): void;
-  onFocusHandled(): void;
   onChange(markdown: string): void;
 };
 
@@ -182,7 +177,7 @@ function useEditorScrollHeader(
       }
 
       const firstLine = scrollContainer.querySelector(
-        "[data-lexical-editor] > :first-child",
+        ".cm-content > .cm-line:first-child",
       ) as HTMLElement | null;
 
       if (!firstLine) {
@@ -343,140 +338,14 @@ function useFindBar({
   };
 }
 
-type ResolvedEditorHtmlParams = {
-  html: string | null;
-  isNewNote: boolean;
-  loadKey: string | null;
-  markdown: string;
-  noteId: string | null;
-};
-
-type ResolvedEditorHtmlState = {
-  html: string | null;
-  loadKey: string | null;
-  ready: boolean;
-};
-
-function shouldRenderEditorMarkdownAsHtml({
-  html,
-  isNewNote,
-  markdown,
-  noteId,
-}: Omit<ResolvedEditorHtmlParams, "loadKey">): boolean {
-  if (!noteId || html !== null) {
-    return false;
-  }
-
-  if (!markdown.trim()) {
-    return false;
-  }
-
-  if (isNewNote && markdown === "- [ ] ") {
-    return false;
-  }
-
-  return true;
-}
-
-function useResolvedEditorHtml({
-  html,
-  isNewNote,
-  loadKey,
-  markdown,
-  noteId,
-}: ResolvedEditorHtmlParams): ResolvedEditorHtmlState {
-  const latestParamsRef = useRef({
-    html,
-    isNewNote,
-    markdown,
-    noteId,
-  });
-
-  useEffect(() => {
-    latestParamsRef.current = {
-      html,
-      isNewNote,
-      markdown,
-      noteId,
-    };
-  }, [html, isNewNote, markdown, noteId]);
-
-  const [state, setState] = useState<ResolvedEditorHtmlState>(() => ({
-    html,
-    loadKey,
-    ready: !shouldRenderEditorMarkdownAsHtml({
-      html,
-      isNewNote,
-      markdown,
-      noteId,
-    }),
-  }));
-
-  useEffect(() => {
-    const {
-      html: latestHtml,
-      isNewNote: latestIsNewNote,
-      markdown: latestMarkdown,
-      noteId: latestNoteId,
-    } = latestParamsRef.current;
-
-    if (
-      !shouldRenderEditorMarkdownAsHtml({
-        html: latestHtml,
-        isNewNote: latestIsNewNote,
-        markdown: latestMarkdown,
-        noteId: latestNoteId,
-      })
-    ) {
-      setState({ html: latestHtml, loadKey, ready: true });
-      return;
-    }
-
-    let cancelled = false;
-    setState({ html: null, loadKey, ready: false });
-
-    void renderMarkdownToHtml(latestMarkdown)
-      .then((resolvedHtml) => {
-        if (cancelled) {
-          return;
-        }
-        setState({ html: resolvedHtml, loadKey, ready: true });
-      })
-      .catch((error) => {
-        console.error("[editor:init] markdown render failed", error);
-        if (cancelled) {
-          return;
-        }
-        // Fall back to Lexical's direct markdown import if backend rendering fails.
-        setState({ html: null, loadKey, ready: true });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadKey]);
-
-  if (html !== null) {
-    return { html, loadKey, ready: true };
-  }
-
-  if (state.loadKey !== loadKey) {
-    return { html: null, loadKey, ready: false };
-  }
-
-  return state;
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
+  autoFocusEditor,
   deletedAt,
   editorKey,
-  focusMode,
-  html,
   isDeletePublishedNotePending,
   isResolveConflictPending,
-  isNewNote,
   markdown,
   modifiedAt,
   noteConflict,
@@ -487,6 +356,7 @@ export function EditorPane({
   readonly,
   selectedConflictRevisionId,
   searchQuery,
+  onAutoFocusEditorHandled,
   onDeletePublishedNote,
   onDuplicateNote,
   onOpenPublishDialog,
@@ -495,7 +365,6 @@ export function EditorPane({
   onSetPinned,
   onSetReadonly,
   onLoadConflictHead,
-  onFocusHandled,
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
@@ -503,18 +372,6 @@ export function EditorPane({
   const isSystemReadOnly = isArchived || deletedAt !== null || isPublishedNote;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [toolbarContainer, setToolbarContainer] =
-    useState<HTMLDivElement | null>(null);
-  const [devtoolsContainer, setDevtoolsContainer] =
-    useState<HTMLDivElement | null>(null);
-  const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
-    setToolbarContainer(node);
-  }, []);
-  const devtoolsContainerRef = useCallback((node: HTMLDivElement | null) => {
-    setDevtoolsContainer(node);
-  }, []);
-  const showToolbar = useUIStore((s) => s.showEditorToolbar);
-  const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
@@ -581,19 +438,13 @@ export function EditorPane({
   const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
     useEditorScrollHeader(noteId, scrollContainerRef);
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
-  const resolvedEditorHtml = useResolvedEditorHtml({
-    html,
-    isNewNote,
-    loadKey: editorLoadKey,
-    markdown,
-    noteId,
-  });
-  const isEditorReady = resolvedEditorHtml.ready;
-  let editorContent: React.ReactNode = null;
+  const editorContent = (() => {
+    if (noteId === null) {
+      return null;
+    }
 
-  if (noteId) {
     if (isViewingDeletedConflictHead) {
-      editorContent = (
+      return (
         <div className="flex min-h-full items-center justify-center px-6">
           <div className="max-w-sm text-center">
             <p className="text-foreground text-sm font-medium">
@@ -606,42 +457,37 @@ export function EditorPane({
           </div>
         </div>
       );
-    } else if (isEditorReady) {
-      editorContent = (
-        <NoteEditor
-          devtoolsContainer={devtoolsContainer}
-          focusMode={focusMode}
-          html={resolvedEditorHtml.html}
-          isNew={isNewNote}
-          loadKey={editorLoadKey ?? noteId}
-          markdown={markdown}
-          onChange={onChange}
-          onEditorFocusChange={(focused) => {
-            if (focused) {
-              setFocusedPane("editor");
-            }
-          }}
-          onFocusHandled={onFocusHandled}
-          onSearchMatchCountChange={
-            isUsingEditorFindSearch ? setFindMatchCount : undefined
-          }
-          readOnly={isReadOnly}
-          ref={editorRef}
-          searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
-          searchActiveMatchIndex={
-            isUsingEditorFindSearch ? activeFindMatchIndex : null
-          }
-          searchQuery={editorSearchQuery}
-          searchScrollRevision={
-            isUsingEditorFindSearch ? findScrollRevision : undefined
-          }
-          toolbarContainer={toolbarContainer}
-        />
-      );
-    } else {
-      editorContent = <div className="min-h-full" />;
     }
-  }
+
+    return (
+      <NoteEditor
+        autoFocus={autoFocusEditor}
+        loadKey={editorLoadKey ?? noteId}
+        markdown={markdown}
+        onChange={onChange}
+        onAutoFocusHandled={onAutoFocusEditorHandled}
+        onEditorFocusChange={(focused) => {
+          if (focused) {
+            setFocusedPane("editor");
+          }
+        }}
+        onSearchMatchCountChange={
+          isUsingEditorFindSearch ? setFindMatchCount : undefined
+        }
+        readOnly={isReadOnly}
+        ref={editorRef}
+        searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
+        searchActiveMatchIndex={
+          isUsingEditorFindSearch ? activeFindMatchIndex : null
+        }
+        searchQuery={editorSearchQuery}
+        searchScrollRevision={
+          isUsingEditorFindSearch ? findScrollRevision : undefined
+        }
+        spellCheck={editorSpellCheck}
+      />
+    );
+  })();
 
   const openEditorMenu = useCallback(
     async (position: LogicalPosition) => {
@@ -705,7 +551,7 @@ export function EditorPane({
       return;
     }
 
-    if (target.closest("[data-lexical-editor]")) {
+    if (target.closest(".cm-editor")) {
       return;
     }
 
@@ -775,22 +621,6 @@ export function EditorPane({
           {hasConflict ? "Resolve conflict to edit" : "Read-only"}
         </TooltipContent>
       </Tooltip>
-    );
-  } else if (!isReadOnly) {
-    toolbarSlot = (
-      <Button
-        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-        onClick={() => setShowToolbar(!showToolbar)}
-        size="icon-sm"
-        variant="ghost"
-        title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-      >
-        {showToolbar ? (
-          <PanelBottomClose className="size-[1.2rem]" />
-        ) : (
-          <PanelBottomOpen className="size-[1.2rem]" />
-        )}
-      </Button>
     );
   }
 
@@ -946,18 +776,7 @@ export function EditorPane({
             </div>
           )}
         </div>
-        {noteId ? (
-          <div className="pointer-events-none absolute top-4 right-4 z-50">
-            <div className="pointer-events-auto" ref={devtoolsContainerRef} />
-          </div>
-        ) : null}
       </div>
-
-      {noteId && !isReadOnly && showToolbar && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div className="pointer-events-auto" ref={toolbarContainerRef} />
-        </div>
-      )}
 
       {noteId && hasConflict ? (
         <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">

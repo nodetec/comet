@@ -91,7 +91,7 @@ type NotesPaneProps = {
   onChangeSortField(field: NoteSortField): void;
   onChangeSortDirection(direction: NoteSortDirection): void;
   onCopyNoteContent(noteId: string): void;
-  onCreateNote(source: "keyboard" | "pointer"): void;
+  onCreateNote(): void;
   onDeleteNotePermanently(noteId: string): void;
   onDuplicateNote(noteId: string): void;
   onLoadMore(): void;
@@ -107,7 +107,7 @@ type NotesPaneProps = {
 function handleCreateButtonPointerDown(
   event: PointerEvent<HTMLButtonElement>,
   isCreatingNote: boolean,
-  onCreateNote: (source: "keyboard" | "pointer") => void,
+  onCreateNote: () => void,
 ) {
   event.preventDefault();
 
@@ -115,18 +115,18 @@ function handleCreateButtonPointerDown(
     return;
   }
 
-  onCreateNote("pointer");
+  onCreateNote();
 }
 
 function handleCreateButtonClick(
   event: MouseEvent<HTMLButtonElement>,
-  onCreateNote: (source: "keyboard" | "pointer") => void,
+  onCreateNote: () => void,
 ) {
   if (event.detail !== 0) {
     return;
   }
 
-  onCreateNote("keyboard");
+  onCreateNote();
 }
 
 const HIGHLIGHT_CLASS_NAME =
@@ -433,6 +433,27 @@ function noteRowClassName(params: {
   ].join(" ");
 }
 
+function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  useShellStore.getState().setFocusedPane("notes");
+
+  const activeElement = document.activeElement;
+  if (
+    activeElement instanceof HTMLElement &&
+    activeElement !== event.currentTarget &&
+    activeElement.closest(".cm-editor")
+  ) {
+    activeElement.blur();
+  }
+
+  window.getSelection()?.removeAllRanges();
+
+  event.currentTarget.focus({ preventScroll: true });
+}
+
 const NoteRow = memo(function NoteRow({
   focusedPane,
   highlightWords,
@@ -474,6 +495,7 @@ const NoteRow = memo(function NoteRow({
         })}
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
+        onPointerDown={handleNoteRowPointerDown}
         onMouseDown={(event) => {
           if (event.button === 2) {
             event.preventDefault();

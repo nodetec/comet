@@ -2,7 +2,6 @@ use crate::adapters::nostr::sync_manager::SyncManager;
 use crate::db;
 use crate::domain::accounts::model::{AccountSummary, SecretStorageStatus};
 use crate::error::AppError;
-use crate::infra::cache::RenderedHtmlCache;
 use tauri::{AppHandle, Manager};
 
 async fn run_account_change<T>(
@@ -13,10 +12,6 @@ async fn run_account_change<T>(
     manager.stop().await;
 
     let result = change();
-    if result.is_ok() {
-        let cache = app.state::<RenderedHtmlCache>();
-        cache.clear();
-    }
     crate::adapters::nostr::sync_manager::auto_start(app).await;
     result
 }

@@ -305,7 +305,7 @@ mod tests {
 
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
-             VALUES ('note-1', 'Title', '# Title\n\n#work/project alpha# #roadmap', 1, 2, 2, 1)",
+             VALUES ('note-1', 'Title', '# Title\n\n#work/project-alpha #roadmap', 1, 2, 2, 1)",
             [],
         )
         .unwrap();
@@ -329,7 +329,7 @@ mod tests {
         };
         assert_eq!(
             direct,
-            vec!["roadmap".to_string(), "work/project alpha".to_string()]
+            vec!["roadmap".to_string(), "work/project-alpha".to_string()]
         );
 
         let derived: Vec<String> = {
@@ -357,7 +357,7 @@ mod tests {
 
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
-             VALUES ('note-1', 'Title', '# Title\n\n#work/project alpha# #roadmap', 1, 2, 2, 1)",
+             VALUES ('note-1', 'Title', '# Title\n\n#work/project-alpha #roadmap', 1, 2, 2, 1)",
             [],
         )
         .unwrap();

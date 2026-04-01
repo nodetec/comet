@@ -30,6 +30,7 @@ body {
 
 :root {
   --radius: 0.5rem;
+  /*--editor-bottom-padding: clamp(10rem, 35dvh, 24rem);*/
 }
 
 @theme inline {
@@ -116,10 +117,44 @@ body {
 
 .comet-editor-shell {
   background: transparent;
+  width: 100%;
+  display: grid;
+  /*padding-bottom: var(--editor-bottom-padding);*/
+  grid-template-columns:
+    minmax(clamp(1rem, 4vw, 3rem), 1fr)
+    minmax(0, 48rem)
+    minmax(clamp(1rem, 4vw, 3rem), 1fr);
 }
 
 .comet-editor-content-wrap {
   min-height: 100%;
+}
+
+.comet-editor-gutter {
+  min-width: 0;
+  position: relative;
+  cursor: text;
+}
+
+.comet-editor-column {
+  grid-column: 2;
+  width: min(100%, 48rem);
+  max-width: 48rem;
+  min-width: 0;
+  position: relative;
+}
+
+.comet-editor-column::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--background) 94%, transparent),
+    color-mix(in oklab, var(--background) 98%, transparent)
+  );
+  border-radius: min(var(--radius-xl), 18px);
+  pointer-events: none;
 }
 
 .comet-editor-content {
@@ -134,9 +169,8 @@ body {
   width: 100%;
   box-sizing: border-box;
 
-  padding-bottom: 35vh;
-  padding-left: max(3.5rem, calc((100% - 41rem) / 2));
-  padding-right: max(3.5rem, calc((100% - 41rem) / 2));
+  padding-left: clamp(1rem, 5vw, 3.5rem);
+  padding-right: clamp(1rem, 5vw, 3.5rem);
   padding-top: 0.25rem;
 }
 
@@ -147,6 +181,42 @@ body {
   padding: 0 0.08rem;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+
+.comet-codemirror-host {
+  min-height: 100%;
+  flex: 1;
+  width: 100%;
+}
+
+.comet-codemirror-host > .cm-editor {
+  min-height: 100%;
+  width: 100%;
+}
+
+.comet-codemirror-host .cm-scroller {
+  min-height: 100%;
+  width: 100%;
+}
+
+.comet-codemirror-host .cm-gutters {
+  display: none;
+}
+
+.comet-codemirror-host .cm-searchMatch {
+  background: color-mix(in oklab, var(--search-match) 82%, transparent);
+  color: var(--search-match-foreground);
+  border: 0;
+  border-radius: 0.25rem;
+}
+
+.comet-codemirror-host .cm-searchMatch.cm-searchMatch-selected {
+  background: color-mix(in oklab, var(--search-match) 92%, transparent);
+}
+
+.comet-codemirror-passive-search .cm-searchMatch {
+  background: var(--markdown-highlight);
+  color: var(--markdown-highlight-foreground);
 }
 
 .comet-table-wrapper {
@@ -399,6 +469,10 @@ body {
 
 ::selection {
   background: color-mix(in oklab, var(--primary) 30%, transparent);
+}
+
+.cm-editor .cm-content ::selection {
+  background: color-mix(in oklab, var(--primary) 30%, transparent) !important;
 }
 
 @keyframes slide-in-left {

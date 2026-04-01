@@ -53,7 +53,7 @@ function App() {
       switch (key) {
         case "n": {
           event.preventDefault();
-          handleCreateNoteShortcut("keyboard");
+          handleCreateNoteShortcut();
           break;
         }
         case "s": {

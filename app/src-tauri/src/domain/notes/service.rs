@@ -942,21 +942,21 @@ mod tests {
     }
 
     #[test]
-    fn create_note_renders_wrapped_tags_when_needed() {
+    fn create_note_renders_simple_tags() {
         let repo = MockNoteRepository::new();
 
         let record = NoteService::create_note(
             &repo,
             &[
-                "project alpha".to_string(),
-                "work/project alpha".to_string(),
+                "project-alpha".to_string(),
+                "work/project-alpha".to_string(),
             ],
             None,
         )
         .expect("create_note should succeed");
 
-        assert!(record.markdown.contains("#project alpha#"));
-        assert!(record.markdown.contains("#work/project alpha#"));
+        assert!(record.markdown.contains("#project-alpha"));
+        assert!(record.markdown.contains("#work/project-alpha"));
     }
 
     // ── save_note ───────────────────────────────────────────────────────
@@ -1239,15 +1239,15 @@ mod tests {
     fn rename_tag_rewrites_matching_notes_without_touching_modified_at() {
         let repo = MockNoteRepository::new().with_note(make_note(
             "n1",
-            "# Hello\n\n#work/project alpha# and #work/project alpha#",
+            "# Hello\n\n#work/project-alpha #work/project-alpha",
         ));
         let original_modified_at = repo.notes.borrow()["n1"].modified_at;
 
         let affected = NoteService::rename_tag(
             &repo,
             RenameTagInput {
-                from_path: "work/project alpha".to_string(),
-                to_path: "work/client alpha".to_string(),
+                from_path: "work/project-alpha".to_string(),
+                to_path: "work/client-alpha".to_string(),
             },
         )
         .unwrap();
@@ -1255,36 +1255,36 @@ mod tests {
         let note = repo.notes.borrow()["n1"].clone();
         assert_eq!(affected, vec!["n1".to_string()]);
         assert_eq!(note.modified_at, original_modified_at);
-        assert!(note.markdown.contains("#work/client alpha#"));
-        assert!(!note.markdown.contains("#work/project alpha#"));
+        assert!(note.markdown.contains("#work/client-alpha"));
+        assert!(!note.markdown.contains("#work/project-alpha"));
     }
 
     #[test]
     fn delete_tag_removes_matching_tag_from_notes() {
         let repo = MockNoteRepository::new().with_note(make_note(
             "n1",
-            "# Hello\n\n#work/project alpha# #work/client beta#",
+            "# Hello\n\n#work/project-alpha #work/client-beta",
         ));
 
         let affected = NoteService::delete_tag(
             &repo,
             DeleteTagInput {
-                path: "work/project alpha".to_string(),
+                path: "work/project-alpha".to_string(),
             },
         )
         .unwrap();
 
         let note = repo.notes.borrow()["n1"].clone();
         assert_eq!(affected, vec!["n1".to_string()]);
-        assert!(!note.markdown.contains("#work/project alpha#"));
-        assert!(note.markdown.contains("#work/client beta#"));
+        assert!(!note.markdown.contains("#work/project-alpha"));
+        assert!(note.markdown.contains("#work/client-beta"));
     }
 
     #[test]
     fn rename_tag_rewrites_descendant_tags_in_subtree() {
         let repo = MockNoteRepository::new().with_note(make_note(
             "n1",
-            "# Hello\n\n#work/project alpha# #work/client beta#",
+            "# Hello\n\n#work/project-alpha #work/client-beta",
         ));
 
         let affected = NoteService::rename_tag(
@@ -1298,16 +1298,16 @@ mod tests {
 
         let note = repo.notes.borrow()["n1"].clone();
         assert_eq!(affected, vec!["n1".to_string()]);
-        assert!(note.markdown.contains("#personal/project alpha#"));
-        assert!(note.markdown.contains("#personal/client beta#"));
-        assert!(!note.markdown.contains("#work/project alpha#"));
-        assert!(!note.markdown.contains("#work/client beta#"));
+        assert!(note.markdown.contains("#personal/project-alpha"));
+        assert!(note.markdown.contains("#personal/client-beta"));
+        assert!(!note.markdown.contains("#work/project-alpha"));
+        assert!(!note.markdown.contains("#work/client-beta"));
     }
 
     #[test]
     fn rename_tag_preserves_pinned_state() {
         let repo =
-            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project-alpha"));
 
         NoteService::set_tag_pinned(
             &repo,
@@ -1335,7 +1335,7 @@ mod tests {
     #[test]
     fn delete_tag_removes_descendant_tags_in_subtree() {
         let repo = MockNoteRepository::new()
-            .with_note(make_note("n1", "# Hello\n\n#work/project alpha# #roadmap"));
+            .with_note(make_note("n1", "# Hello\n\n#work/project-alpha #roadmap"));
 
         let affected = NoteService::delete_tag(
             &repo,
@@ -1347,21 +1347,21 @@ mod tests {
 
         let note = repo.notes.borrow()["n1"].clone();
         assert_eq!(affected, vec!["n1".to_string()]);
-        assert!(!note.markdown.contains("#work/project alpha#"));
+        assert!(!note.markdown.contains("#work/project-alpha"));
         assert!(note.markdown.contains("#roadmap"));
     }
 
     #[test]
     fn rename_tag_rejects_readonly_notes() {
-        let mut note = make_note("n1", "# Hello\n\n#work/project alpha#");
+        let mut note = make_note("n1", "# Hello\n\n#work/project-alpha");
         note.readonly = true;
         let repo = MockNoteRepository::new().with_note(note);
 
         let result = NoteService::rename_tag(
             &repo,
             RenameTagInput {
-                from_path: "work/project alpha".to_string(),
-                to_path: "work/client alpha".to_string(),
+                from_path: "work/project-alpha".to_string(),
+                to_path: "work/client-alpha".to_string(),
             },
         );
 
@@ -1371,12 +1371,12 @@ mod tests {
     #[test]
     fn set_tag_pinned_rejects_subtags() {
         let repo =
-            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project-alpha"));
 
         let result = NoteService::set_tag_pinned(
             &repo,
             SetTagPinnedInput {
-                path: "work/project alpha".to_string(),
+                path: "work/project-alpha".to_string(),
                 pinned: true,
             },
         );
@@ -1403,12 +1403,12 @@ mod tests {
     #[test]
     fn set_hide_subtag_notes_updates_tag_metadata() {
         let repo =
-            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project alpha#"));
+            MockNoteRepository::new().with_note(make_note("n1", "# Hello\n\n#work/project-alpha"));
 
         NoteService::set_hide_subtag_notes(
             &repo,
             SetHideSubtagNotesInput {
-                path: "work/project alpha".to_string(),
+                path: "work/project-alpha".to_string(),
                 hide_subtag_notes: true,
             },
         )
@@ -1417,6 +1417,6 @@ mod tests {
         assert!(repo
             .hide_subtag_notes_tags
             .borrow()
-            .contains("work/project alpha"));
+            .contains("work/project-alpha"));
     }
 }

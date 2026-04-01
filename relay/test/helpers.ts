@@ -1,12 +1,16 @@
+import { createServer } from "node:net";
+
 import postgres from "postgres";
 
 import { createRevisionRelayServer } from "../src/server";
 
 const TEST_DB_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/postgres";
+const TEST_HOST = "127.0.0.1";
 const TEST_LOGS_ENABLED =
   process.env.RELAY_TEST_LOGS === "1" ||
   process.env.REVISION_RELAY_TEST_LOGS === "1";
+const START_RELAY_MAX_ATTEMPTS = 5;
 
 export type RevisionRelayTestContext = {
   port: number;
@@ -22,7 +26,7 @@ export type RevisionRelayTestContext = {
 };
 
 export async function startTestRevisionRelay(
-  port: number,
+  portHint: number,
   options: {
     adminToken?: string | null;
     privateMode?: boolean;
@@ -30,50 +34,76 @@ export async function startTestRevisionRelay(
     passThroughKinds?: number[];
   } = {},
 ): Promise<RevisionRelayTestContext> {
-  const databaseName = `relay_test_${port}_${Date.now()}`;
-  await createDatabase(databaseName);
+  let lastError: unknown = null;
 
-  const databaseUrl = databaseUrlFor(databaseName);
-  const relayUrl = `ws://localhost:${port}/ws`;
-  const httpUrl = `http://127.0.0.1:${port}`;
-  const transcript: string[] = [];
-  const log = (message: string) => {
-    const entry = `[relay:${port}] ${message}`;
-    transcript.push(entry);
-    if (TEST_LOGS_ENABLED) {
-      console.error(entry);
-    }
-  };
-  const runtime = await createRevisionRelayServer({
-    port,
-    host: "127.0.0.1",
-    databaseUrl,
-    relayUrl,
-    privateMode: options.privateMode ?? false,
-    adminToken: options.adminToken ?? null,
-    defaultPayloadRetentionDays: null,
-    defaultCompactionIntervalSeconds: 300,
-    companionKinds: options.companionKinds ?? [],
-    passThroughKinds: options.passThroughKinds ?? [],
-    resetDatabase: true,
-  });
+  for (let attempt = 1; attempt <= START_RELAY_MAX_ATTEMPTS; attempt += 1) {
+    const port = await reservePort();
+    const databaseName = [
+      "relay_test",
+      String(portHint),
+      String(attempt),
+      crypto.randomUUID().replaceAll("-", ""),
+    ].join("_");
+    await createDatabase(databaseName);
 
-  return {
-    port,
-    relayUrl,
-    httpUrl,
-    databaseUrl,
-    transcript,
-    compactPayloadsBefore: runtime.compaction.compactPayloadsBefore,
-    connectionCount: () => runtime.connections.size(),
-    log,
-    dumpTranscript: () => transcript.join("\n"),
-    cleanup: async () => {
-      log(`cleanup database=${databaseName}`);
-      await runtime.stop();
+    const databaseUrl = databaseUrlFor(databaseName);
+    const relayUrl = `ws://localhost:${port}/ws`;
+    const transcript: string[] = [];
+    const log = (message: string) => {
+      const entry = `[relay:${port}] ${message}`;
+      transcript.push(entry);
+      if (TEST_LOGS_ENABLED) {
+        console.error(entry);
+      }
+    };
+
+    try {
+      const runtime = await createRevisionRelayServer({
+        port,
+        host: TEST_HOST,
+        databaseUrl,
+        relayUrl,
+        privateMode: options.privateMode ?? false,
+        adminToken: options.adminToken ?? null,
+        defaultPayloadRetentionDays: null,
+        defaultCompactionIntervalSeconds: 300,
+        companionKinds: options.companionKinds ?? [],
+        passThroughKinds: options.passThroughKinds ?? [],
+        resetDatabase: true,
+      });
+      const actualPort = runtime.port ?? port;
+
+      return {
+        port: actualPort,
+        relayUrl: `ws://localhost:${actualPort}/ws`,
+        httpUrl: `http://${TEST_HOST}:${actualPort}`,
+        databaseUrl,
+        transcript,
+        compactPayloadsBefore: runtime.compaction.compactPayloadsBefore,
+        connectionCount: () => runtime.connections.size(),
+        log,
+        dumpTranscript: () => transcript.join("\n"),
+        cleanup: async () => {
+          log(`cleanup database=${databaseName}`);
+          await runtime.stop();
+          await dropDatabase(databaseName);
+        },
+      };
+    } catch (error) {
+      lastError = error;
+      log(
+        `startup failed attempt=${attempt}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       await dropDatabase(databaseName);
-    },
-  };
+      if (attempt >= START_RELAY_MAX_ATTEMPTS || !isPortInUseError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("failed to start relay test server");
 }
 
 type TraceOptions = {
@@ -302,4 +332,40 @@ function assertSafeDatabaseName(databaseName: string) {
   if (!/^[a-z0-9_]+$/u.test(databaseName)) {
     throw new Error(`unsafe database name: ${databaseName}`);
   }
+}
+
+async function reservePort(): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+
+    server.once("error", reject);
+    server.listen(0, TEST_HOST, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close();
+        reject(new Error("failed to resolve reserved test port"));
+        return;
+      }
+
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+  });
+}
+
+function isPortInUseError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("Failed to start server. Is port") ||
+    error.message.includes("EADDRINUSE")
+  );
 }

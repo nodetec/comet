@@ -12,7 +12,7 @@ use rusqlite::Connection;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, watch, Mutex};
 
 use super::sync_manager::{set_state, sync_log};
@@ -300,10 +300,7 @@ async fn handle_revision_incoming_message(
                     keys,
                     &event,
                     Some(seq),
-                    |note_id| {
-                        app.state::<crate::infra::cache::RenderedHtmlCache>()
-                            .invalidate(note_id);
-                    },
+                    |_| {},
                 )?
             {
                 emit_sync_remote_change(app, change);

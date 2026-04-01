@@ -19,6 +19,6 @@ describe("normalizePublishTags", () => {
   it("dedupes and filters invalid tags", () => {
     expect(
       normalizePublishTags(["#Roadmap", "roadmap", "#Project Alpha#", "123"]),
-    ).toEqual(["roadmap", "project alpha"]);
+    ).toEqual(["roadmap"]);
   });
 });

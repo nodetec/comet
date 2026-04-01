@@ -51,10 +51,9 @@ export function useShellController() {
   const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
     string | null
   >(null);
+  const [pendingAutoFocusEditorNoteId, setPendingAutoFocusEditorNoteId] =
+    useState<string | null>(null);
   const [syncEditorRevision, setSyncEditorRevision] = useState(0);
-  const [editorFocusMode, setEditorFocusMode] = useState<
-    "none" | "immediate" | "pointerup"
-  >("none");
   const [chooseConflictDialogOpen, setChooseConflictDialogOpen] =
     useState(false);
   const [chooseConflictNoteId, setChooseConflictNoteId] = useState<
@@ -177,8 +176,8 @@ export function useShellController() {
     setSelectedNoteId,
     setDraft,
     setCreatingSelectedNoteId,
+    setPendingAutoFocusEditorNoteId,
     setIsCreatingNoteTransition,
-    setEditorFocusMode,
     setNoteFilter,
   });
 
@@ -246,6 +245,7 @@ export function useShellController() {
   ]);
 
   const currentNote = selectedNoteId ? noteQuery.data : undefined;
+  const currentNoteId = currentNote?.id ?? null;
   const currentNoteConflict = selectedNoteId
     ? noteConflictQuery.data
     : undefined;
@@ -478,7 +478,7 @@ export function useShellController() {
         return;
       }
 
-      setFocusedPane("sidebar");
+      setFocusedPane("notes");
       latestRef.current.handleSelectTagPath(tagPath);
     };
 
@@ -489,7 +489,7 @@ export function useShellController() {
   }, [setFocusedPane]);
 
   // --- Handlers ---
-  const handleCreateNote = (source: "keyboard" | "pointer") => {
+  const handleCreateNote = () => {
     if (isCreatingNote) {
       return;
     }
@@ -509,7 +509,6 @@ export function useShellController() {
     setSearchQuery("");
     setCreatingSelectedNoteId(null);
     setIsCreatingNoteTransition(true);
-    setEditorFocusMode(source === "pointer" ? "pointerup" : "immediate");
     createNoteMutation.mutate({
       tags: tagsForNewNote,
       markdown: effectiveNoteFilter === "todo" ? "- [ ] " : undefined,
@@ -751,6 +750,7 @@ export function useShellController() {
 
     flushCurrentDraft();
     setCreatingSelectedNoteId(null);
+    setPendingAutoFocusEditorNoteId(null);
     setSelectedNoteId(noteId);
   };
 
@@ -1091,19 +1091,8 @@ export function useShellController() {
   const nextEditorPaneProps = useMemo(
     () => ({
       archivedAt: currentNote?.archivedAt ?? null,
+      autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
       deletedAt: currentNote?.deletedAt ?? null,
-      focusMode:
-        currentNote &&
-        currentNote.id === selectedNoteId &&
-        !isCreatingNoteTransition
-          ? editorFocusMode
-          : ("none" as const),
-      html:
-        currentNote && currentEditorMarkdown === currentNote.markdown
-          ? (currentNote.html ?? null)
-          : null,
-      isNewNote:
-        currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
       noteConflict: currentNoteConflict ?? null,
@@ -1134,6 +1123,11 @@ export function useShellController() {
       onDuplicateNote() {
         if (currentNote) {
           latestRef.current.handleDuplicateNote(currentNote.id);
+        }
+      },
+      onAutoFocusEditorHandled() {
+        if (currentNoteId === pendingAutoFocusEditorNoteId) {
+          setPendingAutoFocusEditorNoteId(null);
         }
       },
       onOpenPublishDialog() {
@@ -1171,12 +1165,6 @@ export function useShellController() {
           setDraft(currentNote.id, markdown);
         }
       },
-      onFocusHandled() {
-        if (currentNote && currentNote.id === creatingSelectedNoteId) {
-          setCreatingSelectedNoteId(null);
-        }
-        setEditorFocusMode("none");
-      },
       onLoadConflictHead(revisionId: string, markdown: string | null) {
         latestRef.current.handleLoadConflictHead(revisionId, markdown);
       },
@@ -1186,26 +1174,24 @@ export function useShellController() {
       },
     }),
     [
-      creatingSelectedNoteId,
       currentEditorMarkdown,
       currentNoteConflict,
       currentNote,
+      currentNoteId,
       displayedSelectedNoteId,
-      editorFocusMode,
       isDeletePublishedNotePending,
-      isCreatingNoteTransition,
       isCreatingNote,
       isPublishNotePending,
       isPublishShortNotePending,
       isResolveConflictPending,
+      pendingAutoFocusEditorNoteId,
       searchQuery,
       selectedConflictRevisionId,
-      selectedNoteId,
       setChooseConflictNoteId,
       setChooseConflictDialogOpen,
       setDeletePublishDialogOpen,
       setDraft,
-      setEditorFocusMode,
+      setPendingAutoFocusEditorNoteId,
       setPublishDialogOpen,
       setPublishShortNoteDialogOpen,
       syncEditorRevision,
@@ -1272,7 +1258,6 @@ export function useShellController() {
     ],
   );
 
-  const currentNoteId = currentNote?.id ?? null;
   const deletePublishDialogProps = useMemo(
     () => ({
       open: deletePublishDialogOpen,
@@ -1349,8 +1334,7 @@ export function useShellController() {
       onChangeSearch: setSearchQuery,
       onCopyNoteContent: (noteId: string) =>
         latestRef.current.handleCopyNoteContent(noteId),
-      onCreateNote: (source: "keyboard" | "pointer") =>
-        latestRef.current.handleCreateNote(source),
+      onCreateNote: () => latestRef.current.handleCreateNote(),
       onDeleteNotePermanently: (noteId: string) =>
         latestRef.current.handleDeleteNotePermanently(noteId),
       onDuplicateNote: (noteId: string) =>

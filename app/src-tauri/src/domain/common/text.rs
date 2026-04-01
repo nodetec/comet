@@ -148,8 +148,7 @@ pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
     let mut canonical_segments = Vec::new();
 
     for segment in trimmed.split('/') {
-        let normalized = segment.split_whitespace().collect::<Vec<_>>().join(" ");
-        let trimmed = normalized.trim();
+        let trimmed = segment.trim();
 
         if trimmed.is_empty() {
             return None;
@@ -161,7 +160,7 @@ pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
                 has_letter = true;
             }
 
-            if !(character.is_alphanumeric() || matches!(character, '_' | '-' | ' ')) {
+            if !(character.is_alphanumeric() || matches!(character, '_' | '-')) {
                 return None;
             }
         }
@@ -193,11 +192,7 @@ fn strip_trailing_tag_separators(raw: &str) -> &str {
 /// Render a canonical tag path back into authored markdown syntax.
 pub fn render_tag_token(path: &str) -> Option<String> {
     let canonical = canonicalize_tag_path(path)?;
-    if canonical.contains(' ') {
-        Some(format!("#{canonical}#"))
-    } else {
-        Some(format!("#{canonical}"))
-    }
+    Some(format!("#{canonical}"))
 }
 
 pub fn ancestor_tag_paths(path: &str) -> Vec<String> {
@@ -336,12 +331,6 @@ pub fn extract_tag_occurrences(markdown: &str) -> Vec<TagOccurrence> {
             continue;
         }
 
-        if let Some(occurrence) = parse_wrapped_tag(markdown, index) {
-            index = occurrence.end;
-            occurrences.push(occurrence);
-            continue;
-        }
-
         if let Some(occurrence) = parse_simple_tag(markdown, index) {
             index = occurrence.end;
             occurrences.push(occurrence);
@@ -380,58 +369,6 @@ fn is_boundary_disallowed_tag_char(character: char) -> bool {
 
 fn is_simple_tag_body_char(character: char) -> bool {
     character.is_alphanumeric() || matches!(character, '_' | '-' | '/')
-}
-
-fn is_wrapped_tag_body_char(character: char) -> bool {
-    character != '\n'
-        && character != '\r'
-        && (character.is_alphanumeric()
-            || matches!(character, '_' | '-' | '/')
-            || character.is_whitespace())
-}
-
-fn parse_wrapped_tag(markdown: &str, start_index: usize) -> Option<TagOccurrence> {
-    let rest = &markdown[start_index + 1..];
-    let mut first_char = true;
-
-    for (offset, character) in rest.char_indices() {
-        if first_char && character.is_whitespace() {
-            return None;
-        }
-        first_char = false;
-
-        if character == '#' {
-            if offset == 0 {
-                return None;
-            }
-
-            let candidate = &rest[..offset];
-            let canonical = canonicalize_tag_path(candidate)?;
-            let next_index = start_index + 1 + offset + 1;
-            if has_invalid_wrapped_trailing_boundary(markdown, next_index) {
-                return None;
-            }
-            return Some(TagOccurrence {
-                start: start_index,
-                end: next_index,
-                canonical_path: canonical,
-            });
-        }
-
-        if !is_wrapped_tag_body_char(character) {
-            return None;
-        }
-    }
-
-    None
-}
-
-fn has_invalid_wrapped_trailing_boundary(markdown: &str, next_index: usize) -> bool {
-    let Some(next) = markdown[next_index..].chars().next() else {
-        return false;
-    };
-
-    next.is_alphanumeric() || matches!(next, '_' | '-' | '/' | ':' | '.')
 }
 
 fn parse_simple_tag(markdown: &str, start_index: usize) -> Option<TagOccurrence> {
@@ -744,8 +681,8 @@ mod tests {
     #[test]
     fn canonicalize_tag_path_normalizes_segments() {
         assert_eq!(
-            canonicalize_tag_path("Work/ project   alpha "),
-            Some("work/project alpha".to_string())
+            canonicalize_tag_path("Work/Project-Alpha "),
+            Some("work/project-alpha".to_string())
         );
         assert_eq!(canonicalize_tag_path("work/"), Some("work".to_string()));
         assert_eq!(
@@ -762,11 +699,11 @@ mod tests {
     }
 
     #[test]
-    fn render_tag_token_wraps_multi_word_paths() {
+    fn render_tag_token_renders_simple_paths() {
         assert_eq!(render_tag_token("roadmap"), Some("#roadmap".to_string()));
         assert_eq!(
-            render_tag_token("work/project alpha"),
-            Some("#work/project alpha#".to_string())
+            render_tag_token("work/project-alpha"),
+            Some("#work/project-alpha".to_string())
         );
     }
 
@@ -807,13 +744,13 @@ mod tests {
     }
 
     #[test]
-    fn extract_tags_supports_simple_wrapped_and_nested_tags() {
+    fn extract_tags_supports_simple_and_nested_tags() {
         let markdown = [
             "#RoadMap",
             "#work/project",
             "#work/",
-            "#project alpha#",
-            "#work/project alpha#",
+            "#project-alpha",
+            "#work/project-alpha",
             "#roadmap",
             "#work/project",
         ]
@@ -822,11 +759,11 @@ mod tests {
         assert_eq!(
             extract_tags(&markdown),
             vec![
-                "project alpha".to_string(),
+                "project-alpha".to_string(),
                 "roadmap".to_string(),
                 "work".to_string(),
                 "work/project".to_string(),
-                "work/project alpha".to_string(),
+                "work/project-alpha".to_string(),
             ]
         );
     }
@@ -856,12 +793,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_tags_accepts_wrapped_nested_segments_with_spacing() {
+    fn extract_tags_rejects_wrapped_nested_segments_with_spacing() {
         let markdown = "#work/ project alpha #";
-        assert_eq!(
-            extract_tags(markdown),
-            vec!["work/project alpha".to_string()]
-        );
+        assert_eq!(extract_tags(markdown), vec!["work".to_string()]);
     }
 
     #[test]
@@ -872,7 +806,7 @@ mod tests {
 
     #[test]
     fn extract_tag_occurrences_tracks_spans_and_paths() {
-        let markdown = "hello #roadmap, and #project alpha#";
+        let markdown = "hello #roadmap, and #project-alpha";
         assert_eq!(
             extract_tag_occurrences(markdown),
             vec![
@@ -883,8 +817,8 @@ mod tests {
                 },
                 TagOccurrence {
                     start: 20,
-                    end: 35,
-                    canonical_path: "project alpha".to_string(),
+                    end: 34,
+                    canonical_path: "project-alpha".to_string(),
                 },
             ]
         );
@@ -892,27 +826,27 @@ mod tests {
 
     #[test]
     fn rewrite_tag_path_in_markdown_renames_exact_direct_occurrences() {
-        let markdown = "hello #roadmap and #work/project alpha#";
+        let markdown = "hello #roadmap and #work/project-alpha";
         assert_eq!(
-            rewrite_tag_path_in_markdown(markdown, "work/project alpha", Some("work/mobile")),
+            rewrite_tag_path_in_markdown(markdown, "work/project-alpha", Some("work/mobile")),
             Some("hello #roadmap and #work/mobile".to_string())
         );
     }
 
     #[test]
     fn rewrite_tag_path_in_markdown_deletes_exact_direct_occurrences() {
-        let markdown = "hello #roadmap and #project alpha#";
+        let markdown = "hello #roadmap and #project-alpha";
         assert_eq!(
-            rewrite_tag_path_in_markdown(markdown, "project alpha", None),
+            rewrite_tag_path_in_markdown(markdown, "project-alpha", None),
             Some("hello #roadmap and ".to_string())
         );
     }
 
     #[test]
     fn rewrite_tag_path_in_markdown_dedupes_rename_target_when_already_present() {
-        let markdown = "#roadmap #project alpha#";
+        let markdown = "#roadmap #project-alpha";
         assert_eq!(
-            rewrite_tag_path_in_markdown(markdown, "project alpha", Some("roadmap")),
+            rewrite_tag_path_in_markdown(markdown, "project-alpha", Some("roadmap")),
             Some("#roadmap ".to_string())
         );
     }
@@ -928,16 +862,16 @@ mod tests {
 
     #[test]
     fn rewrite_tag_path_in_markdown_renames_descendant_tags_in_subtree() {
-        let markdown = "#work/project alpha# #work/client beta#";
+        let markdown = "#work/project-alpha #work/client-beta";
         assert_eq!(
             rewrite_tag_path_in_markdown(markdown, "work", Some("personal")),
-            Some("#personal/project alpha# #personal/client beta#".to_string())
+            Some("#personal/project-alpha #personal/client-beta".to_string())
         );
     }
 
     #[test]
     fn rewrite_tag_path_in_markdown_deletes_descendant_tags_in_subtree() {
-        let markdown = "#work/project alpha# #roadmap";
+        let markdown = "#work/project-alpha #roadmap";
         assert_eq!(
             rewrite_tag_path_in_markdown(markdown, "work", None),
             Some(" #roadmap".to_string())
@@ -949,7 +883,7 @@ mod tests {
         let markdown = [
             "# Title",
             "",
-            "#work #project alpha#",
+            "#work #project-alpha",
             "",
             "Keep `#inline-code#` and [link](https://example.com/#hash).",
         ]
@@ -958,7 +892,7 @@ mod tests {
         let stripped = strip_tags_from_markdown(&markdown);
 
         assert!(!stripped.contains("#work"));
-        assert!(!stripped.contains("#project alpha#"));
+        assert!(!stripped.contains("#project-alpha"));
         assert!(stripped.contains("`#inline-code#`"));
         assert!(stripped.contains("https://example.com/#hash"));
     }

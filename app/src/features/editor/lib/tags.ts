@@ -23,14 +23,6 @@ function isTagSegmentChar(character: string) {
   return /[\p{L}\p{N}_-]/u.test(character);
 }
 
-function isWrappedTagBodyChar(character: string) {
-  return (
-    character !== "\n" &&
-    character !== "\r" &&
-    (isTagSegmentChar(character) || character === "/" || /\s/u.test(character))
-  );
-}
-
 function isEscapedHash(text: string, index: number) {
   let slashCount = 0;
   let current = index;
@@ -55,37 +47,6 @@ function hasValidBoundary(text: string, hashIndex: number) {
     previous === ":" ||
     previous === "."
   );
-}
-
-function hasInvalidWrappedTrailingBoundary(text: string, nextIndex: number) {
-  const next = text[nextIndex];
-  return (
-    next != null &&
-    (isTagSegmentChar(next) || next === "/" || next === ":" || next === ".")
-  );
-}
-
-function resolveWrappedTagMatch(
-  text: string,
-  startIndex: number,
-  rest: string,
-  offset: number,
-): TagEntityMatch | null {
-  if (offset === 0) {
-    return null;
-  }
-
-  const candidate = rest.slice(0, offset);
-  if (!canonicalizeTagPath(candidate)) {
-    return null;
-  }
-
-  const end = startIndex + 1 + offset + 1;
-  if (hasInvalidWrappedTrailingBoundary(text, end)) {
-    return null;
-  }
-
-  return { start: startIndex, end };
 }
 
 function hasInvalidSimpleTrailingText(text: string, endIndex: number) {
@@ -120,7 +81,7 @@ export function canonicalizeTagPath(raw: string): string | null {
   const canonicalSegments: string[] = [];
 
   for (const segment of segments) {
-    const normalized = segment.trim().split(/\s+/u).filter(Boolean).join(" ");
+    const normalized = segment.trim();
     if (!normalized) {
       return null;
     }
@@ -131,7 +92,7 @@ export function canonicalizeTagPath(raw: string): string | null {
         hasLetter = true;
       }
 
-      if (!(isTagSegmentChar(character) || character === " ")) {
+      if (!isTagSegmentChar(character)) {
         return null;
       }
     }
@@ -155,7 +116,7 @@ export function renderTagToken(path: string): string | null {
   if (!canonical) {
     return null;
   }
-  return canonical.includes(" ") ? `#${canonical}#` : `#${canonical}`;
+  return `#${canonical}`;
 }
 
 export function canonicalizeAuthoredTagToken(token: string): string | null {
@@ -168,33 +129,6 @@ export function canonicalizeAuthoredTagToken(token: string): string | null {
   }
 
   return canonicalizeTagPath(token.slice(1));
-}
-
-function parseWrappedTag(
-  text: string,
-  startIndex: number,
-): TagEntityMatch | null {
-  const rest = text.slice(startIndex + 1);
-  let sawAny = false;
-
-  for (let offset = 0; offset < rest.length; offset += 1) {
-    const character = rest[offset]!;
-    if (!sawAny && /\s/u.test(character)) {
-      return null;
-    }
-
-    if (character === "#") {
-      return resolveWrappedTagMatch(text, startIndex, rest, offset);
-    }
-
-    if (!isWrappedTagBodyChar(character)) {
-      return null;
-    }
-
-    sawAny = true;
-  }
-
-  return null;
 }
 
 function parseSimpleTag(
@@ -241,11 +175,6 @@ export function findTagEntityMatch(text: string): TagEntityMatch | null {
       continue;
     }
 
-    const wrapped = parseWrappedTag(text, index);
-    if (wrapped) {
-      return wrapped;
-    }
-
     const simple = parseSimpleTag(text, index);
     if (simple) {
       return simple;
@@ -265,7 +194,7 @@ export function canonicalizeTagPartial(raw: string): string | null {
   const canonicalSegments: string[] = [];
 
   for (const [index, segment] of segments.entries()) {
-    const normalized = segment.trim().split(/\s+/u).filter(Boolean).join(" ");
+    const normalized = segment.trim();
     const isLast = index === segments.length - 1;
 
     if (!normalized) {
@@ -277,7 +206,7 @@ export function canonicalizeTagPartial(raw: string): string | null {
     }
 
     for (const character of normalized) {
-      if (!(isTagSegmentChar(character) || character === " ")) {
+      if (!isTagSegmentChar(character)) {
         return null;
       }
     }

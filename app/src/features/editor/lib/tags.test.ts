@@ -47,24 +47,13 @@ describe("editor tag helpers", () => {
     });
   });
 
-  it("matches completion at the cursor for wrapped-like partials", () => {
-    expect(matchTagCompletionAtEnd("hello #project al")).toEqual({
-      matchingString: "project al",
-      leadOffset: 6,
-      replaceableLength: 11,
-    });
-    expect(matchTagCompletionAtEnd("hello #work/ project al")).toEqual({
-      matchingString: "work/project al",
-      leadOffset: 6,
-      replaceableLength: 17,
-    });
-  });
-
   it("rejects invalid completion candidates", () => {
     expect(matchTagCompletionAtEnd("hello #")).toBeNull();
     expect(matchTagCompletionAtEnd(String.raw`hello \#roadmap`)).toBeNull();
     expect(matchTagCompletionAtEnd("hello #!/bin")).toBeNull();
     expect(matchTagCompletionAtEnd("hello #work//proj")).toBeNull();
+    expect(matchTagCompletionAtEnd("hello #project al")).toBeNull();
+    expect(matchTagCompletionAtEnd("hello #work/ project al")).toBeNull();
   });
 
   it("normalizes trailing slashes in canonical tag paths", () => {
@@ -75,14 +64,12 @@ describe("editor tag helpers", () => {
 
   it("canonicalizes authored tag tokens", () => {
     expect(canonicalizeAuthoredTagToken("#roadmap")).toBe("roadmap");
-    expect(canonicalizeAuthoredTagToken("#project alpha#")).toBe(
-      "project alpha",
-    );
+    expect(canonicalizeAuthoredTagToken("#project alpha#")).toBeNull();
     expect(canonicalizeAuthoredTagToken("#work/")).toBe("work");
   });
 
   it("normalizes tag partials for backend search", () => {
-    expect(canonicalizeTagPartial("Work/ project  al")).toBe("work/project al");
+    expect(canonicalizeTagPartial("Work/ project  al")).toBeNull();
     expect(canonicalizeTagPartial("work/")).toBe("work/");
   });
 });
