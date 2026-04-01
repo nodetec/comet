@@ -51,6 +51,21 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     borderRadius: "0.2rem",
     padding: "0.1em 0.2em",
   },
+  ".cm-md-codeblock": {
+    fontFamily:
+      '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: "0.9em",
+    backgroundColor: "color-mix(in oklab, var(--muted) 50%, transparent)",
+    padding: "0 0.75rem",
+  },
+  ".cm-md-codeblock.cm-md-codeblock-open": {
+    borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
+    paddingTop: "0.5rem",
+  },
+  ".cm-md-codeblock.cm-md-codeblock-close": {
+    borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+    paddingBottom: "0.5rem",
+  },
   ".cm-md-link": {
     color: "var(--syntax-link)",
     textDecoration: "underline",
@@ -97,56 +112,38 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-strikethrough": {
     textDecoration: "line-through",
   },
-  ".cm-md-bullet": {
-    display: "inline-block",
-    width: "1.2em",
-    color: "var(--primary)",
-    textAlign: "center",
-    fontWeight: "700",
-    userSelect: "none",
+  ".cm-md-indent": {
+    display: "inline-flex",
+    width: "2rem",
   },
-  ".cm-md-ordered-num": {
-    display: "inline-block",
-    minWidth: "1.5em",
-    color: "var(--primary)",
-    textAlign: "right",
-    paddingRight: "0.3em",
+  ".cm-md-list": {
+    paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
+    position: "relative",
+    textIndent: "calc((var(--indent-level) * 2rem + 2rem) * -1)",
+  },
+  ".cm-md-list *": {
+    textIndent: "0",
+  },
+  ".cm-md-list-marker": {
+    alignItems: "center",
+    color: "var(--muted-foreground)",
+    display: "inline-flex",
+    justifyContent: "center",
+    minWidth: "2rem",
+  },
+  ".cm-md-number-marker": {
     fontVariantNumeric: "tabular-nums",
     fontSize: "0.9em",
-    whiteSpace: "nowrap",
-    userSelect: "none",
   },
-  ".cm-md-checkbox": {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "16px",
-    height: "16px",
-    border: "1px solid var(--editor-checkbox-border, var(--border))",
-    borderRadius: "4px",
-    backgroundColor: "var(--background)",
+  ".cm-md-task-marker": {
     cursor: "pointer",
-    verticalAlign: "-0.15em",
-    marginRight: "6px",
-    transition: "background-color 0.1s, border-color 0.1s",
-    userSelect: "none",
-    flexShrink: "0",
+    margin: "0",
+    scale: "1.2",
+    transformOrigin: "center center",
   },
-  ".cm-md-checkbox:hover": {
-    borderColor: "var(--primary)",
-  },
-  ".cm-md-checkbox-checked": {
-    borderColor: "var(--primary)",
-    backgroundColor: "var(--primary)",
-    backgroundImage:
-      "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M20 6 9 17l-5-5'/%3e%3c/svg%3e\")",
-    backgroundSize: "12px 12px",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-  },
-  ".cm-md-task-checked": {
-    color: "var(--muted-foreground)",
+  ".cm-md-task-list.cm-md-task-checked": {
     textDecoration: "line-through",
+    textDecorationColor: "var(--muted-foreground)",
   },
   ".cm-md-hr": {
     border: "none",

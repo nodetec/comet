@@ -7,9 +7,23 @@ import type {
   DecorationEntry,
 } from "@/features/editor/extensions/markdown-decorations/types";
 
+const TAB_SIZE = 2;
+
 // ---------------------------------------------------------------------------
 // Widgets
 // ---------------------------------------------------------------------------
+
+class SpacerWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+
+  override toDOM(): HTMLElement {
+    const spacer = document.createElement("span");
+    spacer.className = "cm-md-indent";
+    return spacer;
+  }
+}
 
 class BulletWidget extends WidgetType {
   override eq(): boolean {
@@ -17,10 +31,12 @@ class BulletWidget extends WidgetType {
   }
 
   override toDOM(): HTMLElement {
-    const span = document.createElement("span");
-    span.className = "cm-md-bullet";
-    span.textContent = "•";
-    return span;
+    const wrapper = document.createElement("label");
+    wrapper.className = "cm-md-list-marker";
+    wrapper.setAttribute("aria-hidden", "true");
+    wrapper.setAttribute("inert", "true");
+    wrapper.innerHTML = "&bull;";
+    return wrapper;
   }
 }
 
@@ -34,10 +50,17 @@ class OrderedNumberWidget extends WidgetType {
   }
 
   override toDOM(): HTMLElement {
-    const span = document.createElement("span");
-    span.className = "cm-md-ordered-num";
-    span.textContent = this.number;
-    return span;
+    const wrapper = document.createElement("label");
+    wrapper.className = "cm-md-list-marker";
+    wrapper.setAttribute("aria-hidden", "true");
+    wrapper.setAttribute("inert", "true");
+
+    const content = document.createElement("span");
+    content.className = "cm-md-number-marker";
+    content.textContent = this.number;
+    wrapper.append(content);
+
+    return wrapper;
   }
 }
 
@@ -64,12 +87,17 @@ class CheckboxWidget extends WidgetType {
   }
 
   override toDOM(view: EditorView): HTMLElement {
-    const span = document.createElement("span");
-    span.className = this.checked
-      ? "cm-md-checkbox cm-md-checkbox-checked"
-      : "cm-md-checkbox";
+    const wrapper = document.createElement("label");
+    wrapper.className = "cm-md-list-marker cm-md-task";
+    wrapper.setAttribute("aria-hidden", "true");
 
-    span.addEventListener("mousedown", (event) => {
+    const input = document.createElement("input");
+    input.className = "cm-md-task-marker";
+    input.type = "checkbox";
+    input.checked = this.checked;
+    input.setAttribute("tabindex", "-1");
+
+    input.addEventListener("mousedown", (event) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -80,7 +108,8 @@ class CheckboxWidget extends WidgetType {
       });
     });
 
-    return span;
+    wrapper.append(input);
+    return wrapper;
   }
 }
 
@@ -88,94 +117,101 @@ class CheckboxWidget extends WidgetType {
 // Handlers
 // ---------------------------------------------------------------------------
 
-const taskCheckedLine = Decoration.line({ class: "cm-md-task-checked" });
-
 export function handleListMark(
   node: SyntaxNodeRef,
   ctx: BuilderContext,
   out: DecorationEntry[],
 ): void {
-  // Only decorate when there's a space after the marker (fully formed list item)
   const line = ctx.state.doc.lineAt(node.from);
   const charAfter = node.to < line.to ? line.text[node.to - line.from] : "";
   if (charAfter !== " ") {
     return;
   }
 
-  // Include the trailing space in the replacement range
-  const replaceEnd = node.to + 1;
-  const text = ctx.state.sliceDoc(node.from, node.to).trim();
+  const markerStart = node.from;
+  const markerEnd = node.to;
+  const textStart = markerEnd + 1;
+  const marker = ctx.state.sliceDoc(markerStart, markerEnd).trim();
+  const lineStart = line.from;
+  const indentation = markerStart - lineStart;
+  const indentLevel = Math.floor(indentation / TAB_SIZE);
   const parent = node.node.parent;
   const isOrdered = parent?.parent?.name === "OrderedList";
 
-  // Check if this is a task list item by looking at the text after the mark
-  // (e.g. "- [ ] task" or "- [x] task")
-  const afterSpace = replaceEnd;
+  // Check if this is a task list item
   const restOfLine = ctx.state.sliceDoc(
-    afterSpace,
-    Math.min(afterSpace + 4, line.to),
+    textStart,
+    Math.min(textStart + 4, line.to),
   );
   const isTaskItem = /^\[[ xX]\]/.test(restOfLine);
+
+  // Line decoration with indent level
+  let listClass = "cm-md-list";
   if (isTaskItem) {
-    out.push({
-      from: node.from,
-      to: replaceEnd,
-      decoration: Decoration.replace({}),
-    });
-    return;
+    const isChecked =
+      restOfLine.startsWith("[x]") || restOfLine.startsWith("[X]");
+    listClass += isChecked
+      ? " cm-md-task-list cm-md-task-checked"
+      : " cm-md-task-list";
+  } else {
+    listClass += isOrdered ? " cm-md-number-list" : " cm-md-bullet-list";
   }
 
-  if (isOrdered) {
-    const num = text.replace(/\D/g, "") + ".";
+  out.push({
+    from: lineStart,
+    to: lineStart,
+    decoration: Decoration.line({
+      attributes: {
+        class: listClass,
+        style: `--indent-level: ${indentLevel}`,
+      },
+    }),
+  });
+
+  // Replace indentation spaces with spacer widgets
+  for (let i = 0; i < indentLevel; i++) {
+    const from = lineStart + i * TAB_SIZE;
+    const to = from + TAB_SIZE;
     out.push({
-      from: node.from,
-      to: replaceEnd,
+      from,
+      to,
+      decoration: Decoration.replace({ widget: new SpacerWidget() }),
+    });
+  }
+
+  if (isTaskItem) {
+    // Replace "- [ ] " or "- [x] " with checkbox widget
+    const taskEnd = textStart + 3;
+    const taskText = ctx.state.sliceDoc(textStart, taskEnd);
+    const checked = taskText === "[x]" || taskText === "[X]";
+    const taskTextEnd =
+      taskEnd < line.to && line.text[taskEnd - line.from] === " "
+        ? taskEnd + 1
+        : taskEnd;
+
+    out.push({
+      from: markerStart,
+      to: taskTextEnd,
+      decoration: Decoration.replace({
+        widget: new CheckboxWidget(checked, textStart, taskEnd),
+      }),
+    });
+  } else if (isOrdered) {
+    const num = marker.replace(/\D/g, "") + ".";
+    out.push({
+      from: markerStart,
+      to: textStart,
       decoration: Decoration.replace({
         widget: new OrderedNumberWidget(num),
       }),
     });
   } else {
     out.push({
-      from: node.from,
-      to: replaceEnd,
+      from: markerStart,
+      to: textStart,
       decoration: Decoration.replace({
         widget: new BulletWidget(),
       }),
-    });
-  }
-}
-
-export function handleTaskMarker(
-  node: SyntaxNodeRef,
-  ctx: BuilderContext,
-  out: DecorationEntry[],
-): void {
-  const text = ctx.state.sliceDoc(node.from, node.to);
-  const checked = text === "[x]" || text === "[X]";
-
-  // Replace [ ]/[x] with an interactive checkbox widget
-  // Include the trailing space in the replacement if present
-  const afterMarker = node.to;
-  const line = ctx.state.doc.lineAt(node.from);
-  const endOfReplace =
-    afterMarker < line.to && line.text[afterMarker - line.from] === " "
-      ? afterMarker + 1
-      : afterMarker;
-
-  out.push({
-    from: node.from,
-    to: endOfReplace,
-    decoration: Decoration.replace({
-      widget: new CheckboxWidget(checked, node.from, node.to),
-    }),
-  });
-
-  // Add line decoration for checked items (muted + strikethrough)
-  if (checked) {
-    out.push({
-      from: line.from,
-      to: line.from,
-      decoration: taskCheckedLine,
     });
   }
 }

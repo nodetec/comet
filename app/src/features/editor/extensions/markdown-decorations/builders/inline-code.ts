@@ -20,7 +20,7 @@ export function handleInlineCode(
   // Always apply code styling to the full span
   out.push({ from: node.from, to: node.to, decoration: codeMark });
 
-  // Hide backtick delimiters when off cursor line
+  // Hide backtick delimiters when cursor is outside
   if (!onCursor) {
     for (const child of resolved.getChildren("CodeMark")) {
       out.push({
