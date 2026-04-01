@@ -29,6 +29,7 @@ import {
 } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import {
+  $createLineBreakNode,
   $createParagraphNode,
   $createTextNode,
   $getRoot,
@@ -295,6 +296,20 @@ describe("markdown editor pipeline", () => {
     );
   });
 
+  it("exports indented code blocks after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      const code = $createCodeNode("indented");
+      code.append($createTextNode("console.log('hi');"));
+
+      root.append(lead, code);
+    });
+
+    expect(markdown).toBe(["Lead", "    console.log('hi');"].join("\n"));
+  });
+
   it("exports a horizontal rule after top-level text with a single newline", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const lead = $createParagraphNode();
@@ -373,9 +388,7 @@ describe("markdown editor pipeline", () => {
       root.append(outer);
     });
 
-    expect(markdown).toBe(
-      ["> outer", ">", "> > inner", "> >", "> > > deep"].join("\n"),
-    );
+    expect(markdown).toBe(["> outer", "> > inner", "> > > deep"].join("\n"));
   });
 
   it("exports nested bullet lists under checklist items without converting them", () => {
@@ -395,6 +408,24 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("indents multiline list item continuations under the marker", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const list = $createListNode("bullet");
+      const item = $createListItemNode();
+      item.append(
+        $createTextNode("high quality and fast image"),
+        $createLineBreakNode(),
+        $createTextNode("resize in browser."),
+      );
+      list.append(item);
+      root.append(list);
+    });
+
+    expect(markdown).toBe(
+      ["- high quality and fast image", "  resize in browser."].join("\n"),
+    );
   });
 
   it("does not export list cursor anchors", () => {

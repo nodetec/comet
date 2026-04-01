@@ -18,7 +18,6 @@ import {
   type PointType,
 } from "lexical";
 import { $findMatchingParent } from "@lexical/utils";
-import { $generateNodesFromDOM } from "@lexical/html";
 import { renderMarkdownToHtml } from "@/shared/api/invoke";
 import { importImageBytes } from "@/shared/lib/attachments";
 import {
@@ -32,10 +31,7 @@ import {
   parseSingleFencedCodeBlock,
   trimBoundaryEmptyParagraphs,
 } from "../lib/markdown-paste";
-import {
-  normalizeImportedCodeBlocksFromMarkdown,
-  normalizeImportedNodes,
-} from "../lib/markdown";
+import { createNormalizedMarkdownNodesFromHTML } from "../lib/markdown";
 
 /* eslint-disable sonarjs/slow-regex -- patterns are tested against bounded clipboard content */
 // Patterns that strongly indicate markdown content
@@ -343,13 +339,6 @@ function insertFallbackPlainText(
   $getRoot().append(paragraph);
 }
 
-function htmlToDOM(html: string): Document {
-  return new DOMParser().parseFromString(
-    `<!DOCTYPE html><html><body>${html}</body></html>`,
-    "text/html",
-  );
-}
-
 type LoadKeyRef = { current: string };
 
 function insertRenderedMarkdown(
@@ -367,9 +356,7 @@ function insertRenderedMarkdown(
 
     restoreSelectionSnapshot(selectionSnapshot);
 
-    const dom = htmlToDOM(html);
-    const allNodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
-    normalizeImportedCodeBlocksFromMarkdown(allNodes, text);
+    const allNodes = createNormalizedMarkdownNodesFromHTML(editor, html, text);
     // Filter to block-level nodes only — $generateNodesFromDOM may
     // produce stray TextNodes from whitespace between HTML tags
     const filteredNodes = allNodes.filter(isBlockLevelNode);

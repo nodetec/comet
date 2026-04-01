@@ -112,7 +112,6 @@ function exportQuoteNode(
 
   const lines: string[] = [];
   let pendingBlankLines = 0;
-  let hasContent = false;
 
   const pushBlankLines = (count: number) => {
     for (let i = 0; i < count; i++) {
@@ -135,23 +134,18 @@ function exportQuoteNode(
       childMd = child.getTextContent();
     }
 
-    if (hasContent) {
-      pushBlankLines(Math.max(1, pendingBlankLines));
-    } else if (pendingBlankLines > 0) {
+    if (pendingBlankLines > 0) {
       pushBlankLines(pendingBlankLines);
+      pendingBlankLines = 0;
     }
 
-    pendingBlankLines = 0;
     lines.push(
       ...childMd.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)),
     );
-    hasContent = true;
   }
 
   if (pendingBlankLines > 0) {
-    pushBlankLines(
-      hasContent ? Math.max(1, pendingBlankLines) : pendingBlankLines,
-    );
+    pushBlankLines(pendingBlankLines);
   }
 
   return lines.join("\n");

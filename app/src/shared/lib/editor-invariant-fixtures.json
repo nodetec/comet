@@ -48,7 +48,7 @@
       "skipClipboardRoundtrip": true,
       "skipLexicalRoundtrip": true,
       "title": "",
-      "markdown": "> Blockquotes can also be nested...\n>\n> > ...by using additional greater-than signs right next to each other...\n> >\n> > > ...or with spaces between arrows.",
+      "markdown": "> Blockquotes can also be nested...\n> > ...by using additional greater-than signs right next to each other...\n> > > ...or with spaces between arrows.",
       "html": "<blockquote><p>Blockquotes can also be nested...</p><blockquote><p>...by using additional greater-than signs right next to each other...</p><blockquote><p>...or with spaces between arrows.</p></blockquote></blockquote></blockquote>"
     },
     {
@@ -58,8 +58,8 @@
       "skipClipboardRoundtrip": true,
       "skipLexicalRoundtrip": true,
       "title": "",
-      "markdown": "- [**pica**](https://nodeca.github.io/pica/demo/) - high quality and fast image\nresize in browser.\n\n\nYou will like those projects!",
-      "html": "<ul><li><a href=\"https://nodeca.github.io/pica/demo/\"><strong>pica</strong></a> - high quality and fast image<br />\nresize in browser.</li></ul><p><br></p><p><br></p><p>You will like those projects!</p>"
+      "markdown": "- [**pica**](https://nodeca.github.io/pica/demo/) - high quality and fast image\n  resize in browser.\n\nYou will like those projects!",
+      "html": "<ul><li><a href=\"https://nodeca.github.io/pica/demo/\"><strong>pica</strong></a> - high quality and fast image<br />\nresize in browser.</li></ul><p><br></p><p>You will like those projects!</p>"
     },
     {
       "id": "heading-link-literal-angle-label",

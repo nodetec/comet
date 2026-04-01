@@ -36,9 +36,9 @@ import { YouTubeNode } from "../nodes/youtube-node";
 import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import { ListAnchorNode } from "../nodes/list-anchor-node";
 import {
-  normalizeImportedCodeBlocksFromMarkdown,
-  normalizeImportedNodes,
   $exportMarkdown,
+  createNormalizedMarkdownNodesFromHTML,
+  normalizeImportedNodes,
 } from "./markdown";
 import {
   isBlockLevelNode,
@@ -111,11 +111,11 @@ describe("trimBoundaryEmptyParagraphs", () => {
 
       editor.update(
         () => {
-          const dom = htmlToDOM(fixture.html);
-          const allNodes = normalizeImportedNodes(
-            $generateNodesFromDOM(editor, dom),
+          const allNodes = createNormalizedMarkdownNodesFromHTML(
+            editor,
+            fixture.html,
+            fixture.markdown,
           );
-          normalizeImportedCodeBlocksFromMarkdown(allNodes, fixture.markdown);
           const filteredNodes = allNodes.filter(isBlockLevelNode);
           const nodes = trimBoundaryEmptyParagraphs(
             filteredNodes,
