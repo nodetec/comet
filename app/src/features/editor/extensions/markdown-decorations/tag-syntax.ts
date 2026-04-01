@@ -11,14 +11,14 @@ const HASH_CODES = new Set([35, 65_283]);
 
 function isTagChar(code: number): boolean {
   // Letters, numbers, underscore, hyphen
-  if (code >= 0x41 && code <= 0x5A) return true; // A-Z
-  if (code >= 0x61 && code <= 0x7A) return true; // a-z
-  if (code >= 0x30 && code <= 0x39) return true; // 0-9
-  if (code === 0x5F) return true; // _
-  if (code === 0x2D) return true; // -
-  if (code === 0x2F) return true; // /
+  if (code >= 65 && code <= 90) return true; // A-Z
+  if (code >= 97 && code <= 122) return true; // a-z
+  if (code >= 48 && code <= 57) return true; // 0-9
+  if (code === 95) return true; // _
+  if (code === 45) return true; // -
+  if (code === 47) return true; // /
   // Extended unicode letters
-  if (code >= 0xC0) return true;
+  if (code >= 192) return true;
   return false;
 }
 
