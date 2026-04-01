@@ -37,6 +37,7 @@ import { type NoteConflictInfo } from "@/shared/api/types";
 
 type EditorPaneProps = {
   archivedAt: number | null;
+  autoFocusEditor: boolean;
   deletedAt: number | null;
   editorKey: string | null;
   isDeletePublishedNotePending: boolean;
@@ -51,6 +52,7 @@ type EditorPaneProps = {
   readonly: boolean;
   selectedConflictRevisionId: string | null;
   searchQuery: string;
+  onAutoFocusEditorHandled(): void;
   onDeletePublishedNote(): void;
   onDuplicateNote(): void;
   onOpenPublishDialog(): void;
@@ -339,6 +341,7 @@ function useFindBar({
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
+  autoFocusEditor,
   deletedAt,
   editorKey,
   isDeletePublishedNotePending,
@@ -353,6 +356,7 @@ export function EditorPane({
   readonly,
   selectedConflictRevisionId,
   searchQuery,
+  onAutoFocusEditorHandled,
   onDeletePublishedNote,
   onDuplicateNote,
   onOpenPublishDialog,
@@ -457,9 +461,11 @@ export function EditorPane({
 
     return (
       <NoteEditor
+        autoFocus={autoFocusEditor}
         loadKey={editorLoadKey ?? noteId}
         markdown={markdown}
         onChange={onChange}
+        onAutoFocusHandled={onAutoFocusEditorHandled}
         onEditorFocusChange={(focused) => {
           if (focused) {
             setFocusedPane("editor");

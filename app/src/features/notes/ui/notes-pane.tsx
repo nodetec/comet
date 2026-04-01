@@ -433,6 +433,27 @@ function noteRowClassName(params: {
   ].join(" ");
 }
 
+function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  useShellStore.getState().setFocusedPane("notes");
+
+  const activeElement = document.activeElement;
+  if (
+    activeElement instanceof HTMLElement &&
+    activeElement !== event.currentTarget &&
+    activeElement.closest(".cm-editor")
+  ) {
+    activeElement.blur();
+  }
+
+  window.getSelection()?.removeAllRanges();
+
+  event.currentTarget.focus({ preventScroll: true });
+}
+
 const NoteRow = memo(function NoteRow({
   focusedPane,
   highlightWords,
@@ -474,6 +495,7 @@ const NoteRow = memo(function NoteRow({
         })}
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
+        onPointerDown={handleNoteRowPointerDown}
         onMouseDown={(event) => {
           if (event.button === 2) {
             event.preventDefault();

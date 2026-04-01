@@ -51,6 +51,8 @@ export function useShellController() {
   const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
     string | null
   >(null);
+  const [pendingAutoFocusEditorNoteId, setPendingAutoFocusEditorNoteId] =
+    useState<string | null>(null);
   const [syncEditorRevision, setSyncEditorRevision] = useState(0);
   const [chooseConflictDialogOpen, setChooseConflictDialogOpen] =
     useState(false);
@@ -174,6 +176,7 @@ export function useShellController() {
     setSelectedNoteId,
     setDraft,
     setCreatingSelectedNoteId,
+    setPendingAutoFocusEditorNoteId,
     setIsCreatingNoteTransition,
     setNoteFilter,
   });
@@ -242,6 +245,7 @@ export function useShellController() {
   ]);
 
   const currentNote = selectedNoteId ? noteQuery.data : undefined;
+  const currentNoteId = currentNote?.id ?? null;
   const currentNoteConflict = selectedNoteId
     ? noteConflictQuery.data
     : undefined;
@@ -746,6 +750,7 @@ export function useShellController() {
 
     flushCurrentDraft();
     setCreatingSelectedNoteId(null);
+    setPendingAutoFocusEditorNoteId(null);
     setSelectedNoteId(noteId);
   };
 
@@ -1086,6 +1091,7 @@ export function useShellController() {
   const nextEditorPaneProps = useMemo(
     () => ({
       archivedAt: currentNote?.archivedAt ?? null,
+      autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
       deletedAt: currentNote?.deletedAt ?? null,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
@@ -1117,6 +1123,11 @@ export function useShellController() {
       onDuplicateNote() {
         if (currentNote) {
           latestRef.current.handleDuplicateNote(currentNote.id);
+        }
+      },
+      onAutoFocusEditorHandled() {
+        if (currentNoteId === pendingAutoFocusEditorNoteId) {
+          setPendingAutoFocusEditorNoteId(null);
         }
       },
       onOpenPublishDialog() {
@@ -1166,18 +1177,21 @@ export function useShellController() {
       currentEditorMarkdown,
       currentNoteConflict,
       currentNote,
+      currentNoteId,
       displayedSelectedNoteId,
       isDeletePublishedNotePending,
       isCreatingNote,
       isPublishNotePending,
       isPublishShortNotePending,
       isResolveConflictPending,
+      pendingAutoFocusEditorNoteId,
       searchQuery,
       selectedConflictRevisionId,
       setChooseConflictNoteId,
       setChooseConflictDialogOpen,
       setDeletePublishDialogOpen,
       setDraft,
+      setPendingAutoFocusEditorNoteId,
       setPublishDialogOpen,
       setPublishShortNoteDialogOpen,
       syncEditorRevision,
@@ -1244,7 +1258,6 @@ export function useShellController() {
     ],
   );
 
-  const currentNoteId = currentNote?.id ?? null;
   const deletePublishDialogProps = useMemo(
     () => ({
       open: deletePublishDialogOpen,

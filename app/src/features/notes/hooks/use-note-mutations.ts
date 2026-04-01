@@ -33,6 +33,7 @@ export interface NoteMutationDeps {
   setSelectedNoteId: (id: string | null) => void;
   setDraft: (id: string, markdown: string) => void;
   setCreatingSelectedNoteId: (id: string | null) => void;
+  setPendingAutoFocusEditorNoteId: (id: string | null) => void;
   setIsCreatingNoteTransition: (v: boolean) => void;
   setNoteFilter: (filter: NoteFilter) => void;
 }
@@ -49,6 +50,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     setSelectedNoteId,
     setDraft,
     setCreatingSelectedNoteId,
+    setPendingAutoFocusEditorNoteId,
     setIsCreatingNoteTransition,
     setNoteFilter,
   } = deps;
@@ -74,6 +76,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     onSuccess: (note) => {
       queryClient.setQueryData(["note", note.id], note);
       setCreatingSelectedNoteId(note.id);
+      setPendingAutoFocusEditorNoteId(note.id);
       setSelectedNoteId(note.id);
       setDraft(note.id, note.markdown);
       setIsCreatingNoteTransition(false);

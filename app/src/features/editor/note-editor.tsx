@@ -35,8 +35,10 @@ import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
 type NoteEditorProps = {
+  autoFocus?: boolean;
   loadKey: string;
   markdown: string;
+  onAutoFocusHandled?(): void;
   onEditorFocusChange?(focused: boolean): void;
   onSearchMatchCountChange?(count: number): void;
   readOnly: boolean;
@@ -207,9 +209,11 @@ function focusAndClickAtLine(
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function NoteEditor(
     {
+      autoFocus = false,
       loadKey,
       markdown,
       onChange,
+      onAutoFocusHandled,
       onEditorFocusChange,
       onSearchMatchCountChange,
       readOnly,
@@ -432,23 +436,40 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       }
 
       applyingExternalChangeRef.current = true;
-      const nextSelection = isNewLoad
-        ? EditorSelection.cursor(0)
-        : EditorSelection.cursor(
-            Math.min(view.state.selection.main.head, nextMarkdown.length),
-          );
 
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: nextMarkdown,
-        },
-        selection: nextSelection,
-      });
+      if (isNewLoad) {
+        // Replace content without setting selection — avoids WebKit
+        // focusing the contenteditable when the DOM selection is updated
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: nextMarkdown,
+          },
+        });
+
+        if (autoFocus) {
+          view.focus();
+          onAutoFocusHandled?.();
+        } else {
+          view.contentDOM.blur();
+        }
+      } else {
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: nextMarkdown,
+          },
+          selection: EditorSelection.cursor(
+            Math.min(view.state.selection.main.head, nextMarkdown.length),
+          ),
+        });
+      }
+
       applyingExternalChangeRef.current = false;
       lastLoadKeyRef.current = loadKey;
-    }, [loadKey, markdown]);
+    }, [autoFocus, loadKey, markdown, onAutoFocusHandled]);
 
     useEffect(() => {
       const view = viewRef.current;
