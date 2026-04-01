@@ -40,7 +40,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_secure_storage::init())
-        .manage(infra::cache::RenderedHtmlCache::default())
         .manage(crate::adapters::tauri::key_store::UnlockedNostrKeys::default())
         .manage(crate::adapters::nostr::sync_manager::SyncManager::new())
         .setup(|app| {
@@ -68,7 +67,6 @@ pub fn run() {
             commands::notes::query_notes,
             commands::notes::contextual_tags,
             commands::notes::load_note,
-            commands::notes::render_markdown_to_html,
             commands::notes::get_note_conflict,
             commands::notes::resolve_note_conflict,
             commands::notes::create_note,

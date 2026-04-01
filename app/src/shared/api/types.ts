@@ -23,7 +23,6 @@ export type NoteSummary = {
 export type LoadedNote = {
   archivedAt: number | null;
   deletedAt: number | null;
-  html: string;
   id: string;
   markdown: string;
   modifiedAt: number;

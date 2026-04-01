@@ -22,7 +22,6 @@ pub struct LoadedNote {
     pub title: String,
     pub modified_at: i64,
     pub markdown: String,
-    pub html: String,
     pub archived_at: Option<i64>,
     pub deleted_at: Option<i64>,
     pub pinned_at: Option<i64>,

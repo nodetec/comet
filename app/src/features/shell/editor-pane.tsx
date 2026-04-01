@@ -31,7 +31,6 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
-import { renderMarkdownToHtml } from "@/shared/api/invoke";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
@@ -43,10 +42,8 @@ type EditorPaneProps = {
   deletedAt: number | null;
   editorKey: string | null;
   focusMode: "none" | "immediate" | "pointerup";
-  html: string | null;
   isDeletePublishedNotePending: boolean;
   isResolveConflictPending: boolean;
-  isNewNote: boolean;
   markdown: string;
   modifiedAt: number;
   noteConflict: NoteConflictInfo | null;
@@ -182,7 +179,7 @@ function useEditorScrollHeader(
       }
 
       const firstLine = scrollContainer.querySelector(
-        "[data-lexical-editor] > :first-child",
+        ".cm-content > .cm-line:first-child",
       ) as HTMLElement | null;
 
       if (!firstLine) {
@@ -343,140 +340,14 @@ function useFindBar({
   };
 }
 
-type ResolvedEditorHtmlParams = {
-  html: string | null;
-  isNewNote: boolean;
-  loadKey: string | null;
-  markdown: string;
-  noteId: string | null;
-};
-
-type ResolvedEditorHtmlState = {
-  html: string | null;
-  loadKey: string | null;
-  ready: boolean;
-};
-
-function shouldRenderEditorMarkdownAsHtml({
-  html,
-  isNewNote,
-  markdown,
-  noteId,
-}: Omit<ResolvedEditorHtmlParams, "loadKey">): boolean {
-  if (!noteId || html !== null) {
-    return false;
-  }
-
-  if (!markdown.trim()) {
-    return false;
-  }
-
-  if (isNewNote && markdown === "- [ ] ") {
-    return false;
-  }
-
-  return true;
-}
-
-function useResolvedEditorHtml({
-  html,
-  isNewNote,
-  loadKey,
-  markdown,
-  noteId,
-}: ResolvedEditorHtmlParams): ResolvedEditorHtmlState {
-  const latestParamsRef = useRef({
-    html,
-    isNewNote,
-    markdown,
-    noteId,
-  });
-
-  useEffect(() => {
-    latestParamsRef.current = {
-      html,
-      isNewNote,
-      markdown,
-      noteId,
-    };
-  }, [html, isNewNote, markdown, noteId]);
-
-  const [state, setState] = useState<ResolvedEditorHtmlState>(() => ({
-    html,
-    loadKey,
-    ready: !shouldRenderEditorMarkdownAsHtml({
-      html,
-      isNewNote,
-      markdown,
-      noteId,
-    }),
-  }));
-
-  useEffect(() => {
-    const {
-      html: latestHtml,
-      isNewNote: latestIsNewNote,
-      markdown: latestMarkdown,
-      noteId: latestNoteId,
-    } = latestParamsRef.current;
-
-    if (
-      !shouldRenderEditorMarkdownAsHtml({
-        html: latestHtml,
-        isNewNote: latestIsNewNote,
-        markdown: latestMarkdown,
-        noteId: latestNoteId,
-      })
-    ) {
-      setState({ html: latestHtml, loadKey, ready: true });
-      return;
-    }
-
-    let cancelled = false;
-    setState({ html: null, loadKey, ready: false });
-
-    void renderMarkdownToHtml(latestMarkdown)
-      .then((resolvedHtml) => {
-        if (cancelled) {
-          return;
-        }
-        setState({ html: resolvedHtml, loadKey, ready: true });
-      })
-      .catch((error) => {
-        console.error("[editor:init] markdown render failed", error);
-        if (cancelled) {
-          return;
-        }
-        // Fall back to Lexical's direct markdown import if backend rendering fails.
-        setState({ html: null, loadKey, ready: true });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadKey]);
-
-  if (html !== null) {
-    return { html, loadKey, ready: true };
-  }
-
-  if (state.loadKey !== loadKey) {
-    return { html: null, loadKey, ready: false };
-  }
-
-  return state;
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
   deletedAt,
   editorKey,
   focusMode,
-  html,
   isDeletePublishedNotePending,
   isResolveConflictPending,
-  isNewNote,
   markdown,
   modifiedAt,
   noteConflict,
@@ -505,13 +376,8 @@ export function EditorPane({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [toolbarContainer, setToolbarContainer] =
     useState<HTMLDivElement | null>(null);
-  const [devtoolsContainer, setDevtoolsContainer] =
-    useState<HTMLDivElement | null>(null);
   const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
     setToolbarContainer(node);
-  }, []);
-  const devtoolsContainerRef = useCallback((node: HTMLDivElement | null) => {
-    setDevtoolsContainer(node);
   }, []);
   const showToolbar = useUIStore((s) => s.showEditorToolbar);
   const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
@@ -581,19 +447,13 @@ export function EditorPane({
   const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
     useEditorScrollHeader(noteId, scrollContainerRef);
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
-  const resolvedEditorHtml = useResolvedEditorHtml({
-    html,
-    isNewNote,
-    loadKey: editorLoadKey,
-    markdown,
-    noteId,
-  });
-  const isEditorReady = resolvedEditorHtml.ready;
-  let editorContent: React.ReactNode = null;
+  const editorContent = (() => {
+    if (noteId === null) {
+      return null;
+    }
 
-  if (noteId) {
     if (isViewingDeletedConflictHead) {
-      editorContent = (
+      return (
         <div className="flex min-h-full items-center justify-center px-6">
           <div className="max-w-sm text-center">
             <p className="text-foreground text-sm font-medium">
@@ -606,42 +466,38 @@ export function EditorPane({
           </div>
         </div>
       );
-    } else if (isEditorReady) {
-      editorContent = (
-        <NoteEditor
-          devtoolsContainer={devtoolsContainer}
-          focusMode={focusMode}
-          html={resolvedEditorHtml.html}
-          isNew={isNewNote}
-          loadKey={editorLoadKey ?? noteId}
-          markdown={markdown}
-          onChange={onChange}
-          onEditorFocusChange={(focused) => {
-            if (focused) {
-              setFocusedPane("editor");
-            }
-          }}
-          onFocusHandled={onFocusHandled}
-          onSearchMatchCountChange={
-            isUsingEditorFindSearch ? setFindMatchCount : undefined
-          }
-          readOnly={isReadOnly}
-          ref={editorRef}
-          searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
-          searchActiveMatchIndex={
-            isUsingEditorFindSearch ? activeFindMatchIndex : null
-          }
-          searchQuery={editorSearchQuery}
-          searchScrollRevision={
-            isUsingEditorFindSearch ? findScrollRevision : undefined
-          }
-          toolbarContainer={toolbarContainer}
-        />
-      );
-    } else {
-      editorContent = <div className="min-h-full" />;
     }
-  }
+
+    return (
+      <NoteEditor
+        focusMode={focusMode}
+        loadKey={editorLoadKey ?? noteId}
+        markdown={markdown}
+        onChange={onChange}
+        onEditorFocusChange={(focused) => {
+          if (focused) {
+            setFocusedPane("editor");
+          }
+        }}
+        onFocusHandled={onFocusHandled}
+        onSearchMatchCountChange={
+          isUsingEditorFindSearch ? setFindMatchCount : undefined
+        }
+        readOnly={isReadOnly}
+        ref={editorRef}
+        searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
+        searchActiveMatchIndex={
+          isUsingEditorFindSearch ? activeFindMatchIndex : null
+        }
+        searchQuery={editorSearchQuery}
+        searchScrollRevision={
+          isUsingEditorFindSearch ? findScrollRevision : undefined
+        }
+        spellCheck={editorSpellCheck}
+        toolbarContainer={toolbarContainer}
+      />
+    );
+  })();
 
   const openEditorMenu = useCallback(
     async (position: LogicalPosition) => {
@@ -700,12 +556,22 @@ export function EditorPane({
     }
 
     const target = event.target as HTMLElement;
+    const clickedInsideEditor = target.closest(".cm-editor") !== null;
 
     if (target.closest("button, input, textarea, select, a, [role='button']")) {
       return;
     }
 
-    if (target.closest("[data-lexical-editor]")) {
+    if (target.closest(".cm-content")) {
+      return;
+    }
+
+    if (editorRef.current?.focusAtSurfacePoint(event.clientX, event.clientY)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (clickedInsideEditor) {
       return;
     }
 
@@ -946,11 +812,6 @@ export function EditorPane({
             </div>
           )}
         </div>
-        {noteId ? (
-          <div className="pointer-events-none absolute top-4 right-4 z-50">
-            <div className="pointer-events-auto" ref={devtoolsContainerRef} />
-          </div>
-        ) : null}
       </div>
 
       {noteId && !isReadOnly && showToolbar && (

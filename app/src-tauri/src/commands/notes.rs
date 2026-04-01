@@ -6,7 +6,6 @@ use crate::domain::notes::model::*;
 use crate::domain::notes::service::NoteService;
 use crate::domain::sync::model::SyncCommand;
 use crate::error::AppError;
-use crate::infra::cache::RenderedHtmlCache;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 use rusqlite::{params, OptionalExtension};
 use tauri::{AppHandle, Manager};
@@ -25,29 +24,13 @@ fn sync_push(app: &AppHandle, cmd: SyncCommand) {
     });
 }
 
-fn render_html(app: &AppHandle, note_id: &str, modified_at: i64, markdown: &str) -> String {
-    let cache = app.state::<RenderedHtmlCache>();
-    if let Some(html) = cache.get(note_id, modified_at) {
-        return html;
-    }
-    let html = crate::adapters::markdown::renderer::markdown_to_lexical_html(markdown);
-    cache.insert(note_id.to_string(), modified_at, html.clone());
-    html
-}
-
-fn record_to_loaded_note(
-    app: &AppHandle,
-    record: NoteRecord,
-    repo: &SqliteNoteRepository,
-) -> Result<LoadedNote, AppError> {
+fn record_to_loaded_note(record: NoteRecord, repo: &SqliteNoteRepository) -> Result<LoadedNote, AppError> {
     let tags = repo.tags_for_note(&record.id)?;
-    let html = render_html(app, &record.id, record.modified_at, &record.markdown);
     Ok(LoadedNote {
         id: record.id,
         title: record.title,
         modified_at: record.modified_at,
         markdown: record.markdown,
-        html,
         archived_at: record.archived_at,
         deleted_at: record.deleted_at,
         pinned_at: record.pinned_at,
@@ -142,12 +125,7 @@ pub fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::load_note(&repo, &note_id)?;
-    record_to_loaded_note(&app, record, &repo)
-}
-
-#[tauri::command]
-pub fn render_markdown_to_html(markdown: String) -> String {
-    crate::adapters::markdown::renderer::markdown_to_lexical_html(&markdown)
+    record_to_loaded_note(record, &repo)
 }
 
 #[tauri::command]
@@ -375,7 +353,7 @@ pub fn create_note(
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::create_note(&repo, &tags, markdown.as_deref())?;
-    record_to_loaded_note(&app, record, &repo)
+    record_to_loaded_note(record, &repo)
 }
 
 #[tauri::command]
@@ -383,7 +361,7 @@ pub fn duplicate_note(app: AppHandle, note_id: String) -> Result<LoadedNote, App
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::duplicate_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note.id.clone()));
     Ok(note)
 }
@@ -394,7 +372,7 @@ pub fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, App
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let (record, content_changed) = NoteService::save_note(&repo, input)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     if content_changed {
         sync_push(&app, SyncCommand::PushNote(note_id));
     }
@@ -410,7 +388,7 @@ pub fn set_note_readonly(
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::set_readonly(&repo, input)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -421,9 +399,7 @@ pub fn rename_tag(app: AppHandle, input: RenameTagInput) -> Result<Vec<String>, 
     let repo = SqliteNoteRepository::new(&conn);
     let affected_note_ids = NoteService::rename_tag(&repo, input)?;
 
-    let cache = app.state::<RenderedHtmlCache>();
     for note_id in &affected_note_ids {
-        cache.invalidate(note_id);
         sync_push(&app, SyncCommand::PushNote(note_id.clone()));
     }
 
@@ -436,9 +412,7 @@ pub fn delete_tag(app: AppHandle, input: DeleteTagInput) -> Result<Vec<String>, 
     let repo = SqliteNoteRepository::new(&conn);
     let affected_note_ids = NoteService::delete_tag(&repo, input)?;
 
-    let cache = app.state::<RenderedHtmlCache>();
     for note_id in &affected_note_ids {
-        cache.invalidate(note_id);
         sync_push(&app, SyncCommand::PushNote(note_id.clone()));
     }
 
@@ -469,7 +443,7 @@ pub fn archive_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppEr
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::archive_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -479,7 +453,7 @@ pub fn restore_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppEr
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::restore_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -489,7 +463,7 @@ pub fn trash_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppErro
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::trash_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -499,7 +473,7 @@ pub fn restore_from_trash(app: AppHandle, note_id: String) -> Result<LoadedNote,
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::restore_from_trash(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -519,10 +493,6 @@ pub fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), Ap
     let blossom_deletions =
         crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
-
-    // Invalidate cached HTML.
-    let cache = app.state::<RenderedHtmlCache>();
-    cache.invalidate(&note_id);
 
     // Record pending deletion for sync.
     let _ = conn.execute(
@@ -550,10 +520,8 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
         crate::domain::blob::service::cleanup_orphaned_blobs(&app, &conn, &orphaned);
     spawn_blossom_deletions(&app, blossom_deletions);
 
-    // Invalidate cached HTML and record pending deletions.
-    let cache = app.state::<RenderedHtmlCache>();
+    // Record pending deletions.
     for note_id in &note_ids {
-        cache.invalidate(note_id);
         let _ = conn.execute(
             "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
             rusqlite::params![note_id, now_millis()],
@@ -569,7 +537,7 @@ pub fn pin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError>
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::pin_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }
@@ -579,7 +547,7 @@ pub fn unpin_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppErro
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::unpin_note(&repo, &note_id)?;
-    let note = record_to_loaded_note(&app, record, &repo)?;
+    let note = record_to_loaded_note(record, &repo)?;
     sync_push(&app, SyncCommand::PushNote(note_id));
     Ok(note)
 }

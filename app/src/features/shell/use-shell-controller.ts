@@ -1098,12 +1098,6 @@ export function useShellController() {
         !isCreatingNoteTransition
           ? editorFocusMode
           : ("none" as const),
-      html:
-        currentNote && currentEditorMarkdown === currentNote.markdown
-          ? (currentNote.html ?? null)
-          : null,
-      isNewNote:
-        currentNote != null && currentNote.id === creatingSelectedNoteId,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
       noteConflict: currentNoteConflict ?? null,

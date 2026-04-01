@@ -86,16 +86,11 @@ export async function loadNote(noteId: string) {
     console.log("[editor:loadNote]", {
       noteId,
       markdownLength: note.markdown.length,
-      htmlLength: note.html.length,
       totalMs: Number((performance.now() - startedAt).toFixed(1)),
     });
   }
 
   return note;
-}
-
-export async function renderMarkdownToHtml(markdown: string) {
-  return invoke<string>("render_markdown_to_html", { markdown });
 }
 
 export async function getNoteConflict(noteId: string) {

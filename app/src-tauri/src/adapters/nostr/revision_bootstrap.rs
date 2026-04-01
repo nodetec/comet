@@ -14,7 +14,7 @@ use rusqlite::Connection;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::time::timeout;
 use url::Url;
 
@@ -45,10 +45,7 @@ pub async fn bootstrap_relay_connection(
         &db_path,
         &keys,
         relay_ws_url,
-        |note_id| {
-            app.state::<crate::infra::cache::RenderedHtmlCache>()
-                .invalidate(note_id);
-        },
+        |_| {},
         |change| {
             let _ = app.emit("sync-remote-change", change);
         },
