@@ -1,7 +1,11 @@
-import type { Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { type Extension, Prec } from "@codemirror/state";
+import { EditorView, keymap } from "@codemirror/view";
 
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
+import {
+  dedentListItem,
+  indentListItem,
+} from "@/features/editor/extensions/markdown-decorations/list-keymap";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
 
 const markdownDecorationsTheme = EditorView.baseTheme({
@@ -152,6 +156,13 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
 });
 
+const listKeymap = Prec.high(
+  keymap.of([
+    { key: "Tab", run: indentListItem },
+    { key: "Shift-Tab", run: dedentListItem },
+  ]),
+);
+
 export function markdownDecorations(): Extension {
-  return [markdownDecorationsPlugin, markdownDecorationsTheme];
+  return [markdownDecorationsPlugin, markdownDecorationsTheme, listKeymap];
 }
