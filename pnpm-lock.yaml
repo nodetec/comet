@@ -58,6 +58,9 @@ importers:
       "@fontsource-variable/nunito-sans":
         specifier: ^5.2.7
         version: 5.2.7
+      "@lezer/common":
+        specifier: ^1.5.1
+        version: 1.5.1
       "@lezer/highlight":
         specifier: ^1.2.3
         version: 1.2.3

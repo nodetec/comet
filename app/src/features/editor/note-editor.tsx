@@ -24,6 +24,7 @@ import {
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
+import { markdownDecorations } from "@/features/editor/extensions/markdown-decorations";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -273,6 +274,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           EditorView.lineWrapping,
           markdownLanguage(),
           inlineImages(),
+          markdownDecorations(),
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {
