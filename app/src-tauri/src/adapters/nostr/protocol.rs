@@ -249,11 +249,11 @@ mod tests {
         let tags = normalize_publish_tags(&[
             "Roadmap".to_string(),
             "roadmap".to_string(),
-            "Work/Project Alpha".to_string(),
+            "Work/Project-Alpha".to_string(),
         ])
         .unwrap();
 
-        assert_eq!(tags, vec!["roadmap", "work/project alpha"]);
+        assert_eq!(tags, vec!["roadmap", "work/project-alpha"]);
     }
 
     #[test]

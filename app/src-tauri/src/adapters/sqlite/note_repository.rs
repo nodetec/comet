@@ -1425,7 +1425,7 @@ mod tests {
             &conn,
             "n1",
             "Tagged",
-            "# Tagged\n\n#work #project alpha#",
+            "# Tagged\n\n#work #project-alpha",
             10,
         );
 
@@ -1443,7 +1443,7 @@ mod tests {
         assert_eq!(count, 1);
         let exported = std::fs::read_to_string(export_dir.join("Tagged.md")).unwrap();
         assert!(!exported.contains("#work"));
-        assert!(!exported.contains("#project alpha#"));
+        assert!(!exported.contains("#project-alpha"));
 
         let _ = std::fs::remove_dir_all(export_dir);
     }

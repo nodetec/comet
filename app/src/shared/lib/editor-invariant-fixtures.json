@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "title-and-body",
+      "description": "Top-level H1 followed by a visible blank separator and paragraph body.",
+      "support": "lossless",
+      "title": "Title",
+      "markdown": "# Title\n\nBody",
+      "html": "<h1>Title</h1><p><br></p><p>Body</p>"
+    },
+    {
+      "id": "title-immediate-image",
+      "description": "Top-level H1 directly followed by an attachment image with no blank separator.",
+      "support": "lossless",
+      "title": "Title",
+      "markdown": "# Title\n![img](attachment://hash.png)",
+      "html": "<h1>Title</h1><p><img src=\"attachment://hash.png\" alt=\"img\" /></p>"
+    },
+    {
+      "id": "body-only-hr-and-strong",
+      "description": "Body-only markdown used when note title is carried separately in sync metadata.",
+      "support": "lossless",
+      "title": "h1 Heading 8-)",
+      "markdown": "---\n**Advertisement :)**",
+      "html": "<hr /><p><strong>Advertisement :)</strong></p>"
+    },
+    {
+      "id": "title-only",
+      "description": "A note containing only a title line.",
+      "support": "lossless",
+      "title": "Title",
+      "markdown": "# Title",
+      "html": "<h1>Title</h1>"
+    },
+    {
+      "id": "blockquote-paragraph-breaks",
+      "description": "A blockquote with a visible paragraph break between two quoted paragraphs.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "> first\n>\n> second",
+      "html": "<blockquote><p>first</p><p>second</p></blockquote>"
+    },
+    {
+      "id": "checklist-basic",
+      "description": "A basic two-item checklist with mixed checked states.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "- [ ] alpha\n- [x] beta",
+      "html": "<ul class=\"contains-task-list\"><li class=\"task-list-item\"><input type=\"checkbox\" class=\"task-list-item-checkbox\" disabled=\"\" /> alpha</li><li class=\"task-list-item\"><input type=\"checkbox\" class=\"task-list-item-checkbox\" checked=\"\" disabled=\"\" /> beta</li></ul>"
+    },
+    {
+      "id": "checklist-nested-bullet",
+      "description": "A checklist item with a nested plain bullet list.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "- [ ] parent\n  - child",
+      "html": "<ul class=\"contains-task-list\"><li class=\"task-list-item\"><input type=\"checkbox\" class=\"task-list-item-checkbox\" disabled=\"\" /> parent\n<ul><li>child</li></ul></li></ul>"
+    },
+    {
+      "id": "table-basic",
+      "description": "A simple two-column markdown table.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "| A | B |\n| --- | --- |\n| 1 | 2 |",
+      "html": "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    }
+  ]
+}
