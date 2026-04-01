@@ -1,5 +1,3 @@
-#[cfg(test)]
-use crate::domain::common::text::strip_title_line;
 use crate::domain::sync::model::SyncedNote;
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -7,6 +5,50 @@ use nostr_sdk::prelude::*;
 pub const COMET_EVENT_KIND: Kind = Kind::ApplicationSpecificData; // 30078
 pub const COMET_SCHEMA_VERSION: &str = "1";
 pub const COMET_CLIENT: &str = "comet";
+
+#[cfg(test)]
+fn split_markdown_title_prefix(markdown: &str, title: &str) -> String {
+    if title.is_empty() {
+        return markdown.to_string();
+    }
+
+    let Some(rest) = markdown.strip_prefix("# ") else {
+        return markdown.to_string();
+    };
+    let Some(newline_index) = rest.find('\n') else {
+        return String::new();
+    };
+
+    let line_title = rest[..newline_index].trim();
+    if line_title != title {
+        return markdown.to_string();
+    }
+
+    rest[newline_index..].to_string()
+}
+
+fn reconstruct_markdown_with_title(title: &str, content: &str) -> String {
+    if title.is_empty() {
+        return content.to_string();
+    }
+
+    if let Some(rest) = content.strip_prefix("# ") {
+        let first_line = rest.lines().next().unwrap_or_default().trim();
+        if first_line == title {
+            return content.to_string();
+        }
+    }
+
+    if content.is_empty() {
+        return format!("# {title}");
+    }
+
+    if content.starts_with('\n') {
+        return format!("# {title}{content}");
+    }
+
+    content.to_string()
+}
 
 pub fn comet_base_tags() -> Vec<Tag> {
     vec![
@@ -33,7 +75,7 @@ pub fn note_to_rumor(
     blob_tags: &[(String, String, String)], // (plaintext_hash, ciphertext_hash, encryption_key_hex)
     pubkey: PublicKey,
 ) -> UnsignedEvent {
-    let content = strip_title_line(markdown);
+    let content = split_markdown_title_prefix(markdown, title);
 
     let mut event_tags = comet_base_tags();
     event_tags.extend([
@@ -166,11 +208,7 @@ pub fn rumor_to_synced_note(rumor: &UnsignedEvent) -> Result<SyncedNote, AppErro
         .collect();
 
     // Reconstruct full markdown with title line
-    let markdown = if title.is_empty() {
-        rumor.content.clone()
-    } else {
-        format!("# {}\n\n{}", title, rumor.content)
-    };
+    let markdown = reconstruct_markdown_with_title(&title, &rumor.content);
 
     Ok(SyncedNote {
         id: note_id,
@@ -263,6 +301,81 @@ mod tests {
                 .and_then(|tag| tag.content()),
             Some("note")
         );
+    }
+
+    #[test]
+    fn note_roundtrip_preserves_exact_spacing_after_title() {
+        let pubkey = test_pubkey();
+        let markdown = "# Title\n![img](attachment://hash.png)";
+
+        let rumor = note_to_rumor(
+            "note-spacing",
+            "Title",
+            markdown,
+            1_000,
+            1_000,
+            1_000,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
+        );
+
+        let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+        assert_eq!(parsed.markdown, markdown);
+    }
+
+    #[test]
+    fn note_roundtrip_preserves_body_only_markdown_when_title_tag_is_separate() {
+        let pubkey = test_pubkey();
+        let markdown = ["---", "**Advertisement :)**"].join("\n");
+
+        let rumor = note_to_rumor(
+            "note-body-only",
+            "Title",
+            &markdown,
+            1_000,
+            1_000,
+            1_000,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
+        );
+
+        let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+        assert_eq!(parsed.markdown, markdown);
+    }
+
+    #[test]
+    fn note_roundtrip_preserves_title_only_markdown() {
+        let pubkey = test_pubkey();
+        let markdown = "# Title";
+
+        let rumor = note_to_rumor(
+            "note-title-only",
+            "Title",
+            markdown,
+            1_000,
+            1_000,
+            1_000,
+            None,
+            None,
+            None,
+            false,
+            &[],
+            &[],
+            pubkey,
+        );
+
+        let parsed = rumor_to_synced_note(&rumor).expect("parse should succeed");
+        assert_eq!(parsed.markdown, markdown);
     }
 
     #[test]

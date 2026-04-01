@@ -1,4 +1,3 @@
-use crate::domain::common::text::strip_title_line;
 use crate::error::AppError;
 use hmac::{Hmac, Mac};
 use nostr_sdk::prelude::*;
@@ -35,6 +34,26 @@ pub struct RevisionEnvelopeMeta {
     pub mtime: i64,
     pub entity_type: Option<String>,
     pub schema_version: String,
+}
+
+fn split_markdown_title_prefix(markdown: &str, title: &str) -> String {
+    if title.is_empty() {
+        return markdown.to_string();
+    }
+
+    let Some(rest) = markdown.strip_prefix("# ") else {
+        return markdown.to_string();
+    };
+    let Some(newline_index) = rest.find('\n') else {
+        return String::new();
+    };
+
+    let line_title = rest[..newline_index].trim();
+    if line_title != title {
+        return markdown.to_string();
+    }
+
+    rest[newline_index..].to_string()
 }
 
 fn find_entity_type_tag(event: &Event) -> Option<String> {
@@ -142,7 +161,7 @@ pub fn build_revision_note_rumor(
     input: RevisionRumorInput<'_>,
     pubkey: PublicKey,
 ) -> UnsignedEvent {
-    let content = strip_title_line(input.markdown);
+    let content = split_markdown_title_prefix(input.markdown, input.title);
 
     let mut tags = vec![
         Tag::identifier(input.document_id),

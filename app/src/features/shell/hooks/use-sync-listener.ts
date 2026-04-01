@@ -1,10 +1,4 @@
-import {
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-  useEffect,
-  useRef,
-} from "react";
+import { type RefObject, useEffect, useRef } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 
@@ -15,20 +9,28 @@ export interface SyncListenerDeps {
   queryClient: QueryClient;
   pendingSaveTimeoutRef: RefObject<number | null>;
   isSavingRef: RefObject<boolean>;
-  setSyncEditorRevision: Dispatch<SetStateAction<number>>;
+  bumpSyncEditorRevision: (
+    reason: string,
+    details?: Record<string, unknown>,
+  ) => void;
 }
 
 function handleFreshNote(
   freshNote: { id: string; markdown: string } | undefined,
   queryClient: SyncListenerDeps["queryClient"],
-  setSyncEditorRevision: SyncListenerDeps["setSyncEditorRevision"],
+  bumpSyncEditorRevision: SyncListenerDeps["bumpSyncEditorRevision"],
 ) {
   if (!freshNote) return;
   queryClient.setQueryData(["note", freshNote.id], freshNote);
   const { draftMarkdown: currentDraft } = useShellStore.getState();
+
   if (freshNote.markdown !== currentDraft) {
     useShellStore.getState().setDraft("", "");
-    setSyncEditorRevision((r) => r + 1);
+    bumpSyncEditorRevision("sync-remote-upsert", {
+      draftLength: currentDraft.length,
+      freshLength: freshNote.markdown.length,
+      noteId: freshNote.id,
+    });
   }
 }
 
@@ -37,7 +39,7 @@ export function useSyncListener(deps: SyncListenerDeps) {
     queryClient,
     pendingSaveTimeoutRef,
     isSavingRef,
-    setSyncEditorRevision,
+    bumpSyncEditorRevision,
   } = deps;
   const pendingBatchRef = useRef<{
     deletedIds: Set<string>;
@@ -86,7 +88,9 @@ export function useSyncListener(deps: SyncListenerDeps) {
         });
         useShellStore.getState().setDraft("", "");
         useShellStore.getState().setSelectedNoteId(null);
-        setSyncEditorRevision((r) => r + 1);
+        bumpSyncEditorRevision("sync-remote-delete", {
+          noteId: currentOpenNoteId,
+        });
         return;
       }
 
@@ -104,12 +108,12 @@ export function useSyncListener(deps: SyncListenerDeps) {
                 window.clearTimeout(pendingSaveTimeoutRef.current);
                 pendingSaveTimeoutRef.current = null;
               }
-              handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+              handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
               return;
             }
 
             if (!hasPendingSave) {
-              handleFreshNote(freshNote, queryClient, setSyncEditorRevision);
+              handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
             }
           })
           .catch(() => {});
@@ -139,5 +143,5 @@ export function useSyncListener(deps: SyncListenerDeps) {
       }
       void unlisten.then((fn) => fn());
     };
-  }, [queryClient, pendingSaveTimeoutRef, isSavingRef, setSyncEditorRevision]);
+  }, [queryClient, pendingSaveTimeoutRef, isSavingRef, bumpSyncEditorRevision]);
 }

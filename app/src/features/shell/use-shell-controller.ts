@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useQueryClient } from "@tanstack/react-query";
@@ -119,6 +119,13 @@ export function useShellController() {
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
+  const bumpSyncEditorRevision = useCallback(
+    (_reason: string, _details: Record<string, unknown> = {}) => {
+      setSyncEditorRevision((revision) => revision + 1);
+    },
+    [],
+  );
+
   // --- Queries ---
   const {
     bootstrapQuery,
@@ -183,7 +190,7 @@ export function useShellController() {
     queryClient,
     pendingSaveTimeoutRef,
     isSavingRef,
-    setSyncEditorRevision,
+    bumpSyncEditorRevision,
   });
 
   // --- Active tag cleanup when available tags change ---
@@ -305,9 +312,14 @@ export function useShellController() {
       draftMarkdown !== currentNote.markdown
     ) {
       setDraft(currentNote.id, currentNote.markdown);
-      setSyncEditorRevision((revision) => revision + 1);
+      bumpSyncEditorRevision("conflict-reset-to-current-note", {
+        draftLength: draftMarkdown.length,
+        noteId: currentNote.id,
+        noteLength: currentNote.markdown.length,
+      });
     }
   }, [
+    bumpSyncEditorRevision,
     currentNote,
     draftMarkdown,
     draftNoteId,
@@ -582,7 +594,10 @@ export function useShellController() {
     const refreshedNote = await loadNote(selectedNoteId);
     queryClient.setQueryData(["note", refreshedNote.id], refreshedNote);
     setDraft(refreshedNote.id, refreshedNote.markdown);
-    setSyncEditorRevision((revision) => revision + 1);
+    bumpSyncEditorRevision("tag-rewrite-refresh", {
+      noteId: refreshedNote.id,
+      refreshedLength: refreshedNote.markdown.length,
+    });
   };
 
   const handleRenameTag = (fromPath: string, toPath: string) => {
@@ -1061,7 +1076,11 @@ export function useShellController() {
       setSelectedConflictRevisionId(revisionId);
       if (markdown !== null) {
         setDraft(currentNote.id, markdown);
-        setSyncEditorRevision((revision) => revision + 1);
+        bumpSyncEditorRevision("load-conflict-head", {
+          noteId: currentNote.id,
+          revisionId,
+          markdownLength: markdown.length,
+        });
       }
     },
   };
@@ -1153,6 +1172,9 @@ export function useShellController() {
         }
       },
       onFocusHandled() {
+        if (currentNote && currentNote.id === creatingSelectedNoteId) {
+          setCreatingSelectedNoteId(null);
+        }
         setEditorFocusMode("none");
       },
       onLoadConflictHead(revisionId: string, markdown: string | null) {

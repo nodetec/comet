@@ -18,6 +18,7 @@ import {
   unpinNote,
 } from "@/shared/api/invoke";
 import { type NoteFilter, type NoteSummary } from "@/shared/api/types";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
 
 export interface NoteMutationDeps {
@@ -90,11 +91,30 @@ export function useNoteMutations(deps: NoteMutationDeps) {
 
   const saveNoteMutation = useMutation({
     mutationFn: saveNote,
-    onMutate: () => {
+    onMutate: (input: { id: string; markdown: string }) => {
       isSavingRef.current = true;
+      return {
+        noteId: input.id,
+        submittedMarkdown: input.markdown,
+      };
     },
-    onSuccess: (savedNote) => {
+    onSuccess: (savedNote, _variables, context) => {
       queryClient.setQueryData(["note", savedNote.id], savedNote);
+
+      if (context?.noteId === savedNote.id) {
+        const {
+          draftMarkdown: liveDraftMarkdown,
+          draftNoteId: liveDraftNoteId,
+        } = useShellStore.getState();
+        const shouldReconcileDraft =
+          liveDraftNoteId === savedNote.id &&
+          liveDraftMarkdown === context.submittedMarkdown;
+
+        if (shouldReconcileDraft) {
+          setDraft(savedNote.id, savedNote.markdown);
+        }
+      }
+
       void Promise.all([
         invalidateNotes(),
         invalidateContextualTags(),
