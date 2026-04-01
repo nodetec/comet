@@ -30,7 +30,7 @@ body {
 
 :root {
   --radius: 0.5rem;
-  /*--editor-bottom-padding: clamp(10rem, 35dvh, 24rem);*/
+  --editor-bottom-padding: clamp(10rem, 35dvh, 24rem);
 }
 
 @theme inline {
@@ -119,7 +119,7 @@ body {
   background: transparent;
   width: 100%;
   display: grid;
-  /*padding-bottom: var(--editor-bottom-padding);*/
+  padding-bottom: var(--editor-bottom-padding);
   grid-template-columns:
     minmax(clamp(1rem, 4vw, 3rem), 1fr)
     minmax(0, 48rem)
@@ -160,7 +160,7 @@ body {
 .comet-editor-content {
   font-family: "Figtree Variable", sans-serif;
   font-size: var(--editor-font-size, 15px);
-  /*line-height: normal;*/
+  line-height: 1.625;
   letter-spacing: -0.01em;
   color: var(--editor-text);
   caret-color: var(--editor-caret);
