@@ -3,10 +3,18 @@ import {
   type EditorState,
   type Extension,
   Prec,
-  RangeSetBuilder,
 } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { Decoration, EditorView, keymap, WidgetType } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate,
+  WidgetType,
+} from "@codemirror/view";
+import { RangeSetBuilder } from "@codemirror/state";
 
 import { resolveImageSrc } from "@/shared/lib/attachments";
 
@@ -17,7 +25,24 @@ type InlineImageMatch = {
   to: number;
 };
 
-const IMAGE_MARKDOWN_PATTERN = /^!\[([^\]]*)\]\(([^)]+)\)$/;
+const INLINE_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+function isInsideCodeBlock(
+  tree: ReturnType<typeof syntaxTree>,
+  pos: number,
+): boolean {
+  const node = tree.resolveInner(pos, 1);
+  for (let n: typeof node | null = node; n; n = n.parent) {
+    if (
+      n.name === "FencedCode" ||
+      n.name === "CodeBlock" ||
+      n.name === "InlineCode"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 class InlineImageWidget extends WidgetType {
   constructor(
@@ -45,15 +70,18 @@ class InlineImageWidget extends WidgetType {
 
   override toDOM(view: EditorView): HTMLElement {
     const wrapper = document.createElement("span");
-    wrapper.className = "cm-inline-image";
+    wrapper.className = "cm-inline-image cm-inline-image-loading";
 
     const image = document.createElement("img");
     image.className = "cm-inline-image-element";
     image.alt = this.altText;
     image.draggable = false;
-    image.loading = "lazy";
     image.src = resolveImageSrc(this.src);
+    image.addEventListener("load", () => {
+      wrapper.classList.remove("cm-inline-image-loading");
+    });
     image.addEventListener("error", () => {
+      wrapper.classList.remove("cm-inline-image-loading");
       wrapper.dataset.imageState = "broken";
       wrapper.textContent = this.altText || "Image unavailable";
     });
@@ -80,43 +108,28 @@ class InlineImageWidget extends WidgetType {
   }
 }
 
-function matchInlineImage(
-  markdown: string,
-): null | { altText: string; src: string } {
-  const match = IMAGE_MARKDOWN_PATTERN.exec(markdown);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    altText: match[1] ?? "",
-    src: match[2] ?? "",
-  };
-}
-
 export function findInlineImages(state: EditorState): InlineImageMatch[] {
   const doc = state.doc.toString();
+  const tree = syntaxTree(state);
   const matches: InlineImageMatch[] = [];
+  const regex = new RegExp(INLINE_IMAGE_REGEX.source, "g");
 
-  syntaxTree(state).iterate({
-    enter(node) {
-      if (node.name !== "Image") {
-        return;
-      }
+  let m;
+  while ((m = regex.exec(doc)) !== null) {
+    const from = m.index;
+    const to = from + m[0].length;
 
-      const parsed = matchInlineImage(doc.slice(node.from, node.to));
-      if (!parsed) {
-        return;
-      }
+    if (isInsideCodeBlock(tree, from)) {
+      continue;
+    }
 
-      matches.push({
-        altText: parsed.altText,
-        from: node.from,
-        src: parsed.src,
-        to: node.to,
-      });
-    },
-  });
+    matches.push({
+      altText: m[1] ?? "",
+      from,
+      src: m[2] ?? "",
+      to,
+    });
+  }
 
   return matches;
 }
@@ -156,8 +169,24 @@ function buildInlineImageDecorations(state: EditorState) {
   return builder.finish();
 }
 
-const inlineImageField = EditorView.decorations.compute(["doc"], (state) =>
-  buildInlineImageDecorations(state),
+const inlineImagePlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = buildInlineImageDecorations(view.state);
+    }
+
+    update(update: ViewUpdate) {
+      if (
+        update.docChanged ||
+        syntaxTree(update.state) !== syntaxTree(update.startState)
+      ) {
+        this.decorations = buildInlineImageDecorations(update.state);
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
 );
 
 const inlineImageTheme = EditorView.baseTheme({
@@ -166,6 +195,12 @@ const inlineImageTheme = EditorView.baseTheme({
     maxWidth: "100%",
     paddingBlock: "0.25rem",
     verticalAlign: "top",
+  },
+  ".cm-inline-image-loading": {
+    minHeight: "4rem",
+    minWidth: "8rem",
+    backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)",
+    borderRadius: "calc(var(--radius) + 0.25rem)",
   },
   ".cm-inline-image-element": {
     borderRadius: "calc(var(--radius) + 0.25rem)",
@@ -211,7 +246,7 @@ function deleteInlineImageBackward(view: EditorView): boolean {
 
 export function inlineImages(): Extension {
   return [
-    inlineImageField,
+    inlineImagePlugin,
     inlineImageTheme,
     Prec.high(
       keymap.of([
