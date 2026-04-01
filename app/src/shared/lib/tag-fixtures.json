@@ -7,8 +7,8 @@
     },
     {
       "raw": "Work/ project   alpha ",
-      "canonical": "work/project alpha",
-      "rendered": "#work/project alpha#"
+      "canonical": null,
+      "rendered": null
     },
     {
       "raw": "work/",
@@ -42,19 +42,11 @@
     },
     {
       "text": "hello #project alpha# there",
-      "match": {
-        "start": 6,
-        "end": 21,
-        "canonical": "project alpha"
-      }
+      "match": null
     },
     {
       "text": "hello #work/project alpha# there",
-      "match": {
-        "start": 6,
-        "end": 26,
-        "canonical": "work/project alpha"
-      }
+      "match": null
     },
     {
       "text": "hello #work/ there",
@@ -88,11 +80,11 @@
     },
     {
       "raw": "#Project Alpha#",
-      "canonical": "project alpha"
+      "canonical": null
     },
     {
       "raw": "Work/Project Alpha",
-      "canonical": "work/project alpha"
+      "canonical": null
     },
     {
       "raw": "123",

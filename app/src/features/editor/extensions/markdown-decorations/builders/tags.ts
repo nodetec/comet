@@ -12,29 +12,12 @@ const tagMark = Decoration.mark({ class: "cm-md-tag" });
 const SIMPLE_TAG_RE =
   /(?<=^|[\s(])(#[\p{L}\p{N}_-]+(?:\/[\p{L}\p{N}_-]+)*)(?=[\s,.;:!?)}\]]|$)/gu;
 
-// Wrapped tag: #content with spaces# (content must not start/end with whitespace)
-const WRAPPED_TAG_RE =
-  /(?<=^|[\s(])(#[^\s#](?:[^\r\n#]*[^\s#])?#)(?=[^\p{L}\p{N}_/:.]+|$)/gu;
-
 type TagRange = { from: number; to: number };
 
 export function findAllTags(text: string, baseOffset: number): TagRange[] {
   const tags: TagRange[] = [];
 
-  const wrappedRanges = new Set<string>();
-  WRAPPED_TAG_RE.lastIndex = 0;
   let m;
-  while ((m = WRAPPED_TAG_RE.exec(text)) !== null) {
-    const raw = m[1]!;
-    const inner = raw.slice(1, -1);
-    if (canonicalizeTagPath(inner)) {
-      const from = baseOffset + m.index + (m[0].length - raw.length);
-      const to = from + raw.length;
-      tags.push({ from, to });
-      wrappedRanges.add(`${from}:${to}`);
-    }
-  }
-
   SIMPLE_TAG_RE.lastIndex = 0;
   while ((m = SIMPLE_TAG_RE.exec(text)) !== null) {
     const raw = m[1]!;
@@ -42,10 +25,7 @@ export function findAllTags(text: string, baseOffset: number): TagRange[] {
     if (canonicalizeTagPath(inner)) {
       const from = baseOffset + m.index + (m[0].length - raw.length);
       const to = from + raw.length;
-      const key = `${from}:${to}`;
-      if (!wrappedRanges.has(key)) {
-        tags.push({ from, to });
-      }
+      tags.push({ from, to });
     }
   }
 

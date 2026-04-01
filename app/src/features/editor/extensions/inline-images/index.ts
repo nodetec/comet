@@ -70,20 +70,15 @@ class InlineImageWidget extends WidgetType {
 
   override toDOM(view: EditorView): HTMLElement {
     const wrapper = document.createElement("span");
-    wrapper.className = "cm-inline-image cm-inline-image-loading";
+    wrapper.className = "cm-inline-image";
 
     const image = document.createElement("img");
     image.className = "cm-inline-image-element";
     image.alt = this.altText;
     image.draggable = false;
     image.src = resolveImageSrc(this.src);
-    image.addEventListener("load", () => {
-      wrapper.classList.remove("cm-inline-image-loading");
-    });
     image.addEventListener("error", () => {
-      wrapper.classList.remove("cm-inline-image-loading");
-      wrapper.dataset.imageState = "broken";
-      wrapper.textContent = this.altText || "Image unavailable";
+      wrapper.style.display = "none";
     });
     image.addEventListener("mousedown", (event) => {
       if (event.button !== 0) {
@@ -212,13 +207,7 @@ const inlineImageTheme = EditorView.baseTheme({
   ".cm-inline-image": {
     display: "inline-flex",
     maxWidth: "100%",
-    // paddingBlock: "0.25rem",
     verticalAlign: "top",
-  },
-  ".cm-inline-image-loading": {
-    minHeight: "4rem",
-    minWidth: "8rem",
-    backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)",
   },
   ".cm-inline-image-element": {
     display: "block",
@@ -236,15 +225,6 @@ const inlineImageTheme = EditorView.baseTheme({
     inset: "0",
     backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
     pointerEvents: "none",
-  },
-  ".cm-inline-image[data-image-state='broken']": {
-    alignItems: "center",
-    backgroundColor: "color-mix(in oklab, var(--muted) 50%, transparent)",
-    color: "var(--muted-foreground)",
-    display: "inline-flex",
-    fontSize: "0.875rem",
-    minHeight: "8rem",
-    paddingInline: "1rem",
   },
 });
 
