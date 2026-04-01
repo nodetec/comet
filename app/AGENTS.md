@@ -9,6 +9,16 @@ Desktop notes app.
 - **Composition over inheritance**: build behavior by combining small pieces, not extending base types.
 - **Fail fast**: surface errors early, never swallow them silently.
 
+## Editor Invariants
+
+- The editor is **markdown-first**. Stored note markdown is the canonical representation for note content.
+- Lexical AST, rendered HTML, clipboard payloads, and sync payloads are derived representations and must not introduce content drift.
+- Supported content should round-trip stably across save/load, sync, copy/paste, and import/export flows.
+- Preserve authored structure where possible. Do not silently reformat or normalize content unless the normalization is intentional, documented, and stable after one pass.
+- Any bug caused by representation drift should get a regression test at the seam where it occurred.
+
+Reference: `app/docs/editor-invariants.md`
+
 ## Stack
 
 - **Frontend**: React 19, Vite, Tailwind 4, shadcn/ui, Lexical editor
