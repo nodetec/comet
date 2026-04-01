@@ -42,6 +42,36 @@
       "html": "<blockquote><p>first</p><p>second</p></blockquote>"
     },
     {
+      "id": "blockquote-nested",
+      "description": "Nested blockquotes survive markdown export and HTML re-import.",
+      "support": "lossless",
+      "skipClipboardRoundtrip": true,
+      "skipLexicalRoundtrip": true,
+      "title": "",
+      "markdown": "> Blockquotes can also be nested...\n> > ...by using additional greater-than signs right next to each other...\n> > > ...or with spaces between arrows.",
+      "html": "<blockquote><p>Blockquotes can also be nested...</p><blockquote><p>...by using additional greater-than signs right next to each other...</p><blockquote><p>...or with spaces between arrows.</p></blockquote></blockquote></blockquote>"
+    },
+    {
+      "id": "list-bold-link-label",
+      "description": "A list item with a formatted link label followed by a paragraph keeps its formatting and spacing after HTML re-import.",
+      "support": "lossless",
+      "skipClipboardRoundtrip": true,
+      "skipLexicalRoundtrip": true,
+      "title": "",
+      "markdown": "- [**pica**](https://nodeca.github.io/pica/demo/) - high quality and fast image\n  resize in browser.\n\nYou will like those projects!",
+      "html": "<ul><li><a href=\"https://nodeca.github.io/pica/demo/\"><strong>pica</strong></a> - high quality and fast image<br />\nresize in browser.</li></ul><p><br></p><p>You will like those projects!</p>"
+    },
+    {
+      "id": "heading-link-literal-angle-label",
+      "description": "Heading links with literal angle brackets in the label survive export and HTML re-import.",
+      "support": "lossless",
+      "skipClipboardRoundtrip": true,
+      "skipLexicalRoundtrip": true,
+      "title": "",
+      "markdown": "### [\\<ins>](https://github.com/markdown-it/markdown-it-ins)\n\n### [\\<mark>](https://github.com/markdown-it/markdown-it-mark)",
+      "html": "<h3><a href=\"https://github.com/markdown-it/markdown-it-ins\">&lt;ins&gt;</a></h3><p><br></p><h3><a href=\"https://github.com/markdown-it/markdown-it-mark\">&lt;mark&gt;</a></h3>"
+    },
+    {
       "id": "checklist-basic",
       "description": "A basic two-item checklist with mixed checked states.",
       "support": "lossless",

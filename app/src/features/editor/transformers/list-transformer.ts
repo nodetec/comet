@@ -96,6 +96,21 @@ function exportListItemContent(
   return exportChildren(contentNode);
 }
 
+function prefixMultilineListItemContent(
+  indent: string,
+  prefix: string,
+  content: string,
+): string {
+  const continuationIndent = indent + " ".repeat(prefix.length);
+  const lines = content.split("\n");
+
+  return lines
+    .map((line, index) =>
+      index === 0 ? indent + prefix + line : continuationIndent + line,
+    )
+    .join("\n");
+}
+
 function exportListNode(
   listNode: ListNode,
   exportChildren: (node: ElementNode) => string,
@@ -125,12 +140,11 @@ function exportListNode(
         listNode.getListType() !== "check" ||
         !options.clipboard ||
         hasSelectedChecklistMarker(child);
+      const prefix = listItemPrefix(listNode, child, ordinal, bulletMarker);
       output.push(
         includePrefix
-          ? indent +
-              listItemPrefix(listNode, child, ordinal, bulletMarker) +
-              content
-          : indent + content,
+          ? prefixMultilineListItemContent(indent, prefix, content)
+          : prefixMultilineListItemContent(indent, "", content),
       );
       ordinal++;
     }

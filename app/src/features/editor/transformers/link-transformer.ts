@@ -19,6 +19,13 @@ function getLinkAttributes(url: string) {
   return { target: "_blank", rel: "noopener noreferrer" };
 }
 
+function escapeMarkdownLinkLabel(label: string): string {
+  return label
+    .replace(/\[/g, String.raw`\[`)
+    .replace(/\]/g, String.raw`\]`)
+    .replace(/</g, String.raw`\<`);
+}
+
 function isPlainEmailAutolink(
   displayText: string,
   url: string,
@@ -47,11 +54,14 @@ function isPlainWebsiteAutolink(
 
 export const LINK: TextMatchTransformer = {
   dependencies: [LinkNode],
-  export: (node) => {
+  export: (node, exportChildren) => {
     if (!$isLinkNode(node)) {
       return null;
     }
     const displayText = node.getTextContent();
+    const displayMarkdown = escapeMarkdownLinkLabel(
+      exportChildren(node) || displayText,
+    );
     const url = node.getURL();
     const title = node.getTitle();
     if (
@@ -62,7 +72,7 @@ export const LINK: TextMatchTransformer = {
       return displayText;
     }
     const titlePart = title ? ` "${title}"` : "";
-    return `[${displayText || url}](${url}${titlePart})`;
+    return `[${displayMarkdown || url}](${url}${titlePart})`;
   },
   // Match [text](url) format, but NOT ![text](url) which is an image
   importRegExp: MARKDOWN_LINK_IMPORT_RE,

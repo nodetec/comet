@@ -6,7 +6,7 @@ import { $generateNodesFromDOM } from "@lexical/html";
 import { $isListItemNode, $isListNode, type ListNode } from "@lexical/list";
 import { $isCometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import { TRANSFORMERS } from "../transformers";
-import type { ElementNode, LexicalNode } from "lexical";
+import type { ElementNode, LexicalEditor, LexicalNode } from "lexical";
 import {
   $createParagraphNode,
   $createTextNode,
@@ -24,6 +24,7 @@ import { $convertTopLevelElementToMarkdown } from "./markdown-export";
 // with adjacent lines (mirrors Lexical's internal normalizeMarkdown logic).
 const CODE_FENCE_RE = /^(`{3,}|~{3,})/;
 const CODE_SINGLE_LINE_RE = /^(`{3,})[^`]+\1$/;
+const EXPLICIT_BLANK_LINE_SENTINEL = "\uE000";
 
 const CLIPBOARD_EMAIL_LINK_RE =
   /\[([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\]\(mailto:\1\)/g;
@@ -41,6 +42,38 @@ function isEmptyParagraph(node: LexicalNode): boolean {
     return /^\s*$/.test(text);
   }
   return false;
+}
+
+function isExplicitBlankLineParagraph(node: LexicalNode): boolean {
+  if (!$isParagraphNode(node)) {
+    return false;
+  }
+
+  const children = node.getChildren();
+  return (
+    children.length === 1 &&
+    $isTextNode(children[0]) &&
+    children[0].getTextContent() === EXPLICIT_BLANK_LINE_SENTINEL
+  );
+}
+
+function normalizeImportedNestedBlankLineParagraphs(node: LexicalNode): void {
+  if (!$isElementNode(node)) {
+    return;
+  }
+
+  for (const child of node.getChildren()) {
+    if ($isParagraphNode(child) && isExplicitBlankLineParagraph(child)) {
+      child.clear();
+      continue;
+    }
+
+    normalizeImportedNestedBlankLineParagraphs(child);
+
+    if (isEmptyParagraph(child)) {
+      child.remove();
+    }
+  }
 }
 
 function normalizeImportedQuoteSpacing(node: LexicalNode): void {
@@ -72,7 +105,7 @@ function normalizeImportedQuoteSpacing(node: LexicalNode): void {
   }
 }
 
-function isIgnorableChecklistWrapperChild(node: LexicalNode): boolean {
+function isIgnorableWrapperChild(node: LexicalNode): boolean {
   if ($isParagraphNode(node)) {
     return isEmptyParagraph(node);
   }
@@ -93,18 +126,45 @@ function isWrapperOnlyListItem(child: LexicalNode): boolean {
 
   return children.every(
     (grandchild) =>
-      $isListNode(grandchild) || isIgnorableChecklistWrapperChild(grandchild),
+      $isListNode(grandchild) || isIgnorableWrapperChild(grandchild),
   );
 }
 
-function normalizeImportedChecklistNesting(node: LexicalNode): void {
+function mergeNestedListIntoListItem(
+  owner: LexicalNode,
+  nestedList: ListNode,
+): void {
+  if (!$isListItemNode(owner)) {
+    return;
+  }
+
+  const existingNestedList = owner
+    .getChildren()
+    .find(
+      (child): child is ListNode =>
+        $isListNode(child) && child.getListType() === nestedList.getListType(),
+    );
+
+  if (!existingNestedList) {
+    owner.append(nestedList);
+    return;
+  }
+
+  for (const nestedChild of nestedList.getChildren()) {
+    existingNestedList.append(nestedChild);
+  }
+
+  nestedList.remove();
+}
+
+function normalizeImportedListNesting(node: LexicalNode): void {
   if ($isElementNode(node)) {
     for (const child of node.getChildren()) {
-      normalizeImportedChecklistNesting(child);
+      normalizeImportedListNesting(child);
     }
   }
 
-  if (!$isListNode(node) || node.getListType() !== "check") {
+  if (!$isListNode(node)) {
     return;
   }
 
@@ -128,7 +188,7 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
         );
 
       for (const nestedList of nestedLists) {
-        previousItem.append(nestedList);
+        mergeNestedListIntoListItem(previousItem, nestedList);
       }
 
       child.remove();
@@ -180,31 +240,26 @@ function normalizeImportedListItemLeadParagraph(node: LexicalNode): void {
   }
 }
 
-type FencedCodeBlock = {
-  signature: string;
+type SourceCodeBlock = {
+  style: SourceCodeBlockStyle;
   text: string;
 };
+
+type SourceCodeBlockStyle = "fenced" | "indented";
 
 function normalizeCodeBlockLanguage(
   language: string | null | undefined,
 ): string {
-  return !language || language === "plain" ? "" : language;
-}
-
-function getCodeBlockSignature(
-  language: string | null | undefined,
-  text: string,
-): string {
-  // eslint-disable-next-line sonarjs/slow-regex -- input is bounded to a single code block's text content
-  return `${normalizeCodeBlockLanguage(language)}\u0000${text.replace(/\n+$/, "")}`;
+  return !language || language === "plain" || language === "indented"
+    ? ""
+    : language;
 }
 
 function parseFencedCodeBlock(
   lines: string[],
   startIndex: number,
   fenceMatch: RegExpExecArray,
-  trimmed: string,
-): { block: FencedCodeBlock; endIndex: number } {
+): { block: SourceCodeBlock; endIndex: number } {
   const fenceChar = fenceMatch[1][0];
   const fenceLen = fenceMatch[1].length;
   const escapedFenceChar = fenceChar === "`" ? "\\`" : "~";
@@ -231,55 +286,127 @@ function parseFencedCodeBlock(
       ? contentLines.slice(0, contentLines.length - trailingBlankLines)
       : contentLines;
   const text = baseLines.join("\n") + "\n".repeat(trailingBlankLines);
-  const info = trimmed.slice(fenceMatch[1].length).trim();
-  const language =
-    info.length > 0 ? normalizeCodeBlockLanguage(info.split(/\s+/, 1)[0]) : "";
 
   return {
-    block: { signature: getCodeBlockSignature(language, text), text },
+    block: { style: "fenced", text },
     endIndex: end,
   };
 }
 
-function collectFencedCodeBlocks(markdown: string): FencedCodeBlock[] {
-  const lines = markdown.split("\n");
-  const blocks: FencedCodeBlock[] = [];
-  let i = 0;
+function hasIndentedCodePrefix(line: string): boolean {
+  return line.startsWith("\t") || line.startsWith("    ");
+}
 
-  while (i < lines.length) {
-    const line = lines[i];
+function stripIndentedCodePrefix(line: string): string {
+  if (line.startsWith("\t")) {
+    return line.slice(1);
+  }
+
+  if (line.startsWith("    ")) {
+    return line.slice(4);
+  }
+
+  return line;
+}
+
+function isIndentedCodeStart(lines: string[], index: number): boolean {
+  const line = lines[index] ?? "";
+  if (!hasIndentedCodePrefix(line)) {
+    return false;
+  }
+
+  const previousLine = index === 0 ? "" : (lines[index - 1] ?? "");
+  if (previousLine.trim() !== "") {
+    return false;
+  }
+
+  const stripped = stripIndentedCodePrefix(line).trimStart();
+  return !/^([-*+]|\d+\.)\s+/.test(stripped) && !/^>\s+/.test(stripped);
+}
+
+function parseIndentedCodeBlock(
+  lines: string[],
+  startIndex: number,
+): { block: SourceCodeBlock; endIndex: number } {
+  const contentLines: string[] = [];
+  let index = startIndex;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    if (line.trim() === "") {
+      contentLines.push("");
+      index++;
+      continue;
+    }
+
+    if (!hasIndentedCodePrefix(line)) {
+      break;
+    }
+
+    contentLines.push(stripIndentedCodePrefix(line));
+    index++;
+  }
+
+  while (contentLines.length > 0 && contentLines.at(-1) === "") {
+    contentLines.pop();
+  }
+
+  return {
+    block: {
+      style: "indented",
+      text: contentLines.join("\n"),
+    },
+    endIndex: Math.max(startIndex, index - 1),
+  };
+}
+
+function collectSourceCodeBlocks(markdown: string): SourceCodeBlock[] {
+  const lines = markdown.split("\n");
+  const blocks: SourceCodeBlock[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
     const trimmed = line.trimStart();
 
     if (CODE_SINGLE_LINE_RE.test(trimmed)) {
-      blocks.push({
-        signature: getCodeBlockSignature("", ""),
-        text: "",
-      });
-      i++;
+      blocks.push({ style: "fenced", text: "" });
+      index++;
       continue;
     }
 
-    const match = CODE_FENCE_RE.exec(trimmed);
-    if (!match) {
-      i++;
+    const fencedMatch = CODE_FENCE_RE.exec(trimmed);
+    if (fencedMatch) {
+      const { block, endIndex } = parseFencedCodeBlock(
+        lines,
+        index,
+        fencedMatch,
+      );
+      blocks.push(block);
+      index = endIndex + 1;
       continue;
     }
 
-    const { block, endIndex } = parseFencedCodeBlock(lines, i, match, trimmed);
+    if (!isIndentedCodeStart(lines, index)) {
+      index++;
+      continue;
+    }
+
+    const { block, endIndex } = parseIndentedCodeBlock(lines, index);
     blocks.push(block);
-    i = endIndex + 1;
+    index = endIndex + 1;
   }
 
   return blocks;
 }
 
-function normalizeImportedCodeBlockText(
+function normalizeImportedCodeBlocksSequentially(
   node: LexicalNode,
-  codeBlocksBySignature: Map<string, string[]>,
+  sourceBlocks: SourceCodeBlock[],
 ): void {
   if ($isElementNode(node)) {
     for (const child of node.getChildren()) {
-      normalizeImportedCodeBlockText(child, codeBlocksBySignature);
+      normalizeImportedCodeBlocksSequentially(child, sourceBlocks);
     }
   }
 
@@ -287,20 +414,23 @@ function normalizeImportedCodeBlockText(
     return;
   }
 
-  const expectedText = codeBlocksBySignature
-    .get(getCodeBlockSignature(node.getLanguage(), node.getTextContent()))
-    ?.shift();
-  if (expectedText == null) {
+  const sourceBlock = sourceBlocks.shift();
+  if (sourceBlock == null) {
     return;
   }
 
-  if (node.getTextContent() === expectedText) {
-    return;
+  if (node.getTextContent() !== sourceBlock.text) {
+    node.clear();
+    if (sourceBlock.text.length > 0) {
+      node.append($createTextNode(sourceBlock.text));
+    }
   }
 
-  node.clear();
-  if (expectedText.length > 0) {
-    node.append($createTextNode(expectedText));
+  if (
+    sourceBlock.style === "indented" &&
+    normalizeCodeBlockLanguage(node.getLanguage()) === ""
+  ) {
+    node.setLanguage("indented");
   }
 }
 
@@ -308,25 +438,17 @@ export function normalizeImportedCodeBlocksFromMarkdown(
   nodes: LexicalNode[],
   markdown: string,
 ): void {
-  const codeBlocksBySignature = new Map<string, string[]>();
-  for (const block of collectFencedCodeBlocks(markdown)) {
-    const existing = codeBlocksBySignature.get(block.signature);
-    if (existing) {
-      existing.push(block.text);
-    } else {
-      codeBlocksBySignature.set(block.signature, [block.text]);
-    }
-  }
-
+  const sourceBlocks = collectSourceCodeBlocks(markdown);
   for (const node of nodes) {
-    normalizeImportedCodeBlockText(node, codeBlocksBySignature);
+    normalizeImportedCodeBlocksSequentially(node, sourceBlocks);
   }
 }
 
 export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   for (const node of nodes) {
+    normalizeImportedNestedBlankLineParagraphs(node);
     normalizeImportedQuoteSpacing(node);
-    normalizeImportedChecklistNesting(node);
+    normalizeImportedListNesting(node);
     normalizeImportedListItemLeadParagraph(node);
   }
 
@@ -353,7 +475,8 @@ export function normalizeImportedTopLevelListSpacingMarkers(
     let separatorEnd = index + 1;
     while (
       separatorEnd < nodes.length &&
-      isEmptyParagraph(nodes[separatorEnd])
+      (isEmptyParagraph(nodes[separatorEnd]) ||
+        isExplicitBlankLineParagraph(nodes[separatorEnd]))
     ) {
       separatorEnd++;
     }
@@ -454,6 +577,96 @@ function minimumSeparatorLineFeeds(
   return canUseSoftBreakSeparator(previousNode, nextNode) ? 1 : 2;
 }
 
+type ExplicitMarkerSpacingParts = {
+  contentNodes: LexicalNode[];
+  leadingMarkers: number;
+  separatorMarkerCounts: number[];
+  trailingMarkers: number;
+};
+
+function collectExplicitMarkerSpacingParts(
+  nodes: LexicalNode[],
+): ExplicitMarkerSpacingParts {
+  const contentNodes: LexicalNode[] = [];
+  const separatorMarkerCounts: number[] = [];
+  let pendingMarkers = 0;
+  let leadingMarkers = 0;
+  let sawContent = false;
+
+  for (const node of nodes) {
+    if (isExplicitBlankLineParagraph(node)) {
+      pendingMarkers++;
+      continue;
+    }
+
+    if (isEmptyParagraph(node)) {
+      continue;
+    }
+
+    if (sawContent) {
+      separatorMarkerCounts.push(pendingMarkers);
+    } else {
+      leadingMarkers = pendingMarkers;
+      sawContent = true;
+    }
+
+    pendingMarkers = 0;
+    contentNodes.push(node);
+  }
+
+  return {
+    contentNodes,
+    leadingMarkers,
+    separatorMarkerCounts,
+    trailingMarkers: pendingMarkers,
+  };
+}
+
+function appendEmptyParagraphs(target: LexicalNode[], count: number): void {
+  for (let index = 0; index < count; index++) {
+    target.push($createParagraphNode());
+  }
+}
+
+function normalizeImportedTopLevelSpacingFromExplicitMarkers(
+  nodes: LexicalNode[],
+): LexicalNode[] {
+  const {
+    contentNodes,
+    leadingMarkers,
+    separatorMarkerCounts,
+    trailingMarkers,
+  } = collectExplicitMarkerSpacingParts(nodes);
+
+  if (contentNodes.length === 0) {
+    return Array.from({ length: leadingMarkers }, () => $createParagraphNode());
+  }
+
+  const rebuiltNodes: LexicalNode[] = [];
+  appendEmptyParagraphs(rebuiltNodes, leadingMarkers);
+
+  for (const [index, node] of contentNodes.entries()) {
+    rebuiltNodes.push(node);
+
+    const nextNode = contentNodes[index + 1];
+    if (!nextNode) {
+      continue;
+    }
+
+    const markerCount = separatorMarkerCounts[index] ?? 0;
+    const visibleSpacerCount = Math.max(
+      0,
+      markerCount + 1 - minimumSeparatorLineFeeds(node, nextNode),
+    );
+
+    appendEmptyParagraphs(rebuiltNodes, visibleSpacerCount);
+  }
+
+  appendEmptyParagraphs(rebuiltNodes, trailingMarkers);
+
+  return rebuiltNodes;
+}
+
 type TopLevelMarkdownMatch = {
   markdown: string;
   node: LexicalNode;
@@ -542,6 +755,26 @@ export function normalizeImportedTopLevelSpacingFromMarkdown(
   return rebuiltNodes;
 }
 
+export function createNormalizedMarkdownNodesFromHTML(
+  editor: LexicalEditor,
+  html: string,
+  markdown: string,
+): LexicalNode[] {
+  const normalizedHtml = html.replace(
+    /<p><br\s*\/?><\/p>/g,
+    `<p>${EXPLICIT_BLANK_LINE_SENTINEL}</p>`,
+  );
+  const dom = new DOMParser().parseFromString(
+    `<!DOCTYPE html><html><body>${normalizedHtml}</body></html>`,
+    "text/html",
+  );
+
+  let nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
+  nodes = normalizeImportedTopLevelListSpacingMarkers(nodes);
+  normalizeImportedCodeBlocksFromMarkdown(nodes, markdown);
+  return normalizeImportedTopLevelSpacingFromExplicitMarkers(nodes);
+}
+
 /**
  * Imports pre-rendered HTML into the Lexical editor.
  * Used for note loading — HTML is provided by the Rust backend (comrak).
@@ -553,15 +786,8 @@ export function $importMarkdownFromHTML(
 ): void {
   const t0 = performance.now();
   const editor = $getEditor();
-  const dom = new DOMParser().parseFromString(
-    `<!DOCTYPE html><html><body>${html}</body></html>`,
-    "text/html",
-  );
   const t1 = performance.now();
-  let nodes = normalizeImportedNodes($generateNodesFromDOM(editor, dom));
-  nodes = normalizeImportedTopLevelListSpacingMarkers(nodes);
-  normalizeImportedCodeBlocksFromMarkdown(nodes, markdown);
-  nodes = normalizeImportedTopLevelSpacingFromMarkdown(nodes, markdown);
+  const nodes = createNormalizedMarkdownNodesFromHTML(editor, html, markdown);
   const t2 = performance.now();
   const target = node ?? $getRoot();
   target.clear();

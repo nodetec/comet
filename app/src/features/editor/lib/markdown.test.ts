@@ -29,6 +29,7 @@ import {
 } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import {
+  $createLineBreakNode,
   $createParagraphNode,
   $createTextNode,
   $getRoot,
@@ -295,6 +296,20 @@ describe("markdown editor pipeline", () => {
     );
   });
 
+  it("exports indented code blocks after top-level text with a single newline", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const lead = $createParagraphNode();
+      lead.append($createTextNode("Lead"));
+
+      const code = $createCodeNode("indented");
+      code.append($createTextNode("console.log('hi');"));
+
+      root.append(lead, code);
+    });
+
+    expect(markdown).toBe(["Lead", "    console.log('hi');"].join("\n"));
+  });
+
   it("exports a horizontal rule after top-level text with a single newline", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const lead = $createParagraphNode();
@@ -353,6 +368,29 @@ describe("markdown editor pipeline", () => {
     expect(roundtripMarkdown("> quoted")).toBe("> quoted");
   });
 
+  it("exports nested blockquotes without flattening them", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const outer = $createQuoteNode();
+      const outerParagraph = $createParagraphNode();
+      outerParagraph.append($createTextNode("outer"));
+
+      const inner = $createQuoteNode();
+      const innerParagraph = $createParagraphNode();
+      innerParagraph.append($createTextNode("inner"));
+
+      const deep = $createQuoteNode();
+      const deepParagraph = $createParagraphNode();
+      deepParagraph.append($createTextNode("deep"));
+
+      deep.append(deepParagraph);
+      inner.append(innerParagraph, deep);
+      outer.append(outerParagraph, inner);
+      root.append(outer);
+    });
+
+    expect(markdown).toBe(["> outer", "> > inner", "> > > deep"].join("\n"));
+  });
+
   it("exports nested bullet lists under checklist items without converting them", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const checklist = $createListNode("check");
@@ -370,6 +408,24 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe(["- [ ] Parent", "  - Child"].join("\n"));
+  });
+
+  it("indents multiline list item continuations under the marker", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const list = $createListNode("bullet");
+      const item = $createListItemNode();
+      item.append(
+        $createTextNode("high quality and fast image"),
+        $createLineBreakNode(),
+        $createTextNode("resize in browser."),
+      );
+      list.append(item);
+      root.append(list);
+    });
+
+    expect(markdown).toBe(
+      ["- high quality and fast image", "  resize in browser."].join("\n"),
+    );
   });
 
   it("does not export list cursor anchors", () => {
@@ -805,6 +861,36 @@ describe("markdown editor pipeline", () => {
     });
 
     expect(markdown).toBe("www.example.com");
+  });
+
+  it("exports markdown formatting inside link labels", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createLinkNode("https://nodeca.github.io/pica/demo/");
+      const text = $createTextNode("pica");
+      text.toggleFormat("bold");
+      link.append(text);
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe("[**pica**](https://nodeca.github.io/pica/demo/)");
+  });
+
+  it("escapes literal angle brackets in link labels on export", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createLinkNode(
+        "https://github.com/markdown-it/markdown-it-ins",
+      );
+      link.append($createTextNode("<ins>"));
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe(
+      String.raw`[\<ins>](https://github.com/markdown-it/markdown-it-ins)`,
+    );
   });
 
   it("round-trips markdown links with titles", () => {

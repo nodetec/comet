@@ -4,7 +4,12 @@ import fixtures from "@/shared/lib/editor-paste-fixtures.json";
 import { $generateNodesFromDOM } from "@lexical/html";
 import { CodeNode } from "@lexical/code";
 import { AutoLinkNode, LinkNode } from "@lexical/link";
-import { ListItemNode, ListNode } from "@lexical/list";
+import {
+  $isListItemNode,
+  $isListNode,
+  ListItemNode,
+  ListNode,
+} from "@lexical/list";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import { createEditor, $getRoot } from "lexical";
@@ -31,9 +36,9 @@ import { YouTubeNode } from "../nodes/youtube-node";
 import { CometHorizontalRuleNode } from "../nodes/comet-horizontal-rule-node";
 import { ListAnchorNode } from "../nodes/list-anchor-node";
 import {
-  normalizeImportedCodeBlocksFromMarkdown,
-  normalizeImportedNodes,
   $exportMarkdown,
+  createNormalizedMarkdownNodesFromHTML,
+  normalizeImportedNodes,
 } from "./markdown";
 import {
   isBlockLevelNode,
@@ -76,6 +81,15 @@ function htmlToDOM(html: string): Document {
   );
 }
 
+function getDirectItemText(item: ListItemNode): string {
+  return item
+    .getChildren()
+    .filter((child) => !$isListNode(child))
+    .map((child) => child.getTextContent())
+    .join("")
+    .trim();
+}
+
 describe("parseSingleFencedCodeBlock", () => {
   it.each(fixtures.fencedCodeBlockCases)(
     "parses a single fenced code block: $id",
@@ -97,11 +111,11 @@ describe("trimBoundaryEmptyParagraphs", () => {
 
       editor.update(
         () => {
-          const dom = htmlToDOM(fixture.html);
-          const allNodes = normalizeImportedNodes(
-            $generateNodesFromDOM(editor, dom),
+          const allNodes = createNormalizedMarkdownNodesFromHTML(
+            editor,
+            fixture.html,
+            fixture.markdown,
           );
-          normalizeImportedCodeBlocksFromMarkdown(allNodes, fixture.markdown);
           const filteredNodes = allNodes.filter(isBlockLevelNode);
           const nodes = trimBoundaryEmptyParagraphs(
             filteredNodes,
@@ -116,4 +130,77 @@ describe("trimBoundaryEmptyParagraphs", () => {
       expect(output).toBe(fixture.markdown);
     },
   );
+});
+
+describe("normalizeImportedNodes", () => {
+  it("merges wrapper-only nested bullet list items created by mixed markers", () => {
+    const editor = createTestEditor();
+    let nestedParentTexts: string[] = [];
+    let nestedLeafTexts: string[] = [];
+
+    editor.update(
+      () => {
+        const dom = htmlToDOM(
+          [
+            "<ul>",
+            "<li>",
+            "Sub-lists are made by indenting 2 spaces:",
+            "<ul>",
+            "<li>",
+            "Marker character change forces new list start:",
+            "<ul><li>Ac tristique libero volutpat at</li></ul>",
+            "</li>",
+            "<li><ul><li>Facilisis in pretium nisl aliquet</li></ul></li>",
+            "<li><ul><li>Nulla volutpat aliquam velit</li></ul></li>",
+            "</ul>",
+            "</li>",
+            "</ul>",
+          ].join(""),
+        );
+
+        const nodes = normalizeImportedNodes(
+          $generateNodesFromDOM(editor, dom),
+        );
+        $getRoot().append(...nodes);
+
+        const topLevelList = $getRoot().getFirstChild();
+        if (!$isListNode(topLevelList)) {
+          return;
+        }
+
+        const outerItem = topLevelList.getFirstChild();
+        if (!$isListItemNode(outerItem)) {
+          return;
+        }
+
+        const nestedList = outerItem.getChildren().find($isListNode);
+        if (!$isListNode(nestedList)) {
+          return;
+        }
+
+        const nestedItems = nestedList.getChildren().filter($isListItemNode);
+        nestedParentTexts = nestedItems.map(getDirectItemText);
+
+        const leafList = nestedItems[0]?.getChildren().find($isListNode);
+        if (!$isListNode(leafList)) {
+          return;
+        }
+
+        nestedLeafTexts = leafList
+          .getChildren()
+          .filter($isListItemNode)
+          .map(getDirectItemText);
+      },
+      { discrete: true },
+    );
+
+    expect(nestedParentTexts).toEqual([
+      "Marker character change forces new list start:",
+    ]);
+    expect(nestedLeafTexts).toEqual([
+      "Ac tristique libero volutpat at",
+      "Facilisis in pretium nisl aliquet",
+      "Nulla volutpat aliquam velit",
+    ]);
+  });
 });
