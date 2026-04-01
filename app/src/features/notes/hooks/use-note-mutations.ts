@@ -34,7 +34,6 @@ export interface NoteMutationDeps {
   setDraft: (id: string, markdown: string) => void;
   setCreatingSelectedNoteId: (id: string | null) => void;
   setIsCreatingNoteTransition: (v: boolean) => void;
-  setEditorFocusMode: (mode: "none" | "immediate" | "pointerup") => void;
   setNoteFilter: (filter: NoteFilter) => void;
 }
 
@@ -51,7 +50,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     setDraft,
     setCreatingSelectedNoteId,
     setIsCreatingNoteTransition,
-    setEditorFocusMode,
     setNoteFilter,
   } = deps;
 
@@ -84,7 +82,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     onError: (error) => {
       setCreatingSelectedNoteId(null);
       setIsCreatingNoteTransition(false);
-      setEditorFocusMode("none");
       toastErrorHandler("Couldn't create note", "create-note-error")(error);
     },
   });
@@ -145,7 +142,6 @@ export function useNoteMutations(deps: NoteMutationDeps) {
       setCreatingSelectedNoteId(null);
       setSelectedNoteId(duplicatedNote.id);
       setDraft(duplicatedNote.id, duplicatedNote.markdown);
-      setEditorFocusMode("immediate");
 
       if (noteFilter === "archive" || noteFilter === "trash") {
         setNoteFilter("all");

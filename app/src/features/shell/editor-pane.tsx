@@ -21,8 +21,6 @@ import {
   Ellipsis,
   Lock,
   PencilOff,
-  PanelBottomOpen,
-  PanelBottomClose,
   Search,
   X,
 } from "lucide-react";
@@ -41,7 +39,6 @@ type EditorPaneProps = {
   archivedAt: number | null;
   deletedAt: number | null;
   editorKey: string | null;
-  focusMode: "none" | "immediate" | "pointerup";
   isDeletePublishedNotePending: boolean;
   isResolveConflictPending: boolean;
   markdown: string;
@@ -62,7 +59,6 @@ type EditorPaneProps = {
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
   onLoadConflictHead(revisionId: string, markdown: string | null): void;
-  onFocusHandled(): void;
   onChange(markdown: string): void;
 };
 
@@ -345,7 +341,6 @@ export function EditorPane({
   archivedAt,
   deletedAt,
   editorKey,
-  focusMode,
   isDeletePublishedNotePending,
   isResolveConflictPending,
   markdown,
@@ -366,7 +361,6 @@ export function EditorPane({
   onSetPinned,
   onSetReadonly,
   onLoadConflictHead,
-  onFocusHandled,
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
@@ -374,13 +368,6 @@ export function EditorPane({
   const isSystemReadOnly = isArchived || deletedAt !== null || isPublishedNote;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [toolbarContainer, setToolbarContainer] =
-    useState<HTMLDivElement | null>(null);
-  const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
-    setToolbarContainer(node);
-  }, []);
-  const showToolbar = useUIStore((s) => s.showEditorToolbar);
-  const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
@@ -470,7 +457,6 @@ export function EditorPane({
 
     return (
       <NoteEditor
-        focusMode={focusMode}
         loadKey={editorLoadKey ?? noteId}
         markdown={markdown}
         onChange={onChange}
@@ -479,7 +465,6 @@ export function EditorPane({
             setFocusedPane("editor");
           }
         }}
-        onFocusHandled={onFocusHandled}
         onSearchMatchCountChange={
           isUsingEditorFindSearch ? setFindMatchCount : undefined
         }
@@ -494,7 +479,6 @@ export function EditorPane({
           isUsingEditorFindSearch ? findScrollRevision : undefined
         }
         spellCheck={editorSpellCheck}
-        toolbarContainer={toolbarContainer}
       />
     );
   })();
@@ -556,22 +540,12 @@ export function EditorPane({
     }
 
     const target = event.target as HTMLElement;
-    const clickedInsideEditor = target.closest(".cm-editor") !== null;
 
     if (target.closest("button, input, textarea, select, a, [role='button']")) {
       return;
     }
 
-    if (target.closest(".cm-content")) {
-      return;
-    }
-
-    if (editorRef.current?.focusAtSurfacePoint(event.clientX, event.clientY)) {
-      event.preventDefault();
-      return;
-    }
-
-    if (clickedInsideEditor) {
+    if (target.closest(".cm-editor")) {
       return;
     }
 
@@ -641,22 +615,6 @@ export function EditorPane({
           {hasConflict ? "Resolve conflict to edit" : "Read-only"}
         </TooltipContent>
       </Tooltip>
-    );
-  } else if (!isReadOnly) {
-    toolbarSlot = (
-      <Button
-        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-        onClick={() => setShowToolbar(!showToolbar)}
-        size="icon-sm"
-        variant="ghost"
-        title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-      >
-        {showToolbar ? (
-          <PanelBottomClose className="size-[1.2rem]" />
-        ) : (
-          <PanelBottomOpen className="size-[1.2rem]" />
-        )}
-      </Button>
     );
   }
 
@@ -813,12 +771,6 @@ export function EditorPane({
           )}
         </div>
       </div>
-
-      {noteId && !isReadOnly && showToolbar && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div className="pointer-events-auto" ref={toolbarContainerRef} />
-        </div>
-      )}
 
       {noteId && hasConflict ? (
         <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">

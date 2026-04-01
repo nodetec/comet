@@ -91,7 +91,7 @@ type NotesPaneProps = {
   onChangeSortField(field: NoteSortField): void;
   onChangeSortDirection(direction: NoteSortDirection): void;
   onCopyNoteContent(noteId: string): void;
-  onCreateNote(source: "keyboard" | "pointer"): void;
+  onCreateNote(): void;
   onDeleteNotePermanently(noteId: string): void;
   onDuplicateNote(noteId: string): void;
   onLoadMore(): void;
@@ -107,7 +107,7 @@ type NotesPaneProps = {
 function handleCreateButtonPointerDown(
   event: PointerEvent<HTMLButtonElement>,
   isCreatingNote: boolean,
-  onCreateNote: (source: "keyboard" | "pointer") => void,
+  onCreateNote: () => void,
 ) {
   event.preventDefault();
 
@@ -115,18 +115,18 @@ function handleCreateButtonPointerDown(
     return;
   }
 
-  onCreateNote("pointer");
+  onCreateNote();
 }
 
 function handleCreateButtonClick(
   event: MouseEvent<HTMLButtonElement>,
-  onCreateNote: (source: "keyboard" | "pointer") => void,
+  onCreateNote: () => void,
 ) {
   if (event.detail !== 0) {
     return;
   }
 
-  onCreateNote("keyboard");
+  onCreateNote();
 }
 
 const HIGHLIGHT_CLASS_NAME =
