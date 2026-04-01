@@ -42,6 +42,16 @@
       "html": "<blockquote><p>first</p><p>second</p></blockquote>"
     },
     {
+      "id": "blockquote-nested",
+      "description": "Nested blockquotes survive markdown export and HTML re-import.",
+      "support": "lossless",
+      "skipClipboardRoundtrip": true,
+      "skipLexicalRoundtrip": true,
+      "title": "",
+      "markdown": "> Blockquotes can also be nested...\n>\n> > ...by using additional greater-than signs right next to each other...\n> >\n> > > ...or with spaces between arrows.",
+      "html": "<blockquote><p>Blockquotes can also be nested...</p><blockquote><p>...by using additional greater-than signs right next to each other...</p><blockquote><p>...or with spaces between arrows.</p></blockquote></blockquote></blockquote>"
+    },
+    {
       "id": "checklist-basic",
       "description": "A basic two-item checklist with mixed checked states.",
       "support": "lossless",

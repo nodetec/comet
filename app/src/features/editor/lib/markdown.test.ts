@@ -353,6 +353,31 @@ describe("markdown editor pipeline", () => {
     expect(roundtripMarkdown("> quoted")).toBe("> quoted");
   });
 
+  it("exports nested blockquotes without flattening them", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const outer = $createQuoteNode();
+      const outerParagraph = $createParagraphNode();
+      outerParagraph.append($createTextNode("outer"));
+
+      const inner = $createQuoteNode();
+      const innerParagraph = $createParagraphNode();
+      innerParagraph.append($createTextNode("inner"));
+
+      const deep = $createQuoteNode();
+      const deepParagraph = $createParagraphNode();
+      deepParagraph.append($createTextNode("deep"));
+
+      deep.append(deepParagraph);
+      inner.append(innerParagraph, deep);
+      outer.append(outerParagraph, inner);
+      root.append(outer);
+    });
+
+    expect(markdown).toBe(
+      ["> outer", ">", "> > inner", "> >", "> > > deep"].join("\n"),
+    );
+  });
+
   it("exports nested bullet lists under checklist items without converting them", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const checklist = $createListNode("check");

@@ -18,6 +18,7 @@ import {
   $isLineBreakNode,
   $isParagraphNode,
   $isTextNode,
+  type ElementNode,
 } from "lexical";
 
 import { LINK } from "./link-transformer";
@@ -97,6 +98,65 @@ function isEmptyParagraphChild(
  * Lexical's built-in QUOTE export flattens all children into a single line.
  * We export each block child separated by `>\n>` to maintain paragraphs.
  */
+function exportQuoteNode(
+  node: QuoteNode,
+  traverseChildren: (node: ElementNode) => string,
+): string {
+  const hasParagraphChildren = node.getChildren().some($isParagraphNode);
+  if (!hasParagraphChildren) {
+    return traverseChildren(node)
+      .split("\n")
+      .map((line) => (line === "" || line === ">" ? ">" : `> ${line}`))
+      .join("\n");
+  }
+
+  const lines: string[] = [];
+  let pendingBlankLines = 0;
+  let hasContent = false;
+
+  const pushBlankLines = (count: number) => {
+    for (let i = 0; i < count; i++) {
+      lines.push(">");
+    }
+  };
+
+  for (const child of node.getChildren()) {
+    if (isEmptyParagraphChild(child)) {
+      pendingBlankLines++;
+      continue;
+    }
+
+    let childMd: string;
+    if ($isQuoteNode(child)) {
+      childMd = exportQuoteNode(child, traverseChildren);
+    } else if ($isElementNode(child)) {
+      childMd = traverseChildren(child);
+    } else {
+      childMd = child.getTextContent();
+    }
+
+    if (hasContent) {
+      pushBlankLines(Math.max(1, pendingBlankLines));
+    } else if (pendingBlankLines > 0) {
+      pushBlankLines(pendingBlankLines);
+    }
+
+    pendingBlankLines = 0;
+    lines.push(
+      ...childMd.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)),
+    );
+    hasContent = true;
+  }
+
+  if (pendingBlankLines > 0) {
+    pushBlankLines(
+      hasContent ? Math.max(1, pendingBlankLines) : pendingBlankLines,
+    );
+  }
+
+  return lines.join("\n");
+}
+
 const QUOTE: ElementTransformer = {
   ...BUILTIN_QUOTE,
   dependencies: [QuoteNode],
@@ -104,55 +164,7 @@ const QUOTE: ElementTransformer = {
     if (!$isQuoteNode(node)) {
       return null;
     }
-
-    const hasParagraphChildren = node.getChildren().some($isParagraphNode);
-    if (!hasParagraphChildren) {
-      return traverseChildren(node)
-        .split("\n")
-        .map((line) => (line === "" || line === ">" ? ">" : `> ${line}`))
-        .join("\n");
-    }
-
-    const lines: string[] = [];
-    let pendingBlankLines = 0;
-    let hasContent = false;
-
-    const pushBlankLines = (count: number) => {
-      for (let i = 0; i < count; i++) {
-        lines.push(">");
-      }
-    };
-
-    for (const child of node.getChildren()) {
-      if (isEmptyParagraphChild(child)) {
-        pendingBlankLines++;
-        continue;
-      }
-
-      const childMd = $isElementNode(child)
-        ? traverseChildren(child)
-        : child.getTextContent();
-
-      if (hasContent) {
-        pushBlankLines(Math.max(1, pendingBlankLines));
-      } else if (pendingBlankLines > 0) {
-        pushBlankLines(pendingBlankLines);
-      }
-
-      pendingBlankLines = 0;
-      lines.push(
-        ...childMd.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)),
-      );
-      hasContent = true;
-    }
-
-    if (pendingBlankLines > 0) {
-      pushBlankLines(
-        hasContent ? Math.max(1, pendingBlankLines) : pendingBlankLines,
-      );
-    }
-
-    return lines.join("\n");
+    return exportQuoteNode(node, traverseChildren);
   },
 };
 

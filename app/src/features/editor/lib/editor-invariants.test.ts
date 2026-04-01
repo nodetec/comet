@@ -42,9 +42,13 @@ type SharedInvariantFixture = {
   html: string;
   id: string;
   markdown: string;
+  skipClipboardRoundtrip?: boolean;
+  skipLexicalRoundtrip?: boolean;
   support: "lossless" | "normalized" | "unsupported";
   title: string;
 };
+
+const allFixtures = fixtures.cases as SharedInvariantFixture[];
 
 const TEST_NODES = [
   CodeNode,
@@ -123,13 +127,18 @@ function exportClipboardMarkdown(markdown: string): string {
   return output;
 }
 
-const losslessFixtures = fixtures.cases.filter(
-  (fixture): fixture is SharedInvariantFixture =>
-    fixture.support === "lossless",
+const losslessFixtures = allFixtures.filter(
+  (fixture) => fixture.support === "lossless",
+);
+const lexicalLosslessFixtures = losslessFixtures.filter(
+  (fixture) => fixture.skipLexicalRoundtrip !== true,
+);
+const clipboardLosslessFixtures = losslessFixtures.filter(
+  (fixture) => fixture.skipClipboardRoundtrip !== true,
 );
 
 describe("editor invariants", () => {
-  it.each(losslessFixtures)(
+  it.each(lexicalLosslessFixtures)(
     "preserves markdown through Lexical round-trip: $id",
     (fixture) => {
       expect(roundtripMarkdown(fixture.markdown)).toBe(fixture.markdown);
@@ -145,10 +154,54 @@ describe("editor invariants", () => {
     },
   );
 
-  it.each(losslessFixtures)(
+  it.each(clipboardLosslessFixtures)(
     "preserves markdown through clipboard export: $id",
     (fixture) => {
       expect(exportClipboardMarkdown(fixture.markdown)).toBe(fixture.markdown);
     },
   );
+
+  it("imports nested blockquote HTML as nested quote nodes", () => {
+    const fixture = losslessFixtures.find(
+      (candidate) => candidate.id === "blockquote-nested",
+    );
+    expect(fixture).toBeDefined();
+    if (!fixture) {
+      return;
+    }
+
+    const editor = createTestEditor();
+    let topLevelTypes: string[] = [];
+    let outerChildTypes: string[] = [];
+    let innerChildTypes: string[] = [];
+
+    editor.update(
+      () => {
+        const root = $getRoot();
+        root.clear();
+        $importMarkdownFromHTML(fixture.html, fixture.markdown);
+
+        const outer = root.getFirstChild();
+        topLevelTypes = root.getChildren().map((child) => child.getType());
+        if (!(outer instanceof QuoteNode)) {
+          return;
+        }
+
+        outerChildTypes = outer.getChildren().map((child) => child.getType());
+        const inner = outer
+          .getChildren()
+          .find((child): child is QuoteNode => child instanceof QuoteNode);
+        if (!inner) {
+          return;
+        }
+
+        innerChildTypes = inner.getChildren().map((child) => child.getType());
+      },
+      { discrete: true },
+    );
+
+    expect(topLevelTypes).toEqual(["quote"]);
+    expect(outerChildTypes).toContain("quote");
+    expect(innerChildTypes).toContain("quote");
+  });
 });
