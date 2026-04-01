@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "checklistReplacementCases": [
+    {
+      "id": "replace-empty-checklist-item-in-place",
+      "existingItems": [
+        { "checked": false, "text": "before" },
+        { "checked": false, "text": "" },
+        { "checked": false, "text": "after" }
+      ],
+      "pastedMarkdown": "- [ ] chrome/firefox nostr signer\n- [ ] deploy multiple relays (maybe a neon branch per relay?)\n- [x] locked notes",
+      "expectedChecked": [false, false, false, true, false],
+      "expectedTexts": [
+        "before",
+        "chrome/firefox nostr signer",
+        "deploy multiple relays (maybe a neon branch per relay?)",
+        "locked notes",
+        "after"
+      ]
+    }
+  ],
+  "fencedCodeBlockCases": [
+    {
+      "code": "fn main() {}",
+      "id": "rust-fence",
+      "language": "rust",
+      "markdown": "```rust\nfn main() {}\n```"
+    },
+    {
+      "code": "console.log('hi');",
+      "id": "trim-surrounding-blank-lines",
+      "language": "ts",
+      "markdown": "\n\n```ts\nconsole.log('hi');\n```\n\n"
+    }
+  ],
+  "mixedBlockPasteCases": [
+    {
+      "html": "<h1>Title</h1><p><br></p><ul class=\"contains-task-list\"><li class=\"task-list-item\"><input type=\"checkbox\" class=\"task-list-item-checkbox\" disabled=\"\" /> Task</li></ul><p>Body</p>",
+      "id": "mixed-heading-checklist-paragraph",
+      "markdown": "# Title\n\n- [ ] Task\n\nBody"
+    }
+  ]
+}

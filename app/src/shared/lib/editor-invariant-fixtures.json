@@ -64,6 +64,30 @@
       "title": "",
       "markdown": "| A | B |\n| --- | --- |\n| 1 | 2 |",
       "html": "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    },
+    {
+      "id": "code-fence-trailing-blank-line",
+      "description": "A fenced code block with a trailing blank line preserved inside the block.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "```rust\nfn main() {}\n\n```",
+      "html": "<pre data-language=\"rust\">fn main() {}\n\n</pre>"
+    },
+    {
+      "id": "link-with-title",
+      "description": "A markdown link that carries an explicit title attribute.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "[Open docs](https://example.com \"Docs\")",
+      "html": "<p><a href=\"https://example.com\" title=\"Docs\">Open docs</a></p>"
+    },
+    {
+      "id": "image-with-title",
+      "description": "A markdown image that carries an explicit title attribute.",
+      "support": "lossless",
+      "title": "",
+      "markdown": "![diagram](attachment://hash.png \"Reference image\")",
+      "html": "<p><img src=\"attachment://hash.png\" alt=\"diagram\" title=\"Reference image\" /></p>"
     }
   ]
 }

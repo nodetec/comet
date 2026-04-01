@@ -41,6 +41,7 @@ type BlobFetchStatus = "downloaded" | "missing" | "needsUnlock";
 export interface ImagePayload {
   src: string;
   altText?: string;
+  title?: string;
   width?: number;
   height?: number;
   key?: NodeKey;
@@ -50,6 +51,7 @@ export type SerializedImageNode = Spread<
   {
     src: string;
     altText: string;
+    title: string;
     width?: number;
     height?: number;
   },
@@ -60,10 +62,12 @@ export type SerializedImageNode = Spread<
 function ImageComponent({
   src,
   altText,
+  title,
   nodeKey,
 }: {
   src: string;
   altText: string;
+  title: string;
   width?: number;
   height?: number;
   nodeKey: NodeKey;
@@ -318,6 +322,7 @@ function ImageComponent({
         ref={imageRef}
         src={reloadToken ? `${src}#t=${reloadToken}` : src}
         alt={altText}
+        title={title}
         className="max-w-full cursor-default overflow-hidden select-none"
         style={{ opacity: isFocused ? 0.7 : 1 }}
         draggable="false"
@@ -337,6 +342,7 @@ function ImageComponent({
 export class ImageNode extends DecoratorNode<ReactNode> {
   __src: string;
   __altText: string;
+  __title: string;
   __width?: number;
   __height?: number;
 
@@ -348,6 +354,7 @@ export class ImageNode extends DecoratorNode<ReactNode> {
     return new ImageNode(
       node.__src,
       node.__altText,
+      node.__title,
       node.__width,
       node.__height,
       node.__key,
@@ -355,8 +362,8 @@ export class ImageNode extends DecoratorNode<ReactNode> {
   }
 
   static importJSON(serializedNode: SerializedImageNode): ImageNode {
-    const { src, altText, width, height } = serializedNode;
-    return $createImageNode({ src, altText, width, height });
+    const { src, altText, title, width, height } = serializedNode;
+    return $createImageNode({ src, altText, title, width, height });
   }
 
   static importDOM(): DOMConversionMap | null {
@@ -368,8 +375,9 @@ export class ImageNode extends DecoratorNode<ReactNode> {
           if (!rawSrc) return null;
           const src = resolveImageSrc(rawSrc);
           const altText = img.getAttribute("alt") || "";
+          const title = img.getAttribute("title") || "";
           return {
-            node: $createImageNode({ src, altText }),
+            node: $createImageNode({ src, altText, title }),
           };
         },
         priority: 0,
@@ -380,6 +388,7 @@ export class ImageNode extends DecoratorNode<ReactNode> {
   constructor(
     src: string,
     altText?: string,
+    title?: string,
     width?: number,
     height?: number,
     key?: NodeKey,
@@ -387,6 +396,7 @@ export class ImageNode extends DecoratorNode<ReactNode> {
     super(key);
     this.__src = src;
     this.__altText = altText || "";
+    this.__title = title || "";
     this.__width = width;
     this.__height = height;
   }
@@ -397,6 +407,7 @@ export class ImageNode extends DecoratorNode<ReactNode> {
       version: 1,
       src: this.__src,
       altText: this.__altText,
+      title: this.__title,
       width: this.__width,
       height: this.__height,
     };
@@ -406,6 +417,9 @@ export class ImageNode extends DecoratorNode<ReactNode> {
     const img = document.createElement("img");
     img.setAttribute("src", this.__src);
     img.setAttribute("alt", this.__altText);
+    if (this.__title.length > 0) {
+      img.setAttribute("title", this.__title);
+    }
     if (this.__width) {
       img.setAttribute("width", String(this.__width));
     }
@@ -437,11 +451,16 @@ export class ImageNode extends DecoratorNode<ReactNode> {
     return this.__altText;
   }
 
+  getTitle(): string {
+    return this.__title;
+  }
+
   decorate(): ReactNode {
     return (
       <ImageComponent
         src={this.__src}
         altText={this.__altText}
+        title={this.__title}
         width={this.__width}
         height={this.__height}
         nodeKey={this.__key}
@@ -461,11 +480,14 @@ export class ImageNode extends DecoratorNode<ReactNode> {
 export function $createImageNode({
   src,
   altText = "",
+  title = "",
   width,
   height,
   key,
 }: ImagePayload): ImageNode {
-  return $applyNodeReplacement(new ImageNode(src, altText, width, height, key));
+  return $applyNodeReplacement(
+    new ImageNode(src, altText, title, width, height, key),
+  );
 }
 
 export function $isImageNode(

@@ -813,6 +813,12 @@ describe("markdown editor pipeline", () => {
     );
   });
 
+  it("round-trips markdown images with titles", () => {
+    expect(
+      roundtripMarkdown('![diagram](attachment://hash.png "Reference image")'),
+    ).toBe('![diagram](attachment://hash.png "Reference image")');
+  });
+
   it("exports code blocks with longer fences when content contains backticks", () => {
     const markdown = exportMarkdownFromEditor((root) => {
       const code = $createCodeNode("rust");

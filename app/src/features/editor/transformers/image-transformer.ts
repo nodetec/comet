@@ -9,15 +9,19 @@ export const IMAGE: TextMatchTransformer = {
       return null;
     }
     const src = unresolveImageSrc(node.getSrc());
-    return `![${node.getAltText()}](${src})`;
+    const title = node.getTitle();
+    const escapedTitle = title.split('"').join(String.raw`\"`);
+    const titlePart = title ? ` "${escapedTitle}"` : "";
+    return `![${node.getAltText()}](${src}${titlePart})`;
   },
-  importRegExp: /!(?:\[([^[]*)\])(?:\(([^(]+)\))/,
-  regExp: /!\[([^\]]*)\]\(([^)]+)\)$/,
+  importRegExp: /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)/,
+  regExp: /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"((?:[^"\\]|\\.)*)")?\)$/,
   trigger: ")",
   replace: (textNode, match) => {
-    const [, altText, src] = match;
+    const [, altText, src, rawTitle] = match;
     const resolvedSrc = resolveImageSrc(src);
-    const imageNode = $createImageNode({ src: resolvedSrc, altText });
+    const title = rawTitle?.replace(/\\"/g, '"') ?? "";
+    const imageNode = $createImageNode({ src: resolvedSrc, altText, title });
     textNode.replace(imageNode);
   },
   type: "text-match",

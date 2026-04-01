@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import fixtures from "@/shared/lib/editor-paste-fixtures.json";
 import {
   $createListItemNode,
   $createListNode,
@@ -54,6 +55,64 @@ describe("parseSingleChecklistItemContent", () => {
 });
 
 describe("replaceEmptyChecklistItemWithChecklistNodes", () => {
+  it.each(fixtures.checklistReplacementCases)(
+    "replaces pasted checklist items in place: $id",
+    (fixture) => {
+      const editor = createTestEditor();
+      let checklistTexts: string[] = [];
+      let checkedStates: boolean[] = [];
+
+      editor.update(
+        () => {
+          const checklist = $createListNode("check");
+          const listItems = fixture.existingItems.map((item) => {
+            const listItem = $createListItemNode(item.checked);
+            listItem.append(
+              $createTextNode(item.text || CHECKLIST_PLACEHOLDER),
+            );
+            normalizeChecklistItemMarker(listItem);
+            return listItem;
+          });
+
+          checklist.append(...listItems);
+          $getRoot().append(checklist);
+
+          const importedChecklist = $createListNode("check");
+          for (const line of fixture.pastedMarkdown.split("\n")) {
+            const match = /^\s*[-*+]\s+\[([ xX])\]\s?(.*)$/.exec(line);
+            if (!match) {
+              throw new Error(`Invalid fixture checklist line: ${line}`);
+            }
+            const pastedItem = $createListItemNode(
+              match[1]?.toLowerCase() === "x",
+            );
+            pastedItem.append($createTextNode(match[2] ?? ""));
+            importedChecklist.append(pastedItem);
+          }
+
+          const didReplace = replaceEmptyChecklistItemWithChecklistNodes(
+            listItems[1]!,
+            [importedChecklist],
+          );
+
+          expect(didReplace).toBe(true);
+
+          const topLevelItems = checklist.getChildren().filter($isListItemNode);
+          checklistTexts = topLevelItems.map((item) =>
+            stripChecklistPlaceholders(item.getTextContent()),
+          );
+          checkedStates = topLevelItems.map(
+            (item) => item.getChecked() ?? false,
+          );
+        },
+        { discrete: true },
+      );
+
+      expect(checklistTexts).toEqual(fixture.expectedTexts);
+      expect(checkedStates).toEqual(fixture.expectedChecked);
+    },
+  );
+
   it("replaces an empty checklist item with pasted checklist items in place", () => {
     const editor = createTestEditor();
     let checklistTexts: string[] = [];
