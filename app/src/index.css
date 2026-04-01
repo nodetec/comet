@@ -161,7 +161,6 @@ body {
   font-family: "Figtree Variable", sans-serif;
   font-size: var(--editor-font-size, 15px);
   line-height: 1.625;
-  letter-spacing: -0.01em;
   color: var(--editor-text);
   caret-color: var(--editor-caret);
   outline: none;
