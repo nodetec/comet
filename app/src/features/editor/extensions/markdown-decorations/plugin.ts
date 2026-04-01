@@ -23,7 +23,6 @@ import {
 } from "@/features/editor/extensions/markdown-decorations/builders/lists";
 import { handleLink } from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { handleStrikethrough } from "@/features/editor/extensions/markdown-decorations/builders/strikethrough";
-import { addTagDecorations } from "@/features/editor/extensions/markdown-decorations/builders/tags";
 import {
   getCursorLineRanges,
   getCursorRanges,
@@ -79,9 +78,6 @@ function buildDecorations(view: EditorView): DecorationSet {
       },
     });
   }
-
-  // Tags aren't in the syntax tree — scan visible lines with regex
-  addTagDecorations(ctx, entries);
 
   // RangeSetBuilder requires entries sorted by from position
   entries.sort((a, b) => a.from - b.from || a.to - b.to);

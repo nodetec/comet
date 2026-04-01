@@ -19,12 +19,7 @@ import {
   EditorState,
   Transaction,
 } from "@codemirror/state";
-import {
-  drawSelection,
-  EditorView,
-  highlightSpecialChars,
-  keymap,
-} from "@codemirror/view";
+import { EditorView, highlightSpecialChars, keymap } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
@@ -32,6 +27,10 @@ import {
   HighlightSyntax,
   markdownDecorations,
 } from "@/features/editor/extensions/markdown-decorations";
+import {
+  TagGrammar,
+  tagHighlightStyle,
+} from "@/features/editor/extensions/markdown-decorations/tag-syntax";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -281,15 +280,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           MARKDOWN_EDITOR_THEME,
           syntaxHighlighting(MARKDOWN_HIGHLIGHT_STYLE),
           history(),
-          drawSelection(),
           highlightSpecialChars(),
           EditorView.lineWrapping,
           markdownLanguage({
             base: markdownLang,
-            extensions: [Strikethrough, TaskList, HighlightSyntax],
+            extensions: [Strikethrough, TaskList, HighlightSyntax, TagGrammar],
           }),
           inlineImages(),
           markdownDecorations(),
+          tagHighlightStyle,
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {

@@ -18,10 +18,9 @@ const WRAPPED_TAG_RE =
 
 type TagRange = { from: number; to: number };
 
-function findAllTags(text: string, baseOffset: number): TagRange[] {
+export function findAllTags(text: string, baseOffset: number): TagRange[] {
   const tags: TagRange[] = [];
 
-  // Find wrapped tags first (higher priority)
   const wrappedRanges = new Set<string>();
   WRAPPED_TAG_RE.lastIndex = 0;
   let m;
@@ -36,7 +35,6 @@ function findAllTags(text: string, baseOffset: number): TagRange[] {
     }
   }
 
-  // Find simple tags (skip positions already matched by wrapped)
   SIMPLE_TAG_RE.lastIndex = 0;
   while ((m = SIMPLE_TAG_RE.exec(text)) !== null) {
     const raw = m[1]!;
@@ -51,13 +49,9 @@ function findAllTags(text: string, baseOffset: number): TagRange[] {
     }
   }
 
-  return tags.toSorted((a, b) => a.from - b.from);
+  return [...tags].toSorted((a, b) => a.from - b.from);
 }
 
-/**
- * Scan visible lines for tags and add decorations.
- * Called directly from the plugin's buildDecorations, not via NODE_HANDLERS.
- */
 export function addTagDecorations(
   ctx: BuilderContext,
   out: DecorationEntry[],
@@ -68,14 +62,8 @@ export function addTagDecorations(
 
     for (let n = startLine.number; n <= endLine.number; n++) {
       const line = ctx.state.doc.line(n);
-      const tags = findAllTags(line.text, line.from);
-
-      for (const tag of tags) {
-        out.push({
-          from: tag.from,
-          to: tag.to,
-          decoration: tagMark,
-        });
+      for (const tag of findAllTags(line.text, line.from)) {
+        out.push({ from: tag.from, to: tag.to, decoration: tagMark });
       }
     }
   }

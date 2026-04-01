@@ -471,6 +471,10 @@ body {
   background: color-mix(in oklab, var(--primary) 30%, transparent);
 }
 
+.cm-editor .cm-content ::selection {
+  background: color-mix(in oklab, var(--primary) 30%, transparent) !important;
+}
+
 @keyframes slide-in-left {
   from {
     opacity: 0;

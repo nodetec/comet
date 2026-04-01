@@ -1,8 +1,6 @@
 import { type Extension, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 
-import { canonicalizeAuthoredTagToken } from "@/features/editor/lib/tags";
-import { dispatchFocusTagPath } from "@/shared/lib/tag-navigation";
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
 import {
   dedentListItem,
@@ -150,47 +148,11 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     color: "var(--muted-foreground)",
     textDecoration: "line-through",
   },
-  ".cm-md-tag": {
-    backgroundColor: "var(--accent)",
-    color: "var(--accent-foreground)",
-    borderRadius: "calc(var(--radius) * 0.8)",
-    padding: "0.1em 0.4em",
-    boxDecorationBreak: "clone",
-    cursor: "pointer",
-  },
   ".cm-md-hr": {
     border: "none",
     borderTop: "1px solid var(--border)",
     display: "block",
     margin: "0.5em 0",
-  },
-});
-
-const tagClickHandler = EditorView.domEventHandlers({
-  click(event) {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    const tagEl = target.closest(".cm-md-tag");
-    if (!tagEl) {
-      return false;
-    }
-
-    const tagText = tagEl.textContent;
-    if (!tagText) {
-      return false;
-    }
-
-    const canonical = canonicalizeAuthoredTagToken(tagText);
-    if (!canonical) {
-      return false;
-    }
-
-    event.preventDefault();
-    dispatchFocusTagPath(canonical);
-    return true;
   },
 });
 
@@ -202,10 +164,5 @@ const listKeymap = Prec.high(
 );
 
 export function markdownDecorations(): Extension {
-  return [
-    markdownDecorationsPlugin,
-    markdownDecorationsTheme,
-    listKeymap,
-    tagClickHandler,
-  ];
+  return [markdownDecorationsPlugin, markdownDecorationsTheme, listKeymap];
 }
