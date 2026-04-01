@@ -93,7 +93,10 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
     borderLeftColor: "var(--editor-caret)",
   },
   ".cm-selectionBackground": {
-    backgroundColor: "color-mix(in oklab, var(--accent) 35%, transparent)",
+    backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
+  },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
   },
 });
 

@@ -103,6 +103,8 @@ class InlineImageWidget extends WidgetType {
       view.focus();
     });
 
+    wrapper.dataset.from = String(this.from);
+    wrapper.dataset.to = String(this.to);
     wrapper.append(image);
     return wrapper;
   }
@@ -169,6 +171,19 @@ function buildInlineImageDecorations(state: EditorState) {
   return builder.finish();
 }
 
+function syncImageSelectionState(view: EditorView) {
+  const sel = view.state.selection.main;
+  for (const el of view.contentDOM.querySelectorAll(".cm-inline-image")) {
+    if (!(el instanceof HTMLElement)) {
+      continue;
+    }
+    const from = Number(el.dataset.from);
+    const to = Number(el.dataset.to);
+    const isSelected = !sel.empty && from < sel.to && to > sel.from;
+    el.classList.toggle("cm-inline-image-selected", isSelected);
+  }
+}
+
 const inlineImagePlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -184,6 +199,10 @@ const inlineImagePlugin = ViewPlugin.fromClass(
       ) {
         this.decorations = buildInlineImageDecorations(update.state);
       }
+
+      if (update.selectionSet || update.docChanged) {
+        syncImageSelectionState(update.view);
+      }
     }
   },
   { decorations: (v) => v.decorations },
@@ -193,27 +212,34 @@ const inlineImageTheme = EditorView.baseTheme({
   ".cm-inline-image": {
     display: "inline-flex",
     maxWidth: "100%",
-    paddingBlock: "0.25rem",
+    // paddingBlock: "0.25rem",
     verticalAlign: "top",
   },
   ".cm-inline-image-loading": {
     minHeight: "4rem",
     minWidth: "8rem",
     backgroundColor: "color-mix(in oklab, var(--muted) 40%, transparent)",
-    borderRadius: "calc(var(--radius) + 0.25rem)",
   },
   ".cm-inline-image-element": {
-    borderRadius: "calc(var(--radius) + 0.25rem)",
     display: "block",
     maxHeight: "min(24rem, 50vh)",
     maxWidth: "min(100%, 32rem)",
     objectFit: "contain",
     userSelect: "none",
   },
+  ".cm-inline-image-selected": {
+    position: "relative",
+  },
+  ".cm-inline-image-selected::after": {
+    content: '""',
+    position: "absolute",
+    inset: "0",
+    backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
+    pointerEvents: "none",
+  },
   ".cm-inline-image[data-image-state='broken']": {
     alignItems: "center",
     backgroundColor: "color-mix(in oklab, var(--muted) 50%, transparent)",
-    borderRadius: "calc(var(--radius) + 0.25rem)",
     color: "var(--muted-foreground)",
     display: "inline-flex",
     fontSize: "0.875rem",
