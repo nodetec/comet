@@ -13,6 +13,7 @@ import {
   handleQuoteMark,
 } from "@/features/editor/extensions/markdown-decorations/builders/blockquotes";
 import { handleEmphasis } from "@/features/editor/extensions/markdown-decorations/builders/emphasis";
+import { handleHighlight } from "@/features/editor/extensions/markdown-decorations/builders/highlight";
 import { handleHeading } from "@/features/editor/extensions/markdown-decorations/builders/headings";
 import { handleHorizontalRule } from "@/features/editor/extensions/markdown-decorations/builders/horizontal-rules";
 import { handleInlineCode } from "@/features/editor/extensions/markdown-decorations/builders/inline-code";
@@ -40,6 +41,7 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
   StrongEmphasis: handleEmphasis,
   InlineCode: handleInlineCode,
   Link: handleLink,
+  Highlight: handleHighlight,
   Blockquote: handleBlockquote,
   QuoteMark: handleQuoteMark,
   HorizontalRule: handleHorizontalRule,
@@ -48,10 +50,11 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
 
 function buildDecorations(view: EditorView): DecorationSet {
   const { state } = view;
+  const hasFocus = view.hasFocus;
   const ctx: BuilderContext = {
     state,
-    cursorLines: getCursorLineRanges(state),
-    cursorRanges: getCursorRanges(state),
+    cursorLines: hasFocus ? getCursorLineRanges(state) : [],
+    cursorRanges: hasFocus ? getCursorRanges(state) : [],
     view,
   };
   const entries: Array<{ from: number; to: number; decoration: Decoration }> =
@@ -94,6 +97,7 @@ export const markdownDecorationsPlugin = ViewPlugin.fromClass(
       if (
         update.docChanged ||
         update.selectionSet ||
+        update.focusChanged ||
         update.viewportChanged ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {

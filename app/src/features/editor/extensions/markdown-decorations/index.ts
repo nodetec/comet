@@ -1,6 +1,7 @@
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
+export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
 
 const markdownDecorationsTheme = EditorView.baseTheme({
@@ -81,6 +82,13 @@ const markdownDecorationsTheme = EditorView.baseTheme({
       "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
     backgroundSize: "2px 100%,2px 100%,2px 100%,2px 100%",
     backgroundPosition: "0.5em 0,1.5em 0,2.5em 0,3.5em 0",
+  },
+  ".cm-md-highlight": {
+    backgroundColor: "var(--markdown-highlight)",
+    color: "var(--markdown-highlight-foreground)",
+    borderRadius: "0.2rem",
+    padding: "0 0.08rem",
+    boxDecorationBreak: "clone",
   },
   ".cm-md-strikethrough": {
     textDecoration: "line-through",

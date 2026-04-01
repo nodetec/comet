@@ -7,31 +7,22 @@ import type {
   DecorationEntry,
 } from "@/features/editor/extensions/markdown-decorations/types";
 
-const strikethroughMark = Decoration.mark({ class: "cm-md-strikethrough" });
+const highlightMark = Decoration.mark({ class: "cm-md-highlight" });
 
-export function handleStrikethrough(
+export function handleHighlight(
   node: SyntaxNodeRef,
   ctx: BuilderContext,
   out: DecorationEntry[],
 ): void {
   const resolved = node.node;
-  const marks = resolved.getChildren("StrikethroughMark");
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorRanges);
 
-  // Apply line-through only to content between delimiters
-  const contentFrom = marks.length > 0 ? marks[0]!.to : node.from;
-  const contentTo = marks.length > 1 ? marks.at(-1)!.from : node.to;
-  if (contentFrom < contentTo) {
-    out.push({
-      from: contentFrom,
-      to: contentTo,
-      decoration: strikethroughMark,
-    });
-  }
+  // Always apply highlight styling
+  out.push({ from: node.from, to: node.to, decoration: highlightMark });
 
-  // Hide ~~ delimiters when off cursor
+  // Hide == delimiters when off cursor
   if (!onCursor) {
-    for (const child of marks) {
+    for (const child of resolved.getChildren("HighlightMark")) {
       out.push({
         from: child.from,
         to: child.to,

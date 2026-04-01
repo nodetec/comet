@@ -6,7 +6,11 @@ import {
   type MouseEvent,
 } from "react";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
+import {
+  markdown as markdownLanguage,
+  markdownLanguage as markdownLang,
+} from "@codemirror/lang-markdown";
+import { Strikethrough } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
 import {
@@ -24,7 +28,10 @@ import {
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
-import { markdownDecorations } from "@/features/editor/extensions/markdown-decorations";
+import {
+  HighlightSyntax,
+  markdownDecorations,
+} from "@/features/editor/extensions/markdown-decorations";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -59,7 +66,8 @@ const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   },
   { tag: [t.link, t.url], color: "var(--syntax-link)" },
   { tag: [t.quote], color: "var(--muted-foreground)", fontStyle: "italic" },
-  { tag: [t.comment, t.processingInstruction], color: "var(--syntax-comment)" },
+  { tag: [t.comment], color: "var(--syntax-comment)" },
+  { tag: [t.processingInstruction], color: "var(--muted-foreground)" },
   { tag: [t.contentSeparator], color: "var(--muted-foreground)" },
   { tag: [t.list], color: "var(--muted-foreground)" },
 ]);
@@ -276,7 +284,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           drawSelection(),
           highlightSpecialChars(),
           EditorView.lineWrapping,
-          markdownLanguage(),
+          markdownLanguage({
+            base: markdownLang,
+            extensions: [Strikethrough, HighlightSyntax],
+          }),
           inlineImages(),
           markdownDecorations(),
           search(),
@@ -436,9 +447,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           insert: nextMarkdown,
         },
         selection: nextSelection,
-        effects: isNewLoad
-          ? EditorView.scrollIntoView(0, { y: "start" })
-          : undefined,
       });
       applyingExternalChangeRef.current = false;
       lastLoadKeyRef.current = loadKey;
