@@ -474,7 +474,7 @@ export function useShellController() {
         return;
       }
 
-      setFocusedPane("sidebar");
+      setFocusedPane("notes");
       latestRef.current.handleSelectTagPath(tagPath);
     };
 
