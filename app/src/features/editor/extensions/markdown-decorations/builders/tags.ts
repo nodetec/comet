@@ -49,7 +49,10 @@ export function findAllTags(text: string, baseOffset: number): TagRange[] {
     }
   }
 
-  return [...tags].toSorted((a, b) => a.from - b.from);
+  // eslint-disable-next-line unicorn/no-array-sort
+  return [...tags].sort(
+    (a: TagRange, b: TagRange) => a.from - b.from || a.to - b.to,
+  );
 }
 
 export function addTagDecorations(

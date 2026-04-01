@@ -1,3 +1,4 @@
+import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
@@ -30,6 +31,19 @@ function getHeadingMark(level: number): Decoration {
   return deco;
 }
 
+export function isSpaceDelimitedATXHeading(
+  state: Pick<EditorState, "doc">,
+  headerMarkTo: number,
+  nodeTo: number,
+): boolean {
+  if (headerMarkTo >= nodeTo) {
+    return false;
+  }
+
+  const nextCharacter = state.doc.sliceString(headerMarkTo, headerMarkTo + 1);
+  return nextCharacter === " " || nextCharacter === "\t";
+}
+
 function handleATXHeading(
   node: SyntaxNodeRef,
   resolved: SyntaxNode,
@@ -49,7 +63,8 @@ function handleATXHeading(
     });
 
     if (marks.length > 1) {
-      const lastMark = marks.at(-1)!;
+      // eslint-disable-next-line unicorn/prefer-at
+      const lastMark = marks[marks.length - 1]!;
       out.push({
         from: lastMark.from,
         to: lastMark.to,
@@ -109,6 +124,14 @@ export function handleHeading(
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
 
   if (node.name.startsWith("ATX")) {
+    const headerMark = resolved.getChild("HeaderMark");
+    if (
+      !headerMark ||
+      !isSpaceDelimitedATXHeading(ctx.state, headerMark.to, node.to)
+    ) {
+      return;
+    }
+
     handleATXHeading(node, resolved, level, onCursor, out);
   } else {
     handleSetextHeading(node, resolved, level, onCursor, out);

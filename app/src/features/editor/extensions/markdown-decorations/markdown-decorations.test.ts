@@ -2,6 +2,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
 
+import { isSpaceDelimitedATXHeading } from "@/features/editor/extensions/markdown-decorations/builders/headings";
 import {
   getCursorLineRanges,
   getCursorRanges,
@@ -67,5 +68,17 @@ describe("getCursorRanges", () => {
 
     // Cursor at position 10 — should NOT expand to full line
     expect(ranges).toEqual([{ from: 10, to: 10 }]);
+  });
+});
+
+describe("ATX heading delimiter rules", () => {
+  it("requires a space after the header marks", () => {
+    const bareHash = createState("#", 0);
+    const hashWithSpace = createState("# ", 0);
+    const hashWithText = createState("# heading", 0);
+
+    expect(isSpaceDelimitedATXHeading(bareHash, 1, 1)).toBe(false);
+    expect(isSpaceDelimitedATXHeading(hashWithSpace, 1, 2)).toBe(true);
+    expect(isSpaceDelimitedATXHeading(hashWithText, 1, 9)).toBe(true);
   });
 });

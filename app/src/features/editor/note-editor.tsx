@@ -54,7 +54,6 @@ export type NoteEditorHandle = {
 };
 
 const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
-  { tag: t.heading, color: "var(--foreground)", fontWeight: "700" },
   { tag: [t.emphasis], fontStyle: "italic" },
   { tag: [t.strong], fontWeight: "700" },
   {

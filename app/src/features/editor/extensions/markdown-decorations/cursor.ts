@@ -18,7 +18,8 @@ export function getCursorLineRanges(state: EditorState): LineRange[] {
       to: toLine.to,
     };
 
-    const last = ranges.at(-1);
+    // eslint-disable-next-line unicorn/prefer-at
+    const last = ranges.length > 0 ? ranges[ranges.length - 1] : undefined;
     if (last && lineRange.from <= last.to) {
       last.to = Math.max(last.to, lineRange.to);
     } else {
