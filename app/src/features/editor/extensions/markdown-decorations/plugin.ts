@@ -17,6 +17,10 @@ import { handleHighlight } from "@/features/editor/extensions/markdown-decoratio
 import { handleHeading } from "@/features/editor/extensions/markdown-decorations/builders/headings";
 import { handleHorizontalRule } from "@/features/editor/extensions/markdown-decorations/builders/horizontal-rules";
 import { handleInlineCode } from "@/features/editor/extensions/markdown-decorations/builders/inline-code";
+import {
+  handleListMark,
+  handleTaskMarker,
+} from "@/features/editor/extensions/markdown-decorations/builders/lists";
 import { handleLink } from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { handleStrikethrough } from "@/features/editor/extensions/markdown-decorations/builders/strikethrough";
 import {
@@ -41,6 +45,8 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
   StrongEmphasis: handleEmphasis,
   InlineCode: handleInlineCode,
   Link: handleLink,
+  ListMark: handleListMark,
+  TaskMarker: handleTaskMarker,
   Highlight: handleHighlight,
   Blockquote: handleBlockquote,
   QuoteMark: handleQuoteMark,
