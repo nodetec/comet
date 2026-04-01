@@ -832,6 +832,36 @@ describe("markdown editor pipeline", () => {
     expect(markdown).toBe("www.example.com");
   });
 
+  it("exports markdown formatting inside link labels", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createLinkNode("https://nodeca.github.io/pica/demo/");
+      const text = $createTextNode("pica");
+      text.toggleFormat("bold");
+      link.append(text);
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe("[**pica**](https://nodeca.github.io/pica/demo/)");
+  });
+
+  it("escapes literal angle brackets in link labels on export", () => {
+    const markdown = exportMarkdownFromEditor((root) => {
+      const paragraph = $createParagraphNode();
+      const link = $createLinkNode(
+        "https://github.com/markdown-it/markdown-it-ins",
+      );
+      link.append($createTextNode("<ins>"));
+      paragraph.append(link);
+      root.append(paragraph);
+    });
+
+    expect(markdown).toBe(
+      String.raw`[\<ins>](https://github.com/markdown-it/markdown-it-ins)`,
+    );
+  });
+
   it("round-trips markdown links with titles", () => {
     expect(roundtripMarkdown('[Open docs](https://example.com "Docs")')).toBe(
       '[Open docs](https://example.com "Docs")',
