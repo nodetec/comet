@@ -25,6 +25,7 @@ import {
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
+import { scrollCenterOnEnter } from "@/features/editor/lib/scroll-center-on-enter";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -427,6 +428,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           EditorView.lineWrapping,
           markdownLanguage(),
           search(),
+          scrollCenterOnEnter(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           editableExtension,
           contentAttributesExtension,

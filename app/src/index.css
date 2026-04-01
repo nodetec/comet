@@ -30,6 +30,7 @@ body {
 
 :root {
   --radius: 0.5rem;
+  --editor-bottom-padding: clamp(10rem, 35dvh, 24rem);
 }
 
 @theme inline {
@@ -118,6 +119,7 @@ body {
   background: transparent;
   width: 100%;
   display: grid;
+  padding-bottom: var(--editor-bottom-padding);
   grid-template-columns:
     minmax(clamp(1rem, 4vw, 3rem), 1fr)
     minmax(0, 48rem)
@@ -167,7 +169,6 @@ body {
   width: 100%;
   box-sizing: border-box;
 
-  padding-bottom: 35vh;
   padding-left: clamp(1rem, 5vw, 3.5rem);
   padding-right: clamp(1rem, 5vw, 3.5rem);
   padding-top: 0.25rem;
