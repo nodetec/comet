@@ -72,7 +72,7 @@ function normalizeImportedQuoteSpacing(node: LexicalNode): void {
   }
 }
 
-function isIgnorableChecklistWrapperChild(node: LexicalNode): boolean {
+function isIgnorableWrapperChild(node: LexicalNode): boolean {
   if ($isParagraphNode(node)) {
     return isEmptyParagraph(node);
   }
@@ -93,18 +93,45 @@ function isWrapperOnlyListItem(child: LexicalNode): boolean {
 
   return children.every(
     (grandchild) =>
-      $isListNode(grandchild) || isIgnorableChecklistWrapperChild(grandchild),
+      $isListNode(grandchild) || isIgnorableWrapperChild(grandchild),
   );
 }
 
-function normalizeImportedChecklistNesting(node: LexicalNode): void {
+function mergeNestedListIntoListItem(
+  owner: LexicalNode,
+  nestedList: ListNode,
+): void {
+  if (!$isListItemNode(owner)) {
+    return;
+  }
+
+  const existingNestedList = owner
+    .getChildren()
+    .find(
+      (child): child is ListNode =>
+        $isListNode(child) && child.getListType() === nestedList.getListType(),
+    );
+
+  if (!existingNestedList) {
+    owner.append(nestedList);
+    return;
+  }
+
+  for (const nestedChild of nestedList.getChildren()) {
+    existingNestedList.append(nestedChild);
+  }
+
+  nestedList.remove();
+}
+
+function normalizeImportedListNesting(node: LexicalNode): void {
   if ($isElementNode(node)) {
     for (const child of node.getChildren()) {
-      normalizeImportedChecklistNesting(child);
+      normalizeImportedListNesting(child);
     }
   }
 
-  if (!$isListNode(node) || node.getListType() !== "check") {
+  if (!$isListNode(node)) {
     return;
   }
 
@@ -128,7 +155,7 @@ function normalizeImportedChecklistNesting(node: LexicalNode): void {
         );
 
       for (const nestedList of nestedLists) {
-        previousItem.append(nestedList);
+        mergeNestedListIntoListItem(previousItem, nestedList);
       }
 
       child.remove();
@@ -326,7 +353,7 @@ export function normalizeImportedCodeBlocksFromMarkdown(
 export function normalizeImportedNodes(nodes: LexicalNode[]): LexicalNode[] {
   for (const node of nodes) {
     normalizeImportedQuoteSpacing(node);
-    normalizeImportedChecklistNesting(node);
+    normalizeImportedListNesting(node);
     normalizeImportedListItemLeadParagraph(node);
   }
 
