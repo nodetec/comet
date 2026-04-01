@@ -206,6 +206,18 @@ function focusAndClickAtLine(
   return true;
 }
 
+function blurEditorView(view: EditorView) {
+  const activeElement = document.activeElement;
+  if (
+    activeElement instanceof HTMLElement &&
+    view.dom.contains(activeElement)
+  ) {
+    activeElement.blur();
+  }
+
+  view.contentDOM.blur();
+}
+
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function NoteEditor(
     {
@@ -452,7 +464,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           view.focus();
           onAutoFocusHandled?.();
         } else {
-          view.contentDOM.blur();
+          blurEditorView(view);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (useShellStore.getState().focusedPane !== "editor") {
+                blurEditorView(view);
+              }
+            });
+          });
         }
       } else {
         view.dispatch({
