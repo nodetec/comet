@@ -2,7 +2,10 @@ import { EditorState } from "@codemirror/state";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
 
-import { findInlineImages } from "@/features/editor/lib/inline-images";
+import {
+  findInlineImageBeforeCursor,
+  findInlineImages,
+} from "@/features/editor/extensions/inline-images";
 
 function createMarkdownState(doc: string) {
   return EditorState.create({
@@ -66,5 +69,18 @@ describe("inline image matcher", () => {
         to: 71,
       },
     ]);
+  });
+
+  it("finds the image immediately before the cursor", () => {
+    const doc = "before ![One](attachment://one.png) after";
+    const state = createMarkdownState(doc);
+
+    expect(findInlineImageBeforeCursor(state, 35)).toEqual({
+      altText: "One",
+      from: 7,
+      src: "attachment://one.png",
+      to: 35,
+    });
+    expect(findInlineImageBeforeCursor(state, 34)).toBeNull();
   });
 });

@@ -23,7 +23,7 @@ import {
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
-import { inlineImages } from "@/features/editor/lib/inline-images";
+import { inlineImages } from "@/features/editor/extensions/inline-images";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 

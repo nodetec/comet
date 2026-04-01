@@ -2,10 +2,11 @@ import {
   EditorSelection,
   type EditorState,
   type Extension,
+  Prec,
   RangeSetBuilder,
 } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { Decoration, EditorView, WidgetType } from "@codemirror/view";
+import { Decoration, EditorView, keymap, WidgetType } from "@codemirror/view";
 
 import { resolveImageSrc } from "@/shared/lib/attachments";
 
@@ -120,6 +121,19 @@ export function findInlineImages(state: EditorState): InlineImageMatch[] {
   return matches;
 }
 
+export function findInlineImageBeforeCursor(
+  state: EditorState,
+  cursor: number,
+): InlineImageMatch | null {
+  for (const match of findInlineImages(state)) {
+    if (match.to === cursor) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
 function buildInlineImageDecorations(state: EditorState) {
   const builder = new RangeSetBuilder<Decoration>();
 
@@ -173,6 +187,39 @@ const inlineImageTheme = EditorView.baseTheme({
   },
 });
 
+function deleteInlineImageBackward(view: EditorView): boolean {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return false;
+  }
+
+  const image = findInlineImageBeforeCursor(view.state, selection.head);
+  if (!image) {
+    return false;
+  }
+
+  view.dispatch({
+    changes: {
+      from: image.from,
+      to: image.to,
+    },
+    selection: EditorSelection.cursor(image.from),
+  });
+
+  return true;
+}
+
 export function inlineImages(): Extension {
-  return [inlineImageField, inlineImageTheme];
+  return [
+    inlineImageField,
+    inlineImageTheme,
+    Prec.high(
+      keymap.of([
+        {
+          key: "Backspace",
+          run: deleteInlineImageBackward,
+        },
+      ]),
+    ),
+  ];
 }
