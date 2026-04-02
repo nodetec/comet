@@ -23,8 +23,6 @@
     "ring": "#9e9e9e",
     "sidebar": "#eceef3",
     "sidebar-foreground": "#46484a",
-    "sidebar-primary": "#005fcf",
-    "sidebar-accent": "#dfe1e5",
     "sidebar-accent-foreground": "#1b1b1b",
     "sidebar-active-focus": "#005fcf40",
     "sidebar-muted": "#dbdee3",
@@ -38,7 +36,6 @@
     "editor-caret": "#005fcf",
     "editor-selection": "#508cdc2e",
     "heading-color": "#1a456b",
-    "blockquote-accent": "#005fcf99",
     "note-focus-indicator": "#005fcf99",
     "overlay-backdrop": "#0f172a38",
     "control-thumb": "#ffffff",
@@ -64,7 +61,6 @@
     "syntax-number": "#098658",
     "syntax-foreground": "#24292f",
     "syntax-regex": "#811f3f",
-    "syntax-selector": "#800000",
-    "syntax-link": "#0451a5"
+    "syntax-selector": "#800000"
   }
 }

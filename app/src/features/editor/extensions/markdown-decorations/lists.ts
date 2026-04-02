@@ -94,8 +94,14 @@ class TaskWidget extends MarkerWidget {
 class BulletWidget extends MarkerWidget {
   override toDOM(): HTMLElement {
     const wrapper = createMarkerWrapper();
+    const content = document.createElement("span");
+
     wrapper.setAttribute("inert", "true");
-    wrapper.innerHTML = "&bull;";
+    content.setAttribute("aria-hidden", "true");
+    content.setAttribute("tabindex", "-1");
+    content.className = "cm-md-bullet-marker";
+    content.innerHTML = "&bull;";
+    wrapper.append(content);
     return wrapper;
   }
 }
@@ -656,12 +662,17 @@ const listTheme = EditorView.theme({
   },
   ".cm-md-list-marker": {
     alignItems: "center",
-    color: "var(--muted-foreground)",
+    color: "var(--primary)",
     display: "inline-flex",
     justifyContent: "center",
     minWidth: "2rem",
   },
+  ".cm-md-bullet-marker": {
+    fontSize: "1.35rem",
+    lineHeight: "1",
+  },
   ".cm-md-task-marker": {
+    accentColor: "var(--primary)",
     cursor: "pointer",
     margin: "0",
     scale: "1.2",

@@ -30,8 +30,6 @@ const THEME_COLOR_KEYS: &[&str] = &[
     "ring",
     "sidebar",
     "sidebar-foreground",
-    "sidebar-primary",
-    "sidebar-accent",
     "sidebar-accent-foreground",
     "sidebar-active-focus",
     "sidebar-muted",
@@ -45,7 +43,6 @@ const THEME_COLOR_KEYS: &[&str] = &[
     "editor-caret",
     "editor-selection",
     "heading-color",
-    "blockquote-accent",
     "note-focus-indicator",
     "overlay-backdrop",
     "control-thumb",
@@ -72,7 +69,6 @@ const THEME_COLOR_KEYS: &[&str] = &[
     "syntax-foreground",
     "syntax-regex",
     "syntax-selector",
-    "syntax-link",
 ];
 
 static BUNDLED_THEMES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../src/shared/theme/themes");

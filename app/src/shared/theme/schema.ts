@@ -27,8 +27,6 @@ export const THEME_COLOR_KEYS = [
   "ring",
   "sidebar",
   "sidebar-foreground",
-  "sidebar-primary",
-  "sidebar-accent",
   "sidebar-accent-foreground",
   "sidebar-active-focus",
   "sidebar-muted",
@@ -42,7 +40,6 @@ export const THEME_COLOR_KEYS = [
   "editor-caret",
   "editor-selection",
   "heading-color",
-  "blockquote-accent",
   "note-focus-indicator",
   "overlay-backdrop",
   "control-thumb",
@@ -69,7 +66,6 @@ export const THEME_COLOR_KEYS = [
   "syntax-foreground",
   "syntax-regex",
   "syntax-selector",
-  "syntax-link",
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];

@@ -41,10 +41,11 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     fontStyle: "italic",
   },
   ".cm-md-code": {
+    color: "var(--foreground)",
     fontFamily:
       '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: "0.9em",
-    backgroundColor: "color-mix(in oklab, var(--muted) 50%, transparent)",
+    backgroundColor: "var(--muted)",
     borderRadius: "0.2rem",
     padding: "0.1em 0.2em",
   },
@@ -52,7 +53,7 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     fontFamily:
       '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: "0.9em",
-    backgroundColor: "color-mix(in oklab, var(--muted) 50%, transparent)",
+    backgroundColor: "var(--muted)",
     padding: "0 0.75rem",
   },
   ".cm-md-codeblock.cm-md-codeblock-open": {
@@ -158,38 +159,35 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     textAlign: "right",
   },
   ".cm-md-link": {
-    color: "var(--syntax-link)",
-    textDecoration: "underline",
-    textUnderlineOffset: "0.15em",
+    color: "var(--primary)",
   },
   ".cm-md-bq": {
     backgroundRepeat: "no-repeat",
   },
   ".cm-md-bq-1": {
     paddingLeft: "1.5em",
-    backgroundImage:
-      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+    backgroundImage: "linear-gradient(var(--primary),var(--primary))",
     backgroundSize: "2px 100%",
     backgroundPosition: "0.5em 0",
   },
   ".cm-md-bq-2": {
     paddingLeft: "2.5em",
     backgroundImage:
-      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
     backgroundSize: "2px 100%,2px 100%",
     backgroundPosition: "0.5em 0,1.5em 0",
   },
   ".cm-md-bq-3": {
     paddingLeft: "3.5em",
     backgroundImage:
-      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
     backgroundSize: "2px 100%,2px 100%,2px 100%",
     backgroundPosition: "0.5em 0,1.5em 0,2.5em 0",
   },
   ".cm-md-bq-4": {
     paddingLeft: "4.5em",
     backgroundImage:
-      "linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent)),linear-gradient(var(--blockquote-accent),var(--blockquote-accent))",
+      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
     backgroundSize: "2px 100%,2px 100%,2px 100%,2px 100%",
     backgroundPosition: "0.5em 0,1.5em 0,2.5em 0,3.5em 0",
   },

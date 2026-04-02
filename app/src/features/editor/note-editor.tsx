@@ -63,11 +63,10 @@ const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   { tag: [t.strong], fontWeight: "700" },
   {
     tag: [t.monospace, t.literal],
-    color: "var(--syntax-string)",
     fontFamily:
       '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   },
-  { tag: [t.link, t.url], color: "var(--syntax-link)" },
+  { tag: [t.link, t.url], color: "var(--primary)" },
   { tag: [t.quote], color: "var(--muted-foreground)", fontStyle: "italic" },
   { tag: [t.comment], color: "var(--syntax-comment)" },
   { tag: [t.processingInstruction], color: "var(--muted-foreground)" },
