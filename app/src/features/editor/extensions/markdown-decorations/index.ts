@@ -71,16 +71,27 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     overflowX: "auto",
   },
   ".cm-md-table": {
-    borderCollapse: "collapse",
+    borderCollapse: "separate",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-md)",
+    borderSpacing: "0",
     fontSize: "0.95em",
+    overflow: "hidden",
     minWidth: "100%",
     tableLayout: "fixed",
     width: "100%",
   },
   ".cm-md-table th, .cm-md-table td": {
-    border: "1px solid var(--border)",
+    borderBottom: "1px solid var(--border)",
+    borderRight: "1px solid var(--border)",
     padding: "0.45rem 0.6rem",
     verticalAlign: "top",
+  },
+  ".cm-md-table tr:last-child > th, .cm-md-table tr:last-child > td": {
+    borderBottom: "none",
+  },
+  ".cm-md-table th:last-child, .cm-md-table td:last-child": {
+    borderRight: "none",
   },
   ".cm-md-table-cell": {
     cursor: "text",
