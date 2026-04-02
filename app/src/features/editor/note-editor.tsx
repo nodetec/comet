@@ -188,13 +188,20 @@ function getHorizontalRuleSelection(
     return null;
   }
 
+  const hrElement = lineElement.querySelector(".cm-md-hr");
+  if (!(hrElement instanceof HTMLElement)) {
+    return null;
+  }
+
   const lineStart = view.posAtDOM(lineElement, 0);
   const line = view.state.doc.lineAt(lineStart);
   if (!HORIZONTAL_RULE_RE.test(line.text)) {
     return null;
   }
 
-  return EditorSelection.create([EditorSelection.cursor(line.from, 1)]);
+  const cursor = EditorSelection.cursor(line.to, -1);
+
+  return EditorSelection.create([cursor]);
 }
 
 function isRectOnClickedRow(
