@@ -8,6 +8,7 @@ import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown
 
 const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-heading": {
+    color: "var(--heading-color)",
     fontWeight: "700",
   },
   ".cm-md-h1": {
