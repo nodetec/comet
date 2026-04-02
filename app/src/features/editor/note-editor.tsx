@@ -109,6 +109,7 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
 });
 
 const DEBUG_EDITOR_FLOW = import.meta.env.DEV;
+const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 
 function countSearchMatches(state: EditorState, query: SearchQuery): number {
@@ -166,6 +167,34 @@ function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
 function getListTextStartOffset(lineText: string): number {
   const match = LIST_PREFIX_RE.exec(lineText);
   return match ? match[0].length : 0;
+}
+
+function getHorizontalRuleSelection(
+  view: EditorView,
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+) {
+  const targetElement =
+    target instanceof HTMLElement
+      ? target
+      : document.elementFromPoint(clientX, clientY);
+  const lineElement = targetElement?.closest(".cm-line");
+
+  if (
+    !(lineElement instanceof HTMLElement) ||
+    !view.contentDOM.contains(lineElement)
+  ) {
+    return null;
+  }
+
+  const lineStart = view.posAtDOM(lineElement, 0);
+  const line = view.state.doc.lineAt(lineStart);
+  if (!HORIZONTAL_RULE_RE.test(line.text)) {
+    return null;
+  }
+
+  return EditorSelection.create([EditorSelection.cursor(line.from, 1)]);
 }
 
 function isRectOnClickedRow(
@@ -367,6 +396,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {
+              const horizontalRuleSelection = getHorizontalRuleSelection(
+                view,
+                event.target,
+                event.clientX,
+                event.clientY,
+              );
+              if (horizontalRuleSelection) {
+                event.preventDefault();
+                event.stopPropagation();
+                view.focus();
+                view.dispatch({ selection: horizontalRuleSelection });
+                return true;
+              }
+
               event.stopPropagation();
 
               if (!view.hasFocus) {

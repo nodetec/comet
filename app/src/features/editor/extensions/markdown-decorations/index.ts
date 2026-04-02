@@ -26,13 +26,12 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     lineHeight: "1.4",
   },
   ".cm-md-h5": {
-    fontSize: "1.0em",
+    fontSize: "1.05em",
     lineHeight: "1.45",
   },
   ".cm-md-h6": {
-    fontSize: "0.925em",
+    fontSize: "1.0em",
     lineHeight: "1.45",
-    color: "var(--muted-foreground)",
   },
   ".cm-md-strong": {
     fontWeight: "700",
@@ -110,10 +109,23 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     textDecoration: "line-through",
   },
   ".cm-md-hr": {
-    border: "none",
+    display: "inline-block",
+    height: "1em",
+    lineHeight: "1em",
+    marginBlock: "-0.35em",
+    paddingBlock: "0.35em",
+    position: "relative",
+    verticalAlign: "middle",
+    width: "100%",
+  },
+  ".cm-md-hr::before": {
     borderTop: "1px solid var(--border)",
-    display: "block",
-    margin: "0.5em 0",
+    content: '""',
+    left: "0",
+    position: "absolute",
+    right: "0",
+    top: "calc(50% + 1px)",
+    transform: "translateY(-50%)",
   },
 });
 

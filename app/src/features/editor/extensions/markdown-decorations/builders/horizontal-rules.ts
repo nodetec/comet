@@ -12,16 +12,17 @@ class HorizontalRuleWidget extends WidgetType {
     return true;
   }
 
+  override ignoreEvent(): boolean {
+    return false;
+  }
+
   override toDOM(): HTMLElement {
-    const hr = document.createElement("hr");
-    hr.className = "cm-md-hr";
-    return hr;
+    const separator = document.createElement("span");
+    separator.className = "cm-md-hr";
+    separator.setAttribute("aria-hidden", "true");
+    return separator;
   }
 }
-
-const hrReplace = Decoration.replace({
-  widget: new HorizontalRuleWidget(),
-});
 
 export function handleHorizontalRule(
   node: SyntaxNodeRef,
@@ -31,6 +32,12 @@ export function handleHorizontalRule(
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
 
   if (!onCursor) {
-    out.push({ from: node.from, to: node.to, decoration: hrReplace });
+    out.push({
+      from: node.from,
+      to: node.to,
+      decoration: Decoration.replace({
+        widget: new HorizontalRuleWidget(),
+      }),
+    });
   }
 }
