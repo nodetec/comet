@@ -1,11 +1,8 @@
-import { type Extension, Prec } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { type Extension } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
-import {
-  dedentListItem,
-  indentListItem,
-} from "@/features/editor/extensions/markdown-decorations/list-keymap";
+import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
 
 const markdownDecorationsTheme = EditorView.baseTheme({
@@ -112,39 +109,6 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-strikethrough": {
     textDecoration: "line-through",
   },
-  ".cm-md-indent": {
-    display: "inline-flex",
-    width: "2rem",
-  },
-  ".cm-md-list": {
-    paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
-    position: "relative",
-    textIndent: "calc((var(--indent-level) * 2rem + 2rem) * -1)",
-  },
-  ".cm-md-list *": {
-    textIndent: "0",
-  },
-  ".cm-md-list-marker": {
-    alignItems: "center",
-    color: "var(--muted-foreground)",
-    display: "inline-flex",
-    justifyContent: "center",
-    minWidth: "2rem",
-  },
-  ".cm-md-number-marker": {
-    fontVariantNumeric: "tabular-nums",
-    fontSize: "0.9em",
-  },
-  ".cm-md-task-marker": {
-    cursor: "pointer",
-    margin: "0",
-    scale: "1.2",
-    transformOrigin: "center center",
-  },
-  ".cm-md-task-list.cm-md-task-checked": {
-    textDecoration: "line-through",
-    textDecorationColor: "var(--muted-foreground)",
-  },
   ".cm-md-hr": {
     border: "none",
     borderTop: "1px solid var(--border)",
@@ -153,13 +117,6 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
 });
 
-const listKeymap = Prec.high(
-  keymap.of([
-    { key: "Tab", run: indentListItem },
-    { key: "Shift-Tab", run: dedentListItem },
-  ]),
-);
-
 export function markdownDecorations(): Extension {
-  return [markdownDecorationsPlugin, markdownDecorationsTheme, listKeymap];
+  return [markdownDecorationsPlugin, markdownDecorationsTheme, lists()];
 }

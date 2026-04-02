@@ -69,7 +69,6 @@ const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   { tag: [t.comment], color: "var(--syntax-comment)" },
   { tag: [t.processingInstruction], color: "var(--muted-foreground)" },
   { tag: [t.contentSeparator], color: "var(--muted-foreground)" },
-  { tag: [t.list], color: "var(--muted-foreground)" },
 ]);
 
 const MARKDOWN_EDITOR_THEME = EditorView.theme({
@@ -163,10 +162,10 @@ function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
   });
 }
 
-function focusAndClickAtLine(
+function focusAtLineBoundary(
   view: EditorView,
-  clientX: number,
   clientY: number,
+  side: "left" | "right",
 ): boolean {
   const contentRect = view.contentDOM.getBoundingClientRect();
   if (clientY < contentRect.top || clientY > contentRect.bottom) {
@@ -186,22 +185,29 @@ function focusAndClickAtLine(
     lockScrollPosition(scrollContainer, scrollTop);
   }
 
-  // Clamp X into the content area and re-dispatch so CM places the cursor
-  const targetX = Math.min(
-    contentRect.right - 1,
-    Math.max(contentRect.left + 1, clientX),
+  const targetY = Math.min(
+    contentRect.bottom - 1,
+    Math.max(contentRect.top + 1, clientY),
   );
-  view.contentDOM.dispatchEvent(
-    new MouseEvent("mousedown", {
-      clientX: targetX,
-      clientY,
-      button: 0,
-      buttons: 1,
-      detail: 1,
-      bubbles: true,
-      cancelable: true,
-    }),
-  );
+  const anchor =
+    view.posAtCoords({ x: contentRect.left + 1, y: targetY }, false) ??
+    view.posAtCoords({ x: contentRect.right - 1, y: targetY }, false);
+
+  if (anchor == null) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(anchor);
+  view.dispatch({
+    selection: EditorSelection.cursor(
+      side === "left" ? line.from : line.to,
+      side === "left" ? -1 : 1,
+    ),
+  });
+
+  requestAnimationFrame(() => {
+    view.focus();
+  });
 
   return true;
 }
@@ -548,20 +554,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         <div
           className="comet-editor-gutter"
           data-editor-gutter="left"
+          onClick={(event: MouseEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
+            viewRef.current?.focus();
+          }}
           onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
             if (readOnly) {
               return;
             }
+
+            event.preventDefault();
+            event.stopPropagation();
+            useShellStore.getState().setFocusedPane("editor");
 
             const view = viewRef.current;
             if (!view) {
               return;
             }
 
-            if (focusAndClickAtLine(view, event.clientX, event.clientY)) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
+            focusAtLineBoundary(view, event.clientY, "left");
           }}
         />
         <div className="comet-editor-column">
@@ -573,20 +589,30 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         <div
           className="comet-editor-gutter"
           data-editor-gutter="right"
+          onClick={(event: MouseEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
+            event.preventDefault();
+            event.stopPropagation();
+            viewRef.current?.focus();
+          }}
           onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
             if (readOnly) {
               return;
             }
+
+            event.preventDefault();
+            event.stopPropagation();
+            useShellStore.getState().setFocusedPane("editor");
 
             const view = viewRef.current;
             if (!view) {
               return;
             }
 
-            if (focusAndClickAtLine(view, event.clientX, event.clientY)) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
+            focusAtLineBoundary(view, event.clientY, "right");
           }}
         />
       </div>
