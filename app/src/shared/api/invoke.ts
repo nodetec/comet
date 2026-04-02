@@ -85,7 +85,6 @@ export async function loadNote(noteId: string) {
   if (import.meta.env.DEV) {
     console.log("[editor:loadNote]", {
       noteId,
-      markdownLength: note.markdown.length,
       totalMs: Number((performance.now() - startedAt).toFixed(1)),
     });
   }

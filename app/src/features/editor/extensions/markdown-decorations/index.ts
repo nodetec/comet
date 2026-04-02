@@ -78,12 +78,14 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     fontSize: "0.95em",
     overflow: "hidden",
     minWidth: "100%",
-    tableLayout: "fixed",
-    width: "100%",
+    tableLayout: "auto",
+    width: "max-content",
   },
   ".cm-md-table th, .cm-md-table td": {
     borderBottom: "1px solid var(--border)",
     borderRight: "1px solid var(--border)",
+    maxWidth: "18rem",
+    minWidth: "8rem",
     padding: "0.45rem 0.6rem",
     verticalAlign: "top",
   },
@@ -95,6 +97,44 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
   ".cm-md-table-cell": {
     cursor: "text",
+    position: "relative",
+  },
+  ".cm-md-table-cell-selected": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 16%, transparent)",
+  },
+  ".cm-md-table-cell-content, .cm-md-table-cell-editor": {
+    minHeight: "1.5rem",
+    overflowWrap: "break-word",
+    paddingInlineEnd: "1.35rem",
+    whiteSpace: "pre-wrap",
+  },
+  ".cm-md-table-cell-menu-trigger": {
+    alignItems: "center",
+    background: "transparent",
+    border: "none",
+    borderRadius: "var(--radius-xs)",
+    color: "var(--muted-foreground)",
+    cursor: "pointer",
+    display: "inline-flex",
+    height: "1.1rem",
+    insetInlineEnd: "0.2rem",
+    justifyContent: "center",
+    lineHeight: "1",
+    opacity: "0",
+    padding: "0",
+    position: "absolute",
+    top: "0.2rem",
+    transition:
+      "opacity 120ms ease, background-color 120ms ease, color 120ms ease",
+    width: "1.1rem",
+  },
+  ".cm-md-table-cell:hover .cm-md-table-cell-menu-trigger, .cm-md-table-cell-menu-trigger:focus-visible":
+    {
+      opacity: "1",
+    },
+  ".cm-md-table-cell-menu-trigger:hover": {
+    backgroundColor: "color-mix(in oklab, var(--muted) 75%, transparent)",
+    color: "var(--foreground)",
   },
   ".cm-md-table-input": {
     background: "transparent",

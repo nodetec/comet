@@ -19,7 +19,12 @@ import {
   EditorState,
   Transaction,
 } from "@codemirror/state";
-import { EditorView, highlightSpecialChars, keymap } from "@codemirror/view";
+import {
+  EditorView,
+  highlightSpecialChars,
+  keymap,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
@@ -111,6 +116,12 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
 const DEBUG_EDITOR_FLOW = import.meta.env.DEV;
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
+
+function summarizeTransactionUserEvents(update: ViewUpdate) {
+  return update.transactions
+    .map((transaction) => transaction.annotation(Transaction.userEvent))
+    .filter((userEvent): userEvent is string => typeof userEvent === "string");
+}
 
 function countSearchMatches(state: EditorState, query: SearchQuery): number {
   if (!query.valid) {
@@ -463,17 +474,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
-            if (
-              DEBUG_EDITOR_FLOW &&
-              (update.selectionSet || update.docChanged)
-            ) {
-              console.debug("[editor:flow] updateListener", {
-                docChanged: update.docChanged,
-                head: update.state.selection.main.head,
-                selectionSet: update.selectionSet,
-                userEvents: update.transactions.map((transaction) =>
-                  transaction.annotation(Transaction.userEvent),
-                ),
+            if (DEBUG_EDITOR_FLOW && update.docChanged) {
+              console.debug("[editor:flow] docChanged", {
+                external: applyingExternalChangeRef.current,
+                loadKey: lastLoadKeyRef.current,
+                nextLength: update.state.doc.length,
+                previousLength: update.startState.doc.length,
+                userEvents: summarizeTransactionUserEvents(update),
               });
             }
 
@@ -557,9 +564,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       if (DEBUG_EDITOR_FLOW) {
         console.debug("[editor:flow] external markdown sync", {
           currentLength: currentMarkdown.length,
-          isNewLoad,
           loadKey,
           nextLength: nextMarkdown.length,
+          reason: isNewLoad ? "new-load" : "content-mismatch",
         });
       }
 

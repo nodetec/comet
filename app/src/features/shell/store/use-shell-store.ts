@@ -59,10 +59,6 @@ export const useShellStore = create<ShellStore>((set) => ({
         console.debug("[shell:selected-note] setSelectedNoteId", {
           from: state.selectedNoteId,
           to: selectedNoteId,
-          stack: new Error("setSelectedNoteId").stack
-            ?.split("\n")
-            .slice(1, 6)
-            .map((line) => line.trim()),
         });
       }
 
