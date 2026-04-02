@@ -1,6 +1,7 @@
 import { Decoration } from "@codemirror/view";
 import type { SyntaxNodeRef } from "@lezer/common";
 
+import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
 import type {
   BuilderContext,
   DecorationEntry,
@@ -26,6 +27,9 @@ const codeBlockCloseLine = Decoration.line({
     spellcheck: "false",
   },
 });
+const hiddenFenceMark = Decoration.mark({
+  class: "cm-md-codeblock-fence-hidden",
+});
 
 export function handleCodeBlock(
   node: SyntaxNodeRef,
@@ -38,17 +42,30 @@ export function handleCodeBlock(
 
   const openLine = ctx.state.doc.lineAt(node.from);
   const closeLine = ctx.state.doc.lineAt(node.to);
+  const revealFences =
+    node.name !== "FencedCode" ||
+    overlapsAny(node.from, node.to, ctx.cursorRanges);
 
   for (let n = openLine.number; n <= closeLine.number; n++) {
     const line = ctx.state.doc.line(n);
     let deco = codeBlockLine;
+    let hideFence = false;
 
     if (n === openLine.number) {
       deco = codeBlockOpenLine;
+      hideFence = !revealFences;
     } else if (n === closeLine.number) {
       deco = codeBlockCloseLine;
+      hideFence = !revealFences;
     }
 
     out.push({ from: line.from, to: line.from, decoration: deco });
+    if (hideFence && line.from < line.to) {
+      out.push({
+        from: line.from,
+        to: line.to,
+        decoration: hiddenFenceMark,
+      });
+    }
   }
 }

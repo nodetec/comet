@@ -62,6 +62,9 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
     paddingBottom: "0.5rem",
   },
+  ".cm-md-codeblock-fence-hidden": {
+    opacity: "0",
+  },
   ".cm-md-link": {
     color: "var(--syntax-link)",
     textDecoration: "underline",
