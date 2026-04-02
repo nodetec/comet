@@ -189,20 +189,25 @@ function focusAtLineBoundary(
     contentRect.bottom - 1,
     Math.max(contentRect.top + 1, clientY),
   );
-  const anchor =
-    view.posAtCoords({ x: contentRect.left + 1, y: targetY }, false) ??
-    view.posAtCoords({ x: contentRect.right - 1, y: targetY }, false);
+  const probeInset = Math.max(view.defaultCharacterWidth * 4, 8);
+  const probeX =
+    side === "left"
+      ? Math.min(contentRect.left + probeInset, contentRect.right - 1)
+      : Math.max(contentRect.right - probeInset, contentRect.left + 1);
+  const anchor = view.posAndSideAtCoords({ x: probeX, y: targetY }, false);
 
   if (anchor == null) {
     return false;
   }
 
-  const line = view.state.doc.lineAt(anchor);
+  const boundary = view.moveToLineBoundary(
+    EditorSelection.cursor(anchor.pos, anchor.assoc),
+    side === "right",
+    true,
+  );
+
   view.dispatch({
-    selection: EditorSelection.cursor(
-      side === "left" ? line.from : line.to,
-      side === "left" ? -1 : 1,
-    ),
+    selection: EditorSelection.create([boundary]),
   });
 
   requestAnimationFrame(() => {
