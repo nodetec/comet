@@ -10,7 +10,7 @@ import {
   type Extension,
 } from "@codemirror/state";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu, PredefinedMenuItem } from "@tauri-apps/api/menu";
+import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { redo, undo } from "@codemirror/commands";
 import {
   Decoration,
@@ -78,6 +78,7 @@ const ROW_ATTR = "data-table-row";
 const COL_ATTR = "data-table-col";
 const TABLE_HASH_ATTR = "data-table-hash";
 const TABLE_FROM_ATTR = "data-table-from";
+const TABLE_TO_ATTR = "data-table-to";
 const normalizeBeforeEditAnnotation = Annotation.define<boolean>();
 const syncTableEditAnnotation = Annotation.define<boolean>();
 type PendingCursorPosition = "end" | "lastLineStart" | "mapped" | "start";
@@ -98,10 +99,22 @@ type ResolvedTableAtPosition = {
   tableTo: number;
 };
 
+type TableCellMenuContext = {
+  activeCell: ActiveTableCell;
+  canDeleteColumn: boolean;
+  canDeleteRow: boolean;
+  view: EditorView;
+};
+
 const pendingTableCellOpens = new WeakMap<EditorView, PendingTableCellOpen>();
 const pendingTableNormalizations = new WeakSet<EditorView>();
 const tableHeightCache = new Map<string, number>();
 const tableResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
+const tableCellMenus = new WeakMap<EditorView, TableCellMenuController>();
+const pendingTableCellMenus = new WeakMap<
+  EditorView,
+  Promise<TableCellMenuController>
+>();
 
 function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
   scrollContainer.scrollTop = scrollTop;
@@ -602,6 +615,208 @@ function runPassiveTableOperationAtCell(
   return true;
 }
 
+function deleteTableAtCell(activeCell: ActiveTableCell, view: EditorView) {
+  const resolved = resolveMarkdownTableAtCell(activeCell, view);
+  if (!resolved) {
+    return false;
+  }
+
+  view.dispatch({
+    changes: {
+      from: resolved.resolvedTable.tableFrom,
+      insert: "",
+      to: resolved.resolvedTable.tableTo,
+    },
+    effects: [clearActiveTableCellEffect.of(), clearCellSelectionEffect.of()],
+    selection: EditorSelection.cursor(resolved.resolvedTable.tableFrom),
+    scrollIntoView: false,
+  });
+  return true;
+}
+
+class TableCellMenuController {
+  private context: TableCellMenuContext | null = null;
+  private constructor(
+    private readonly deleteColumnItem: MenuItem,
+    private readonly deleteRowItem: MenuItem,
+    private readonly items: Array<MenuItem | PredefinedMenuItem>,
+    private readonly menu: Menu,
+  ) {}
+
+  static async create() {
+    const controllerRef: { current: TableCellMenuController | null } = {
+      current: null,
+    };
+    const getContext = () => controllerRef.current?.context ?? null;
+    const run = (
+      operation: (table: MarkdownTable, cell: ActiveTableCell) => MarkdownTable,
+    ) => {
+      const context = getContext();
+      if (!context) {
+        return;
+      }
+
+      runPassiveTableOperationAtCell(
+        context.activeCell,
+        operation,
+        context.view,
+      );
+    };
+
+    const rowAboveItem = await MenuItem.new({
+      id: "table-row-above",
+      text: "Insert Row Above",
+      action: () => {
+        run((table, currentCell) =>
+          table.insertRowRelativeTo(
+            currentCell.section,
+            currentCell.row,
+            "before",
+          ),
+        );
+      },
+    });
+    const rowBelowItem = await MenuItem.new({
+      id: "table-row-below",
+      text: "Insert Row Below",
+      action: () => {
+        run((table, currentCell) =>
+          table.insertRowRelativeTo(
+            currentCell.section,
+            currentCell.row,
+            "after",
+          ),
+        );
+      },
+    });
+    const separatorOne = await PredefinedMenuItem.new({ item: "Separator" });
+    const columnLeftItem = await MenuItem.new({
+      id: "table-column-left",
+      text: "Insert Column Left",
+      action: () => {
+        run((table, currentCell) =>
+          table.insertColumn(currentCell.col, "before"),
+        );
+      },
+    });
+    const columnRightItem = await MenuItem.new({
+      id: "table-column-right",
+      text: "Insert Column Right",
+      action: () => {
+        run((table, currentCell) =>
+          table.insertColumn(currentCell.col, "after"),
+        );
+      },
+    });
+    const separatorTwo = await PredefinedMenuItem.new({ item: "Separator" });
+    const deleteRowItem = await MenuItem.new({
+      id: "table-delete-row",
+      text: "Delete Row",
+      action: () => {
+        run((table, currentCell) =>
+          table.deleteRowAt(currentCell.section, currentCell.row),
+        );
+      },
+    });
+    const deleteColumnItem = await MenuItem.new({
+      id: "table-delete-column",
+      text: "Delete Column",
+      action: () => {
+        run((table, currentCell) => table.deleteColumn(currentCell.col));
+      },
+    });
+    const separatorThree = await PredefinedMenuItem.new({ item: "Separator" });
+    const deleteTableItem = await MenuItem.new({
+      id: "table-delete-table",
+      text: "Delete Table",
+      action: () => {
+        const context = getContext();
+        if (!context) {
+          return;
+        }
+
+        deleteTableAtCell(context.activeCell, context.view);
+      },
+    });
+
+    const items: Array<MenuItem | PredefinedMenuItem> = [
+      rowAboveItem,
+      rowBelowItem,
+      separatorOne,
+      columnLeftItem,
+      columnRightItem,
+      separatorTwo,
+      deleteRowItem,
+      deleteColumnItem,
+      separatorThree,
+      deleteTableItem,
+    ];
+    const menu = await Menu.new({ items });
+    const controller = new TableCellMenuController(
+      deleteColumnItem,
+      deleteRowItem,
+      items,
+      menu,
+    );
+    controllerRef.current = controller;
+
+    return controller;
+  }
+
+  async destroy() {
+    await this.menu.close();
+    await Promise.allSettled(this.items.map((item) => item.close()));
+  }
+
+  async popup(button: HTMLButtonElement, context: TableCellMenuContext) {
+    this.context = context;
+    await Promise.all([
+      this.deleteColumnItem.setEnabled(context.canDeleteColumn),
+      this.deleteRowItem.setEnabled(context.canDeleteRow),
+    ]);
+
+    const rect = button.getBoundingClientRect();
+    await this.menu.popup(new LogicalPosition(rect.left, rect.bottom));
+  }
+}
+
+async function getTableCellMenu(view: EditorView) {
+  const existing = tableCellMenus.get(view);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = pendingTableCellMenus.get(view);
+  if (pending) {
+    return pending;
+  }
+
+  const next = TableCellMenuController.create().then((controller) => {
+    pendingTableCellMenus.delete(view);
+    tableCellMenus.set(view, controller);
+    return controller;
+  });
+  pendingTableCellMenus.set(view, next);
+  return next;
+}
+
+function destroyTableCellMenu(view: EditorView) {
+  const existing = tableCellMenus.get(view);
+  if (existing) {
+    tableCellMenus.delete(view);
+    void existing.destroy();
+  }
+
+  const pending = pendingTableCellMenus.get(view);
+  if (pending) {
+    pendingTableCellMenus.delete(view);
+    void pending.then((controller) => {
+      tableCellMenus.delete(view);
+      void controller.destroy();
+    });
+  }
+}
+
 async function showTableCellMenu(
   button: HTMLButtonElement,
   cell: HTMLElement,
@@ -621,104 +836,15 @@ async function showTableCellMenu(
     setMainSelectionToTableCell(activeCell, view);
   }
 
-  const rect = button.getBoundingClientRect();
-  const canDeleteColumn = resolved.markdownTable.columnCount > 1;
-  const canDeleteRow =
-    activeCell.section !== "header" ||
-    resolved.markdownTable.bodyRows.length > 0;
-  const menu = await Menu.new({
-    items: [
-      {
-        id: "table-row-above",
-        text: "Insert Row Above",
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) =>
-              table.insertRowRelativeTo(
-                currentCell.section,
-                currentCell.row,
-                "before",
-              ),
-            view,
-          );
-        },
-      },
-      {
-        id: "table-row-below",
-        text: "Insert Row Below",
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) =>
-              table.insertRowRelativeTo(
-                currentCell.section,
-                currentCell.row,
-                "after",
-              ),
-            view,
-          );
-        },
-      },
-      await PredefinedMenuItem.new({ item: "Separator" }),
-      {
-        id: "table-column-left",
-        text: "Insert Column Left",
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) =>
-              table.insertColumn(currentCell.col, "before"),
-            view,
-          );
-        },
-      },
-      {
-        id: "table-column-right",
-        text: "Insert Column Right",
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) =>
-              table.insertColumn(currentCell.col, "after"),
-            view,
-          );
-        },
-      },
-      await PredefinedMenuItem.new({ item: "Separator" }),
-      {
-        id: "table-delete-row",
-        text: "Delete Row",
-        enabled: canDeleteRow,
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) =>
-              table.deleteRowAt(currentCell.section, currentCell.row),
-            view,
-          );
-        },
-      },
-      {
-        id: "table-delete-column",
-        text: "Delete Column",
-        enabled: canDeleteColumn,
-        action: () => {
-          runPassiveTableOperationAtCell(
-            activeCell,
-            (table, currentCell) => table.deleteColumn(currentCell.col),
-            view,
-          );
-        },
-      },
-    ],
+  const menu = await getTableCellMenu(view);
+  await menu.popup(button, {
+    activeCell,
+    canDeleteColumn: resolved.markdownTable.columnCount > 1,
+    canDeleteRow:
+      activeCell.section !== "header" ||
+      resolved.markdownTable.bodyRows.length > 0,
+    view,
   });
-
-  try {
-    await menu.popup(new LogicalPosition(rect.left, rect.bottom));
-  } finally {
-    await menu.close();
-  }
 }
 
 function requestTableMeasurement(
@@ -805,6 +931,7 @@ class MarkdownTableWidget extends WidgetType {
     }
 
     dom.setAttribute(TABLE_FROM_ATTR, String(this.tableFrom));
+    dom.setAttribute(TABLE_TO_ATTR, String(this.tableTo));
     for (const cell of dom.querySelectorAll(`.${CELL_CLASS}`)) {
       if (cell instanceof HTMLElement) {
         cell.setAttribute(TABLE_FROM_ATTR, String(this.tableFrom));
@@ -828,6 +955,7 @@ class MarkdownTableWidget extends WidgetType {
     wrapper.className = "cm-md-table-wrapper";
     wrapper.setAttribute(TABLE_HASH_ATTR, this.hash);
     wrapper.setAttribute(TABLE_FROM_ATTR, String(this.tableFrom));
+    wrapper.setAttribute(TABLE_TO_ATTR, String(this.tableTo));
 
     const table = document.createElement("table");
     table.className = "cm-md-table";
@@ -884,8 +1012,13 @@ class MarkdownTableWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
       view.focus();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const selectBeforeTable =
+        event.clientX <= wrapperRect.left + wrapperRect.width / 2;
       view.dispatch({
-        selection: EditorSelection.cursor(this.tableTo, -1),
+        selection: selectBeforeTable
+          ? EditorSelection.cursor(this.tableFrom, 1)
+          : EditorSelection.cursor(this.tableTo, -1),
       });
     });
 
@@ -1416,6 +1549,13 @@ function runTableHistoryCommand(
   return true;
 }
 
+function scheduleMainEditorAction(action: () => void) {
+  requestAnimationFrame(() => {
+    action();
+  });
+  return true;
+}
+
 function syncMainSelectionToLocalSelection(
   localSelection: { anchor: number; head: number },
   localText: string,
@@ -1442,6 +1582,26 @@ function syncMainSelectionToLocalSelection(
       Transaction.addToHistory.of(false),
     ],
     scrollIntoView: false,
+  });
+}
+
+function scheduleMainSelectionToLocalSelection(
+  localSelection: { anchor: number; head: number },
+  localText: string,
+  mainView: EditorView,
+  resolved: ResolvedActiveTableCell,
+) {
+  requestAnimationFrame(() => {
+    if (!mainView.dom.isConnected) {
+      return;
+    }
+
+    syncMainSelectionToLocalSelection(
+      localSelection,
+      localText,
+      mainView,
+      resolved,
+    );
   });
 }
 
@@ -1568,7 +1728,7 @@ class NestedTableEditorController {
         break;
       }
     }
-    syncMainSelectionToLocalSelection(
+    scheduleMainSelectionToLocalSelection(
       initialSelection,
       localText,
       mainView,
@@ -1607,7 +1767,10 @@ class NestedTableEditorController {
               const toRect = nestedView.coordsAtPos(to);
               return head === to ||
                 (headRect && toRect && Math.abs(headRect.top - toRect.top) < 2)
-                ? startCellSelectionFromActiveCell("down", mainView)
+                ? (this.close(),
+                  scheduleMainEditorAction(() => {
+                    startCellSelectionFromActiveCell("down", mainView);
+                  }))
                 : false;
             },
           },
@@ -1625,7 +1788,10 @@ class NestedTableEditorController {
             run: (nestedView) => {
               const { from, head } = nestedView.state.selection.main;
               return head === from
-                ? startCellSelectionFromActiveCell("left", mainView)
+                ? (this.close(),
+                  scheduleMainEditorAction(() => {
+                    startCellSelectionFromActiveCell("left", mainView);
+                  }))
                 : false;
             },
           },
@@ -1643,7 +1809,10 @@ class NestedTableEditorController {
             run: (nestedView) => {
               const { head, to } = nestedView.state.selection.main;
               return head === to
-                ? startCellSelectionFromActiveCell("right", mainView)
+                ? (this.close(),
+                  scheduleMainEditorAction(() => {
+                    startCellSelectionFromActiveCell("right", mainView);
+                  }))
                 : false;
             },
           },
@@ -1674,7 +1843,10 @@ class NestedTableEditorController {
                 (headRect &&
                   fromRect &&
                   Math.abs(headRect.top - fromRect.top) < 2)
-                ? startCellSelectionFromActiveCell("up", mainView)
+                ? (this.close(),
+                  scheduleMainEditorAction(() => {
+                    startCellSelectionFromActiveCell("up", mainView);
+                  }))
                 : false;
             },
           },
@@ -2297,6 +2469,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
     destroy() {
       this.controller.close();
       nestedEditors.delete(this.view);
+      destroyTableCellMenu(this.view);
     }
 
     private sync() {

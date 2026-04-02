@@ -113,6 +113,11 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
 
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
+const TABLE_CELL_SELECTOR = ".cm-md-table-cell";
+const TABLE_EDITOR_HOST_SELECTOR = ".cm-md-table-cell-editor";
+const TABLE_WRAPPER_SELECTOR = ".cm-md-table-wrapper";
+const TABLE_FROM_ATTR = "data-table-from";
+const TABLE_TO_ATTR = "data-table-to";
 
 function countSearchMatches(state: EditorState, query: SearchQuery): number {
   if (!query.valid) {
@@ -206,6 +211,127 @@ function getHorizontalRuleSelection(
   return EditorSelection.create([cursor]);
 }
 
+function getTargetElementAtPoint(
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+) {
+  return target instanceof HTMLElement
+    ? target
+    : document.elementFromPoint(clientX, clientY);
+}
+
+function isInteractiveTableTarget(targetElement: HTMLElement | Element | null) {
+  return Boolean(
+    targetElement?.closest(
+      `${TABLE_CELL_SELECTOR}, ${TABLE_EDITOR_HOST_SELECTOR}`,
+    ),
+  );
+}
+
+function findTableWrapperAtY(view: EditorView, clientY: number) {
+  for (const candidate of view.contentDOM.querySelectorAll(
+    TABLE_WRAPPER_SELECTOR,
+  )) {
+    if (!(candidate instanceof HTMLElement)) {
+      continue;
+    }
+
+    const rect = candidate.getBoundingClientRect();
+    if (clientY >= rect.top && clientY <= rect.bottom) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getTableSelectionSide(wrapperRect: DOMRect, clientX: number) {
+  if (clientX <= wrapperRect.left) {
+    return "before";
+  }
+
+  if (clientX >= wrapperRect.right) {
+    return "after";
+  }
+
+  return clientX <= wrapperRect.left + wrapperRect.width / 2
+    ? "before"
+    : "after";
+}
+
+function getTableBoundarySelectionFromWrapper(
+  wrapper: HTMLElement,
+  selectionSide: "after" | "before",
+) {
+  const tableFrom = Number.parseInt(
+    wrapper.getAttribute(TABLE_FROM_ATTR) ?? "",
+    10,
+  );
+  const tableTo = Number.parseInt(
+    wrapper.getAttribute(TABLE_TO_ATTR) ?? "",
+    10,
+  );
+  if (!Number.isFinite(tableFrom) || !Number.isFinite(tableTo)) {
+    return null;
+  }
+
+  return EditorSelection.create([
+    EditorSelection.cursor(
+      selectionSide === "before" ? tableFrom : tableTo,
+      selectionSide === "before" ? 1 : -1,
+    ),
+  ]);
+}
+
+function getTableBoundarySelection(
+  view: EditorView,
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+) {
+  const targetElement = getTargetElementAtPoint(target, clientX, clientY);
+  if (isInteractiveTableTarget(targetElement)) {
+    return null;
+  }
+
+  const wrapperFromTarget = targetElement?.closest(TABLE_WRAPPER_SELECTOR);
+  let wrapper =
+    wrapperFromTarget instanceof HTMLElement &&
+    view.contentDOM.contains(wrapperFromTarget)
+      ? wrapperFromTarget
+      : null;
+
+  if (!wrapper) {
+    wrapper = findTableWrapperAtY(view, clientY);
+  }
+
+  if (!wrapper) {
+    return null;
+  }
+
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const selectionSide = getTableSelectionSide(wrapperRect, clientX);
+
+  return getTableBoundarySelectionFromWrapper(wrapper, selectionSide);
+}
+
+function getGutterTableBoundarySelection(
+  view: EditorView,
+  clientY: number,
+  side: "left" | "right",
+) {
+  const wrapper = findTableWrapperAtY(view, clientY);
+  if (!wrapper) {
+    return null;
+  }
+
+  return getTableBoundarySelectionFromWrapper(
+    wrapper,
+    side === "left" ? "before" : "after",
+  );
+}
+
 function isRectOnClickedRow(
   rect: { top: number; bottom: number },
   clientY: number,
@@ -269,6 +395,23 @@ function focusAtLineBoundary(
     contentRect.bottom - 1,
     Math.max(contentRect.top + 1, clientY),
   );
+  const tableBoundarySelection = getGutterTableBoundarySelection(
+    view,
+    targetY,
+    side,
+  );
+  if (tableBoundarySelection) {
+    view.dispatch({
+      selection: tableBoundarySelection,
+    });
+
+    requestAnimationFrame(() => {
+      view.focus();
+    });
+
+    return true;
+  }
+
   const probeInset = Math.max(view.defaultCharacterWidth * 4, 8);
   const probeX =
     side === "left"
@@ -422,6 +565,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 event.stopPropagation();
                 view.focus();
                 view.dispatch({ selection: horizontalRuleSelection });
+                return true;
+              }
+
+              const tableBoundarySelection = getTableBoundarySelection(
+                view,
+                event.target,
+                event.clientX,
+                event.clientY,
+              );
+              if (tableBoundarySelection) {
+                event.preventDefault();
+                event.stopPropagation();
+                view.focus();
+                view.dispatch({
+                  scrollIntoView: false,
+                  selection: tableBoundarySelection,
+                });
                 return true;
               }
 
