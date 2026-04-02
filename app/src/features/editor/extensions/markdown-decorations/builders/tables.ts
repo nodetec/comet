@@ -20,53 +20,25 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNodeRef } from "@lezer/common";
 
-type TableAlignment = "center" | "left" | "right" | null;
-type TableSection = "header" | "body";
-
-type TableCellRange = {
-  editableFrom: number;
-  editableTo: number;
-  from: number;
-  to: number;
-};
-
-type ParsedMarkdownTable = {
-  alignments: TableAlignment[];
-  bodyRows: string[][];
-  cellRanges: {
-    headers: TableCellRange[];
-    rows: TableCellRange[][];
-  };
-  headerCells: string[];
-};
-
-type ResolvedTable = {
-  table: ParsedMarkdownTable;
-  tableFrom: number;
-  tableTo: number;
-};
-
-type ResolvedActiveCell = {
-  activeCell: ActiveTableCell;
-  editableFrom: number;
-  editableTo: number;
-  table: ParsedMarkdownTable;
-  tableFrom: number;
-  tableTo: number;
-  text: string;
-};
-
-type ActiveTableCell = {
-  col: number;
-  row: number;
-  section: TableSection;
-  tableFrom: number;
-};
-
-type LocalSelection = {
-  anchor: number;
-  head: number;
-};
+import { parseMarkdownTable } from "@/features/editor/extensions/tables/markdown-table";
+import {
+  activeTableCellField,
+  clearActiveTableCellEffect,
+  getActiveTableCell,
+  isSameActiveTableCell,
+  setActiveTableCellEffect,
+} from "@/features/editor/extensions/tables/state";
+import {
+  clampSelection,
+  sanitizeLocalText,
+  unsanitizeRootText,
+} from "@/features/editor/extensions/tables/text-codec";
+import type {
+  ActiveTableCell,
+  ParsedMarkdownTable,
+  ResolvedActiveTableCell,
+  ResolvedTable,
+} from "@/features/editor/extensions/tables/types";
 
 const ACTIVE_CELL_HOST_CLASS = "cm-md-table-cell-editor";
 const CELL_CLASS = "cm-md-table-cell";
@@ -75,371 +47,7 @@ const SECTION_ATTR = "data-table-section";
 const ROW_ATTR = "data-table-row";
 const COL_ATTR = "data-table-col";
 const TABLE_FROM_ATTR = "data-table-from";
-const NON_CANONICAL_BR_PATTERN = /<br\s*\/>/gi;
-const LINE_BREAK_PATTERN = /\r\n|\n|\r/g;
-const UNESCAPED_PIPE_PATTERN = /(?<!\\)(\\\\)*\|/g;
-
-const setActiveTableCellEffect = StateEffect.define<ActiveTableCell>();
-const clearActiveTableCellEffect = StateEffect.define<void>();
 const syncTableEditAnnotation = Annotation.define<boolean>();
-
-function isSameActiveTableCell(
-  left: ActiveTableCell | null,
-  right: ActiveTableCell | null,
-): boolean {
-  return (
-    left?.tableFrom === right?.tableFrom &&
-    left?.section === right?.section &&
-    left?.row === right?.row &&
-    left?.col === right?.col
-  );
-}
-
-const activeTableCellField = StateField.define<ActiveTableCell | null>({
-  create() {
-    return null;
-  },
-  update(value, transaction) {
-    for (const effect of transaction.effects) {
-      if (effect.is(clearActiveTableCellEffect)) {
-        return null;
-      }
-
-      if (effect.is(setActiveTableCellEffect)) {
-        return effect.value;
-      }
-    }
-
-    if (!value || !transaction.docChanged) {
-      return value;
-    }
-
-    return {
-      ...value,
-      tableFrom: transaction.changes.mapPos(value.tableFrom, 1),
-    };
-  },
-});
-
-function getActiveTableCell(state: EditorState): ActiveTableCell | null {
-  return state.field(activeTableCellField, false) ?? null;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeBrTags(text: string): string {
-  return text.replace(NON_CANONICAL_BR_PATTERN, "<br>");
-}
-
-function unsanitizeRootText(rootText: string): string {
-  return rootText
-    .split("<br>")
-    .join("\n")
-    .split(String.raw`\|`)
-    .join("|");
-}
-
-function sanitizeLocalText(localText: string): string {
-  return normalizeBrTags(localText)
-    .replace(LINE_BREAK_PATTERN, "<br>")
-    .replace(UNESCAPED_PIPE_PATTERN, String.raw`\$&`);
-}
-
-function clampSelection(
-  selection: LocalSelection,
-  textLength: number,
-): LocalSelection {
-  return {
-    anchor: clamp(selection.anchor, 0, textLength),
-    head: clamp(selection.head, 0, textLength),
-  };
-}
-
-function getTrimBounds(line: string) {
-  let from = 0;
-  let to = line.length;
-
-  while (from < to && /\s/u.test(line[from] ?? "")) {
-    from += 1;
-  }
-  while (to > from && /\s/u.test(line[to - 1] ?? "")) {
-    to -= 1;
-  }
-
-  return { from, to };
-}
-
-function trimCellBounds(line: string, from: number, to: number) {
-  let start = from;
-  let end = to;
-
-  while (start < end && /\s/u.test(line[start] ?? "")) {
-    start += 1;
-  }
-  while (end > start && /\s/u.test(line[end - 1] ?? "")) {
-    end -= 1;
-  }
-
-  if (start === end) {
-    const insertion = Math.min(from + 1, to);
-    return { from: insertion, to: insertion };
-  }
-
-  return { from: start, to: end };
-}
-
-function editableCellBounds(line: string, from: number, to: number) {
-  let start = from;
-  let end = to;
-
-  if (start < end && /\s/u.test(line[start] ?? "")) {
-    start += 1;
-  }
-  if (end > start && /\s/u.test(line[end - 1] ?? "")) {
-    end -= 1;
-  }
-
-  if (start === end && from < to) {
-    const insertion = Math.min(from + 1, to);
-    return { from: insertion, to: insertion };
-  }
-
-  return { from: start, to: end };
-}
-
-function getNonEmptyLinesWithOffsets(text: string) {
-  const result: Array<{ from: number; line: string }> = [];
-  const lines = text.split("\n");
-  let offset = 0;
-
-  for (const [index, line] of lines.entries()) {
-    if (line.trim().length > 0) {
-      result.push({ from: offset, line });
-    }
-    offset += line.length;
-    if (index < lines.length - 1) {
-      offset += 1;
-    }
-  }
-
-  return result;
-}
-
-function scanMarkdownTableRow(line: string) {
-  const delimiters: number[] = [];
-  let escaped = false;
-
-  for (const [index, character] of [...line].entries()) {
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (character === "\\") {
-      escaped = true;
-      continue;
-    }
-
-    if (character === "|") {
-      delimiters.push(index);
-    }
-  }
-
-  return { delimiters };
-}
-
-function lastDelimiter(delimiters: number[]) {
-  const lastIndex = delimiters.length - 1;
-  return lastIndex >= 0 ? delimiters[lastIndex] : Number.NaN;
-}
-
-function isSeparatorRow(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed.includes("-") && /^[\s|:-]+$/u.test(trimmed);
-}
-
-function parseSeparatorRow(line: string): string[] {
-  const trimmed = line.trim();
-  const { delimiters: allDelimiters } = scanMarkdownTableRow(trimmed);
-
-  let innerFrom = 0;
-  let innerTo = trimmed.length;
-  if (allDelimiters[0] === 0) {
-    innerFrom += 1;
-  }
-  if (lastDelimiter(allDelimiters) === trimmed.length - 1) {
-    innerTo -= 1;
-  }
-
-  const delimiters = allDelimiters.filter(
-    (index) => index > innerFrom && index < innerTo,
-  );
-
-  const cells: string[] = [];
-  let segmentStart = innerFrom;
-  for (const delimiterIndex of delimiters) {
-    cells.push(trimmed.slice(segmentStart, delimiterIndex).trim());
-    segmentStart = delimiterIndex + 1;
-  }
-  cells.push(trimmed.slice(segmentStart, innerTo).trim());
-
-  return cells;
-}
-
-function parseAlignment(cell: string): TableAlignment {
-  const trimmed = cell.trim();
-  const startsWithColon = trimmed.startsWith(":");
-  const endsWithColon = trimmed.endsWith(":");
-
-  if (startsWithColon && endsWithColon) {
-    return "center";
-  }
-  if (startsWithColon) {
-    return "left";
-  }
-  if (endsWithColon) {
-    return "right";
-  }
-  return null;
-}
-
-function parseLineCellRanges(line: string, lineFromInTable: number) {
-  const { from: trimFrom, to: trimTo } = getTrimBounds(line);
-  if (trimTo <= trimFrom) {
-    return [];
-  }
-
-  const { delimiters: allDelimiters } = scanMarkdownTableRow(line);
-  let innerFrom = trimFrom;
-  let innerTo = trimTo;
-
-  if (allDelimiters[0] === trimFrom) {
-    innerFrom += 1;
-  }
-  if (lastDelimiter(allDelimiters) === trimTo - 1) {
-    innerTo -= 1;
-  }
-
-  const delimiters = allDelimiters.filter(
-    (index) => index > innerFrom && index < innerTo,
-  );
-
-  const ranges: TableCellRange[] = [];
-  let segmentStart = innerFrom;
-
-  for (const delimiterIndex of delimiters) {
-    const trimmed = trimCellBounds(line, segmentStart, delimiterIndex);
-    const editable = editableCellBounds(line, segmentStart, delimiterIndex);
-    ranges.push({
-      editableFrom: lineFromInTable + editable.from,
-      editableTo: lineFromInTable + editable.to,
-      from: lineFromInTable + trimmed.from,
-      to: lineFromInTable + trimmed.to,
-    });
-    segmentStart = delimiterIndex + 1;
-  }
-
-  const trimmed = trimCellBounds(line, segmentStart, innerTo);
-  const editable = editableCellBounds(line, segmentStart, innerTo);
-  ranges.push({
-    editableFrom: lineFromInTable + editable.from,
-    editableTo: lineFromInTable + editable.to,
-    from: lineFromInTable + trimmed.from,
-    to: lineFromInTable + trimmed.to,
-  });
-
-  return ranges;
-}
-
-function parseMarkdownTable(markdown: string): ParsedMarkdownTable | null {
-  const lines = getNonEmptyLinesWithOffsets(markdown);
-  if (lines.length < 2) {
-    return null;
-  }
-
-  const headerLine = lines[0];
-  const separatorLine = lines[1];
-  if (
-    !headerLine?.line.includes("|") ||
-    !separatorLine ||
-    !isSeparatorRow(separatorLine.line)
-  ) {
-    return null;
-  }
-
-  const headers = parseLineCellRanges(headerLine.line, headerLine.from);
-  const alignments = parseSeparatorRow(separatorLine.line).map(parseAlignment);
-  const rows: TableCellRange[][] = [];
-  for (const lineInfo of lines.slice(2)) {
-    if (lineInfo.line.includes("|")) {
-      rows.push(parseLineCellRanges(lineInfo.line, lineInfo.from));
-    }
-  }
-
-  const headerCells = headers.map((range) =>
-    markdown.slice(range.from, range.to),
-  );
-  const bodyRows = rows.map((row) =>
-    row.map((range) => markdown.slice(range.from, range.to)),
-  );
-
-  const columnCount = Math.max(
-    headerCells.length,
-    alignments.length,
-    ...bodyRows.map((row) => row.length),
-  );
-
-  return {
-    alignments: Array.from(
-      { length: columnCount },
-      (_, index) => alignments[index] ?? null,
-    ),
-    bodyRows: Array.from(bodyRows, (row) =>
-      Array.from({ length: columnCount }, (_, index) => row[index] ?? ""),
-    ),
-    cellRanges: {
-      headers: Array.from({ length: columnCount }, (_, index) => {
-        const range = headers[index];
-        return (
-          range ?? {
-            editableFrom: headerLine.from + headerLine.line.length,
-            editableTo: headerLine.from + headerLine.line.length,
-            from: headerLine.from + headerLine.line.length,
-            to: headerLine.from + headerLine.line.length,
-          }
-        );
-      }),
-      rows: Array.from(bodyRows, (_row, rowIndex) => {
-        const ranges = rows[rowIndex] ?? [];
-        const lineInfo = lines[rowIndex + 2];
-        const fallback =
-          lineInfo == null
-            ? separatorLine
-            : {
-                from: lineInfo.from + lineInfo.line.length,
-                line: lineInfo.line,
-              };
-        return Array.from({ length: columnCount }, (_, index) => {
-          const range = ranges[index];
-          return (
-            range ?? {
-              editableFrom: fallback.from,
-              editableTo: fallback.from,
-              from: fallback.from,
-              to: fallback.from,
-            }
-          );
-        });
-      }),
-    },
-    headerCells: Array.from(
-      { length: columnCount },
-      (_, index) => headerCells[index] ?? "",
-    ),
-  };
-}
 
 function resolveTableByFrom(
   state: EditorState,
@@ -477,7 +85,7 @@ function resolveTableByFrom(
 function resolveActiveTableCell(
   state: EditorState,
   activeCell: ActiveTableCell | null,
-): ResolvedActiveCell | null {
+): ResolvedActiveTableCell | null {
   if (!activeCell) {
     return null;
   }
@@ -648,7 +256,7 @@ function buildTableDecorations(state: EditorState): DecorationSet {
 
 function transactionTouchesOnlyActiveCell(
   transaction: Transaction,
-  resolved: ResolvedActiveCell | null,
+  resolved: ResolvedActiveTableCell | null,
 ): boolean {
   if (!resolved || !transaction.docChanged) {
     return false;
@@ -695,6 +303,31 @@ const tableDecorationField = StateField.define<DecorationSet>({
     return [EditorView.decorations.from(field)];
   },
 });
+
+const activeTableCellGuard = EditorState.transactionExtender.of(
+  (transaction: Transaction) => {
+    if (
+      !transaction.docChanged ||
+      transaction.annotation(syncTableEditAnnotation)
+    ) {
+      return null;
+    }
+
+    if (
+      transaction.effects.some(
+        (effect: StateEffect<unknown>) =>
+          effect.is(setActiveTableCellEffect) ||
+          effect.is(clearActiveTableCellEffect),
+      )
+    ) {
+      return null;
+    }
+
+    return getActiveTableCell(transaction.startState)
+      ? { effects: clearActiveTableCellEffect.of() }
+      : null;
+  },
+);
 
 function findActiveCellElement(
   view: EditorView,
@@ -745,11 +378,11 @@ class NestedTableEditorController {
   private cellElement: HTMLElement | null = null;
   private editor: EditorView | null = null;
   private mainView: EditorView | null = null;
-  private resolved: ResolvedActiveCell | null = null;
+  private resolved: ResolvedActiveTableCell | null = null;
 
   open(
     mainView: EditorView,
-    resolved: ResolvedActiveCell,
+    resolved: ResolvedActiveTableCell,
     cellElement: HTMLElement,
   ) {
     this.close();
@@ -785,6 +418,32 @@ class NestedTableEditorController {
             },
           },
         ]),
+        EditorView.domEventHandlers({
+          beforeinput(event) {
+            event.stopPropagation();
+            return false;
+          },
+          compositionend(event) {
+            event.stopPropagation();
+            return false;
+          },
+          compositionstart(event) {
+            event.stopPropagation();
+            return false;
+          },
+          compositionupdate(event) {
+            event.stopPropagation();
+            return false;
+          },
+          input(event) {
+            event.stopPropagation();
+            return false;
+          },
+          keydown(event) {
+            event.stopPropagation();
+            return false;
+          },
+        }),
         EditorView.updateListener.of((update) =>
           this.handleLocalUpdate(update),
         ),
@@ -1074,6 +733,7 @@ export function tables(): Extension {
   return [
     activeTableCellField,
     tableDecorationField,
+    activeTableCellGuard,
     tableInteractionHandlers,
     nestedTableEditorPlugin,
   ];
