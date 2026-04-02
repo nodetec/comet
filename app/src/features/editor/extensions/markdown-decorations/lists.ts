@@ -32,11 +32,6 @@ type ListMarkerData = {
   spacerDecorations: Array<Range<Decoration>>;
 };
 
-type MarkerRange = {
-  from: number;
-  to: number;
-};
-
 class SpacerWidget extends WidgetType {
   override toDOM(): HTMLElement {
     const spacer = document.createElement("span");
@@ -45,98 +40,6 @@ class SpacerWidget extends WidgetType {
     spacer.style.inlineSize = "2rem";
     return spacer;
   }
-}
-
-abstract class MarkerWidget extends WidgetType {
-  override coordsAt(dom: HTMLElement, _pos: number, side: number) {
-    const rect = dom.getBoundingClientRect();
-    const x = side < 0 ? rect.left : rect.right;
-
-    return {
-      bottom: rect.bottom,
-      left: x,
-      right: x,
-      top: rect.top,
-    };
-  }
-}
-
-class TaskWidget extends MarkerWidget {
-  constructor(private readonly checked: boolean) {
-    super();
-  }
-
-  override eq(other: WidgetType): boolean {
-    return other instanceof TaskWidget && other.checked === this.checked;
-  }
-
-  override ignoreEvent(): boolean {
-    return false;
-  }
-
-  override toDOM(): HTMLElement {
-    const wrapper = createMarkerWrapper();
-    const input = document.createElement("input");
-
-    input.setAttribute("aria-hidden", "true");
-    input.setAttribute("tabindex", "-1");
-    input.className = "cm-md-task-marker";
-    input.type = "checkbox";
-    input.checked = this.checked;
-
-    wrapper.classList.add("cm-md-task");
-    wrapper.append(input);
-
-    return wrapper;
-  }
-}
-
-class BulletWidget extends MarkerWidget {
-  override toDOM(): HTMLElement {
-    const wrapper = createMarkerWrapper();
-    const content = document.createElement("span");
-
-    wrapper.setAttribute("inert", "true");
-    content.setAttribute("aria-hidden", "true");
-    content.setAttribute("tabindex", "-1");
-    content.className = "cm-md-bullet-marker";
-    content.innerHTML = "&bull;";
-    wrapper.append(content);
-    return wrapper;
-  }
-}
-
-class NumberWidget extends MarkerWidget {
-  constructor(private readonly marker: string) {
-    super();
-  }
-
-  override eq(other: WidgetType): boolean {
-    return other instanceof NumberWidget && other.marker === this.marker;
-  }
-
-  override toDOM(): HTMLElement {
-    const wrapper = createMarkerWrapper();
-    const content = document.createElement("span");
-
-    wrapper.setAttribute("inert", "true");
-    content.setAttribute("aria-hidden", "true");
-    content.setAttribute("tabindex", "-1");
-    content.className = "cm-md-number-marker";
-    content.innerHTML = this.marker;
-
-    wrapper.append(content);
-    return wrapper;
-  }
-}
-
-function createMarkerWrapper(): HTMLElement {
-  const wrapper = document.createElement("label");
-  wrapper.setAttribute("aria-hidden", "true");
-  wrapper.setAttribute("tabindex", "-1");
-  wrapper.className = "cm-md-list-marker";
-  wrapper.style.minWidth = "2rem";
-  return wrapper;
 }
 
 export function getListMarkerData(
@@ -218,44 +121,7 @@ function addListDecorations(
     ...data.spacerDecorations,
     markerDecoration,
   );
-  atomicRanges.push(...data.spacerDecorations, markerDecoration);
-}
-
-function buildListMarkerRanges(state: EditorState): MarkerRange[] {
-  const ranges: MarkerRange[] = [];
-
-  syntaxTree(state).iterate({
-    enter(node) {
-      if (node.type.name === "Blockquote") {
-        return false;
-      }
-
-      const data = getListMarkerData(state, node);
-      if (!data) {
-        return;
-      }
-
-      if (BULLET_MARKERS.has(data.marker)) {
-        const taskStart = data.markerEnd + 1;
-        const taskEnd = taskStart + 3;
-        const task = state.sliceDoc(taskStart, taskEnd);
-        const taskHasTrailingSpace =
-          state.sliceDoc(taskEnd, taskEnd + 1) === " ";
-
-        if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
-          ranges.push({ from: data.markerStart, to: taskEnd + 1 });
-          return;
-        }
-
-        ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
-        return;
-      }
-
-      ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
-    },
-  });
-
-  return ranges;
+  atomicRanges.push(...data.spacerDecorations);
 }
 
 function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
@@ -404,86 +270,6 @@ function dedentListItemPreservingWrappedStart(view: EditorView) {
   return true;
 }
 
-function normalizeCursorToMarkerBoundary(
-  position: number,
-  assoc: -1 | 0 | 1,
-  markerRanges: readonly MarkerRange[],
-) {
-  for (const marker of markerRanges) {
-    const boundary = getCursorBoundary(position, assoc, marker);
-    if (boundary) {
-      return EditorSelection.cursor(boundary.position, boundary.assoc);
-    }
-  }
-
-  return null;
-}
-
-function getCursorBoundary(
-  position: number,
-  assoc: -1 | 0 | 1,
-  marker: MarkerRange,
-) {
-  if (position === marker.from) {
-    return { assoc: -1 as const, position: marker.from };
-  }
-
-  if (position === marker.to) {
-    return { assoc: 1 as const, position: marker.to };
-  }
-
-  if (position <= marker.from || position >= marker.to) {
-    return null;
-  }
-
-  const midpoint = marker.from + (marker.to - marker.from) / 2;
-  if (assoc < 0 || (assoc === 0 && position <= midpoint)) {
-    return { assoc: -1 as const, position: marker.from };
-  }
-
-  return { assoc: 1 as const, position: marker.to };
-}
-
-function normalizeSelectionToListMarkers(state: EditorState) {
-  const markerRanges = buildListMarkerRanges(state);
-  if (markerRanges.length === 0) {
-    return null;
-  }
-
-  let changed = false;
-  const ranges = state.selection.ranges.map((range) => {
-    if (!range.empty) {
-      return range;
-    }
-
-    const normalized = normalizeCursorToMarkerBoundary(
-      range.head,
-      range.assoc,
-      markerRanges,
-    );
-    if (!normalized) {
-      return range;
-    }
-
-    if (
-      normalized.anchor !== range.anchor ||
-      normalized.head !== range.head ||
-      normalized.assoc !== range.assoc
-    ) {
-      changed = true;
-      return normalized;
-    }
-
-    return range;
-  });
-
-  if (!changed) {
-    return null;
-  }
-
-  return EditorSelection.create(ranges, state.selection.mainIndex);
-}
-
 function buildBulletListDecorations(
   state: EditorState,
 ): [DecorationSet, DecorationSet] {
@@ -501,13 +287,21 @@ function buildBulletListDecorations(
         return;
       }
 
+      const taskStart = data.markerEnd + 1;
+      const taskEnd = taskStart + 3;
+      const task = state.sliceDoc(taskStart, taskEnd);
+      const taskHasTrailingSpace = state.sliceDoc(taskEnd, taskEnd + 1) === " ";
+
+      if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
+        return;
+      }
+
       addListDecorations(
         data,
         "cm-md-list cm-md-bullet-list",
-        Decoration.replace({ widget: new BulletWidget() }).range(
-          data.markerStart,
-          data.markerEnd + 1,
-        ),
+        Decoration.mark({
+          class: "cm-md-list-marker cm-md-bullet-marker-source",
+        }).range(data.markerStart, data.markerEnd + 1),
         decorationRanges,
         atomicRanges,
       );
@@ -540,10 +334,9 @@ function buildNumberListDecorations(
       addListDecorations(
         data,
         "cm-md-list cm-md-number-list",
-        Decoration.replace({ widget: new NumberWidget(data.marker) }).range(
-          data.markerStart,
-          data.markerEnd + 1,
-        ),
+        Decoration.mark({
+          class: "cm-md-list-marker cm-md-number-marker",
+        }).range(data.markerStart, data.markerEnd + 1),
         decorationRanges,
         atomicRanges,
       );
@@ -586,10 +379,9 @@ function buildTaskListDecorations(
       addListDecorations(
         data,
         `cm-md-list cm-md-task-list ${checked ? "cm-md-task-checked" : "cm-md-task-unchecked"}`,
-        Decoration.replace({ widget: new TaskWidget(checked) }).range(
-          data.markerStart,
-          taskEnd + 1,
-        ),
+        Decoration.mark({
+          class: `cm-md-list-marker cm-md-task-marker-source ${checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`,
+        }).range(data.markerStart, taskEnd + 1),
         decorationRanges,
         atomicRanges,
       );
@@ -614,27 +406,38 @@ function taskLists(): Extension {
   return [
     ViewPlugin.define(() => ({}), {
       eventHandlers: {
-        mousedown(event, view) {
+        mousedown(event) {
           const target = event.target as HTMLElement;
-          const checkbox = target
-            .closest(".cm-md-list-marker")
-            ?.querySelector(".cm-md-task-marker");
-
-          if (!(checkbox instanceof HTMLElement)) {
+          const marker = target.closest(".cm-md-task-marker-source");
+          if (!(marker instanceof HTMLElement) || event.button !== 0) {
             return false;
           }
 
-          const position = view.posAtDOM(checkbox);
-          const from = position - 4;
-          const to = position - 1;
-          const marker = view.state.sliceDoc(from, to);
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        },
+        click(event, view) {
+          const target = event.target as HTMLElement;
+          const marker = target.closest(".cm-md-task-marker-source");
+          if (!(marker instanceof HTMLElement)) {
+            return false;
+          }
 
-          if (marker === "[ ]" || marker === "[x]") {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const position = view.posAtDOM(marker, 0);
+          const from = position + 2;
+          const to = from + 3;
+          const taskMarker = view.state.sliceDoc(from, to);
+
+          if (taskMarker === "[ ]" || taskMarker === "[x]") {
             view.dispatch({
               changes: {
                 from,
                 to,
-                insert: marker === "[ ]" ? "[x]" : "[ ]",
+                insert: taskMarker === "[ ]" ? "[x]" : "[ ]",
               },
             });
             return true;
@@ -666,21 +469,81 @@ const listTheme = EditorView.theme({
     display: "inline-flex",
     justifyContent: "center",
     minWidth: "2rem",
+    position: "relative",
+    textAlign: "center",
+    verticalAlign: "middle",
+    whiteSpace: "pre",
   },
-  ".cm-md-bullet-marker": {
+  ".cm-md-bullet-marker-source": {
+    color: "transparent",
+    WebkitTextFillColor: "transparent",
+  },
+  ".cm-md-bullet-marker-source::before": {
+    alignItems: "center",
+    color: "var(--primary)",
+    content: '"•"',
+    display: "inline-flex",
     fontSize: "1.35rem",
+    justifyContent: "center",
+    left: "50%",
     lineHeight: "1",
+    pointerEvents: "none",
+    position: "absolute",
+    top: "50%",
+    transform: "translate(-50%, -54%)",
+    WebkitTextFillColor: "var(--primary)",
   },
-  ".cm-md-task-marker": {
-    accentColor: "var(--primary)",
+  ".cm-md-number-marker": {
+    color: "var(--primary)",
+    fontVariantNumeric: "tabular-nums",
+    WebkitTextFillColor: "var(--primary)",
+  },
+  ".cm-md-task-marker-source": {
+    color: "transparent",
     cursor: "pointer",
-    margin: "0",
-    scale: "1.2",
-    transformOrigin: "center center",
+    WebkitTextFillColor: "transparent",
+  },
+  ".cm-md-task-marker-source::before": {
+    alignItems: "center",
+    backgroundColor: "var(--background)",
+    border: "1px solid var(--primary)",
+    borderRadius: "4px",
+    boxSizing: "border-box",
+    content: '""',
+    display: "inline-flex",
+    height: "1rem",
+    justifyContent: "center",
+    left: "50%",
+    pointerEvents: "none",
+    position: "absolute",
+    top: "50%",
+    transform: "translate(-50%, -54%)",
+    width: "1rem",
+  },
+  ".cm-md-task-marker-checked::before": {
+    backgroundColor: "var(--primary)",
+  },
+  ".cm-md-task-marker-checked::after": {
+    borderColor: "var(--primary-foreground)",
+    borderStyle: "solid",
+    borderWidth: "0 2px 2px 0",
+    boxSizing: "border-box",
+    content: '""',
+    height: "0.6rem",
+    left: "50%",
+    pointerEvents: "none",
+    position: "absolute",
+    top: "50%",
+    transform: "translate(-50%, -56%) rotate(45deg)",
+    width: "0.35rem",
   },
   ".cm-md-task-list.cm-md-task-checked": {
+    color: "var(--muted-foreground)",
     textDecoration: "line-through",
     textDecorationColor: "var(--muted-foreground)",
+  },
+  ".cm-md-task-list.cm-md-task-checked .cm-md-link": {
+    color: "var(--muted-foreground)",
   },
 });
 
@@ -690,17 +553,5 @@ const listKeymap = keymap.of([
 ]);
 
 export function lists(): Extension {
-  return [
-    EditorState.transactionFilter.of((transaction) => {
-      const selection = normalizeSelectionToListMarkers(transaction.state);
-      return selection
-        ? [transaction, { selection, sequential: true }]
-        : [transaction];
-    }),
-    taskLists(),
-    bulletLists(),
-    numberLists(),
-    listTheme,
-    listKeymap,
-  ];
+  return [taskLists(), bulletLists(), numberLists(), listTheme, listKeymap];
 }
