@@ -2,6 +2,7 @@ import { type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
+import { tables } from "@/features/editor/extensions/markdown-decorations/builders/tables";
 import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
 
@@ -64,6 +65,46 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
   ".cm-md-codeblock-fence-hidden": {
     opacity: "0",
+  },
+  ".cm-md-table-wrapper": {
+    paddingBlock: "0.4rem",
+    overflowX: "auto",
+  },
+  ".cm-md-table": {
+    borderCollapse: "collapse",
+    fontSize: "0.95em",
+    minWidth: "100%",
+    tableLayout: "fixed",
+    width: "100%",
+  },
+  ".cm-md-table th, .cm-md-table td": {
+    border: "1px solid var(--border)",
+    padding: "0.45rem 0.6rem",
+    verticalAlign: "top",
+  },
+  ".cm-md-table-cell": {
+    cursor: "text",
+  },
+  ".cm-md-table-input": {
+    background: "transparent",
+    border: "none",
+    color: "inherit",
+    font: "inherit",
+    margin: "0",
+    outline: "none",
+    padding: "0",
+    width: "100%",
+  },
+  ".cm-md-table th": {
+    backgroundColor: "color-mix(in oklab, var(--muted) 65%, transparent)",
+    fontWeight: "600",
+    textAlign: "left",
+  },
+  '.cm-md-table [data-align="center"]': {
+    textAlign: "center",
+  },
+  '.cm-md-table [data-align="right"]': {
+    textAlign: "right",
   },
   ".cm-md-link": {
     color: "var(--syntax-link)",
@@ -133,5 +174,10 @@ const markdownDecorationsTheme = EditorView.baseTheme({
 });
 
 export function markdownDecorations(): Extension {
-  return [markdownDecorationsPlugin, markdownDecorationsTheme, lists()];
+  return [
+    markdownDecorationsPlugin,
+    markdownDecorationsTheme,
+    lists(),
+    tables(),
+  ];
 }

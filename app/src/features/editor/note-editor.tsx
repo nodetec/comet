@@ -10,7 +10,7 @@ import {
   markdown as markdownLanguage,
   markdownLanguage as markdownLang,
 } from "@codemirror/lang-markdown";
-import { Strikethrough, TaskList } from "@lezer/markdown";
+import { Strikethrough, Table, TaskList } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
 import {
@@ -395,7 +395,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           EditorView.lineWrapping,
           markdownLanguage({
             base: markdownLang,
-            extensions: [Strikethrough, TaskList, HighlightSyntax, TagGrammar],
+            extensions: [
+              Strikethrough,
+              Table,
+              TaskList,
+              HighlightSyntax,
+              TagGrammar,
+            ],
           }),
           inlineImages(),
           markdownDecorations(),
