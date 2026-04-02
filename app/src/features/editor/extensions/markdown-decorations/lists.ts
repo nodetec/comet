@@ -490,7 +490,7 @@ const listTheme = EditorView.theme({
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
-    transform: "translate(-50%, -54%)",
+    transform: "translate(-50%, -60%)",
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-number-marker": {
