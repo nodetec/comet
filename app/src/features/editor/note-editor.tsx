@@ -58,6 +58,8 @@ export type NoteEditorHandle = {
   undo(): boolean;
 };
 
+type GutterSide = "left" | "right";
+
 const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   { tag: [t.emphasis], fontStyle: "italic" },
   { tag: [t.strong], fontWeight: "700" },
@@ -288,9 +290,10 @@ function getTableBoundarySelection(
   target: EventTarget | null,
   clientX: number,
   clientY: number,
+  allowInteractiveTableTarget = false,
 ) {
   const targetElement = getTargetElementAtPoint(target, clientX, clientY);
-  if (isInteractiveTableTarget(targetElement)) {
+  if (!allowInteractiveTableTarget && isInteractiveTableTarget(targetElement)) {
     return null;
   }
 
@@ -318,7 +321,7 @@ function getTableBoundarySelection(
 function getGutterTableBoundarySelection(
   view: EditorView,
   clientY: number,
-  side: "left" | "right",
+  side: GutterSide,
 ) {
   const wrapper = findTableWrapperAtY(view, clientY);
   if (!wrapper) {
@@ -329,6 +332,90 @@ function getGutterTableBoundarySelection(
     wrapper,
     side === "left" ? "before" : "after",
   );
+}
+
+function getLineBoundaryCursor(
+  view: EditorView,
+  clientY: number,
+  side: GutterSide,
+) {
+  const contentRect = view.contentDOM.getBoundingClientRect();
+  if (clientY < contentRect.top || clientY > contentRect.bottom) {
+    return null;
+  }
+
+  const targetY = Math.min(
+    contentRect.bottom - 1,
+    Math.max(contentRect.top + 1, clientY),
+  );
+  const tableBoundarySelection = getGutterTableBoundarySelection(
+    view,
+    targetY,
+    side,
+  );
+  if (tableBoundarySelection) {
+    return tableBoundarySelection.main;
+  }
+
+  const probeInset = Math.max(view.defaultCharacterWidth * 4, 8);
+  const probeX =
+    side === "left"
+      ? Math.min(contentRect.left + probeInset, contentRect.right - 1)
+      : Math.max(contentRect.right - probeInset, contentRect.left + 1);
+  const anchor = view.posAndSideAtCoords({ x: probeX, y: targetY }, false);
+
+  if (anchor == null) {
+    return null;
+  }
+
+  const line = view.state.doc.lineAt(anchor.pos);
+  const contentFrom = Math.min(
+    line.to,
+    line.from + getListTextStartOffset(line.text),
+  );
+
+  return findVisualFragmentBoundary(view, contentFrom, line.to, targetY, side);
+}
+
+function getSelectionHeadFromPoint(
+  view: EditorView,
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+  side: GutterSide,
+) {
+  const contentRect = view.contentDOM.getBoundingClientRect();
+  if (clientY < contentRect.top || clientY > contentRect.bottom) {
+    return null;
+  }
+
+  if (clientX <= contentRect.left || clientX >= contentRect.right) {
+    return getLineBoundaryCursor(view, clientY, side);
+  }
+
+  const tableBoundarySelection = getTableBoundarySelection(
+    view,
+    target,
+    clientX,
+    clientY,
+    true,
+  );
+  if (tableBoundarySelection) {
+    return tableBoundarySelection.main;
+  }
+
+  const pos = view.posAtCoords(
+    {
+      x: clientX,
+      y: clientY,
+    },
+    false,
+  );
+  if (pos == null) {
+    return null;
+  }
+
+  return EditorSelection.cursor(pos);
 }
 
 function isRectOnClickedRow(
@@ -365,85 +452,6 @@ function findVisualFragmentBoundary(
   }
 
   return EditorSelection.cursor(lineTo, -1);
-}
-
-function focusAtLineBoundary(
-  view: EditorView,
-  clientY: number,
-  side: "left" | "right",
-): boolean {
-  const contentRect = view.contentDOM.getBoundingClientRect();
-  if (clientY < contentRect.top || clientY > contentRect.bottom) {
-    return false;
-  }
-
-  const scrollContainer = view.dom.closest(
-    "[data-editor-scroll-container]",
-  ) as HTMLElement | null;
-  const scrollTop = scrollContainer?.scrollTop ?? 0;
-
-  if (!view.hasFocus) {
-    view.focus();
-  }
-
-  if (scrollContainer) {
-    lockScrollPosition(scrollContainer, scrollTop);
-  }
-
-  const targetY = Math.min(
-    contentRect.bottom - 1,
-    Math.max(contentRect.top + 1, clientY),
-  );
-  const tableBoundarySelection = getGutterTableBoundarySelection(
-    view,
-    targetY,
-    side,
-  );
-  if (tableBoundarySelection) {
-    view.dispatch({
-      selection: tableBoundarySelection,
-    });
-
-    requestAnimationFrame(() => {
-      view.focus();
-    });
-
-    return true;
-  }
-
-  const probeInset = Math.max(view.defaultCharacterWidth * 4, 8);
-  const probeX =
-    side === "left"
-      ? Math.min(contentRect.left + probeInset, contentRect.right - 1)
-      : Math.max(contentRect.right - probeInset, contentRect.left + 1);
-  const anchor = view.posAndSideAtCoords({ x: probeX, y: targetY }, false);
-
-  if (anchor == null) {
-    return false;
-  }
-
-  const line = view.state.doc.lineAt(anchor.pos);
-  const contentFrom = Math.min(
-    line.to,
-    line.from + getListTextStartOffset(line.text),
-  );
-  const boundary = findVisualFragmentBoundary(
-    view,
-    contentFrom,
-    line.to,
-    targetY,
-    side,
-  );
-
-  view.dispatch({
-    selection: EditorSelection.create([boundary]),
-  });
-
-  requestAnimationFrame(() => {
-    view.focus();
-  });
-
-  return true;
 }
 
 function blurEditorView(view: EditorView) {
@@ -487,6 +495,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
+    const gutterDragCleanupRef = useRef<(() => void) | null>(null);
     const initialMarkdownRef = useRef(markdown);
     const initialReadOnlyRef = useRef(readOnly);
     const initialSpellCheckRef = useRef(spellCheck);
@@ -805,6 +814,95 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       });
     }, []);
 
+    useEffect(() => {
+      return () => {
+        gutterDragCleanupRef.current?.();
+        gutterDragCleanupRef.current = null;
+      };
+    }, []);
+
+    const startGutterSelectionDrag = (
+      event: MouseEvent<HTMLDivElement>,
+      side: GutterSide,
+    ) => {
+      if (readOnly) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      useShellStore.getState().setFocusedPane("editor");
+
+      const view = viewRef.current;
+      if (!view) {
+        return;
+      }
+
+      const anchor = getLineBoundaryCursor(view, event.clientY, side);
+      if (!anchor) {
+        return;
+      }
+
+      const scrollContainer = view.dom.closest(
+        "[data-editor-scroll-container]",
+      ) as HTMLElement | null;
+      const scrollTop = scrollContainer?.scrollTop ?? 0;
+
+      view.focus();
+      if (scrollContainer) {
+        lockScrollPosition(scrollContainer, scrollTop);
+      }
+
+      view.dispatch({
+        selection: EditorSelection.create([anchor]),
+      });
+
+      gutterDragCleanupRef.current?.();
+
+      const ownerDocument = view.dom.ownerDocument;
+      const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+        if ((moveEvent.buttons & 1) === 0) {
+          cleanup();
+          return;
+        }
+
+        moveEvent.preventDefault();
+        const head = getSelectionHeadFromPoint(
+          view,
+          moveEvent.target,
+          moveEvent.clientX,
+          moveEvent.clientY,
+          side,
+        );
+        if (!head) {
+          return;
+        }
+
+        view.dispatch({
+          scrollIntoView: false,
+          selection: EditorSelection.create([
+            EditorSelection.range(anchor.anchor, head.head),
+          ]),
+        });
+      };
+      const handleMouseUp = (upEvent: globalThis.MouseEvent) => {
+        upEvent.preventDefault();
+        cleanup();
+        view.focus();
+      };
+      const cleanup = () => {
+        ownerDocument.removeEventListener("mousemove", handleMouseMove, true);
+        ownerDocument.removeEventListener("mouseup", handleMouseUp, true);
+        if (gutterDragCleanupRef.current === cleanup) {
+          gutterDragCleanupRef.current = null;
+        }
+      };
+
+      ownerDocument.addEventListener("mousemove", handleMouseMove, true);
+      ownerDocument.addEventListener("mouseup", handleMouseUp, true);
+      gutterDragCleanupRef.current = cleanup;
+    };
+
     return (
       <div
         className={cn(
@@ -825,20 +923,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             viewRef.current?.focus();
           }}
           onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-            if (readOnly) {
-              return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
-            useShellStore.getState().setFocusedPane("editor");
-
-            const view = viewRef.current;
-            if (!view) {
-              return;
-            }
-
-            focusAtLineBoundary(view, event.clientY, "left");
+            startGutterSelectionDrag(event, "left");
           }}
         />
         <div className="comet-editor-column">
@@ -860,20 +945,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             viewRef.current?.focus();
           }}
           onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-            if (readOnly) {
-              return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
-            useShellStore.getState().setFocusedPane("editor");
-
-            const view = viewRef.current;
-            if (!view) {
-              return;
-            }
-
-            focusAtLineBoundary(view, event.clientY, "right");
+            startGutterSelectionDrag(event, "right");
           }}
         />
       </div>
