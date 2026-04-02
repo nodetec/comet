@@ -59,6 +59,8 @@ import {
 import {
   clampSelection,
   sanitizeLocalText,
+  toLocalSelection,
+  toRootSelection,
   unsanitizeRootText,
 } from "@/features/editor/extensions/tables/text-codec";
 import type {
@@ -78,21 +80,46 @@ const TABLE_HASH_ATTR = "data-table-hash";
 const TABLE_FROM_ATTR = "data-table-from";
 const normalizeBeforeEditAnnotation = Annotation.define<boolean>();
 const syncTableEditAnnotation = Annotation.define<boolean>();
-
-type PendingCursorPosition = "end" | "lastLineStart" | "start";
+type PendingCursorPosition = "end" | "lastLineStart" | "mapped" | "start";
 
 type PendingTableCellOpen = {
   activeCell: ActiveTableCell;
   cursorPos: PendingCursorPosition;
+  localSelection?: {
+    anchor: number;
+    head: number;
+  };
 };
 
 type TableOperationTarget = Pick<ActiveTableCell, "col" | "row" | "section">;
+type ResolvedTableAtPosition = {
+  table: ParsedMarkdownTable;
+  tableFrom: number;
+  tableTo: number;
+};
 
 const pendingTableCellOpens = new WeakMap<EditorView, PendingTableCellOpen>();
 const pendingTableNormalizations = new WeakSet<EditorView>();
-const pendingTableFocusRestores = new WeakMap<EditorView, number>();
 const tableHeightCache = new Map<string, number>();
 const tableResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
+  scrollContainer.scrollTop = scrollTop;
+  const lock = () => {
+    scrollContainer.scrollTop = scrollTop;
+  };
+  scrollContainer.addEventListener("scroll", lock);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollContainer.removeEventListener("scroll", lock);
+    });
+  });
+}
+
+function getEditorScrollContainer(view: EditorView): HTMLElement | null {
+  const container = view.dom.closest("[data-editor-scroll-container]");
+  return container instanceof HTMLElement ? container : null;
+}
 
 function buildClipboardGrid(text: string): string[][] {
   const markdownTable = MarkdownTable.parse(text);
@@ -141,6 +168,7 @@ function createCellMenuTrigger(
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    nestedEditors.get(view)?.syncSelectionToMain();
     void showTableCellMenu(button, cell, view);
   });
   return button;
@@ -316,11 +344,193 @@ function getEditableRangeForCell(
     : table.cellRanges.rows[activeCell.row]?.[activeCell.col];
 }
 
+function selectionForActiveTableCell(
+  activeCell: ActiveTableCell,
+  table: ParsedMarkdownTable,
+  tableFrom: number,
+) {
+  const range = getEditableRangeForCell(activeCell, table);
+  if (!range) {
+    return null;
+  }
+
+  return EditorSelection.cursor(tableFrom + range.editableFrom);
+}
+
+function dispatchActiveTableCellSelection(
+  activeCell: ActiveTableCell,
+  view: EditorView,
+) {
+  const resolvedTable = resolveTableByFrom(view.state, activeCell.tableFrom);
+  const selection = resolvedTable
+    ? selectionForActiveTableCell(
+        activeCell,
+        resolvedTable.table,
+        resolvedTable.tableFrom,
+      )
+    : null;
+
+  view.dispatch({
+    effects: setActiveTableCellEffect.of(activeCell),
+    selection: selection ?? undefined,
+    scrollIntoView: false,
+  });
+}
+
+function setMainSelectionToTableCell(
+  activeCell: ActiveTableCell,
+  view: EditorView,
+) {
+  const resolvedTable = resolveTableByFrom(view.state, activeCell.tableFrom);
+  const selection = resolvedTable
+    ? selectionForActiveTableCell(
+        activeCell,
+        resolvedTable.table,
+        resolvedTable.tableFrom,
+      )
+    : null;
+  if (!selection) {
+    return false;
+  }
+
+  const currentSelection = view.state.selection.main;
+  if (
+    currentSelection.anchor === selection.anchor &&
+    currentSelection.head === selection.head
+  ) {
+    return true;
+  }
+
+  view.dispatch({
+    selection,
+    annotations: Transaction.addToHistory.of(false),
+    scrollIntoView: false,
+  });
+  return true;
+}
+
+function isUndoRedoTransaction(transaction: Transaction) {
+  return transaction.isUserEvent("undo") || transaction.isUserEvent("redo");
+}
+
+function transactionChangesOutsideCell(
+  transaction: Transaction,
+  resolved: ResolvedActiveTableCell,
+) {
+  let outsideCell = false;
+
+  transaction.changes.iterChanges((fromA, toA) => {
+    if (outsideCell) {
+      return;
+    }
+
+    if (fromA < resolved.editableFrom || toA > resolved.editableTo) {
+      outsideCell = true;
+    }
+  });
+
+  return outsideCell;
+}
+
+function transactionRequiresTableRebuild(
+  transaction: Transaction,
+  resolved: ResolvedActiveTableCell | null,
+) {
+  if (!resolved || !isUndoRedoTransaction(transaction)) {
+    return false;
+  }
+
+  return transactionChangesOutsideCell(transaction, resolved);
+}
+
+function resolveTableAtPosition(
+  pos: number,
+  state: EditorState,
+): ResolvedTableAtPosition | null {
+  let resolvedTable: ResolvedTableAtPosition | null = null;
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (
+        resolvedTable ||
+        node.name !== "Table" ||
+        pos < node.from ||
+        pos > node.to
+      ) {
+        return;
+      }
+
+      const table = parseMarkdownTable(state.sliceDoc(node.from, node.to));
+      if (!table) {
+        return;
+      }
+
+      resolvedTable = {
+        table,
+        tableFrom: node.from,
+        tableTo: node.to,
+      };
+    },
+  });
+
+  return resolvedTable;
+}
+
+function activateCellAtPosition(
+  clearIfOutside: boolean,
+  pos: number,
+  view: EditorView,
+) {
+  const resolvedTable = resolveTableAtPosition(pos, view.state);
+  if (!resolvedTable) {
+    if (clearIfOutside) {
+      view.dispatch({
+        effects: clearActiveTableCellEffect.of(),
+        selection: EditorSelection.cursor(pos),
+        scrollIntoView: false,
+      });
+    }
+    return false;
+  }
+
+  const relativePos = pos - resolvedTable.tableFrom;
+  const activeCell = getActiveTableCell(view.state);
+  const fallbackCoords =
+    activeCell && activeCell.tableFrom === resolvedTable.tableFrom
+      ? activeCellToCoords(activeCell)
+      : { col: 0, row: 0, section: "body" as const };
+  const targetCoords =
+    findCellCoordsForRelativePos(resolvedTable.table, relativePos) ??
+    fallbackCoords;
+  const nextActiveCell: ActiveTableCell = {
+    ...targetCoords,
+    tableFrom: resolvedTable.tableFrom,
+  };
+  const range = getEditableRangeForCell(nextActiveCell, resolvedTable.table);
+  if (!range) {
+    return false;
+  }
+
+  rememberPendingTableCellOpen(view, nextActiveCell, "mapped", {
+    anchor: pos - resolvedTable.tableFrom - range.editableFrom,
+    head: pos - resolvedTable.tableFrom - range.editableFrom,
+  });
+  view.dispatch({
+    selection: EditorSelection.cursor(
+      resolvedTable.tableFrom + range.editableFrom,
+    ),
+    effects: setActiveTableCellEffect.of(nextActiveCell),
+    scrollIntoView: false,
+  });
+  return true;
+}
+
 function runTableOperationAtCell(
   activeCell: ActiveTableCell,
   computeTargetCell: (cell: ActiveTableCell) => TableOperationTarget,
   cursorPos: PendingCursorPosition,
   operation: (table: MarkdownTable, cell: ActiveTableCell) => MarkdownTable,
+  preserveSelection: boolean,
   view: EditorView,
 ) {
   const resolved = resolveMarkdownTableAtCell(activeCell, view);
@@ -355,10 +565,38 @@ function runTableOperationAtCell(
       insert: nextTableText,
       to: resolved.resolvedTable.tableTo,
     },
-    selection: EditorSelection.cursor(
-      resolved.resolvedTable.tableFrom + nextRange.editableFrom,
-    ),
+    selection: preserveSelection
+      ? undefined
+      : EditorSelection.cursor(
+          resolved.resolvedTable.tableFrom + nextRange.editableFrom,
+        ),
     effects: setActiveTableCellEffect.of(nextActiveCell),
+    scrollIntoView: false,
+  });
+  return true;
+}
+
+function runPassiveTableOperationAtCell(
+  activeCell: ActiveTableCell,
+  operation: (table: MarkdownTable, cell: ActiveTableCell) => MarkdownTable,
+  view: EditorView,
+) {
+  const resolved = resolveMarkdownTableAtCell(activeCell, view);
+  if (!resolved) {
+    return false;
+  }
+
+  const nextTable = operation(resolved.markdownTable, activeCell);
+  if (nextTable === resolved.markdownTable) {
+    return false;
+  }
+
+  view.dispatch({
+    changes: {
+      from: resolved.resolvedTable.tableFrom,
+      insert: nextTable.serialize(),
+      to: resolved.resolvedTable.tableTo,
+    },
     scrollIntoView: false,
   });
   return true;
@@ -379,26 +617,23 @@ async function showTableCellMenu(
     return;
   }
 
+  if (!nestedEditors.get(view)?.syncSelectionToMain()) {
+    setMainSelectionToTableCell(activeCell, view);
+  }
+
   const rect = button.getBoundingClientRect();
   const canDeleteColumn = resolved.markdownTable.columnCount > 1;
   const canDeleteRow =
     activeCell.section !== "header" ||
     resolved.markdownTable.bodyRows.length > 0;
-  let shouldRefocusEditor = false;
   const menu = await Menu.new({
     items: [
       {
         id: "table-row-above",
         text: "Insert Row Above",
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: currentCell.col,
-              row: currentCell.section === "header" ? 0 : currentCell.row,
-              section: currentCell.section === "header" ? "header" : "body",
-            }),
-            "start",
             (table, currentCell) =>
               table.insertRowRelativeTo(
                 currentCell.section,
@@ -413,14 +648,8 @@ async function showTableCellMenu(
         id: "table-row-below",
         text: "Insert Row Below",
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: currentCell.col,
-              row: currentCell.section === "header" ? 0 : currentCell.row + 1,
-              section: "body",
-            }),
-            "start",
             (table, currentCell) =>
               table.insertRowRelativeTo(
                 currentCell.section,
@@ -436,14 +665,8 @@ async function showTableCellMenu(
         id: "table-column-left",
         text: "Insert Column Left",
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: currentCell.col,
-              row: currentCell.row,
-              section: currentCell.section,
-            }),
-            "start",
             (table, currentCell) =>
               table.insertColumn(currentCell.col, "before"),
             view,
@@ -454,14 +677,8 @@ async function showTableCellMenu(
         id: "table-column-right",
         text: "Insert Column Right",
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: currentCell.col + 1,
-              row: currentCell.row,
-              section: currentCell.section,
-            }),
-            "start",
             (table, currentCell) =>
               table.insertColumn(currentCell.col, "after"),
             view,
@@ -474,17 +691,8 @@ async function showTableCellMenu(
         text: "Delete Row",
         enabled: canDeleteRow,
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: currentCell.col,
-              row:
-                currentCell.section === "header"
-                  ? 0
-                  : Math.max(0, currentCell.row - 1),
-              section: currentCell.section === "header" ? "header" : "body",
-            }),
-            "start",
             (table, currentCell) =>
               table.deleteRowAt(currentCell.section, currentCell.row),
             view,
@@ -496,14 +704,8 @@ async function showTableCellMenu(
         text: "Delete Column",
         enabled: canDeleteColumn,
         action: () => {
-          shouldRefocusEditor ||= runTableOperationAtCell(
+          runPassiveTableOperationAtCell(
             activeCell,
-            (currentCell) => ({
-              col: Math.max(0, currentCell.col - 1),
-              row: currentCell.row,
-              section: currentCell.section,
-            }),
-            "start",
             (table, currentCell) => table.deleteColumn(currentCell.col),
             view,
           );
@@ -516,9 +718,6 @@ async function showTableCellMenu(
     await menu.popup(new LogicalPosition(rect.left, rect.bottom));
   } finally {
     await menu.close();
-    if (shouldRefocusEditor) {
-      requestTableEditorFocusRestore(view);
-    }
   }
 }
 
@@ -779,12 +978,57 @@ const tableDecorationField = StateField.define<DecorationSet>({
   },
 });
 
+function createUndoScrollPreservation() {
+  let viewRef: EditorView | null = null;
+
+  const captureView = ViewPlugin.fromClass(
+    class {
+      constructor(private readonly view: EditorView) {
+        viewRef = view;
+      }
+
+      destroy() {
+        if (viewRef === this.view) {
+          viewRef = null;
+        }
+      }
+    },
+  );
+
+  const preserveScroll = EditorState.transactionExtender.of(
+    (transaction: Transaction) => {
+      if (!viewRef || !isUndoRedoTransaction(transaction)) {
+        return null;
+      }
+
+      const selectionInsideTable =
+        resolveTableAtPosition(
+          transaction.startState.selection.main.head,
+          transaction.startState,
+        ) !== null;
+      if (
+        !getActiveTableCell(transaction.startState) &&
+        !selectionInsideTable
+      ) {
+        return null;
+      }
+
+      return {
+        effects: viewRef.scrollSnapshot(),
+      };
+    },
+  );
+
+  return [captureView, preserveScroll] as const;
+}
+
 const activeTableCellGuard = EditorState.transactionExtender.of(
   (transaction: Transaction) => {
     if (
       !transaction.docChanged ||
       transaction.annotation(syncTableEditAnnotation) ||
-      transaction.annotation(normalizeBeforeEditAnnotation)
+      transaction.annotation(normalizeBeforeEditAnnotation) ||
+      isUndoRedoTransaction(transaction)
     ) {
       return null;
     }
@@ -1003,17 +1247,22 @@ function rememberPendingTableCellOpen(
   view: EditorView,
   activeCell: ActiveTableCell,
   cursorPos: PendingCursorPosition,
+  localSelection?: {
+    anchor: number;
+    head: number;
+  },
 ) {
   pendingTableCellOpens.set(view, {
     activeCell,
     cursorPos,
+    localSelection,
   });
 }
 
 function consumePendingTableCellOpen(
   view: EditorView,
   activeCell: ActiveTableCell,
-): PendingCursorPosition | null {
+): PendingTableCellOpen | null {
   const pending = pendingTableCellOpens.get(view);
   if (!pending) {
     return null;
@@ -1024,19 +1273,19 @@ function consumePendingTableCellOpen(
   }
 
   pendingTableCellOpens.delete(view);
-  return pending.cursorPos;
+  return pending;
 }
 
 function peekPendingTableCellOpen(
   view: EditorView,
   activeCell: ActiveTableCell,
-): PendingCursorPosition | null {
+): PendingTableCellOpen | null {
   const pending = pendingTableCellOpens.get(view);
   if (!pending || !isSameActiveTableCell(pending.activeCell, activeCell)) {
     return null;
   }
 
-  return pending.cursorPos;
+  return pending;
 }
 
 function moveTableSelection(
@@ -1110,10 +1359,7 @@ function moveTableSelection(
         };
 
   rememberPendingTableCellOpen(view, nextActiveCell, cursorPos);
-  view.dispatch({
-    effects: setActiveTableCellEffect.of(nextActiveCell),
-    scrollIntoView: false,
-  });
+  dispatchActiveTableCellSelection(nextActiveCell, view);
   return true;
 }
 
@@ -1149,6 +1395,7 @@ function runTableOperation(
   computeTargetCell: (cell: ActiveTableCell) => TableOperationTarget,
   cursorPos: PendingCursorPosition,
   operation: (table: MarkdownTable, cell: ActiveTableCell) => MarkdownTable,
+  preserveSelection: boolean,
   view: EditorView,
 ) {
   return runTableOperationAtCell(
@@ -1156,8 +1403,46 @@ function runTableOperation(
     computeTargetCell,
     cursorPos,
     operation,
+    preserveSelection,
     view,
   );
+}
+
+function runTableHistoryCommand(
+  command: (target: EditorView) => boolean,
+  view: EditorView,
+) {
+  command(view);
+  return true;
+}
+
+function syncMainSelectionToLocalSelection(
+  localSelection: { anchor: number; head: number },
+  localText: string,
+  mainView: EditorView,
+  resolved: ResolvedActiveTableCell,
+) {
+  const rootSelection = toRootSelection(localSelection, localText);
+  const absoluteSelection = EditorSelection.single(
+    resolved.editableFrom + rootSelection.anchor,
+    resolved.editableFrom + rootSelection.head,
+  );
+  const currentSelection = mainView.state.selection.main;
+  if (
+    currentSelection.anchor === absoluteSelection.main.anchor &&
+    currentSelection.head === absoluteSelection.main.head
+  ) {
+    return;
+  }
+
+  mainView.dispatch({
+    selection: absoluteSelection,
+    annotations: [
+      syncTableEditAnnotation.of(true),
+      Transaction.addToHistory.of(false),
+    ],
+    scrollIntoView: false,
+  });
 }
 
 function insertRowFromNavigation(
@@ -1182,6 +1467,7 @@ function insertRowFromNavigation(
     }),
     cursorPos,
     (table, cell) => table.insertRowRelativeTo(cell.section, cell.row, "after"),
+    false,
     view,
   );
 }
@@ -1227,7 +1513,7 @@ class NestedTableEditorController {
     mainView: EditorView,
     resolved: ResolvedActiveTableCell,
     cellElement: HTMLElement,
-    initialCursorPos: PendingCursorPosition = "end",
+    pendingOpen: PendingTableCellOpen | null = null,
   ) {
     this.close();
 
@@ -1241,17 +1527,59 @@ class NestedTableEditorController {
     this.cellElement.replaceChildren(host);
 
     const localText = unsanitizeRootText(resolved.text);
-    let initialSelection = localText.length;
-    if (initialCursorPos === "start") {
-      initialSelection = 0;
-    } else if (initialCursorPos === "lastLineStart") {
-      initialSelection = localText.includes("\n")
-        ? localText.lastIndexOf("\n") + 1
-        : 0;
+    const initialCursorPos = pendingOpen?.cursorPos ?? "end";
+    let initialSelection = {
+      anchor: localText.length,
+      head: localText.length,
+    };
+    switch (initialCursorPos) {
+      case "start": {
+        initialSelection = { anchor: 0, head: 0 };
+        break;
+      }
+      case "lastLineStart": {
+        const lineStart = localText.includes("\n")
+          ? localText.lastIndexOf("\n") + 1
+          : 0;
+        initialSelection = { anchor: lineStart, head: lineStart };
+        break;
+      }
+      case "mapped": {
+        initialSelection = clampSelection(
+          pendingOpen?.localSelection ??
+            toLocalSelection(
+              clampSelection(
+                {
+                  anchor:
+                    mainView.state.selection.main.anchor -
+                    resolved.editableFrom,
+                  head:
+                    mainView.state.selection.main.head - resolved.editableFrom,
+                },
+                resolved.text.length,
+              ),
+              resolved.text,
+            ),
+          localText.length,
+        );
+        break;
+      }
+      default: {
+        break;
+      }
     }
+    syncMainSelectionToLocalSelection(
+      initialSelection,
+      localText,
+      mainView,
+      resolved,
+    );
     const state = EditorState.create({
       doc: localText,
-      selection: EditorSelection.cursor(initialSelection),
+      selection: EditorSelection.single(
+        initialSelection.anchor,
+        initialSelection.head,
+      ),
       extensions: [
         EditorView.lineWrapping,
         nestedTableEditorTheme,
@@ -1381,6 +1709,7 @@ class NestedTableEditorController {
                         cell.row,
                         "after",
                       ),
+                    false,
                     this.mainView,
                   )
                 : false,
@@ -1392,12 +1721,13 @@ class NestedTableEditorController {
                 ? runTableOperation(
                     this.resolved.activeCell,
                     (cell) => ({
-                      col: cell.col,
+                      col: cell.col + 1,
                       row: cell.row,
                       section: cell.section,
                     }),
-                    "start",
+                    "mapped",
                     (table, cell) => table.insertColumn(cell.col, "before"),
+                    true,
                     this.mainView,
                   )
                 : false,
@@ -1409,12 +1739,13 @@ class NestedTableEditorController {
                 ? runTableOperation(
                     this.resolved.activeCell,
                     (cell) => ({
-                      col: cell.col + 1,
+                      col: cell.col,
                       row: cell.row,
                       section: cell.section,
                     }),
-                    "start",
+                    "mapped",
                     (table, cell) => table.insertColumn(cell.col, "after"),
+                    true,
                     this.mainView,
                   )
                 : false,
@@ -1437,6 +1768,7 @@ class NestedTableEditorController {
                         cell.row,
                         "before",
                       ),
+                    false,
                     this.mainView,
                   )
                 : false,
@@ -1447,7 +1779,7 @@ class NestedTableEditorController {
           },
           {
             key: "Mod-y",
-            run: () => redo(mainView),
+            run: () => runTableHistoryCommand(redo, mainView),
           },
           {
             key: "Mod-Alt-Backspace",
@@ -1465,6 +1797,7 @@ class NestedTableEditorController {
                     }),
                     "start",
                     (table, cell) => table.deleteRowAt(cell.section, cell.row),
+                    false,
                     this.mainView,
                   )
                 : false,
@@ -1482,6 +1815,7 @@ class NestedTableEditorController {
                     }),
                     "start",
                     (table, cell) => table.deleteColumn(cell.col),
+                    false,
                     this.mainView,
                   )
                 : false,
@@ -1499,7 +1833,7 @@ class NestedTableEditorController {
           },
           {
             key: "Mod-Shift-z",
-            run: () => redo(mainView),
+            run: () => runTableHistoryCommand(redo, mainView),
           },
           {
             key: "Shift-Tab",
@@ -1511,7 +1845,7 @@ class NestedTableEditorController {
           },
           {
             key: "Mod-z",
-            run: () => undo(mainView),
+            run: () => runTableHistoryCommand(undo, mainView),
           },
         ]),
         EditorView.domEventHandlers({
@@ -1550,7 +1884,7 @@ class NestedTableEditorController {
       parent: host,
       state,
     });
-    this.editor.focus();
+    this.editor.contentDOM.focus({ preventScroll: true });
   }
 
   handleMainEditorUpdate(mainView: EditorView) {
@@ -1593,16 +1927,30 @@ class NestedTableEditorController {
     }
 
     const localText = unsanitizeRootText(resolved.text);
-    if (localText === this.editor.state.doc.toString()) {
+    const relativeRootSelection = clampSelection(
+      {
+        anchor: mainView.state.selection.main.anchor - resolved.editableFrom,
+        head: mainView.state.selection.main.head - resolved.editableFrom,
+      },
+      resolved.text.length,
+    );
+    const rootMappedSelection = clampSelection(
+      toLocalSelection(relativeRootSelection, resolved.text),
+      localText.length,
+    );
+    if (
+      localText === this.editor.state.doc.toString() &&
+      this.editor.state.selection.main.anchor === rootMappedSelection.anchor &&
+      this.editor.state.selection.main.head === rootMappedSelection.head
+    ) {
       return;
     }
 
     this.applyingRootUpdate = true;
-    const currentSelection = this.editor.state.selection.main;
     const nextSelection = clampSelection(
       {
-        anchor: currentSelection.anchor,
-        head: currentSelection.head,
+        anchor: rootMappedSelection.anchor,
+        head: rootMappedSelection.head,
       },
       localText.length,
     );
@@ -1620,27 +1968,55 @@ class NestedTableEditorController {
   }
 
   private handleLocalUpdate(update: ViewUpdate) {
-    if (
-      this.applyingRootUpdate ||
-      !update.docChanged ||
-      !this.mainView ||
-      !this.resolved
-    ) {
+    if (this.applyingRootUpdate || !this.mainView || !this.resolved) {
       return;
     }
 
-    const rootText = sanitizeLocalText(update.state.doc.toString());
-    if (rootText === this.resolved.text) {
+    if (!update.docChanged && !update.selectionSet) {
+      return;
+    }
+
+    const localText = update.state.doc.toString();
+    const rootText = sanitizeLocalText(localText);
+    const rootSelection = toRootSelection(
+      {
+        anchor: update.state.selection.main.anchor,
+        head: update.state.selection.main.head,
+      },
+      localText,
+    );
+    const absoluteSelection = {
+      anchor: this.resolved.editableFrom + rootSelection.anchor,
+      head: this.resolved.editableFrom + rootSelection.head,
+    };
+    const currentMainSelection = this.mainView.state.selection.main;
+    const selectionChanged =
+      currentMainSelection.anchor !== absoluteSelection.anchor ||
+      currentMainSelection.head !== absoluteSelection.head;
+    const textChanged = rootText !== this.resolved.text;
+
+    if (!textChanged && !selectionChanged) {
       return;
     }
 
     this.mainView.dispatch({
-      changes: {
-        from: this.resolved.editableFrom,
-        insert: rootText,
-        to: this.resolved.editableTo,
-      },
-      annotations: syncTableEditAnnotation.of(true),
+      changes: textChanged
+        ? {
+            from: this.resolved.editableFrom,
+            insert: rootText,
+            to: this.resolved.editableTo,
+          }
+        : undefined,
+      selection: EditorSelection.single(
+        absoluteSelection.anchor,
+        absoluteSelection.head,
+      ),
+      annotations: textChanged
+        ? syncTableEditAnnotation.of(true)
+        : [
+            syncTableEditAnnotation.of(true),
+            Transaction.addToHistory.of(false),
+          ],
       scrollIntoView: false,
     });
   }
@@ -1676,7 +2052,7 @@ class NestedTableEditorController {
 
   focus() {
     if (this.editor) {
-      this.editor.focus();
+      this.editor.contentDOM.focus({ preventScroll: true });
       return true;
     }
 
@@ -1688,78 +2064,27 @@ class NestedTableEditorController {
       this.editor !== null && this.editor.dom.contains(document.activeElement)
     );
   }
+
+  syncSelectionToMain() {
+    if (!this.editor || !this.mainView || !this.resolved) {
+      return false;
+    }
+
+    const localText = this.editor.state.doc.toString();
+    syncMainSelectionToLocalSelection(
+      {
+        anchor: this.editor.state.selection.main.anchor,
+        head: this.editor.state.selection.main.head,
+      },
+      localText,
+      this.mainView,
+      this.resolved,
+    );
+    return true;
+  }
 }
 
 const nestedEditors = new WeakMap<EditorView, NestedTableEditorController>();
-
-function reopenAndFocusActiveTableCell(view: EditorView) {
-  const controller = nestedEditors.get(view);
-  const activeCell = getActiveTableCell(view.state);
-  const resolved = getResolvedActiveTableCell(view.state);
-  if (!controller || !activeCell || !resolved) {
-    return false;
-  }
-
-  const cellElement = findActiveCellElement(view, resolved.activeCell);
-  if (!cellElement) {
-    return false;
-  }
-
-  if (controller.isOpenFor(resolved.activeCell, cellElement)) {
-    controller.handleMainEditorUpdate(view);
-  } else {
-    controller.open(
-      view,
-      resolved,
-      cellElement,
-      consumePendingTableCellOpen(view, resolved.activeCell) ?? "end",
-    );
-  }
-
-  return controller.focus();
-}
-
-function focusTableEditor(view: EditorView) {
-  if (reopenAndFocusActiveTableCell(view)) {
-    return;
-  }
-
-  view.focus();
-}
-
-function requestTableEditorFocusRestore(view: EditorView, attempts = 8) {
-  pendingTableFocusRestores.set(view, attempts);
-
-  const restore = () => {
-    if (!view.dom.isConnected) {
-      pendingTableFocusRestores.delete(view);
-      return;
-    }
-
-    const remaining = pendingTableFocusRestores.get(view);
-    if (!remaining) {
-      return;
-    }
-
-    const controller = nestedEditors.get(view);
-    if (controller?.hasFocus()) {
-      pendingTableFocusRestores.delete(view);
-      return;
-    }
-
-    focusTableEditor(view);
-
-    if (remaining <= 1) {
-      pendingTableFocusRestores.delete(view);
-      return;
-    }
-
-    pendingTableFocusRestores.set(view, remaining - 1);
-    requestAnimationFrame(restore);
-  };
-
-  requestAnimationFrame(restore);
-}
 
 function normalizeTableBeforeOpen(
   activeCell: ActiveTableCell,
@@ -1777,6 +2102,7 @@ function normalizeTableBeforeOpen(
   if (!canonicalText) {
     return false;
   }
+  const pendingOpen = peekPendingTableCellOpen(view, activeCell);
 
   rememberPendingTableCellOpen(
     view,
@@ -1784,7 +2110,8 @@ function normalizeTableBeforeOpen(
       ...activeCell,
       tableFrom: resolved.tableFrom,
     },
-    peekPendingTableCellOpen(view, activeCell) ?? "end",
+    pendingOpen?.cursorPos ?? "end",
+    pendingOpen?.localSelection,
   );
 
   pendingTableNormalizations.add(view);
@@ -1794,16 +2121,27 @@ function normalizeTableBeforeOpen(
       return;
     }
 
+    const nextTable = parseMarkdownTable(canonicalText);
+    const nextActiveCell = {
+      ...activeCell,
+      tableFrom: resolved.tableFrom,
+    };
+    const selection = nextTable
+      ? selectionForActiveTableCell(
+          nextActiveCell,
+          nextTable,
+          resolved.tableFrom,
+        )
+      : null;
+
     view.dispatch({
       changes: {
         from: resolved.tableFrom,
         insert: canonicalText,
         to: resolved.tableTo,
       },
-      effects: setActiveTableCellEffect.of({
-        ...activeCell,
-        tableFrom: resolved.tableFrom,
-      }),
+      effects: setActiveTableCellEffect.of(nextActiveCell),
+      selection: selection ?? undefined,
       annotations: normalizeBeforeEditAnnotation.of(true),
       scrollIntoView: false,
     });
@@ -1910,6 +2248,38 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
+      const resolvedPreviousActiveCell = getResolvedActiveTableCell(
+        update.startState,
+      );
+      const shouldRepositionAfterUndoRedo =
+        update.docChanged &&
+        update.transactions.some((transaction) =>
+          transactionRequiresTableRebuild(
+            transaction,
+            resolvedPreviousActiveCell,
+          ),
+        );
+      if (shouldRepositionAfterUndoRedo) {
+        const scrollContainer = getEditorScrollContainer(this.view);
+        const scrollTop = scrollContainer?.scrollTop ?? 0;
+        this.controller.close();
+        requestAnimationFrame(() => {
+          if (!this.view.dom.isConnected) {
+            return;
+          }
+
+          activateCellAtPosition(
+            true,
+            this.view.state.selection.main.head,
+            this.view,
+          );
+          if (scrollContainer) {
+            lockScrollPosition(scrollContainer, scrollTop);
+          }
+        });
+        return;
+      }
+
       if (
         update.docChanged ||
         update.transactions.some((transaction) =>
@@ -1968,8 +2338,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
               this.view,
               resolved,
               nextElement,
-              consumePendingTableCellOpen(this.view, resolved.activeCell) ??
-                "end",
+              consumePendingTableCellOpen(this.view, resolved.activeCell),
             );
           }
         });
@@ -1985,7 +2354,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
         this.view,
         resolved,
         cellElement,
-        consumePendingTableCellOpen(this.view, resolved.activeCell) ?? "end",
+        consumePendingTableCellOpen(this.view, resolved.activeCell),
       );
     }
   },
@@ -2236,9 +2605,7 @@ const tableInteractionHandlers = EditorView.domEventHandlers({
       ) {
         nestedEditors.get(view)?.handleMainEditorUpdate(view);
       } else {
-        view.dispatch({
-          effects: setActiveTableCellEffect.of(nextActiveCell),
-        });
+        dispatchActiveTableCellSelection(nextActiveCell, view);
       }
       return true;
     }
@@ -2249,12 +2616,16 @@ const tableInteractionHandlers = EditorView.domEventHandlers({
 });
 
 export function tables(): Extension {
+  const [undoScrollCapturePlugin, undoScrollPreservation] =
+    createUndoScrollPreservation();
   return [
     activeTableCellField,
     cellSelectionField,
     resolvedActiveTableCellField,
     tableDecorationField,
     activeTableCellGuard,
+    undoScrollCapturePlugin,
+    undoScrollPreservation,
     cellSelectionClipboardHandlers,
     cellSelectionKeymap,
     cellSelectionVisualsPlugin,

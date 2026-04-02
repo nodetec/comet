@@ -338,6 +338,24 @@ function useFindBar({
   };
 }
 
+function isEditableElement(element: EventTarget | null) {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (element.closest(".cm-editor")) {
+    return true;
+  }
+
+  const tagName = element.tagName;
+  return (
+    element.isContentEditable ||
+    tagName === "INPUT" ||
+    tagName === "SELECT" ||
+    tagName === "TEXTAREA"
+  );
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
   archivedAt,
@@ -557,6 +575,38 @@ export function EditorPane({
 
     editorRef.current?.focus();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!noteId || !(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+
+      if (isEditableElement(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      let handled = false;
+      if (key === "z") {
+        handled = event.shiftKey
+          ? (editorRef.current?.redo() ?? false)
+          : (editorRef.current?.undo() ?? false);
+      } else if (key === "y") {
+        handled = editorRef.current?.redo() ?? false;
+      }
+
+      if (!handled) {
+        return;
+      }
+
+      event.preventDefault();
+      setFocusedPane("editor");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [noteId, setFocusedPane]);
 
   const menuButton = (
     <Button

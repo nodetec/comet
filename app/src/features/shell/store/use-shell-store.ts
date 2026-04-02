@@ -5,8 +5,6 @@ export type { NoteFilter } from "@/shared/api/types";
 
 export type FocusedPane = "sidebar" | "notes" | "editor";
 
-const DEBUG_SHELL_SELECTION = import.meta.env.DEV;
-
 type ShellStore = {
   activeTagPath: string | null;
   draftMarkdown: string;
@@ -54,16 +52,7 @@ export const useShellStore = create<ShellStore>((set) => ({
     set({ searchQuery });
   },
   setSelectedNoteId: (selectedNoteId) => {
-    set((state) => {
-      if (DEBUG_SHELL_SELECTION && state.selectedNoteId !== selectedNoteId) {
-        console.debug("[shell:selected-note] setSelectedNoteId", {
-          from: state.selectedNoteId,
-          to: selectedNoteId,
-        });
-      }
-
-      return { selectedNoteId };
-    });
+    set({ selectedNoteId });
   },
   setTagViewActive: (tagViewActive) => {
     set({ tagViewActive });

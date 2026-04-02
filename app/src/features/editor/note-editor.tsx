@@ -5,7 +5,13 @@ import {
   useRef,
   type MouseEvent,
 } from "react";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  redo,
+  undo,
+} from "@codemirror/commands";
 import {
   markdown as markdownLanguage,
   markdownLanguage as markdownLang,
@@ -13,18 +19,8 @@ import {
 import { Strikethrough, Table, TaskList } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
-import {
-  Compartment,
-  EditorSelection,
-  EditorState,
-  Transaction,
-} from "@codemirror/state";
-import {
-  EditorView,
-  highlightSpecialChars,
-  keymap,
-  type ViewUpdate,
-} from "@codemirror/view";
+import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
+import { EditorView, highlightSpecialChars, keymap } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
@@ -58,6 +54,8 @@ type NoteEditorProps = {
 export type NoteEditorHandle = {
   blur(): void;
   focus(): void;
+  redo(): boolean;
+  undo(): boolean;
 };
 
 const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
@@ -113,15 +111,8 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   },
 });
 
-const DEBUG_EDITOR_FLOW = import.meta.env.DEV;
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
-
-function summarizeTransactionUserEvents(update: ViewUpdate) {
-  return update.transactions
-    .map((transaction) => transaction.annotation(Transaction.userEvent))
-    .filter((userEvent): userEvent is string => typeof userEvent === "string");
-}
 
 function countSearchMatches(state: EditorState, query: SearchQuery): number {
   if (!query.valid) {
@@ -443,6 +434,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                   "[data-editor-scroll-container]",
                 ) as HTMLElement | null;
                 const scrollTop = scrollContainer?.scrollTop ?? 0;
+                const clickedInsideTable =
+                  event.target instanceof HTMLElement &&
+                  event.target.closest(".cm-md-table-wrapper");
 
                 view.focus();
 
@@ -450,19 +444,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                   lockScrollPosition(scrollContainer, scrollTop);
                 }
 
-                // Re-dispatch so CM's native mousedown handles cursor
-                // placement (hasFocus is now true, so our guard skips it)
-                view.contentDOM.dispatchEvent(
-                  new MouseEvent("mousedown", {
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                    button: event.button,
-                    buttons: event.buttons,
-                    detail: event.detail,
-                    bubbles: true,
-                    cancelable: true,
-                  }),
+                if (clickedInsideTable) {
+                  return false;
+                }
+
+                const pos = view.posAtCoords(
+                  {
+                    x: event.clientX,
+                    y: event.clientY,
+                  },
+                  false,
                 );
+                if (pos != null) {
+                  view.dispatch({
+                    selection: EditorSelection.cursor(pos),
+                    scrollIntoView: false,
+                  });
+                }
 
                 return true;
               }
@@ -474,16 +472,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
-            if (DEBUG_EDITOR_FLOW && update.docChanged) {
-              console.debug("[editor:flow] docChanged", {
-                external: applyingExternalChangeRef.current,
-                loadKey: lastLoadKeyRef.current,
-                nextLength: update.state.doc.length,
-                previousLength: update.startState.doc.length,
-                userEvents: summarizeTransactionUserEvents(update),
-              });
-            }
-
             if (update.docChanged) {
               if (!applyingExternalChangeRef.current) {
                 onChangeRef.current(update.state.doc.toString());
@@ -559,15 +547,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       const isNewLoad = lastLoadKeyRef.current !== loadKey;
       if (!isNewLoad && currentMarkdown === nextMarkdown) {
         return;
-      }
-
-      if (DEBUG_EDITOR_FLOW) {
-        console.debug("[editor:flow] external markdown sync", {
-          currentLength: currentMarkdown.length,
-          loadKey,
-          nextLength: nextMarkdown.length,
-          reason: isNewLoad ? "new-load" : "content-mismatch",
-        });
       }
 
       applyingExternalChangeRef.current = true;
@@ -646,6 +625,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             return;
           }
           viewRef.current?.focus();
+        },
+        redo() {
+          return viewRef.current ? redo(viewRef.current) : false;
+        },
+        undo() {
+          return viewRef.current ? undo(viewRef.current) : false;
         },
       }),
       [readOnly],

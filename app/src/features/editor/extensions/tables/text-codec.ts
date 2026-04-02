@@ -26,6 +26,65 @@ export function sanitizeLocalText(localText: string): string {
     .replace(UNESCAPED_PIPE_PATTERN, String.raw`\$&`);
 }
 
+function toLocalOffset(rootText: string, rootOffset: number): number {
+  const clampedOffset = clamp(rootOffset, 0, rootText.length);
+  let localOffset = 0;
+  let rootIndex = 0;
+
+  while (rootIndex < clampedOffset) {
+    if (rootText.startsWith("<br>", rootIndex)) {
+      const nextIndex = rootIndex + 4;
+      if (nextIndex > clampedOffset) {
+        break;
+      }
+      localOffset += 1;
+      rootIndex = nextIndex;
+      continue;
+    }
+
+    if (rootText.startsWith(String.raw`\|`, rootIndex)) {
+      const nextIndex = rootIndex + 2;
+      if (nextIndex > clampedOffset) {
+        break;
+      }
+      localOffset += 1;
+      rootIndex = nextIndex;
+      continue;
+    }
+
+    localOffset += 1;
+    rootIndex += 1;
+  }
+
+  return localOffset;
+}
+
+function toRootOffset(localText: string, localOffset: number): number {
+  return sanitizeLocalText(
+    localText.slice(0, clamp(localOffset, 0, localText.length)),
+  ).length;
+}
+
+export function toLocalSelection(
+  rootSelection: LocalSelection,
+  rootText: string,
+): LocalSelection {
+  return {
+    anchor: toLocalOffset(rootText, rootSelection.anchor),
+    head: toLocalOffset(rootText, rootSelection.head),
+  };
+}
+
+export function toRootSelection(
+  localSelection: LocalSelection,
+  localText: string,
+): LocalSelection {
+  return {
+    anchor: toRootOffset(localText, localSelection.anchor),
+    head: toRootOffset(localText, localSelection.head),
+  };
+}
+
 export function clampSelection(
   selection: LocalSelection,
   textLength: number,
