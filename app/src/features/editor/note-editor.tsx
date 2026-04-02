@@ -109,6 +109,7 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
 });
 
 const DEBUG_EDITOR_FLOW = import.meta.env.DEV;
+const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 
 function countSearchMatches(state: EditorState, query: SearchQuery): number {
   if (!query.valid) {
@@ -162,6 +163,47 @@ function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
   });
 }
 
+function getListTextStartOffset(lineText: string): number {
+  const match = LIST_PREFIX_RE.exec(lineText);
+  return match ? match[0].length : 0;
+}
+
+function isRectOnClickedRow(
+  rect: { top: number; bottom: number },
+  clientY: number,
+): boolean {
+  return clientY >= rect.top && clientY <= rect.bottom;
+}
+
+function findVisualFragmentBoundary(
+  view: EditorView,
+  lineFrom: number,
+  lineTo: number,
+  clientY: number,
+  side: "left" | "right",
+) {
+  if (side === "left") {
+    for (let position = lineFrom; position <= lineTo; position += 1) {
+      const rect =
+        view.coordsAtPos(position, 1) ?? view.coordsAtPos(position, -1);
+      if (rect && isRectOnClickedRow(rect, clientY)) {
+        return EditorSelection.cursor(position, 1);
+      }
+    }
+    return EditorSelection.cursor(lineFrom, 1);
+  }
+
+  for (let position = lineTo; position >= lineFrom; position -= 1) {
+    const rect =
+      view.coordsAtPos(position, -1) ?? view.coordsAtPos(position, 1);
+    if (rect && isRectOnClickedRow(rect, clientY)) {
+      return EditorSelection.cursor(position, -1);
+    }
+  }
+
+  return EditorSelection.cursor(lineTo, -1);
+}
+
 function focusAtLineBoundary(
   view: EditorView,
   clientY: number,
@@ -200,10 +242,17 @@ function focusAtLineBoundary(
     return false;
   }
 
-  const boundary = view.moveToLineBoundary(
-    EditorSelection.cursor(anchor.pos, anchor.assoc),
-    side === "right",
-    true,
+  const line = view.state.doc.lineAt(anchor.pos);
+  const contentFrom = Math.min(
+    line.to,
+    line.from + getListTextStartOffset(line.text),
+  );
+  const boundary = findVisualFragmentBoundary(
+    view,
+    contentFrom,
+    line.to,
+    targetY,
+    side,
   );
 
   view.dispatch({

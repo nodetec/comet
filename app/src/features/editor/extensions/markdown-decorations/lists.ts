@@ -18,7 +18,9 @@ import {
 import type { SyntaxNodeRef } from "@lezer/common";
 
 const TAB_SIZE = 2;
-const BULLET_MARKERS = new Set(["-", "*"]);
+const BULLET_MARKERS = new Set(["-", "*", "+"]);
+const INDENT = "  ";
+const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 const TASK_MARKERS = new Set(["[ ]", "[x]"]);
 
 type ListMarkerData = {
@@ -41,13 +43,6 @@ class SpacerWidget extends WidgetType {
     spacer.className = "cm-md-indent";
     spacer.style.display = "inline-flex";
     spacer.style.inlineSize = "2rem";
-    spacer.style.textDecoration = "none";
-
-    const marker = document.createElement("span");
-    marker.className = "cm-md-indent-marker";
-    marker.innerHTML = "&nbsp;";
-
-    spacer.append(marker);
     return spacer;
   }
 }
@@ -255,6 +250,152 @@ function buildListMarkerRanges(state: EditorState): MarkerRange[] {
   });
 
   return ranges;
+}
+
+function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
+  const match = LIST_PREFIX_RE.exec(lineText);
+  return Math.min(lineTo, lineFrom + (match?.[0].length ?? 0));
+}
+
+function getCaretRect(view: EditorView, position: number) {
+  return view.coordsAtPos(position, 1) ?? view.coordsAtPos(position, -1);
+}
+
+function getVisualFragmentStarts(view: EditorView, from: number, to: number) {
+  const starts: number[] = [];
+  let previousTop: number | null = null;
+
+  for (let position = from; position <= to; position += 1) {
+    const rect = getCaretRect(view, position);
+    if (!rect) {
+      continue;
+    }
+
+    if (previousTop === null || Math.abs(rect.top - previousTop) > 0.5) {
+      starts.push(position);
+      previousTop = rect.top;
+    }
+  }
+
+  return starts;
+}
+
+function getVisualFragmentIndex(position: number, starts: readonly number[]) {
+  if (starts.length === 0) {
+    return -1;
+  }
+
+  for (let index = starts.length - 1; index >= 0; index -= 1) {
+    if (position >= starts[index]) {
+      return index;
+    }
+  }
+
+  return 0;
+}
+
+function indentListItemPreservingWrappedStart(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return indentMore(view);
+  }
+
+  const line = view.state.doc.lineAt(selection.head);
+  if (!LIST_PREFIX_RE.test(line.text)) {
+    return indentMore(view);
+  }
+
+  const textStart = getListTextStart(line.text, line.from, line.to);
+  const starts = getVisualFragmentStarts(view, textStart, line.to);
+  const fragmentIndex = getVisualFragmentIndex(selection.head, starts);
+  const fragmentStart = fragmentIndex >= 0 ? starts[fragmentIndex] : null;
+
+  if (fragmentStart == null || selection.head !== fragmentStart) {
+    return indentMore(view);
+  }
+
+  view.dispatch({
+    changes: { from: line.from, insert: INDENT },
+    selection: EditorSelection.cursor(selection.head + INDENT.length),
+  });
+
+  const nextLine = view.state.doc.lineAt(selection.head + INDENT.length);
+  const nextTextStart = getListTextStart(
+    nextLine.text,
+    nextLine.from,
+    nextLine.to,
+  );
+  const nextStarts = getVisualFragmentStarts(view, nextTextStart, nextLine.to);
+  const nextFragmentStart =
+    nextStarts[Math.min(fragmentIndex, nextStarts.length - 1)];
+
+  if (nextFragmentStart != null) {
+    view.dispatch({
+      selection: EditorSelection.cursor(nextFragmentStart, 1),
+    });
+  }
+
+  return true;
+}
+
+function dedentListItemPreservingWrappedStart(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return indentLess(view);
+  }
+
+  const line = view.state.doc.lineAt(selection.head);
+  if (!LIST_PREFIX_RE.test(line.text)) {
+    return indentLess(view);
+  }
+
+  let removableIndent = 0;
+  if (line.text.startsWith(INDENT)) {
+    removableIndent = INDENT.length;
+  } else if (line.text.startsWith(" ")) {
+    removableIndent = 1;
+  }
+
+  if (removableIndent === 0) {
+    return true;
+  }
+
+  const textStart = getListTextStart(line.text, line.from, line.to);
+  const starts = getVisualFragmentStarts(view, textStart, line.to);
+  const fragmentIndex = getVisualFragmentIndex(selection.head, starts);
+  const fragmentStart = fragmentIndex >= 0 ? starts[fragmentIndex] : null;
+
+  if (fragmentStart == null || selection.head !== fragmentStart) {
+    return indentLess(view);
+  }
+
+  view.dispatch({
+    changes: { from: line.from, to: line.from + removableIndent },
+    selection: EditorSelection.cursor(
+      Math.max(line.from, selection.head - removableIndent),
+      1,
+    ),
+  });
+
+  const nextLine = view.state.doc.lineAt(
+    Math.max(line.from, selection.head - removableIndent),
+  );
+  const nextTextStart = getListTextStart(
+    nextLine.text,
+    nextLine.from,
+    nextLine.to,
+  );
+  const nextStarts = getVisualFragmentStarts(view, nextTextStart, nextLine.to);
+  const nextFragmentStart =
+    nextStarts[Math.min(fragmentIndex, nextStarts.length - 1)];
+
+  if (nextFragmentStart != null) {
+    view.dispatch({
+      selection: EditorSelection.cursor(nextFragmentStart, 1),
+    });
+  }
+
+  return true;
 }
 
 function normalizeCursorToMarkerBoundary(
@@ -504,15 +645,6 @@ function taskLists(): Extension {
 const listTheme = EditorView.theme({
   ".cm-md-indent": {
     display: "inline-flex",
-    justifyContent: "center",
-  },
-  ".cm-md-indent-marker": {
-    borderLeft: "1px solid var(--muted-foreground)",
-    bottom: "0",
-    overflow: "hidden",
-    position: "absolute",
-    top: "0",
-    width: "0",
   },
   ".cm-md-list": {
     paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
@@ -542,15 +674,17 @@ const listTheme = EditorView.theme({
 });
 
 const listKeymap = keymap.of([
-  { key: "Tab", run: indentMore },
-  { key: "Shift-Tab", run: indentLess },
+  { key: "Tab", run: indentListItemPreservingWrappedStart },
+  { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
 ]);
 
 export function lists(): Extension {
   return [
     EditorState.transactionFilter.of((transaction) => {
       const selection = normalizeSelectionToListMarkers(transaction.state);
-      return selection ? [transaction, { selection }] : [transaction];
+      return selection
+        ? [transaction, { selection, sequential: true }]
+        : [transaction];
     }),
     taskLists(),
     bulletLists(),
