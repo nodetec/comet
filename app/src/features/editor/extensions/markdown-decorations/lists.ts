@@ -32,6 +32,11 @@ type ListMarkerData = {
   spacerDecorations: Array<Range<Decoration>>;
 };
 
+type MarkerRange = {
+  from: number;
+  to: number;
+};
+
 class SpacerWidget extends WidgetType {
   override toDOM(): HTMLElement {
     const spacer = document.createElement("span");
@@ -268,6 +273,158 @@ function dedentListItemPreservingWrappedStart(view: EditorView) {
   }
 
   return true;
+}
+
+function buildListMarkerRanges(state: EditorState): MarkerRange[] {
+  const ranges: MarkerRange[] = [];
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.type.name === "Blockquote") {
+        return false;
+      }
+
+      const data = getListMarkerData(state, node);
+      if (!data) {
+        return;
+      }
+
+      if (BULLET_MARKERS.has(data.marker)) {
+        const taskStart = data.markerEnd + 1;
+        const taskEnd = taskStart + 3;
+        const task = state.sliceDoc(taskStart, taskEnd);
+        const taskHasTrailingSpace =
+          state.sliceDoc(taskEnd, taskEnd + 1) === " ";
+
+        if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
+          ranges.push({ from: data.markerStart, to: taskEnd + 1 });
+          return;
+        }
+      }
+
+      ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
+    },
+  });
+
+  return ranges;
+}
+
+function getCursorBoundary(
+  position: number,
+  assoc: -1 | 0 | 1,
+  marker: MarkerRange,
+) {
+  if (position === marker.from) {
+    return { assoc: -1 as const, position: marker.from };
+  }
+
+  if (position === marker.to) {
+    return { assoc: 1 as const, position: marker.to };
+  }
+
+  if (position <= marker.from || position >= marker.to) {
+    return null;
+  }
+
+  const midpoint = marker.from + (marker.to - marker.from) / 2;
+  if (assoc < 0 || (assoc === 0 && position <= midpoint)) {
+    return { assoc: -1 as const, position: marker.from };
+  }
+
+  return { assoc: 1 as const, position: marker.to };
+}
+
+function normalizeCursorToMarkerBoundary(
+  position: number,
+  assoc: -1 | 0 | 1,
+  markerRanges: readonly MarkerRange[],
+) {
+  for (const marker of markerRanges) {
+    const boundary = getCursorBoundary(position, assoc, marker);
+    if (boundary) {
+      return EditorSelection.cursor(boundary.position, boundary.assoc);
+    }
+  }
+
+  return null;
+}
+
+function normalizeSelectionToListMarkers(state: EditorState) {
+  const markerRanges = buildListMarkerRanges(state);
+  if (markerRanges.length === 0) {
+    return null;
+  }
+
+  let changed = false;
+  const ranges = state.selection.ranges.map((range) => {
+    if (!range.empty) {
+      return range;
+    }
+
+    const normalized = normalizeCursorToMarkerBoundary(
+      range.head,
+      range.assoc,
+      markerRanges,
+    );
+    if (!normalized) {
+      return range;
+    }
+
+    if (
+      normalized.anchor !== range.anchor ||
+      normalized.head !== range.head ||
+      normalized.assoc !== range.assoc
+    ) {
+      changed = true;
+      return normalized;
+    }
+
+    return range;
+  });
+
+  if (!changed) {
+    return null;
+  }
+
+  return EditorSelection.create(ranges, state.selection.mainIndex);
+}
+
+function moveAcrossListMarker(direction: "left" | "right", view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return false;
+  }
+
+  const markerRanges = buildListMarkerRanges(view.state);
+  if (markerRanges.length === 0) {
+    return false;
+  }
+
+  for (const marker of markerRanges) {
+    if (
+      direction === "left" &&
+      selection.head === marker.to &&
+      selection.assoc === 1
+    ) {
+      view.dispatch({
+        selection: EditorSelection.cursor(marker.from, -1),
+      });
+      return true;
+    }
+
+    if (
+      direction === "right" &&
+      selection.head === marker.from &&
+      selection.assoc === -1
+    ) {
+      view.dispatch({
+        selection: EditorSelection.cursor(marker.to, 1),
+      });
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function buildBulletListDecorations(
@@ -548,10 +705,24 @@ const listTheme = EditorView.theme({
 });
 
 const listKeymap = keymap.of([
+  { key: "ArrowLeft", run: (view) => moveAcrossListMarker("left", view) },
+  { key: "ArrowRight", run: (view) => moveAcrossListMarker("right", view) },
   { key: "Tab", run: indentListItemPreservingWrappedStart },
   { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
 ]);
 
 export function lists(): Extension {
-  return [taskLists(), bulletLists(), numberLists(), listTheme, listKeymap];
+  return [
+    EditorState.transactionFilter.of((transaction) => {
+      const selection = normalizeSelectionToListMarkers(transaction.state);
+      return selection
+        ? [transaction, { selection, sequential: true }]
+        : [transaction];
+    }),
+    taskLists(),
+    bulletLists(),
+    numberLists(),
+    listTheme,
+    listKeymap,
+  ];
 }

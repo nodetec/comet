@@ -177,6 +177,11 @@ function getListTextStartOffset(lineText: string): number {
   return match ? match[0].length : 0;
 }
 
+function getListMarkerStartOffset(lineText: string): number {
+  const match = LIST_PREFIX_RE.exec(lineText);
+  return match ? (match[1]?.length ?? 0) : 0;
+}
+
 function getHorizontalRuleSelection(
   view: EditorView,
   target: EventTarget | null,
@@ -369,6 +374,13 @@ function getLineBoundaryCursor(
   }
 
   const line = view.state.doc.lineAt(anchor.pos);
+  if (side === "left") {
+    return EditorSelection.cursor(
+      line.from + getListMarkerStartOffset(line.text),
+      1,
+    );
+  }
+
   const contentFrom = Math.min(
     line.to,
     line.from + getListTextStartOffset(line.text),
