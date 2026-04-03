@@ -69,7 +69,8 @@ function App() {
           setCommandPaletteOpen((open) => !open);
           break;
         }
-        case "k": {
+        case "f": {
+          if (!event.shiftKey) break;
           event.preventDefault();
           window.dispatchEvent(new CustomEvent("comet:focus-search"));
           break;
