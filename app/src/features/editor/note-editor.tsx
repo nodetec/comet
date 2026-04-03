@@ -16,7 +16,12 @@ import {
   markdown as markdownLanguage,
   markdownLanguage as markdownLang,
 } from "@codemirror/lang-markdown";
-import { Strikethrough, Table, TaskList } from "@lezer/markdown";
+import {
+  Strikethrough,
+  Table,
+  TaskList,
+  type MarkdownConfig,
+} from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
 import {
@@ -134,6 +139,17 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
     backgroundColor: "transparent !important",
   },
 });
+
+const DisableSetextHeading: MarkdownConfig = {
+  parseBlock: [
+    {
+      name: "SetextHeading",
+      parse() {
+        return false;
+      },
+    },
+  ],
+};
 
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
@@ -590,6 +606,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               TaskList,
               HighlightSyntax,
               TagGrammar,
+              DisableSetextHeading,
             ],
           }),
           inlineImages(),

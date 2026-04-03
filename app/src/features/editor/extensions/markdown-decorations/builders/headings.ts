@@ -15,8 +15,6 @@ const HEADING_LEVEL: Record<string, number> = {
   ATXHeading4: 4,
   ATXHeading5: 5,
   ATXHeading6: 6,
-  SetextHeading1: 1,
-  SetextHeading2: 2,
 };
 
 const headingMarkCache = new Map<string, Decoration>();
@@ -80,36 +78,6 @@ function handleATXHeading(
   });
 }
 
-function handleSetextHeading(
-  node: SyntaxNodeRef,
-  resolved: SyntaxNode,
-  level: number,
-  onCursor: boolean,
-  out: DecorationEntry[],
-): void {
-  const headerMark = resolved.getChild("HeaderMark");
-  if (!headerMark) {
-    return;
-  }
-
-  const textEnd = headerMark.from > 0 ? headerMark.from - 1 : headerMark.from;
-  if (node.from < textEnd) {
-    out.push({
-      from: node.from,
-      to: textEnd,
-      decoration: getHeadingMark(level),
-    });
-  }
-
-  if (!onCursor) {
-    out.push({
-      from: headerMark.from,
-      to: headerMark.to,
-      decoration: Decoration.replace({}),
-    });
-  }
-}
-
 export function handleHeading(
   node: SyntaxNodeRef,
   ctx: BuilderContext,
@@ -123,17 +91,17 @@ export function handleHeading(
   const resolved = node.node;
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
 
-  if (node.name.startsWith("ATX")) {
-    const headerMark = resolved.getChild("HeaderMark");
-    if (
-      !headerMark ||
-      !isSpaceDelimitedATXHeading(ctx.state, headerMark.to, node.to)
-    ) {
-      return;
-    }
-
-    handleATXHeading(node, resolved, level, onCursor, out);
-  } else {
-    handleSetextHeading(node, resolved, level, onCursor, out);
+  if (!node.name.startsWith("ATX")) {
+    return;
   }
+
+  const headerMark = resolved.getChild("HeaderMark");
+  if (
+    !headerMark ||
+    !isSpaceDelimitedATXHeading(ctx.state, headerMark.to, node.to)
+  ) {
+    return;
+  }
+
+  handleATXHeading(node, resolved, level, onCursor, out);
 }
