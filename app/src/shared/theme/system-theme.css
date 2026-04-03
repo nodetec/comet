@@ -31,7 +31,7 @@
   --sidebar-border: #0a0a0a;
   --separator: #0a0a0a;
   --editor-text: #dfe0e0;
-  --editor-checkbox-border: #c2c5c7;
+  --editor-checkbox-border: #c7c7cc;
   --editor-caret: #6cb4ee;
   --editor-selection: #6cb4ee2e;
   --heading-color: #ccdbe4;
@@ -96,7 +96,7 @@
     --sidebar-border: #d5d7db;
     --separator: #d5d7db;
     --editor-text: #1e1e23eb;
-    --editor-checkbox-border: #4a4c55;
+    --editor-checkbox-border: #2d2e30;
     --editor-caret: #005fcf;
     --editor-selection: #508cdc2e;
     --heading-color: #1a456b;
