@@ -90,6 +90,8 @@ export function handleHeading(
 
   const resolved = node.node;
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
+  const revealSyntax =
+    onCursor || overlapsAny(node.from, node.to, ctx.searchMatches);
 
   if (!node.name.startsWith("ATX")) {
     return;
@@ -103,5 +105,5 @@ export function handleHeading(
     return;
   }
 
-  handleATXHeading(node, resolved, level, onCursor, out);
+  handleATXHeading(node, resolved, level, revealSyntax, out);
 }

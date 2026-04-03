@@ -206,6 +206,8 @@ body {
   background: color-mix(in oklab, var(--primary) 25%, transparent);
   border: 0;
   border-radius: 0.25rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .comet-codemirror-host .cm-searchMatch.cm-searchMatch-selected {
@@ -217,9 +219,48 @@ body {
   background: transparent !important;
 }
 
+.comet-codemirror-active-search .cm-content ::selection {
+  background: transparent !important;
+}
+
 .comet-codemirror-passive-search .cm-searchMatch {
   background: var(--markdown-highlight);
   color: var(--markdown-highlight-foreground);
+}
+
+@supports selector(.cm-searchMatch:has(> .cm-md-heading)) {
+  .comet-codemirror-host .cm-searchMatch:has(> .cm-md-heading) {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .comet-codemirror-host
+    .cm-searchMatch:has(> .cm-md-heading)
+    > .cm-md-heading {
+    background: color-mix(in oklab, var(--primary) 25%, transparent);
+    border-radius: 0.35em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    box-shadow: 0 0 0 0.08em
+      color-mix(in oklab, var(--primary) 25%, transparent);
+  }
+
+  .comet-codemirror-host
+    .cm-searchMatch.cm-searchMatch-selected:has(> .cm-md-heading)
+    > .cm-md-heading {
+    background: color-mix(in oklab, var(--search-match) 92%, transparent);
+    color: var(--search-match-foreground);
+    box-shadow: 0 0 0 0.08em
+      color-mix(in oklab, var(--search-match) 92%, transparent);
+  }
+
+  .comet-codemirror-passive-search
+    .cm-searchMatch:has(> .cm-md-heading)
+    > .cm-md-heading {
+    background: var(--markdown-highlight);
+    color: var(--markdown-highlight-foreground);
+    box-shadow: 0 0 0 0.08em var(--markdown-highlight);
+  }
 }
 
 .comet-table-wrapper {

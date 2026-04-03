@@ -23,11 +23,13 @@ import { handleStrikethrough } from "@/features/editor/extensions/markdown-decor
 import {
   getCursorLineRanges,
   getCursorRanges,
+  overlapsAny,
 } from "@/features/editor/extensions/markdown-decorations/cursor";
 import type {
   BuilderContext,
   NodeHandler,
 } from "@/features/editor/extensions/markdown-decorations/types";
+import { collectSearchMatches } from "@/shared/lib/search";
 
 const NODE_HANDLERS: Record<string, NodeHandler> = {
   ATXHeading1: handleHeading,
@@ -51,13 +53,32 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
   Strikethrough: handleStrikethrough,
 };
 
-function buildDecorations(view: EditorView): DecorationSet {
+const SEARCH_REVEAL_NODE_NAMES = new Set([
+  "Emphasis",
+  "StrongEmphasis",
+  "InlineCode",
+  "FencedCode",
+  "CodeBlock",
+  "Link",
+  "Highlight",
+  "Blockquote",
+  "QuoteMark",
+  "HorizontalRule",
+  "Strikethrough",
+]);
+
+function buildDecorations(
+  view: EditorView,
+  searchQuery: string,
+): DecorationSet {
   const { state } = view;
   const hasFocus = view.hasFocus;
+  const searchMatches = collectSearchMatches(state.doc.toString(), searchQuery);
   const ctx: BuilderContext = {
     state,
     cursorLines: hasFocus ? getCursorLineRanges(state) : [],
     cursorRanges: hasFocus ? getCursorRanges(state) : [],
+    searchMatches,
     view,
   };
   const entries: Array<{ from: number; to: number; decoration: Decoration }> =
@@ -68,6 +89,13 @@ function buildDecorations(view: EditorView): DecorationSet {
       from,
       to,
       enter(node) {
+        if (
+          SEARCH_REVEAL_NODE_NAMES.has(node.name) &&
+          overlapsAny(node.from, node.to, searchMatches)
+        ) {
+          return false;
+        }
+
         const handler = NODE_HANDLERS[node.name];
         if (handler) {
           handler(node, ctx, entries);
@@ -88,25 +116,27 @@ function buildDecorations(view: EditorView): DecorationSet {
   return builder.finish();
 }
 
-export const markdownDecorationsPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+export function markdownDecorationsPlugin(searchQuery = "") {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.focusChanged ||
-        update.viewportChanged ||
-        syntaxTree(update.state) !== syntaxTree(update.startState)
-      ) {
-        this.decorations = buildDecorations(update.view);
+      constructor(view: EditorView) {
+        this.decorations = buildDecorations(view, searchQuery);
       }
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
+
+      update(update: ViewUpdate) {
+        if (
+          update.docChanged ||
+          update.selectionSet ||
+          update.focusChanged ||
+          update.viewportChanged ||
+          syntaxTree(update.state) !== syntaxTree(update.startState)
+        ) {
+          this.decorations = buildDecorations(update.view, searchQuery);
+        }
+      }
+    },
+    { decorations: (v) => v.decorations },
+  );
+}

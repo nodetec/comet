@@ -19,6 +19,8 @@ export type BuilderContext = {
   cursorLines: LineRange[];
   /** Raw cursor/selection ranges — used by inline elements (reveal on element). */
   cursorRanges: LineRange[];
+  /** Search matches that should reveal transformed markdown source. */
+  searchMatches: LineRange[];
   view: EditorView;
 };
 

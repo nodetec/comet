@@ -9,6 +9,40 @@ export function searchWordsFromQuery(searchQuery: string) {
   ];
 }
 
+export type SearchMatch = {
+  from: number;
+  to: number;
+};
+
+export function collectSearchMatches(
+  text: string,
+  searchQuery: string,
+): SearchMatch[] {
+  const normalizedQuery = searchQuery.toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const normalizedText = text.toLocaleLowerCase();
+  const matches: SearchMatch[] = [];
+  let cursor = 0;
+
+  while (cursor < normalizedText.length) {
+    const from = normalizedText.indexOf(normalizedQuery, cursor);
+    if (from === -1) {
+      break;
+    }
+
+    matches.push({
+      from,
+      to: from + searchQuery.length,
+    });
+    cursor = from + Math.max(searchQuery.length, 1);
+  }
+
+  return matches;
+}
+
 export type ActiveEditorSearchSource = "notes" | "editor" | null;
 
 type ResolveActiveEditorSearchInput = {

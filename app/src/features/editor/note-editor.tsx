@@ -35,6 +35,7 @@ import {
 import {
   Compartment,
   EditorSelection,
+  type SelectionRange,
   EditorState,
   Transaction,
 } from "@codemirror/state";
@@ -54,6 +55,10 @@ function getEditorScrollContainer(view: EditorView): HTMLElement {
     (view.dom.closest("[data-editor-scroll-container]") as HTMLElement) ??
     view.scrollDOM
   );
+}
+
+function buildSearchAwarePresentationExtensions(searchQuery: string) {
+  return [inlineImages({ searchQuery }), markdownDecorations({ searchQuery })];
 }
 
 Vim.defineAction("scrollPageDown", (cm: { cm6: EditorView }) => {
@@ -234,6 +239,7 @@ function findMatchAtIndex(
     if (next.done) {
       break;
     }
+
     const match = next.value;
     if (currentIndex === index) {
       return match;
@@ -590,13 +596,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange);
     const editableCompartmentRef = useRef<Compartment | null>(null);
     const contentAttributesCompartmentRef = useRef<Compartment | null>(null);
+    const presentationCompartmentRef = useRef<Compartment | null>(null);
     const vimCompartmentRef = useRef<Compartment | null>(null);
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
+    const previousActiveFindRef = useRef(
+      searchQuery.trim().length > 0 && searchActiveMatchIndex != null,
+    );
+    const restoreSelectionRef = useRef<SelectionRange | null>(null);
     const gutterDragCleanupRef = useRef<(() => void) | null>(null);
     const initialMarkdownRef = useRef(markdown);
     const initialReadOnlyRef = useRef(readOnly);
+    const initialSearchQueryRef = useRef(searchQuery);
     const initialSpellCheckRef = useRef(spellCheck);
     const initialVimModeRef = useRef(vimMode);
 
@@ -605,6 +617,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     }
     if (contentAttributesCompartmentRef.current === null) {
       contentAttributesCompartmentRef.current = new Compartment();
+    }
+    if (presentationCompartmentRef.current === null) {
+      presentationCompartmentRef.current = new Compartment();
     }
     if (vimCompartmentRef.current === null) {
       vimCompartmentRef.current = new Compartment();
@@ -640,6 +655,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             spellcheck: initialSpellCheckRef.current ? "true" : "false",
           }),
         );
+      const presentationExtension = presentationCompartmentRef.current!.of(
+        buildSearchAwarePresentationExtensions(initialSearchQueryRef.current),
+      );
 
       const view = new EditorView({
         doc: initialMarkdownRef.current,
@@ -661,8 +679,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               DisableSetextHeading,
             ],
           }),
-          inlineImages(),
-          markdownDecorations(),
+          presentationExtension,
           tagHighlightStyle,
           search(),
           EditorView.domEventHandlers({
@@ -776,11 +793,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              if (!applyingExternalChangeRef.current) {
-                onChangeRef.current(update.state.doc.toString());
-              }
+            if (update.docChanged && !applyingExternalChangeRef.current) {
+              onChangeRef.current(update.state.doc.toString());
+            }
 
+            if (update.docChanged) {
               const query = getSearchQuery(update.state);
               onSearchMatchCountChangeRef.current?.(
                 countSearchMatches(update.state, query),
@@ -852,6 +869,56 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
     useEffect(() => {
       const view = viewRef.current;
+      if (!view || !presentationCompartmentRef.current) {
+        return;
+      }
+
+      view.dispatch({
+        effects: presentationCompartmentRef.current.reconfigure(
+          buildSearchAwarePresentationExtensions(searchQuery),
+        ),
+      });
+    }, [searchQuery]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) {
+        return;
+      }
+
+      const isActiveFind =
+        searchQuery.trim().length > 0 && searchActiveMatchIndex != null;
+
+      if (
+        !previousActiveFindRef.current &&
+        isActiveFind &&
+        restoreSelectionRef.current == null
+      ) {
+        restoreSelectionRef.current = view.state.selection.main;
+      } else if (previousActiveFindRef.current && !isActiveFind) {
+        const restoreSelection = restoreSelectionRef.current;
+        restoreSelectionRef.current = null;
+
+        if (restoreSelection) {
+          view.dispatch({
+            selection: EditorSelection.range(
+              restoreSelection.anchor,
+              restoreSelection.head,
+            ),
+          });
+        } else {
+          const cursor = view.state.selection.main.head;
+          view.dispatch({
+            selection: EditorSelection.cursor(cursor),
+          });
+        }
+      }
+
+      previousActiveFindRef.current = isActiveFind;
+    }, [searchActiveMatchIndex, searchQuery]);
+
+    useEffect(() => {
+      const view = viewRef.current;
       if (!view) {
         return;
       }
@@ -861,12 +928,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         return;
       }
 
-      // Open CM6's search panel (hidden via CSS) so the search
-      // highlighter generates match decorations.
       const activeElement = document.activeElement;
       if (searchQuery && !searchPanelOpen(view.state)) {
         openSearchPanel(view);
-        // openSearchPanel steals focus to its hidden input — restore it.
         if (activeElement instanceof HTMLElement) {
           activeElement.focus();
         }
@@ -952,20 +1016,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         return;
       }
 
-      if (searchActiveMatchIndex == null) {
+      if (searchActiveMatchIndex == null || !searchQuery) {
         return;
       }
 
       const query = getSearchQuery(view.state);
       const match = findMatchAtIndex(view.state, query, searchActiveMatchIndex);
-      if (!match) {
-        return;
+      if (match) {
+        view.dispatch({
+          selection: EditorSelection.range(match.from, match.to),
+          effects: EditorView.scrollIntoView(match.from, { y: "center" }),
+        });
       }
-
-      view.dispatch({
-        selection: EditorSelection.range(match.from, match.to),
-        effects: EditorView.scrollIntoView(match.from, { y: "center" }),
-      });
     }, [searchActiveMatchIndex, searchQuery, searchScrollRevision]);
 
     useImperativeHandle(

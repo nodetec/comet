@@ -223,9 +223,15 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
 });
 
-export function markdownDecorations(): Extension {
+type MarkdownDecorationsOptions = {
+  searchQuery?: string;
+};
+
+export function markdownDecorations(
+  options: MarkdownDecorationsOptions = {},
+): Extension {
   return [
-    markdownDecorationsPlugin,
+    markdownDecorationsPlugin(options.searchQuery),
     markdownDecorationsTheme,
     lists(),
     tables(),

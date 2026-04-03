@@ -16,6 +16,8 @@ import {
 } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 
+import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
+import { collectSearchMatches } from "@/shared/lib/search";
 import { resolveImageSrc } from "@/shared/lib/attachments";
 
 type InlineImageMatch = {
@@ -144,10 +146,15 @@ export function findInlineImageBeforeCursor(
   return null;
 }
 
-function buildInlineImageDecorations(state: EditorState) {
+function buildInlineImageDecorations(state: EditorState, searchQuery: string) {
   const builder = new RangeSetBuilder<Decoration>();
+  const searchMatches = collectSearchMatches(state.doc.toString(), searchQuery);
 
   for (const match of findInlineImages(state)) {
+    if (overlapsAny(match.from, match.to, searchMatches)) {
+      continue;
+    }
+
     builder.add(
       match.from,
       match.to,
@@ -179,29 +186,34 @@ function syncImageSelectionState(view: EditorView) {
   }
 }
 
-const inlineImagePlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+function inlineImagePlugin(searchQuery = "") {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = buildInlineImageDecorations(view.state);
-    }
-
-    update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        syntaxTree(update.state) !== syntaxTree(update.startState)
-      ) {
-        this.decorations = buildInlineImageDecorations(update.state);
+      constructor(view: EditorView) {
+        this.decorations = buildInlineImageDecorations(view.state, searchQuery);
       }
 
-      if (update.selectionSet || update.docChanged) {
-        syncImageSelectionState(update.view);
+      update(update: ViewUpdate) {
+        if (
+          update.docChanged ||
+          syntaxTree(update.state) !== syntaxTree(update.startState)
+        ) {
+          this.decorations = buildInlineImageDecorations(
+            update.state,
+            searchQuery,
+          );
+        }
+
+        if (update.selectionSet || update.docChanged) {
+          syncImageSelectionState(update.view);
+        }
       }
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
+    },
+    { decorations: (v) => v.decorations },
+  );
+}
 
 const inlineImageTheme = EditorView.baseTheme({
   ".cm-inline-image": {
@@ -250,9 +262,13 @@ function deleteInlineImageBackward(view: EditorView): boolean {
   return true;
 }
 
-export function inlineImages(): Extension {
+type InlineImagesOptions = {
+  searchQuery?: string;
+};
+
+export function inlineImages(options: InlineImagesOptions = {}): Extension {
   return [
-    inlineImagePlugin,
+    inlineImagePlugin(options.searchQuery),
     inlineImageTheme,
     Prec.high(
       keymap.of([
