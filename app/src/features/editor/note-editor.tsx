@@ -60,6 +60,38 @@ function getEditorScrollContainer(view: EditorView): HTMLElement {
   );
 }
 
+function centerEditorPositionInView(view: EditorView, position: number) {
+  view.requestMeasure<{
+    scrollContainer: HTMLElement;
+    targetScrollTop: number;
+  } | null>({
+    key: `center-search-match-${position}`,
+    read(view) {
+      const scrollContainer = getEditorScrollContainer(view);
+      const block = view.lineBlockAt(position);
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const blockMidpoint = view.documentTop + block.top + block.height / 2;
+      const viewportMidpoint = containerRect.top + containerRect.height / 2;
+      const targetScrollTop = Math.max(
+        0,
+        scrollContainer.scrollTop + (blockMidpoint - viewportMidpoint),
+      );
+
+      return {
+        scrollContainer,
+        targetScrollTop,
+      };
+    },
+    write(measure) {
+      if (!measure) {
+        return;
+      }
+
+      measure.scrollContainer.scrollTop = measure.targetScrollTop;
+    },
+  });
+}
+
 function buildSearchAwarePresentationExtensions(searchQuery: string) {
   return [inlineImages({ searchQuery }), markdownDecorations({ searchQuery })];
 }
@@ -1036,8 +1068,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       if (match) {
         view.dispatch({
           selection: EditorSelection.range(match.from, match.to),
-          effects: EditorView.scrollIntoView(match.from, { y: "center" }),
         });
+        centerEditorPositionInView(view, match.from);
       }
     }, [searchActiveMatchIndex, searchQuery, searchScrollRevision]);
 
