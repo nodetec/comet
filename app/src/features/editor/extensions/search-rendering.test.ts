@@ -107,6 +107,17 @@ describe("CodeMirror search rendering", () => {
     view.destroy();
   });
 
+  it("keeps fenced code block styling when search matches inside the block", async () => {
+    const { view } = createView("```ts\nlet value = 1;\n```", "value");
+
+    await flush();
+
+    expect(view.dom.querySelector(".cm-md-codeblock")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-searchMatch")).not.toBeNull();
+
+    view.destroy();
+  });
+
   it("keeps heading styling while revealing matched header syntax", async () => {
     const { view } = createView("# lorem ipsum", "l");
 

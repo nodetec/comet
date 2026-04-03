@@ -215,6 +215,12 @@ body {
   color: var(--search-match-foreground);
 }
 
+.comet-codemirror-host > .cm-editor.cm-focused .cm-searchMatch {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
 .comet-codemirror-active-search .cm-selectionBackground {
   background: transparent !important;
 }
@@ -241,8 +247,7 @@ body {
     border-radius: 0.35em;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    box-shadow: 0 0 0 0.08em
-      color-mix(in oklab, var(--primary) 25%, transparent);
+    padding: 0 0.2rem;
   }
 
   .comet-codemirror-host
@@ -250,8 +255,7 @@ body {
     > .cm-md-heading {
     background: color-mix(in oklab, var(--search-match) 92%, transparent);
     color: var(--search-match-foreground);
-    box-shadow: 0 0 0 0.08em
-      color-mix(in oklab, var(--search-match) 92%, transparent);
+    padding: 0 0.2rem;
   }
 
   .comet-codemirror-passive-search
@@ -259,7 +263,15 @@ body {
     > .cm-md-heading {
     background: var(--markdown-highlight);
     color: var(--markdown-highlight-foreground);
-    box-shadow: 0 0 0 0.08em var(--markdown-highlight);
+    padding: 0 0.2rem;
+  }
+
+  .comet-codemirror-host
+    > .cm-editor.cm-focused
+    .cm-searchMatch:has(> .cm-md-heading)
+    > .cm-md-heading {
+    background: transparent !important;
+    color: inherit !important;
   }
 }
 

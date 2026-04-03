@@ -323,6 +323,14 @@ function useFindBar({
     [findMatchCount],
   );
 
+  const ensureActiveFindMatch = useCallback(() => {
+    if (findMatchCount === 0 || findQuery.trim().length === 0) {
+      return;
+    }
+
+    setFindScrollRevision((revision) => revision + 1);
+  }, [findMatchCount, findQuery]);
+
   useLayoutEffect(() => {
     if (!findOpen || !noteId) {
       return;
@@ -376,6 +384,7 @@ function useFindBar({
     setFindQuery,
     setActiveFindMatchIndex,
     closeFind,
+    ensureActiveFindMatch,
     stepActiveFindMatch,
   };
 }
@@ -493,6 +502,7 @@ export function EditorPane({
     setFindQuery,
     setActiveFindMatchIndex,
     closeFind,
+    ensureActiveFindMatch,
     stepActiveFindMatch,
   } = find;
 
@@ -768,6 +778,9 @@ export function EditorPane({
               onChange={(e) => {
                 setFindQuery(e.target.value);
                 setActiveFindMatchIndex(0);
+              }}
+              onFocus={() => {
+                ensureActiveFindMatch();
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {

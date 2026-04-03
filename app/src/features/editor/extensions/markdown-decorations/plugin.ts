@@ -57,8 +57,6 @@ const SEARCH_REVEAL_NODE_NAMES = new Set([
   "Emphasis",
   "StrongEmphasis",
   "InlineCode",
-  "FencedCode",
-  "CodeBlock",
   "Link",
   "Highlight",
   "Blockquote",
