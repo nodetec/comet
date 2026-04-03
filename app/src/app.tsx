@@ -22,6 +22,7 @@ import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 
 function App() {
   useTheme();
@@ -45,9 +46,11 @@ function App() {
   const handleCreateNoteShortcut = notesPaneProps.onCreateNote;
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
+  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey)) return;
+      if (!event.metaKey) return;
 
       const key = event.key.toLowerCase();
       switch (key) {
@@ -71,6 +74,11 @@ function App() {
           window.dispatchEvent(new CustomEvent("comet:focus-search"));
           break;
         }
+        case ",": {
+          event.preventDefault();
+          setSettingsOpen(true);
+          break;
+        }
         default: {
           break;
         }
@@ -79,7 +87,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleCreateNoteShortcut]);
+  }, [handleCreateNoteShortcut, setSettingsOpen]);
 
   useEffect(() => {
     if (readyToRevealWindow && !hasCompletedStartupReveal) {

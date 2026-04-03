@@ -45,7 +45,41 @@ import {
   keymap,
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
-import { vim } from "@replit/codemirror-vim";
+import { Vim, vim } from "@replit/codemirror-vim";
+
+function getEditorScrollContainer(view: EditorView): HTMLElement {
+  return (
+    (view.dom.closest("[data-editor-scroll-container]") as HTMLElement) ??
+    view.scrollDOM
+  );
+}
+
+Vim.defineAction("scrollPageDown", (cm: { cm6: EditorView }) => {
+  const view = cm.cm6;
+  const el = getEditorScrollContainer(view);
+  const pageHeight = el.clientHeight;
+  el.scrollBy({ top: pageHeight, behavior: "smooth" });
+  const targetTop = el.scrollTop + pageHeight;
+  const pos = view.lineBlockAtHeight(targetTop - view.documentTop).from;
+  view.dispatch({ selection: EditorSelection.cursor(pos) });
+});
+Vim.defineAction("scrollPageUp", (cm: { cm6: EditorView }) => {
+  const view = cm.cm6;
+  const el = getEditorScrollContainer(view);
+  const pageHeight = el.clientHeight;
+  el.scrollBy({ top: -pageHeight, behavior: "smooth" });
+  const targetTop = Math.max(0, el.scrollTop - pageHeight);
+  const pos = view.lineBlockAtHeight(targetTop - view.documentTop).from;
+  view.dispatch({ selection: EditorSelection.cursor(pos) });
+});
+Vim.mapCommand("<C-j>", "action", "scrollPageDown", {}, { context: "normal" });
+Vim._mapCommand({
+  keys: "<C-k>",
+  type: "action",
+  action: "scrollPageUp",
+  actionArgs: {},
+  context: "normal",
+} as never);
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
 import {
@@ -711,34 +745,27 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             },
           }),
           EditorView.domEventHandlers({
-            keydown(event) {
-              return (event.metaKey || event.ctrlKey) && event.key === "f";
+            keydown(event, view) {
+              if (event.metaKey && event.key === "f") return true;
+              if (event.ctrlKey && !event.metaKey && event.key === "k") {
+                event.preventDefault();
+                const el = getEditorScrollContainer(view);
+                const pageHeight = el.clientHeight;
+                el.scrollBy({ top: -pageHeight, behavior: "smooth" });
+                const targetTop = Math.max(0, el.scrollTop - pageHeight);
+                const pos = view.lineBlockAtHeight(
+                  targetTop - view.documentTop,
+                ).from;
+                view.dispatch({ selection: EditorSelection.cursor(pos) });
+                return true;
+              }
+              return false;
             },
           }),
           keymap.of([
-            {
-              key: "Ctrl-j",
-              run(view) {
-                const scrollContainer = view.scrollDOM;
-                scrollContainer.scrollBy({
-                  top: scrollContainer.clientHeight,
-                  behavior: "smooth",
-                });
-                return true;
-              },
-            },
-            {
-              key: "Ctrl-k",
-              run(view) {
-                const scrollContainer = view.scrollDOM;
-                scrollContainer.scrollBy({
-                  top: -scrollContainer.clientHeight,
-                  behavior: "smooth",
-                });
-                return true;
-              },
-            },
-            ...defaultKeymap,
+            ...defaultKeymap.filter(
+              (b) => b.key !== "Ctrl-k" && b.mac !== "Ctrl-k",
+            ),
             ...historyKeymap,
           ]),
           vimCompartmentRef.current!.of(initialVimModeRef.current ? vim() : []),

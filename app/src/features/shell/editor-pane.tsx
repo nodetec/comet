@@ -303,7 +303,7 @@ function useFindBar({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "f") {
+      if (event.metaKey && event.key === "f") {
         event.preventDefault();
         setFocusedPane("editor");
         setFindOpen(true);
