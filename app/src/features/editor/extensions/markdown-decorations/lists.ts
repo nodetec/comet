@@ -20,9 +20,9 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNodeRef } from "@lezer/common";
 
-const TAB_SIZE = 2;
+const BULLET_INDENT = 2;
+const ORDERED_INDENT = 3;
 const BULLET_MARKERS = new Set(["-", "*", "+"]);
-const INDENT = "  ";
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 const TASK_MARKERS = new Set(["[ ]", "[x]"]);
 
@@ -75,15 +75,14 @@ export function getListMarkerData(
     return null;
   }
 
-  const indentLevel = Math.floor((from - line.from) / TAB_SIZE);
+  const tabSize = BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
+  const indentChars = from - line.from;
+  const indentLevel = Math.floor(indentChars / tabSize);
   const spacerDecorations: Array<Range<Decoration>> = [];
 
-  for (const index of Array.from(
-    { length: indentLevel },
-    (_, value) => value,
-  )) {
-    const spacerFrom = line.from + index * TAB_SIZE;
-    const spacerTo = spacerFrom + TAB_SIZE;
+  for (let i = 0; i < indentLevel; i++) {
+    const spacerFrom = line.from + i * tabSize;
+    const spacerTo = spacerFrom + tabSize;
     spacerDecorations.push(
       Decoration.replace({ widget: new SpacerWidget() }).range(
         spacerFrom,
@@ -177,6 +176,15 @@ export function getTaskListShortcut(
   };
 }
 
+function getListIndentStep(lineText: string): number {
+  const match = LIST_PREFIX_RE.exec(lineText);
+  if (!match) {
+    return BULLET_INDENT;
+  }
+  const marker = match[2] ?? "";
+  return BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
+}
+
 function getCaretRect(view: EditorView, position: number) {
   return view.coordsAtPos(position, 1) ?? view.coordsAtPos(position, -1);
 }
@@ -234,12 +242,14 @@ function indentListItemPreservingWrappedStart(view: EditorView) {
     return indentMore(view);
   }
 
+  const indentStep = getListIndentStep(line.text);
+  const indentStr = " ".repeat(indentStep);
   view.dispatch({
-    changes: { from: line.from, insert: INDENT },
-    selection: EditorSelection.cursor(selection.head + INDENT.length),
+    changes: { from: line.from, insert: indentStr },
+    selection: EditorSelection.cursor(selection.head + indentStep),
   });
 
-  const nextLine = view.state.doc.lineAt(selection.head + INDENT.length);
+  const nextLine = view.state.doc.lineAt(selection.head + indentStep);
   const nextTextStart = getListTextStart(
     nextLine.text,
     nextLine.from,
@@ -269,11 +279,13 @@ function dedentListItemPreservingWrappedStart(view: EditorView) {
     return indentLess(view);
   }
 
+  const indentStep = getListIndentStep(line.text);
   let removableIndent = 0;
-  if (line.text.startsWith(INDENT)) {
-    removableIndent = INDENT.length;
-  } else if (line.text.startsWith(" ")) {
-    removableIndent = 1;
+  const leadingSpaces = /^( *)/.exec(line.text)?.[1].length ?? 0;
+  if (leadingSpaces >= indentStep) {
+    removableIndent = indentStep;
+  } else if (leadingSpaces > 0) {
+    removableIndent = leadingSpaces;
   }
 
   if (removableIndent === 0) {
@@ -406,6 +418,19 @@ function normalizeSelectionToListMarkers(state: EditorState) {
   const ranges = state.selection.ranges.map((range) => {
     if (!range.empty) {
       return range;
+    }
+
+    // At marker.to on an empty list item (end of line), force assoc -1
+    // so drawSelection looks left into the content for coordinates.
+    for (const marker of markerRanges) {
+      if (
+        range.head === marker.to &&
+        range.assoc !== -1 &&
+        state.doc.lineAt(range.head).to === range.head
+      ) {
+        changed = true;
+        return EditorSelection.cursor(range.head, -1);
+      }
     }
 
     const normalized = normalizeCursorToMarkerBoundary(
@@ -551,6 +576,19 @@ function backspaceRemoveListPrefix(
     return null;
   }
 
+  const indent = match[1] ?? "";
+  const indentStep = getListIndentStep(line.text);
+  if (indent.length >= indentStep) {
+    // De-indent one level, keeping the marker
+    const removeFrom = line.from;
+    const removeTo = line.from + Math.min(indent.length, indentStep);
+    return {
+      changes: { from: removeFrom, to: removeTo },
+      annotations: Transaction.userEvent.of("delete.backward"),
+    };
+  }
+
+  // At zero indent (or less than one tab): remove the entire prefix
   return {
     changes: { from: line.from, to: textStart },
     annotations: Transaction.userEvent.of("delete.backward"),
@@ -607,6 +645,11 @@ function buildNumberListDecorations(
   const decorationRanges: Array<Range<Decoration>> = [];
   const atomicRanges: Array<Range<Decoration>> = [];
 
+  // Track display number per indent level across the whole document.
+  // Reset when indent decreases or a non-list gap appears.
+  const counterByIndent = new Map<number, number>();
+  let prevIndent = -1;
+
   syntaxTree(state).iterate({
     enter(node) {
       if (node.type.name === "Blockquote") {
@@ -618,11 +661,32 @@ function buildNumberListDecorations(
         return;
       }
 
+      const indent = data.indentLevel;
+
+      // Reset deeper counters when returning to shallower indent
+      if (prevIndent >= 0 && indent < prevIndent) {
+        for (const [key] of counterByIndent) {
+          if (key > indent) {
+            counterByIndent.delete(key);
+          }
+        }
+      }
+
+      const displayNumber = (counterByIndent.get(indent) ?? 0) + 1;
+      counterByIndent.set(indent, displayNumber);
+      prevIndent = indent;
+
+      // Extract the separator (. or )) from the marker text
+      const sep = data.marker.replace(/^\d+/, "");
+
       addListDecorations(
         data,
         "cm-md-list cm-md-number-list",
         Decoration.mark({
-          class: "cm-md-list-marker cm-md-number-marker",
+          class: "cm-md-list-marker cm-md-number-marker-source",
+          attributes: {
+            style: `--display-number: "${displayNumber}${sep} "`,
+          },
         }).range(data.markerStart, data.markerEnd + 1),
         decorationRanges,
         atomicRanges,
@@ -758,7 +822,7 @@ function listMarkerInteractions(): Extension {
         }
 
         const marker = target.closest(
-          ".cm-md-bullet-marker-source, .cm-md-number-marker",
+          ".cm-md-bullet-marker-source, .cm-md-number-marker-source",
         );
         if (!(marker instanceof HTMLElement)) {
           return false;
@@ -835,9 +899,22 @@ const listTheme = EditorView.theme({
     transform: "translate(-50%, -60%)",
     WebkitTextFillColor: "var(--primary)",
   },
-  ".cm-md-number-marker": {
+  ".cm-md-number-marker-source": {
+    color: "transparent",
+    display: "inline-block",
+    overflow: "hidden",
+    width: "2rem",
+    WebkitTextFillColor: "transparent",
+  },
+  ".cm-md-number-marker-source::before": {
     color: "var(--primary)",
+    content: "var(--display-number)",
     fontVariantNumeric: "tabular-nums",
+    left: "50%",
+    pointerEvents: "none",
+    position: "absolute",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-task-marker-source": {
@@ -933,12 +1010,12 @@ export function lists(): Extension {
       (transaction): readonly TransactionSpec[] => {
         const tightContinuation = stripNonTightListContinuation(transaction);
         if (tightContinuation) {
-          return [tightContinuation];
+          return [tightContinuation as TransactionSpec];
         }
 
         const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
         if (listPrefixRemoval) {
-          return [listPrefixRemoval];
+          return [listPrefixRemoval as TransactionSpec];
         }
 
         const selection = normalizeSelectionToListMarkers(transaction.state);
