@@ -511,7 +511,7 @@ export function useShellController() {
     setIsCreatingNoteTransition(true);
     createNoteMutation.mutate({
       tags: tagsForNewNote,
-      markdown: effectiveNoteFilter === "todo" ? "- [ ] " : undefined,
+      markdown: effectiveNoteFilter === "todo" ? "- [ ] " : "# ",
     });
   };
 

@@ -910,6 +910,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         });
 
         if (autoFocus) {
+          view.dispatch({
+            selection: EditorSelection.cursor(view.state.doc.length),
+          });
           view.focus();
           onAutoFocusHandled?.();
         } else {
