@@ -20,7 +20,12 @@ import { Strikethrough, Table, TaskList } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
 import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
-import { EditorView, highlightSpecialChars, keymap } from "@codemirror/view";
+import {
+  EditorView,
+  drawSelection,
+  highlightSpecialChars,
+  keymap,
+} from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
@@ -109,6 +114,9 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
     backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
+  },
+  "&.cm-focused .cm-content ::selection": {
+    backgroundColor: "transparent !important",
   },
 });
 
@@ -557,6 +565,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           syntaxHighlighting(MARKDOWN_HIGHLIGHT_STYLE),
           history(),
           highlightSpecialChars(),
+          drawSelection(),
           EditorView.lineWrapping,
           markdownLanguage({
             base: markdownLang,

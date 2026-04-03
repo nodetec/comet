@@ -3,9 +3,12 @@ import { syntaxTree } from "@codemirror/language";
 import {
   EditorSelection,
   EditorState,
+  Prec,
   StateField,
+  Transaction,
   type Extension,
   type Range,
+  type TransactionSpec,
 } from "@codemirror/state";
 import {
   Decoration,
@@ -35,6 +38,15 @@ type ListMarkerData = {
 type MarkerRange = {
   from: number;
   to: number;
+};
+
+type TaskListShortcut = {
+  changes: {
+    from: number;
+    insert: string;
+    to: number;
+  };
+  selection: EditorSelection;
 };
 
 class SpacerWidget extends WidgetType {
@@ -132,6 +144,37 @@ function addListDecorations(
 function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
   const match = LIST_PREFIX_RE.exec(lineText);
   return Math.min(lineTo, lineFrom + (match?.[0].length ?? 0));
+}
+
+export function getTaskListShortcut(
+  state: EditorState,
+  from: number,
+  to: number,
+  text: string,
+): TaskListShortcut | null {
+  if (text !== " " || from !== to) {
+    return null;
+  }
+
+  const line = state.doc.lineAt(from);
+  const beforeCursor = state.sliceDoc(line.from, from);
+  const match = /^([ \t]*)\[\]$/.exec(beforeCursor);
+  if (!match) {
+    return null;
+  }
+
+  const indent = match[1] ?? "";
+  const markerFrom = line.from + indent.length;
+  const insert = "- [ ] ";
+
+  return {
+    changes: {
+      from: markerFrom,
+      to: from,
+      insert,
+    },
+    selection: EditorSelection.single(markerFrom + insert.length),
+  };
 }
 
 function getCaretRect(view: EditorView, position: number) {
@@ -309,26 +352,30 @@ function buildListMarkerRanges(state: EditorState): MarkerRange[] {
   return ranges;
 }
 
-function getCursorBoundary(
+function findMarkerRangeAtPosition(
+  state: EditorState,
   position: number,
-  assoc: -1 | 0 | 1,
-  marker: MarkerRange,
-) {
-  if (position === marker.from) {
-    return { assoc: -1 as const, position: marker.from };
+): MarkerRange | null {
+  for (const marker of buildListMarkerRanges(state)) {
+    if (position >= marker.from && position <= marker.to) {
+      return marker;
+    }
   }
 
-  if (position === marker.to) {
-    return { assoc: 1 as const, position: marker.to };
+  return null;
+}
+
+function getCursorBoundary(
+  position: number,
+  _assoc: -1 | 0 | 1,
+  marker: MarkerRange,
+) {
+  if (position === marker.from || position === marker.to) {
+    return null;
   }
 
   if (position <= marker.from || position >= marker.to) {
     return null;
-  }
-
-  const midpoint = marker.from + (marker.to - marker.from) / 2;
-  if (assoc < 0 || (assoc === 0 && position <= midpoint)) {
-    return { assoc: -1 as const, position: marker.from };
   }
 
   return { assoc: 1 as const, position: marker.to };
@@ -401,22 +448,14 @@ function moveAcrossListMarker(direction: "left" | "right", view: EditorView) {
   }
 
   for (const marker of markerRanges) {
-    if (
-      direction === "left" &&
-      selection.head === marker.to &&
-      selection.assoc === 1
-    ) {
+    if (direction === "left" && selection.head === marker.to) {
       view.dispatch({
         selection: EditorSelection.cursor(marker.from, -1),
       });
       return true;
     }
 
-    if (
-      direction === "right" &&
-      selection.head === marker.from &&
-      selection.assoc === -1
-    ) {
+    if (direction === "right" && selection.head === marker.from) {
       view.dispatch({
         selection: EditorSelection.cursor(marker.to, 1),
       });
@@ -425,6 +464,97 @@ function moveAcrossListMarker(direction: "left" | "right", view: EditorView) {
   }
 
   return false;
+}
+
+function placeCaretAtListMarkerBoundary(
+  view: EditorView,
+  marker: MarkerRange,
+  side: "before" | "after",
+) {
+  view.dispatch({
+    selection: EditorSelection.cursor(
+      side === "before" ? marker.from : marker.to,
+      side === "before" ? -1 : 1,
+    ),
+  });
+}
+
+function stripNonTightListContinuation(
+  transaction: Transaction,
+): TransactionSpec | readonly TransactionSpec[] | null {
+  if (!transaction.isUserEvent("input") || !transaction.docChanged) {
+    return null;
+  }
+
+  const state = transaction.startState;
+  const selection = state.selection.main;
+  if (!selection.empty) {
+    return null;
+  }
+
+  const line = state.doc.lineAt(selection.head);
+  if (!LIST_PREFIX_RE.test(line.text)) {
+    return null;
+  }
+
+  let changeFrom = 0;
+  let changeTo = 0;
+  let insertedText = "";
+  let found = false;
+
+  transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    const text = inserted.toString();
+    if (/\n\s*\n/.test(text)) {
+      found = true;
+      changeFrom = fromA;
+      changeTo = toA;
+      insertedText = text;
+    }
+  });
+
+  if (!found) {
+    return null;
+  }
+
+  const fixedText = insertedText.replace(/\n\s*\n/, "\n");
+  const charsRemoved = insertedText.length - fixedText.length;
+  const originalCursor = transaction.newSelection.main.head;
+
+  return {
+    changes: { from: changeFrom, to: changeTo, insert: fixedText },
+    selection: EditorSelection.cursor(originalCursor - charsRemoved),
+    annotations: Transaction.userEvent.of("input"),
+  };
+}
+
+function backspaceRemoveListPrefix(
+  transaction: Transaction,
+): TransactionSpec | readonly TransactionSpec[] | null {
+  if (!transaction.isUserEvent("delete") || !transaction.docChanged) {
+    return null;
+  }
+
+  const state = transaction.startState;
+  const selection = state.selection.main;
+  if (!selection.empty) {
+    return null;
+  }
+
+  const line = state.doc.lineAt(selection.head);
+  const match = LIST_PREFIX_RE.exec(line.text);
+  if (!match) {
+    return null;
+  }
+
+  const textStart = getListTextStart(line.text, line.from, line.to);
+  if (selection.head > textStart) {
+    return null;
+  }
+
+  return {
+    changes: { from: line.from, to: textStart },
+    annotations: Transaction.userEvent.of("delete.backward"),
+  };
 }
 
 function buildBulletListDecorations(
@@ -533,15 +663,22 @@ function buildTaskListDecorations(
       }
 
       const checked = task === "[x]";
-      addListDecorations(
-        data,
-        `cm-md-list cm-md-task-list ${checked ? "cm-md-task-checked" : "cm-md-task-unchecked"}`,
+      decorationRanges.push(
+        Decoration.line({
+          attributes: {
+            class: `cm-md-list cm-md-task-list ${checked ? "cm-md-task-checked" : "cm-md-task-unchecked"}`,
+            style: `--indent-level: ${data.indentLevel}`,
+          },
+        }).range(data.lineStart),
+        ...data.spacerDecorations,
+        Decoration.mark({
+          class: "cm-md-task-bullet-source",
+        }).range(data.markerStart, data.markerEnd + 1),
         Decoration.mark({
           class: `cm-md-list-marker cm-md-task-marker-source ${checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`,
-        }).range(data.markerStart, taskEnd + 1),
-        decorationRanges,
-        atomicRanges,
+        }).range(taskStart, taskEnd + 1),
       );
+      atomicRanges.push(...data.spacerDecorations);
     },
   });
 
@@ -584,8 +721,7 @@ function taskLists(): Extension {
           event.preventDefault();
           event.stopPropagation();
 
-          const position = view.posAtDOM(marker, 0);
-          const from = position + 2;
+          const from = view.posAtDOM(marker, 0);
           const to = from + 3;
           const taskMarker = view.state.sliceDoc(from, to);
 
@@ -606,6 +742,52 @@ function taskLists(): Extension {
     }),
     createListStateField(buildTaskListDecorations),
   ];
+}
+
+function listMarkerInteractions(): Extension {
+  return ViewPlugin.define(() => ({}), {
+    eventHandlers: {
+      click(event, view) {
+        const target = event.target as HTMLElement;
+        if (event.button !== 0) {
+          return false;
+        }
+
+        if (target.closest(".cm-md-task-marker-source")) {
+          return false;
+        }
+
+        const marker = target.closest(
+          ".cm-md-bullet-marker-source, .cm-md-number-marker",
+        );
+        if (!(marker instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (!view.state.selection.main.empty) {
+          return false;
+        }
+
+        const markerRange = findMarkerRangeAtPosition(
+          view.state,
+          view.posAtDOM(marker, 0),
+        );
+        if (!markerRange) {
+          return false;
+        }
+
+        const rect = marker.getBoundingClientRect();
+        placeCaretAtListMarkerBoundary(
+          view,
+          markerRange,
+          event.clientX < rect.left + rect.width / 2 ? "before" : "after",
+        );
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      },
+    },
+  });
 }
 
 const listTheme = EditorView.theme({
@@ -633,6 +815,9 @@ const listTheme = EditorView.theme({
   },
   ".cm-md-bullet-marker-source": {
     color: "transparent",
+    display: "inline-block",
+    letterSpacing: "0.65rem",
+    width: "2rem",
     WebkitTextFillColor: "transparent",
   },
   ".cm-md-bullet-marker-source::before": {
@@ -658,6 +843,19 @@ const listTheme = EditorView.theme({
   ".cm-md-task-marker-source": {
     color: "transparent",
     cursor: "pointer",
+    display: "inline-block",
+    minWidth: "2rem",
+    overflow: "hidden",
+    textAlign: "justify",
+    textAlignLast: "justify",
+    textJustify: "inter-character",
+    whiteSpace: "pre",
+    width: "2rem",
+    WebkitTextFillColor: "transparent",
+  },
+  ".cm-md-task-bullet-source": {
+    color: "transparent",
+    fontSize: "0",
     WebkitTextFillColor: "transparent",
   },
   ".cm-md-task-marker-source::before": {
@@ -668,9 +866,11 @@ const listTheme = EditorView.theme({
     boxSizing: "border-box",
     content: '""',
     display: "inline-flex",
+    fontSize: "1rem",
     height: "1rem",
     justifyContent: "center",
     left: "50%",
+    lineHeight: "1",
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
@@ -704,25 +904,55 @@ const listTheme = EditorView.theme({
   },
 });
 
-const listKeymap = keymap.of([
-  { key: "ArrowLeft", run: (view) => moveAcrossListMarker("left", view) },
-  { key: "ArrowRight", run: (view) => moveAcrossListMarker("right", view) },
+const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  const shortcut = getTaskListShortcut(view.state, from, to, text);
+  if (!shortcut) {
+    return false;
+  }
+
+  view.dispatch(shortcut);
+  return true;
+});
+
+const listNavigationKeymap = Prec.high(
+  keymap.of([
+    { key: "ArrowLeft", run: (view) => moveAcrossListMarker("left", view) },
+    { key: "ArrowRight", run: (view) => moveAcrossListMarker("right", view) },
+  ]),
+);
+
+const listEditKeymap = keymap.of([
   { key: "Tab", run: indentListItemPreservingWrappedStart },
   { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
 ]);
 
 export function lists(): Extension {
   return [
-    EditorState.transactionFilter.of((transaction) => {
-      const selection = normalizeSelectionToListMarkers(transaction.state);
-      return selection
-        ? [transaction, { selection, sequential: true }]
-        : [transaction];
-    }),
+    EditorState.transactionFilter.of(
+      (transaction): readonly TransactionSpec[] => {
+        const tightContinuation = stripNonTightListContinuation(transaction);
+        if (tightContinuation) {
+          return [tightContinuation];
+        }
+
+        const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
+        if (listPrefixRemoval) {
+          return [listPrefixRemoval];
+        }
+
+        const selection = normalizeSelectionToListMarkers(transaction.state);
+        return selection
+          ? [transaction, { selection, sequential: true }]
+          : [transaction];
+      },
+    ),
     taskLists(),
+    listMarkerInteractions(),
     bulletLists(),
     numberLists(),
+    listInputHandler,
     listTheme,
-    listKeymap,
+    listNavigationKeymap,
+    listEditKeymap,
   ];
 }
