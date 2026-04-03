@@ -587,6 +587,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {
+              if (!view.hasFocus) {
+                useShellStore.getState().setFocusedPane("editor");
+                view.contentDOM.focus({ preventScroll: true });
+              }
+
               const horizontalRuleSelection = getHorizontalRuleSelection(
                 view,
                 event.target,
