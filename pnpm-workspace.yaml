@@ -9,3 +9,4 @@ packages:
   - packages/*
 patchedDependencies:
   "@codemirror/view": patches/@codemirror__view.patch
+  "@lezer/markdown": patches/@lezer__markdown.patch

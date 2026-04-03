@@ -676,12 +676,6 @@ function buildNumberListDecorations(
       }
 
       const displayNumber = (counterByIndent.get(indent) ?? 0) + 1;
-      console.log("[num]", {
-        indent,
-        displayNumber,
-        marker: data.marker,
-        line: state.doc.lineAt(data.lineStart).text.trim(),
-      });
       counterByIndent.set(indent, displayNumber);
       prevIndent = indent;
 

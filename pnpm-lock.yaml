@@ -8,6 +8,9 @@ patchedDependencies:
   "@codemirror/view":
     hash: 0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b
     path: patches/@codemirror__view.patch
+  "@lezer/markdown":
+    hash: 2506b27a5ba673c84fd0d0b48c90574b992da77a34a0915091b47b5ca2fe6129
+    path: patches/@lezer__markdown.patch
 
 importers:
   .:
@@ -71,7 +74,7 @@ importers:
         version: 1.2.3
       "@lezer/markdown":
         specifier: ^1.6.3
-        version: 1.6.3
+        version: 1.6.3(patch_hash=2506b27a5ba673c84fd0d0b48c90574b992da77a34a0915091b47b5ca2fe6129)
       "@tailwindcss/vite":
         specifier: ^4.2.1
         version: 4.2.2(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -13621,7 +13624,7 @@ snapshots:
       "@codemirror/state": 6.6.0
       "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
-      "@lezer/markdown": 1.6.3
+      "@lezer/markdown": 1.6.3(patch_hash=2506b27a5ba673c84fd0d0b48c90574b992da77a34a0915091b47b5ca2fe6129)
 
   "@codemirror/language@6.12.3":
     dependencies:
@@ -14372,7 +14375,7 @@ snapshots:
     dependencies:
       "@lezer/common": 1.5.1
 
-  "@lezer/markdown@1.6.3":
+  "@lezer/markdown@1.6.3(patch_hash=2506b27a5ba673c84fd0d0b48c90574b992da77a34a0915091b47b5ca2fe6129)":
     dependencies:
       "@lezer/common": 1.5.1
       "@lezer/highlight": 1.2.3
