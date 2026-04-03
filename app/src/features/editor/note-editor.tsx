@@ -177,6 +177,7 @@ import {
   TagGrammar,
   tagHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/tag-syntax";
+import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -749,6 +750,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           highlightSpecialChars(),
           drawSelection(),
           EditorView.lineWrapping,
+          scrollCenterOnEnter({ viewportPercentage: 5 }),
           markdownLanguage({
             base: markdownLang,
             extensions: [
