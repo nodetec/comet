@@ -198,15 +198,23 @@ body {
   display: none;
 }
 
+.comet-codemirror-host .cm-search.cm-panel {
+  display: none !important;
+}
+
 .comet-codemirror-host .cm-searchMatch {
-  background: color-mix(in oklab, var(--search-match) 82%, transparent);
-  color: var(--search-match-foreground);
+  background: color-mix(in oklab, var(--primary) 25%, transparent);
   border: 0;
   border-radius: 0.25rem;
 }
 
 .comet-codemirror-host .cm-searchMatch.cm-searchMatch-selected {
   background: color-mix(in oklab, var(--search-match) 92%, transparent);
+  color: var(--search-match-foreground);
+}
+
+.comet-codemirror-active-search .cm-selectionBackground {
+  background: transparent !important;
 }
 
 .comet-codemirror-passive-search .cm-searchMatch {

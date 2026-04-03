@@ -23,7 +23,15 @@ import {
   type MarkdownConfig,
 } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
+import {
+  SearchQuery,
+  closeSearchPanel,
+  getSearchQuery,
+  openSearchPanel,
+  search,
+  searchPanelOpen,
+  setSearchQuery,
+} from "@codemirror/search";
 import {
   Compartment,
   EditorSelection,
@@ -702,6 +710,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
           }),
+          EditorView.domEventHandlers({
+            keydown(event) {
+              return (event.metaKey || event.ctrlKey) && event.key === "f";
+            },
+          }),
           keymap.of([
             {
               key: "Ctrl-j",
@@ -805,6 +818,42 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         effects: vimCompartmentRef.current.reconfigure(vimMode ? vim() : []),
       });
     }, [vimMode]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) {
+        return;
+      }
+
+      const currentQuery = getSearchQuery(view.state);
+      if (currentQuery.search === searchQuery) {
+        return;
+      }
+
+      // Open CM6's search panel (hidden via CSS) so the search
+      // highlighter generates match decorations.
+      const activeElement = document.activeElement;
+      if (searchQuery && !searchPanelOpen(view.state)) {
+        openSearchPanel(view);
+        // openSearchPanel steals focus to its hidden input — restore it.
+        if (activeElement instanceof HTMLElement) {
+          activeElement.focus();
+        }
+      } else if (!searchQuery && searchPanelOpen(view.state)) {
+        closeSearchPanel(view);
+      }
+
+      view.dispatch({
+        effects: setSearchQuery.of(
+          new SearchQuery({ search: searchQuery, literal: true }),
+        ),
+      });
+
+      const query = getSearchQuery(view.state);
+      onSearchMatchCountChangeRef.current?.(
+        countSearchMatches(view.state, query),
+      );
+    }, [searchQuery]);
 
     useEffect(() => {
       const view = viewRef.current;
@@ -1011,6 +1060,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         className={cn(
           "comet-editor-shell relative flex min-h-full w-full flex-1",
           searchHighlightAllMatchesYellow && "comet-codemirror-passive-search",
+          searchQuery &&
+            !searchHighlightAllMatchesYellow &&
+            "comet-codemirror-active-search",
         )}
       >
         <div
