@@ -19,7 +19,12 @@ import {
 import { Strikethrough, Table, TaskList } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type SearchQuery, getSearchQuery, search } from "@codemirror/search";
-import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
+import {
+  Compartment,
+  EditorSelection,
+  EditorState,
+  Transaction,
+} from "@codemirror/state";
 import {
   EditorView,
   drawSelection,
@@ -750,14 +755,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       applyingExternalChangeRef.current = true;
 
       if (isNewLoad) {
-        // Replace content without setting selection — avoids WebKit
-        // focusing the contenteditable when the DOM selection is updated
+        // Replace content and exclude from undo history so the user
+        // cannot undo past the newly loaded note.
         view.dispatch({
           changes: {
             from: 0,
             to: view.state.doc.length,
             insert: nextMarkdown,
           },
+          annotations: Transaction.addToHistory.of(false),
         });
 
         if (autoFocus) {
