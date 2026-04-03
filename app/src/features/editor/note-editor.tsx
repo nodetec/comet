@@ -92,6 +92,49 @@ function centerEditorPositionInView(view: EditorView, position: number) {
   });
 }
 
+function revealEditorPositionIfNeeded(view: EditorView, position: number) {
+  view.requestMeasure<{
+    scrollContainer: HTMLElement;
+    targetScrollTop: number;
+  } | null>({
+    key: `reveal-search-match-${position}`,
+    read(view) {
+      const scrollContainer = getEditorScrollContainer(view);
+      const positionRect =
+        view.coordsAtPos(position, 1) ?? view.coordsAtPos(position, -1);
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const isVisible = positionRect
+        ? positionRect.bottom > containerRect.top &&
+          positionRect.top < containerRect.bottom
+        : false;
+
+      if (isVisible) {
+        return null;
+      }
+
+      const block = view.lineBlockAt(position);
+      const blockMidpoint = view.documentTop + block.top + block.height / 2;
+      const viewportMidpoint = containerRect.top + containerRect.height / 2;
+      const targetScrollTop = Math.max(
+        0,
+        scrollContainer.scrollTop + (blockMidpoint - viewportMidpoint),
+      );
+
+      return {
+        scrollContainer,
+        targetScrollTop,
+      };
+    },
+    write(measure) {
+      if (!measure) {
+        return;
+      }
+
+      measure.scrollContainer.scrollTop = measure.targetScrollTop;
+    },
+  });
+}
+
 function buildSearchAwarePresentationExtensions(searchQuery: string) {
   return [inlineImages({ searchQuery }), markdownDecorations({ searchQuery })];
 }
@@ -1052,6 +1095,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       applyingExternalChangeRef.current = false;
       lastLoadKeyRef.current = loadKey;
     }, [autoFocus, loadKey, markdown, onAutoFocusHandled]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view || !searchHighlightAllMatchesYellow || !searchQuery) {
+        return;
+      }
+
+      const frame = requestAnimationFrame(() => {
+        const query = getSearchQuery(view.state);
+        const firstMatch = findMatchAtIndex(view.state, query, 0);
+        if (!firstMatch) {
+          return;
+        }
+
+        revealEditorPositionIfNeeded(view, firstMatch.from);
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }, [loadKey, markdown, searchHighlightAllMatchesYellow, searchQuery]);
 
     useEffect(() => {
       const view = viewRef.current;
