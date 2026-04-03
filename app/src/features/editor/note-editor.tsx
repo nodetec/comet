@@ -48,7 +48,10 @@ import {
 import { tags as t } from "@lezer/highlight";
 import { Vim, vim } from "@replit/codemirror-vim";
 
-import { isEditorFindShortcut } from "@/shared/lib/keyboard";
+import {
+  isEditorFindShortcut,
+  isNotesSearchShortcut,
+} from "@/shared/lib/keyboard";
 
 function getEditorScrollContainer(view: EditorView): HTMLElement {
   return (
@@ -765,6 +768,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           }),
           EditorView.domEventHandlers({
             keydown(event, view) {
+              if (event.defaultPrevented) {
+                return false;
+              }
+
+              if (isNotesSearchShortcut(event)) {
+                return false;
+              }
+
               if (isEditorFindShortcut(event)) {
                 return true;
               }

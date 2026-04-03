@@ -7,8 +7,21 @@ mod infra;
 mod ports;
 pub mod tools;
 
-use tauri::{Manager, RunEvent, WindowEvent};
+#[cfg(desktop)]
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
+
+const MENU_EDITOR_FIND_ID: &str = "editor-find";
+const MENU_NEW_NOTE_ID: &str = "new-note";
+const MENU_COMMAND_PALETTE_ID: &str = "command-palette";
+const MENU_NOTES_SEARCH_ID: &str = "notes-search";
+const MENU_SETTINGS_ID: &str = "settings";
+const TAURI_EVENT_COMMAND_PALETTE: &str = "menu-command-palette";
+const TAURI_EVENT_EDITOR_FIND: &str = "menu-editor-find";
+const TAURI_EVENT_NEW_NOTE: &str = "menu-new-note";
+const TAURI_EVENT_NOTES_SEARCH: &str = "menu-notes-search";
+const TAURI_EVENT_SETTINGS: &str = "menu-settings";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -35,6 +48,94 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .menu(|app| {
+            let file_menu = SubmenuBuilder::new(app, "File")
+                .item(
+                    &MenuItemBuilder::with_id(MENU_NEW_NOTE_ID, "New Note")
+                        .accelerator("CmdOrCtrl+N")
+                        .build(app)?,
+                )
+                .item(
+                    &MenuItemBuilder::with_id(
+                        MENU_COMMAND_PALETTE_ID,
+                        "Command Palette",
+                    )
+                    .accelerator("CmdOrCtrl+O")
+                    .build(app)?,
+                );
+
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .separator()
+                .item(
+                    &MenuItemBuilder::with_id(MENU_EDITOR_FIND_ID, "Find in Note")
+                        .accelerator("CmdOrCtrl+F")
+                        .build(app)?,
+                )
+                .item(
+                    &MenuItemBuilder::with_id(MENU_NOTES_SEARCH_ID, "Search Notes")
+                        .accelerator("CmdOrCtrl+Shift+F")
+                        .build(app)?,
+                )
+                .build()?;
+
+            #[cfg(target_os = "macos")]
+            let app_menu = SubmenuBuilder::new(app, "Comet")
+                .item(
+                    &MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings")
+                        .accelerator("CmdOrCtrl+,")
+                        .build(app)?,
+                )
+                .separator()
+                .hide()
+                .hide_others()
+                .separator()
+                .quit()
+                .build()?;
+
+            let mut builder = MenuBuilder::new(app);
+            #[cfg(target_os = "macos")]
+            {
+                builder = builder.item(&app_menu);
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            let file_menu = file_menu
+                .separator()
+                .item(
+                    &MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings")
+                        .accelerator("CmdOrCtrl+,")
+                        .build(app)?,
+                );
+
+            let file_menu = file_menu.build()?;
+
+            builder.item(&file_menu).item(&edit_menu).build()
+        })
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            MENU_EDITOR_FIND_ID => {
+                let _ = app.emit(TAURI_EVENT_EDITOR_FIND, ());
+            }
+            MENU_NEW_NOTE_ID => {
+                let _ = app.emit(TAURI_EVENT_NEW_NOTE, ());
+            }
+            MENU_COMMAND_PALETTE_ID => {
+                let _ = app.emit(TAURI_EVENT_COMMAND_PALETTE, ());
+            }
+            MENU_NOTES_SEARCH_ID => {
+                let _ = app.emit(TAURI_EVENT_NOTES_SEARCH, ());
+            }
+            MENU_SETTINGS_ID => {
+                let _ = app.emit(TAURI_EVENT_SETTINGS, ());
+            }
+            _ => {}
+        })
         .plugin(log_plugin.build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())

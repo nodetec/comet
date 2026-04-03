@@ -29,12 +29,17 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
-import { isEditorFindShortcut } from "@/shared/lib/keyboard";
+import {
+  isEditorFindShortcut,
+  isNotesSearchShortcut,
+} from "@/shared/lib/keyboard";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
 import { type NoteConflictInfo } from "@/shared/api/types";
+
+const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
 
 type EditorPaneProps = {
   archivedAt: number | null;
@@ -288,6 +293,22 @@ function useFindBar({
     [setFocusedPane, editorRef],
   );
 
+  const focusFindInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      findInputRef.current?.focus();
+      findInputRef.current?.select();
+    });
+  }, []);
+
+  const openFind = useCallback(() => {
+    setFocusedPane("editor");
+    setFindOpen(true);
+
+    if (findOpen) {
+      focusFindInput();
+    }
+  }, [findOpen, focusFindInput, setFocusedPane]);
+
   const stepActiveFindMatch = useCallback(
     (direction: 1 | -1) => {
       if (findMatchCount === 0) return;
@@ -302,25 +323,45 @@ function useFindBar({
     [findMatchCount],
   );
 
+  useLayoutEffect(() => {
+    if (!findOpen || !noteId) {
+      return;
+    }
+
+    focusFindInput();
+  }, [findOpen, focusFindInput, noteId]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (isNotesSearchShortcut(event)) {
+        return;
+      }
+
       if (isEditorFindShortcut(event)) {
         event.preventDefault();
-        setFocusedPane("editor");
-        setFindOpen(true);
-        requestAnimationFrame(() => {
-          findInputRef.current?.focus();
-          findInputRef.current?.select();
-        });
+        openFind();
       }
       if (event.key === "Escape" && findOpen) {
         event.preventDefault();
         closeFind(true);
       }
     };
+
+    const handleOpenEditorFind = () => {
+      openFind();
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeFind, findOpen, setFocusedPane]);
+    window.addEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
+    };
+  }, [closeFind, findOpen, openFind]);
 
   return {
     findOpen,

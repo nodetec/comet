@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 
 import { useTheme } from "@/shared/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
@@ -23,7 +24,17 @@ import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { isNotesSearchShortcut } from "@/shared/lib/keyboard";
+import {
+  isEditorFindShortcut,
+  isNotesSearchShortcut,
+} from "@/shared/lib/keyboard";
+
+const TAURI_EVENT_COMMAND_PALETTE = "menu-command-palette";
+const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
+const TAURI_EVENT_EDITOR_FIND = "menu-editor-find";
+const TAURI_EVENT_NEW_NOTE = "menu-new-note";
+const TAURI_EVENT_NOTES_SEARCH = "menu-notes-search";
+const TAURI_EVENT_SETTINGS = "menu-settings";
 
 function App() {
   useTheme();
@@ -51,34 +62,32 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isNotesSearchShortcut(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        window.dispatchEvent(new CustomEvent("comet:focus-search"));
+        return;
+      }
+
+      if (isEditorFindShortcut(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
+        return;
+      }
+
       if (!event.metaKey) return;
 
       const key = event.key.toLowerCase();
       switch (key) {
-        case "n": {
-          event.preventDefault();
-          handleCreateNoteShortcut();
-          break;
-        }
         case "s": {
           event.preventDefault();
           setAccountSwitcherOpen((open) => !open);
           break;
         }
-        case "o": {
-          event.preventDefault();
-          setCommandPaletteOpen((open) => !open);
-          break;
-        }
-        case "f": {
-          if (!isNotesSearchShortcut(event)) break;
-          event.preventDefault();
-          window.dispatchEvent(new CustomEvent("comet:focus-search"));
-          break;
-        }
         case ",": {
-          event.preventDefault();
-          setSettingsOpen(true);
           break;
         }
         default: {
@@ -87,8 +96,56 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [handleCreateNoteShortcut, setSettingsOpen]);
+
+  useEffect(() => {
+    let unlistenCommandPalette: (() => void) | null = null;
+    let unlistenEditorFind: (() => void) | null = null;
+    let unlistenNewNote: (() => void) | null = null;
+    let unlistenNotesSearch: (() => void) | null = null;
+    let unlistenSettings: (() => void) | null = null;
+
+    void Promise.all([
+      listen(TAURI_EVENT_COMMAND_PALETTE, () => {
+        setCommandPaletteOpen((open) => !open);
+      }),
+      listen(TAURI_EVENT_EDITOR_FIND, () => {
+        window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
+      }),
+      listen(TAURI_EVENT_NEW_NOTE, () => {
+        handleCreateNoteShortcut();
+      }),
+      listen(TAURI_EVENT_NOTES_SEARCH, () => {
+        window.dispatchEvent(new CustomEvent("comet:focus-search"));
+      }),
+      listen(TAURI_EVENT_SETTINGS, () => {
+        setSettingsOpen(true);
+      }),
+    ]).then(
+      ([
+        disposeCommandPalette,
+        disposeEditorFind,
+        disposeNewNote,
+        disposeNotesSearch,
+        disposeSettings,
+      ]) => {
+        unlistenCommandPalette = disposeCommandPalette;
+        unlistenEditorFind = disposeEditorFind;
+        unlistenNewNote = disposeNewNote;
+        unlistenNotesSearch = disposeNotesSearch;
+        unlistenSettings = disposeSettings;
+      },
+    );
+
+    return () => {
+      unlistenCommandPalette?.();
+      unlistenEditorFind?.();
+      unlistenNewNote?.();
+      unlistenNotesSearch?.();
+      unlistenSettings?.();
+    };
   }, [handleCreateNoteShortcut, setSettingsOpen]);
 
   useEffect(() => {
