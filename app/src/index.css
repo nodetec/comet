@@ -205,7 +205,7 @@ body {
 .comet-codemirror-host .cm-searchMatch {
   background: color-mix(in oklab, var(--primary) 25%, transparent);
   border: 0;
-  border-radius: 0.25rem;
+  border-radius: 3px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -244,7 +244,7 @@ body {
     .cm-searchMatch:has(> .cm-md-heading)
     > .cm-md-heading {
     background: color-mix(in oklab, var(--primary) 25%, transparent);
-    border-radius: 0.35em;
+    border-radius: 3px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
     padding: 0 0.2rem;
