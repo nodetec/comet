@@ -10,6 +10,7 @@ import {
   history,
   historyKeymap,
   redo,
+  selectAll,
   undo,
 } from "@codemirror/commands";
 import {
@@ -52,6 +53,7 @@ import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
+import { collectSearchMatches } from "@/shared/lib/search";
 
 function getEditorScrollContainer(view: EditorView): HTMLElement {
   return (
@@ -689,6 +691,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialSearchQueryRef = useRef(searchQuery);
     const initialSpellCheckRef = useRef(spellCheck);
     const initialVimModeRef = useRef(vimMode);
+    const selectAllCursorRef = useRef<number | null>(null);
 
     if (editableCompartmentRef.current === null) {
       editableCompartmentRef.current = new Compartment();
@@ -870,6 +873,36 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             },
           }),
           keymap.of([
+            {
+              key: "Escape",
+              run(view) {
+                const { main } = view.state.selection;
+                const savedCursor = selectAllCursorRef.current;
+                const isFullDocumentSelection =
+                  !main.empty &&
+                  main.from === 0 &&
+                  main.to === view.state.doc.length;
+
+                if (!isFullDocumentSelection || savedCursor == null) {
+                  return false;
+                }
+
+                selectAllCursorRef.current = null;
+                view.dispatch({
+                  selection: EditorSelection.cursor(
+                    Math.min(savedCursor, view.state.doc.length),
+                  ),
+                });
+                return true;
+              },
+            },
+            {
+              key: "Mod-a",
+              run(view) {
+                selectAllCursorRef.current = view.state.selection.main.head;
+                return selectAll(view);
+              },
+            },
             ...defaultKeymap.filter(
               (b) => b.key !== "Ctrl-k" && b.mac !== "Ctrl-k",
             ),
@@ -881,6 +914,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !applyingExternalChangeRef.current) {
               onChangeRef.current(update.state.doc.toString());
+            }
+
+            if (
+              !update.docChanged &&
+              update.selectionSet &&
+              update.state.selection.main.empty
+            ) {
+              selectAllCursorRef.current = null;
             }
 
             if (update.docChanged) {
@@ -1103,8 +1144,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       }
 
       const frame = requestAnimationFrame(() => {
-        const query = getSearchQuery(view.state);
-        const firstMatch = findMatchAtIndex(view.state, query, 0);
+        const [firstMatch] = collectSearchMatches(
+          view.state.doc.toString(),
+          searchQuery,
+        );
         if (!firstMatch) {
           return;
         }
