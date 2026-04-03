@@ -29,6 +29,7 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
+import { isEditorFindShortcut } from "@/shared/lib/keyboard";
 import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
@@ -303,7 +304,7 @@ function useFindBar({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey && event.key === "f") {
+      if (isEditorFindShortcut(event)) {
         event.preventDefault();
         setFocusedPane("editor");
         setFindOpen(true);

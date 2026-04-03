@@ -23,6 +23,7 @@ import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { isNotesSearchShortcut } from "@/shared/lib/keyboard";
 
 function App() {
   useTheme();
@@ -70,7 +71,7 @@ function App() {
           break;
         }
         case "f": {
-          if (!event.shiftKey) break;
+          if (!isNotesSearchShortcut(event)) break;
           event.preventDefault();
           window.dispatchEvent(new CustomEvent("comet:focus-search"));
           break;
