@@ -117,6 +117,7 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   },
   ".cm-selectionLayer": {
     zIndex: "1 !important",
+    pointerEvents: "none",
   },
   "&.cm-focused .cm-content ::selection": {
     backgroundColor: "transparent !important",
