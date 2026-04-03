@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   "@codemirror/view":
-    hash: 8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90
+    hash: 0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b
     path: patches/@codemirror__view.patch
 
 importers:
@@ -50,7 +50,7 @@ importers:
         version: 6.6.0
       "@codemirror/view":
         specifier: ^6.40.0
-        version: 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+        version: 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@column-resizer/react":
         specifier: ^1.4.0
         version: 1.4.0(react@19.2.4)
@@ -13573,14 +13573,14 @@ snapshots:
     dependencies:
       "@codemirror/language": 6.12.3
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
 
   "@codemirror/commands@6.10.3":
     dependencies:
       "@codemirror/language": 6.12.3
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
 
   "@codemirror/lang-css@6.3.1":
@@ -13598,7 +13598,7 @@ snapshots:
       "@codemirror/lang-javascript": 6.2.5
       "@codemirror/language": 6.12.3
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
       "@lezer/css": 1.3.3
       "@lezer/html": 1.3.13
@@ -13609,7 +13609,7 @@ snapshots:
       "@codemirror/language": 6.12.3
       "@codemirror/lint": 6.9.5
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
       "@lezer/javascript": 1.5.4
 
@@ -13619,14 +13619,14 @@ snapshots:
       "@codemirror/lang-html": 6.4.11
       "@codemirror/language": 6.12.3
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
       "@lezer/markdown": 1.6.3
 
   "@codemirror/language@6.12.3":
     dependencies:
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       "@lezer/common": 1.5.1
       "@lezer/highlight": 1.2.3
       "@lezer/lr": 1.4.8
@@ -13635,20 +13635,20 @@ snapshots:
   "@codemirror/lint@6.9.5":
     dependencies:
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       crelt: 1.0.6
 
   "@codemirror/search@6.6.0":
     dependencies:
       "@codemirror/state": 6.6.0
-      "@codemirror/view": 6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
       crelt: 1.0.6
 
   "@codemirror/state@6.6.0":
     dependencies:
       "@marijn/find-cluster-break": 1.0.2
 
-  "@codemirror/view@6.41.0(patch_hash=8df6db16eb67c52bc9970a81e26c8e748a3853bf11814c7e8d374db76592cd90)":
+  "@codemirror/view@6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)":
     dependencies:
       "@codemirror/state": 6.6.0
       crelt: 1.0.6
