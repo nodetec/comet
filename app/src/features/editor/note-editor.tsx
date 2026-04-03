@@ -115,6 +115,9 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
     backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
   },
+  ".cm-selectionLayer": {
+    zIndex: "1 !important",
+  },
   "&.cm-focused .cm-content ::selection": {
     backgroundColor: "transparent !important",
   },
