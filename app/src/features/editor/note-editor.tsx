@@ -113,6 +113,9 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   },
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--editor-caret)",
+    borderLeftWidth: "1.5px",
+    // marginTop: "-5px",
+    // marginBottom: "-5px",
   },
   ".cm-selectionBackground": {
     backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
