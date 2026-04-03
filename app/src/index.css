@@ -225,11 +225,16 @@ body {
   color: inherit !important;
 }
 
-.comet-codemirror-active-search .cm-selectionBackground {
+.comet-codemirror-active-search
+  .cm-editor:not(.cm-focused)
+  .cm-selectionBackground {
   background: transparent !important;
 }
 
-.comet-codemirror-active-search .cm-content ::selection {
+.comet-codemirror-active-search
+  .cm-editor:not(.cm-focused)
+  .cm-content
+  ::selection {
   background: transparent !important;
 }
 
@@ -243,11 +248,16 @@ body {
   color: var(--search-match-foreground);
 }
 
-.comet-codemirror-passive-search .cm-selectionBackground {
+.comet-codemirror-passive-search
+  .cm-editor:not(.cm-focused)
+  .cm-selectionBackground {
   background: transparent !important;
 }
 
-.comet-codemirror-passive-search .cm-content ::selection {
+.comet-codemirror-passive-search
+  .cm-editor:not(.cm-focused)
+  .cm-content
+  ::selection {
   background: transparent !important;
 }
 
