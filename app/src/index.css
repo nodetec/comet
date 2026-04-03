@@ -234,8 +234,21 @@ body {
 }
 
 .comet-codemirror-passive-search .cm-searchMatch {
-  background: var(--markdown-highlight);
-  color: var(--markdown-highlight-foreground);
+  background: var(--search-match);
+  color: var(--search-match-foreground);
+}
+
+.comet-codemirror-passive-search .cm-searchMatch.cm-searchMatch-selected {
+  background: var(--search-match);
+  color: var(--search-match-foreground);
+}
+
+.comet-codemirror-passive-search .cm-selectionBackground {
+  background: transparent !important;
+}
+
+.comet-codemirror-passive-search .cm-content ::selection {
+  background: transparent !important;
 }
 
 @supports selector(.cm-searchMatch:has(> .cm-md-heading)) {
@@ -265,8 +278,16 @@ body {
   .comet-codemirror-passive-search
     .cm-searchMatch:has(> .cm-md-heading)
     > .cm-md-heading {
-    background: var(--markdown-highlight);
-    color: var(--markdown-highlight-foreground);
+    background: var(--search-match);
+    color: var(--search-match-foreground);
+    padding: 0 0.2rem;
+  }
+
+  .comet-codemirror-passive-search
+    .cm-searchMatch.cm-searchMatch-selected:has(> .cm-md-heading)
+    > .cm-md-heading {
+    background: var(--search-match);
+    color: var(--search-match-foreground);
     padding: 0 0.2rem;
   }
 
