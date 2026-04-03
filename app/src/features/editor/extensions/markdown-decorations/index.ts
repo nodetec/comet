@@ -44,11 +44,11 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-code": {
     color: "var(--foreground)",
     fontFamily:
-      '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+      'monospace, "SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo',
     fontSize: "0.9em",
     backgroundColor: "var(--muted)",
     borderRadius: "0.2rem",
-    padding: "0.1em 0.2em",
+    padding: "0.15rem 0.2rem",
   },
   ".cm-md-codeblock": {
     fontFamily:
@@ -196,7 +196,7 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     backgroundColor: "var(--markdown-highlight)",
     color: "var(--markdown-highlight-foreground)",
     borderRadius: "0.2rem",
-    padding: "0 0.08rem",
+    padding: "0.15rem 0.2rem",
     boxDecorationBreak: "clone",
   },
   ".cm-md-strikethrough": {
