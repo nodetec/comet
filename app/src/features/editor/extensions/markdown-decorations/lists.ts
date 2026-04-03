@@ -420,16 +420,19 @@ function normalizeSelectionToListMarkers(state: EditorState) {
       return range;
     }
 
-    // At marker.to on an empty list item (end of line), force assoc -1
-    // so drawSelection looks left into the content for coordinates.
+    // Snap cursor in the indent/spacer/marker area to the text start.
+    // This covers positions inside spacer widgets, at marker boundaries,
+    // and in the padding area where drawSelection can't render a cursor.
     for (const marker of markerRanges) {
-      if (
-        range.head === marker.to &&
-        range.assoc !== -1 &&
-        state.doc.lineAt(range.head).to === range.head
-      ) {
-        changed = true;
-        return EditorSelection.cursor(range.head, -1);
+      const line = state.doc.lineAt(marker.from);
+      if (range.head >= line.from && range.head <= marker.to) {
+        const isEndOfLine = line.to === marker.to;
+        const targetAssoc = isEndOfLine ? -1 : 1;
+        if (range.head !== marker.to || range.assoc !== targetAssoc) {
+          changed = true;
+          return EditorSelection.cursor(marker.to, targetAssoc);
+        }
+        return range;
       }
     }
 
@@ -860,7 +863,6 @@ const listTheme = EditorView.theme({
   },
   ".cm-md-list": {
     paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
-    position: "relative",
     textIndent: "calc((var(--indent-level) * 2rem + 2rem) * -1)",
   },
   ".cm-md-list *": {
@@ -876,6 +878,7 @@ const listTheme = EditorView.theme({
     textAlign: "center",
     verticalAlign: "middle",
     whiteSpace: "pre",
+    zIndex: "0",
   },
   ".cm-md-bullet-marker-source": {
     color: "transparent",
@@ -902,7 +905,6 @@ const listTheme = EditorView.theme({
   ".cm-md-number-marker-source": {
     color: "transparent",
     display: "inline-block",
-    overflow: "hidden",
     width: "2rem",
     WebkitTextFillColor: "transparent",
   },
