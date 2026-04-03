@@ -7,3 +7,5 @@ packages:
   - web
   - www
   - packages/*
+patchedDependencies:
+  "@codemirror/view": patches/@codemirror__view.patch

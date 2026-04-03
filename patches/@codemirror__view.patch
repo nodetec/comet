@@ -1,0 +1,356 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 0f6cc242d7f52a66069c8b68c7ff35774a7146db..14261a57cb4a6e8de9053fc93df5607db30ab28f 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -55,8 +55,8 @@ function attrsEq(a, b, ignore) {
+     if (!b)
+         b = noAttrs;
+     let keysA = Object.keys(a), keysB = Object.keys(b);
+-    if (keysA.length - (ignore && keysA.indexOf(ignore) > -1 ? 1 : 0) !=
+-        keysB.length - (ignore && keysB.indexOf(ignore) > -1 ? 1 : 0))
++    if (keysA.length - (0) !=
++        keysB.length - (0))
+         return false;
+     for (let key of keysA) {
+         if (key != ignore && (keysB.indexOf(key) == -1 || a[key] !== b[key]))
+@@ -258,10 +258,10 @@ class Decoration extends state.RangeValue {
+     given position.
+     */
+     static widget(spec) {
+-        let side = Math.max(-10000, Math.min(10000, spec.side || 0)), block = !!spec.block;
++        let side = Math.max(-1e4, Math.min(10000, spec.side || 0)), block = !!spec.block;
+         side += (block && !spec.inlineOrder)
+-            ? (side > 0 ? 300000000 /* Side.BlockAfter */ : -400000000 /* Side.BlockBefore */)
+-            : (side > 0 ? 100000000 /* Side.InlineAfter */ : -100000000 /* Side.InlineBefore */);
++            ? (side > 0 ? 300000000 /* Side.BlockAfter */ : -4e8 /* Side.BlockBefore */)
++            : (side > 0 ? 100000000 /* Side.InlineAfter */ : -1e8 /* Side.InlineBefore */);
+         return new PointDecoration(spec, side, side, block, spec.widget || null, false);
+     }
+     /**
+@@ -271,13 +271,13 @@ class Decoration extends state.RangeValue {
+     static replace(spec) {
+         let block = !!spec.block, startSide, endSide;
+         if (spec.isBlockGap) {
+-            startSide = -500000000 /* Side.GapStart */;
++            startSide = -5e8 /* Side.GapStart */;
+             endSide = 400000000 /* Side.GapEnd */;
+         }
+         else {
+             let { start, end } = getInclusive(spec, block);
+-            startSide = (start ? (block ? -300000000 /* Side.BlockIncStart */ : -1 /* Side.InlineIncStart */) : 500000000 /* Side.NonIncStart */) - 1;
+-            endSide = (end ? (block ? 200000000 /* Side.BlockIncEnd */ : 1 /* Side.InlineIncEnd */) : -600000000 /* Side.NonIncEnd */) + 1;
++            startSide = (start ? (block ? -3e8 /* Side.BlockIncStart */ : -1 /* Side.InlineIncStart */) : 500000000 /* Side.NonIncStart */) - 1;
++            endSide = (end ? (block ? 200000000 /* Side.BlockIncEnd */ : 1 /* Side.InlineIncEnd */) : -6e8 /* Side.NonIncEnd */) + 1;
+         }
+         return new PointDecoration(spec, startSide, endSide, block, spec.widget || null, true);
+     }
+@@ -308,7 +308,7 @@ Decoration.none = state.RangeSet.empty;
+ class MarkDecoration extends Decoration {
+     constructor(spec) {
+         let { start, end } = getInclusive(spec);
+-        super(start ? -1 /* Side.InlineIncStart */ : 500000000 /* Side.NonIncStart */, end ? 1 /* Side.InlineIncEnd */ : -600000000 /* Side.NonIncEnd */, null, spec);
++        super(start ? -1 /* Side.InlineIncStart */ : 500000000 /* Side.NonIncStart */, end ? 1 /* Side.InlineIncEnd */ : -6e8 /* Side.NonIncEnd */, null, spec);
+         this.tagName = spec.tagName || "span";
+         this.attrs = spec.class && spec.attributes ? combineAttrs(spec.attributes, { class: spec.class })
+             : spec.class ? { class: spec.class } : spec.attributes || noAttrs;
+@@ -325,7 +325,7 @@ class MarkDecoration extends Decoration {
+ MarkDecoration.prototype.point = false;
+ class LineDecoration extends Decoration {
+     constructor(spec) {
+-        super(-200000000 /* Side.Line */, -200000000 /* Side.Line */, null, spec);
++        super(-2e8 /* Side.Line */, -2e8 /* Side.Line */, null, spec);
+     }
+     eq(other) {
+         return other instanceof LineDecoration &&
+@@ -1734,7 +1734,7 @@ class Tile {
+     sync(track) {
+         this.flags |= 2 /* TileFlag.Synced */;
+         if (this.flags & 4 /* TileFlag.AttrsDirty */) {
+-            this.flags &= ~4 /* TileFlag.AttrsDirty */;
++            this.flags &= -5 /* TileFlag.AttrsDirty */;
+             let attrs = this.domAttrs;
+             if (attrs)
+                 setAttrs(this.dom, attrs);
+@@ -1774,7 +1774,7 @@ class Tile {
+         return new DOMPos(this.parent.dom, index + (after ? 1 : 0), off == 0 || off == this.length);
+     }
+     markDirty(attrs) {
+-        this.flags &= ~2 /* TileFlag.Synced */;
++        this.flags &= -3 /* TileFlag.Synced */;
+         if (attrs)
+             this.flags |= 4 /* TileFlag.AttrsDirty */;
+         if (this.parent && (this.parent.flags & 2 /* TileFlag.Synced */))
+@@ -1940,6 +1940,38 @@ class BlockWrapperTile extends CompositeTile {
+         return tile;
+     }
+ }
++// When the cursor enters a padded mark from outside (e.g., arrow-left
++// into a tag with padding-right), snap the cursor rect to the mark's
++// outer edge so it doesn't appear to stop inside the padding gap.
++// Only adjusts for entry (side looks into the mark), not exit.
++function adjustForMarkPadding(rect, tile, offset, side) {
++    // Walk up to find the outermost MarkTile with padding
++    let mark = null;
++    let t = tile;
++    while (t.parent instanceof MarkTile) {
++        mark = t.parent;
++        t = mark;
++    }
++    if (!mark)
++        return rect;
++    let isText = tile.isText();
++    let len = isText ? tile.length : 0;
++    // Entry from right: at end of text, side -1 (looking left into mark)
++    if (isText && offset == len && side < 0) {
++        let markRight = mark.dom.getBoundingClientRect().right;
++        if (markRight > rect.right) {
++            return { left: rect.left, right: markRight, top: rect.top, bottom: rect.bottom };
++        }
++    }
++    // Entry from left: at start of text, side 1 (looking right into mark)
++    if (offset == 0 && side > 0) {
++        let markLeft = mark.dom.getBoundingClientRect().left;
++        if (markLeft < rect.left) {
++            return { left: markLeft, right: rect.right, top: rect.top, bottom: rect.bottom };
++        }
++    }
++    return rect;
++}
+ class LineTile extends CompositeTile {
+     constructor(dom, attrs) {
+         super(dom);
+@@ -1984,7 +2016,10 @@ class LineTile extends CompositeTile {
+         let found = this.resolveInline(pos, side, true);
+         if (!found)
+             return fallbackRect(this);
+-        return found.tile.coordsIn(Math.max(0, found.offset), side);
++        let rect = found.tile.coordsIn(Math.max(0, found.offset), side);
++        if (rect)
++            rect = adjustForMarkPadding(rect, found.tile, found.offset, side);
++        return rect;
+     }
+     domIn(pos, side) {
+         let found = this.resolveInline(pos, side);
+@@ -2549,7 +2584,7 @@ class TileCache {
+                     }
+                     else {
+                         this.reused.set(tile, 2 /* Reused.DOM */);
+-                        return new WidgetTile(tile.dom, length, widget, (tile.flags & ~(496 /* TileFlag.Widget */ | 1 /* TileFlag.BreakAfter */)) | flags);
++                        return new WidgetTile(tile.dom, length, widget, (tile.flags & -498) | flags);
+                     }
+                 }
+             }
+@@ -2646,7 +2681,7 @@ class TileUpdate {
+                             ? WidgetTile.of(tile.widget, this.view, to - from, tile.flags & 496 /* TileFlag.Widget */, this.cache.maybeReuse(tile))
+                             : this.cache.reuse(tile);
+                         if (widget.flags & 256 /* TileFlag.Block */) {
+-                            widget.flags &= ~1 /* TileFlag.BreakAfter */;
++                            widget.flags &= -2 /* TileFlag.BreakAfter */;
+                             this.builder.addBlockWidget(widget);
+                         }
+                         else {
+@@ -2668,7 +2703,7 @@ class TileUpdate {
+                     openMarks = activeMarks.length;
+                 }
+                 else if (tile.isLine()) {
+-                    tile.flags &= ~1 /* TileFlag.BreakAfter */;
++                    tile.flags &= -2 /* TileFlag.BreakAfter */;
+                     this.cache.reused.set(tile, 1 /* Reused.Full */);
+                     this.builder.addLine(tile);
+                 }
+@@ -5469,7 +5504,7 @@ class HeightMap {
+         this.flags = flags;
+     }
+     get outdated() { return (this.flags & 2 /* Flag.Outdated */) > 0; }
+-    set outdated(value) { this.flags = (value ? 2 /* Flag.Outdated */ : 0) | (this.flags & ~2 /* Flag.Outdated */); }
++    set outdated(value) { this.flags = (value ? 2 /* Flag.Outdated */ : 0) | (this.flags & -3 /* Flag.Outdated */); }
+     setHeight(height) {
+         if (this.height != height) {
+             if (Math.abs(this.height - height) > Epsilon)
+@@ -11235,7 +11270,7 @@ Define an editor gutter. The order in which the gutters appear is
+ determined by their extension priority.
+ */
+ function gutter(config) {
+-    return [gutters(), activeGutters.of({ ...defaults, ...config })];
++    return [gutters(), activeGutters.of(Object.assign(Object.assign({}, defaults), config))];
+ }
+ const unfixGutters = state.Facet.define({
+     combine: values => values.some(x => x)
+diff --git a/dist/index.js b/dist/index.js
+index 05b89f2c14367934b8c0cd9b572502471e089590..99e2588df5469fac18feb6f4a64d79db0558e211 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -53,8 +53,8 @@ function attrsEq(a, b, ignore) {
+     if (!b)
+         b = noAttrs;
+     let keysA = Object.keys(a), keysB = Object.keys(b);
+-    if (keysA.length - (ignore && keysA.indexOf(ignore) > -1 ? 1 : 0) !=
+-        keysB.length - (ignore && keysB.indexOf(ignore) > -1 ? 1 : 0))
++    if (keysA.length - (0) !=
++        keysB.length - (0))
+         return false;
+     for (let key of keysA) {
+         if (key != ignore && (keysB.indexOf(key) == -1 || a[key] !== b[key]))
+@@ -255,10 +255,10 @@ class Decoration extends RangeValue {
+     given position.
+     */
+     static widget(spec) {
+-        let side = Math.max(-10000, Math.min(10000, spec.side || 0)), block = !!spec.block;
++        let side = Math.max(-1e4, Math.min(10000, spec.side || 0)), block = !!spec.block;
+         side += (block && !spec.inlineOrder)
+-            ? (side > 0 ? 300000000 /* Side.BlockAfter */ : -400000000 /* Side.BlockBefore */)
+-            : (side > 0 ? 100000000 /* Side.InlineAfter */ : -100000000 /* Side.InlineBefore */);
++            ? (side > 0 ? 300000000 /* Side.BlockAfter */ : -4e8 /* Side.BlockBefore */)
++            : (side > 0 ? 100000000 /* Side.InlineAfter */ : -1e8 /* Side.InlineBefore */);
+         return new PointDecoration(spec, side, side, block, spec.widget || null, false);
+     }
+     /**
+@@ -268,13 +268,13 @@ class Decoration extends RangeValue {
+     static replace(spec) {
+         let block = !!spec.block, startSide, endSide;
+         if (spec.isBlockGap) {
+-            startSide = -500000000 /* Side.GapStart */;
++            startSide = -5e8 /* Side.GapStart */;
+             endSide = 400000000 /* Side.GapEnd */;
+         }
+         else {
+             let { start, end } = getInclusive(spec, block);
+-            startSide = (start ? (block ? -300000000 /* Side.BlockIncStart */ : -1 /* Side.InlineIncStart */) : 500000000 /* Side.NonIncStart */) - 1;
+-            endSide = (end ? (block ? 200000000 /* Side.BlockIncEnd */ : 1 /* Side.InlineIncEnd */) : -600000000 /* Side.NonIncEnd */) + 1;
++            startSide = (start ? (block ? -3e8 /* Side.BlockIncStart */ : -1 /* Side.InlineIncStart */) : 500000000 /* Side.NonIncStart */) - 1;
++            endSide = (end ? (block ? 200000000 /* Side.BlockIncEnd */ : 1 /* Side.InlineIncEnd */) : -6e8 /* Side.NonIncEnd */) + 1;
+         }
+         return new PointDecoration(spec, startSide, endSide, block, spec.widget || null, true);
+     }
+@@ -305,7 +305,7 @@ Decoration.none = RangeSet.empty;
+ class MarkDecoration extends Decoration {
+     constructor(spec) {
+         let { start, end } = getInclusive(spec);
+-        super(start ? -1 /* Side.InlineIncStart */ : 500000000 /* Side.NonIncStart */, end ? 1 /* Side.InlineIncEnd */ : -600000000 /* Side.NonIncEnd */, null, spec);
++        super(start ? -1 /* Side.InlineIncStart */ : 500000000 /* Side.NonIncStart */, end ? 1 /* Side.InlineIncEnd */ : -6e8 /* Side.NonIncEnd */, null, spec);
+         this.tagName = spec.tagName || "span";
+         this.attrs = spec.class && spec.attributes ? combineAttrs(spec.attributes, { class: spec.class })
+             : spec.class ? { class: spec.class } : spec.attributes || noAttrs;
+@@ -322,7 +322,7 @@ class MarkDecoration extends Decoration {
+ MarkDecoration.prototype.point = false;
+ class LineDecoration extends Decoration {
+     constructor(spec) {
+-        super(-200000000 /* Side.Line */, -200000000 /* Side.Line */, null, spec);
++        super(-2e8 /* Side.Line */, -2e8 /* Side.Line */, null, spec);
+     }
+     eq(other) {
+         return other instanceof LineDecoration &&
+@@ -1730,7 +1730,7 @@ class Tile {
+     sync(track) {
+         this.flags |= 2 /* TileFlag.Synced */;
+         if (this.flags & 4 /* TileFlag.AttrsDirty */) {
+-            this.flags &= ~4 /* TileFlag.AttrsDirty */;
++            this.flags &= -5 /* TileFlag.AttrsDirty */;
+             let attrs = this.domAttrs;
+             if (attrs)
+                 setAttrs(this.dom, attrs);
+@@ -1770,7 +1770,7 @@ class Tile {
+         return new DOMPos(this.parent.dom, index + (after ? 1 : 0), off == 0 || off == this.length);
+     }
+     markDirty(attrs) {
+-        this.flags &= ~2 /* TileFlag.Synced */;
++        this.flags &= -3 /* TileFlag.Synced */;
+         if (attrs)
+             this.flags |= 4 /* TileFlag.AttrsDirty */;
+         if (this.parent && (this.parent.flags & 2 /* TileFlag.Synced */))
+@@ -1936,6 +1936,38 @@ class BlockWrapperTile extends CompositeTile {
+         return tile;
+     }
+ }
++// When the cursor enters a padded mark from outside (e.g., arrow-left
++// into a tag with padding-right), snap the cursor rect to the mark's
++// outer edge so it doesn't appear to stop inside the padding gap.
++// Only adjusts for entry (side looks into the mark), not exit.
++function adjustForMarkPadding(rect, tile, offset, side) {
++    // Walk up to find the outermost MarkTile with padding
++    let mark = null;
++    let t = tile;
++    while (t.parent instanceof MarkTile) {
++        mark = t.parent;
++        t = mark;
++    }
++    if (!mark)
++        return rect;
++    let isText = tile.isText();
++    let len = isText ? tile.length : 0;
++    // Entry from right: at end of text, side -1 (looking left into mark)
++    if (isText && offset == len && side < 0) {
++        let markRight = mark.dom.getBoundingClientRect().right;
++        if (markRight > rect.right) {
++            return { left: rect.left, right: markRight, top: rect.top, bottom: rect.bottom };
++        }
++    }
++    // Entry from left: at start of text, side 1 (looking right into mark)
++    if (offset == 0 && side > 0) {
++        let markLeft = mark.dom.getBoundingClientRect().left;
++        if (markLeft < rect.left) {
++            return { left: markLeft, right: rect.right, top: rect.top, bottom: rect.bottom };
++        }
++    }
++    return rect;
++}
+ class LineTile extends CompositeTile {
+     constructor(dom, attrs) {
+         super(dom);
+@@ -1980,7 +2012,10 @@ class LineTile extends CompositeTile {
+         let found = this.resolveInline(pos, side, true);
+         if (!found)
+             return fallbackRect(this);
+-        return found.tile.coordsIn(Math.max(0, found.offset), side);
++        let rect = found.tile.coordsIn(Math.max(0, found.offset), side);
++        if (rect)
++            rect = adjustForMarkPadding(rect, found.tile, found.offset, side);
++        return rect;
+     }
+     domIn(pos, side) {
+         let found = this.resolveInline(pos, side);
+@@ -2545,7 +2580,7 @@ class TileCache {
+                     }
+                     else {
+                         this.reused.set(tile, 2 /* Reused.DOM */);
+-                        return new WidgetTile(tile.dom, length, widget, (tile.flags & ~(496 /* TileFlag.Widget */ | 1 /* TileFlag.BreakAfter */)) | flags);
++                        return new WidgetTile(tile.dom, length, widget, (tile.flags & -498) | flags);
+                     }
+                 }
+             }
+@@ -2642,7 +2677,7 @@ class TileUpdate {
+                             ? WidgetTile.of(tile.widget, this.view, to - from, tile.flags & 496 /* TileFlag.Widget */, this.cache.maybeReuse(tile))
+                             : this.cache.reuse(tile);
+                         if (widget.flags & 256 /* TileFlag.Block */) {
+-                            widget.flags &= ~1 /* TileFlag.BreakAfter */;
++                            widget.flags &= -2 /* TileFlag.BreakAfter */;
+                             this.builder.addBlockWidget(widget);
+                         }
+                         else {
+@@ -2664,7 +2699,7 @@ class TileUpdate {
+                     openMarks = activeMarks.length;
+                 }
+                 else if (tile.isLine()) {
+-                    tile.flags &= ~1 /* TileFlag.BreakAfter */;
++                    tile.flags &= -2 /* TileFlag.BreakAfter */;
+                     this.cache.reused.set(tile, 1 /* Reused.Full */);
+                     this.builder.addLine(tile);
+                 }
+@@ -5464,7 +5499,7 @@ class HeightMap {
+         this.flags = flags;
+     }
+     get outdated() { return (this.flags & 2 /* Flag.Outdated */) > 0; }
+-    set outdated(value) { this.flags = (value ? 2 /* Flag.Outdated */ : 0) | (this.flags & ~2 /* Flag.Outdated */); }
++    set outdated(value) { this.flags = (value ? 2 /* Flag.Outdated */ : 0) | (this.flags & -3 /* Flag.Outdated */); }
+     setHeight(height) {
+         if (this.height != height) {
+             if (Math.abs(this.height - height) > Epsilon)
+@@ -11230,7 +11265,7 @@ Define an editor gutter. The order in which the gutters appear is
+ determined by their extension priority.
+ */
+ function gutter(config) {
+-    return [gutters(), activeGutters.of({ ...defaults, ...config })];
++    return [gutters(), activeGutters.of(Object.assign(Object.assign({}, defaults), config))];
+ }
+ const unfixGutters = /*@__PURE__*/Facet.define({
+     combine: values => values.some(x => x)
