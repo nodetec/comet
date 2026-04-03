@@ -37,6 +37,7 @@ import {
   keymap,
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
+import { vim } from "@replit/codemirror-vim";
 
 import { inlineImages } from "@/features/editor/extensions/inline-images";
 import {
@@ -63,6 +64,7 @@ type NoteEditorProps = {
   searchQuery: string;
   searchScrollRevision?: number;
   spellCheck?: boolean;
+  vimMode?: boolean;
   onChange(markdown: string): void;
 };
 
@@ -533,6 +535,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       searchQuery,
       searchScrollRevision,
       spellCheck = false,
+      vimMode = false,
     },
     ref,
   ) {
@@ -543,6 +546,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange);
     const editableCompartmentRef = useRef<Compartment | null>(null);
     const contentAttributesCompartmentRef = useRef<Compartment | null>(null);
+    const vimCompartmentRef = useRef<Compartment | null>(null);
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
@@ -550,12 +554,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialMarkdownRef = useRef(markdown);
     const initialReadOnlyRef = useRef(readOnly);
     const initialSpellCheckRef = useRef(spellCheck);
+    const initialVimModeRef = useRef(vimMode);
 
     if (editableCompartmentRef.current === null) {
       editableCompartmentRef.current = new Compartment();
     }
     if (contentAttributesCompartmentRef.current === null) {
       contentAttributesCompartmentRef.current = new Compartment();
+    }
+    if (vimCompartmentRef.current === null) {
+      vimCompartmentRef.current = new Compartment();
     }
 
     useEffect(() => {
@@ -694,7 +702,33 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
           }),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([
+            {
+              key: "Ctrl-j",
+              run(view) {
+                const scrollContainer = view.scrollDOM;
+                scrollContainer.scrollBy({
+                  top: scrollContainer.clientHeight,
+                  behavior: "smooth",
+                });
+                return true;
+              },
+            },
+            {
+              key: "Ctrl-k",
+              run(view) {
+                const scrollContainer = view.scrollDOM;
+                scrollContainer.scrollBy({
+                  top: -scrollContainer.clientHeight,
+                  behavior: "smooth",
+                });
+                return true;
+              },
+            },
+            ...defaultKeymap,
+            ...historyKeymap,
+          ]),
+          vimCompartmentRef.current!.of(initialVimModeRef.current ? vim() : []),
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
@@ -761,6 +795,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         ],
       });
     }, [readOnly, spellCheck]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view || !vimCompartmentRef.current) {
+        return;
+      }
+      view.dispatch({
+        effects: vimCompartmentRef.current.reconfigure(vimMode ? vim() : []),
+      });
+    }, [vimMode]);
 
     useEffect(() => {
       const view = viewRef.current;

@@ -75,6 +75,9 @@ importers:
       "@lezer/markdown":
         specifier: ^1.6.3
         version: 1.6.3(patch_hash=2506b27a5ba673c84fd0d0b48c90574b992da77a34a0915091b47b5ca2fe6129)
+      "@replit/codemirror-vim":
+        specifier: ^6.3.0
+        version: 6.3.0(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/search@6.6.0)(@codemirror/state@6.6.0)(@codemirror/view@6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b))
       "@tailwindcss/vite":
         specifier: ^4.2.1
         version: 4.2.2(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -3881,6 +3884,18 @@ packages:
       {
         integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==,
       }
+
+  "@replit/codemirror-vim@6.3.0":
+    resolution:
+      {
+        integrity: sha512-aTx931ULAMuJx6xLf7KQDOL7CxD+Sa05FktTDrtLaSy53uj01ll3Zf17JdKsriER248oS55GBzg0CfCTjEneAQ==,
+      }
+    peerDependencies:
+      "@codemirror/commands": 6.x.x
+      "@codemirror/language": 6.x.x
+      "@codemirror/search": 6.x.x
+      "@codemirror/state": 6.x.x
+      "@codemirror/view": 6.x.x
 
   "@rolldown/binding-android-arm64@1.0.0-rc.10":
     resolution:
@@ -15311,6 +15326,14 @@ snapshots:
       "@types/react-dom": 19.2.3(@types/react@19.2.14)
 
   "@radix-ui/rect@1.1.1": {}
+
+  "@replit/codemirror-vim@6.3.0(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/search@6.6.0)(@codemirror/state@6.6.0)(@codemirror/view@6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b))":
+    dependencies:
+      "@codemirror/commands": 6.10.3
+      "@codemirror/language": 6.12.3
+      "@codemirror/search": 6.6.0
+      "@codemirror/state": 6.6.0
+      "@codemirror/view": 6.41.0(patch_hash=0195a1f24ae667c1ef0b68941fce99634d3610a746ee3e5b9d4eda9b80cdab3b)
 
   "@rolldown/binding-android-arm64@1.0.0-rc.10":
     optional: true

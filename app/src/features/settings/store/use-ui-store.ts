@@ -31,6 +31,9 @@ type UIStore = {
   editorSpellCheck: boolean;
   setEditorSpellCheck(enabled: boolean): void;
 
+  editorVimMode: boolean;
+  setEditorVimMode(enabled: boolean): void;
+
   noteSortPrefs: Record<string, NoteSortPrefs>;
   setNoteSortPrefs(viewKey: string, prefs: Partial<NoteSortPrefs>): void;
 
@@ -72,6 +75,11 @@ export const useUIStore = create<UIStore>()(
         set({ editorSpellCheck });
       },
 
+      editorVimMode: false,
+      setEditorVimMode: (editorVimMode) => {
+        set({ editorVimMode });
+      },
+
       themeName: null,
       setThemeName: (themeName) => {
         set({ themeName });
@@ -110,6 +118,7 @@ export const useUIStore = create<UIStore>()(
         showEditorToolbar: state.showEditorToolbar,
         editorFontSize: state.editorFontSize,
         editorSpellCheck: state.editorSpellCheck,
+        editorVimMode: state.editorVimMode,
         themeName: state.themeName,
         noteSortPrefs: state.noteSortPrefs,
         expandedSidebarTagPaths: state.expandedSidebarTagPaths,

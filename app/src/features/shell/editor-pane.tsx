@@ -392,6 +392,7 @@ export function EditorPane({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const editorFontSize = useUIStore((s) => s.editorFontSize);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
+  const editorVimMode = useUIStore((s) => s.editorVimMode);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.headCount ?? 0) > 1;
@@ -503,6 +504,7 @@ export function EditorPane({
           isUsingEditorFindSearch ? findScrollRevision : undefined
         }
         spellCheck={editorSpellCheck}
+        vimMode={editorVimMode}
       />
     );
   })();

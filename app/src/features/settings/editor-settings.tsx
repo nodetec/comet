@@ -13,6 +13,8 @@ export function EditorSettings() {
   const setFontSize = useUIStore((s) => s.setEditorFontSize);
   const spellCheck = useUIStore((s) => s.editorSpellCheck);
   const setSpellCheck = useUIStore((s) => s.setEditorSpellCheck);
+  const vimMode = useUIStore((s) => s.editorVimMode);
+  const setVimMode = useUIStore((s) => s.setEditorVimMode);
 
   return (
     <div>
@@ -49,9 +51,15 @@ export function EditorSettings() {
       <SettingRow
         label="Spell Check"
         description="Enable browser spell checking in the editor"
-        border={false}
       >
         <Switch checked={spellCheck} onCheckedChange={setSpellCheck} />
+      </SettingRow>
+      <SettingRow
+        label="Vim Mode"
+        description="Use Vim keybindings in the editor"
+        border={false}
+      >
+        <Switch checked={vimMode} onCheckedChange={setVimMode} />
       </SettingRow>
     </div>
   );
