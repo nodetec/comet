@@ -171,6 +171,63 @@ function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
   return Math.min(lineTo, lineFrom + (match?.[0].length ?? 0));
 }
 
+function getListMarkerDataForLine(
+  state: EditorState,
+  lineFrom: number,
+  lineTo: number,
+) {
+  let markerData: ListMarkerData | null = null;
+
+  syntaxTree(state).iterate({
+    from: lineFrom,
+    to: lineTo,
+    enter(node) {
+      const data = getListMarkerData(state, node);
+      if (!data || data.lineStart !== lineFrom) {
+        return;
+      }
+
+      markerData = data;
+      return false;
+    },
+  });
+
+  return markerData;
+}
+
+export function insertLineBreakWithoutListContinuation(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(selection.head);
+  if (selection.head !== line.to) {
+    return false;
+  }
+
+  const markerData = getListMarkerDataForLine(view.state, line.from, line.to);
+  if (!markerData) {
+    return false;
+  }
+
+  const prefix = view.state.sliceDoc(line.from, markerData.markerStart);
+  const insert = `\n${prefix}`;
+  const cursor = selection.head + insert.length;
+
+  view.dispatch({
+    changes: {
+      from: selection.head,
+      insert,
+      to: selection.head,
+    },
+    selection: EditorSelection.cursor(cursor),
+    annotations: Transaction.userEvent.of("input"),
+  });
+
+  return true;
+}
+
 export function getTaskListShortcut(
   state: EditorState,
   from: number,
@@ -1177,6 +1234,15 @@ const listNavigationKeymap = Prec.high(
   ]),
 );
 
+const listBreakKeymap = Prec.high(
+  keymap.of([
+    {
+      key: "Shift-Enter",
+      run: insertLineBreakWithoutListContinuation,
+    },
+  ]),
+);
+
 const listEditKeymap = keymap.of([
   { key: "Tab", run: indentListItemPreservingWrappedStart },
   { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
@@ -1221,6 +1287,7 @@ export function lists(): Extension {
         listMarkerInteractions(),
         listInputHandler,
         listNavigationKeymap,
+        listBreakKeymap,
         listEditKeymap,
       ];
 

@@ -10,6 +10,7 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { markdownDecorations } from "@/features/editor/extensions/markdown-decorations";
+import { insertLineBreakWithoutListContinuation } from "@/features/editor/extensions/markdown-decorations/lists";
 
 function createView(doc: string, cursor?: number) {
   const parent = document.createElement("div");
@@ -148,6 +149,30 @@ describe("List rendering", () => {
     expect(view.state.doc.toString()).toBe(
       "1. First\n\n2. Second\n3. \n\n4. Third",
     );
+
+    view.destroy();
+  });
+
+  it("inserts a plain line break at the end of a list item on Shift-Enter", async () => {
+    const doc = "1. First\n2. Second";
+    const { view } = createView(doc, doc.length);
+
+    await flush();
+
+    expect(insertLineBreakWithoutListContinuation(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("1. First\n2. Second\n");
+
+    view.destroy();
+  });
+
+  it("preserves quote and indent prefix when breaking a quoted nested list item", async () => {
+    const doc = ["> - Parent", ">   - Child"].join("\n");
+    const { view } = createView(doc, doc.length);
+
+    await flush();
+
+    expect(insertLineBreakWithoutListContinuation(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("> - Parent\n>   - Child\n>   ");
 
     view.destroy();
   });
