@@ -89,6 +89,18 @@ describe("Editor link interactions", () => {
     );
   });
 
+  it("does not treat the position immediately after a plain URL as part of the link", () => {
+    const doc = "text https://github.com/nodeca/pica more";
+    const state = EditorState.create({
+      doc,
+      extensions: [markdownLanguage()],
+    });
+    const url = "https://github.com/nodeca/pica";
+    const afterUrl = doc.indexOf(url) + url.length;
+
+    expect(findExternalLinkTargetAtPosition(state, afterUrl)).toBeNull();
+  });
+
   it("ignores non-external markdown links", () => {
     const doc = "[Attachment](attachment://file.png)";
     const state = EditorState.create({
@@ -164,6 +176,49 @@ describe("Editor link interactions", () => {
 
     expect(openUrlMock).toHaveBeenCalledWith("https://github.com/nodeca/pica");
 
+    view.destroy();
+  });
+
+  it("does not open plain external URLs when the click resolves to the right boundary", async () => {
+    const doc = "See https://github.com/nodeca/pica now";
+    const url = "https://github.com/nodeca/pica";
+    const { view } = createView(doc);
+
+    await flush();
+
+    const link = [...view.dom.querySelectorAll(".cm-md-link")].find((element) =>
+      element.textContent?.includes(url),
+    );
+    expect(link).not.toBeNull();
+
+    const afterUrl = doc.indexOf(url) + url.length;
+    const originalPosAtCoords = view.posAtCoords.bind(view);
+    Object.assign(view, {
+      posAtCoords: () => afterUrl,
+    });
+
+    link?.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+    link?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+
+    expect(openUrlMock).not.toHaveBeenCalled();
+
+    Object.assign(view, {
+      posAtCoords: originalPosAtCoords,
+    });
     view.destroy();
   });
 

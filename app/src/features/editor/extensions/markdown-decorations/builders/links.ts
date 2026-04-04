@@ -216,7 +216,7 @@ export function findExternalLinkTargetAtPosition(
 
     const from = match.index;
     const to = from + target.length;
-    if (offset < from || offset > to) {
+    if (offset < from || offset >= to) {
       continue;
     }
 
@@ -242,15 +242,29 @@ function shouldOpenLink(event: MouseEvent) {
 
 function getExternalLinkTargetFromEvent(
   view: EditorView,
-  target: EventTarget | null,
+  event: MouseEvent,
 ): string | null {
+  const { target } = event;
   if (!(target instanceof Node) || !view.contentDOM.contains(target)) {
     return null;
   }
 
+  const hasPointerCoordinates = event.clientX !== 0 || event.clientY !== 0;
+  if (hasPointerCoordinates) {
+    const position = view.posAtCoords(
+      { x: event.clientX, y: event.clientY },
+      false,
+    );
+    if (position != null) {
+      return findExternalLinkTargetAtPosition(view.state, position);
+    }
+  }
+
   try {
-    const position = view.posAtDOM(target, 0);
-    return findExternalLinkTargetAtPosition(view.state, position);
+    return findExternalLinkTargetAtPosition(
+      view.state,
+      view.posAtDOM(target, 0),
+    );
   } catch {
     return null;
   }
@@ -263,7 +277,7 @@ export function linkInteractions(): Extension {
         return false;
       }
 
-      const targetUrl = getExternalLinkTargetFromEvent(view, event.target);
+      const targetUrl = getExternalLinkTargetFromEvent(view, event);
       if (!targetUrl) {
         return false;
       }
@@ -277,7 +291,7 @@ export function linkInteractions(): Extension {
         return false;
       }
 
-      const targetUrl = getExternalLinkTargetFromEvent(view, event.target);
+      const targetUrl = getExternalLinkTargetFromEvent(view, event);
       if (!targetUrl) {
         return false;
       }
