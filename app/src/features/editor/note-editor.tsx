@@ -24,6 +24,7 @@ import {
   type MarkdownConfig,
 } from "@lezer/markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 import {
   SearchQuery,
   closeSearchPanel,
@@ -218,6 +219,40 @@ const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   { tag: [t.link, t.url], color: "var(--primary)" },
   { tag: [t.quote], color: "var(--muted-foreground)", fontStyle: "italic" },
   { tag: [t.comment], color: "var(--syntax-comment)" },
+  {
+    tag: [t.keyword, t.operatorKeyword, t.controlKeyword, t.modifier],
+    color: "var(--syntax-keyword)",
+  },
+  {
+    tag: [t.typeName, t.className, t.namespace],
+    color: "var(--syntax-type)",
+  },
+  {
+    tag: [t.function(t.variableName), t.function(t.propertyName), t.macroName],
+    color: "var(--syntax-function)",
+  },
+  {
+    tag: [t.propertyName, t.attributeName],
+    color: "var(--syntax-attribute)",
+  },
+  {
+    tag: [t.number, t.integer, t.float],
+    color: "var(--syntax-number)",
+  },
+  {
+    tag: [t.string, t.special(t.string)],
+    color: "var(--syntax-string)",
+  },
+  { tag: [t.regexp], color: "var(--syntax-regex)" },
+  {
+    tag: [t.bool, t.null, t.atom, t.labelName, t.constant(t.name)],
+    color: "var(--syntax-constant)",
+  },
+  {
+    tag: [t.tagName, t.special(t.tagName)],
+    color: "var(--syntax-selector)",
+  },
+  { tag: [t.meta], color: "var(--syntax-atrule)" },
   { tag: [t.processingInstruction], color: "var(--muted-foreground)" },
   { tag: [t.contentSeparator], color: "var(--muted-foreground)" },
 ]);
@@ -762,6 +797,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               TagGrammar,
               DisableSetextHeading,
             ],
+            codeLanguages: languages,
           }),
           presentationExtension,
           tagHighlightStyle,
