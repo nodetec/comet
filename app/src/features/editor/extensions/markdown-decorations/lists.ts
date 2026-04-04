@@ -17,7 +17,7 @@ import {
   ViewPlugin,
   type DecorationSet,
 } from "@codemirror/view";
-import type { SyntaxNodeRef } from "@lezer/common";
+import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
 import {
   isListDecorationsDisabled,
@@ -65,9 +65,12 @@ type TaskListShortcut = {
   selection: EditorSelection;
 };
 
+type ListMarkerNodeRef = Pick<SyntaxNodeRef, "from" | "to" | "type" | "node">;
+type DocLine = ReturnType<EditorState["doc"]["lineAt"]>;
+
 export function getListMarkerData(
   state: EditorState,
-  { from, to, type, node }: SyntaxNodeRef,
+  { from, to, type, node }: ListMarkerNodeRef,
 ): ListMarkerData | null {
   if (type.name !== "ListMark") {
     return null;
@@ -220,7 +223,7 @@ function getListMarkerDataForLine(
   state: EditorState,
   lineFrom: number,
   lineTo: number,
-) {
+): ListMarkerData | null {
   let markerData: ListMarkerData | null = null;
 
   syntaxTree(state).iterate({
@@ -284,7 +287,7 @@ function logListDeleteDebug(
 function getParsedContinuationContextForLine(
   state: EditorState,
   targetLineFrom: number,
-) {
+): ExplicitContinuationContext | null {
   let result: ExplicitContinuationContext | null = null;
 
   syntaxTree(state).iterate({
@@ -338,8 +341,8 @@ function getParsedContinuationContextForLine(
 
 function getExplicitContinuationContextForLine(
   state: EditorState,
-  line: EditorState["doc"]["line"],
-) {
+  line: DocLine,
+): ExplicitContinuationContext | null {
   const parsedContext = getParsedContinuationContextForLine(state, line.from);
   if (parsedContext) {
     return parsedContext;
@@ -706,7 +709,7 @@ function buildListMarkerRanges(state: EditorState): MarkerRange[] {
 }
 
 function getHiddenContinuationPrefixRange(
-  line: EditorState["doc"]["line"],
+  line: DocLine,
   expectedPrefix: string,
 ): HiddenPrefixRange | null {
   if (!line.text.startsWith(expectedPrefix)) {
@@ -1367,7 +1370,7 @@ function isListContainerNode(node: SyntaxNodeRef["node"]) {
 
 function addParagraphPrefixDecorations(
   state: EditorState,
-  child: SyntaxNodeRef["node"],
+  child: SyntaxNode,
   markerLineStart: number,
   expectedPrefix: string,
   decorationRanges: Array<Range<Decoration>>,
@@ -1423,7 +1426,7 @@ function addListChildGapDecorations(
 
 function decorateListChildNode(
   state: EditorState,
-  child: SyntaxNodeRef["node"],
+  child: SyntaxNode,
   markerLineStart: number,
   expectedPrefix: string,
   indentStyle: string,
