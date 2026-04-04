@@ -69,4 +69,37 @@ describe("Blockquote rendering", () => {
 
     view.destroy();
   });
+
+  it("does not shift the quote bar when nested lists appear inside a blockquote", async () => {
+    const { view } = createView(
+      [
+        "> - Quoted bullet one",
+        "> - Quoted bullet two",
+        ">   - testing",
+        ">   1. Quoted nested ordered item",
+        ">   2. Quoted nested ordered item",
+        "> - Quoted bullet three",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const nestedBulletLine = [...view.dom.querySelectorAll(".cm-line")].find(
+      (element) => element.textContent?.includes("testing"),
+    );
+    const nestedOrderedLine = [...view.dom.querySelectorAll(".cm-line")].find(
+      (element) => element.textContent?.includes("Quoted nested ordered item"),
+    );
+
+    expect(nestedBulletLine?.classList.contains("cm-md-bq")).toBe(true);
+    expect(nestedOrderedLine?.classList.contains("cm-md-bq")).toBe(true);
+    expect(nestedBulletLine?.getAttribute("style") ?? "").not.toContain(
+      "--cm-md-list-child-indent",
+    );
+    expect(nestedOrderedLine?.getAttribute("style") ?? "").not.toContain(
+      "--cm-md-list-child-indent",
+    );
+
+    view.destroy();
+  });
 });

@@ -810,6 +810,7 @@ function getListItemMarkerContext(
 function isListContainerNode(node: SyntaxNodeRef["node"]) {
   return (
     node.type.name === "ListMark" ||
+    node.type.name === "QuoteMark" ||
     node.type.name === "BulletList" ||
     node.type.name === "OrderedList"
   );
