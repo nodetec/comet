@@ -41,6 +41,10 @@ export function handleBlockquote(
 
   for (const [lineNum, depth] of quoteMarksByLine) {
     const line = ctx.state.doc.line(lineNum);
+    if (overlapsAny(line.from, line.to, ctx.cursorLines)) {
+      continue;
+    }
+
     out.push({
       from: line.from,
       to: line.from,

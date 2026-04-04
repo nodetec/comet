@@ -163,35 +163,37 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-link": {
     color: "var(--primary)",
   },
-  ".cm-md-bq": {
+  ".cm-line.cm-md-bq": {
+    "--cm-md-bq-bar-color": "var(--primary)",
     backgroundRepeat: "no-repeat",
   },
-  ".cm-md-bq-1": {
-    paddingLeft: "1.5em",
-    backgroundImage: "linear-gradient(var(--primary),var(--primary))",
-    backgroundSize: "2px 100%",
-    backgroundPosition: "0.5em 0",
-  },
-  ".cm-md-bq-2": {
-    paddingLeft: "2.5em",
+  ".cm-line.cm-md-bq-1": {
+    paddingLeft: "0.9rem",
     backgroundImage:
-      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
-    backgroundSize: "2px 100%,2px 100%",
-    backgroundPosition: "0.5em 0,1.5em 0",
+      "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
+    backgroundPosition: "0 0",
+    backgroundSize: "3px 100%",
   },
-  ".cm-md-bq-3": {
-    paddingLeft: "3.5em",
+  ".cm-line.cm-md-bq-2": {
+    paddingLeft: "1.8rem",
     backgroundImage:
-      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
-    backgroundSize: "2px 100%,2px 100%,2px 100%",
-    backgroundPosition: "0.5em 0,1.5em 0,2.5em 0",
+      "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
+    backgroundPosition: "0 0, 0.9rem 0",
+    backgroundSize: "3px 100%, 3px 100%",
   },
-  ".cm-md-bq-4": {
-    paddingLeft: "4.5em",
+  ".cm-line.cm-md-bq-3": {
+    paddingLeft: "2.7rem",
     backgroundImage:
-      "linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary)),linear-gradient(var(--primary),var(--primary))",
-    backgroundSize: "2px 100%,2px 100%,2px 100%,2px 100%",
-    backgroundPosition: "0.5em 0,1.5em 0,2.5em 0,3.5em 0",
+      "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
+    backgroundPosition: "0 0, 0.9rem 0, 1.8rem 0",
+    backgroundSize: "3px 100%, 3px 100%, 3px 100%",
+  },
+  ".cm-line.cm-md-bq-4": {
+    paddingLeft: "3.6rem",
+    backgroundImage:
+      "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
+    backgroundPosition: "0 0, 0.9rem 0, 1.8rem 0, 2.7rem 0",
+    backgroundSize: "3px 100%, 3px 100%, 3px 100%, 3px 100%",
   },
   ".cm-md-highlight": {
     backgroundColor: "var(--markdown-highlight)",
