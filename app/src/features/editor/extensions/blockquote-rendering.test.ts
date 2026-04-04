@@ -102,4 +102,32 @@ describe("Blockquote rendering", () => {
 
     view.destroy();
   });
+
+  it("applies list marker decorations inside blockquotes", async () => {
+    const { view } = createView(
+      [
+        "> - Quoted bullet one",
+        "> - Quoted bullet two",
+        ">   1. Quoted nested ordered item",
+        ">   2. Quoted nested ordered item",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const bulletMarkers = view.dom.querySelectorAll(
+      ".cm-md-bullet-marker-source",
+    );
+    const numberMarkers = view.dom.querySelectorAll(
+      ".cm-md-number-marker-source",
+    );
+
+    expect(bulletMarkers.length).toBe(2);
+    expect(numberMarkers.length).toBe(2);
+    expect(
+      [...view.dom.querySelectorAll(".cm-line.cm-md-bq.cm-md-list")].length,
+    ).toBeGreaterThan(0);
+
+    view.destroy();
+  });
 });

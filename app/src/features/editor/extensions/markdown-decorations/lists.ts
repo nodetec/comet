@@ -634,10 +634,6 @@ function buildBulletListDecorations(
 
   syntaxTree(state).iterate({
     enter(node) {
-      if (node.type.name === "Blockquote") {
-        return false;
-      }
-
       const data = getListMarkerData(state, node);
       if (!data || !BULLET_MARKERS.has(data.marker)) {
         return;
@@ -678,10 +674,6 @@ function buildNumberListDecorations(
 
   syntaxTree(state).iterate({
     enter(node) {
-      if (node.type.name === "Blockquote") {
-        return false;
-      }
-
       const data = getListMarkerData(state, node);
       if (!data || BULLET_MARKERS.has(data.marker)) {
         return;
@@ -716,10 +708,6 @@ function buildTaskListDecorations(
 
   syntaxTree(state).iterate({
     enter(node) {
-      if (node.type.name === "Blockquote") {
-        return false;
-      }
-
       const data = getListMarkerData(state, node);
       if (!data || !BULLET_MARKERS.has(data.marker)) {
         return;
