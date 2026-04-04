@@ -55,7 +55,11 @@ const markdownDecorationsTheme = EditorView.baseTheme({
       '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: "0.9em",
     backgroundColor: "var(--muted)",
-    padding: "0 0.75rem",
+  },
+  ".cm-md-codeblock-content": {
+    display: "inline-block",
+    paddingLeft: "0.75rem",
+    paddingRight: "0.75rem",
   },
   ".cm-md-codeblock.cm-md-codeblock-open": {
     borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
