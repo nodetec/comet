@@ -1,5 +1,9 @@
 import { EditorState } from "@codemirror/state";
-import { LanguageDescription, syntaxTree } from "@codemirror/language";
+import {
+  LanguageDescription,
+  ensureSyntaxTree,
+  syntaxTree,
+} from "@codemirror/language";
 import {
   markdown as markdownLanguage,
   markdownLanguage as markdownLang,
@@ -22,7 +26,9 @@ describe("Code fence syntax highlighting", () => {
     });
 
     const valuePosition = state.doc.toString().indexOf("value");
-    const node = syntaxTree(state).resolveInner(valuePosition, 1);
+    const tree =
+      ensureSyntaxTree(state, state.doc.length, 200) ?? syntaxTree(state);
+    const node = tree.resolveInner(valuePosition, 1);
 
     expect(node.name).toBe("VariableDefinition");
     expect(node.parent?.name).toBe("VariableDeclaration");

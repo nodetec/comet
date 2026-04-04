@@ -15,10 +15,15 @@ import {
   EditorView,
   keymap,
   ViewPlugin,
-  WidgetType,
   type DecorationSet,
 } from "@codemirror/view";
 import type { SyntaxNodeRef } from "@lezer/common";
+
+import {
+  isListDecorationsDisabled,
+  isListInteractionsDisabled,
+  isListSelectionNormalizationDisabled,
+} from "@/shared/lib/editor-debug";
 
 const BULLET_INDENT = 2;
 const ORDERED_INDENT = 3;
@@ -32,7 +37,6 @@ type ListMarkerData = {
   marker: string;
   markerEnd: number;
   markerStart: number;
-  spacerDecorations: Array<Range<Decoration>>;
 };
 
 type MarkerRange = {
@@ -48,16 +52,6 @@ type TaskListShortcut = {
   };
   selection: EditorSelection;
 };
-
-class SpacerWidget extends WidgetType {
-  override toDOM(): HTMLElement {
-    const spacer = document.createElement("span");
-    spacer.className = "cm-md-indent";
-    spacer.style.display = "inline-flex";
-    spacer.style.inlineSize = "2rem";
-    return spacer;
-  }
-}
 
 export function getListMarkerData(
   state: EditorState,
@@ -78,18 +72,6 @@ export function getListMarkerData(
   const tabSize = BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
   const indentChars = from - line.from;
   const indentLevel = Math.floor(indentChars / tabSize);
-  const spacerDecorations: Array<Range<Decoration>> = [];
-
-  for (let i = 0; i < indentLevel; i++) {
-    const spacerFrom = line.from + i * tabSize;
-    const spacerTo = spacerFrom + tabSize;
-    spacerDecorations.push(
-      Decoration.replace({ widget: new SpacerWidget() }).range(
-        spacerFrom,
-        spacerTo,
-      ),
-    );
-  }
 
   return {
     indentLevel,
@@ -97,7 +79,6 @@ export function getListMarkerData(
     marker,
     markerEnd: to,
     markerStart: from,
-    spacerDecorations,
   };
 }
 
@@ -108,7 +89,10 @@ function createListStateField(
     create(state) {
       return decorate(state);
     },
-    update(_value, transaction) {
+    update(value, transaction) {
+      if (!transaction.docChanged) {
+        return value;
+      }
       return decorate(transaction.state);
     },
     provide(field) {
@@ -125,7 +109,7 @@ function addListDecorations(
   lineClass: string,
   markerDecoration: Range<Decoration>,
   decorationRanges: Array<Range<Decoration>>,
-  atomicRanges: Array<Range<Decoration>>,
+  _atomicRanges: Array<Range<Decoration>>,
 ) {
   decorationRanges.push(
     Decoration.line({
@@ -134,10 +118,8 @@ function addListDecorations(
         style: `--indent-level: ${data.indentLevel}`,
       },
     }).range(data.lineStart),
-    ...data.spacerDecorations,
     markerDecoration,
   );
-  atomicRanges.push(...data.spacerDecorations);
 }
 
 function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
@@ -355,6 +337,9 @@ function buildListMarkerRanges(state: EditorState): MarkerRange[] {
           ranges.push({ from: data.markerStart, to: taskEnd + 1 });
           return;
         }
+
+        ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
+        return;
       }
 
       ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
@@ -648,11 +633,6 @@ function buildNumberListDecorations(
   const decorationRanges: Array<Range<Decoration>> = [];
   const atomicRanges: Array<Range<Decoration>> = [];
 
-  // Track display number per indent level across the whole document.
-  // Reset when indent decreases or a non-list gap appears.
-  const counterByIndent = new Map<number, number>();
-  let prevIndent = -1;
-
   syntaxTree(state).iterate({
     enter(node) {
       if (node.type.name === "Blockquote") {
@@ -664,31 +644,13 @@ function buildNumberListDecorations(
         return;
       }
 
-      const indent = data.indentLevel;
-
-      // Reset deeper counters when returning to shallower indent
-      if (prevIndent >= 0 && indent < prevIndent) {
-        for (const [key] of counterByIndent) {
-          if (key > indent) {
-            counterByIndent.delete(key);
-          }
-        }
-      }
-
-      const displayNumber = (counterByIndent.get(indent) ?? 0) + 1;
-      counterByIndent.set(indent, displayNumber);
-      prevIndent = indent;
-
-      // Extract the separator (. or )) from the marker text
-      const sep = data.marker.replace(/^\d+/, "");
-
       addListDecorations(
         data,
         "cm-md-list cm-md-number-list",
         Decoration.mark({
           class: "cm-md-list-marker cm-md-number-marker-source",
           attributes: {
-            style: `--display-number: "${displayNumber}${sep} "`,
+            style: `--display-number: "${data.marker} "`,
           },
         }).range(data.markerStart, data.markerEnd + 1),
         decorationRanges,
@@ -737,7 +699,6 @@ function buildTaskListDecorations(
             style: `--indent-level: ${data.indentLevel}`,
           },
         }).range(data.lineStart),
-        ...data.spacerDecorations,
         Decoration.mark({
           class: "cm-md-task-bullet-source",
         }).range(data.markerStart, data.markerEnd + 1),
@@ -745,7 +706,6 @@ function buildTaskListDecorations(
           class: `cm-md-list-marker cm-md-task-marker-source ${checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`,
         }).range(taskStart, taskEnd + 1),
       );
-      atomicRanges.push(...data.spacerDecorations);
     },
   });
 
@@ -763,7 +723,11 @@ function numberLists(): Extension {
   return createListStateField(buildNumberListDecorations);
 }
 
-function taskLists(): Extension {
+function taskListDecorations(): Extension {
+  return createListStateField(buildTaskListDecorations);
+}
+
+function taskListInteractions(): Extension {
   return [
     ViewPlugin.define(() => ({}), {
       eventHandlers: {
@@ -807,7 +771,6 @@ function taskLists(): Extension {
         },
       },
     }),
-    createListStateField(buildTaskListDecorations),
   ];
 }
 
@@ -858,9 +821,6 @@ function listMarkerInteractions(): Extension {
 }
 
 const listTheme = EditorView.theme({
-  ".cm-md-indent": {
-    display: "inline-flex",
-  },
   ".cm-md-list": {
     paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
     textIndent: "calc((var(--indent-level) * 2rem + 2rem) * -1)",
@@ -1007,32 +967,51 @@ const listEditKeymap = keymap.of([
 ]);
 
 export function lists(): Extension {
+  const decorationsDisabled = isListDecorationsDisabled();
+  const interactionsDisabled = isListInteractionsDisabled();
+  const selectionNormalizationDisabled = isListSelectionNormalizationDisabled();
+  const selectionNormalizationExtensions = selectionNormalizationDisabled
+    ? []
+    : [
+        EditorState.transactionFilter.of(
+          (transaction): readonly TransactionSpec[] => {
+            const tightContinuation =
+              stripNonTightListContinuation(transaction);
+            if (tightContinuation) {
+              return [tightContinuation as TransactionSpec];
+            }
+
+            const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
+            if (listPrefixRemoval) {
+              return [listPrefixRemoval as TransactionSpec];
+            }
+
+            const selection = normalizeSelectionToListMarkers(
+              transaction.state,
+            );
+            return selection
+              ? [transaction, { selection, sequential: true }]
+              : [transaction];
+          },
+        ),
+      ];
+  const decorationExtensions = decorationsDisabled
+    ? []
+    : [taskListDecorations(), bulletLists(), numberLists()];
+  const interactionExtensions = interactionsDisabled
+    ? []
+    : [
+        taskListInteractions(),
+        listMarkerInteractions(),
+        listInputHandler,
+        listNavigationKeymap,
+        listEditKeymap,
+      ];
+
   return [
-    EditorState.transactionFilter.of(
-      (transaction): readonly TransactionSpec[] => {
-        const tightContinuation = stripNonTightListContinuation(transaction);
-        if (tightContinuation) {
-          return [tightContinuation as TransactionSpec];
-        }
-
-        const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
-        if (listPrefixRemoval) {
-          return [listPrefixRemoval as TransactionSpec];
-        }
-
-        const selection = normalizeSelectionToListMarkers(transaction.state);
-        return selection
-          ? [transaction, { selection, sequential: true }]
-          : [transaction];
-      },
-    ),
-    taskLists(),
-    listMarkerInteractions(),
-    bulletLists(),
-    numberLists(),
-    listInputHandler,
+    ...selectionNormalizationExtensions,
+    ...decorationExtensions,
+    ...interactionExtensions,
     listTheme,
-    listNavigationKeymap,
-    listEditKeymap,
   ];
 }

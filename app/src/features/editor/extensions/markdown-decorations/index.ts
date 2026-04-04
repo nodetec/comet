@@ -5,6 +5,10 @@ export { HighlightSyntax } from "@/features/editor/extensions/markdown-decoratio
 import { tables } from "@/features/editor/extensions/markdown-decorations/builders/tables";
 import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
+import {
+  isListExtensionsDisabled,
+  logEditorDebug,
+} from "@/shared/lib/editor-debug";
 
 const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-heading": {
@@ -233,10 +237,16 @@ type MarkdownDecorationsOptions = {
 export function markdownDecorations(
   options: MarkdownDecorationsOptions = {},
 ): Extension {
+  const listsDisabled = isListExtensionsDisabled();
+  logEditorDebug("markdown-decorations", "initializing markdown decorations", {
+    listsDisabled,
+  });
+  const listExtensions = listsDisabled ? [] : [lists()];
+
   return [
     markdownDecorationsPlugin(options.searchQuery),
     markdownDecorationsTheme,
-    lists(),
+    ...listExtensions,
     tables(),
   ];
 }

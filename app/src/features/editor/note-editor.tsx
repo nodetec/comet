@@ -15,6 +15,7 @@ import {
 } from "@codemirror/commands";
 import {
   markdown as markdownLanguage,
+  markdownKeymap,
   markdownLanguage as markdownLang,
 } from "@codemirror/lang-markdown";
 import {
@@ -54,6 +55,7 @@ import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
+import { logEditorDebug, summarizeRanges } from "@/shared/lib/editor-debug";
 import { collectSearchMatches } from "@/shared/lib/search";
 
 function getEditorScrollContainer(view: EditorView): HTMLElement {
@@ -721,6 +723,7 @@ function startSelectionEdgeAutoScroll(
   view: EditorView,
   pointerId: number,
   options: {
+    captureOnStart?: boolean;
     getAnchor(): number;
     getHead(pointer: DragPointerState): SelectionRange | null;
     updateSelectionOnPointerMove?: boolean;
@@ -730,7 +733,17 @@ function startSelectionEdgeAutoScroll(
   const ownerWindow = pointerTarget.ownerDocument.defaultView ?? window;
   const scrollContainer = getEditorScrollContainer(view);
   let animationFrame: number | null = null;
+  let hasCapture = false;
   let latestPointer: DragPointerState | null = null;
+
+  const capturePointer = () => {
+    if (hasCapture) {
+      return;
+    }
+
+    pointerTarget.setPointerCapture(pointerId);
+    hasCapture = true;
+  };
 
   const stopAnimation = () => {
     if (animationFrame == null) {
@@ -781,6 +794,7 @@ function startSelectionEdgeAutoScroll(
 
     if (nextScrollTop !== scrollContainer.scrollTop) {
       scrollContainer.scrollTop = nextScrollTop;
+      view.requestMeasure();
     }
 
     updateSelection(latestPointer);
@@ -803,11 +817,21 @@ function startSelectionEdgeAutoScroll(
       target: event.target,
     };
 
-    if (options.updateSelectionOnPointerMove) {
+    const delta = getDragScrollDelta(
+      scrollContainer,
+      event.clientY,
+      ownerWindow,
+    );
+
+    if (delta !== 0 && !hasCapture) {
+      capturePointer();
+    }
+
+    if (options.updateSelectionOnPointerMove || hasCapture) {
       updateSelection(latestPointer);
     }
 
-    if (getDragScrollDelta(scrollContainer, event.clientY, ownerWindow) === 0) {
+    if (delta === 0) {
       stopAnimation();
       return;
     }
@@ -836,7 +860,7 @@ function startSelectionEdgeAutoScroll(
       handlePointerDone,
       true,
     );
-    if (pointerTarget.hasPointerCapture(pointerId)) {
+    if (hasCapture && pointerTarget.hasPointerCapture(pointerId)) {
       pointerTarget.releasePointerCapture(pointerId);
     }
   };
@@ -845,7 +869,9 @@ function startSelectionEdgeAutoScroll(
   pointerTarget.addEventListener("pointerup", handlePointerDone, true);
   pointerTarget.addEventListener("pointercancel", handlePointerDone, true);
   pointerTarget.addEventListener("lostpointercapture", handlePointerDone, true);
-  pointerTarget.setPointerCapture(pointerId);
+  if (options.captureOnStart) {
+    capturePointer();
+  }
 
   return cleanup;
 }
@@ -1035,6 +1061,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               let anchor: number | null = null;
               selectionAutoScrollCleanupRef.current =
                 startSelectionEdgeAutoScroll(view, event.pointerId, {
+                  captureOnStart: false,
                   getAnchor: () => anchor ?? view.state.selection.main.anchor,
                   getHead: (pointer) =>
                     getContentSelectionHeadFromPoint(
@@ -1192,6 +1219,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 return selectAll(view);
               },
             },
+            ...markdownKeymap,
             ...defaultKeymap.filter(
               (b) => b.key !== "Ctrl-k" && b.mac !== "Ctrl-k",
             ),
@@ -1201,6 +1229,29 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
+            if (
+              update.viewportChanged ||
+              update.docChanged ||
+              update.selectionSet
+            ) {
+              const scrollContainer = getEditorScrollContainer(update.view);
+              logEditorDebug("editor-update", "editor view update", {
+                docChanged: update.docChanged,
+                docLength: update.state.doc.length,
+                docLines: update.state.doc.lines,
+                scrollTop: scrollContainer.scrollTop,
+                selection: {
+                  anchor: update.state.selection.main.anchor,
+                  empty: update.state.selection.main.empty,
+                  head: update.state.selection.main.head,
+                },
+                selectionSet: update.selectionSet,
+                visibleRanges: summarizeRanges(update.view.visibleRanges),
+                viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
+                viewportChanged: update.viewportChanged,
+              });
+            }
+
             if (update.docChanged && !applyingExternalChangeRef.current) {
               onChangeRef.current(update.state.doc.toString());
             }
@@ -1551,6 +1602,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         view,
         pointerId ?? 1,
         {
+          captureOnStart: true,
           getAnchor: () => anchor.anchor,
           getHead: (pointer) =>
             getSelectionHeadFromPoint(

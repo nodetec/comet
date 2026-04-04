@@ -18,8 +18,6 @@ type ScrollMeasure = {
   targetScrollTop: number;
 } | null;
 
-const DEBUG_SCROLL_CENTER = import.meta.env.DEV;
-
 function getScrollContainer(view: EditorView): HTMLElement | null {
   const container = view.dom.closest("[data-editor-scroll-container]");
   return container instanceof HTMLElement ? container : null;
@@ -69,14 +67,6 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
       updateInsertedLineBreak(update) &&
       update.state.selection.main.empty;
 
-    if (DEBUG_SCROLL_CENTER) {
-      console.debug("[editor:scroll-center] update", {
-        docChanged: update.docChanged,
-        insertedLineBreak,
-        selectionSet: update.selectionSet,
-      });
-    }
-
     if (!insertedLineBreak) {
       return;
     }
@@ -86,11 +76,6 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
       read: (view) => {
         const nextScrollContainer = getScrollContainer(view);
         if (!nextScrollContainer) {
-          if (DEBUG_SCROLL_CENTER) {
-            console.debug(
-              "[editor:scroll-center] missing scroll container during read",
-            );
-          }
           return null;
         }
 
@@ -99,13 +84,6 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
           nextScrollContainer,
           this.viewportPercentage,
         );
-
-        if (DEBUG_SCROLL_CENTER) {
-          console.debug("[editor:scroll-center] trigger", {
-            shouldCenter,
-            viewportPercentage: this.viewportPercentage,
-          });
-        }
 
         if (!shouldCenter) {
           return null;
@@ -120,17 +98,6 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
           nextScrollContainer.scrollTop + (blockMidpoint - viewportMidpoint),
         );
 
-        if (DEBUG_SCROLL_CENTER) {
-          console.debug("[editor:scroll-center] measure", {
-            blockHeight: block.height,
-            blockTop: block.top,
-            containerHeight: containerRect.height,
-            currentScrollTop: nextScrollContainer.scrollTop,
-            documentTop: view.documentTop,
-            targetScrollTop,
-          });
-        }
-
         return {
           blockHeight: block.height,
           blockTop: block.top,
@@ -143,16 +110,6 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
       write: (measure) => {
         if (!measure) {
           return;
-        }
-
-        if (DEBUG_SCROLL_CENTER) {
-          console.debug("[editor:scroll-center] write", {
-            blockHeight: measure.blockHeight,
-            blockTop: measure.blockTop,
-            containerHeight: measure.containerHeight,
-            from: measure.scrollTop,
-            to: measure.targetScrollTop,
-          });
         }
 
         measure.scrollContainer.scrollTop = measure.targetScrollTop;
