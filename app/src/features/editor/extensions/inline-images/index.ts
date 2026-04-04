@@ -100,8 +100,6 @@ class InlineImageWidget extends WidgetType {
       view.focus();
     });
 
-    wrapper.dataset.from = String(this.from);
-    wrapper.dataset.to = String(this.to);
     wrapper.append(image);
     return wrapper;
   }
@@ -173,19 +171,6 @@ function buildInlineImageDecorations(state: EditorState, searchQuery: string) {
   return builder.finish();
 }
 
-function syncImageSelectionState(view: EditorView) {
-  const sel = view.state.selection.main;
-  for (const el of view.contentDOM.querySelectorAll(".cm-inline-image")) {
-    if (!(el instanceof HTMLElement)) {
-      continue;
-    }
-    const from = Number(el.dataset.from);
-    const to = Number(el.dataset.to);
-    const isSelected = !sel.empty && from < sel.to && to > sel.from;
-    el.classList.toggle("cm-inline-image-selected", isSelected);
-  }
-}
-
 function inlineImagePlugin(searchQuery = "") {
   return ViewPlugin.fromClass(
     class {
@@ -205,10 +190,6 @@ function inlineImagePlugin(searchQuery = "") {
             searchQuery,
           );
         }
-
-        if (update.selectionSet || update.docChanged) {
-          syncImageSelectionState(update.view);
-        }
       }
     },
     { decorations: (v) => v.decorations },
@@ -227,16 +208,6 @@ const inlineImageTheme = EditorView.baseTheme({
     maxWidth: "min(100%, 32rem)",
     objectFit: "contain",
     userSelect: "none",
-  },
-  ".cm-inline-image-selected": {
-    position: "relative",
-  },
-  ".cm-inline-image-selected::after": {
-    content: '""',
-    position: "absolute",
-    inset: "0",
-    backgroundColor: "color-mix(in oklab, var(--primary) 30%, transparent)",
-    pointerEvents: "none",
   },
 });
 
