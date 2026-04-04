@@ -2,6 +2,7 @@ import { type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
+import { linkInteractions } from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { tables } from "@/features/editor/extensions/markdown-decorations/builders/tables";
 import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
@@ -166,6 +167,7 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   },
   ".cm-md-link": {
     color: "var(--primary)",
+    cursor: "pointer",
   },
   ".cm-line.cm-md-bq": {
     "--cm-md-bq-bar-color": "var(--primary)",
@@ -249,6 +251,7 @@ export function markdownDecorations(
   return [
     markdownDecorationsPlugin(options.searchQuery),
     markdownDecorationsTheme,
+    linkInteractions(),
     ...listExtensions,
     tables(),
   ];

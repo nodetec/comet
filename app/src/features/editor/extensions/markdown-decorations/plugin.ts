@@ -18,7 +18,10 @@ import { handleHeading } from "@/features/editor/extensions/markdown-decorations
 import { handleHorizontalRule } from "@/features/editor/extensions/markdown-decorations/builders/horizontal-rules";
 import { handleCodeBlock } from "@/features/editor/extensions/markdown-decorations/builders/code-blocks";
 import { handleInlineCode } from "@/features/editor/extensions/markdown-decorations/builders/inline-code";
-import { handleLink } from "@/features/editor/extensions/markdown-decorations/builders/links";
+import {
+  addPlainExternalLinkDecorations,
+  handleLink,
+} from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { handleStrikethrough } from "@/features/editor/extensions/markdown-decorations/builders/strikethrough";
 import {
   getCursorLineRanges,
@@ -170,6 +173,8 @@ function buildDecorations(
       }
     },
   });
+
+  addPlainExternalLinkDecorations(ctx, entries);
 
   // RangeSetBuilder requires entries sorted by from position
   entries.sort((a, b) => a.from - b.from || a.to - b.to);
