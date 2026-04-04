@@ -30,9 +30,6 @@ const codeBlockCloseLine = Decoration.line({
 const hiddenFenceMark = Decoration.mark({
   class: "cm-md-codeblock-fence-hidden",
 });
-const codeBlockContentMark = Decoration.mark({
-  class: "cm-md-codeblock-content",
-});
 
 export function handleCodeBlock(
   node: SyntaxNodeRef,
@@ -63,13 +60,6 @@ export function handleCodeBlock(
     }
 
     out.push({ from: line.from, to: line.from, decoration: deco });
-    if (!hideFence && line.from < line.to) {
-      out.push({
-        from: line.from,
-        to: line.to,
-        decoration: codeBlockContentMark,
-      });
-    }
     if (hideFence && line.from < line.to) {
       out.push({
         from: line.from,
