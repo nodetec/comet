@@ -510,18 +510,19 @@ function stripNonTightListContinuation(
     return null;
   }
 
-  let changeFrom = 0;
-  let changeTo = 0;
-  let insertedText = "";
+  const allChanges: Array<{ from: number; to: number; insert: string }> = [];
   let found = false;
+  let charsRemoved = 0;
 
   transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
     const text = inserted.toString();
     if (/\n\s*\n/.test(text)) {
       found = true;
-      changeFrom = fromA;
-      changeTo = toA;
-      insertedText = text;
+      const fixedText = text.replace(/\n\s*\n/, "\n");
+      charsRemoved = text.length - fixedText.length;
+      allChanges.push({ from: fromA, to: toA, insert: fixedText });
+    } else {
+      allChanges.push({ from: fromA, to: toA, insert: text });
     }
   });
 
@@ -529,12 +530,10 @@ function stripNonTightListContinuation(
     return null;
   }
 
-  const fixedText = insertedText.replace(/\n\s*\n/, "\n");
-  const charsRemoved = insertedText.length - fixedText.length;
   const originalCursor = transaction.newSelection.main.head;
 
   return {
-    changes: { from: changeFrom, to: changeTo, insert: fixedText },
+    changes: allChanges,
     selection: EditorSelection.cursor(originalCursor - charsRemoved),
     annotations: Transaction.userEvent.of("input"),
   };
@@ -822,8 +821,11 @@ function listMarkerInteractions(): Extension {
 
 const listTheme = EditorView.theme({
   ".cm-md-list": {
-    paddingLeft: "calc(var(--indent-level) * 2rem + 2rem) !important",
-    textIndent: "calc((var(--indent-level) * 2rem + 2rem) * -1)",
+    "--cm-md-list-indent-step": "1.5rem",
+    "--cm-md-list-marker-width": "2rem",
+    paddingLeft:
+      "calc(var(--indent-level) * var(--cm-md-list-indent-step) + var(--cm-md-list-marker-width)) !important",
+    textIndent: "calc(var(--cm-md-list-marker-width) * -1)",
   },
   ".cm-md-list *": {
     textIndent: "0",
@@ -833,7 +835,7 @@ const listTheme = EditorView.theme({
     color: "var(--primary)",
     display: "inline-flex",
     justifyContent: "center",
-    minWidth: "2rem",
+    minWidth: "var(--cm-md-list-marker-width)",
     position: "relative",
     textAlign: "center",
     verticalAlign: "middle",
@@ -844,7 +846,7 @@ const listTheme = EditorView.theme({
     color: "transparent",
     display: "inline-block",
     letterSpacing: "0.65rem",
-    width: "2rem",
+    width: "var(--cm-md-list-marker-width)",
     WebkitTextFillColor: "transparent",
   },
   ".cm-md-bullet-marker-source::before": {
@@ -865,7 +867,7 @@ const listTheme = EditorView.theme({
   ".cm-md-number-marker-source": {
     color: "transparent",
     display: "inline-block",
-    width: "2rem",
+    width: "var(--cm-md-list-marker-width)",
     WebkitTextFillColor: "transparent",
   },
   ".cm-md-number-marker-source::before": {
@@ -883,13 +885,13 @@ const listTheme = EditorView.theme({
     color: "transparent",
     cursor: "pointer",
     display: "inline-block",
-    minWidth: "2rem",
+    minWidth: "var(--cm-md-list-marker-width)",
     overflow: "hidden",
     textAlign: "justify",
     textAlignLast: "justify",
     textJustify: "inter-character",
     whiteSpace: "pre",
-    width: "2rem",
+    width: "var(--cm-md-list-marker-width)",
     WebkitTextFillColor: "transparent",
   },
   ".cm-md-task-bullet-source": {

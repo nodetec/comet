@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import {
+  insertNewlineContinueMarkup,
   markdown as markdownLanguage,
   markdownLanguage as markdownLang,
 } from "@codemirror/lang-markdown";
@@ -10,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { markdownDecorations } from "@/features/editor/extensions/markdown-decorations";
 
-function createView(doc: string) {
+function createView(doc: string, cursor?: number) {
   const parent = document.createElement("div");
   document.body.append(parent);
 
@@ -18,6 +19,7 @@ function createView(doc: string) {
     parent,
     state: EditorState.create({
       doc,
+      selection: cursor == null ? undefined : EditorSelection.cursor(cursor),
       extensions: [
         markdownLanguage({
           base: markdownLang,
@@ -110,6 +112,42 @@ describe("List rendering", () => {
       '--display-number: "8. ";',
       '--display-number: "9. ";',
     ]);
+
+    view.destroy();
+  });
+
+  it("renumbers subsequent items when Enter creates a new list item", async () => {
+    const doc = "1. First\n2. Second\n3. Third";
+    const { view } = createView(doc, doc.indexOf("\n3."));
+
+    await flush();
+
+    insertNewlineContinueMarkup({
+      state: view.state,
+      dispatch: (tr) => view.dispatch(tr),
+    });
+
+    expect(view.state.doc.toString()).toBe(
+      "1. First\n2. Second\n3. \n4. Third",
+    );
+
+    view.destroy();
+  });
+
+  it("renumbers subsequent items in a non-tight list", async () => {
+    const doc = "1. First\n\n2. Second\n\n3. Third";
+    const { view } = createView(doc, doc.indexOf("\n\n3."));
+
+    await flush();
+
+    insertNewlineContinueMarkup({
+      state: view.state,
+      dispatch: (tr) => view.dispatch(tr),
+    });
+
+    expect(view.state.doc.toString()).toBe(
+      "1. First\n\n2. Second\n3. \n\n4. Third",
+    );
 
     view.destroy();
   });

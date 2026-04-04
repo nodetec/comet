@@ -366,7 +366,7 @@ body {
 /* Horizontal rule — no custom CSS needed, styled with Tailwind in the component */
 
 .comet-list {
-  --comet-list-indent-step: 1.25rem;
+  --comet-list-indent-step: 1.5rem;
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
