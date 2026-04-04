@@ -390,20 +390,28 @@ function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
 function getDragScrollDelta(
   scrollContainer: HTMLElement,
   clientY: number,
+  ownerWindow: Window,
 ): number {
   const rect = scrollContainer.getBoundingClientRect();
-  const zone = Math.min(DRAG_SCROLL_EDGE_SIZE, rect.height / 4);
+  const viewportTop = ownerWindow.visualViewport?.offsetTop ?? 0;
+  const viewportBottom =
+    viewportTop +
+    (ownerWindow.visualViewport?.height ?? ownerWindow.innerHeight);
+  const effectiveTop = Math.max(rect.top, viewportTop);
+  const effectiveBottom = Math.min(rect.bottom, viewportBottom);
+  const effectiveHeight = effectiveBottom - effectiveTop;
+  const zone = Math.min(DRAG_SCROLL_EDGE_SIZE, effectiveHeight / 4);
   if (zone <= 0) {
     return 0;
   }
 
-  const topThreshold = rect.top + zone;
+  const topThreshold = effectiveTop + zone;
   if (clientY < topThreshold) {
     const intensity = (topThreshold - clientY) / zone;
     return -Math.max(1, Math.ceil(intensity * DRAG_SCROLL_MAX_STEP));
   }
 
-  const bottomThreshold = rect.bottom - zone;
+  const bottomThreshold = effectiveBottom - zone;
   if (clientY > bottomThreshold) {
     const intensity = (clientY - bottomThreshold) / zone;
     return Math.max(1, Math.ceil(intensity * DRAG_SCROLL_MAX_STEP));
@@ -753,7 +761,11 @@ function startSelectionEdgeAutoScroll(
       return;
     }
 
-    const delta = getDragScrollDelta(scrollContainer, latestPointer.clientY);
+    const delta = getDragScrollDelta(
+      scrollContainer,
+      latestPointer.clientY,
+      ownerWindow,
+    );
     if (delta === 0) {
       return;
     }
@@ -795,7 +807,7 @@ function startSelectionEdgeAutoScroll(
       updateSelection(latestPointer);
     }
 
-    if (getDragScrollDelta(scrollContainer, event.clientY) === 0) {
+    if (getDragScrollDelta(scrollContainer, event.clientY, ownerWindow) === 0) {
       stopAnimation();
       return;
     }
