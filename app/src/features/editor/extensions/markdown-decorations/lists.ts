@@ -1022,10 +1022,86 @@ function tryMoveAcrossContinuationRange(
   return false;
 }
 
+function expandSelectionRangeToOverlappingMarkers(
+  state: EditorState,
+  from: number,
+  to: number,
+) {
+  let nextFrom = from;
+  let nextTo = to;
+  let changed = false;
+
+  for (const marker of buildListMarkerRanges(state)) {
+    if (nextFrom >= marker.to || nextTo <= marker.from) {
+      continue;
+    }
+
+    nextFrom = Math.min(nextFrom, marker.from);
+    nextTo = Math.max(nextTo, marker.to);
+    changed = true;
+  }
+
+  return { changed, from: nextFrom, to: nextTo };
+}
+
+function getExpandedSelectionRangeAcrossListMarkers(
+  state: EditorState,
+  from: number,
+  to: number,
+) {
+  let nextFrom = from;
+  let nextTo = to;
+  let changed = false;
+
+  while (true) {
+    const expanded = expandSelectionRangeToOverlappingMarkers(
+      state,
+      nextFrom,
+      nextTo,
+    );
+    if (!expanded.changed) {
+      break;
+    }
+
+    nextFrom = expanded.from;
+    nextTo = expanded.to;
+    changed = true;
+  }
+
+  return changed ? { from: nextFrom, to: nextTo } : null;
+}
+
+function deleteExpandedSelectionAcrossListMarkers(view: EditorView) {
+  if (view.state.selection.ranges.length !== 1) {
+    return false;
+  }
+
+  const selection = view.state.selection.main;
+  if (selection.empty) {
+    return false;
+  }
+
+  const expandedRange = getExpandedSelectionRangeAcrossListMarkers(
+    view.state,
+    selection.from,
+    selection.to,
+  );
+  if (!expandedRange) {
+    return false;
+  }
+
+  view.dispatch({
+    changes: expandedRange,
+    selection: EditorSelection.cursor(expandedRange.from),
+    annotations: Transaction.userEvent.of("delete.backward"),
+  });
+  return true;
+}
+
 export function deleteAcrossListBoundary(view: EditorView) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
-    return false;
+    return deleteExpandedSelectionAcrossListMarkers(view);
   }
 
   const currentLine = view.state.doc.lineAt(selection.head);

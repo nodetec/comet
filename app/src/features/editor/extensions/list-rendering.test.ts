@@ -461,6 +461,23 @@ describe("List rendering", () => {
     view.destroy();
   });
 
+  it("backspace on a task selection removes the hidden bullet prefix too", async () => {
+    const doc = "- [ ] Task item";
+    const { view } = createView(doc);
+
+    view.dispatch({
+      selection: EditorSelection.range(2, doc.length),
+    });
+
+    await flush();
+
+    expect(deleteAcrossListBoundary(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("");
+    expect(view.state.selection.main.head).toBe(0);
+
+    view.destroy();
+  });
+
   it("backspace on an empty quoted continuation line removes the whole blank continuation line", async () => {
     const doc = "> - Child\n>   ";
     const { view } = createView(doc, doc.length);
