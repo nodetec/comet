@@ -207,6 +207,11 @@ export type NoteEditorHandle = {
 };
 
 type GutterSide = "left" | "right";
+type DragPointerState = {
+  clientX: number;
+  clientY: number;
+  target: EventTarget | null;
+};
 
 const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
   { tag: [t.emphasis], fontStyle: "italic" },
@@ -321,6 +326,8 @@ const DisableSetextHeading: MarkdownConfig = {
 
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
+const DRAG_SCROLL_EDGE_SIZE = 48;
+const DRAG_SCROLL_MAX_STEP = 24;
 const TABLE_CELL_SELECTOR = ".cm-md-table-cell";
 const TABLE_EDITOR_HOST_SELECTOR = ".cm-md-table-cell-editor";
 const TABLE_WRAPPER_SELECTOR = ".cm-md-table-wrapper";
@@ -378,6 +385,31 @@ function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
       scrollContainer.removeEventListener("scroll", lock);
     });
   });
+}
+
+function getDragScrollDelta(
+  scrollContainer: HTMLElement,
+  clientY: number,
+): number {
+  const rect = scrollContainer.getBoundingClientRect();
+  const zone = Math.min(DRAG_SCROLL_EDGE_SIZE, rect.height / 4);
+  if (zone <= 0) {
+    return 0;
+  }
+
+  const topThreshold = rect.top + zone;
+  if (clientY < topThreshold) {
+    const intensity = (topThreshold - clientY) / zone;
+    return -Math.max(1, Math.ceil(intensity * DRAG_SCROLL_MAX_STEP));
+  }
+
+  const bottomThreshold = rect.bottom - zone;
+  if (clientY > bottomThreshold) {
+    const intensity = (clientY - bottomThreshold) / zone;
+    return Math.max(1, Math.ceil(intensity * DRAG_SCROLL_MAX_STEP));
+  }
+
+  return 0;
 }
 
 function getListTextStartOffset(lineText: string): number {
@@ -553,10 +585,6 @@ function getLineBoundaryCursor(
   side: GutterSide,
 ) {
   const contentRect = view.contentDOM.getBoundingClientRect();
-  if (clientY < contentRect.top || clientY > contentRect.bottom) {
-    return null;
-  }
-
   const targetY = Math.min(
     contentRect.bottom - 1,
     Math.max(contentRect.top + 1, clientY),
@@ -605,19 +633,20 @@ function getSelectionHeadFromPoint(
   side: GutterSide,
 ) {
   const contentRect = view.contentDOM.getBoundingClientRect();
-  if (clientY < contentRect.top || clientY > contentRect.bottom) {
-    return null;
-  }
+  const clampedY = Math.min(
+    contentRect.bottom - 1,
+    Math.max(contentRect.top + 1, clientY),
+  );
 
   if (clientX <= contentRect.left || clientX >= contentRect.right) {
-    return getLineBoundaryCursor(view, clientY, side);
+    return getLineBoundaryCursor(view, clampedY, side);
   }
 
   const tableBoundarySelection = getTableBoundarySelection(
     view,
     target,
     clientX,
-    clientY,
+    clampedY,
     true,
   );
   if (tableBoundarySelection) {
@@ -627,7 +656,7 @@ function getSelectionHeadFromPoint(
   const pos = view.posAtCoords(
     {
       x: clientX,
-      y: clientY,
+      y: clampedY,
     },
     false,
   );
@@ -636,6 +665,177 @@ function getSelectionHeadFromPoint(
   }
 
   return EditorSelection.cursor(pos);
+}
+
+function getContentSelectionHeadFromPoint(
+  view: EditorView,
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+) {
+  const contentRect = view.contentDOM.getBoundingClientRect();
+  const clampedX = Math.min(
+    contentRect.right - 1,
+    Math.max(contentRect.left + 1, clientX),
+  );
+  const clampedY = Math.min(
+    contentRect.bottom - 1,
+    Math.max(contentRect.top + 1, clientY),
+  );
+
+  const tableBoundarySelection = getTableBoundarySelection(
+    view,
+    target,
+    clampedX,
+    clampedY,
+    true,
+  );
+  if (tableBoundarySelection) {
+    return tableBoundarySelection.main;
+  }
+
+  const pos = view.posAtCoords({ x: clampedX, y: clampedY }, false);
+  if (pos != null) {
+    return EditorSelection.cursor(pos);
+  }
+
+  const boundaryLine =
+    clientY < contentRect.top
+      ? view.state.doc.line(1)
+      : view.state.doc.line(view.state.doc.lines);
+  return EditorSelection.cursor(
+    clientY < contentRect.top ? boundaryLine.from : boundaryLine.to,
+    clientY < contentRect.top ? 1 : -1,
+  );
+}
+
+function startSelectionEdgeAutoScroll(
+  view: EditorView,
+  pointerId: number,
+  options: {
+    getAnchor(): number;
+    getHead(pointer: DragPointerState): SelectionRange | null;
+    updateSelectionOnPointerMove?: boolean;
+  },
+) {
+  const pointerTarget = view.contentDOM;
+  const ownerWindow = pointerTarget.ownerDocument.defaultView ?? window;
+  const scrollContainer = getEditorScrollContainer(view);
+  let animationFrame: number | null = null;
+  let latestPointer: DragPointerState | null = null;
+
+  const stopAnimation = () => {
+    if (animationFrame == null) {
+      return;
+    }
+
+    ownerWindow.cancelAnimationFrame(animationFrame);
+    animationFrame = null;
+  };
+
+  const updateSelection = (pointer: DragPointerState) => {
+    const head = options.getHead(pointer);
+    if (!head) {
+      return;
+    }
+
+    view.dispatch({
+      scrollIntoView: false,
+      selection: EditorSelection.create([
+        EditorSelection.range(options.getAnchor(), head.head),
+      ]),
+    });
+  };
+
+  const tick = () => {
+    animationFrame = null;
+    if (!latestPointer) {
+      return;
+    }
+
+    const delta = getDragScrollDelta(scrollContainer, latestPointer.clientY);
+    if (delta === 0) {
+      return;
+    }
+
+    const maxScrollTop = Math.max(
+      0,
+      scrollContainer.scrollHeight - scrollContainer.clientHeight,
+    );
+    const nextScrollTop = Math.max(
+      0,
+      Math.min(maxScrollTop, scrollContainer.scrollTop + delta),
+    );
+
+    if (nextScrollTop !== scrollContainer.scrollTop) {
+      scrollContainer.scrollTop = nextScrollTop;
+    }
+
+    updateSelection(latestPointer);
+    animationFrame = ownerWindow.requestAnimationFrame(tick);
+  };
+
+  const handlePointerMove = (event: PointerEvent) => {
+    if (event.pointerId !== pointerId) {
+      return;
+    }
+
+    if ((event.buttons & 1) === 0) {
+      cleanup();
+      return;
+    }
+
+    latestPointer = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      target: event.target,
+    };
+
+    if (options.updateSelectionOnPointerMove) {
+      updateSelection(latestPointer);
+    }
+
+    if (getDragScrollDelta(scrollContainer, event.clientY) === 0) {
+      stopAnimation();
+      return;
+    }
+
+    event.preventDefault();
+    if (animationFrame == null) {
+      animationFrame = ownerWindow.requestAnimationFrame(tick);
+    }
+  };
+
+  const handlePointerDone = (event: PointerEvent) => {
+    if (event.pointerId !== pointerId) {
+      return;
+    }
+
+    cleanup();
+  };
+
+  const cleanup = () => {
+    stopAnimation();
+    pointerTarget.removeEventListener("pointermove", handlePointerMove, true);
+    pointerTarget.removeEventListener("pointerup", handlePointerDone, true);
+    pointerTarget.removeEventListener("pointercancel", handlePointerDone, true);
+    pointerTarget.removeEventListener(
+      "lostpointercapture",
+      handlePointerDone,
+      true,
+    );
+    if (pointerTarget.hasPointerCapture(pointerId)) {
+      pointerTarget.releasePointerCapture(pointerId);
+    }
+  };
+
+  pointerTarget.addEventListener("pointermove", handlePointerMove, true);
+  pointerTarget.addEventListener("pointerup", handlePointerDone, true);
+  pointerTarget.addEventListener("pointercancel", handlePointerDone, true);
+  pointerTarget.addEventListener("lostpointercapture", handlePointerDone, true);
+  pointerTarget.setPointerCapture(pointerId);
+
+  return cleanup;
 }
 
 function isRectOnClickedRow(
@@ -723,6 +923,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     );
     const restoreSelectionRef = useRef<SelectionRange | null>(null);
     const gutterDragCleanupRef = useRef<(() => void) | null>(null);
+    const gutterPointerIdRef = useRef<number | null>(null);
+    const selectionAutoScrollCleanupRef = useRef<(() => void) | null>(null);
     const initialMarkdownRef = useRef(markdown);
     const initialReadOnlyRef = useRef(readOnly);
     const initialSearchQueryRef = useRef(searchQuery);
@@ -803,6 +1005,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           tagHighlightStyle,
           search(),
           EditorView.domEventHandlers({
+            pointerdown(event, view) {
+              selectionAutoScrollCleanupRef.current?.();
+              selectionAutoScrollCleanupRef.current = null;
+
+              if (
+                event.button !== 0 ||
+                !event.isPrimary ||
+                (event.target instanceof HTMLElement &&
+                  event.target.closest(
+                    `${TABLE_CELL_SELECTOR}, ${TABLE_EDITOR_HOST_SELECTOR}`,
+                  ))
+              ) {
+                return;
+              }
+
+              let anchor: number | null = null;
+              selectionAutoScrollCleanupRef.current =
+                startSelectionEdgeAutoScroll(view, event.pointerId, {
+                  getAnchor: () => anchor ?? view.state.selection.main.anchor,
+                  getHead: (pointer) =>
+                    getContentSelectionHeadFromPoint(
+                      view,
+                      pointer.target,
+                      pointer.clientX,
+                      pointer.clientY,
+                    ),
+                });
+
+              requestAnimationFrame(() => {
+                anchor = view.state.selection.main.anchor;
+              });
+            },
             mousedown(event, view) {
               if (!view.hasFocus) {
                 useShellStore.getState().setFocusedPane("editor");
@@ -816,6 +1050,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 event.clientY,
               );
               if (horizontalRuleSelection) {
+                selectionAutoScrollCleanupRef.current?.();
+                selectionAutoScrollCleanupRef.current = null;
                 event.preventDefault();
                 event.stopPropagation();
                 view.focus();
@@ -830,6 +1066,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 event.clientY,
               );
               if (tableBoundarySelection) {
+                selectionAutoScrollCleanupRef.current?.();
+                selectionAutoScrollCleanupRef.current = null;
                 event.preventDefault();
                 event.stopPropagation();
                 view.focus();
@@ -1253,6 +1491,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       return () => {
         gutterDragCleanupRef.current?.();
         gutterDragCleanupRef.current = null;
+        selectionAutoScrollCleanupRef.current?.();
+        selectionAutoScrollCleanupRef.current = null;
       };
     }, []);
 
@@ -1293,48 +1533,34 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       });
 
       gutterDragCleanupRef.current?.();
+      selectionAutoScrollCleanupRef.current?.();
+      const pointerId = gutterPointerIdRef.current;
+      selectionAutoScrollCleanupRef.current = startSelectionEdgeAutoScroll(
+        view,
+        pointerId ?? 1,
+        {
+          getAnchor: () => anchor.anchor,
+          getHead: (pointer) =>
+            getSelectionHeadFromPoint(
+              view,
+              pointer.target,
+              pointer.clientX,
+              pointer.clientY,
+              side,
+            ),
+          updateSelectionOnPointerMove: true,
+        },
+      );
 
-      const ownerDocument = view.dom.ownerDocument;
-      const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
-        if ((moveEvent.buttons & 1) === 0) {
-          cleanup();
-          return;
-        }
-
-        moveEvent.preventDefault();
-        const head = getSelectionHeadFromPoint(
-          view,
-          moveEvent.target,
-          moveEvent.clientX,
-          moveEvent.clientY,
-          side,
-        );
-        if (!head) {
-          return;
-        }
-
-        view.dispatch({
-          scrollIntoView: false,
-          selection: EditorSelection.create([
-            EditorSelection.range(anchor.anchor, head.head),
-          ]),
-        });
-      };
-      const handleMouseUp = (upEvent: globalThis.MouseEvent) => {
-        upEvent.preventDefault();
-        cleanup();
-        view.focus();
-      };
       const cleanup = () => {
-        ownerDocument.removeEventListener("mousemove", handleMouseMove, true);
-        ownerDocument.removeEventListener("mouseup", handleMouseUp, true);
+        selectionAutoScrollCleanupRef.current?.();
+        selectionAutoScrollCleanupRef.current = null;
+        gutterPointerIdRef.current = null;
         if (gutterDragCleanupRef.current === cleanup) {
           gutterDragCleanupRef.current = null;
         }
       };
 
-      ownerDocument.addEventListener("mousemove", handleMouseMove, true);
-      ownerDocument.addEventListener("mouseup", handleMouseUp, true);
       gutterDragCleanupRef.current = cleanup;
     };
 
@@ -1351,6 +1577,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         <div
           className="comet-editor-gutter"
           data-editor-gutter="left"
+          onPointerDown={(event) => {
+            gutterPointerIdRef.current = event.pointerId;
+          }}
           onClick={(event: MouseEvent<HTMLDivElement>) => {
             event.preventDefault();
             event.stopPropagation();
@@ -1373,6 +1602,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         <div
           className="comet-editor-gutter"
           data-editor-gutter="right"
+          onPointerDown={(event) => {
+            gutterPointerIdRef.current = event.pointerId;
+          }}
           onClick={(event: MouseEvent<HTMLDivElement>) => {
             event.preventDefault();
             event.stopPropagation();
