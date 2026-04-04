@@ -1026,7 +1026,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 !event.isPrimary ||
                 (event.target instanceof HTMLElement &&
                   event.target.closest(
-                    `${TABLE_CELL_SELECTOR}, ${TABLE_EDITOR_HOST_SELECTOR}`,
+                    `${TABLE_CELL_SELECTOR}, ${TABLE_EDITOR_HOST_SELECTOR}, .cm-md-task-marker-source`,
                   ))
               ) {
                 return;
