@@ -115,4 +115,15 @@ describe("editor tag helpers", () => {
       ),
     ).toEqual(["work/client", "work/internal"]);
   });
+
+  it("matches a tag before the next line starts with non-tag content", () => {
+    expect(findTagEntityMatch("#archi\n---")).toEqual({
+      start: 0,
+      end: 6,
+    });
+    expect(findTagEntityMatch("#archi\nnext line")).toEqual({
+      start: 0,
+      end: 6,
+    });
+  });
 });

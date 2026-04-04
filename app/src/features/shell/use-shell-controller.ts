@@ -400,17 +400,17 @@ export function useShellController() {
     });
   };
 
-  const flushCurrentDraftAsync = async () => {
+  const flushCurrentDraftAsync = async (): Promise<LoadedNote | undefined> => {
     if (!currentNote || draftNoteId !== currentNote.id) {
-      return;
+      return undefined;
     }
 
     if (isCurrentNoteConflicted) {
-      return;
+      return undefined;
     }
 
     if (draftMarkdown === currentNote.markdown) {
-      return;
+      return undefined;
     }
 
     if (pendingSaveTimeoutRef.current !== null) {
@@ -418,10 +418,23 @@ export function useShellController() {
       pendingSaveTimeoutRef.current = null;
     }
 
-    await saveNoteMutation.mutateAsync({
+    return await saveNoteMutation.mutateAsync({
       id: currentNote.id,
       markdown: draftMarkdown,
     });
+  };
+
+  const withFlushedCurrentDraft = (
+    action: (savedNote?: LoadedNote) => void | Promise<void>,
+  ) => {
+    void (async () => {
+      try {
+        const savedNote = await flushCurrentDraftAsync();
+        await action(savedNote);
+      } catch {
+        // Save failures already surface through the mutation error handler.
+      }
+    })();
   };
 
   const discardPendingSave = () => {
@@ -523,47 +536,61 @@ export function useShellController() {
   };
 
   const handleSelectAll = () => {
-    clearSelectionIfNotActive();
-    setTagViewActive(false);
-    setNoteFilter("all");
+    withFlushedCurrentDraft(() => {
+      clearSelectionIfNotActive();
+      setTagViewActive(false);
+      setNoteFilter("all");
+    });
   };
 
   const handleSelectToday = () => {
-    clearSelectionIfNotActive();
-    setTagViewActive(false);
-    setNoteFilter("today");
+    withFlushedCurrentDraft(() => {
+      clearSelectionIfNotActive();
+      setTagViewActive(false);
+      setNoteFilter("today");
+    });
   };
 
   const handleSelectTodo = () => {
-    clearSelectionIfNotActive();
-    setTagViewActive(false);
-    setNoteFilter("todo");
+    withFlushedCurrentDraft(() => {
+      clearSelectionIfNotActive();
+      setTagViewActive(false);
+      setNoteFilter("todo");
+    });
   };
 
   const handleSelectPinned = () => {
-    clearSelectionIfNotActive();
-    setTagViewActive(false);
-    setNoteFilter("pinned");
+    withFlushedCurrentDraft(() => {
+      clearSelectionIfNotActive();
+      setTagViewActive(false);
+      setNoteFilter("pinned");
+    });
   };
 
   const handleSelectUntagged = () => {
-    clearSelectionIfNotActive();
-    setTagViewActive(false);
-    setNoteFilter("untagged");
+    withFlushedCurrentDraft(() => {
+      clearSelectionIfNotActive();
+      setTagViewActive(false);
+      setNoteFilter("untagged");
+    });
   };
 
   const handleSelectArchive = () => {
-    setSelectedNoteId(null);
-    setDraft("", "");
-    setTagViewActive(false);
-    setNoteFilter("archive");
+    withFlushedCurrentDraft(() => {
+      setSelectedNoteId(null);
+      setDraft("", "");
+      setTagViewActive(false);
+      setNoteFilter("archive");
+    });
   };
 
   const handleSelectTrash = () => {
-    setSelectedNoteId(null);
-    setDraft("", "");
-    setTagViewActive(false);
-    setNoteFilter("trash");
+    withFlushedCurrentDraft(() => {
+      setSelectedNoteId(null);
+      setDraft("", "");
+      setTagViewActive(false);
+      setNoteFilter("trash");
+    });
   };
 
   const handleEmptyTrash = () => {
@@ -575,13 +602,17 @@ export function useShellController() {
       return;
     }
 
-    if (currentNote && !matchesTagScope(currentNote.tags, tagPath)) {
-      setSelectedNoteId(null);
-      setDraft("", "");
-    }
+    withFlushedCurrentDraft((savedNote) => {
+      const noteForScope = savedNote ?? currentNote;
 
-    setTagViewActive(true);
-    setActiveTagPath(tagPath);
+      if (noteForScope && !matchesTagScope(noteForScope.tags, tagPath)) {
+        setSelectedNoteId(null);
+        setDraft("", "");
+      }
+
+      setTagViewActive(true);
+      setActiveTagPath(tagPath);
+    });
   };
 
   const syncSelectedNoteAfterTagRewrite = async (affectedNoteIds: string[]) => {

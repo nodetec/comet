@@ -410,6 +410,10 @@ fn has_invalid_simple_trailing_text(markdown: &str, end_index: usize) -> bool {
         return false;
     }
 
+    if matches!(next, '\n' | '\r') {
+        return false;
+    }
+
     for character in characters {
         if matches!(character, '\n' | '\r') {
             return false;
@@ -796,6 +800,18 @@ mod tests {
     fn extract_tags_rejects_wrapped_nested_segments_with_spacing() {
         let markdown = "#work/ project alpha #";
         assert_eq!(extract_tags(markdown), vec!["work".to_string()]);
+    }
+
+    #[test]
+    fn extract_tags_keeps_simple_tag_before_horizontal_rule() {
+        let markdown = ["# h1 Heading 8-)", "#archi", "---"].join("\n");
+        assert_eq!(extract_tags(&markdown), vec!["archi".to_string()]);
+    }
+
+    #[test]
+    fn extract_tags_keeps_simple_tag_before_plain_text_on_next_line() {
+        let markdown = ["#archi", "next line"].join("\n");
+        assert_eq!(extract_tags(&markdown), vec!["archi".to_string()]);
     }
 
     #[test]

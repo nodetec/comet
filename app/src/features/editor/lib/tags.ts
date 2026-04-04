@@ -63,6 +63,10 @@ function hasInvalidSimpleTrailingText(text: string, endIndex: number) {
     return false;
   }
 
+  if (next === "\n" || next === "\r") {
+    return false;
+  }
+
   for (let index = endIndex + 1; index < text.length; index += 1) {
     const character = text[index]!;
     if (character === "\n" || character === "\r") {
