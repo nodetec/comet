@@ -202,6 +202,7 @@ import {
   tagHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/tag-syntax";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
+import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -1353,6 +1354,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             },
           }),
           keymap.of([
+            {
+              key: "Backspace",
+              run: deleteTableBackward,
+            },
             {
               key: "Escape",
               run(view) {
