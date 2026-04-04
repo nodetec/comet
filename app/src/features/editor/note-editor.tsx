@@ -946,6 +946,46 @@ function blurEditorView(view: EditorView) {
   view.contentDOM.blur();
 }
 
+function focusEditorViewWithoutScroll(view: EditorView) {
+  try {
+    view.contentDOM.focus({ preventScroll: true });
+  } catch {
+    view.focus();
+  }
+}
+
+function getContiguousMarkdownChange(
+  currentMarkdown: string,
+  nextMarkdown: string,
+) {
+  let start = 0;
+  const maxStart = Math.min(currentMarkdown.length, nextMarkdown.length);
+  while (
+    start < maxStart &&
+    currentMarkdown.codePointAt(start) === nextMarkdown.codePointAt(start)
+  ) {
+    start += 1;
+  }
+
+  let currentEnd = currentMarkdown.length;
+  let nextEnd = nextMarkdown.length;
+  while (
+    currentEnd > start &&
+    nextEnd > start &&
+    currentMarkdown.codePointAt(currentEnd - 1) ===
+      nextMarkdown.codePointAt(nextEnd - 1)
+  ) {
+    currentEnd -= 1;
+    nextEnd -= 1;
+  }
+
+  return {
+    from: start,
+    insert: nextMarkdown.slice(start, nextEnd),
+    to: currentEnd,
+  };
+}
+
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function NoteEditor(
     {
@@ -1046,22 +1086,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           next.selection.anchor === currentSelection.anchor &&
           next.selection.head === currentSelection.head
         ) {
-          view.focus();
+          focusEditorViewWithoutScroll(view);
           return false;
         }
 
+        const change = getContiguousMarkdownChange(
+          currentMarkdown,
+          next.markdown,
+        );
+
         view.dispatch({
-          changes: {
-            from: 0,
-            to: view.state.doc.length,
-            insert: next.markdown,
-          },
+          changes: change,
           selection: EditorSelection.range(
             next.selection.anchor,
             next.selection.head,
           ),
+          scrollIntoView: false,
         });
-        view.focus();
+        focusEditorViewWithoutScroll(view);
         return true;
       },
       [readOnly],
