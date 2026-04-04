@@ -1,10 +1,13 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
   type MouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   defaultKeymap,
   history,
@@ -50,11 +53,29 @@ import {
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { Vim, vim } from "@replit/codemirror-vim";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 
+import {
+  DEFAULT_TOOLBAR_STATE,
+  cycleBlockType,
+  getToolbarState,
+  insertCodeBlock,
+  insertMarkdownImage,
+  insertMarkdownTable,
+  toggleInlineFormat,
+  type InlineFormat,
+  type SelectionSnapshot,
+} from "@/features/editor/lib/toolbar-state";
+import { EditorToolbar } from "@/features/editor/ui/editor-toolbar";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
+import {
+  IMAGE_EXTENSIONS,
+  importImage,
+  unresolveImageSrc,
+} from "@/shared/lib/attachments";
 import { logEditorDebug, summarizeRanges } from "@/shared/lib/editor-debug";
 import { collectSearchMatches } from "@/shared/lib/search";
 
@@ -197,6 +218,7 @@ type NoteEditorProps = {
   searchQuery: string;
   searchScrollRevision?: number;
   spellCheck?: boolean;
+  toolbarContainer?: HTMLElement | null;
   vimMode?: boolean;
   onChange(markdown: string): void;
 };
@@ -940,6 +962,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       searchQuery,
       searchScrollRevision,
       spellCheck = false,
+      toolbarContainer = null,
       vimMode = false,
     },
     ref,
@@ -969,6 +992,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialSpellCheckRef = useRef(spellCheck);
     const initialVimModeRef = useRef(vimMode);
     const selectAllCursorRef = useRef<number | null>(null);
+    const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
 
     if (editableCompartmentRef.current === null) {
       editableCompartmentRef.current = new Compartment();
@@ -994,6 +1018,104 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     useEffect(() => {
       onSearchMatchCountChangeRef.current = onSearchMatchCountChange;
     }, [onSearchMatchCountChange]);
+
+    const applyToolbarMutation = useCallback(
+      (
+        transform: (
+          markdown: string,
+          selection: SelectionSnapshot,
+        ) => {
+          markdown: string;
+          selection: SelectionSnapshot;
+        },
+      ) => {
+        const view = viewRef.current;
+        if (!view || readOnly) {
+          return false;
+        }
+
+        const currentMarkdown = view.state.doc.toString();
+        const currentSelection = view.state.selection.main;
+        const next = transform(currentMarkdown, {
+          anchor: currentSelection.anchor,
+          head: currentSelection.head,
+        });
+
+        if (
+          next.markdown === currentMarkdown &&
+          next.selection.anchor === currentSelection.anchor &&
+          next.selection.head === currentSelection.head
+        ) {
+          view.focus();
+          return false;
+        }
+
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: next.markdown,
+          },
+          selection: EditorSelection.range(
+            next.selection.anchor,
+            next.selection.head,
+          ),
+        });
+        view.focus();
+        return true;
+      },
+      [readOnly],
+    );
+
+    const handleToggleInlineFormat = useCallback(
+      (format: InlineFormat) => {
+        applyToolbarMutation((currentMarkdown, selection) =>
+          toggleInlineFormat(currentMarkdown, selection, format),
+        );
+      },
+      [applyToolbarMutation],
+    );
+
+    const handleCycleBlockType = useCallback(() => {
+      applyToolbarMutation(cycleBlockType);
+    }, [applyToolbarMutation]);
+
+    const handleInsertCodeBlock = useCallback(() => {
+      applyToolbarMutation(insertCodeBlock);
+    }, [applyToolbarMutation]);
+
+    const handleInsertTable = useCallback(() => {
+      applyToolbarMutation(insertMarkdownTable);
+    }, [applyToolbarMutation]);
+
+    const handleInsertImage = useCallback(async () => {
+      if (readOnly) {
+        return;
+      }
+
+      const sourcePath = await openFileDialog({
+        filters: [
+          {
+            extensions: IMAGE_EXTENSIONS,
+            name: "Images",
+          },
+        ],
+        multiple: false,
+      });
+
+      if (typeof sourcePath !== "string") {
+        return;
+      }
+
+      const imported = await importImage(sourcePath);
+      const src = unresolveImageSrc(imported.assetUrl);
+      applyToolbarMutation((currentMarkdown, selection) =>
+        insertMarkdownImage(currentMarkdown, selection, {
+          altText: imported.altText,
+          src,
+        }),
+      );
+    }, [applyToolbarMutation, readOnly]);
 
     useEffect(() => {
       if (!containerRef.current) {
@@ -1270,6 +1392,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 countSearchMatches(update.state, query),
               );
             }
+
+            if (update.docChanged || update.selectionSet) {
+              setToolbarState(
+                getToolbarState(update.state.doc.toString(), {
+                  anchor: update.state.selection.main.anchor,
+                  head: update.state.selection.main.head,
+                }),
+              );
+            }
           }),
           EditorView.domEventHandlers({
             focus: () => {
@@ -1293,6 +1424,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
       viewRef.current = view;
       onSearchMatchCountChangeRef.current?.(0);
+      setToolbarState(
+        getToolbarState(view.state.doc.toString(), {
+          anchor: view.state.selection.main.anchor,
+          head: view.state.selection.main.head,
+        }),
+      );
 
       return () => {
         view.destroy();
@@ -1629,60 +1766,76 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     };
 
     return (
-      <div
-        className={cn(
-          "comet-editor-shell relative flex min-h-full w-full flex-1",
-          searchHighlightAllMatchesYellow && "comet-codemirror-passive-search",
-          searchQuery &&
-            !searchHighlightAllMatchesYellow &&
-            "comet-codemirror-active-search",
-        )}
-      >
+      <>
         <div
-          className="comet-editor-gutter"
-          data-editor-gutter="left"
-          onPointerDown={(event) => {
-            gutterPointerIdRef.current = event.pointerId;
-          }}
-          onClick={(event: MouseEvent<HTMLDivElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-            viewRef.current?.focus();
-          }}
-          onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-            startGutterSelectionDrag(event, "left");
-          }}
-        />
-        <div className="comet-editor-column">
+          className={cn(
+            "comet-editor-shell relative flex min-h-full w-full flex-1",
+            searchHighlightAllMatchesYellow &&
+              "comet-codemirror-passive-search",
+            searchQuery &&
+              !searchHighlightAllMatchesYellow &&
+              "comet-codemirror-active-search",
+          )}
+        >
           <div
-            className="comet-codemirror-host min-h-full flex-1"
-            ref={containerRef}
+            className="comet-editor-gutter"
+            data-editor-gutter="left"
+            onPointerDown={(event) => {
+              gutterPointerIdRef.current = event.pointerId;
+            }}
+            onClick={(event: MouseEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+              viewRef.current?.focus();
+            }}
+            onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
+              startGutterSelectionDrag(event, "left");
+            }}
+          />
+          <div className="comet-editor-column">
+            <div
+              className="comet-codemirror-host min-h-full flex-1"
+              ref={containerRef}
+            />
+          </div>
+          <div
+            className="comet-editor-gutter"
+            data-editor-gutter="right"
+            onPointerDown={(event) => {
+              gutterPointerIdRef.current = event.pointerId;
+            }}
+            onClick={(event: MouseEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+              viewRef.current?.focus();
+            }}
+            onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
+              startGutterSelectionDrag(event, "right");
+            }}
           />
         </div>
-        <div
-          className="comet-editor-gutter"
-          data-editor-gutter="right"
-          onPointerDown={(event) => {
-            gutterPointerIdRef.current = event.pointerId;
-          }}
-          onClick={(event: MouseEvent<HTMLDivElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-            viewRef.current?.focus();
-          }}
-          onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-            startGutterSelectionDrag(event, "right");
-          }}
-        />
-      </div>
+        {toolbarContainer && !readOnly
+          ? createPortal(
+              <EditorToolbar
+                state={toolbarState}
+                onCycleBlockType={handleCycleBlockType}
+                onInsertCodeBlock={handleInsertCodeBlock}
+                onInsertImage={() => void handleInsertImage()}
+                onInsertTable={handleInsertTable}
+                onToggleInlineFormat={handleToggleInlineFormat}
+              />,
+              toolbarContainer,
+            )
+          : null}
+      </>
     );
   },
 );

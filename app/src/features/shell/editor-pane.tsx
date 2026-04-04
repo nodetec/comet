@@ -21,6 +21,8 @@ import {
   Ellipsis,
   Lock,
   PencilOff,
+  PanelBottomClose,
+  PanelBottomOpen,
   Search,
   X,
 } from "lucide-react";
@@ -441,9 +443,14 @@ export function EditorPane({
   const isSystemReadOnly = isArchived || deletedAt !== null || isPublishedNote;
   const editorRef = useRef<NoteEditorHandle | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [toolbarContainer, setToolbarContainer] = useState<HTMLElement | null>(
+    null,
+  );
   const editorFontSize = useUIStore((s) => s.editorFontSize);
+  const showToolbar = useUIStore((s) => s.showEditorToolbar);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const editorVimMode = useUIStore((s) => s.editorVimMode);
+  const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.headCount ?? 0) > 1;
@@ -508,6 +515,9 @@ export function EditorPane({
 
   const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
     useEditorScrollHeader(noteId, scrollContainerRef);
+  const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
+    setToolbarContainer(node);
+  }, []);
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
   const editorContent = (() => {
     if (noteId === null) {
@@ -556,6 +566,7 @@ export function EditorPane({
           isUsingEditorFindSearch ? findScrollRevision : undefined
         }
         spellCheck={editorSpellCheck}
+        toolbarContainer={toolbarContainer}
         vimMode={editorVimMode}
       />
     );
@@ -726,6 +737,22 @@ export function EditorPane({
         </TooltipContent>
       </Tooltip>
     );
+  } else if (!isReadOnly) {
+    toolbarSlot = (
+      <Button
+        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+        onClick={() => setShowToolbar(!showToolbar)}
+        size="icon-sm"
+        title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+        variant="ghost"
+      >
+        {showToolbar ? (
+          <PanelBottomClose className="size-[1.2rem]" />
+        ) : (
+          <PanelBottomOpen className="size-[1.2rem]" />
+        )}
+      </Button>
+    );
   }
 
   return (
@@ -884,6 +911,12 @@ export function EditorPane({
           )}
         </div>
       </div>
+
+      {noteId && !isReadOnly && showToolbar ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+          <div className="pointer-events-auto" ref={toolbarContainerRef} />
+        </div>
+      ) : null}
 
       {noteId && hasConflict ? (
         <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">
