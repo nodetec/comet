@@ -257,7 +257,10 @@ mod tests {
     }
 
     fn shared_editor_invariant_fixtures() -> SharedEditorInvariantCorpus {
-        serde_json::from_str(include_str!("../../../../src/shared/lib/editor-invariant-fixtures.json")).unwrap()
+        serde_json::from_str(include_str!(
+            "../../../../src/shared/lib/editor-invariant-fixtures.json"
+        ))
+        .unwrap()
     }
 
     fn test_pubkey() -> PublicKey {

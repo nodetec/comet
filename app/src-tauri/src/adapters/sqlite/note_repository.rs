@@ -109,7 +109,6 @@ fn direct_tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>,
 
     Ok(tags)
 }
-
 fn sanitize_filename(title: &str) -> String {
     let sanitized: String = title
         .chars()
@@ -805,6 +804,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         if current_tags == next_tags {
             return Ok(());
         }
+
         crate::adapters::sqlite::tag_index::rebuild_note_tag_index(self.conn, note_id, markdown)
             .map_err(map_err)
     }

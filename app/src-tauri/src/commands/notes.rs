@@ -24,7 +24,10 @@ fn sync_push(app: &AppHandle, cmd: SyncCommand) {
     });
 }
 
-fn record_to_loaded_note(record: NoteRecord, repo: &SqliteNoteRepository) -> Result<LoadedNote, AppError> {
+fn record_to_loaded_note(
+    record: NoteRecord,
+    repo: &SqliteNoteRepository,
+) -> Result<LoadedNote, AppError> {
     let tags = repo.tags_for_note(&record.id)?;
     Ok(LoadedNote {
         id: record.id,

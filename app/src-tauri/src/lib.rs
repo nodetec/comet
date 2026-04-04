@@ -56,12 +56,9 @@ pub fn run() {
                         .build(app)?,
                 )
                 .item(
-                    &MenuItemBuilder::with_id(
-                        MENU_COMMAND_PALETTE_ID,
-                        "Command Palette",
-                    )
-                    .accelerator("CmdOrCtrl+O")
-                    .build(app)?,
+                    &MenuItemBuilder::with_id(MENU_COMMAND_PALETTE_ID, "Command Palette")
+                        .accelerator("CmdOrCtrl+O")
+                        .build(app)?,
                 );
 
             let edit_menu = SubmenuBuilder::new(app, "Edit")
@@ -106,13 +103,11 @@ pub fn run() {
             }
 
             #[cfg(not(target_os = "macos"))]
-            let file_menu = file_menu
-                .separator()
-                .item(
-                    &MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings")
-                        .accelerator("CmdOrCtrl+,")
-                        .build(app)?,
-                );
+            let file_menu = file_menu.separator().item(
+                &MenuItemBuilder::with_id(MENU_SETTINGS_ID, "Settings")
+                    .accelerator("CmdOrCtrl+,")
+                    .build(app)?,
+            );
 
             let file_menu = file_menu.build()?;
 
