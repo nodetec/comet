@@ -14,6 +14,7 @@ import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { redo, undo } from "@codemirror/commands";
 import {
   Decoration,
+  drawSelection,
   EditorView,
   keymap,
   ViewPlugin,
@@ -1657,8 +1658,19 @@ const nestedTableEditorTheme = EditorView.theme({
   ".cm-selectionBackground": {
     backgroundColor: "color-mix(in oklab, var(--primary) 22%, transparent)",
   },
-  ".cm-cursor": {
+  ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--editor-caret)",
+    borderLeftWidth: "1.5px",
+  },
+  ".cm-selectionLayer": {
+    zIndex: "1 !important",
+    pointerEvents: "none",
+  },
+  ".cm-cursorLayer": {
+    zIndex: "2 !important",
+  },
+  "&.cm-focused .cm-content ::selection": {
+    backgroundColor: "transparent !important",
   },
 });
 
@@ -1741,6 +1753,7 @@ class NestedTableEditorController {
         initialSelection.head,
       ),
       extensions: [
+        drawSelection(),
         EditorView.lineWrapping,
         nestedTableEditorTheme,
         keymap.of([
