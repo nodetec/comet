@@ -8,6 +8,7 @@ import {
   type MouseEvent,
 } from "react";
 import { format } from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
@@ -42,6 +43,16 @@ import { cn } from "@/shared/lib/utils";
 import { type NoteConflictInfo } from "@/shared/api/types";
 
 const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
+const TOOLBAR_ENTER_ANIMATION = {
+  damping: 28,
+  mass: 0.8,
+  stiffness: 360,
+  type: "spring" as const,
+};
+const TOOLBAR_EXIT_ANIMATION = {
+  duration: 0.16,
+  ease: [0.4, 0, 1, 1] as const,
+};
 
 type EditorPaneProps = {
   archivedAt: number | null;
@@ -912,11 +923,34 @@ export function EditorPane({
         </div>
       </div>
 
-      {noteId && !isReadOnly && showToolbar ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div className="pointer-events-auto" ref={toolbarContainerRef} />
-        </div>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {noteId && !isReadOnly && showToolbar ? (
+          <motion.div
+            animate={{
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              transition: TOOLBAR_ENTER_ANIMATION,
+            }}
+            className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center"
+            exit={{
+              opacity: 0.85,
+              scale: 0.97,
+              transition: TOOLBAR_EXIT_ANIMATION,
+              y: 22,
+            }}
+            initial={{
+              opacity: 0.72,
+              scale: 0.94,
+              y: 20,
+            }}
+            key="editor-toolbar"
+            style={{ transformOrigin: "50% 100%" }}
+          >
+            <div className="pointer-events-auto" ref={toolbarContainerRef} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {noteId && hasConflict ? (
         <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">
