@@ -201,12 +201,14 @@ import {
   TagGrammar,
   tagHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/tag-syntax";
+import { tagAutocomplete } from "@/features/editor/extensions/tag-autocomplete";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
 import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { cn } from "@/shared/lib/utils";
 
 type NoteEditorProps = {
+  availableTagPaths: string[];
   autoFocus?: boolean;
   loadKey: string;
   markdown: string;
@@ -333,8 +335,66 @@ const MARKDOWN_EDITOR_THEME = EditorView.theme({
   ".cm-cursorLayer": {
     zIndex: "2 !important",
   },
+  ".cm-tooltip": {
+    border: "1px solid var(--border)",
+    backgroundColor: "var(--popover)",
+    color: "var(--popover-foreground)",
+    borderRadius: "calc(var(--radius) - 2px)",
+    boxShadow:
+      "0 16px 40px color-mix(in oklab, var(--shadow-color) 18%, transparent)",
+    overflow: "hidden",
+  },
   "&.cm-focused .cm-content ::selection": {
     backgroundColor: "transparent !important",
+  },
+});
+
+const AUTOCOMPLETE_MENU_THEME = EditorView.theme({
+  ".cm-tooltip.cm-tooltip-autocomplete": {
+    borderRadius: "calc(var(--radius) + 6px)",
+    "& .cm-tag-completion-icon-wrap": {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "0.875rem",
+      flexShrink: 0,
+      color: "var(--muted-foreground)",
+    },
+    "& .cm-tag-completion-icon": {
+      width: "0.875rem",
+      height: "0.875rem",
+      display: "block",
+    },
+    "& .cm-completionLabel": {
+      display: "block",
+      minWidth: 0,
+    },
+    "& .cm-completionMatchedText": {
+      textDecoration: "none",
+      color: "var(--autocomplete-match)",
+      fontWeight: "600",
+    },
+    "& > ul": {
+      minWidth: "100px",
+      padding: "0.5rem",
+      fontFamily: '"Geist Variable", sans-serif',
+      fontSize: "0.8125rem",
+      lineHeight: "1.35",
+    },
+    "& > ul > li": {
+      display: "flex",
+      alignItems: "center",
+      gap: "0.45rem",
+      borderRadius: "calc(var(--radius) + 2px)",
+      padding: "0.375rem 0.5rem",
+    },
+    "& > ul > li[aria-selected]": {
+      backgroundColor: "var(--accent)",
+      color: "var(--accent-foreground)",
+    },
+    "& > ul > li[aria-selected] .cm-tag-completion-icon-wrap": {
+      color: "var(--primary)",
+    },
   },
 });
 
@@ -990,6 +1050,7 @@ function getContiguousMarkdownChange(
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function NoteEditor(
     {
+      availableTagPaths,
       autoFocus = false,
       loadKey,
       markdown,
@@ -1013,7 +1074,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const onChangeRef = useRef(onChange);
     const onEditorFocusChangeRef = useRef(onEditorFocusChange);
     const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange);
+    const initialAvailableTagPathsRef = useRef(availableTagPaths);
     const editableCompartmentRef = useRef<Compartment | null>(null);
+    const autocompleteCompartmentRef = useRef<Compartment | null>(null);
     const contentAttributesCompartmentRef = useRef<Compartment | null>(null);
     const presentationCompartmentRef = useRef<Compartment | null>(null);
     const vimCompartmentRef = useRef<Compartment | null>(null);
@@ -1037,6 +1100,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
     if (editableCompartmentRef.current === null) {
       editableCompartmentRef.current = new Compartment();
+    }
+    if (autocompleteCompartmentRef.current === null) {
+      autocompleteCompartmentRef.current = new Compartment();
     }
     if (contentAttributesCompartmentRef.current === null) {
       contentAttributesCompartmentRef.current = new Compartment();
@@ -1169,6 +1235,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         EditorState.readOnly.of(initialReadOnlyRef.current),
         EditorView.editable.of(!initialReadOnlyRef.current),
       ]);
+      const autocompleteExtension = autocompleteCompartmentRef.current!.of(
+        tagAutocomplete(initialAvailableTagPathsRef.current),
+      );
       const contentAttributesExtension =
         contentAttributesCompartmentRef.current!.of(
           EditorView.contentAttributes.of({
@@ -1204,6 +1273,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             ],
             codeLanguages: languages,
           }),
+          autocompleteExtension,
+          AUTOCOMPLETE_MENU_THEME,
           presentationExtension,
           tagHighlightStyle,
           search(),
@@ -1507,6 +1578,19 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         ],
       });
     }, [readOnly, spellCheck]);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view || !autocompleteCompartmentRef.current) {
+        return;
+      }
+
+      view.dispatch({
+        effects: autocompleteCompartmentRef.current.reconfigure(
+          tagAutocomplete(availableTagPaths),
+        ),
+      });
+    }, [availableTagPaths]);
 
     useEffect(() => {
       const view = viewRef.current;

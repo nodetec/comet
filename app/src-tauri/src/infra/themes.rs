@@ -45,6 +45,8 @@ const THEME_COLOR_KEYS: &[&str] = &[
     "heading-color",
     "note-focus-indicator",
     "overlay-backdrop",
+    "shadow-color",
+    "autocomplete-match",
     "control-thumb",
     "search-match",
     "search-match-foreground",

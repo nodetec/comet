@@ -1090,6 +1090,7 @@ export function useShellController() {
   // --- Props assembly ---
   const nextEditorPaneProps = useMemo(
     () => ({
+      availableTagPaths,
       archivedAt: currentNote?.archivedAt ?? null,
       autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
       deletedAt: currentNote?.deletedAt ?? null,
@@ -1174,6 +1175,7 @@ export function useShellController() {
       },
     }),
     [
+      availableTagPaths,
       currentEditorMarkdown,
       currentNoteConflict,
       currentNote,

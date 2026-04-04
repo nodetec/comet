@@ -38,6 +38,8 @@
     "heading-color": "#1a456b",
     "note-focus-indicator": "#005fcf99",
     "overlay-backdrop": "#0f172a38",
+    "shadow-color": "#0f172a",
+    "autocomplete-match": "#000000",
     "control-thumb": "#ffffff",
     "search-match": "#fddc5b",
     "search-match-foreground": "#393221",

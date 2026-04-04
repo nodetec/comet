@@ -37,6 +37,8 @@
   --heading-color: #ccdbe4;
   --note-focus-indicator: #45a1e599;
   --overlay-backdrop: #0000004d;
+  --shadow-color: #000000;
+  --autocomplete-match: #ffffff;
   --control-thumb: #fafafa;
   --search-match: #ebc42b;
   --search-match-foreground: #231f14;
@@ -102,6 +104,8 @@
     --heading-color: #1a456b;
     --note-focus-indicator: #005fcf99;
     --overlay-backdrop: #0f172a38;
+    --shadow-color: #0f172a;
+    --autocomplete-match: #000000;
     --control-thumb: #ffffff;
     --search-match: #fddc5b;
     --search-match-foreground: #393221;

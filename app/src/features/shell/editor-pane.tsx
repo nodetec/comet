@@ -55,6 +55,7 @@ const TOOLBAR_EXIT_ANIMATION = {
 };
 
 type EditorPaneProps = {
+  availableTagPaths: string[];
   archivedAt: number | null;
   autoFocusEditor: boolean;
   deletedAt: number | null;
@@ -422,6 +423,7 @@ function isEditableElement(element: EventTarget | null) {
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
+  availableTagPaths,
   archivedAt,
   autoFocusEditor,
   deletedAt,
@@ -553,6 +555,7 @@ export function EditorPane({
 
     return (
       <NoteEditor
+        availableTagPaths={availableTagPaths}
         autoFocus={autoFocusEditor}
         loadKey={editorLoadKey ?? noteId}
         markdown={markdown}

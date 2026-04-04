@@ -6,6 +6,8 @@ import {
   canonicalizeAuthoredTagToken,
   canonicalizeTagPartial,
   canonicalizeTagPath,
+  matchTagCompletionAtCursor,
+  findTagCompletionOptions,
   findTagEntityMatch,
   matchTagCompletionAtEnd,
   renderTagToken,
@@ -47,6 +49,19 @@ describe("editor tag helpers", () => {
     });
   });
 
+  it("matches completion ranges in the middle of a tag token", () => {
+    const text = "hello #project-alpha";
+    expect(matchTagCompletionAtCursor(text, 10)).toEqual({
+      from: 7,
+      matchingString: "pro",
+      to: text.length,
+    });
+  });
+
+  it("does not match completion outside a tag token", () => {
+    expect(matchTagCompletionAtCursor("hello project", 11)).toBeNull();
+  });
+
   it("rejects invalid completion candidates", () => {
     expect(matchTagCompletionAtEnd("hello #")).toBeNull();
     expect(matchTagCompletionAtEnd(String.raw`hello \#roadmap`)).toBeNull();
@@ -71,5 +86,33 @@ describe("editor tag helpers", () => {
   it("normalizes tag partials for backend search", () => {
     expect(canonicalizeTagPartial("Work/ project  al")).toBeNull();
     expect(canonicalizeTagPartial("work/")).toBe("work/");
+  });
+
+  it("ranks tag completion options by path prefix before segment prefix", () => {
+    expect(
+      findTagCompletionOptions(
+        [
+          "personal/projects",
+          "project-alpha",
+          "work/project-alpha",
+          "work/projects",
+        ],
+        "proj",
+      ),
+    ).toEqual([
+      "project-alpha",
+      "personal/projects",
+      "work/project-alpha",
+      "work/projects",
+    ]);
+  });
+
+  it("limits slash completions to matching descendants", () => {
+    expect(
+      findTagCompletionOptions(
+        ["work", "work/client", "work/internal", "personal/workout"],
+        "work/",
+      ),
+    ).toEqual(["work/client", "work/internal"]);
   });
 });

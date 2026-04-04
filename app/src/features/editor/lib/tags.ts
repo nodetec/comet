@@ -9,6 +9,14 @@ export type TagCompletionMatch = {
   replaceableLength: number;
 };
 
+export type TagCompletionContext = {
+  from: number;
+  matchingString: string;
+  to: number;
+};
+
+const DEFAULT_TAG_COMPLETION_LIMIT = 12;
+
 function stripTrailingTagSeparators(raw: string) {
   let normalized = raw.trim();
 
@@ -256,4 +264,76 @@ export function matchTagCompletionAtEnd(
     leadOffset: hashIndex,
     replaceableLength: textUpToCursor.length - hashIndex,
   };
+}
+
+export function matchTagCompletionAtCursor(
+  text: string,
+  cursorOffset: number,
+): TagCompletionContext | null {
+  if (cursorOffset < 0 || cursorOffset > text.length) {
+    return null;
+  }
+
+  const prefixMatch = matchTagCompletionAtEnd(text.slice(0, cursorOffset));
+  if (!prefixMatch) {
+    return null;
+  }
+
+  let tokenEnd = cursorOffset;
+  while (tokenEnd < text.length) {
+    const character = text[tokenEnd]!;
+    if (isTagSegmentChar(character) || character === "/") {
+      tokenEnd += 1;
+      continue;
+    }
+    break;
+  }
+
+  return {
+    from: prefixMatch.leadOffset + 1,
+    matchingString: prefixMatch.matchingString,
+    to: tokenEnd,
+  };
+}
+
+export function findTagCompletionOptions(
+  availableTagPaths: readonly string[],
+  rawPartial: string,
+  limit = DEFAULT_TAG_COMPLETION_LIMIT,
+): string[] {
+  const partial = canonicalizeTagPartial(rawPartial);
+  if (!partial || limit <= 0) {
+    return [];
+  }
+
+  const allowSegmentPrefixMatch = !partial.includes("/");
+  const matches = availableTagPaths
+    .map((tagPath) => {
+      if (tagPath === partial) {
+        return { path: tagPath, score: 0 };
+      }
+
+      if (tagPath.startsWith(partial)) {
+        return { path: tagPath, score: 1 };
+      }
+
+      if (
+        allowSegmentPrefixMatch &&
+        tagPath.split("/").some((segment) => segment.startsWith(partial))
+      ) {
+        return { path: tagPath, score: 2 };
+      }
+
+      return null;
+    })
+    .filter((match) => match !== null);
+
+  matches.sort(
+    (left, right) =>
+      left.score - right.score ||
+      left.path.localeCompare(right.path) ||
+      left.path.length - right.path.length,
+  );
+
+  return matches.slice(0, limit).map((match) => match.path);
 }

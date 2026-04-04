@@ -90,6 +90,7 @@ body {
   --color-note-focus-indicator: var(--note-focus-indicator);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-shadow-color: var(--shadow-color);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
