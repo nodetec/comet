@@ -59,7 +59,7 @@ const markdownDecorationsTheme = EditorView.baseTheme({
       '"SF Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: "0.9em",
     backgroundColor: "var(--muted)",
-    paddingLeft: "0.75rem",
+    paddingLeft: "calc(var(--cm-md-list-child-indent, 0px) + 0.75rem)",
     paddingRight: "0.75rem",
   },
   ".cm-line.cm-md-codeblock.cm-md-codeblock-open": {
@@ -172,31 +172,34 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     backgroundRepeat: "no-repeat",
   },
   ".cm-line.cm-md-bq-1": {
-    paddingLeft: "0.9rem",
+    paddingLeft: "calc(var(--cm-md-list-child-indent, 0px) + 0.9rem)",
     backgroundImage:
       "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
-    backgroundPosition: "0 0",
+    backgroundPosition: "var(--cm-md-list-child-indent, 0px) 0",
     backgroundSize: "3px 100%",
   },
   ".cm-line.cm-md-bq-2": {
-    paddingLeft: "1.8rem",
+    paddingLeft: "calc(var(--cm-md-list-child-indent, 0px) + 1.8rem)",
     backgroundImage:
       "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
-    backgroundPosition: "0 0, 0.9rem 0",
+    backgroundPosition:
+      "var(--cm-md-list-child-indent, 0px) 0, calc(var(--cm-md-list-child-indent, 0px) + 0.9rem) 0",
     backgroundSize: "3px 100%, 3px 100%",
   },
   ".cm-line.cm-md-bq-3": {
-    paddingLeft: "2.7rem",
+    paddingLeft: "calc(var(--cm-md-list-child-indent, 0px) + 2.7rem)",
     backgroundImage:
       "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
-    backgroundPosition: "0 0, 0.9rem 0, 1.8rem 0",
+    backgroundPosition:
+      "var(--cm-md-list-child-indent, 0px) 0, calc(var(--cm-md-list-child-indent, 0px) + 0.9rem) 0, calc(var(--cm-md-list-child-indent, 0px) + 1.8rem) 0",
     backgroundSize: "3px 100%, 3px 100%, 3px 100%",
   },
   ".cm-line.cm-md-bq-4": {
-    paddingLeft: "3.6rem",
+    paddingLeft: "calc(var(--cm-md-list-child-indent, 0px) + 3.6rem)",
     backgroundImage:
       "linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color)), linear-gradient(var(--cm-md-bq-bar-color), var(--cm-md-bq-bar-color))",
-    backgroundPosition: "0 0, 0.9rem 0, 1.8rem 0, 2.7rem 0",
+    backgroundPosition:
+      "var(--cm-md-list-child-indent, 0px) 0, calc(var(--cm-md-list-child-indent, 0px) + 0.9rem) 0, calc(var(--cm-md-list-child-indent, 0px) + 1.8rem) 0, calc(var(--cm-md-list-child-indent, 0px) + 2.7rem) 0",
     backgroundSize: "3px 100%, 3px 100%, 3px 100%, 3px 100%",
   },
   ".cm-md-highlight": {

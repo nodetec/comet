@@ -151,4 +151,124 @@ describe("List rendering", () => {
 
     view.destroy();
   });
+
+  it("keeps continuation paragraphs visually attached to their list item", async () => {
+    const { view } = createView(
+      [
+        "1. First item with an indented continuation paragraph",
+        "",
+        "   This paragraph should stay attached to the first item.",
+        "",
+        "2. Second item after a continuation paragraph",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const line = [...view.dom.querySelectorAll(".cm-line")].find((element) =>
+      element.textContent?.includes(
+        "This paragraph should stay attached to the first item.",
+      ),
+    );
+
+    expect(line?.classList.contains("cm-md-list-child")).toBe(true);
+    expect(line?.getAttribute("style")).toContain("--cm-md-list-child-indent");
+    expect(line?.textContent?.startsWith(" ")).toBe(false);
+
+    const emptyChildLine = [...view.dom.querySelectorAll(".cm-line")].find(
+      (element) =>
+        element.classList.contains("cm-md-list-child") &&
+        (element.textContent ?? "") === "",
+    );
+
+    expect(emptyChildLine).toBeDefined();
+
+    view.destroy();
+  });
+
+  it("keeps nested blockquotes visually attached to their list item", async () => {
+    const { view } = createView(
+      [
+        "1. Ordered item before a blockquote",
+        "",
+        "   > Nested quote inside ordered item",
+        "   > Still inside the ordered item",
+        "",
+        "2. Ordered item after a nested blockquote",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const line = [...view.dom.querySelectorAll(".cm-line")].find((element) =>
+      element.textContent?.includes("Nested quote inside ordered item"),
+    );
+
+    expect(line?.classList.contains("cm-md-list-child")).toBe(true);
+    expect(line?.classList.contains("cm-md-bq")).toBe(true);
+    expect(line?.getAttribute("style")).toContain("--cm-md-list-child-indent");
+
+    view.destroy();
+  });
+
+  it("uses tree depth for mixed ordered and unordered list indentation", async () => {
+    const { view } = createView(
+      [
+        "1. Ordered parent",
+        "   - Unordered child",
+        "   - Another unordered child",
+        "     1. Ordered grandchild",
+        "     2. Ordered grandchild",
+        "   - Back to unordered child level",
+        "2. Second ordered parent",
+        "   1. Nested ordered child",
+        "   2. Nested ordered child",
+        "      - Nested unordered grandchild",
+        "      - Another nested unordered grandchild",
+        "3. Third ordered parent",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const findListLine = (text: string) =>
+      [...view.dom.querySelectorAll(".cm-line.cm-md-list")].find((element) =>
+        element.textContent?.includes(text),
+      );
+
+    expect(findListLine("Ordered parent")?.getAttribute("style")).toContain(
+      "--indent-level: 0",
+    );
+    expect(findListLine("Unordered child")?.getAttribute("style")).toContain(
+      "--indent-level: 1",
+    );
+    expect(
+      findListLine("Another unordered child")?.getAttribute("style"),
+    ).toContain("--indent-level: 1");
+    expect(findListLine("Ordered grandchild")?.getAttribute("style")).toContain(
+      "--indent-level: 2",
+    );
+    expect(
+      findListLine("Back to unordered child level")?.getAttribute("style"),
+    ).toContain("--indent-level: 1");
+    expect(
+      findListLine("Second ordered parent")?.getAttribute("style"),
+    ).toContain("--indent-level: 0");
+    expect(
+      findListLine("Nested ordered child")?.getAttribute("style"),
+    ).toContain("--indent-level: 1");
+    expect(
+      findListLine("Nested unordered grandchild")?.getAttribute("style"),
+    ).toContain("--indent-level: 2");
+    expect(
+      findListLine("Another nested unordered grandchild")?.getAttribute(
+        "style",
+      ),
+    ).toContain("--indent-level: 2");
+    expect(
+      findListLine("Third ordered parent")?.getAttribute("style"),
+    ).toContain("--indent-level: 0");
+
+    view.destroy();
+  });
 });

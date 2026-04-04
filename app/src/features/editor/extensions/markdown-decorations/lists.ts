@@ -27,6 +27,9 @@ import {
 
 const BULLET_INDENT = 2;
 const ORDERED_INDENT = 3;
+const LIST_INDENT_STEP = "1.5rem";
+const LIST_MARKER_WIDTH = "2rem";
+const LIST_CHILD_BLOCK_OFFSET = LIST_MARKER_WIDTH;
 const BULLET_MARKERS = new Set(["-", "*", "+"]);
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 const TASK_MARKERS = new Set(["[ ]", "[x]"]);
@@ -55,7 +58,7 @@ type TaskListShortcut = {
 
 export function getListMarkerData(
   state: EditorState,
-  { from, to, type }: SyntaxNodeRef,
+  { from, to, type, node }: SyntaxNodeRef,
 ): ListMarkerData | null {
   if (type.name !== "ListMark") {
     return null;
@@ -69,9 +72,16 @@ export function getListMarkerData(
     return null;
   }
 
-  const tabSize = BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
-  const indentChars = from - line.from;
-  const indentLevel = Math.floor(indentChars / tabSize);
+  let listDepth = 0;
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (
+      ancestor.type.name === "BulletList" ||
+      ancestor.type.name === "OrderedList"
+    ) {
+      listDepth += 1;
+    }
+  }
+  const indentLevel = Math.max(0, listDepth - 1);
 
   return {
     indentLevel,
@@ -120,6 +130,40 @@ function addListDecorations(
     }).range(data.lineStart),
     markerDecoration,
   );
+}
+
+function buildListChildIndentStyle(indentLevel: number) {
+  return `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET})`;
+}
+
+function addListChildLineDecorations(
+  state: EditorState,
+  from: number,
+  to: number,
+  markerLineStart: number,
+  indentStyle: string,
+  decorationRanges: Array<Range<Decoration>>,
+) {
+  let line = state.doc.lineAt(from);
+
+  while (true) {
+    if (line.from !== markerLineStart) {
+      decorationRanges.push(
+        Decoration.line({
+          attributes: {
+            class: "cm-md-list-child",
+            style: indentStyle,
+          },
+        }).range(line.from),
+      );
+    }
+
+    if (line.to >= to || line.to + 1 > state.doc.length) {
+      break;
+    }
+
+    line = state.doc.lineAt(line.to + 1);
+  }
 }
 
 function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
@@ -726,6 +770,173 @@ function taskListDecorations(): Extension {
   return createListStateField(buildTaskListDecorations);
 }
 
+function getListItemMarkerContext(
+  state: EditorState,
+  node: SyntaxNodeRef,
+): { markerData: ListMarkerData; markerLineStart: number } | null {
+  for (let child = node.node.firstChild; child; child = child.nextSibling) {
+    if (child.type.name !== "ListMark") {
+      continue;
+    }
+
+    const markerData = getListMarkerData(state, {
+      from: child.from,
+      node: child,
+      to: child.to,
+      type: child.type,
+    });
+    if (!markerData) {
+      return null;
+    }
+
+    return {
+      markerData,
+      markerLineStart: state.doc.lineAt(child.from).from,
+    };
+  }
+
+  return null;
+}
+
+function isListContainerNode(node: SyntaxNodeRef["node"]) {
+  return (
+    node.type.name === "ListMark" ||
+    node.type.name === "BulletList" ||
+    node.type.name === "OrderedList"
+  );
+}
+
+function addParagraphPrefixDecoration(
+  state: EditorState,
+  child: SyntaxNodeRef["node"],
+  markerLineStart: number,
+  decorationRanges: Array<Range<Decoration>>,
+  atomicRanges: Array<Range<Decoration>>,
+) {
+  if (child.type.name !== "Paragraph") {
+    return;
+  }
+
+  const childLine = state.doc.lineAt(child.from);
+  if (childLine.from === markerLineStart || childLine.from >= child.from) {
+    return;
+  }
+
+  const prefixDecoration = Decoration.replace({});
+  decorationRanges.push(prefixDecoration.range(childLine.from, child.from));
+  atomicRanges.push(prefixDecoration.range(childLine.from, child.from));
+}
+
+function addListChildGapDecorations(
+  state: EditorState,
+  previousChildLineEnd: number,
+  childLineStart: number,
+  markerLineStart: number,
+  indentStyle: string,
+  decorationRanges: Array<Range<Decoration>>,
+) {
+  if (previousChildLineEnd + 1 > childLineStart - 1) {
+    return;
+  }
+
+  addListChildLineDecorations(
+    state,
+    previousChildLineEnd + 1,
+    childLineStart - 1,
+    markerLineStart,
+    indentStyle,
+    decorationRanges,
+  );
+}
+
+function decorateListChildNode(
+  state: EditorState,
+  child: SyntaxNodeRef["node"],
+  markerLineStart: number,
+  indentStyle: string,
+  previousChildLineEnd: number,
+  decorationRanges: Array<Range<Decoration>>,
+  atomicRanges: Array<Range<Decoration>>,
+) {
+  addParagraphPrefixDecoration(
+    state,
+    child,
+    markerLineStart,
+    decorationRanges,
+    atomicRanges,
+  );
+
+  const childLineStart = state.doc.lineAt(child.from).from;
+  addListChildGapDecorations(
+    state,
+    previousChildLineEnd,
+    childLineStart,
+    markerLineStart,
+    indentStyle,
+    decorationRanges,
+  );
+
+  addListChildLineDecorations(
+    state,
+    child.from,
+    child.to,
+    markerLineStart,
+    indentStyle,
+    decorationRanges,
+  );
+
+  return state.doc.lineAt(child.to).to;
+}
+
+function buildListChildBlockDecorations(
+  state: EditorState,
+): [DecorationSet, DecorationSet] {
+  const decorationRanges: Array<Range<Decoration>> = [];
+  const atomicRanges: Array<Range<Decoration>> = [];
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.type.name !== "ListItem") {
+        return;
+      }
+
+      const markerContext = getListItemMarkerContext(state, node);
+      if (!markerContext) {
+        return;
+      }
+
+      const { markerData, markerLineStart } = markerContext;
+      const indentStyle = buildListChildIndentStyle(markerData.indentLevel);
+      let previousChildLineEnd = state.doc.lineAt(markerData.markerEnd).to;
+
+      for (let child = node.node.firstChild; child; child = child.nextSibling) {
+        if (isListContainerNode(child)) {
+          continue;
+        }
+
+        previousChildLineEnd = decorateListChildNode(
+          state,
+          child,
+          markerLineStart,
+          indentStyle,
+          previousChildLineEnd,
+          decorationRanges,
+          atomicRanges,
+        );
+      }
+    },
+  });
+
+  return [
+    Decoration.set(decorationRanges, true),
+    Decoration.set(atomicRanges, true),
+  ];
+}
+
+function listChildBlocks(): Extension {
+  return createListStateField(buildListChildBlockDecorations);
+}
+
 function taskListInteractions(): Extension {
   return [
     ViewPlugin.define(() => ({}), {
@@ -821,14 +1032,17 @@ function listMarkerInteractions(): Extension {
 
 const listTheme = EditorView.theme({
   ".cm-md-list": {
-    "--cm-md-list-indent-step": "1.5rem",
-    "--cm-md-list-marker-width": "2rem",
+    "--cm-md-list-indent-step": LIST_INDENT_STEP,
+    "--cm-md-list-marker-width": LIST_MARKER_WIDTH,
     paddingLeft:
       "calc(var(--indent-level) * var(--cm-md-list-indent-step) + var(--cm-md-list-marker-width)) !important",
     textIndent: "calc(var(--cm-md-list-marker-width) * -1)",
   },
   ".cm-md-list *": {
     textIndent: "0",
+  },
+  ".cm-line.cm-md-list-child:not(.cm-md-codeblock):not(.cm-md-bq)": {
+    paddingLeft: "var(--cm-md-list-child-indent)",
   },
   ".cm-md-list-marker": {
     alignItems: "center",
@@ -999,7 +1213,7 @@ export function lists(): Extension {
       ];
   const decorationExtensions = decorationsDisabled
     ? []
-    : [taskListDecorations(), bulletLists(), numberLists()];
+    : [taskListDecorations(), bulletLists(), numberLists(), listChildBlocks()];
   const interactionExtensions = interactionsDisabled
     ? []
     : [
