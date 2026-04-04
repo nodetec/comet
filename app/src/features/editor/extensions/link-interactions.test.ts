@@ -65,6 +65,21 @@ describe("Editor link interactions", () => {
     ).toBe("https://example.com");
   });
 
+  it("does not treat the position immediately after markdown link text as part of the link when using exact hit testing", () => {
+    const doc = "[Example](https://example.com)";
+    const state = EditorState.create({
+      doc,
+      extensions: [markdownLanguage()],
+    });
+    const afterLabel = doc.indexOf("Example") + "Example".length;
+
+    expect(
+      findExternalLinkTargetAtPosition(state, afterLabel, {
+        allowPreviousCharacterFallback: false,
+      }),
+    ).toBeNull();
+  });
+
   it("finds autolink targets", () => {
     const doc = "<https://example.com>";
     const state = EditorState.create({
@@ -148,6 +163,46 @@ describe("Editor link interactions", () => {
 
     expect(openUrlMock).toHaveBeenCalledWith("https://example.com");
 
+    view.destroy();
+  });
+
+  it("does not open markdown links when the click resolves to the right boundary", async () => {
+    const doc = "[Example](https://example.com)";
+    const { view } = createView(doc);
+
+    await flush();
+
+    const link = view.dom.querySelector(".cm-md-link");
+    expect(link).not.toBeNull();
+
+    const afterLabel = doc.indexOf("Example") + "Example".length;
+    const originalPosAtCoords = view.posAtCoords.bind(view);
+    Object.assign(view, {
+      posAtCoords: () => afterLabel,
+    });
+
+    link?.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+    link?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+
+    expect(openUrlMock).not.toHaveBeenCalled();
+
+    Object.assign(view, {
+      posAtCoords: originalPosAtCoords,
+    });
     view.destroy();
   });
 

@@ -182,11 +182,33 @@ function getExternalLinkTargetFromNode(
   return EXTERNAL_LINK_SCHEME_RE.test(url) ? url : null;
 }
 
-export function findExternalLinkTargetAtPosition(
+function isVisibleLinkPosition(node: SyntaxNode, position: number): boolean {
+  if (node.name === "Link") {
+    const marks = node.getChildren("LinkMark");
+    if (marks.length < 2) {
+      return false;
+    }
+
+    return position >= marks[0]!.to && position < marks[1]!.from;
+  }
+
+  if (node.name === "Autolink") {
+    const urlNode = node.getChild("URL");
+    return urlNode ? position >= urlNode.from && position < urlNode.to : false;
+  }
+
+  return false;
+}
+
+function findSyntaxTreeLinkTargetAtPosition(
   state: EditorState,
   position: number,
+  allowPreviousCharacterFallback: boolean,
 ): string | null {
-  const candidates = new Set([position, Math.max(0, position - 1)]);
+  const candidates = new Set([position]);
+  if (allowPreviousCharacterFallback) {
+    candidates.add(Math.max(0, position - 1));
+  }
 
   for (const candidate of candidates) {
     const resolved = syntaxTree(state).resolveInner(candidate, 0);
@@ -196,12 +218,24 @@ export function findExternalLinkTargetAtPosition(
         continue;
       }
 
+      if (!isVisibleLinkPosition(node, candidate)) {
+        continue;
+      }
+
       return getExternalLinkTargetFromNode(state, node);
     }
   }
 
+  return null;
+}
+
+function findPlainExternalLinkTargetAtPosition(
+  state: EditorState,
+  position: number,
+): string | null {
   const line = state.doc.lineAt(position);
   const offset = position - line.from;
+  const tree = syntaxTree(state);
 
   for (const match of line.text.matchAll(PLAIN_EXTERNAL_LINK_RE)) {
     if (match.index == null) {
@@ -222,7 +256,6 @@ export function findExternalLinkTargetAtPosition(
 
     const absoluteFrom = line.from + from;
     const absoluteTo = line.from + to;
-    const tree = syntaxTree(state);
     if (
       isInsidePlainLinkExcludedSyntax(tree, absoluteFrom) ||
       isInsidePlainLinkExcludedSyntax(tree, absoluteTo - 1)
@@ -234,6 +267,22 @@ export function findExternalLinkTargetAtPosition(
   }
 
   return null;
+}
+
+export function findExternalLinkTargetAtPosition(
+  state: EditorState,
+  position: number,
+  options: {
+    allowPreviousCharacterFallback?: boolean;
+  } = {},
+): string | null {
+  return (
+    findSyntaxTreeLinkTargetAtPosition(
+      state,
+      position,
+      options.allowPreviousCharacterFallback ?? true,
+    ) ?? findPlainExternalLinkTargetAtPosition(state, position)
+  );
 }
 
 function shouldOpenLink(event: MouseEvent) {
@@ -256,7 +305,9 @@ function getExternalLinkTargetFromEvent(
       false,
     );
     if (position != null) {
-      return findExternalLinkTargetAtPosition(view.state, position);
+      return findExternalLinkTargetAtPosition(view.state, position, {
+        allowPreviousCharacterFallback: false,
+      });
     }
   }
 
