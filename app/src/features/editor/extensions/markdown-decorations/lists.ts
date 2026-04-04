@@ -23,6 +23,7 @@ import {
   isListDecorationsDisabled,
   isListInteractionsDisabled,
   isListSelectionNormalizationDisabled,
+  logEditorDebug,
 } from "@/shared/lib/editor-debug";
 
 const BULLET_INDENT = 2;
@@ -30,6 +31,8 @@ const ORDERED_INDENT = 3;
 const LIST_INDENT_STEP = "1.5rem";
 const LIST_MARKER_WIDTH = "2rem";
 const LIST_CHILD_BLOCK_OFFSET = LIST_MARKER_WIDTH;
+const LIST_SOURCE_INDENT_CHAR_WIDTH = "0.25rem";
+const BLOCKQUOTE_PREFIX_RE = /^(?:[ \t]{0,3}> ?)+/;
 const BULLET_MARKERS = new Set(["-", "*", "+"]);
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
 const TASK_MARKERS = new Set(["[ ]", "[x]"]);
@@ -37,12 +40,18 @@ const TASK_MARKERS = new Set(["[ ]", "[x]"]);
 type ListMarkerData = {
   indentLevel: number;
   lineStart: number;
+  sourceIndentChars: number;
   marker: string;
   markerEnd: number;
   markerStart: number;
 };
 
 type MarkerRange = {
+  from: number;
+  to: number;
+};
+
+type HiddenPrefixRange = {
   from: number;
   to: number;
 };
@@ -82,10 +91,13 @@ export function getListMarkerData(
     }
   }
   const indentLevel = Math.max(0, listDepth - 1);
+  const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
+  const sourceIndentChars = Math.max(0, from - line.from - quotePrefix.length);
 
   return {
     indentLevel,
     lineStart: line.from,
+    sourceIndentChars,
     marker,
     markerEnd: to,
     markerStart: from,
@@ -132,8 +144,11 @@ function addListDecorations(
   );
 }
 
-function buildListChildIndentStyle(indentLevel: number) {
-  return `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET})`;
+function buildListChildIndentStyle(
+  indentLevel: number,
+  sourceIndentChars: number,
+) {
+  return `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET} + ${sourceIndentChars} * ${LIST_SOURCE_INDENT_CHAR_WIDTH})`;
 }
 
 function addListChildLineDecorations(
@@ -159,6 +174,36 @@ function addListChildLineDecorations(
     }
 
     if (line.to >= to || line.to + 1 > state.doc.length) {
+      break;
+    }
+
+    line = state.doc.lineAt(line.to + 1);
+  }
+}
+
+function addParagraphChildLineDecorations(
+  state: EditorState,
+  child: SyntaxNodeRef["node"],
+  markerLineStart: number,
+  expectedPrefix: string,
+  indentStyle: string,
+  decorationRanges: Array<Range<Decoration>>,
+) {
+  let line = state.doc.lineAt(child.from);
+
+  while (true) {
+    if (line.from !== markerLineStart && line.text.startsWith(expectedPrefix)) {
+      decorationRanges.push(
+        Decoration.line({
+          attributes: {
+            class: "cm-md-list-child",
+            style: indentStyle,
+          },
+        }).range(line.from),
+      );
+    }
+
+    if (line.to >= child.to || line.to + 1 > state.doc.length) {
       break;
     }
 
@@ -195,7 +240,183 @@ function getListMarkerDataForLine(
   return markerData;
 }
 
-export function insertLineBreakWithoutListContinuation(view: EditorView) {
+function getListContinuationIndent(marker: string) {
+  return BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
+}
+
+function getExpectedContinuationPrefix(
+  state: EditorState,
+  markerData: ListMarkerData,
+) {
+  const markerPrefix = state.sliceDoc(
+    markerData.lineStart,
+    markerData.markerStart,
+  );
+  return (
+    markerPrefix + " ".repeat(getListContinuationIndent(markerData.marker))
+  );
+}
+
+type ExplicitContinuationContext = {
+  indentStyle: string;
+  prefix: string;
+};
+
+function summarizeTransactionChanges(transaction: Transaction) {
+  const changes: Array<{ fromA: number; toA: number; insert: string }> = [];
+  transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    changes.push({
+      fromA,
+      insert: inserted.toString(),
+      toA,
+    });
+  });
+  return changes;
+}
+
+function logListDeleteDebug(
+  message: string,
+  payload?: Record<string, unknown>,
+) {
+  logEditorDebug("lists", message, payload);
+}
+
+function getParsedContinuationContextForLine(
+  state: EditorState,
+  targetLineFrom: number,
+) {
+  let result: ExplicitContinuationContext | null = null;
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.type.name !== "ListItem") {
+        return;
+      }
+
+      const markerContext = getListItemMarkerContext(state, node);
+      if (!markerContext) {
+        return;
+      }
+
+      const { markerData, markerLineStart } = markerContext;
+      const expectedPrefix = getExpectedContinuationPrefix(state, markerData);
+
+      for (let child = node.node.firstChild; child; child = child.nextSibling) {
+        if (child.type.name !== "Paragraph") {
+          continue;
+        }
+
+        let line = state.doc.lineAt(child.from);
+        while (true) {
+          if (
+            line.from === targetLineFrom &&
+            line.from !== markerLineStart &&
+            line.text.startsWith(expectedPrefix)
+          ) {
+            result = {
+              indentStyle: buildListChildIndentStyle(
+                markerData.indentLevel,
+                markerData.sourceIndentChars,
+              ),
+              prefix: expectedPrefix,
+            };
+            return false;
+          }
+
+          if (line.to >= child.to || line.to + 1 > state.doc.length) {
+            break;
+          }
+
+          line = state.doc.lineAt(line.to + 1);
+        }
+      }
+    },
+  });
+
+  return result;
+}
+
+function getExplicitContinuationContextForLine(
+  state: EditorState,
+  line: EditorState["doc"]["line"],
+) {
+  const parsedContext = getParsedContinuationContextForLine(state, line.from);
+  if (parsedContext) {
+    return parsedContext;
+  }
+
+  if (line.number === 1) {
+    return null;
+  }
+
+  const previousLine = state.doc.line(line.number - 1);
+  const previousContext =
+    getParsedContinuationContextForLine(state, previousLine.from) ??
+    (() => {
+      const markerData = getListMarkerDataForLine(
+        state,
+        previousLine.from,
+        previousLine.to,
+      );
+      return markerData
+        ? {
+            indentStyle: buildListChildIndentStyle(
+              markerData.indentLevel,
+              markerData.sourceIndentChars,
+            ),
+            prefix: getExpectedContinuationPrefix(state, markerData),
+          }
+        : null;
+    })();
+
+  if (!previousContext || line.text !== previousContext.prefix) {
+    return null;
+  }
+
+  return previousContext;
+}
+
+function buildPendingListContinuationDecorations(
+  state: EditorState,
+): [DecorationSet, DecorationSet] {
+  const decorationRanges: Array<Range<Decoration>> = [];
+  const atomicRanges: Array<Range<Decoration>> = [];
+
+  for (let lineNumber = 2; lineNumber <= state.doc.lines; lineNumber += 1) {
+    const line = state.doc.line(lineNumber);
+    const continuationContext = getExplicitContinuationContextForLine(
+      state,
+      line,
+    );
+    if (!continuationContext || line.text !== continuationContext.prefix) {
+      continue;
+    }
+
+    decorationRanges.push(
+      Decoration.line({
+        attributes: {
+          class: "cm-md-list-child cm-md-list-child-draft",
+          style: continuationContext.indentStyle,
+        },
+      }).range(line.from),
+    );
+
+    const hiddenPrefix = Decoration.replace({});
+    decorationRanges.push(hiddenPrefix.range(line.from, line.to));
+    atomicRanges.push(hiddenPrefix.range(line.from, line.to));
+  }
+
+  return [
+    Decoration.set(decorationRanges, true),
+    Decoration.set(atomicRanges, true),
+  ];
+}
+
+function pendingListContinuations(): Extension {
+  return createListStateField(buildPendingListContinuationDecorations);
+}
+
+export function insertExplicitListContinuationBlock(view: EditorView) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
     return false;
@@ -211,8 +432,7 @@ export function insertLineBreakWithoutListContinuation(view: EditorView) {
     return false;
   }
 
-  const prefix = view.state.sliceDoc(line.from, markerData.markerStart);
-  const insert = `\n${prefix}`;
+  const insert = `\n${getExpectedContinuationPrefix(view.state, markerData)}`;
   const cursor = selection.head + insert.length;
 
   view.dispatch({
@@ -222,7 +442,42 @@ export function insertLineBreakWithoutListContinuation(view: EditorView) {
       to: selection.head,
     },
     selection: EditorSelection.cursor(cursor),
-    annotations: Transaction.userEvent.of("input"),
+  });
+
+  return true;
+}
+
+export function insertExplicitContinuationAfterContinuationLine(
+  view: EditorView,
+) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return false;
+  }
+
+  const line = view.state.doc.lineAt(selection.head);
+  if (selection.head !== line.to) {
+    return false;
+  }
+
+  const continuationContext = getExplicitContinuationContextForLine(
+    view.state,
+    line,
+  );
+  if (!continuationContext) {
+    return false;
+  }
+
+  const insert = `\n${continuationContext.prefix}`;
+  const cursor = selection.head + insert.length;
+
+  view.dispatch({
+    changes: {
+      from: selection.head,
+      insert,
+      to: selection.head,
+    },
+    selection: EditorSelection.cursor(cursor),
   });
 
   return true;
@@ -450,6 +705,47 @@ function buildListMarkerRanges(state: EditorState): MarkerRange[] {
   return ranges;
 }
 
+function getHiddenContinuationPrefixRange(
+  line: EditorState["doc"]["line"],
+  expectedPrefix: string,
+): HiddenPrefixRange | null {
+  if (!line.text.startsWith(expectedPrefix)) {
+    return null;
+  }
+
+  const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
+  const from = line.from + quotePrefix.length;
+  const to = Math.min(line.from + expectedPrefix.length, line.to);
+  return to > from ? { from, to } : null;
+}
+
+function buildContinuationPrefixRanges(
+  state: EditorState,
+): HiddenPrefixRange[] {
+  const ranges: HiddenPrefixRange[] = [];
+
+  for (let lineNumber = 2; lineNumber <= state.doc.lines; lineNumber += 1) {
+    const line = state.doc.line(lineNumber);
+    const continuationContext = getExplicitContinuationContextForLine(
+      state,
+      line,
+    );
+    if (!continuationContext) {
+      continue;
+    }
+
+    const range = getHiddenContinuationPrefixRange(
+      line,
+      continuationContext.prefix,
+    );
+    if (range) {
+      ranges.push(range);
+    }
+  }
+
+  return ranges;
+}
+
 function findMarkerRangeAtPosition(
   state: EditorState,
   position: number,
@@ -550,7 +846,10 @@ function normalizeSelectionToListMarkers(state: EditorState) {
   return EditorSelection.create(ranges, state.selection.mainIndex);
 }
 
-function moveAcrossListMarker(direction: "left" | "right", view: EditorView) {
+export function moveAcrossListBoundary(
+  direction: "left" | "right",
+  view: EditorView,
+) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
     return false;
@@ -562,22 +861,227 @@ function moveAcrossListMarker(direction: "left" | "right", view: EditorView) {
   }
 
   for (const marker of markerRanges) {
-    if (direction === "left" && selection.head === marker.to) {
-      view.dispatch({
-        selection: EditorSelection.cursor(marker.from, -1),
-      });
+    if (tryMoveAcrossMarkerRange(direction, view, selection.head, marker)) {
       return true;
     }
+  }
 
-    if (direction === "right" && selection.head === marker.from) {
-      view.dispatch({
-        selection: EditorSelection.cursor(marker.to, 1),
-      });
+  const continuationRanges = buildContinuationPrefixRanges(view.state);
+  for (const range of continuationRanges) {
+    if (
+      tryMoveAcrossContinuationRange(direction, view, selection.head, range)
+    ) {
       return true;
     }
   }
 
   return false;
+}
+
+function tryMoveAcrossMarkerRange(
+  direction: "left" | "right",
+  view: EditorView,
+  head: number,
+  marker: MarkerRange,
+) {
+  if (direction === "left" && head === marker.to) {
+    view.dispatch({
+      selection: EditorSelection.cursor(marker.from, -1),
+    });
+    return true;
+  }
+
+  if (direction === "right" && head === marker.from) {
+    view.dispatch({
+      selection: EditorSelection.cursor(marker.to, 1),
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function tryMoveAcrossContinuationRange(
+  direction: "left" | "right",
+  view: EditorView,
+  head: number,
+  range: HiddenPrefixRange,
+) {
+  if (direction === "left" && head === range.to) {
+    const previousLine = view.state.doc.lineAt(Math.max(0, range.from - 1));
+    view.dispatch({
+      selection: EditorSelection.cursor(previousLine.to),
+    });
+    return true;
+  }
+
+  if (direction === "right" && head === range.from - 1) {
+    view.dispatch({
+      selection: EditorSelection.cursor(range.to, 1),
+    });
+    return true;
+  }
+
+  return false;
+}
+
+export function deleteAcrossListBoundary(view: EditorView) {
+  const selection = view.state.selection.main;
+  if (!selection.empty) {
+    return false;
+  }
+
+  const currentLine = view.state.doc.lineAt(selection.head);
+  const continuationContext = getExplicitContinuationContextForLine(
+    view.state,
+    currentLine,
+  );
+  logListDeleteDebug("deleteAcrossListBoundary invoked", {
+    continuationContext,
+    head: selection.head,
+    lineFrom: currentLine.from,
+    lineText: currentLine.text,
+    lineTo: currentLine.to,
+  });
+  if (
+    continuationContext &&
+    currentLine.text === continuationContext.prefix &&
+    selection.head >= currentLine.from &&
+    selection.head <= currentLine.to
+  ) {
+    const range = getHiddenContinuationPrefixRange(
+      currentLine,
+      continuationContext.prefix,
+    );
+    if (!range) {
+      logListDeleteDebug("empty continuation branch had no hidden range", {
+        head: selection.head,
+        lineText: currentLine.text,
+        prefix: continuationContext.prefix,
+      });
+      return false;
+    }
+
+    logListDeleteDebug("deleting empty continuation prefix", {
+      head: selection.head,
+      lineText: currentLine.text,
+      prefix: continuationContext.prefix,
+      range,
+    });
+    const previousLine = view.state.doc.lineAt(
+      Math.max(0, currentLine.from - 1),
+    );
+    view.dispatch({
+      changes: {
+        from: previousLine.to,
+        to: currentLine.to,
+      },
+      selection: EditorSelection.cursor(previousLine.to),
+      annotations: Transaction.userEvent.of("delete.backward"),
+    });
+    return true;
+  }
+
+  const continuationRanges = buildContinuationPrefixRanges(view.state);
+  for (const range of continuationRanges) {
+    if (selection.head !== range.to) {
+      continue;
+    }
+
+    logListDeleteDebug("joining continuation line into previous line", {
+      head: selection.head,
+      range,
+    });
+    const rangeLine = view.state.doc.lineAt(range.from);
+    const previousLine = view.state.doc.lineAt(Math.max(0, rangeLine.from - 1));
+    view.dispatch({
+      changes: {
+        from: previousLine.to,
+        to: range.to,
+      },
+      selection: EditorSelection.cursor(previousLine.to),
+      annotations: Transaction.userEvent.of("delete.backward"),
+    });
+    return true;
+  }
+
+  logListDeleteDebug("deleteAcrossListBoundary fell through", {
+    continuationRanges,
+    head: selection.head,
+  });
+  return false;
+}
+
+function backspaceRemoveEmptyContinuationPrefix(
+  transaction: Transaction,
+): TransactionSpec | null {
+  const userEvent = transaction.annotation(Transaction.userEvent);
+  if (transaction.docChanged && transaction.isUserEvent("delete")) {
+    logListDeleteDebug("delete transaction observed", {
+      changes: summarizeTransactionChanges(transaction),
+      endSelection: {
+        anchor: transaction.newSelection.main.anchor,
+        head: transaction.newSelection.main.head,
+      },
+      startSelection: {
+        anchor: transaction.startState.selection.main.anchor,
+        head: transaction.startState.selection.main.head,
+      },
+      userEvent,
+    });
+  }
+
+  if (!transaction.isUserEvent("delete") || !transaction.docChanged) {
+    return null;
+  }
+
+  const state = transaction.startState;
+  const selection = state.selection.main;
+  if (!selection.empty) {
+    return null;
+  }
+
+  const currentLine = state.doc.lineAt(selection.head);
+  const continuationContext = getExplicitContinuationContextForLine(
+    state,
+    currentLine,
+  );
+  logListDeleteDebug("backspaceRemoveEmptyContinuationPrefix context", {
+    continuationContext,
+    lineFrom: currentLine.from,
+    lineText: currentLine.text,
+    lineTo: currentLine.to,
+    userEvent,
+  });
+  if (!continuationContext || currentLine.text !== continuationContext.prefix) {
+    return null;
+  }
+
+  const range = getHiddenContinuationPrefixRange(
+    currentLine,
+    continuationContext.prefix,
+  );
+  if (!range) {
+    logListDeleteDebug("backspace fallback found no hidden range", {
+      lineText: currentLine.text,
+      prefix: continuationContext.prefix,
+    });
+    return null;
+  }
+
+  logListDeleteDebug("backspace fallback removing empty continuation prefix", {
+    range,
+    selectionHead: selection.head,
+  });
+  const previousLine = state.doc.lineAt(Math.max(0, currentLine.from - 1));
+  return {
+    changes: {
+      from: previousLine.to,
+      to: currentLine.to,
+    },
+    selection: EditorSelection.cursor(previousLine.to),
+    annotations: Transaction.userEvent.of("delete.backward"),
+  };
 }
 
 function placeCaretAtListMarkerBoundary(
@@ -861,10 +1365,11 @@ function isListContainerNode(node: SyntaxNodeRef["node"]) {
   );
 }
 
-function addParagraphPrefixDecoration(
+function addParagraphPrefixDecorations(
   state: EditorState,
   child: SyntaxNodeRef["node"],
   markerLineStart: number,
+  expectedPrefix: string,
   decorationRanges: Array<Range<Decoration>>,
   atomicRanges: Array<Range<Decoration>>,
 ) {
@@ -872,14 +1377,26 @@ function addParagraphPrefixDecoration(
     return;
   }
 
-  const childLine = state.doc.lineAt(child.from);
-  if (childLine.from === markerLineStart || childLine.from >= child.from) {
-    return;
-  }
+  let line = state.doc.lineAt(child.from);
+  while (true) {
+    if (line.from !== markerLineStart && line.text.startsWith(expectedPrefix)) {
+      const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
+      const hideFrom = line.from + quotePrefix.length;
+      const hideTo = Math.min(line.from + expectedPrefix.length, line.to);
 
-  const prefixDecoration = Decoration.replace({});
-  decorationRanges.push(prefixDecoration.range(childLine.from, child.from));
-  atomicRanges.push(prefixDecoration.range(childLine.from, child.from));
+      if (hideTo > hideFrom) {
+        const prefixDecoration = Decoration.replace({});
+        decorationRanges.push(prefixDecoration.range(hideFrom, hideTo));
+        atomicRanges.push(prefixDecoration.range(hideFrom, hideTo));
+      }
+    }
+
+    if (line.to >= child.to || line.to + 1 > state.doc.length) {
+      break;
+    }
+
+    line = state.doc.lineAt(line.to + 1);
+  }
 }
 
 function addListChildGapDecorations(
@@ -908,15 +1425,17 @@ function decorateListChildNode(
   state: EditorState,
   child: SyntaxNodeRef["node"],
   markerLineStart: number,
+  expectedPrefix: string,
   indentStyle: string,
   previousChildLineEnd: number,
   decorationRanges: Array<Range<Decoration>>,
   atomicRanges: Array<Range<Decoration>>,
 ) {
-  addParagraphPrefixDecoration(
+  addParagraphPrefixDecorations(
     state,
     child,
     markerLineStart,
+    expectedPrefix,
     decorationRanges,
     atomicRanges,
   );
@@ -931,14 +1450,25 @@ function decorateListChildNode(
     decorationRanges,
   );
 
-  addListChildLineDecorations(
-    state,
-    child.from,
-    child.to,
-    markerLineStart,
-    indentStyle,
-    decorationRanges,
-  );
+  if (child.type.name === "Paragraph") {
+    addParagraphChildLineDecorations(
+      state,
+      child,
+      markerLineStart,
+      expectedPrefix,
+      indentStyle,
+      decorationRanges,
+    );
+  } else {
+    addListChildLineDecorations(
+      state,
+      child.from,
+      child.to,
+      markerLineStart,
+      indentStyle,
+      decorationRanges,
+    );
+  }
 
   return state.doc.lineAt(child.to).to;
 }
@@ -961,7 +1491,11 @@ function buildListChildBlockDecorations(
       }
 
       const { markerData, markerLineStart } = markerContext;
-      const indentStyle = buildListChildIndentStyle(markerData.indentLevel);
+      const indentStyle = buildListChildIndentStyle(
+        markerData.indentLevel,
+        markerData.sourceIndentChars,
+      );
+      const expectedPrefix = getExpectedContinuationPrefix(state, markerData);
       let previousChildLineEnd = state.doc.lineAt(markerData.markerEnd).to;
 
       for (let child = node.node.firstChild; child; child = child.nextSibling) {
@@ -973,6 +1507,7 @@ function buildListChildBlockDecorations(
           state,
           child,
           markerLineStart,
+          expectedPrefix,
           indentStyle,
           previousChildLineEnd,
           decorationRanges,
@@ -1229,16 +1764,24 @@ const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
 
 const listNavigationKeymap = Prec.high(
   keymap.of([
-    { key: "ArrowLeft", run: (view) => moveAcrossListMarker("left", view) },
-    { key: "ArrowRight", run: (view) => moveAcrossListMarker("right", view) },
+    { key: "Backspace", run: deleteAcrossListBoundary },
+    { key: "ArrowLeft", run: (view) => moveAcrossListBoundary("left", view) },
+    {
+      key: "ArrowRight",
+      run: (view) => moveAcrossListBoundary("right", view),
+    },
   ]),
 );
 
 const listBreakKeymap = Prec.high(
   keymap.of([
     {
+      key: "Enter",
+      run: insertExplicitContinuationAfterContinuationLine,
+    },
+    {
       key: "Shift-Enter",
-      run: insertLineBreakWithoutListContinuation,
+      run: insertExplicitListContinuationBlock,
     },
   ]),
 );
@@ -1263,6 +1806,12 @@ export function lists(): Extension {
               return [tightContinuation as TransactionSpec];
             }
 
+            const emptyContinuationPrefix =
+              backspaceRemoveEmptyContinuationPrefix(transaction);
+            if (emptyContinuationPrefix) {
+              return [emptyContinuationPrefix];
+            }
+
             const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
             if (listPrefixRemoval) {
               return [listPrefixRemoval as TransactionSpec];
@@ -1279,7 +1828,13 @@ export function lists(): Extension {
       ];
   const decorationExtensions = decorationsDisabled
     ? []
-    : [taskListDecorations(), bulletLists(), numberLists(), listChildBlocks()];
+    : [
+        taskListDecorations(),
+        bulletLists(),
+        numberLists(),
+        listChildBlocks(),
+        pendingListContinuations(),
+      ];
   const interactionExtensions = interactionsDisabled
     ? []
     : [
