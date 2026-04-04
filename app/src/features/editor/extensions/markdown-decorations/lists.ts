@@ -735,6 +735,7 @@ function buildTaskListDecorations(
       }
 
       const checked = task === "[x]";
+      const line = state.doc.lineAt(data.lineStart);
       decorationRanges.push(
         Decoration.line({
           attributes: {
@@ -749,6 +750,14 @@ function buildTaskListDecorations(
           class: `cm-md-list-marker cm-md-task-marker-source ${checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`,
         }).range(taskStart, taskEnd + 1),
       );
+
+      if (checked && taskEnd + 1 < line.to) {
+        decorationRanges.push(
+          Decoration.mark({
+            class: "cm-md-task-content-checked",
+          }).range(taskEnd + 1, line.to),
+        );
+      }
     },
   });
 
@@ -1152,6 +1161,8 @@ const listTheme = EditorView.theme({
   },
   ".cm-md-task-list.cm-md-task-checked": {
     color: "var(--muted-foreground)",
+  },
+  ".cm-md-task-content-checked": {
     textDecoration: "line-through",
     textDecorationColor: "var(--muted-foreground)",
   },

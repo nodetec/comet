@@ -271,4 +271,34 @@ describe("List rendering", () => {
 
     view.destroy();
   });
+
+  it("applies checked task strikethrough to task content instead of the marker slot", async () => {
+    const { view } = createView(
+      [
+        "- [ ] Top-level unchecked task",
+        "- [x] Top-level checked task",
+        "- [ ] Parent task",
+        "  - [x] Nested checked task",
+      ].join("\n"),
+    );
+
+    await flush();
+
+    const checkedContent = view.dom.querySelector(
+      ".cm-md-task-content-checked",
+    );
+    expect(checkedContent).not.toBeNull();
+    expect(checkedContent?.textContent).toContain("Top-level checked task");
+
+    const nestedLine = [
+      ...view.dom.querySelectorAll(".cm-line.cm-md-task-list"),
+    ].find((element) => element.textContent?.includes("Nested checked task"));
+    expect(nestedLine).not.toBeUndefined();
+    expect(
+      nestedLine?.querySelector(".cm-md-task-content-checked")?.textContent,
+    ).toContain("Nested checked task");
+    expect(nestedLine?.textContent).not.toContain("- Nested checked task");
+
+    view.destroy();
+  });
 });
