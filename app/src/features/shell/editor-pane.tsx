@@ -200,7 +200,7 @@ function useEditorScrollHeader(
       ) as HTMLElement | null;
 
       if (!firstLine) {
-        setShowHeaderTitle(false);
+        setShowHeaderTitle(scrolled);
         return;
       }
 
