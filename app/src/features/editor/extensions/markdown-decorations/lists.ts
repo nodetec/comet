@@ -15,6 +15,7 @@ import {
   EditorView,
   keymap,
   ViewPlugin,
+  WidgetType,
   type DecorationSet,
 } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
@@ -64,6 +65,37 @@ type TaskListShortcut = {
   };
   selection: EditorSelection;
 };
+
+class TaskMarkerWidget extends WidgetType {
+  constructor(
+    private readonly checked: boolean,
+    private readonly taskStart: number,
+  ) {
+    super();
+  }
+
+  override eq(other: WidgetType): boolean {
+    return (
+      other instanceof TaskMarkerWidget &&
+      other.checked === this.checked &&
+      other.taskStart === this.taskStart
+    );
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
+  }
+
+  override toDOM(): HTMLElement {
+    const marker = document.createElement("span");
+    marker.className = `cm-md-list-marker cm-md-task-marker-source ${this.checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`;
+    marker.dataset.taskStart = String(this.taskStart);
+    const checkbox = document.createElement("span");
+    checkbox.className = "cm-md-task-marker-box";
+    marker.append(checkbox);
+    return marker;
+  }
+}
 
 type ListMarkerNodeRef = Pick<SyntaxNodeRef, "from" | "to" | "type" | "node">;
 type DocLine = ReturnType<EditorState["doc"]["lineAt"]>;
@@ -517,6 +549,69 @@ export function getTaskListShortcut(
   };
 }
 
+function getTaskCheckboxInsertion(state: EditorState): TaskListShortcut | null {
+  const selection = state.selection.main;
+  if (!selection.empty) {
+    return null;
+  }
+
+  const line = state.doc.lineAt(selection.head);
+  const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
+  const lineContent = line.text.slice(quotePrefix.length);
+  const lineContentStart = line.from + quotePrefix.length;
+  const listMatch = LIST_PREFIX_RE.exec(lineContent);
+
+  if (listMatch) {
+    const existingTaskMarker = listMatch[3]?.trimEnd();
+    if (existingTaskMarker && TASK_MARKERS.has(existingTaskMarker)) {
+      return null;
+    }
+
+    const insert = "[ ] ";
+    const insertPosition = lineContentStart + listMatch[0].length;
+    const nextHead =
+      selection.head <= insertPosition
+        ? insertPosition + insert.length
+        : selection.head + insert.length;
+
+    return {
+      changes: {
+        from: insertPosition,
+        to: insertPosition,
+        insert,
+      },
+      selection: EditorSelection.single(nextHead),
+    };
+  }
+
+  const indent = /^([ \t]*)/.exec(lineContent)?.[1] ?? "";
+  const insert = "- [ ] ";
+  const insertPosition = lineContentStart + indent.length;
+  const nextHead =
+    selection.head <= insertPosition
+      ? insertPosition + insert.length
+      : selection.head + insert.length;
+
+  return {
+    changes: {
+      from: insertPosition,
+      to: insertPosition,
+      insert,
+    },
+    selection: EditorSelection.single(nextHead),
+  };
+}
+
+export function insertTaskCheckbox(view: EditorView) {
+  const insertion = getTaskCheckboxInsertion(view.state);
+  if (!insertion) {
+    return false;
+  }
+
+  view.dispatch(insertion);
+  return true;
+}
+
 function getListIndentStep(lineText: string): number {
   const match = LIST_PREFIX_RE.exec(lineText);
   if (!match) {
@@ -811,8 +906,7 @@ function normalizeSelectionToListMarkers(state: EditorState) {
     for (const marker of markerRanges) {
       const line = state.doc.lineAt(marker.from);
       if (range.head >= line.from && range.head <= marker.to) {
-        const isEndOfLine = line.to === marker.to;
-        const targetAssoc = isEndOfLine ? -1 : 1;
+        const targetAssoc = 1;
         if (range.head !== marker.to || range.assoc !== targetAssoc) {
           changed = true;
           return EditorSelection.cursor(marker.to, targetAssoc);
@@ -1288,6 +1382,9 @@ function buildTaskListDecorations(
 
       const checked = task === "[x]";
       const line = state.doc.lineAt(data.lineStart);
+      const taskMarkerDecoration = Decoration.replace({
+        widget: new TaskMarkerWidget(checked, taskStart),
+      });
       decorationRanges.push(
         Decoration.line({
           attributes: {
@@ -1295,13 +1392,10 @@ function buildTaskListDecorations(
             style: `--indent-level: ${data.indentLevel}`,
           },
         }).range(data.lineStart),
-        Decoration.mark({
-          class: "cm-md-task-bullet-source",
-        }).range(data.markerStart, data.markerEnd + 1),
-        Decoration.mark({
-          class: `cm-md-list-marker cm-md-task-marker-source ${checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`,
-        }).range(taskStart, taskEnd + 1),
+        Decoration.replace({}).range(data.markerStart, data.markerEnd + 1),
+        taskMarkerDecoration.range(taskStart, taskEnd),
       );
+      atomicRanges.push(taskMarkerDecoration.range(taskStart, taskEnd));
 
       if (checked && taskEnd + 1 < line.to) {
         decorationRanges.push(
@@ -1536,7 +1630,7 @@ function taskListInteractions(): Extension {
       eventHandlers: {
         mousedown(event) {
           const target = event.target as HTMLElement;
-          const marker = target.closest(".cm-md-task-marker-source");
+          const marker = target.closest(".cm-md-task-marker-box");
           if (!(marker instanceof HTMLElement) || event.button !== 0) {
             return false;
           }
@@ -1547,7 +1641,12 @@ function taskListInteractions(): Extension {
         },
         click(event, view) {
           const target = event.target as HTMLElement;
-          const marker = target.closest(".cm-md-task-marker-source");
+          const checkbox = target.closest(".cm-md-task-marker-box");
+          if (!(checkbox instanceof HTMLElement)) {
+            return false;
+          }
+
+          const marker = checkbox.closest(".cm-md-task-marker-source");
           if (!(marker instanceof HTMLElement)) {
             return false;
           }
@@ -1555,7 +1654,9 @@ function taskListInteractions(): Extension {
           event.preventDefault();
           event.stopPropagation();
 
-          const from = view.posAtDOM(marker, 0);
+          const from = Number(
+            marker.dataset.taskStart ?? view.posAtDOM(marker, 0),
+          );
           const to = from + 3;
           const taskMarker = view.state.sliceDoc(from, to);
 
@@ -1586,12 +1687,12 @@ function listMarkerInteractions(): Extension {
           return false;
         }
 
-        if (target.closest(".cm-md-task-marker-source")) {
+        if (target.closest(".cm-md-task-marker-box")) {
           return false;
         }
 
         const marker = target.closest(
-          ".cm-md-bullet-marker-source, .cm-md-number-marker-source",
+          ".cm-md-bullet-marker-source, .cm-md-number-marker-source, .cm-md-task-marker-source",
         );
         if (!(marker instanceof HTMLElement)) {
           return false;
@@ -1642,10 +1743,11 @@ const listTheme = EditorView.theme({
     color: "var(--primary)",
     display: "inline-flex",
     justifyContent: "center",
+    lineHeight: "1",
     minWidth: "var(--cm-md-list-marker-width)",
     position: "relative",
     textAlign: "center",
-    verticalAlign: "middle",
+    verticalAlign: "baseline",
     whiteSpace: "pre",
     zIndex: "0",
   },
@@ -1661,14 +1763,14 @@ const listTheme = EditorView.theme({
     color: "var(--primary)",
     content: '"•"',
     display: "inline-flex",
-    fontSize: "1.35rem",
+    fontSize: "1.1em",
     justifyContent: "center",
     left: "50%",
     lineHeight: "1",
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
-    transform: "translate(-50%, -60%)",
+    transform: "translate(-50%, -50%)",
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-number-marker-source": {
@@ -1682,6 +1784,7 @@ const listTheme = EditorView.theme({
     content: "var(--display-number)",
     fontVariantNumeric: "tabular-nums",
     left: "50%",
+    lineHeight: "1",
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
@@ -1689,59 +1792,41 @@ const listTheme = EditorView.theme({
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-task-marker-source": {
-    color: "transparent",
-    cursor: "pointer",
-    display: "inline-block",
-    minWidth: "var(--cm-md-list-marker-width)",
-    overflow: "hidden",
-    textAlign: "justify",
-    textAlignLast: "justify",
-    textJustify: "inter-character",
-    whiteSpace: "pre",
+    cursor: "text",
+    display: "inline-flex",
+    justifyContent: "center",
     width: "var(--cm-md-list-marker-width)",
-    WebkitTextFillColor: "transparent",
   },
-  ".cm-md-task-bullet-source": {
-    color: "transparent",
-    fontSize: "0",
-    WebkitTextFillColor: "transparent",
-  },
-  ".cm-md-task-marker-source::before": {
-    alignItems: "center",
+  ".cm-md-task-marker-box": {
     backgroundColor: "var(--background)",
     border: "1px solid var(--editor-checkbox-border)",
-    borderRadius: "4px",
+    borderRadius: "0.22em",
     boxSizing: "border-box",
-    content: '""',
-    display: "inline-flex",
-    fontSize: "1rem",
-    height: "1.15rem",
-    justifyContent: "center",
-    left: "50%",
+    cursor: "pointer",
+    display: "inline-block",
+    height: "1.15em",
     lineHeight: "1",
-    pointerEvents: "none",
-    position: "absolute",
-    top: "50%",
-    transform: "translate(-50%, -54%)",
-    width: "1.15rem",
+    position: "relative",
+    transform: "translateY(0.20em)",
+    width: "1.15em",
   },
-  ".cm-md-task-marker-checked::before": {
+  ".cm-md-task-marker-checked .cm-md-task-marker-box": {
     backgroundColor: "transparent",
     borderColor: "var(--muted-foreground)",
   },
-  ".cm-md-task-marker-checked::after": {
+  ".cm-md-task-marker-checked .cm-md-task-marker-box::after": {
     borderColor: "var(--muted-foreground)",
     borderStyle: "solid",
     borderWidth: "0 2px 2px 0",
     boxSizing: "border-box",
     content: '""',
-    height: "0.68rem",
+    height: "0.58em",
     left: "50%",
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
-    transform: "translate(-50%, -62%) rotate(45deg)",
-    width: "0.4rem",
+    transform: "translate(-50%, -64%) rotate(45deg)",
+    width: "0.34em",
   },
   ".cm-md-task-list.cm-md-task-checked": {
     color: "var(--muted-foreground)",
@@ -1790,6 +1875,7 @@ const listBreakKeymap = Prec.high(
 );
 
 const listEditKeymap = keymap.of([
+  { key: "Mod-t", run: insertTaskCheckbox },
   { key: "Tab", run: indentListItemPreservingWrappedStart },
   { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
 ]);

@@ -15,6 +15,7 @@ import {
   deleteAcrossListBoundary,
   insertExplicitContinuationAfterContinuationLine,
   insertExplicitListContinuationBlock,
+  insertTaskCheckbox,
   moveAcrossListBoundary,
 } from "@/features/editor/extensions/markdown-decorations/lists";
 
@@ -249,6 +250,56 @@ describe("List rendering", () => {
     );
 
     expect(draftLine).toBeDefined();
+
+    view.destroy();
+  });
+
+  it("inserts a task checkbox on a plain line", async () => {
+    const doc = "Buy milk";
+    const { view } = createView(doc, doc.length);
+
+    await flush();
+
+    expect(insertTaskCheckbox(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("- [ ] Buy milk");
+    expect(view.state.selection.main.head).toBe(doc.length + "- [ ] ".length);
+
+    view.destroy();
+  });
+
+  it("places the cursor after the checkbox when inserting a task on an empty line", async () => {
+    const { view } = createView("", 0);
+
+    await flush();
+
+    expect(insertTaskCheckbox(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("- [ ] ");
+    expect(view.state.selection.main.head).toBe(6);
+    expect(view.state.selection.main.assoc).toBe(1);
+
+    view.destroy();
+  });
+
+  it("inserts a task checkbox into an existing list item without changing the list marker", async () => {
+    const doc = "- Buy milk";
+    const { view } = createView(doc, doc.length);
+
+    await flush();
+
+    expect(insertTaskCheckbox(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("- [ ] Buy milk");
+
+    view.destroy();
+  });
+
+  it("preserves blockquote prefixes when inserting a task checkbox", async () => {
+    const doc = "> Buy milk";
+    const { view } = createView(doc, doc.length);
+
+    await flush();
+
+    expect(insertTaskCheckbox(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("> - [ ] Buy milk");
 
     view.destroy();
   });
@@ -535,6 +586,42 @@ describe("List rendering", () => {
       nestedLine?.querySelector(".cm-md-task-content-checked")?.textContent,
     ).toContain("Nested checked task");
     expect(nestedLine?.textContent).not.toContain("- Nested checked task");
+
+    view.destroy();
+  });
+
+  it("only toggles tasks when clicking the checkbox box, not the surrounding marker gutter", async () => {
+    const { view } = createView("- [ ] Task item");
+
+    await flush();
+
+    const marker = view.dom.querySelector(".cm-md-task-marker-source");
+    const checkbox = view.dom.querySelector(".cm-md-task-marker-box");
+
+    expect(marker).not.toBeNull();
+    expect(checkbox).not.toBeNull();
+
+    marker?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+      }),
+    );
+    expect(view.state.doc.toString()).toBe("- [ ] Task item");
+
+    checkbox?.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+      }),
+    );
+    checkbox?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+      }),
+    );
+    expect(view.state.doc.toString()).toBe("- [x] Task item");
 
     view.destroy();
   });
