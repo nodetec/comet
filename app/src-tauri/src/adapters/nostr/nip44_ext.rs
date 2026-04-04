@@ -1,10 +1,10 @@
-//! NIP-44 v2 with extended length prefix.
+//! NIP-44 v2 with an implementation-specific extended length prefix.
 //!
 //! Identical to standard NIP-44 v2 except for the padding format:
 //! - Small payloads (< 65536 bytes): u16 BE prefix (standard, fully compatible)
 //! - Large payloads (>= 65536 bytes): `[0x00, 0x00]` + u32 BE prefix
 //!
-//! Based on <https://github.com/nostr-protocol/nips/pull/2270>.
+//! This is a local compatibility layer until an upstream standard lands.
 
 use base64::engine::{general_purpose, Engine};
 use chacha20::cipher::{KeyIvInit, StreamCipher};

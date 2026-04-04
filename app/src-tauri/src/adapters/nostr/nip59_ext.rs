@@ -1,4 +1,4 @@
-//! Custom NIP-59 gift wrap/unwrap using NIP-44 v2 with extended prefix.
+//! Gift wrap/unwrap helpers built on the local large-payload NIP-44 shim.
 //!
 //! Replaces `EventBuilder::gift_wrap()` and `nip59::extract_rumor()` to support
 //! payloads larger than the standard NIP-44 v2 limit of ~64KB.
@@ -15,7 +15,7 @@ pub struct UnwrappedGift {
     pub rumor: UnsignedEvent,
 }
 
-/// Gift-wrap a rumor to a receiver using NIP-44 v2 with extended prefix.
+/// Gift-wrap a rumor to a receiver using the local large-payload NIP-44 shim.
 ///
 /// Steps:
 /// 1. Serialize rumor as JSON
@@ -62,7 +62,7 @@ where
     Ok(gift_wrap)
 }
 
-/// Extract a rumor from a gift-wrapped event using NIP-44 v2 with extended prefix.
+/// Extract a rumor from a gift-wrapped event using the local large-payload NIP-44 shim.
 ///
 /// Handles both standard and extended prefix payloads for backward compatibility.
 pub fn extract_rumor(keys: &Keys, gift_wrap: &Event) -> Result<UnwrappedGift, AppError> {
