@@ -198,6 +198,8 @@ Bootstrap does not attempt full-history reconciliation.
 
 Bootstrap is retained-snapshot-only in this version of the draft.
 
+Clients may materialize a bounded local note-history feature from retained snapshots, but that history is a client feature layered on top of bootstrap and replay rather than a distinct transport concept.
+
 ## Sequence Model
 
 `seq` values are relay-local.
@@ -243,6 +245,12 @@ Recommended client flow:
 7. upload missing or newly merged local snapshots only after conflict/policy evaluation
 8. start `CHANGES` with `mode = "tail"`, `since = S`, and `live = true`
 9. continue from the relay tail
+
+Bootstrap is concerned with current and retained snapshot transport only.
+
+- it is not a full-history protocol
+- it is not a local history UI protocol
+- clients may keep a bounded local history window from retained snapshots after apply
 
 This gives the protocols clear responsibilities:
 

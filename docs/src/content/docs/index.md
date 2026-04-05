@@ -22,9 +22,9 @@ This site now focuses on the current sync and storage transport design direction
 ## Current Docs
 
 - [Snapshot Sync Range](/specs/snapshot-sync-range/) reserves a dedicated sync kind range and defines minimal sync metadata for local-first sync events.
-- [Comet Note Snapshots](/specs/comet-note-snapshots/) defines Comet's first concrete sync kind, `42061`, as an encrypted full-note snapshot with vector clocks.
+- [Comet Note Snapshots](/specs/comet-note-snapshots/) defines Comet's first concrete sync kind, `42061`, as an encrypted full-note snapshot with vector clocks, durable tombstones, and bounded local history.
 - [Snapshot Changes Feed](/specs/snapshot-changes-feed/) defines relay-local bootstrap, ordered replay, and live follow for snapshot sync events.
-- [Snapshot Retention And Compaction](/specs/snapshot-compaction/) defines bounded retention and compaction rules for snapshot sync events.
+- [Snapshot Retention And Compaction](/specs/snapshot-compaction/) defines bounded retention and compaction rules for snapshot sync events, including current relay/local defaults.
 - [Blossom Batch Upload](/specs/blossom-batch-upload/) drafts a backward-compatible multi-blob upload extension for attachment-heavy clients.
 
 ## Scope

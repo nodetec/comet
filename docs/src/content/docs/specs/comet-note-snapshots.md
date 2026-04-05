@@ -30,6 +30,7 @@ This draft also defines Comet as a local-first note system:
 - sync transmits encrypted full-note snapshots
 - vector clocks determine whether snapshots are newer, older, or concurrent
 - bounded recent history is a product feature, not the permanent sync substrate
+- retained local snapshots now back an explicit local note-history feature
 
 ## Goals
 
@@ -86,6 +87,17 @@ The intended local canonical fields are:
 Current note state is authoritative locally.
 
 Encrypted sync events are the transport used to move that state across devices and relays.
+
+## Current Comet Defaults
+
+Current implementation defaults:
+
+- local keeps the canonical note row as current state
+- local keeps all unresolved conflict snapshots
+- local keeps the current tombstone while a note remains deleted
+- local keeps the last `10` additional dominated snapshots per note
+- relay keeps a retained payload window of `4` snapshots per document
+- local note history is derived from the retained local snapshot set
 
 ## Sync Metadata
 
@@ -200,6 +212,7 @@ For tombstones:
 - outer `o` is `del`
 - the payload should still include `version`, `device_id`, and `vector_clock`
 - note body fields may be omitted or represented minimally
+- the current tombstone should remain durable while the note stays deleted
 
 ## Canonical JSON Rules
 
@@ -271,6 +284,17 @@ Example:
 
 The merged snapshot then dominates both prior snapshots.
 
+## Local History
+
+Comet should treat retained local snapshots as a user-facing history feature, not only as internal sync state.
+
+That means:
+
+- retained local snapshots may be listed in the UI as note history
+- a user may inspect an older retained snapshot without changing current state
+- restoring an older retained snapshot should produce a new current note state
+- restoring history does not rewrite history in place; it produces a newer snapshot from the restored content
+
 ## Retention Direction
 
 The intended retention direction is:
@@ -321,7 +345,6 @@ The intended direction is:
 
 ## Open Questions
 
-- Which encryption construction should `kind:42061` use for its payload?
 - Should `vector_clock` remain fully encrypted, or should a future profile expose a relay-visible summary?
 
 ## Future Work

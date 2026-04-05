@@ -38,6 +38,7 @@ Current implementation defaults:
 - local keeps the last `10` additional dominated snapshots per note
 - relay keeps the most recent `4` retained snapshot payloads per document
 - relay keeps replay independently from retained snapshot payloads
+- local retained snapshots may be surfaced as bounded note history
 
 ## Goals
 
@@ -62,6 +63,7 @@ For a note-sync profile such as Comet, that usually means:
 
 - the latest known snapshot for a note
 - any unresolved concurrent snapshots for that note
+- the current tombstone while a note remains deleted
 
 These are the snapshots required to represent current logical state.
 
@@ -170,7 +172,7 @@ Recommended shape:
   "current_snapshots_fetchable": true,
   "snapshot_retention": {
     "mode": "bounded_recent_history",
-    "recent_count": 10,
+    "recent_count": 4,
     "min_created_at": 1730000000
   }
 }
@@ -194,7 +196,7 @@ Recommended response shape:
 [
   "EVENT-STATUS",
   "<subscription-id>",
-  { "d": "<document-id>", "status": "compacted" }
+  { "id": "<snapshot-id>", "status": "payload_compacted" }
 ]
 ```
 
