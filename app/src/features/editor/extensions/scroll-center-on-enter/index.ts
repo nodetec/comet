@@ -5,6 +5,8 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 
+import { findEditorScrollContainer } from "@/features/editor/lib/view-utils";
+
 type ScrollCenterOnEnterOptions = {
   viewportPercentage?: number;
 };
@@ -17,11 +19,6 @@ type ScrollMeasure = {
   scrollTop: number;
   targetScrollTop: number;
 } | null;
-
-function getScrollContainer(view: EditorView): HTMLElement | null {
-  const container = view.dom.closest("[data-editor-scroll-container]");
-  return container instanceof HTMLElement ? container : null;
-}
 
 function isCaretNearViewportBottom(
   view: EditorView,
@@ -74,7 +71,7 @@ class ScrollCenterOnEnterPlugin implements PluginValue {
     this.view.requestMeasure<ScrollMeasure>({
       key: this,
       read: (view) => {
-        const nextScrollContainer = getScrollContainer(view);
+        const nextScrollContainer = findEditorScrollContainer(view);
         if (!nextScrollContainer) {
           return null;
         }

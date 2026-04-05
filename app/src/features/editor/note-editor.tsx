@@ -55,6 +55,18 @@ import { tags as t } from "@lezer/highlight";
 import { Vim, vim } from "@replit/codemirror-vim";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 
+import { inlineImages } from "@/features/editor/extensions/inline-images";
+import {
+  HighlightSyntax,
+  markdownDecorations,
+} from "@/features/editor/extensions/markdown-decorations";
+import {
+  TagGrammar,
+  tagHighlightStyle,
+} from "@/features/editor/extensions/markdown-decorations/tag-syntax";
+import { tagAutocomplete } from "@/features/editor/extensions/tag-autocomplete";
+import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
+import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import {
   DEFAULT_TOOLBAR_STATE,
   cycleBlockType,
@@ -66,7 +78,14 @@ import {
   type InlineFormat,
   type SelectionSnapshot,
 } from "@/features/editor/lib/toolbar-state";
+import {
+  createEditorContentAttributes,
+  findEditorScrollContainer,
+  getEditorScrollContainer,
+  lockEditorScrollPosition,
+} from "@/features/editor/lib/view-utils";
 import { EditorToolbar } from "@/features/editor/ui/editor-toolbar";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
@@ -78,13 +97,7 @@ import {
 } from "@/shared/lib/attachments";
 import { logEditorDebug, summarizeRanges } from "@/shared/lib/editor-debug";
 import { collectSearchMatches } from "@/shared/lib/search";
-
-function getEditorScrollContainer(view: EditorView): HTMLElement {
-  return (
-    (view.dom.closest("[data-editor-scroll-container]") as HTMLElement) ??
-    view.scrollDOM
-  );
-}
+import { cn } from "@/shared/lib/utils";
 
 function centerEditorPositionInView(view: EditorView, position: number) {
   view.requestMeasure<{
@@ -191,21 +204,6 @@ Vim._mapCommand({
   actionArgs: {},
   context: "normal",
 } as never);
-
-import { inlineImages } from "@/features/editor/extensions/inline-images";
-import {
-  HighlightSyntax,
-  markdownDecorations,
-} from "@/features/editor/extensions/markdown-decorations";
-import {
-  TagGrammar,
-  tagHighlightStyle,
-} from "@/features/editor/extensions/markdown-decorations/tag-syntax";
-import { tagAutocomplete } from "@/features/editor/extensions/tag-autocomplete";
-import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
-import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
-import { cn } from "@/shared/lib/utils";
 
 type NoteEditorProps = {
   availableTagPaths: string[];
@@ -457,19 +455,6 @@ function findMatchAtIndex(
   }
 
   return null;
-}
-
-function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
-  scrollContainer.scrollTop = scrollTop;
-  const lock = () => {
-    scrollContainer.scrollTop = scrollTop;
-  };
-  scrollContainer.addEventListener("scroll", lock);
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      scrollContainer.removeEventListener("scroll", lock);
-    });
-  });
 }
 
 function getDragScrollDelta(
@@ -1075,11 +1060,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const onEditorFocusChangeRef = useRef(onEditorFocusChange);
     const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange);
     const initialAvailableTagPathsRef = useRef(availableTagPaths);
-    const editableCompartmentRef = useRef<Compartment | null>(null);
-    const autocompleteCompartmentRef = useRef<Compartment | null>(null);
-    const contentAttributesCompartmentRef = useRef<Compartment | null>(null);
-    const presentationCompartmentRef = useRef<Compartment | null>(null);
-    const vimCompartmentRef = useRef<Compartment | null>(null);
+    const editableCompartmentRef = useRef(new Compartment());
+    const autocompleteCompartmentRef = useRef(new Compartment());
+    const contentAttributesCompartmentRef = useRef(new Compartment());
+    const presentationCompartmentRef = useRef(new Compartment());
+    const vimCompartmentRef = useRef(new Compartment());
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
@@ -1097,22 +1082,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialVimModeRef = useRef(vimMode);
     const selectAllCursorRef = useRef<number | null>(null);
     const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
-
-    if (editableCompartmentRef.current === null) {
-      editableCompartmentRef.current = new Compartment();
-    }
-    if (autocompleteCompartmentRef.current === null) {
-      autocompleteCompartmentRef.current = new Compartment();
-    }
-    if (contentAttributesCompartmentRef.current === null) {
-      contentAttributesCompartmentRef.current = new Compartment();
-    }
-    if (presentationCompartmentRef.current === null) {
-      presentationCompartmentRef.current = new Compartment();
-    }
-    if (vimCompartmentRef.current === null) {
-      vimCompartmentRef.current = new Compartment();
-    }
 
     useEffect(() => {
       onChangeRef.current = onChange;
@@ -1231,23 +1200,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         return;
       }
 
-      const editableExtension = editableCompartmentRef.current!.of([
+      const editableExtension = editableCompartmentRef.current.of([
         EditorState.readOnly.of(initialReadOnlyRef.current),
         EditorView.editable.of(!initialReadOnlyRef.current),
       ]);
-      const autocompleteExtension = autocompleteCompartmentRef.current!.of(
+      const autocompleteExtension = autocompleteCompartmentRef.current.of(
         tagAutocomplete(initialAvailableTagPathsRef.current),
       );
       const contentAttributesExtension =
-        contentAttributesCompartmentRef.current!.of(
-          EditorView.contentAttributes.of({
-            autocapitalize: "off",
-            autocorrect: "off",
-            class: "comet-editor-content",
-            spellcheck: initialSpellCheckRef.current ? "true" : "false",
-          }),
+        contentAttributesCompartmentRef.current.of(
+          createEditorContentAttributes(initialSpellCheckRef.current),
         );
-      const presentationExtension = presentationCompartmentRef.current!.of(
+      const presentationExtension = presentationCompartmentRef.current.of(
         buildSearchAwarePresentationExtensions(initialSearchQueryRef.current),
       );
 
@@ -1358,9 +1322,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               if (!view.hasFocus) {
                 event.preventDefault();
 
-                const scrollContainer = view.dom.closest(
-                  "[data-editor-scroll-container]",
-                ) as HTMLElement | null;
+                const scrollContainer = findEditorScrollContainer(view);
                 const scrollTop = scrollContainer?.scrollTop ?? 0;
                 const clickedInsideTable =
                   event.target instanceof HTMLElement &&
@@ -1369,7 +1331,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 view.focus();
 
                 if (scrollContainer) {
-                  lockScrollPosition(scrollContainer, scrollTop);
+                  lockEditorScrollPosition(scrollContainer, scrollTop);
                 }
 
                 if (clickedInsideTable) {
@@ -1465,7 +1427,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             ),
             ...historyKeymap,
           ]),
-          vimCompartmentRef.current!.of(initialVimModeRef.current ? vim() : []),
+          vimCompartmentRef.current.of(initialVimModeRef.current ? vim() : []),
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
@@ -1563,17 +1525,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
       view.dispatch({
         effects: [
-          editableCompartmentRef.current!.reconfigure([
+          editableCompartmentRef.current.reconfigure([
             EditorState.readOnly.of(readOnly),
             EditorView.editable.of(!readOnly),
           ]),
-          contentAttributesCompartmentRef.current!.reconfigure(
-            EditorView.contentAttributes.of({
-              autocapitalize: "off",
-              autocorrect: "off",
-              class: "comet-editor-content",
-              spellcheck: spellCheck ? "true" : "false",
-            }),
+          contentAttributesCompartmentRef.current.reconfigure(
+            createEditorContentAttributes(spellCheck),
           ),
         ],
       });
@@ -1581,7 +1538,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
     useEffect(() => {
       const view = viewRef.current;
-      if (!view || !autocompleteCompartmentRef.current) {
+      if (!view) {
         return;
       }
 
@@ -1594,7 +1551,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
     useEffect(() => {
       const view = viewRef.current;
-      if (!view || !vimCompartmentRef.current) {
+      if (!view) {
         return;
       }
       view.dispatch({
@@ -1604,7 +1561,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
     useEffect(() => {
       const view = viewRef.current;
-      if (!view || !presentationCompartmentRef.current) {
+      if (!view) {
         return;
       }
 
@@ -1849,14 +1806,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         return;
       }
 
-      const scrollContainer = view.dom.closest(
-        "[data-editor-scroll-container]",
-      ) as HTMLElement | null;
+      const scrollContainer = findEditorScrollContainer(view);
       const scrollTop = scrollContainer?.scrollTop ?? 0;
 
       view.focus();
       if (scrollContainer) {
-        lockScrollPosition(scrollContainer, scrollTop);
+        lockEditorScrollPosition(scrollContainer, scrollTop);
       }
 
       view.dispatch({

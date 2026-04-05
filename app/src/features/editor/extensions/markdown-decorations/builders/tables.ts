@@ -64,6 +64,10 @@ import {
   toRootSelection,
   unsanitizeRootText,
 } from "@/features/editor/extensions/tables/text-codec";
+import {
+  findEditorScrollContainer,
+  lockEditorScrollPosition,
+} from "@/features/editor/lib/view-utils";
 import type {
   ActiveTableCell,
   ParsedMarkdownTable,
@@ -116,24 +120,6 @@ const pendingTableCellMenus = new WeakMap<
   EditorView,
   Promise<TableCellMenuController>
 >();
-
-function lockScrollPosition(scrollContainer: HTMLElement, scrollTop: number) {
-  scrollContainer.scrollTop = scrollTop;
-  const lock = () => {
-    scrollContainer.scrollTop = scrollTop;
-  };
-  scrollContainer.addEventListener("scroll", lock);
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      scrollContainer.removeEventListener("scroll", lock);
-    });
-  });
-}
-
-function getEditorScrollContainer(view: EditorView): HTMLElement | null {
-  const container = view.dom.closest("[data-editor-scroll-container]");
-  return container instanceof HTMLElement ? container : null;
-}
 
 function buildClipboardGrid(text: string): string[][] {
   const markdownTable = MarkdownTable.parse(text);
@@ -2445,7 +2431,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
           ),
         );
       if (shouldRepositionAfterUndoRedo) {
-        const scrollContainer = getEditorScrollContainer(this.view);
+        const scrollContainer = findEditorScrollContainer(this.view);
         const scrollTop = scrollContainer?.scrollTop ?? 0;
         this.controller.close();
         requestAnimationFrame(() => {
@@ -2459,7 +2445,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
             this.view,
           );
           if (scrollContainer) {
-            lockScrollPosition(scrollContainer, scrollTop);
+            lockEditorScrollPosition(scrollContainer, scrollTop);
           }
         });
         return;
