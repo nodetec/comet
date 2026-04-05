@@ -42,7 +42,7 @@ This draft defines both:
 ## Non-Goals
 
 - Full-history anti-entropy
-- Requiring relays to decrypt payloads or compare vector clocks
+- Requiring relays to decrypt payloads or derive content-level conflict winners
 - Defining application-specific payload semantics
 - Defining conflict winner semantics
 - Defining cross-relay comparable sequence numbers
@@ -180,16 +180,17 @@ When a relay accepts a `CHANGES` request with `mode = "bootstrap"`, it should:
 
 1. validate the filter as a causal snapshot sync bootstrap filter
 2. capture `snapshot_seq`
-3. resolve the retained current sync snapshots matching the filter at that snapshot
+3. resolve the retained, fetchable, nondominated current sync snapshots matching the filter at that snapshot
 4. send `STATUS` with `snapshot_seq`
 5. stream one `SNAPSHOT` event per retained current matching snapshot
 6. send `EOSE` with `last_seq = snapshot_seq`
 
 Important semantics:
 
-- the returned events are the retained current snapshots at `snapshot_seq`
+- the returned events are the retained fetchable nondominated current snapshots at `snapshot_seq`
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
-- a relay may use relay-visible profile metadata to determine nondominated current snapshots
+- because this sync family exposes relay-visible causal metadata, a relay should use that metadata to determine nondominated current snapshots
+- retained dominated history is not part of bootstrap output by default
 - the client decrypts the returned snapshots, hydrates profile state, and compares vector clocks locally before applying
 
 Bootstrap does not attempt full-history reconciliation.
@@ -294,7 +295,7 @@ For the simple local-first model, the relay should:
 - filter by relay-visible sync metadata only
 - maintain relay-local `seq` ordering
 - avoid deriving note content from encrypted payloads
-- optionally use relay-visible causal metadata to retain and bootstrap nondominated current snapshots
+- use relay-visible causal metadata to retain and bootstrap nondominated current snapshots
 
 This keeps the relay simple and lets the client verify vector clocks after decryption.
 

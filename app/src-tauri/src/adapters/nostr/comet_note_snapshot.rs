@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::adapters::nostr::nip44_ext;
 use crate::domain::common::text::{canonicalize_tag_path, title_from_markdown};
 use crate::domain::sync::model::{SyncedNote, SyncedTombstone};
-use crate::domain::sync::vector_clock::{canonicalize_vector_clock, VectorClock};
+use crate::domain::sync::vector_clock::{
+    canonicalize_vector_clock, VectorClock, MAX_SAFE_VECTOR_CLOCK_COUNTER,
+};
 use crate::error::AppError;
 
 pub const COMET_NOTE_SNAPSHOT_KIND: Kind = Kind::Custom(42061);
@@ -186,6 +188,7 @@ fn build_visible_vector_clock_tags(payload: &NoteSnapshotPayload) -> Result<Vec<
 
 fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppError> {
     let mut vector_clock = BTreeMap::new();
+    let mut previous_device_id: Option<String> = None;
 
     for tag in event
         .tags
@@ -193,6 +196,11 @@ fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppErro
         .filter(|tag| tag.kind() == TagKind::custom("vc"))
     {
         let values = tag.as_slice();
+        if values.len() != 3 {
+            return Err(AppError::custom(
+                "Snapshot vc tags must have exactly 3 elements",
+            ));
+        }
         let device_id = values
             .get(1)
             .cloned()
@@ -208,17 +216,40 @@ fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppErro
             ));
         }
 
+        if previous_device_id
+            .as_ref()
+            .is_some_and(|previous| previous >= &device_id)
+        {
+            return Err(AppError::custom(
+                "Snapshot vc tags must be emitted in ascending device_id order",
+            ));
+        }
+
         let counter = counter_text.parse::<u64>().map_err(|_| {
             AppError::custom(format!(
                 "Snapshot vc tag counter must be an unsigned integer: {counter_text}"
             ))
         })?;
 
+        if counter == 0 {
+            return Err(AppError::custom(
+                "Snapshot vc tag counter must be a positive integer",
+            ));
+        }
+
+        if counter > MAX_SAFE_VECTOR_CLOCK_COUNTER {
+            return Err(AppError::custom(format!(
+                "Snapshot vc tag counter must be <= {MAX_SAFE_VECTOR_CLOCK_COUNTER}",
+            )));
+        }
+
         if vector_clock.insert(device_id.clone(), counter).is_some() {
             return Err(AppError::custom(format!(
                 "Duplicate snapshot vc tag for device id: {device_id}"
             )));
         }
+
+        previous_device_id = Some(device_id);
     }
 
     if vector_clock.is_empty() {
@@ -546,6 +577,66 @@ mod tests {
     }
 
     #[test]
+    fn delete_note_snapshot_event_requires_deleted_at() {
+        let keys = Keys::generate();
+        let payload = NoteSnapshotPayload {
+            version: COMET_NOTE_SNAPSHOT_VERSION,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: BTreeMap::from([("DEVICE-A".to_string(), 3)]),
+            markdown: String::new(),
+            note_created_at: 0,
+            edited_at: 300,
+            deleted_at: None,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+        };
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "del".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(3000),
+        };
+
+        let err = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Delete note snapshot payloads must include deleted_at"));
+    }
+
+    #[test]
+    fn delete_note_snapshot_event_requires_device_id() {
+        let keys = Keys::generate();
+        let payload = NoteSnapshotPayload {
+            version: COMET_NOTE_SNAPSHOT_VERSION,
+            device_id: String::new(),
+            vector_clock: BTreeMap::from([("DEVICE-A".to_string(), 3)]),
+            markdown: String::new(),
+            note_created_at: 0,
+            edited_at: 300,
+            deleted_at: Some(300),
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+        };
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "del".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(3000),
+        };
+
+        let err = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Note payload device_id must be non-empty"));
+    }
+
+    #[test]
     fn parse_uses_visible_vector_clock_as_source_of_truth() {
         let keys = Keys::generate();
         let payload = sample_payload();
@@ -575,5 +666,134 @@ mod tests {
             parsed.payload.unwrap().vector_clock,
             BTreeMap::from([("DEVICE-A".to_string(), 999)])
         );
+    }
+
+    #[test]
+    fn parse_rejects_zero_visible_vector_clock_counter() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec!["DEVICE-A".to_string(), "0".to_string()],
+        ));
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(err.to_string().contains("positive integer"));
+    }
+
+    #[test]
+    fn parse_rejects_non_canonical_visible_vector_clock_order() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec!["DEVICE-B".to_string(), "1".to_string()],
+        ));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec!["DEVICE-A".to_string(), "2".to_string()],
+        ));
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(err.to_string().contains("ascending device_id order"));
+    }
+
+    #[test]
+    fn parse_rejects_visible_vector_clock_counter_above_js_safe_integer_max() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec![
+                "DEVICE-A".to_string(),
+                (MAX_SAFE_VECTOR_CLOCK_COUNTER + 1).to_string(),
+            ],
+        ));
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains(&MAX_SAFE_VECTOR_CLOCK_COUNTER.to_string()));
+    }
+
+    #[test]
+    fn parse_rejects_visible_vector_clock_tags_with_extra_values() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec![
+                "DEVICE-A".to_string(),
+                "2".to_string(),
+                "unexpected".to_string(),
+            ],
+        ));
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(err.to_string().contains("exactly 3 elements"));
     }
 }

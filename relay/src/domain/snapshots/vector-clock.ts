@@ -6,6 +6,18 @@ export type VectorClockComparison =
   | "dominated"
   | "concurrent";
 
+export const MAX_SAFE_VECTOR_CLOCK_COUNTER = 9_007_199_254_740_991;
+
+function compareDeviceIds(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 export function parseVisibleVectorClockFromTags(
   tags: string[][],
 ): VisibleVectorClock | null {
@@ -15,7 +27,11 @@ export function parseVisibleVectorClockFromTags(
   }
 
   const vectorClock: VisibleVectorClock = {};
+  let previousDeviceId: string | null = null;
   for (const entry of entries) {
+    if (entry.length !== 3) {
+      return null;
+    }
     const [, deviceId, counterText] = entry;
     if (
       typeof deviceId !== "string" ||
@@ -26,8 +42,19 @@ export function parseVisibleVectorClockFromTags(
       return null;
     }
 
+    if (
+      previousDeviceId !== null &&
+      compareDeviceIds(previousDeviceId, deviceId) >= 0
+    ) {
+      return null;
+    }
+
     const counter = Number(counterText);
-    if (!Number.isSafeInteger(counter) || counter < 0) {
+    if (
+      !Number.isSafeInteger(counter) ||
+      counter <= 0 ||
+      counter > MAX_SAFE_VECTOR_CLOCK_COUNTER
+    ) {
       return null;
     }
     if (deviceId in vectorClock) {
@@ -35,6 +62,7 @@ export function parseVisibleVectorClockFromTags(
     }
 
     vectorClock[deviceId] = counter;
+    previousDeviceId = deviceId;
   }
 
   if (Object.keys(vectorClock).length === 0) {
@@ -48,7 +76,9 @@ export function canonicalizeVisibleVectorClock(
   input: VisibleVectorClock,
 ): VisibleVectorClock {
   return Object.fromEntries(
-    Object.entries(input).sort(([left], [right]) => left.localeCompare(right)),
+    Object.entries(input).sort(([left], [right]) =>
+      compareDeviceIds(left, right),
+    ),
   );
 }
 

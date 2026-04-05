@@ -219,7 +219,8 @@ Field guidance:
 For tombstones:
 
 - outer `o` is `del`
-- the payload should still include `version`, `device_id`, and `deleted_at`
+- the event must still include at least one `vc` tag as required by the causal snapshot sync range
+- the payload must include `version`, `device_id`, and `deleted_at`
 - note body fields may be omitted or represented minimally
 - the current tombstone should remain durable while the note stays deleted
 
@@ -233,6 +234,7 @@ Comet should use these rules:
 - apply RFC 8785 JSON Canonicalization Scheme semantics to object serialization
 - `version`, `device_id`, `tags`, and `attachments` are always present
 - `markdown`, `note_created_at`, and `edited_at` are always present for `o=put`
+- `deleted_at` is always present for `o=del`
 - `archived_at` and `pinned_at` are omitted when absent
 - `readonly` is omitted when false and included only when true
 - `tags` must be canonicalized, deduplicated, and sorted lexicographically

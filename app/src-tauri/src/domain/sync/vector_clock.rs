@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 pub type VectorClock = BTreeMap<String, u64>;
+pub const MAX_SAFE_VECTOR_CLOCK_COUNTER: u64 = 9_007_199_254_740_991;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VectorClockComparison {
@@ -19,7 +20,13 @@ pub fn canonicalize_vector_clock(clock: &VectorClock) -> Result<VectorClock, Str
         }
 
         if *counter == 0 {
-            continue;
+            return Err("Vector clock counters must be positive integers".to_string());
+        }
+
+        if *counter > MAX_SAFE_VECTOR_CLOCK_COUNTER {
+            return Err(format!(
+                "Vector clock counters must be <= {MAX_SAFE_VECTOR_CLOCK_COUNTER}"
+            ));
         }
 
         canonical.insert(device_id.clone(), *counter);
@@ -111,5 +118,24 @@ mod tests {
         let clock = BTreeMap::from([("A".to_string(), 2)]);
         let next = increment_vector_clock(&clock, "A").unwrap();
         assert_eq!(next.get("A"), Some(&3));
+    }
+
+    #[test]
+    fn rejects_zero_counter() {
+        let clock = BTreeMap::from([("A".to_string(), 0)]);
+        assert!(canonicalize_vector_clock(&clock)
+            .unwrap_err()
+            .contains("positive integers"));
+    }
+
+    #[test]
+    fn rejects_counter_above_js_safe_integer_max() {
+        let clock = BTreeMap::from([(
+            "A".to_string(),
+            MAX_SAFE_VECTOR_CLOCK_COUNTER + 1,
+        )]);
+        assert!(canonicalize_vector_clock(&clock)
+            .unwrap_err()
+            .contains(&MAX_SAFE_VECTOR_CLOCK_COUNTER.to_string()));
     }
 }
