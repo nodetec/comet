@@ -20,7 +20,7 @@ COPY relay/vendor relay/vendor
 COPY packages/data packages/data
 COPY packages/nostr packages/nostr
 
-RUN pnpm --filter @comet/relay --prod deploy --legacy /prod/relay
+RUN pnpm --config.inject-workspace-packages=true --filter @comet/relay --prod deploy /prod/relay
 
 FROM oven/bun:1
 

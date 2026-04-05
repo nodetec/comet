@@ -19,7 +19,7 @@ COPY blossom/src blossom/src
 COPY packages/data packages/data
 COPY packages/nostr packages/nostr
 
-RUN pnpm --filter @comet/blossom --prod deploy --legacy /prod/blossom
+RUN pnpm --config.inject-workspace-packages=true --filter @comet/blossom --prod deploy /prod/blossom
 
 FROM oven/bun:1
 

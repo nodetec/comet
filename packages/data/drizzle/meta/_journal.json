@@ -92,6 +92,13 @@
       "when": 1774915200000,
       "tag": "0012_drop_users_table",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775390639000,
+      "tag": "0013_reset_sync_schema",
+      "breakpoints": true
     }
   ]
 }
