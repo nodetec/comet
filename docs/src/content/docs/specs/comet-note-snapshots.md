@@ -130,6 +130,12 @@ It is not a document identifier.
 
 For Comet, `device_id` should be an opaque randomly generated stable identifier, not a human-readable device label.
 
+This is a deliberate privacy boundary:
+
+- the relay needs stable device identifiers to compare `vc` entries
+- those identifiers should not reveal a device name, platform, or hostname
+- Comet should use opaque random identifiers such as UUIDv4 values, not labels like `MacBook-Pro` or `iPhone`
+
 ## Vector Clock Model
 
 Each note carries a vector clock.
@@ -138,8 +144,8 @@ Example:
 
 ```json
 {
-  "MBP-4f2c": 12,
-  "IPHONE-a91d": 3
+  "7F3B1C2A-91D4-4C8E-A0F1-52D1E7A0B9C3": 12,
+  "91D4C8E0-4A1B-4B55-8E77-3C2048D623AF": 3
 }
 ```
 
@@ -185,7 +191,7 @@ The canonical payload for `kind:42061` should be a JSON object with this shape:
 ```json
 {
   "version": 1,
-  "device_id": "MBP-4f2c",
+  "device_id": "7F3B1C2A-91D4-4C8E-A0F1-52D1E7A0B9C3",
   "markdown": "# Title\n\nBody",
   "note_created_at": 1712345678000,
   "edited_at": 1712345678000,
@@ -344,6 +350,16 @@ That means:
 - the client remains the final authority for local materialization after decrypting the profile payload and applying the relay-visible `vc` clock
 
 This keeps the relay blind to note content while still allowing better retention and bootstrap decisions.
+
+That also means the relay is causality-aware rather than fully metadata-blind.
+
+Observers can still learn:
+
+- how many distinct device ids appear in a note's history
+- which device id produced the most recent visible increment
+- rough relative edit activity per device id over time
+
+Using opaque random `device_id` values reduces this leakage significantly, but it does not eliminate it entirely.
 
 ## Current Direction
 
