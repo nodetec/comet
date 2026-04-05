@@ -1,5 +1,5 @@
+pub mod comet_note_revision;
 pub mod nip44_ext;
-pub mod nip59_ext;
 pub mod protocol;
 pub mod relay_client;
 pub mod revision_bootstrap;

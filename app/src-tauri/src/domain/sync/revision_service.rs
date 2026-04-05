@@ -1,49 +1,44 @@
+use crate::adapters::nostr::comet_note_revision::{
+    build_note_revision_event, compute_note_revision_id, NoteRevisionAttachment,
+    NoteRevisionEventMeta, NoteRevisionPayload, COMET_NOTE_COLLECTION,
+};
 use crate::adapters::sqlite::revision_sync_repository::{
     apply_sync_head_update, list_sync_heads_for_scope, list_sync_revision_parents,
     replace_sync_revision_parents, upsert_sync_revision, LocalSyncRevision,
 };
 use crate::domain::blob::service::extract_attachment_hashes;
-use crate::domain::sync::revision_codec::{
-    build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
-    compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
-    REVISION_SYNC_SCHEMA_VERSION,
-};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct PendingNoteRevision {
     pub note_id: String,
-    pub recipient: String,
+    pub author_pubkey: String,
     pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
-    pub tags: Vec<Tag>,
-    pub rumor: UnsignedEvent,
+    pub event: Event,
     pub op: String,
 }
 
 pub struct PendingDeletionRevision {
-    pub recipient: String,
+    pub author_pubkey: String,
     pub document_coord: String,
     pub revision_id: String,
     pub parent_revision_ids: Vec<String>,
     pub mtime: i64,
-    pub tags: Vec<Tag>,
-    pub rumor: UnsignedEvent,
+    pub event: Event,
     pub op: String,
     pub entity_type: String,
 }
 
 struct NoteRevisionFields {
-    title: String,
     markdown: String,
     created_at: i64,
     modified_at: i64,
     edited_at: i64,
     archived_at: Option<i64>,
-    deleted_at: Option<i64>,
     readonly: bool,
     current_rev: Option<String>,
     pinned_at: Option<i64>,
@@ -52,11 +47,11 @@ struct NoteRevisionFields {
 
 fn current_parent_revision_ids_for_scope(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     document_coord: &str,
     fallback_current_rev: Option<String>,
 ) -> Result<Vec<String>, AppError> {
-    let mut parent_revision_ids = list_sync_heads_for_scope(conn, recipient, document_coord)?
+    let mut parent_revision_ids = list_sync_heads_for_scope(conn, author_pubkey, document_coord)?
         .into_iter()
         .map(|head| head.rev)
         .collect::<Vec<_>>();
@@ -76,10 +71,8 @@ fn load_note_revision_fields(
 ) -> Result<NoteRevisionFields, AppError> {
     let row: Option<(
         String,
-        String,
         i64,
         i64,
-        Option<i64>,
         Option<i64>,
         Option<i64>,
         bool,
@@ -88,7 +81,7 @@ fn load_note_revision_fields(
         Option<String>,
     )> = conn
         .query_row(
-            "SELECT title, markdown, created_at, modified_at, edited_at, archived_at, deleted_at, readonly, current_rev, pinned_at, sync_event_id
+            "SELECT markdown, created_at, modified_at, edited_at, archived_at, readonly, current_rev, pinned_at, sync_event_id
              FROM notes
              WHERE id = ?1",
             params![note_id],
@@ -99,25 +92,21 @@ fn load_note_revision_fields(
                     row.get(2)?,
                     row.get(3)?,
                     row.get(4)?,
-                    row.get(5)?,
+                    row.get::<_, i64>(5)? != 0,
                     row.get(6)?,
-                    row.get::<_, i64>(7)? != 0,
+                    row.get(7)?,
                     row.get(8)?,
-                    row.get(9)?,
-                    row.get(10)?,
                 ))
             },
         )
         .optional()?;
 
     let (
-        title,
         markdown,
         created_at,
         modified_at,
         edited_at,
         archived_at,
-        deleted_at,
         readonly,
         current_rev,
         pinned_at,
@@ -125,13 +114,11 @@ fn load_note_revision_fields(
     ) = row.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
 
     Ok(NoteRevisionFields {
-        title,
         markdown,
         created_at,
         modified_at,
         edited_at: edited_at.unwrap_or(modified_at),
         archived_at,
-        deleted_at,
         readonly,
         current_rev,
         pinned_at,
@@ -151,11 +138,11 @@ fn load_direct_tag_paths(conn: &Connection, note_id: &str) -> Result<Vec<String>
     rows.collect::<Result<Vec<String>, _>>().map_err(Into::into)
 }
 
-fn load_blob_tags(
+fn load_blob_attachments(
     conn: &Connection,
     markdown: &str,
-    recipient_hex: &str,
-) -> Result<Vec<(String, String, String)>, AppError> {
+    author_pubkey_hex: &str,
+) -> Result<Vec<NoteRevisionAttachment>, AppError> {
     let preferred_blossom_url: Option<String> = conn
         .query_row(
             "SELECT value FROM app_settings WHERE key = 'blossom_url'",
@@ -164,7 +151,7 @@ fn load_blob_tags(
         )
         .optional()?;
 
-    let mut blob_tags = Vec::new();
+    let mut blob_attachments = Vec::new();
     let mut seen_hashes = std::collections::HashSet::new();
     for hash in extract_attachment_hashes(markdown) {
         if !seen_hashes.insert(hash.clone()) {
@@ -178,7 +165,7 @@ fn load_blob_tags(
                  WHERE plaintext_hash = ?1 AND pubkey = ?2
                  ORDER BY CASE WHEN server_url = ?3 THEN 0 ELSE 1 END, rowid DESC
                  LIMIT 1",
-                params![hash, recipient_hex, blossom_url],
+                params![hash, author_pubkey_hex, blossom_url],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?
@@ -189,14 +176,18 @@ fn load_blob_tags(
                  WHERE plaintext_hash = ?1 AND pubkey = ?2
                  ORDER BY rowid DESC
                  LIMIT 1",
-                params![hash, recipient_hex],
+                params![hash, author_pubkey_hex],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?
         };
 
         if let Some((ciphertext_hash, key_hex)) = meta {
-            blob_tags.push((hash, ciphertext_hash, key_hex));
+            blob_attachments.push(NoteRevisionAttachment {
+                plaintext_hash: hash,
+                ciphertext_hash,
+                key: key_hex,
+            });
         } else if preferred_blossom_url.is_some() {
             return Err(AppError::custom(format!(
                 "Missing encrypted blob metadata for attachment: {hash}"
@@ -204,88 +195,66 @@ fn load_blob_tags(
         }
     }
 
-    Ok(blob_tags)
+    Ok(blob_attachments)
 }
 
 pub fn build_pending_note_revision(
     conn: &Connection,
     keys: &Keys,
-    recipient: &PublicKey,
+    _author_pubkey: &PublicKey,
     note_id: &str,
 ) -> Result<PendingNoteRevision, AppError> {
     let fields = load_note_revision_fields(conn, note_id)?;
 
-    let recipient_hex = recipient.to_hex();
-    let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.to_string();
     let parent_revision_ids = current_parent_revision_ids_for_scope(
         conn,
-        &recipient_hex,
+        &author_pubkey,
         &document_coord,
         fields.current_rev.clone(),
     )?;
     let direct_tag_paths = load_direct_tag_paths(conn, note_id)?;
-    let blob_tags = load_blob_tags(conn, &fields.markdown, &recipient_hex)?;
-
-    let canonical_payload = canonicalize_revision_payload(
-        &recipient_hex,
+    let attachments = load_blob_attachments(conn, &fields.markdown, &author_pubkey)?;
+    let payload = NoteRevisionPayload {
+        version: 1,
+        markdown: fields.markdown.clone(),
+        note_created_at: fields.created_at,
+        edited_at: fields.edited_at,
+        archived_at: fields.archived_at,
+        pinned_at: fields.pinned_at,
+        readonly: fields.readonly,
+        tags: direct_tag_paths,
+        attachments,
+    };
+    let revision_id = compute_note_revision_id(
         &document_coord,
         &parent_revision_ids,
         "put",
-        "note",
-        &fields.title,
-        &fields.markdown,
-        fields.created_at,
-        fields.modified_at,
-        fields.edited_at,
-        fields.archived_at,
-        fields.deleted_at,
-        fields.pinned_at,
-        fields.readonly,
-        &direct_tag_paths,
+        Some(COMET_NOTE_COLLECTION),
+        Some(&payload),
     )?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
-
-    let rumor = build_revision_note_rumor(
-        RevisionRumorInput {
-            document_id: note_id,
-            title: &fields.title,
-            markdown: &fields.markdown,
-            created_at: fields.created_at,
-            modified_at: fields.modified_at,
-            edited_at: fields.edited_at,
-            archived_at: fields.archived_at,
-            deleted_at: fields.deleted_at,
-            pinned_at: fields.pinned_at,
-            readonly: fields.readonly,
-            tags: &direct_tag_paths,
-            blob_tags: &blob_tags,
-            entity_type: "note",
-            parent_revision_ids: &parent_revision_ids,
-            op: "put",
+    let event = build_note_revision_event(
+        keys,
+        &NoteRevisionEventMeta {
+            document_id: document_coord.clone(),
+            revision_id: revision_id.clone(),
+            parent_revision_ids: parent_revision_ids.clone(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(fields.modified_at),
         },
-        keys.public_key(),
-    );
-
-    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-        recipient: recipient_hex.clone(),
-        document_coord: document_coord.clone(),
-        revision_id: revision_id.clone(),
-        parent_revision_ids: parent_revision_ids.clone(),
-        op: "put".to_string(),
-        mtime: fields.modified_at,
-        entity_type: None,
-        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-    });
+        Some(&payload),
+    )?;
 
     Ok(PendingNoteRevision {
         note_id: note_id.to_string(),
-        recipient: recipient_hex,
+        author_pubkey,
         document_coord,
         revision_id,
         parent_revision_ids,
         mtime: fields.modified_at,
-        tags,
-        rumor,
+        event,
         op: "put".to_string(),
     })
 }
@@ -293,7 +262,7 @@ pub fn build_pending_note_revision(
 pub fn build_materialized_note_revision_for_publish(
     conn: &Connection,
     keys: &Keys,
-    recipient: &PublicKey,
+    _author_pubkey: &PublicKey,
     note_id: &str,
 ) -> Result<Option<PendingNoteRevision>, AppError> {
     let fields = load_note_revision_fields(conn, note_id)?;
@@ -305,75 +274,53 @@ pub fn build_materialized_note_revision_for_publish(
         return Ok(None);
     }
 
-    let recipient_hex = recipient.to_hex();
-    let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.to_string();
     let parent_revision_ids =
-        list_sync_revision_parents(conn, &recipient_hex, &document_coord, &current_rev)?;
-    let direct_tag_paths = load_direct_tag_paths(conn, note_id)?;
-    let blob_tags = load_blob_tags(conn, &fields.markdown, &recipient_hex)?;
-
-    let canonical_payload = canonicalize_revision_payload(
-        &recipient_hex,
+        list_sync_revision_parents(conn, &author_pubkey, &document_coord, &current_rev)?;
+    let payload = NoteRevisionPayload {
+        version: 1,
+        markdown: fields.markdown.clone(),
+        note_created_at: fields.created_at,
+        edited_at: fields.edited_at,
+        archived_at: fields.archived_at,
+        pinned_at: fields.pinned_at,
+        readonly: fields.readonly,
+        tags: load_direct_tag_paths(conn, note_id)?,
+        attachments: load_blob_attachments(conn, &fields.markdown, &author_pubkey)?,
+    };
+    let revision_id = compute_note_revision_id(
         &document_coord,
         &parent_revision_ids,
         "put",
-        "note",
-        &fields.title,
-        &fields.markdown,
-        fields.created_at,
-        fields.modified_at,
-        fields.edited_at,
-        fields.archived_at,
-        fields.deleted_at,
-        fields.pinned_at,
-        fields.readonly,
-        &direct_tag_paths,
+        Some(COMET_NOTE_COLLECTION),
+        Some(&payload),
     )?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
     if revision_id != current_rev {
         return Ok(None);
     }
 
-    let rumor = build_revision_note_rumor(
-        RevisionRumorInput {
-            document_id: note_id,
-            title: &fields.title,
-            markdown: &fields.markdown,
-            created_at: fields.created_at,
-            modified_at: fields.modified_at,
-            edited_at: fields.edited_at,
-            archived_at: fields.archived_at,
-            deleted_at: fields.deleted_at,
-            pinned_at: fields.pinned_at,
-            readonly: fields.readonly,
-            tags: &direct_tag_paths,
-            blob_tags: &blob_tags,
-            entity_type: "note",
-            parent_revision_ids: &parent_revision_ids,
-            op: "put",
+    let event = build_note_revision_event(
+        keys,
+        &NoteRevisionEventMeta {
+            document_id: document_coord.clone(),
+            revision_id: revision_id.clone(),
+            parent_revision_ids: parent_revision_ids.clone(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(fields.modified_at),
         },
-        keys.public_key(),
-    );
-    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-        recipient: recipient_hex.clone(),
-        document_coord: document_coord.clone(),
-        revision_id: revision_id.clone(),
-        parent_revision_ids: parent_revision_ids.clone(),
-        op: "put".to_string(),
-        mtime: fields.modified_at,
-        entity_type: None,
-        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-    });
+        Some(&payload),
+    )?;
 
     Ok(Some(PendingNoteRevision {
         note_id: note_id.to_string(),
-        recipient: recipient_hex,
+        author_pubkey,
         document_coord,
         revision_id,
         parent_revision_ids,
         mtime: fields.modified_at,
-        tags,
-        rumor,
+        event,
         op: "put".to_string(),
     }))
 }
@@ -381,43 +328,43 @@ pub fn build_materialized_note_revision_for_publish(
 pub fn materialize_note_revision_locally(
     conn: &Connection,
     keys: &Keys,
-    recipient: &PublicKey,
+    _author_pubkey: &PublicKey,
     note_id: &str,
     mark_locally_modified: bool,
 ) -> Result<String, AppError> {
     let fields = load_note_revision_fields(conn, note_id)?;
-    let recipient_hex = recipient.to_hex();
-    let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.to_string();
     let parent_revision_ids = current_parent_revision_ids_for_scope(
         conn,
-        &recipient_hex,
+        &author_pubkey,
         &document_coord,
         fields.current_rev.clone(),
     )?;
-    let direct_tag_paths = load_direct_tag_paths(conn, note_id)?;
-    let canonical_payload = canonicalize_revision_payload(
-        &recipient_hex,
+    let markdown = fields.markdown.clone();
+    let payload = NoteRevisionPayload {
+        version: 1,
+        markdown,
+        note_created_at: fields.created_at,
+        edited_at: fields.edited_at,
+        archived_at: fields.archived_at,
+        pinned_at: fields.pinned_at,
+        readonly: fields.readonly,
+        tags: load_direct_tag_paths(conn, note_id)?,
+        attachments: load_blob_attachments(conn, &fields.markdown, &author_pubkey)?,
+    };
+    let revision_id = compute_note_revision_id(
         &document_coord,
         &parent_revision_ids,
         "put",
-        "note",
-        &fields.title,
-        &fields.markdown,
-        fields.created_at,
-        fields.modified_at,
-        fields.edited_at,
-        fields.archived_at,
-        fields.deleted_at,
-        fields.pinned_at,
-        fields.readonly,
-        &direct_tag_paths,
+        Some(COMET_NOTE_COLLECTION),
+        Some(&payload),
     )?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
 
     upsert_sync_revision(
         conn,
         &LocalSyncRevision {
-            recipient: recipient_hex.clone(),
+            author_pubkey: author_pubkey.clone(),
             d_tag: document_coord.clone(),
             rev: revision_id.clone(),
             op: "put".to_string(),
@@ -427,19 +374,19 @@ pub fn materialize_note_revision_locally(
             payload_retained: true,
             relay_url: None,
             stored_seq: None,
-            created_at: fields.modified_at,
+            created_at: fields.modified_at.div_euclid(1000),
         },
     )?;
     replace_sync_revision_parents(
         conn,
-        &recipient_hex,
+        &author_pubkey,
         &document_coord,
         &revision_id,
         &parent_revision_ids,
     )?;
     apply_sync_head_update(
         conn,
-        &recipient_hex,
+        &author_pubkey,
         &document_coord,
         &revision_id,
         "put",
@@ -467,7 +414,7 @@ pub fn persist_local_note_revision(
     upsert_sync_revision(
         conn,
         &LocalSyncRevision {
-            recipient: revision.recipient.clone(),
+            author_pubkey: revision.author_pubkey.clone(),
             d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
@@ -483,7 +430,7 @@ pub fn persist_local_note_revision(
 
     replace_sync_revision_parents(
         conn,
-        &revision.recipient,
+        &revision.author_pubkey,
         &revision.document_coord,
         &revision.revision_id,
         &revision.parent_revision_ids,
@@ -491,7 +438,7 @@ pub fn persist_local_note_revision(
 
     apply_sync_head_update(
         conn,
-        &revision.recipient,
+        &revision.author_pubkey,
         &revision.document_coord,
         &revision.revision_id,
         &revision.op,
@@ -513,7 +460,7 @@ pub fn persist_local_note_revision(
 pub fn build_pending_note_deletion_revision(
     conn: &Connection,
     keys: &Keys,
-    recipient: &PublicKey,
+    _author_pubkey: &PublicKey,
     note_id: &str,
     now: i64,
 ) -> Result<PendingDeletionRevision, AppError> {
@@ -525,43 +472,37 @@ pub fn build_pending_note_deletion_revision(
         )
         .optional()?
         .flatten();
-    let recipient_hex = recipient.to_hex();
-    let document_coord = compute_document_coord(keys.secret_key(), note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.to_string();
     let parent_revision_ids =
-        current_parent_revision_ids_for_scope(conn, &recipient_hex, &document_coord, current_rev)?;
-    let canonical_payload = serde_json::to_string(&serde_json::json!({
-        "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-        "recipient": recipient_hex,
-        "d": document_coord,
-        "parents": parent_revision_ids.clone(),
-        "op": "del",
-        "type": "note",
-        "entity_id": note_id,
-        "mtime": now,
-        "schema_version": crate::domain::sync::revision_codec::REVISION_SYNC_SCHEMA_VERSION,
-    }))
-    .map_err(|e| AppError::custom(format!("Failed to canonicalize note deletion payload: {e}")))?;
-    let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload)?;
-    let rumor = crate::domain::sync::event_codec::deleted_note_rumor(note_id, keys.public_key());
-    let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-        recipient: recipient_hex.clone(),
-        document_coord: document_coord.clone(),
-        revision_id: revision_id.clone(),
-        parent_revision_ids: parent_revision_ids.clone(),
-        op: "del".to_string(),
-        mtime: now,
-        entity_type: None,
-        schema_version: REVISION_SYNC_SCHEMA_VERSION.to_string(),
-    });
+        current_parent_revision_ids_for_scope(conn, &author_pubkey, &document_coord, current_rev)?;
+    let revision_id = compute_note_revision_id(
+        &document_coord,
+        &parent_revision_ids,
+        "del",
+        Some(COMET_NOTE_COLLECTION),
+        None,
+    )?;
+    let event = build_note_revision_event(
+        keys,
+        &NoteRevisionEventMeta {
+            document_id: document_coord.clone(),
+            revision_id: revision_id.clone(),
+            parent_revision_ids: parent_revision_ids.clone(),
+            operation: "del".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(now),
+        },
+        None,
+    )?;
 
     Ok(PendingDeletionRevision {
-        recipient: recipient_hex,
+        author_pubkey,
         document_coord,
         revision_id,
         parent_revision_ids,
         mtime: now,
-        tags,
-        rumor,
+        event,
         op: "del".to_string(),
         entity_type: "note".to_string(),
     })
@@ -574,7 +515,7 @@ pub fn persist_local_deletion_revision(
     upsert_sync_revision(
         conn,
         &LocalSyncRevision {
-            recipient: revision.recipient.clone(),
+            author_pubkey: revision.author_pubkey.clone(),
             d_tag: revision.document_coord.clone(),
             rev: revision.revision_id.clone(),
             op: revision.op.clone(),
@@ -590,7 +531,7 @@ pub fn persist_local_deletion_revision(
 
     replace_sync_revision_parents(
         conn,
-        &revision.recipient,
+        &revision.author_pubkey,
         &revision.document_coord,
         &revision.revision_id,
         &revision.parent_revision_ids,
@@ -598,7 +539,7 @@ pub fn persist_local_deletion_revision(
 
     apply_sync_head_update(
         conn,
-        &revision.recipient,
+        &revision.author_pubkey,
         &revision.document_coord,
         &revision.revision_id,
         &revision.op,
@@ -632,24 +573,37 @@ mod tests {
     fn builds_stable_pending_note_revision() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = Keys::generate().public_key();
+        let author_pubkey = keys.public_key();
 
-        let revision = build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
+        let revision = build_pending_note_revision(&conn, &keys, &author_pubkey, "note-1").unwrap();
         let revision_again =
-            build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
+            build_pending_note_revision(&conn, &keys, &author_pubkey, "note-1").unwrap();
 
         assert_eq!(revision.revision_id, revision_again.revision_id);
         assert_eq!(revision.document_coord, revision_again.document_coord);
-        assert_eq!(revision.recipient, recipient.to_hex());
-        assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "r"));
-        assert!(revision.tags.iter().any(|tag| tag.as_slice()[0] == "m"));
+        assert_eq!(revision.author_pubkey, author_pubkey.to_hex());
+        assert_eq!(revision.document_coord, "note-1");
+        assert_eq!(
+            revision
+                .event
+                .tags
+                .find(TagKind::custom("r"))
+                .and_then(|tag| tag.content()),
+            Some(revision.revision_id.as_str())
+        );
+        assert!(revision
+            .event
+            .tags
+            .filter(TagKind::custom("b"))
+            .next()
+            .is_none());
     }
 
     #[test]
     fn builds_note_revision_with_blob_tags_from_metadata() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = Keys::generate().public_key();
+        let author_pubkey = keys.public_key();
         let hash = "a".repeat(64);
         let ciphertext_hash = "b".repeat(64);
         let key_hex = "c".repeat(64);
@@ -667,30 +621,31 @@ mod tests {
         conn.execute(
             "INSERT INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
              VALUES (?1, 'https://blobs.example.com', ?2, ?3, ?4)",
-            params![hash, recipient.to_hex(), ciphertext_hash, key_hex],
+            params![hash, author_pubkey.to_hex(), ciphertext_hash, key_hex],
         )
         .unwrap();
 
-        let revision = build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
-        let blob_tag = revision
-            .rumor
-            .tags
-            .find(TagKind::custom("blob"))
-            .expect("blob tag should be present");
+        let revision = build_pending_note_revision(&conn, &keys, &author_pubkey, "note-1").unwrap();
+        let parsed = crate::adapters::nostr::comet_note_revision::parse_note_revision_event(
+            &keys,
+            &revision.event,
+        )
+        .unwrap();
+        let payload = parsed.payload.expect("payload should be present");
 
-        assert_eq!(
-            blob_tag.as_slice(),
-            vec!["blob".to_string(), hash, ciphertext_hash, key_hex,]
-        );
+        assert_eq!(payload.attachments.len(), 1);
+        assert_eq!(payload.attachments[0].plaintext_hash, hash);
+        assert_eq!(payload.attachments[0].ciphertext_hash, ciphertext_hash);
+        assert_eq!(payload.attachments[0].key, key_hex);
     }
 
     #[test]
     fn persists_local_revision_and_updates_current_rev() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = Keys::generate().public_key();
+        let author_pubkey = keys.public_key();
 
-        let revision = build_pending_note_revision(&conn, &keys, &recipient, "note-1").unwrap();
+        let revision = build_pending_note_revision(&conn, &keys, &author_pubkey, "note-1").unwrap();
         persist_local_note_revision(&conn, &revision).unwrap();
 
         let current_rev: Option<String> = conn
@@ -708,13 +663,15 @@ mod tests {
     fn builds_note_deletion_revision() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = Keys::generate().public_key();
+        let author_pubkey = keys.public_key();
 
         let revision =
-            build_pending_note_deletion_revision(&conn, &keys, &recipient, "note-1", 300).unwrap();
+            build_pending_note_deletion_revision(&conn, &keys, &author_pubkey, "note-1", 300)
+                .unwrap();
 
         assert!(!revision.revision_id.is_empty());
         assert_eq!(revision.op, "del");
         assert_eq!(revision.entity_type, "note");
+        assert!(revision.event.content.is_empty());
     }
 }

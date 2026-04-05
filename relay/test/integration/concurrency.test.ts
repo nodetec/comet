@@ -54,20 +54,22 @@ describe("relay integration > concurrency", () => {
     const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
     try {
       const headStore = createHeadStore(db);
-      expect(await headStore.listHeads({ recipient: "recipient-1" })).toEqual([
+      expect(
+        await headStore.listHeads({ authorPubkey: "recipient-1" }),
+      ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
-          mtime: 1_700_000_000_100,
+          mtime: 1_700_000_000_000,
         },
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_C,
           op: "put",
-          mtime: 1_700_000_000_200,
+          mtime: 1_700_000_000_000,
         },
       ]);
     } finally {
@@ -100,7 +102,7 @@ describe("relay integration > concurrency", () => {
         {
           since: 1,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -118,7 +120,7 @@ describe("relay integration > concurrency", () => {
       [
         "NEG-OPEN",
         "mixed-bootstrap",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       bootstrapTrace,
     );
@@ -157,7 +159,7 @@ describe("relay integration > concurrency", () => {
         {
           since: 1,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
         },
       ],
       bootstrapTrace,

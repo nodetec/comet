@@ -425,19 +425,19 @@ fn build_prepared_note_revision_publish(
     keys: &Keys,
     note_id: &str,
 ) -> Result<PreparedNoteRevisionPublish, AppError> {
-    let recipient = keys.public_key();
+    let author_pubkey = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
         let pending = if let Some(existing) =
-            build_materialized_note_revision_for_publish(&conn, keys, &recipient, note_id)?
+            build_materialized_note_revision_for_publish(&conn, keys, &author_pubkey, note_id)?
         {
             existing
         } else {
-            let pending = build_pending_note_revision(&conn, keys, &recipient, note_id)?;
+            let pending = build_pending_note_revision(&conn, keys, &author_pubkey, note_id)?;
             persist_local_note_revision(&conn, &pending)?;
             pending
         };
-        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
+        pending.event
     };
 
     Ok(PreparedNoteRevisionPublish {
@@ -749,19 +749,18 @@ pub async fn push_deletion_revision(
     keys: &Keys,
     entity_id: &str,
 ) -> Result<(), AppError> {
-    let recipient = keys.public_key();
+    let author_pubkey = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
         let pending = build_pending_note_deletion_revision(
             &conn,
             keys,
-            &recipient,
+            &author_pubkey,
             entity_id,
             crate::domain::common::time::now_millis(),
         )?;
         persist_local_deletion_revision(&conn, &pending)?;
-
-        crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, pending.tags)?
+        pending.event
     };
 
     let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
@@ -993,10 +992,9 @@ async fn send_events_on_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
-        compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
-        REVISION_SYNC_SCHEMA_VERSION,
+    use crate::adapters::nostr::comet_note_revision::{
+        build_note_revision_event, compute_note_revision_id, NoteRevisionEventMeta,
+        NoteRevisionPayload, COMET_NOTE_COLLECTION,
     };
     use ::url::Url;
     use postgres::{Client as PgClient, NoTls};
@@ -1204,63 +1202,38 @@ mod tests {
         }
     }
 
-    fn make_remote_note_event(keys: &Keys, note_id: &str, title: &str, markdown: &str) -> Event {
-        let recipient = keys.public_key();
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
-        let canonical = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
+    fn make_remote_note_event(keys: &Keys, note_id: &str, _title: &str, markdown: &str) -> Event {
+        let payload = NoteRevisionPayload {
+            version: 1,
+            markdown: markdown.to_string(),
+            note_created_at: 100,
+            edited_at: 200,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+        };
+        let revision_id = compute_note_revision_id(
+            note_id,
             &[],
             "put",
-            "note",
-            title,
-            markdown,
-            100,
-            200,
-            200,
-            None,
-            None,
-            None,
-            false,
-            &[],
+            Some(COMET_NOTE_COLLECTION),
+            Some(&payload),
         )
         .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title,
-                markdown,
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &[],
-                blob_tags: &[],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
-        );
 
-        crate::adapters::nostr::nip59_ext::gift_wrap(
+        build_note_revision_event(
             keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
+            &NoteRevisionEventMeta {
+                document_id: note_id.to_string(),
                 revision_id,
                 parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 200,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
+                operation: "put".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(200),
+            },
+            Some(&payload),
         )
         .unwrap()
     }

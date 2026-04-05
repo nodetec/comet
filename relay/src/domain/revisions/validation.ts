@@ -33,26 +33,17 @@ export function parseRevisionEnvelope(
     return null;
   }
 
-  const recipient = getSingleTag(event.tags, "p");
   const documentCoord = getSingleTag(event.tags, "d");
   const revisionId = getSingleTag(event.tags, "r");
-  const op = parseRevisionOp(getSingleTag(event.tags, "op"));
-  const mtimeText = getSingleTag(event.tags, "m");
-  const mtime = Number.parseInt(mtimeText ?? "", 10);
+  const op = parseRevisionOp(getSingleTag(event.tags, "o"));
+  const mtime = event.created_at * 1000;
 
-  if (
-    !recipient ||
-    !documentCoord ||
-    !revisionId ||
-    !op ||
-    !Number.isFinite(mtime) ||
-    !isHex64(revisionId)
-  ) {
+  if (!documentCoord || !revisionId || !op || !isHex64(revisionId)) {
     return null;
   }
 
   const parentRevisionIds = event.tags
-    .filter(([tagName]) => tagName === "prev")
+    .filter(([tagName]) => tagName === "b")
     .map(([, value]) => value)
     .filter(
       (value): value is string => typeof value === "string" && value.length > 0,
@@ -63,14 +54,14 @@ export function parseRevisionEnvelope(
   }
 
   return {
-    recipient,
+    authorPubkey: event.pubkey,
     documentCoord,
     revisionId,
     parentRevisionIds,
     op,
     mtime,
     entityType: getEntityTypeTag(event.tags),
-    schemaVersion: getSingleTag(event.tags, "v"),
+    schemaVersion: null,
     event,
   };
 }

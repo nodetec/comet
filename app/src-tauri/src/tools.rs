@@ -8,7 +8,7 @@ use std::path::Path;
 pub fn seed_initial_note_revisions(db_path: &Path, nsec: &str) -> Result<usize, AppError> {
     let keys =
         Keys::parse(nsec).map_err(|error| AppError::custom(format!("Invalid nsec: {error}")))?;
-    let recipient = keys.public_key();
+    let author_pubkey = keys.public_key();
 
     let mut conn = Connection::open(db_path)?;
     account_migrations().to_latest(&mut conn)?;
@@ -25,7 +25,7 @@ pub fn seed_initial_note_revisions(db_path: &Path, nsec: &str) -> Result<usize, 
     drop(stmt);
 
     for note_id in &note_ids {
-        materialize_note_revision_locally(&conn, &keys, &recipient, note_id, true)?;
+        materialize_note_revision_locally(&conn, &keys, &author_pubkey, note_id, true)?;
         conn.execute(
             "UPDATE notes
              SET locally_modified = CASE

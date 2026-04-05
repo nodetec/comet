@@ -6,6 +6,7 @@ use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::*;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
+use uuid::Uuid;
 
 const INITIAL_NOTES_PAGE_SIZE: usize = 40;
 const TAG_REWRITE_WARN_THRESHOLD: usize = 100;
@@ -28,7 +29,7 @@ fn validate_note_id(note_id: &str) -> Result<(), NoteError> {
 }
 
 fn generate_note_id() -> String {
-    format!("note-{}", now_millis())
+    Uuid::new_v4().hyphenated().to_string().to_uppercase()
 }
 
 fn validate_tag_path(path: &str) -> Result<String, NoteError> {
@@ -911,7 +912,9 @@ mod tests {
         let record =
             NoteService::create_note(&repo, &[], None).expect("create_note should succeed");
 
-        assert!(record.id.starts_with("note-"));
+        let parsed = Uuid::parse_str(&record.id).expect("note id should be a UUID");
+        assert_eq!(parsed.get_version_num(), 4);
+        assert_eq!(record.id, record.id.to_uppercase());
         assert!(record.markdown.starts_with("# "));
         assert!(!record.readonly);
         // Verify it was stored

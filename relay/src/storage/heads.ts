@@ -15,7 +15,7 @@ export type HeadStore = {
 export function createHeadStore(db: RevisionRelayDb): HeadStore {
   return {
     async listHeads(scope) {
-      const conditions = [eq(syncHeads.recipient, scope.recipient)];
+      const conditions = [eq(syncHeads.recipient, scope.authorPubkey)];
       if (scope.documentCoords && scope.documentCoords.length > 0) {
         conditions.push(inArray(syncHeads.dTag, scope.documentCoords));
       }
@@ -25,7 +25,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
 
       const rows = await db
         .select({
-          recipient: syncHeads.recipient,
+          authorPubkey: syncHeads.recipient,
           documentCoord: syncHeads.dTag,
           revisionId: syncHeads.rev,
           op: syncHeads.op,
@@ -36,7 +36,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
         .orderBy(asc(syncHeads.dTag), asc(syncHeads.mtime));
 
       return rows.map((row) => ({
-        recipient: row.recipient,
+        authorPubkey: row.authorPubkey,
         documentCoord: row.documentCoord,
         revisionId: row.revisionId,
         op: row.op,
@@ -49,7 +49,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
       }
 
       const revisionConditions = [
-        eq(syncRevisions.recipient, scope.recipient),
+        eq(syncRevisions.recipient, scope.authorPubkey),
         lte(syncRevisions.storedSeq, snapshotSeq),
       ];
       if (scope.documentCoords && scope.documentCoords.length > 0) {
@@ -60,7 +60,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
 
       const revisions = await db
         .select({
-          recipient: syncRevisions.recipient,
+          authorPubkey: syncRevisions.recipient,
           documentCoord: syncRevisions.dTag,
           revisionId: syncRevisions.rev,
           op: syncRevisions.op,
@@ -75,7 +75,7 @@ export function createHeadStore(db: RevisionRelayDb): HeadStore {
       }
 
       const supersededConditions = [
-        eq(syncRevisions.recipient, scope.recipient),
+        eq(syncRevisions.recipient, scope.authorPubkey),
         lte(syncRevisions.storedSeq, snapshotSeq),
       ];
       if (scope.documentCoords && scope.documentCoords.length > 0) {

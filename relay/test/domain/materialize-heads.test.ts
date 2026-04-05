@@ -9,7 +9,7 @@ function head(
   op: RevisionHead["op"] = "put",
 ): RevisionHead {
   return {
-    recipient: "pubkey-1",
+    authorPubkey: "pubkey-1",
     documentCoord: "doc-1",
     revisionId,
     op,

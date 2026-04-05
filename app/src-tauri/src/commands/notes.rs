@@ -1,3 +1,6 @@
+use crate::adapters::nostr::comet_note_revision::{
+    parse_note_revision_event, payload_to_synced_note,
+};
 use crate::adapters::sqlite::note_repository::SqliteNoteRepository;
 use crate::db::database_connection;
 use crate::domain::common::text::preview_from_markdown;
@@ -150,14 +153,13 @@ pub async fn get_note_conflict(
         .optional()?;
 
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
-    let recipient = keys.public_key().to_hex();
-    let document_coord =
-        crate::domain::sync::revision_codec::compute_document_coord(keys.secret_key(), &note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.clone();
     let current_revision_id = current_note.as_ref().and_then(|(rev, _, _)| rev.clone());
     let relay_url = preferred_conflict_relay_url(&conn);
     let scope_heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
         &conn,
-        &recipient,
+        &author_pubkey,
         &document_coord,
     )?;
     if scope_heads.len() <= 1 {
@@ -203,7 +205,7 @@ pub async fn get_note_conflict(
             .await
         {
             if connection
-                .send_req_revisions("conflict-inspect", &recipient, &revision_ids)
+                .send_req_revisions("conflict-inspect", &author_pubkey, &revision_ids)
                 .await
                 .is_ok()
             {
@@ -213,29 +215,29 @@ pub async fn get_note_conflict(
                             subscription_id,
                             event,
                         }) if subscription_id == "conflict-inspect" => {
-                            let meta =
-                                crate::domain::sync::revision_codec::parse_revision_envelope_meta(
-                                    &event,
-                                )?;
+                            let parsed = parse_note_revision_event(&keys, &event)?;
                             let Some(head) = heads
                                 .iter_mut()
-                                .find(|head| head.revision_id == meta.revision_id)
+                                .find(|head| head.revision_id == parsed.revision_id)
                             else {
                                 continue;
                             };
 
-                            if meta.op == "del" {
+                            if parsed.operation == "del" {
                                 head.title = head.title.clone().or_else(|| Some("Deleted".into()));
                                 head.preview = Some("Deleted".into());
                                 head.is_available = true;
                                 continue;
                             }
 
-                            let unwrapped =
-                                crate::adapters::nostr::nip59_ext::extract_rumor(&keys, &event)?;
-                            let note = crate::domain::sync::event_codec::rumor_to_synced_note(
-                                &unwrapped.rumor,
-                            )?;
+                            let Some(payload) = parsed.payload.as_ref() else {
+                                continue;
+                            };
+                            let note = payload_to_synced_note(
+                                &parsed.document_id,
+                                event.created_at.as_secs() as i64 * 1000,
+                                payload,
+                            );
                             head.title = Some(note.title.clone());
                             head.preview = Some(preview_from_markdown(&note.markdown));
                             head.markdown = Some(note.markdown);
@@ -302,12 +304,11 @@ pub async fn resolve_note_conflict(
 ) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
-    let recipient = keys.public_key().to_hex();
-    let document_coord =
-        crate::domain::sync::revision_codec::compute_document_coord(keys.secret_key(), &note_id);
+    let author_pubkey = keys.public_key().to_hex();
+    let document_coord = note_id.clone();
     let heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
         &conn,
-        &recipient,
+        &author_pubkey,
         &document_coord,
     )?;
     if heads.len() <= 1 {

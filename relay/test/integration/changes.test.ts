@@ -47,7 +47,11 @@ describe("relay integration > changes", () => {
       [
         "CHANGES",
         "sync-1",
-        { since: 0, kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        {
+          since: 0,
+          kinds: [REVISION_SYNC_EVENT_KIND],
+          authors: ["recipient-1"],
+        },
       ],
       trace,
     );
@@ -80,7 +84,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#d": ["doc-2"],
         },
       ],
@@ -115,7 +119,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_B],
         },
       ],
@@ -145,7 +149,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -188,7 +192,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -220,7 +224,7 @@ describe("relay integration > changes", () => {
     await expectNoMessage(subscriber, 300, subscriberTrace);
   });
 
-  test("returns CHANGES ERR when #p recipient is missing", async () => {
+  test("returns CHANGES ERR when the authors filter is missing", async () => {
     const ctx = await startTestRevisionRelay(39442);
     contexts.push(ctx);
 
@@ -237,11 +241,11 @@ describe("relay integration > changes", () => {
       "CHANGES",
       "bad-scope",
       "ERR",
-      "revision CHANGES currently requires exactly one #p recipient",
+      "revision CHANGES currently requires exactly one author",
     ]);
   });
 
-  test("returns CHANGES ERR when multiple #p recipients are requested", async () => {
+  test("returns CHANGES ERR when multiple authors are requested", async () => {
     const ctx = await startTestRevisionRelay(39443);
     contexts.push(ctx);
 
@@ -256,7 +260,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1", "recipient-2"],
+          authors: ["recipient-1", "recipient-2"],
         },
       ],
       trace,
@@ -266,7 +270,7 @@ describe("relay integration > changes", () => {
       "CHANGES",
       "bad-scope-multi",
       "ERR",
-      "revision CHANGES currently requires exactly one #p recipient",
+      "revision CHANGES currently requires exactly one author",
     ]);
   });
 
@@ -309,7 +313,11 @@ describe("relay integration > changes", () => {
       [
         "CHANGES",
         "all-docs",
-        { since: 0, kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        {
+          since: 0,
+          kinds: [REVISION_SYNC_EVENT_KIND],
+          authors: ["recipient-1"],
+        },
       ],
       readerTrace,
     );
@@ -350,7 +358,7 @@ describe("relay integration > changes", () => {
           {
             since: 0,
             kinds: [REVISION_SYNC_EVENT_KIND],
-            "#p": ["recipient-1"],
+            authors: ["recipient-1"],
             live: true,
           },
         ],
@@ -404,7 +412,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#d": ["doc-1"],
           live: true,
         },
@@ -426,7 +434,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#d": ["doc-2"],
           live: true,
         },
@@ -477,7 +485,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -506,7 +514,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
         },
       ],
       reconnectTrace,
@@ -538,7 +546,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -579,7 +587,7 @@ describe("relay integration > changes", () => {
         {
           since: 1,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
         },
       ],
       reconnectTrace,
@@ -608,7 +616,7 @@ describe("relay integration > changes", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],

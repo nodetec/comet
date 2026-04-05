@@ -11,7 +11,7 @@ export type RevisionRelayInfoDocument = {
     strategy: string;
     current_head_negentropy: boolean;
     changes_feed: boolean;
-    recipient_scoped: boolean;
+    author_scoped: boolean;
     batch_fetch: boolean;
     retention: {
       min_payload_mtime: number | null;
@@ -37,7 +37,7 @@ export function getRevisionRelayInfoDocument(input: {
       strategy: "revision-sync.v1",
       current_head_negentropy: true,
       changes_feed: true,
-      recipient_scoped: true,
+      author_scoped: true,
       batch_fetch: true,
       retention: {
         min_payload_mtime: input.minPayloadMtime,

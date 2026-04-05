@@ -136,7 +136,7 @@ describe("relay integration > admin retention api", () => {
         "retention-fetch",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A, REV_B],
         },
       ],

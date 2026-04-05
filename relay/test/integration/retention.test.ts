@@ -65,7 +65,7 @@ describe("relay integration > retention", () => {
         strategy: "revision-sync.v1",
         current_head_negentropy: true,
         changes_feed: true,
-        recipient_scoped: true,
+        author_scoped: true,
         batch_fetch: true,
         retention: {
           min_payload_mtime: 1_800_000_000_000,
@@ -97,7 +97,7 @@ describe("relay integration > retention", () => {
         "fetch-compacted",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A],
         },
       ],
@@ -137,7 +137,7 @@ describe("relay integration > retention", () => {
         "fetch-mixed",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A, REV_B],
         },
       ],
@@ -178,7 +178,7 @@ describe("relay integration > retention", () => {
         "fetch-head",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_B],
         },
       ],
@@ -215,7 +215,7 @@ describe("relay integration > retention", () => {
         "fetch-conflict-heads",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_B, REV_C],
         },
       ],
@@ -254,7 +254,7 @@ describe("relay integration > retention", () => {
         "fetch-tombstone",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_B],
         },
       ],
@@ -288,25 +288,25 @@ describe("relay integration > retention", () => {
     try {
       const headStore = createHeadStore(db);
       expect(
-        await headStore.listHeadsAtSnapshot({ recipient: "recipient-1" }, 2),
+        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 2),
       ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
-          mtime: 1_700_000_000_100,
+          mtime: 1_700_000_000_000,
         },
       ]);
       expect(
-        await headStore.listHeadsAtSnapshot({ recipient: "recipient-1" }, 3),
+        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 3),
       ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_C,
           op: "put",
-          mtime: 1_700_000_000_200,
+          mtime: 1_700_000_000_000,
         },
       ]);
     } finally {
@@ -314,7 +314,7 @@ describe("relay integration > retention", () => {
     }
   });
 
-  test("compacts payloads independently across multiple documents in one recipient namespace", async () => {
+  test("compacts payloads independently across multiple documents in one author namespace", async () => {
     const ctx = await startTestRevisionRelay(39468);
     contexts.push(ctx);
 
@@ -348,7 +348,7 @@ describe("relay integration > retention", () => {
         "multi-doc-retention",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A, REV_B, REV_C],
         },
       ],

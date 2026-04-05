@@ -51,7 +51,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-left",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       leftTrace,
     );
@@ -60,7 +60,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-right",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       rightTrace,
     );
@@ -93,7 +93,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-sync",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       trace,
     );
@@ -128,7 +128,7 @@ describe("relay integration > negentropy", () => {
     ]);
   });
 
-  test("returns NEG-ERR when NEG-OPEN omits the required recipient scope", async () => {
+  test("returns NEG-ERR when NEG-OPEN omits the required author scope", async () => {
     const ctx = await startTestRevisionRelay(39444);
     contexts.push(ctx);
 
@@ -137,18 +137,18 @@ describe("relay integration > negentropy", () => {
 
     sendJson(
       ws,
-      ["NEG-OPEN", "neg-no-recipient", { kinds: [REVISION_SYNC_EVENT_KIND] }],
+      ["NEG-OPEN", "neg-no-author", { kinds: [REVISION_SYNC_EVENT_KIND] }],
       trace,
     );
 
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
       "NEG-ERR",
-      "neg-no-recipient",
-      "NEG-OPEN requires exactly one #p recipient for revision sync",
+      "neg-no-author",
+      "NEG-OPEN requires exactly one author for revision sync",
     ]);
   });
 
-  test("returns NEG-ERR when NEG-OPEN uses multiple recipients", async () => {
+  test("returns NEG-ERR when NEG-OPEN uses multiple authors", async () => {
     const ctx = await startTestRevisionRelay(39445);
     contexts.push(ctx);
 
@@ -159,10 +159,10 @@ describe("relay integration > negentropy", () => {
       ws,
       [
         "NEG-OPEN",
-        "neg-multi-recipient",
+        "neg-multi-author",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1", "recipient-2"],
+          authors: ["recipient-1", "recipient-2"],
         },
       ],
       trace,
@@ -170,8 +170,8 @@ describe("relay integration > negentropy", () => {
 
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
       "NEG-ERR",
-      "neg-multi-recipient",
-      "NEG-OPEN requires exactly one #p recipient for revision sync",
+      "neg-multi-author",
+      "NEG-OPEN requires exactly one author for revision sync",
     ]);
   });
 
@@ -187,7 +187,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-close-twice",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       trace,
     );
@@ -220,7 +220,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-close-socket",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       trace,
     );
@@ -245,7 +245,7 @@ describe("relay integration > negentropy", () => {
       [
         "NEG-OPEN",
         "neg-close-socket",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       reconnectTrace,
     );

@@ -62,18 +62,16 @@ export function createNegentropySessionManager(options: {
 }
 
 function parseRevisionScope(input: Record<string, unknown>): RevisionScope {
-  const recipientValues = arrayOfStrings(input["#p"]);
-  if (recipientValues.length !== 1) {
-    throw new Error(
-      "NEG-OPEN requires exactly one #p recipient for revision sync",
-    );
+  const authorValues = arrayOfStrings(input.authors);
+  if (authorValues.length !== 1) {
+    throw new Error("NEG-OPEN requires exactly one author for revision sync");
   }
 
   const documentCoords = arrayOfStrings(input["#d"]);
   const revisionIds = arrayOfStrings(input["#r"]);
 
   return {
-    recipient: recipientValues[0],
+    authorPubkey: authorValues[0],
     documentCoords: documentCoords.length > 0 ? documentCoords : undefined,
     revisionIds: revisionIds.length > 0 ? revisionIds : undefined,
   };

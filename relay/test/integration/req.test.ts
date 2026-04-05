@@ -57,7 +57,7 @@ describe("relay integration > req", () => {
     ]);
   });
 
-  test("filters REQ by authors, kind, recipient, document, and revision id together", async () => {
+  test("filters REQ by authors, kind, document, and revision id together", async () => {
     const ctx = await startTestRevisionRelay(39461);
     contexts.push(ctx);
 
@@ -85,7 +85,6 @@ describe("relay integration > req", () => {
         {
           authors: ["sender-b"],
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
           "#d": ["doc-2"],
           "#r": [REV_B],
         },
@@ -134,7 +133,7 @@ describe("relay integration > req", () => {
         "filter-batch",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A, REV_B],
         },
       ],

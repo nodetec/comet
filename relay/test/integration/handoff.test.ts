@@ -46,21 +46,23 @@ describe("relay integration > handoff", () => {
     try {
       const headStore = createHeadStore(db);
 
-      expect(await headStore.listHeads({ recipient: "recipient-1" })).toEqual([
+      expect(
+        await headStore.listHeads({ authorPubkey: "recipient-1" }),
+      ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
-          mtime: 1_700_000_000_100,
+          mtime: 1_700_000_000_000,
         },
       ]);
 
       expect(
-        await headStore.listHeadsAtSnapshot({ recipient: "recipient-1" }, 1),
+        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 1),
       ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_A,
           op: "put",
@@ -69,14 +71,14 @@ describe("relay integration > handoff", () => {
       ]);
 
       expect(
-        await headStore.listHeadsAtSnapshot({ recipient: "recipient-1" }, 2),
+        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 2),
       ).toEqual([
         {
-          recipient: "recipient-1",
+          authorPubkey: "recipient-1",
           documentCoord: "doc-1",
           revisionId: REV_B,
           op: "put",
-          mtime: 1_700_000_000_100,
+          mtime: 1_700_000_000_000,
         },
       ]);
     } finally {
@@ -100,7 +102,7 @@ describe("relay integration > handoff", () => {
       [
         "NEG-OPEN",
         "neg-fetch",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       trace,
     );
@@ -122,7 +124,7 @@ describe("relay integration > handoff", () => {
         "fetch-1",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_B],
         },
       ],
@@ -149,7 +151,7 @@ describe("relay integration > handoff", () => {
         "fetch-missing",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           "#r": [REV_A],
         },
       ],
@@ -180,7 +182,7 @@ describe("relay integration > handoff", () => {
       [
         "NEG-OPEN",
         "handoff",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       bootstrapTrace,
     );
@@ -210,7 +212,7 @@ describe("relay integration > handoff", () => {
         {
           since: 1,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
         },
       ],
       bootstrapTrace,

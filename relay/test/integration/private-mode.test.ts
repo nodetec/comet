@@ -13,7 +13,7 @@ import {
   REV_A,
   authEvent,
   cleanupContexts,
-  revisionEventForRecipient,
+  revisionEventForAuthor,
   traceOptions,
 } from "./fixtures";
 
@@ -37,11 +37,7 @@ describe("relay integration > private mode", () => {
     expect(challenge[0]).toBe("AUTH");
     expect(typeof challenge[1]).toBe("string");
 
-    const event = revisionEventForRecipient(
-      REV_A,
-      AUTH_PUBKEY,
-      1_700_000_000_000,
-    );
+    const event = revisionEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
     sendJson(ws, ["EVENT", event], traceOptions(ctx, "private-open"));
 
     expect(
@@ -115,11 +111,7 @@ describe("relay integration > private mode", () => {
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
     ).toEqual(["OK", auth.id, true, ""]);
 
-    const event = revisionEventForRecipient(
-      REV_A,
-      AUTH_PUBKEY,
-      1_700_000_000_000,
-    );
+    const event = revisionEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
     sendJson(ws, ["EVENT", event], traceOptions(ctx, "private-auth-ok"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
@@ -132,7 +124,7 @@ describe("relay integration > private mode", () => {
         "private-fetch",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": [AUTH_PUBKEY],
+          authors: [AUTH_PUBKEY],
           "#r": [REV_A],
         },
       ],
@@ -146,7 +138,7 @@ describe("relay integration > private mode", () => {
     ).toEqual(["EOSE", "private-fetch"]);
   });
 
-  test("rejects revision queries scoped to a different recipient namespace", async () => {
+  test("rejects revision queries scoped to a different author namespace", async () => {
     const ctx = await startTestRevisionRelay(35223, {
       privateMode: true,
       adminToken: "secret-token",
@@ -179,10 +171,10 @@ describe("relay integration > private mode", () => {
       ws,
       [
         "REQ",
-        "wrong-recipient",
+        "wrong-author",
         {
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": [
+          authors: [
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           ],
           "#r": [REV_A],
@@ -195,8 +187,8 @@ describe("relay integration > private mode", () => {
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-scope")),
     ).toEqual([
       "CLOSED",
-      "wrong-recipient",
-      "restricted: can only query revision state addressed to you",
+      "wrong-author",
+      "restricted: can only query your own revision state",
     ]);
   });
 });

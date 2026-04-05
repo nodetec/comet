@@ -1,13 +1,13 @@
 import type { NostrEvent } from "@comet/nostr";
 
-export const REVISION_SYNC_EVENT_KIND = 1059;
+export const REVISION_SYNC_EVENT_KIND = 42061;
 export const REVISION_NEGENTROPY_STRATEGY = "revision-sync.v1";
 export const RELAY_AUTH_EVENT_KIND = 22242;
 
 export type RevisionOp = "put" | "del";
 
 export type RevisionEnvelope = {
-  recipient: string;
+  authorPubkey: string;
   documentCoord: string;
   revisionId: string;
   parentRevisionIds: string[];
@@ -19,7 +19,7 @@ export type RevisionEnvelope = {
 };
 
 export type RevisionHead = {
-  recipient: string;
+  authorPubkey: string;
   documentCoord: string;
   revisionId: string;
   op: RevisionOp;
@@ -27,7 +27,7 @@ export type RevisionHead = {
 };
 
 export type RevisionScope = {
-  recipient: string;
+  authorPubkey: string;
   documentCoords?: string[];
   revisionIds?: string[];
 };

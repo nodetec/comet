@@ -154,7 +154,11 @@ describe("relay integration > companion/pass-through", () => {
       [
         "CHANGES",
         "revision-only",
-        { since: 0, kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        {
+          since: 0,
+          kinds: [REVISION_SYNC_EVENT_KIND],
+          authors: ["recipient-1"],
+        },
       ],
       trace,
     );
@@ -167,7 +171,7 @@ describe("relay integration > companion/pass-through", () => {
       [
         "NEG-OPEN",
         "generic-scope",
-        { kinds: [REVISION_SYNC_EVENT_KIND], "#p": ["recipient-1"] },
+        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
       ],
       trace,
     );
@@ -202,7 +206,7 @@ describe("relay integration > companion/pass-through", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": ["recipient-1"],
+          authors: ["recipient-1"],
           live: true,
         },
       ],
@@ -222,27 +226,20 @@ describe("relay integration > companion/pass-through", () => {
       ["p", "recipient-1"],
     ]);
     const syncOne = genericEvent("revision-1", REVISION_SYNC_EVENT_KIND, [
-      ["p", "recipient-1"],
       ["d", "doc-1"],
       ["r", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-      ["op", "put"],
-      ["m", "1700000000000"],
-      ["type", "note"],
-      ["v", "2"],
+      ["o", "put"],
+      ["c", "notes"],
     ]);
+    syncOne.pubkey = "recipient-1";
     const syncTwo = genericEvent("revision-2", REVISION_SYNC_EVENT_KIND, [
-      ["p", "recipient-1"],
       ["d", "doc-1"],
       ["r", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
-      [
-        "prev",
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      ],
-      ["op", "put"],
-      ["m", "1700000000100"],
-      ["type", "note"],
-      ["v", "2"],
+      ["b", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      ["o", "put"],
+      ["c", "notes"],
     ]);
+    syncTwo.pubkey = "recipient-1";
 
     const firstLive = waitForMessage(subscriber, 3_000, subscriberTrace);
     sendJson(publisher, ["EVENT", revisionOne], publisherTrace);

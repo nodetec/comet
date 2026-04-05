@@ -68,7 +68,7 @@ describe("relay integration > admin connections", () => {
         {
           since: 0,
           kinds: [REVISION_SYNC_EVENT_KIND],
-          "#p": [AUTH_PUBKEY],
+          authors: [AUTH_PUBKEY],
           live: true,
         },
       ],

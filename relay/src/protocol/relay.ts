@@ -20,7 +20,7 @@ import type { ConnectionRegistry } from "../infra/connections";
 import {
   isAuthorizedForChangesFilter,
   isAuthorizedForRevisionFilters,
-  isAuthorizedForRevisionRecipient,
+  isAuthorizedForRevisionAuthor,
   validateAuthEvent,
 } from "./auth";
 import {
@@ -172,8 +172,8 @@ export function createClientMessageHandler(options: {
       const revisionEnvelope = parseRevisionEnvelope(event);
       if (revisionEnvelope) {
         if (options.access.privateMode) {
-          const auth = isAuthorizedForRevisionRecipient(
-            revisionEnvelope.recipient,
+          const auth = isAuthorizedForRevisionAuthor(
+            revisionEnvelope.authorPubkey,
             authedPubkeys,
           );
           if (!auth.authorized) {
@@ -190,7 +190,7 @@ export function createClientMessageHandler(options: {
           options.connections.broadcastRevisionChange({
             seq: result.seq,
             event,
-            recipient: revisionEnvelope.recipient,
+            authorPubkey: revisionEnvelope.authorPubkey,
             documentCoord: revisionEnvelope.documentCoord,
             revisionId: revisionEnvelope.revisionId,
           });

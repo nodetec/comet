@@ -36,7 +36,7 @@ describe("relay integration > info", () => {
         strategy: "revision-sync.v1",
         current_head_negentropy: true,
         changes_feed: true,
-        recipient_scoped: true,
+        author_scoped: true,
         batch_fetch: true,
         retention: {
           min_payload_mtime: null,

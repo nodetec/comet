@@ -73,7 +73,7 @@ pub(super) async fn run_revision_sync_connection(
         save_active_sync_relay_url(&conn, &relay_url);
     }
 
-    let recipient = bootstrap.recipient.clone();
+    let author_pubkey = bootstrap.author_pubkey.clone();
     // `snapshot_seq` is the bootstrap handoff boundary returned by Negentropy.
     // The live `CHANGES` subscription starts from that boundary, while
     // `checkpoint_seq` later advances as events are actually applied.
@@ -86,7 +86,7 @@ pub(super) async fn run_revision_sync_connection(
 
     set_state(state, SyncState::Syncing, app).await;
     connection
-        .send_changes("sync", &recipient, snapshot_seq, true)
+        .send_changes("sync", &author_pubkey, snapshot_seq, true)
         .await?;
 
     retry_pending_blob_uploads(app, &keys).await?;

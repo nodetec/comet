@@ -49,6 +49,7 @@ hmac = "0.12.1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 thiserror = "2"
 url = "2"
+uuid = { version = "1", features = ["v4"] }
 tauri-plugin-log = "2.8.0"
 tauri-plugin-opener = "2"
 tauri-plugin-secure-storage = "1.4.0"

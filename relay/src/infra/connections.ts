@@ -68,7 +68,7 @@ export function createConnectionRegistry() {
     broadcastRevisionChange(input: {
       seq: number;
       event: NostrEvent;
-      recipient: string;
+      authorPubkey: string;
       documentCoord: string;
       revisionId: string;
     }) {
@@ -107,7 +107,7 @@ function matchesLiveChangesFilter(
   input: {
     seq: number;
     event: NostrEvent;
-    recipient: string;
+    authorPubkey: string;
     documentCoord: string;
     revisionId: string;
   },
@@ -116,10 +116,10 @@ function matchesLiveChangesFilter(
     return false;
   }
 
-  const recipientFilter = asStringArray(filter["#p"]);
   if (
-    recipientFilter.length > 0 &&
-    !recipientFilter.includes(input.recipient)
+    Array.isArray(filter.authors) &&
+    filter.authors.length > 0 &&
+    !filter.authors.includes(input.authorPubkey)
   ) {
     return false;
   }

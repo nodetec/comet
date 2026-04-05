@@ -2,7 +2,7 @@ use crate::adapters::nostr::relay_client::{
     fetch_relay_info, RevisionRelayConnection, RevisionRelayIncomingMessage,
 };
 use crate::adapters::sqlite::revision_sync_repository::{
-    list_sync_heads_for_recipient, upsert_sync_relay_state,
+    list_sync_heads_for_author, upsert_sync_relay_state,
 };
 use crate::db::{active_account, database_connection};
 use crate::domain::sync::model::SyncChangePayload;
@@ -29,7 +29,7 @@ pub struct RevisionBootstrapResult {
     pub have: Vec<String>,
     #[cfg_attr(not(test), allow(dead_code))]
     pub need: Vec<String>,
-    pub recipient: String,
+    pub author_pubkey: String,
 }
 
 pub async fn bootstrap_relay_connection(
@@ -74,9 +74,9 @@ async fn bootstrap_with_keys_and_changes(
     let relay_http_url = relay_http_url_from_ws(relay_ws_url)?;
     let relay_info = fetch_relay_info(&relay_http_url).await?;
 
-    let recipient = keys.public_key().to_hex();
+    let author_pubkey = keys.public_key().to_hex();
     let conn = open_sync_db(db_path)?;
-    let heads = list_sync_heads_for_recipient(&conn, &recipient)?;
+    let heads = list_sync_heads_for_author(&conn, &author_pubkey)?;
     let local_items = heads
         .into_iter()
         .map(|head| RevisionNegentropyItem {
@@ -95,7 +95,9 @@ async fn bootstrap_with_keys_and_changes(
     )?;
 
     let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
-    connection.send_neg_open("bootstrap", &recipient).await?;
+    connection
+        .send_neg_open("bootstrap", &author_pubkey)
+        .await?;
 
     let snapshot_seq =
         match recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-STATUS").await? {
@@ -183,11 +185,11 @@ async fn bootstrap_with_keys_and_changes(
     if !need.is_empty() {
         if relay_info.revision_sync.batch_fetch {
             connection
-                .send_req_revisions_batch("bootstrap-fetch", &recipient, &need)
+                .send_req_revisions_batch("bootstrap-fetch", &author_pubkey, &need)
                 .await?;
         } else {
             connection
-                .send_req_revisions("bootstrap-fetch", &recipient, &need)
+                .send_req_revisions("bootstrap-fetch", &author_pubkey, &need)
                 .await?;
         }
 
@@ -311,7 +313,7 @@ async fn bootstrap_with_keys_and_changes(
         snapshot_seq,
         have: have.into_iter().collect(),
         need,
-        recipient,
+        author_pubkey,
     })
 }
 
@@ -363,15 +365,12 @@ fn open_sync_db(db_path: &Path) -> Result<Connection, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::nostr::comet_note_revision::{
+        build_note_revision_event, compute_note_revision_id, parse_note_revision_event,
+        NoteRevisionEventMeta, NoteRevisionPayload, COMET_NOTE_COLLECTION,
+    };
     use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::adapters::sqlite::revision_sync_repository::{
-        get_sync_head, get_sync_relay_state, list_sync_revision_parents,
-    };
-    use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
-        compute_revision_id, parse_revision_envelope_meta, revision_envelope_tags,
-        RevisionEnvelopeMeta, RevisionRumorInput, REVISION_SYNC_SCHEMA_VERSION,
-    };
+    use crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state;
     use crate::domain::sync::revision_service::{
         build_pending_note_deletion_revision, build_pending_note_revision,
         persist_local_deletion_revision, persist_local_note_revision,
@@ -806,10 +805,7 @@ mod tests {
         let head_op: String = destination_conn
             .query_row(
                 "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
-                rusqlite::params![
-                    keys.public_key().to_hex(),
-                    compute_document_coord(keys.secret_key(), "note-1")
-                ],
+                rusqlite::params![keys.public_key().to_hex(), "note-1"],
                 |row| row.get(0),
             )
             .unwrap();
@@ -868,7 +864,7 @@ mod tests {
             .connection
             .send_changes(
                 "live-sync",
-                &bootstrap.recipient,
+                &bootstrap.author_pubkey,
                 bootstrap.snapshot_seq,
                 true,
             )
@@ -1053,7 +1049,7 @@ mod tests {
             .connection
             .send_changes(
                 "live-sync",
-                &bootstrap.recipient,
+                &bootstrap.author_pubkey,
                 bootstrap.snapshot_seq,
                 true,
             )
@@ -1177,8 +1173,8 @@ mod tests {
             } => {
                 assert_eq!(subscription_id, "live-sync");
                 assert_eq!(seq, 2);
-                let envelope = parse_revision_envelope_meta(&event).unwrap();
-                assert_eq!(envelope.revision_id, updated_revision_id);
+                let parsed = parse_note_revision_event(&keys, &event).unwrap();
+                assert_eq!(parsed.revision_id, updated_revision_id);
             }
             other => panic!("unexpected live changes event: {other:?}"),
         }
@@ -1489,63 +1485,38 @@ mod tests {
         }
     }
 
-    fn make_remote_note_event(keys: &Keys, note_id: &str, title: &str, markdown: &str) -> Event {
-        let recipient = keys.public_key();
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
-        let canonical = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
+    fn make_remote_note_event(keys: &Keys, note_id: &str, _title: &str, markdown: &str) -> Event {
+        let payload = NoteRevisionPayload {
+            version: 1,
+            markdown: markdown.to_string(),
+            note_created_at: 100,
+            edited_at: 200,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+        };
+        let revision_id = compute_note_revision_id(
+            note_id,
             &[],
             "put",
-            "note",
-            title,
-            markdown,
-            100,
-            200,
-            200,
-            None,
-            None,
-            None,
-            false,
-            &[],
+            Some(COMET_NOTE_COLLECTION),
+            Some(&payload),
         )
         .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title,
-                markdown,
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &[],
-                blob_tags: &[],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
-        );
 
-        crate::adapters::nostr::nip59_ext::gift_wrap(
+        build_note_revision_event(
             keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
+            &NoteRevisionEventMeta {
+                document_id: note_id.to_string(),
                 revision_id,
                 parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 200,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
+                operation: "put".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(200),
+            },
+            Some(&payload),
         )
         .unwrap()
     }
@@ -1556,18 +1527,13 @@ mod tests {
         relay_ws_url: &str,
         note_id: &str,
     ) -> String {
-        let recipient = keys.public_key();
+        let author_pubkey = keys.public_key();
         let (event, revision_id) = {
             let conn = Connection::open(db_path).unwrap();
-            let pending = build_pending_note_revision(&conn, keys, &recipient, note_id).unwrap();
+            let pending =
+                build_pending_note_revision(&conn, keys, &author_pubkey, note_id).unwrap();
             persist_local_note_revision(&conn, &pending).unwrap();
-            let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-                keys,
-                &recipient,
-                pending.rumor,
-                pending.tags,
-            )
-            .unwrap();
+            let event = pending.event;
             (event, pending.revision_id)
         };
 
@@ -1597,36 +1563,14 @@ mod tests {
         relay_ws_url: &str,
         note_id: &str,
     ) -> String {
-        let recipient = keys.public_key();
+        let author_pubkey = keys.public_key();
         let (event, revision_id) = {
             let conn = Connection::open(db_path).unwrap();
             let pending =
-                build_pending_note_deletion_revision(&conn, keys, &recipient, note_id, 300)
+                build_pending_note_deletion_revision(&conn, keys, &author_pubkey, note_id, 300)
                     .unwrap();
             persist_local_deletion_revision(&conn, &pending).unwrap();
-            let head = get_sync_head(&conn, &recipient.to_hex(), &pending.document_coord)
-                .unwrap()
-                .unwrap();
-            let parent_revision_ids = list_sync_revision_parents(
-                &conn,
-                &recipient.to_hex(),
-                &pending.document_coord,
-                &head.rev,
-            )
-            .unwrap();
-            let tags = revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord: pending.document_coord.clone(),
-                revision_id: head.rev,
-                parent_revision_ids,
-                op: "del".into(),
-                mtime: head.mtime,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            });
-            let event =
-                crate::adapters::nostr::nip59_ext::gift_wrap(keys, &recipient, pending.rumor, tags)
-                    .unwrap();
+            let event = pending.event;
             (event, pending.revision_id)
         };
 

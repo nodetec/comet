@@ -63,19 +63,19 @@ export function isAuthorizedForRevisionFilters(
   }
 
   for (const filter of filters) {
-    const pValues = filter["#p"];
-    if (!Array.isArray(pValues) || pValues.length === 0) {
+    const authorValues = filter.authors;
+    if (!Array.isArray(authorValues) || authorValues.length === 0) {
       return {
         authorized: false,
-        reason: "restricted: revision queries must include a #p filter",
+        reason: "restricted: revision queries must include an authors filter",
       };
     }
 
-    for (const recipient of pValues) {
-      if (!authedPubkeys.has(recipient)) {
+    for (const author of authorValues) {
+      if (!authedPubkeys.has(author)) {
         return {
           authorized: false,
-          reason: "restricted: can only query revision state addressed to you",
+          reason: "restricted: can only query your own revision state",
         };
       }
     }
@@ -95,19 +95,19 @@ export function isAuthorizedForChangesFilter(
     };
   }
 
-  const pValues = filter["#p"];
-  if (!Array.isArray(pValues) || pValues.length === 0) {
+  const authorValues = filter.authors;
+  if (!Array.isArray(authorValues) || authorValues.length === 0) {
     return {
       authorized: false,
-      reason: "restricted: revision CHANGES must include a #p filter",
+      reason: "restricted: revision CHANGES must include an authors filter",
     };
   }
 
-  for (const recipient of pValues) {
-    if (!authedPubkeys.has(recipient)) {
+  for (const author of authorValues) {
+    if (!authedPubkeys.has(author)) {
       return {
         authorized: false,
-        reason: "restricted: can only query revision changes addressed to you",
+        reason: "restricted: can only query your own revision changes",
       };
     }
   }
@@ -115,8 +115,8 @@ export function isAuthorizedForChangesFilter(
   return { authorized: true, reason: "" };
 }
 
-export function isAuthorizedForRevisionRecipient(
-  recipient: string,
+export function isAuthorizedForRevisionAuthor(
+  authorPubkey: string,
   authedPubkeys: Set<string>,
 ): { authorized: boolean; reason: string } {
   if (authedPubkeys.size === 0) {
@@ -126,10 +126,10 @@ export function isAuthorizedForRevisionRecipient(
     };
   }
 
-  if (!authedPubkeys.has(recipient)) {
+  if (!authedPubkeys.has(authorPubkey)) {
     return {
       authorized: false,
-      reason: "restricted: can only write revision state addressed to you",
+      reason: "restricted: can only write your own revision state",
     };
   }
 

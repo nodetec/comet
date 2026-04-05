@@ -13,7 +13,7 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
     async compactPayloadsBefore(mtime) {
       const rows = await db
         .select({
-          recipient: syncRevisions.recipient,
+          authorPubkey: syncRevisions.recipient,
           dTag: syncRevisions.dTag,
           rev: syncRevisions.rev,
           payloadEventId: syncRevisions.payloadEventId,
@@ -32,7 +32,7 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
 
       const currentHeads = await db
         .select({
-          recipient: syncHeads.recipient,
+          authorPubkey: syncHeads.recipient,
           dTag: syncHeads.dTag,
           rev: syncHeads.rev,
         })
@@ -40,12 +40,12 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
 
       const headKeys = new Set(
         currentHeads.map(
-          (head) => `${head.recipient}:${head.dTag}:${head.rev}`,
+          (head) => `${head.authorPubkey}:${head.dTag}:${head.rev}`,
         ),
       );
 
       const candidates = rows.filter(
-        (row) => !headKeys.has(`${row.recipient}:${row.dTag}:${row.rev}`),
+        (row) => !headKeys.has(`${row.authorPubkey}:${row.dTag}:${row.rev}`),
       );
 
       if (candidates.length === 0) {
@@ -72,7 +72,7 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
             })
             .where(
               and(
-                eq(syncRevisions.recipient, row.recipient),
+                eq(syncRevisions.recipient, row.authorPubkey),
                 eq(syncRevisions.dTag, row.dTag),
                 eq(syncRevisions.rev, row.rev),
               ),

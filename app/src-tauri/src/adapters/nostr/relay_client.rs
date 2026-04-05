@@ -1,4 +1,4 @@
-use crate::domain::sync::revision_codec::REVISION_SYNC_EVENT_KIND;
+use crate::adapters::nostr::comet_note_revision::COMET_NOTE_REVISION_KIND;
 use crate::error::AppError;
 use futures_util::{SinkExt, StreamExt};
 use nostr_sdk::prelude::{Event, EventBuilder, JsonUtil, Keys, RelayUrl};
@@ -34,7 +34,7 @@ pub struct RevisionRelaySyncInfo {
     pub strategy: String,
     pub current_head_negentropy: bool,
     pub changes_feed: bool,
-    pub recipient_scoped: bool,
+    pub author_scoped: bool,
     #[serde(default)]
     pub batch_fetch: bool,
     pub retention: RevisionRelayRetentionInfo,
@@ -138,14 +138,14 @@ impl RevisionRelayConnection {
     pub async fn send_neg_open(
         &mut self,
         subscription_id: &str,
-        recipient: &str,
+        author_pubkey: &str,
     ) -> Result<(), AppError> {
         self.send_json(serde_json::json!([
             "NEG-OPEN",
             subscription_id,
             {
-                "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
-                "#p": [recipient]
+                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "authors": [author_pubkey]
             }
         ]))
         .await
@@ -168,15 +168,15 @@ impl RevisionRelayConnection {
     pub async fn send_req_revisions(
         &mut self,
         subscription_id: &str,
-        recipient: &str,
+        author_pubkey: &str,
         revision_ids: &[String],
     ) -> Result<(), AppError> {
         self.send_json(serde_json::json!([
             "REQ",
             subscription_id,
             {
-                "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
-                "#p": [recipient],
+                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "authors": [author_pubkey],
                 "#r": revision_ids,
             }
         ]))
@@ -186,15 +186,15 @@ impl RevisionRelayConnection {
     pub async fn send_req_revisions_batch(
         &mut self,
         subscription_id: &str,
-        recipient: &str,
+        author_pubkey: &str,
         revision_ids: &[String],
     ) -> Result<(), AppError> {
         self.send_json(serde_json::json!([
             "REQ-BATCH",
             subscription_id,
             {
-                "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
-                "#p": [recipient],
+                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "authors": [author_pubkey],
                 "#r": revision_ids,
             }
         ]))
@@ -204,7 +204,7 @@ impl RevisionRelayConnection {
     pub async fn send_changes(
         &mut self,
         subscription_id: &str,
-        recipient: &str,
+        author_pubkey: &str,
         since: i64,
         live: bool,
     ) -> Result<(), AppError> {
@@ -213,8 +213,8 @@ impl RevisionRelayConnection {
             subscription_id,
             {
                 "since": since,
-                "kinds": [REVISION_SYNC_EVENT_KIND.as_u16()],
-                "#p": [recipient],
+                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "authors": [author_pubkey],
                 "live": live
             }
         ]))
@@ -587,8 +587,8 @@ mod tests {
             "id": "0000000000000000000000000000000000000000000000000000000000000001",
             "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
             "created_at": 1700000000,
-            "kind": 1059,
-            "tags": [["p","recipient"],["d","doc"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["m","1700000000000"],["op","put"],["t","note"],["v","2"]],
+            "kind": 42061,
+            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["o","put"],["c","notes"]],
             "content": "ciphertext",
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });
@@ -603,7 +603,7 @@ mod tests {
                 event,
             } => {
                 assert_eq!(subscription_id, "fetch-1");
-                assert_eq!(event.kind, Kind::GiftWrap);
+                assert_eq!(event.kind, Kind::Custom(42061));
             }
             _ => panic!("expected EVENT message"),
         }
@@ -615,8 +615,8 @@ mod tests {
             "id": "0000000000000000000000000000000000000000000000000000000000000001",
             "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
             "created_at": 1700000000,
-            "kind": 1059,
-            "tags": [["p","recipient"],["d","doc"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["m","1700000000000"],["op","put"],["t","note"],["v","2"]],
+            "kind": 42061,
+            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["o","put"],["c","notes"]],
             "content": "ciphertext",
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });
@@ -632,7 +632,7 @@ mod tests {
             } => {
                 assert_eq!(subscription_id, "fetch-1");
                 assert_eq!(events.len(), 1);
-                assert_eq!(events[0].kind, Kind::Custom(1059));
+                assert_eq!(events[0].kind, Kind::Custom(42061));
             }
             other => panic!("unexpected message: {other:?}"),
         }

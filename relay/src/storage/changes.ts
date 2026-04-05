@@ -15,7 +15,7 @@ export type ChangeStore = {
   currentSequence: () => Promise<number>;
   minSequence: () => Promise<number>;
   appendStoredRevisionChange: (input: {
-    recipient: string;
+    authorPubkey: string;
     documentCoord: string;
     revisionId: string;
     eventId: string;
@@ -46,7 +46,7 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
       const [row] = await db
         .insert(syncChanges)
         .values({
-          recipient: input.recipient,
+          recipient: input.authorPubkey,
           dTag: input.documentCoord,
           rev: input.revisionId,
           eventId: input.eventId,
@@ -59,15 +59,15 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
     },
     async queryStoredRevisionEvents(filter) {
       const since = filter.since ?? 0;
-      const recipientFilter = filter["#p"];
-      if (!Array.isArray(recipientFilter) || recipientFilter.length !== 1) {
+      const authorFilter = filter.authors;
+      if (!Array.isArray(authorFilter) || authorFilter.length !== 1) {
         throw new Error(
-          "revision CHANGES currently requires exactly one #p recipient",
+          "revision CHANGES currently requires exactly one author",
         );
       }
 
       const conditions = [
-        eq(syncChanges.recipient, recipientFilter[0]),
+        eq(syncChanges.recipient, authorFilter[0]),
         gt(syncChanges.seq, since),
       ];
 

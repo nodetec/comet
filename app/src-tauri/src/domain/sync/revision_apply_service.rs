@@ -1,29 +1,16 @@
+use crate::adapters::nostr::comet_note_revision::{
+    parse_note_revision_event, payload_to_synced_note,
+};
 use crate::adapters::sqlite::revision_sync_repository::{
     apply_sync_head_update, get_sync_relay_state, list_sync_heads_for_scope,
     replace_sync_revision_parents, upsert_sync_relay_state, upsert_sync_revision,
     LocalSyncRevision,
 };
-use crate::domain::sync::event_codec::rumor_to_synced_note;
 use crate::domain::sync::model::SyncChangePayload;
-use crate::domain::sync::revision_codec::parse_revision_envelope_meta;
 use crate::domain::sync::service::{delete_note_from_sync, upsert_from_sync};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
-
-fn validate_revision_payload_mtime(
-    outer_mtime: i64,
-    inner_mtime: i64,
-    entity_type: &str,
-) -> Result<(), AppError> {
-    if outer_mtime != inner_mtime {
-        return Err(AppError::custom(format!(
-            "Revision timestamp mismatch for {entity_type}: outer m={outer_mtime}, inner modified_at={inner_mtime}"
-        )));
-    }
-
-    Ok(())
-}
 
 pub fn apply_remote_revision_event(
     conn: &Connection,
@@ -33,8 +20,9 @@ pub fn apply_remote_revision_event(
     stored_seq: Option<i64>,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<Option<SyncChangePayload>, AppError> {
-    let meta = parse_revision_envelope_meta(event)?;
-    let unwrapped = crate::adapters::nostr::nip59_ext::extract_rumor(keys, event)?;
+    let parsed = parse_note_revision_event(keys, event)?;
+    let author_pubkey = event.pubkey.to_hex();
+    let revision_timestamp_ms = event.created_at.as_secs() as i64 * 1000;
     let preferred_blossom_url: Option<String> = conn
         .query_row(
             "SELECT value FROM app_settings WHERE key = 'blossom_url'",
@@ -43,24 +31,18 @@ pub fn apply_remote_revision_event(
         )
         .optional()?;
 
-    let change_payload = if meta.op == "del" {
-        let entity_id = unwrapped
-            .rumor
-            .tags
-            .find(TagKind::d())
-            .and_then(|tag| tag.content())
-            .ok_or_else(|| AppError::custom("Missing d tag in deletion revision rumor"))?
-            .to_string();
+    let change_payload = if parsed.operation == "del" {
+        let entity_id = parsed.document_id.clone();
 
         upsert_sync_revision(
             conn,
             &LocalSyncRevision {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-                entity_type: meta.entity_type.clone(),
+                author_pubkey: author_pubkey.clone(),
+                d_tag: parsed.document_id.clone(),
+                rev: parsed.revision_id.clone(),
+                op: parsed.operation.clone(),
+                mtime: revision_timestamp_ms,
+                entity_type: Some("note".to_string()),
                 payload_event_id: Some(event.id.to_hex()),
                 payload_retained: true,
                 relay_url: Some(relay_url.to_string()),
@@ -70,25 +52,21 @@ pub fn apply_remote_revision_event(
         )?;
         replace_sync_revision_parents(
             conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.parent_revision_ids,
+            &author_pubkey,
+            &parsed.document_id,
+            &parsed.revision_id,
+            &parsed.parent_revision_ids,
         )?;
-        // `sync_heads` stores the authoritative graph head set for this
-        // document scope. Each incoming revision removes any parent heads it
-        // supersedes and becomes a new head itself.
         apply_sync_head_update(
             conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.op,
-            meta.mtime,
-            &meta.parent_revision_ids,
+            &author_pubkey,
+            &parsed.document_id,
+            &parsed.revision_id,
+            &parsed.operation,
+            revision_timestamp_ms,
+            &parsed.parent_revision_ids,
         )?;
-        let remaining_heads =
-            list_sync_heads_for_scope(conn, &meta.recipient, &meta.document_coord)?;
+        let remaining_heads = list_sync_heads_for_scope(conn, &author_pubkey, &parsed.document_id)?;
         let has_content_head = remaining_heads.iter().any(|head| head.op == "put");
         if has_content_head {
             None
@@ -100,35 +78,40 @@ pub fn apply_remote_revision_event(
             })
         }
     } else {
+        let payload = parsed
+            .payload
+            .as_ref()
+            .ok_or_else(|| AppError::custom("Put note revision event is missing payload"))?;
+
         if let Some(ref blossom_url) = preferred_blossom_url {
-            let pubkey_hex = keys.public_key().to_hex();
-            for tag in unwrapped.rumor.tags.filter(TagKind::custom("blob")) {
-                let parts = tag.as_slice();
-                if parts.len() < 4 {
-                    continue;
-                }
+            for attachment in &payload.attachments {
                 conn.execute(
                     "INSERT OR REPLACE INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
                      VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![parts[1], blossom_url, pubkey_hex, parts[2], parts[3]],
+                    params![
+                        attachment.plaintext_hash,
+                        blossom_url,
+                        &author_pubkey,
+                        attachment.ciphertext_hash,
+                        attachment.key
+                    ],
                 )?;
             }
         }
 
-        let note = rumor_to_synced_note(&unwrapped.rumor)?;
-        validate_revision_payload_mtime(meta.mtime, note.modified_at, "note")?;
+        let note = payload_to_synced_note(&parsed.document_id, revision_timestamp_ms, payload);
         let note_id = note.id.clone();
         let updated = upsert_from_sync(conn, &note, &event.id.to_hex())?;
 
         upsert_sync_revision(
             conn,
             &LocalSyncRevision {
-                recipient: meta.recipient.clone(),
-                d_tag: meta.document_coord.clone(),
-                rev: meta.revision_id.clone(),
-                op: meta.op.clone(),
-                mtime: meta.mtime,
-                entity_type: meta.entity_type.clone(),
+                author_pubkey: author_pubkey.clone(),
+                d_tag: parsed.document_id.clone(),
+                rev: parsed.revision_id.clone(),
+                op: parsed.operation.clone(),
+                mtime: revision_timestamp_ms,
+                entity_type: Some("note".to_string()),
                 payload_event_id: Some(event.id.to_hex()),
                 payload_retained: true,
                 relay_url: Some(relay_url.to_string()),
@@ -138,28 +121,25 @@ pub fn apply_remote_revision_event(
         )?;
         replace_sync_revision_parents(
             conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.parent_revision_ids,
+            &author_pubkey,
+            &parsed.document_id,
+            &parsed.revision_id,
+            &parsed.parent_revision_ids,
         )?;
-        // `sync_heads` is the graph truth for this document scope. `current_rev`
-        // is only updated when the note row was actually materialized from this
-        // revision.
         apply_sync_head_update(
             conn,
-            &meta.recipient,
-            &meta.document_coord,
-            &meta.revision_id,
-            &meta.op,
-            meta.mtime,
-            &meta.parent_revision_ids,
+            &author_pubkey,
+            &parsed.document_id,
+            &parsed.revision_id,
+            &parsed.operation,
+            revision_timestamp_ms,
+            &parsed.parent_revision_ids,
         )?;
 
         if updated.is_some() {
             conn.execute(
                 "UPDATE notes SET current_rev = ?1 WHERE id = ?2",
-                params![meta.revision_id, note_id],
+                params![parsed.revision_id, note_id],
             )?;
             invalidate_cache(&note_id);
             Some(SyncChangePayload {
@@ -191,13 +171,11 @@ pub fn apply_remote_revision_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::domain::sync::event_codec::deleted_note_rumor;
-    use crate::domain::sync::revision_codec::{
-        build_revision_note_rumor, canonicalize_revision_payload, compute_document_coord,
-        compute_revision_id, revision_envelope_tags, RevisionEnvelopeMeta, RevisionRumorInput,
-        REVISION_SYNC_SCHEMA_VERSION,
+    use crate::adapters::nostr::comet_note_revision::{
+        build_note_revision_event, compute_note_revision_id, NoteRevisionAttachment,
+        NoteRevisionEventMeta, NoteRevisionPayload, COMET_NOTE_COLLECTION,
     };
+    use crate::adapters::sqlite::migrations::account_migrations;
     use rusqlite::Connection;
 
     fn setup_db() -> Connection {
@@ -206,68 +184,104 @@ mod tests {
         conn
     }
 
+    fn make_put_event(
+        keys: &Keys,
+        note_id: &str,
+        markdown: &str,
+        note_created_at: i64,
+        edited_at: i64,
+        archived_at: Option<i64>,
+        pinned_at: Option<i64>,
+        readonly: bool,
+        tags: Vec<String>,
+        attachments: Vec<NoteRevisionAttachment>,
+        parent_revision_ids: Vec<String>,
+        created_at_ms: i64,
+    ) -> (Event, String) {
+        let payload = NoteRevisionPayload {
+            version: 1,
+            markdown: markdown.to_string(),
+            note_created_at,
+            edited_at,
+            archived_at,
+            pinned_at,
+            readonly,
+            tags,
+            attachments,
+        };
+        let revision_id = compute_note_revision_id(
+            note_id,
+            &parent_revision_ids,
+            "put",
+            Some(COMET_NOTE_COLLECTION),
+            Some(&payload),
+        )
+        .unwrap();
+        let event = build_note_revision_event(
+            keys,
+            &NoteRevisionEventMeta {
+                document_id: note_id.to_string(),
+                revision_id: revision_id.clone(),
+                parent_revision_ids,
+                operation: "put".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(created_at_ms),
+            },
+            Some(&payload),
+        )
+        .unwrap();
+        (event, revision_id)
+    }
+
+    fn make_delete_event(
+        keys: &Keys,
+        note_id: &str,
+        parent_revision_ids: Vec<String>,
+        created_at_ms: i64,
+    ) -> (Event, String) {
+        let revision_id = compute_note_revision_id(
+            note_id,
+            &parent_revision_ids,
+            "del",
+            Some(COMET_NOTE_COLLECTION),
+            None,
+        )
+        .unwrap();
+        let event = build_note_revision_event(
+            keys,
+            &NoteRevisionEventMeta {
+                document_id: note_id.to_string(),
+                revision_id: revision_id.clone(),
+                parent_revision_ids,
+                operation: "del".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(created_at_ms),
+            },
+            None,
+        )
+        .unwrap();
+        (event, revision_id)
+    }
+
     #[test]
     fn applies_remote_note_revision_and_updates_current_rev() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = keys.public_key();
         let note_id = "note-1";
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
-        let canonical_payload = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
-            &[],
-            "put",
-            "note",
-            "Title",
+        let (event, revision_id) = make_put_event(
+            &keys,
+            note_id,
             "# Title\n\nBody",
             100,
             200,
-            200,
-            None,
             None,
             None,
             false,
-            &["alpha".to_string()],
-        )
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title: "Title",
-                markdown: "# Title\n\nBody",
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &["alpha".to_string()],
-                blob_tags: &[],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
+            vec![],
+            vec![],
+            vec![],
+            200,
         );
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord: document_coord.clone(),
-                revision_id: revision_id.clone(),
-                parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 200,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
 
         let change = apply_remote_revision_event(
             &conn,
@@ -297,68 +311,25 @@ mod tests {
     fn live_apply_advances_checkpoint_without_overwriting_snapshot_seq() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = keys.public_key();
         let relay_url = "wss://relay.example";
         let note_id = "note-1";
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
 
         upsert_sync_relay_state(&conn, relay_url, None, Some(12), Some(1000), Some(500)).unwrap();
 
-        let canonical_payload = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
-            &[],
-            "put",
-            "note",
-            "Title",
+        let (event, _) = make_put_event(
+            &keys,
+            note_id,
             "# Title\n\nBody",
             100,
             200,
-            200,
-            None,
             None,
             None,
             false,
-            &[],
-        )
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title: "Title",
-                markdown: "# Title\n\nBody",
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &[],
-                blob_tags: &[],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
+            vec![],
+            vec![],
+            vec![],
+            200,
         );
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
-                revision_id,
-                parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 200,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
 
         apply_remote_revision_event(&conn, relay_url, &keys, &event, Some(20), |_| {}).unwrap();
 
@@ -372,9 +343,7 @@ mod tests {
     fn applies_remote_note_revision_persists_blob_metadata() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = keys.public_key();
         let note_id = "note-blob";
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
         let hash = "a".repeat(64);
         let ciphertext_hash = "b".repeat(64);
         let key_hex = "c".repeat(64);
@@ -386,61 +355,24 @@ mod tests {
         .unwrap();
 
         let markdown = format!("# Title\n\n![img](attachment://{hash}.png)");
-        let canonical_payload = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
-            &[],
-            "put",
-            "note",
-            "Title",
+        let (event, _) = make_put_event(
+            &keys,
+            note_id,
             &markdown,
             100,
             200,
-            200,
-            None,
             None,
             None,
             false,
-            &[],
-        )
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title: "Title",
-                markdown: &markdown,
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &[],
-                blob_tags: &[(hash.clone(), ciphertext_hash.clone(), key_hex.clone())],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
+            vec![],
+            vec![NoteRevisionAttachment {
+                plaintext_hash: hash.clone(),
+                ciphertext_hash: ciphertext_hash.clone(),
+                key: key_hex.clone(),
+            }],
+            vec![],
+            200,
         );
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord: document_coord.clone(),
-                revision_id: revision_id.clone(),
-                parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 200,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
 
         let change = apply_remote_revision_event(
             &conn,
@@ -457,7 +389,7 @@ mod tests {
                 "SELECT server_url, ciphertext_hash, encryption_key
                  FROM blob_meta
                  WHERE plaintext_hash = ?1 AND pubkey = ?2",
-                params![hash, recipient.to_hex()],
+                params![hash, keys.public_key().to_hex()],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()
@@ -478,69 +410,26 @@ mod tests {
     }
 
     #[test]
-    fn rejects_note_revision_when_outer_m_differs_from_inner_modified_at() {
+    fn applies_remote_note_revision_uses_event_created_at_as_modified_at() {
         let conn = setup_db();
         let keys = Keys::generate();
-        let recipient = keys.public_key();
         let note_id = "note-bad-mtime";
-        let document_coord = compute_document_coord(keys.secret_key(), note_id);
-        let canonical_payload = canonicalize_revision_payload(
-            &recipient.to_hex(),
-            &document_coord,
-            &[],
-            "put",
-            "note",
-            "Title",
+        let (event, revision_id) = make_put_event(
+            &keys,
+            note_id,
             "# Title\n\nBody",
             100,
             200,
-            200,
-            None,
             None,
             None,
             false,
-            &[],
-        )
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let rumor = build_revision_note_rumor(
-            RevisionRumorInput {
-                document_id: note_id,
-                title: "Title",
-                markdown: "# Title\n\nBody",
-                created_at: 100,
-                modified_at: 200,
-                edited_at: 200,
-                archived_at: None,
-                deleted_at: None,
-                pinned_at: None,
-                readonly: false,
-                tags: &[],
-                blob_tags: &[],
-                entity_type: "note",
-                parent_revision_ids: &[],
-                op: "put",
-            },
-            keys.public_key(),
+            vec![],
+            vec![],
+            vec![],
+            201,
         );
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            rumor,
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
-                revision_id,
-                parent_revision_ids: vec![],
-                op: "put".into(),
-                mtime: 201,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
 
-        let error = apply_remote_revision_event(
+        let change = apply_remote_revision_event(
             &conn,
             "wss://relay.example",
             &keys,
@@ -548,13 +437,21 @@ mod tests {
             Some(7),
             |_| {},
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(
-            error
-                .to_string()
-                .contains("Revision timestamp mismatch for note"),
-            "unexpected error: {error}"
+        let (current_rev, modified_at): (Option<String>, i64) = conn
+            .query_row(
+                "SELECT current_rev, modified_at FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert_eq!(current_rev, Some(revision_id));
+        assert_eq!(modified_at, 0);
+        assert_eq!(
+            change.map(|payload| (payload.note_id, payload.action)),
+            Some((note_id.to_string(), "upsert".to_string()))
         );
     }
 
@@ -575,37 +472,8 @@ mod tests {
         .unwrap();
 
         let keys = Keys::generate();
-        let recipient = keys.public_key();
-        let document_coord = compute_document_coord(keys.secret_key(), "note-1");
-        let canonical_payload = serde_json::to_string(&serde_json::json!({
-            "strategy": crate::domain::sync::revision_codec::REVISION_SYNC_STRATEGY,
-            "recipient": recipient.to_hex(),
-            "d": document_coord,
-            "parents": [],
-            "op": "del",
-            "type": "note",
-            "entity_id": "note-1",
-            "mtime": 300,
-            "schema_version": REVISION_SYNC_SCHEMA_VERSION,
-        }))
-        .unwrap();
-        let revision_id = compute_revision_id(keys.secret_key(), &canonical_payload).unwrap();
-        let event = crate::adapters::nostr::nip59_ext::gift_wrap(
-            &keys,
-            &recipient,
-            deleted_note_rumor("note-1", keys.public_key()),
-            revision_envelope_tags(&RevisionEnvelopeMeta {
-                recipient: recipient.to_hex(),
-                document_coord,
-                revision_id: revision_id.clone(),
-                parent_revision_ids: vec![],
-                op: "del".into(),
-                mtime: 300,
-                entity_type: None,
-                schema_version: REVISION_SYNC_SCHEMA_VERSION.into(),
-            }),
-        )
-        .unwrap();
+        let author_pubkey = keys.public_key();
+        let (event, _revision_id) = make_delete_event(&keys, "note-1", vec![], 300);
 
         apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(8), |_| {})
             .unwrap();
@@ -622,10 +490,7 @@ mod tests {
         let head_op: String = conn
             .query_row(
                 "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
-                params![
-                    recipient.to_hex(),
-                    compute_document_coord(keys.secret_key(), "note-1")
-                ],
+                params![author_pubkey.to_hex(), "note-1"],
                 |row| row.get(0),
             )
             .unwrap();

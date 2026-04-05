@@ -4,26 +4,23 @@ import { parseRevisionEnvelope } from "../../src/domain/revisions/validation";
 import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
 
 describe("parseRevisionEnvelope", () => {
-  test("parses revision-tagged gift wraps", () => {
+  test("parses direct revision sync events", () => {
     const revisionId =
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const envelope = parseRevisionEnvelope({
       id: "event-1",
-      pubkey: "sender-1",
+      pubkey: "author-1",
       created_at: 1_700_000_000,
       kind: REVISION_SYNC_EVENT_KIND,
       tags: [
-        ["p", "recipient-1"],
         ["d", "doc-1"],
         ["r", revisionId],
         [
-          "prev",
+          "b",
           "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         ],
-        ["op", "put"],
-        ["m", "1700000000000"],
-        ["type", "note"],
-        ["v", "2"],
+        ["o", "put"],
+        ["c", "notes"],
       ],
       content: "ciphertext",
       sig: "sig-1",
@@ -31,7 +28,7 @@ describe("parseRevisionEnvelope", () => {
 
     expect(envelope).not.toBeNull();
     expect(envelope).toMatchObject({
-      recipient: "recipient-1",
+      authorPubkey: "author-1",
       documentCoord: "doc-1",
       revisionId,
       parentRevisionIds: [
@@ -39,8 +36,8 @@ describe("parseRevisionEnvelope", () => {
       ],
       op: "put",
       mtime: 1_700_000_000_000,
-      entityType: "note",
-      schemaVersion: "2",
+      entityType: null,
+      schemaVersion: null,
     });
   });
 
@@ -50,10 +47,7 @@ describe("parseRevisionEnvelope", () => {
       pubkey: "sender-1",
       created_at: 1_700_000_000,
       kind: REVISION_SYNC_EVENT_KIND,
-      tags: [
-        ["p", "recipient-1"],
-        ["d", "doc-1"],
-      ],
+      tags: [["d", "doc-1"]],
       content: "ciphertext",
       sig: "sig-1",
     });

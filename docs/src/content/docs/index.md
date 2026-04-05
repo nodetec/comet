@@ -1,14 +1,14 @@
 ---
 title: Comet Docs
-description: Current sync and storage design drafts for Comet's revision-aware multi-relay model.
+description: Current sync and storage design drafts for revision-oriented sync events, relay transport, and attachment workflows.
 template: splash
 hero:
-  tagline: Revision-aware sync and storage drafts for Comet's encrypted gift-wrap, anti-entropy, relay transport, and attachment pipeline.
+  tagline: Revision-aware sync and storage drafts for a dedicated sync kind range, relay transport, and attachment pipeline.
   actions:
-    - text: Read Revision Gift Wrap
-      link: /specs/revision-gift-wrap/
-    - text: Read Revision Negentropy
-      link: /specs/revision-negentropy/
+    - text: Read Revision Sync Range
+      link: /specs/revision-sync-range/
+    - text: Read Sync Changes Feed
+      link: /specs/revision-changes-feed/
 ---
 
 ## What lives here
@@ -21,16 +21,16 @@ This site now focuses on the current sync and storage transport design direction
 
 ## Current Docs
 
-- [Revision Gift Wrap](/specs/revision-gift-wrap/) defines the outer sync envelope for immutable encrypted revisions.
-- [Revision Negentropy](/specs/revision-negentropy/) defines bootstrap and repair sync over logical revision identities.
-- [Revision Batch Fetch](/specs/revision-batch-fetch/) defines Comet's batched payload download extension after negentropy.
-- [Revision Changes Feed](/specs/revision-changes-feed/) defines the live relay tail over immutable revision events.
+- [Revision Sync Range](/specs/revision-sync-range/) reserves a dedicated sync kind range and defines sync metadata for revision events.
+- [Comet Note Revisions](/specs/comet-note-revisions/) defines Comet's first concrete sync kind, `42061`, and commits Comet to event-native local storage.
+- [Sync Changes Feed](/specs/revision-changes-feed/) defines relay-local bootstrap, ordered replay, and live follow for sync-range events.
+- [Sync Retention And Compaction](/specs/revision-compaction/) defines retention layers and compaction rules for sync-range events.
 - [Blossom Batch Upload](/specs/blossom-batch-upload/) drafts a backward-compatible multi-blob upload extension for attachment-heavy clients.
 
 ## Scope
 
 These drafts are intentionally narrow.
 
-- They focus on revision identity, anti-entropy, live sync, and adjacent attachment transport.
+- They focus on revision identity, relay replay, retention/compaction, and adjacent attachment transport.
 - They do not yet try to document the whole product or workspace.
 - They should be treated as the active design set for Comet sync and storage work.

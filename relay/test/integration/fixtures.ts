@@ -20,34 +20,28 @@ export function revisionEvent(
   parentRevisionIds: string[] = [],
   documentCoord = "doc-1",
   op: "put" | "del" = "put",
-  recipient = "recipient-1",
+  authorPubkey = "recipient-1",
 ): NostrEvent {
   return {
     id: `event-${revisionId}`,
-    pubkey: "sender-1",
-    created_at: 1_700_000_000,
+    pubkey: authorPubkey,
+    created_at: Math.floor(mtime / 1000),
     kind: REVISION_SYNC_EVENT_KIND,
     tags: [
-      ["p", recipient],
       ["d", documentCoord],
       ["r", revisionId],
-      ...parentRevisionIds.map((parentRevisionId) => [
-        "prev",
-        parentRevisionId,
-      ]),
-      ["op", op],
-      ["m", `${mtime}`],
-      ["type", "note"],
-      ["v", "2"],
+      ...parentRevisionIds.map((parentRevisionId) => ["b", parentRevisionId]),
+      ["o", op],
+      ["c", "notes"],
     ],
     content: `ciphertext-${revisionId}`,
     sig: `sig-${revisionId}`,
   };
 }
 
-export function revisionEventForRecipient(
+export function revisionEventForAuthor(
   revisionId: string,
-  recipient: string,
+  authorPubkey: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
   documentCoord = "doc-1",
@@ -59,7 +53,7 @@ export function revisionEventForRecipient(
     parentRevisionIds,
     documentCoord,
     op,
-    recipient,
+    authorPubkey,
   );
 }
 

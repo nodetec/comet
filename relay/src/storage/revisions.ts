@@ -27,7 +27,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         .from(syncRevisions)
         .where(
           and(
-            eq(syncRevisions.recipient, envelope.recipient),
+            eq(syncRevisions.recipient, envelope.authorPubkey),
             eq(syncRevisions.dTag, envelope.documentCoord),
             eq(syncRevisions.rev, envelope.revisionId),
           ),
@@ -45,7 +45,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
       await db.transaction(async (tx) => {
         await tx.insert(syncPayloads).values({
           eventId: envelope.event.id,
-          recipient: envelope.recipient,
+          recipient: envelope.authorPubkey,
           dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           pubkey: envelope.event.pubkey,
@@ -57,7 +57,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         });
 
         await tx.insert(syncRevisions).values({
-          recipient: envelope.recipient,
+          recipient: envelope.authorPubkey,
           dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           op: envelope.op,
@@ -70,7 +70,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         if (envelope.parentRevisionIds.length > 0) {
           await tx.insert(syncRevisionParents).values(
             envelope.parentRevisionIds.map((parentRev) => ({
-              recipient: envelope.recipient,
+              recipient: envelope.authorPubkey,
               dTag: envelope.documentCoord,
               rev: envelope.revisionId,
               parentRev,
@@ -81,7 +81,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
             .delete(syncHeads)
             .where(
               and(
-                eq(syncHeads.recipient, envelope.recipient),
+                eq(syncHeads.recipient, envelope.authorPubkey),
                 eq(syncHeads.dTag, envelope.documentCoord),
                 inArray(syncHeads.rev, envelope.parentRevisionIds),
               ),
@@ -89,7 +89,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         }
 
         await tx.insert(syncHeads).values({
-          recipient: envelope.recipient,
+          recipient: envelope.authorPubkey,
           dTag: envelope.documentCoord,
           rev: envelope.revisionId,
           op: envelope.op,
@@ -99,7 +99,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         const [change] = await tx
           .insert(syncChanges)
           .values({
-            recipient: envelope.recipient,
+            recipient: envelope.authorPubkey,
             dTag: envelope.documentCoord,
             rev: envelope.revisionId,
             eventId: envelope.event.id,
@@ -114,7 +114,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           .set({ storedSeq: change.seq })
           .where(
             and(
-              eq(syncRevisions.recipient, envelope.recipient),
+              eq(syncRevisions.recipient, envelope.authorPubkey),
               eq(syncRevisions.dTag, envelope.documentCoord),
               eq(syncRevisions.rev, envelope.revisionId),
             ),
@@ -147,11 +147,6 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         }
         if (filter.until !== undefined) {
           conditions.push(lte(syncPayloads.createdAt, filter.until));
-        }
-
-        const recipientValues = asStringArray(filter["#p"]);
-        if (recipientValues.length > 0) {
-          conditions.push(inArray(syncPayloads.recipient, recipientValues));
         }
 
         const documentValues = asStringArray(filter["#d"]);
@@ -216,11 +211,6 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         }
 
         const conditions = [eq(syncRevisions.payloadRetained, 0)];
-
-        const recipientValues = asStringArray(filter["#p"]);
-        if (recipientValues.length > 0) {
-          conditions.push(inArray(syncRevisions.recipient, recipientValues));
-        }
 
         const documentValues = asStringArray(filter["#d"]);
         if (documentValues.length > 0) {

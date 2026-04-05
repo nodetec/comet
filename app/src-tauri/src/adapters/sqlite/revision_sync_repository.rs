@@ -20,7 +20,7 @@ pub struct SyncRelayState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalSyncRevision {
-    pub recipient: String,
+    pub author_pubkey: String,
     pub d_tag: String,
     pub rev: String,
     pub op: String,
@@ -35,7 +35,7 @@ pub struct LocalSyncRevision {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalSyncHead {
-    pub recipient: String,
+    pub author_pubkey: String,
     pub d_tag: String,
     pub rev: String,
     pub op: String,
@@ -129,7 +129,7 @@ pub fn upsert_sync_revision(
            relay_url = excluded.relay_url,
            stored_seq = excluded.stored_seq",
         params![
-            revision.recipient,
+            revision.author_pubkey,
             revision.d_tag,
             revision.rev,
             revision.op,
@@ -147,7 +147,7 @@ pub fn upsert_sync_revision(
 
 pub fn replace_sync_revision_parents(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     d_tag: &str,
     rev: &str,
     parent_revs: &[String],
@@ -155,14 +155,14 @@ pub fn replace_sync_revision_parents(
     conn.execute(
         "DELETE FROM sync_revision_parents
          WHERE recipient = ?1 AND d_tag = ?2 AND rev = ?3",
-        params![recipient, d_tag, rev],
+        params![author_pubkey, d_tag, rev],
     )?;
 
     for parent_rev in parent_revs {
         conn.execute(
             "INSERT INTO sync_revision_parents (recipient, d_tag, rev, parent_rev)
              VALUES (?1, ?2, ?3, ?4)",
-            params![recipient, d_tag, rev, parent_rev],
+            params![author_pubkey, d_tag, rev, parent_rev],
         )?;
     }
 
@@ -172,7 +172,7 @@ pub fn replace_sync_revision_parents(
 #[cfg(test)]
 pub fn replace_sync_heads(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     d_tag: &str,
     heads: &[LocalSyncHead],
 ) -> Result<(), AppError> {
@@ -180,14 +180,20 @@ pub fn replace_sync_heads(
     // scope. A document may have more than one head here during a conflict.
     conn.execute(
         "DELETE FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
-        params![recipient, d_tag],
+        params![author_pubkey, d_tag],
     )?;
 
     for head in heads {
         conn.execute(
             "INSERT INTO sync_heads (recipient, d_tag, rev, op, mtime)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![head.recipient, head.d_tag, head.rev, head.op, head.mtime],
+            params![
+                head.author_pubkey,
+                head.d_tag,
+                head.rev,
+                head.op,
+                head.mtime
+            ],
         )?;
     }
 
@@ -196,7 +202,7 @@ pub fn replace_sync_heads(
 
 pub fn apply_sync_head_update(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     d_tag: &str,
     rev: &str,
     op: &str,
@@ -207,22 +213,22 @@ pub fn apply_sync_head_update(
         conn.execute(
             "DELETE FROM sync_heads
              WHERE recipient = ?1 AND d_tag = ?2 AND rev = ?3",
-            params![recipient, d_tag, parent_rev],
+            params![author_pubkey, d_tag, parent_rev],
         )?;
     }
 
     conn.execute(
         "INSERT OR REPLACE INTO sync_heads (recipient, d_tag, rev, op, mtime)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![recipient, d_tag, rev, op, mtime],
+        params![author_pubkey, d_tag, rev, op, mtime],
     )?;
 
     Ok(())
 }
 
-pub fn list_sync_heads_for_recipient(
+pub fn list_sync_heads_for_author(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
 ) -> Result<Vec<LocalSyncHead>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT recipient, d_tag, rev, op, mtime
@@ -230,9 +236,9 @@ pub fn list_sync_heads_for_recipient(
          WHERE recipient = ?1
          ORDER BY d_tag ASC, mtime ASC",
     )?;
-    let rows = stmt.query_map(params![recipient], |row| {
+    let rows = stmt.query_map(params![author_pubkey], |row| {
         Ok(LocalSyncHead {
-            recipient: row.get(0)?,
+            author_pubkey: row.get(0)?,
             d_tag: row.get(1)?,
             rev: row.get(2)?,
             op: row.get(3)?,
@@ -244,7 +250,7 @@ pub fn list_sync_heads_for_recipient(
 
 pub fn list_sync_heads_for_scope(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     d_tag: &str,
 ) -> Result<Vec<LocalSyncHead>, AppError> {
     let mut stmt = conn.prepare(
@@ -253,9 +259,9 @@ pub fn list_sync_heads_for_scope(
          WHERE recipient = ?1 AND d_tag = ?2
          ORDER BY mtime DESC, rev ASC",
     )?;
-    let rows = stmt.query_map(params![recipient, d_tag], |row| {
+    let rows = stmt.query_map(params![author_pubkey, d_tag], |row| {
         Ok(LocalSyncHead {
-            recipient: row.get(0)?,
+            author_pubkey: row.get(0)?,
             d_tag: row.get(1)?,
             rev: row.get(2)?,
             op: row.get(3)?,
@@ -265,38 +271,9 @@ pub fn list_sync_heads_for_scope(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
-#[cfg(test)]
-pub fn get_sync_head(
-    conn: &Connection,
-    recipient: &str,
-    d_tag: &str,
-) -> Result<Option<LocalSyncHead>, AppError> {
-    // This helper returns one head row when the caller expects a single-head
-    // scope. It should not be treated as "the" authoritative head if the
-    // document is conflicted and `sync_heads` contains multiple rows.
-    conn.query_row(
-        "SELECT recipient, d_tag, rev, op, mtime
-         FROM sync_heads
-         WHERE recipient = ?1 AND d_tag = ?2
-         LIMIT 1",
-        params![recipient, d_tag],
-        |row| {
-            Ok(LocalSyncHead {
-                recipient: row.get(0)?,
-                d_tag: row.get(1)?,
-                rev: row.get(2)?,
-                op: row.get(3)?,
-                mtime: row.get(4)?,
-            })
-        },
-    )
-    .optional()
-    .map_err(Into::into)
-}
-
 pub fn list_sync_revision_parents(
     conn: &Connection,
-    recipient: &str,
+    author_pubkey: &str,
     d_tag: &str,
     rev: &str,
 ) -> Result<Vec<String>, AppError> {
@@ -306,7 +283,7 @@ pub fn list_sync_revision_parents(
          WHERE recipient = ?1 AND d_tag = ?2 AND rev = ?3
          ORDER BY parent_rev ASC",
     )?;
-    let rows = stmt.query_map(params![recipient, d_tag, rev], |row| row.get(0))?;
+    let rows = stmt.query_map(params![author_pubkey, d_tag, rev], |row| row.get(0))?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
@@ -356,7 +333,7 @@ mod tests {
             "recipient-1",
             "doc-1",
             &[LocalSyncHead {
-                recipient: "recipient-1".into(),
+                author_pubkey: "recipient-1".into(),
                 d_tag: "doc-1".into(),
                 rev: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 op: "put".into(),
@@ -370,7 +347,7 @@ mod tests {
             "recipient-1",
             "doc-1",
             &[LocalSyncHead {
-                recipient: "recipient-1".into(),
+                author_pubkey: "recipient-1".into(),
                 d_tag: "doc-1".into(),
                 rev: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
                 op: "put".into(),
@@ -379,7 +356,7 @@ mod tests {
         )
         .unwrap();
 
-        let heads = list_sync_heads_for_recipient(&conn, "recipient-1").unwrap();
+        let heads = list_sync_heads_for_author(&conn, "recipient-1").unwrap();
         assert_eq!(heads.len(), 1);
         assert_eq!(
             heads[0].rev,
