@@ -10,7 +10,7 @@ sidebar:
 
 Related drafts:
 
-- [Snapshot Sync Range](/specs/snapshot-sync-range/)
+- [Causal Snapshot Sync Range](/specs/causal-snapshot-sync-range/)
 - [Snapshot Changes Feed](/specs/snapshot-changes-feed/)
 - [Snapshot Retention And Compaction](/specs/snapshot-compaction/)
 
@@ -102,11 +102,10 @@ Current implementation defaults:
 
 ## Sync Metadata
 
-`kind:42061` uses the sync metadata defined by the generic sync-range draft:
+`kind:42061` uses the sync metadata defined by the causal snapshot sync range draft:
 
-- required: `d`, `o`
+- required: `d`, `o`, repeatable `vc`
 - optional: `c`
-- profile-required for Comet: repeatable `vc`
 
 For Comet note snapshots:
 
@@ -171,7 +170,7 @@ Clients should treat the `vc` tags as the wire source of truth for vector-clock 
 
 For Comet implementation work, the `kind:42061` payload should be encrypted using Comet's current large-payload-capable NIP-44 variant.
 
-This is a Comet implementation choice, not a generic sync-range requirement.
+This is a Comet implementation choice layered on top of the causal snapshot sync range.
 
 If a standardized large-payload NIP-44 construction is adopted later, Comet should move to that standardized construction.
 

@@ -10,13 +10,13 @@ sidebar:
 
 Related drafts:
 
-- [Snapshot Sync Range](/specs/snapshot-sync-range/)
+- [Causal Snapshot Sync Range](/specs/causal-snapshot-sync-range/)
 - [Snapshot Changes Feed](/specs/snapshot-changes-feed/)
 - [Comet Note Snapshots](/specs/comet-note-snapshots/)
 
 ## Summary
 
-This draft defines retention and compaction concepts for sync-range events.
+This draft defines retention and compaction concepts for causal snapshot sync events.
 
 The goal is to let clients and relays reduce storage usage without breaking local-first sync correctness.
 

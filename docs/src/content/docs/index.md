@@ -5,8 +5,8 @@ template: splash
 hero:
   tagline: Local-first note sync drafts for a dedicated sync kind range, relay transport, and attachment pipeline.
   actions:
-    - text: Read Sync Range
-      link: /specs/snapshot-sync-range/
+    - text: Read Causal Sync Range
+      link: /specs/causal-snapshot-sync-range/
     - text: Read Sync Changes Feed
       link: /specs/snapshot-changes-feed/
 ---
@@ -21,7 +21,7 @@ This site now focuses on the current sync and storage transport design direction
 
 ## Current Docs
 
-- [Snapshot Sync Range](/specs/snapshot-sync-range/) reserves a dedicated sync kind range and defines minimal sync metadata for local-first sync events.
+- [Causal Snapshot Sync Range](/specs/causal-snapshot-sync-range/) reserves a dedicated sync kind range and defines the required causal metadata for local-first snapshot sync events.
 - [Comet Note Snapshots](/specs/comet-note-snapshots/) defines Comet's first concrete sync kind, `42061`, as an encrypted full-note snapshot with vector clocks, durable tombstones, and bounded local history.
 - [Snapshot Changes Feed](/specs/snapshot-changes-feed/) defines relay-local bootstrap, ordered replay, and live follow for snapshot sync events.
 - [Snapshot Retention And Compaction](/specs/snapshot-compaction/) defines bounded retention and compaction rules for snapshot sync events, including current relay/local defaults.

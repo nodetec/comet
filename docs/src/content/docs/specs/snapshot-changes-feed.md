@@ -10,12 +10,12 @@ sidebar:
 
 Related drafts:
 
-- [Snapshot Sync Range](/specs/snapshot-sync-range/)
+- [Causal Snapshot Sync Range](/specs/causal-snapshot-sync-range/)
 - [Snapshot Retention And Compaction](/specs/snapshot-compaction/)
 
 ## Summary
 
-This draft defines a relay-local changes feed for sync-range events.
+This draft defines a relay-local changes feed for causal snapshot sync events.
 
 The feed is responsible for:
 
@@ -135,14 +135,14 @@ Recommended meaning:
 
 ## Sync-Range Constraints
 
-This feed is intended for sync-range events.
+This feed is intended for causal snapshot sync events.
 
 Recommended rules:
 
 - `mode` is required
 - `kinds` is required
 - each requested kind must be inside the reserved sync range
-- clients should use metadata filters such as `#d`, `#o`, and `#c` only with sync-range kinds
+- clients should use metadata filters such as `#d`, `#o`, and `#c` only with causal snapshot sync kinds
 
 Typical replay filters:
 
@@ -180,7 +180,7 @@ Bootstrap is snapshot-oriented.
 
 When a relay accepts a `CHANGES` request with `mode = "bootstrap"`, it should:
 
-1. validate the filter as a sync-range bootstrap filter
+1. validate the filter as a causal snapshot sync bootstrap filter
 2. capture `snapshot_seq`
 3. resolve the retained current sync snapshots matching the filter at that snapshot
 4. send `STATUS` with `snapshot_seq`
@@ -325,4 +325,4 @@ Snapshot bootstrap is intentionally more compaction-friendly than full-history r
 
 - Define replay retention advertisement
 - Define compaction signaling for historical fetches
-- Define concrete application profiles on top of sync-range events
+- Define concrete application profiles on top of causal snapshot sync events
