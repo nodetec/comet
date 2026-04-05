@@ -3,8 +3,9 @@ import { and, asc, eq, gt, inArray, lte, max } from "drizzle-orm";
 import type { SnapshotRelayDb } from "../db";
 import type { NostrEvent } from "@comet/nostr";
 
-import { syncChanges, syncPayloads } from "./schema";
+import { syncChanges, syncPayloads, syncSnapshots } from "./schema";
 import type { SnapshotChangesFilter } from "../types";
+import { selectNondominatedSnapshotIds } from "../domain/snapshots/vector-clock";
 
 export type StoredChangeEvent = {
   seq: number;
@@ -24,6 +25,9 @@ export type ChangeStore = {
   queryStoredSnapshotEvents: (
     filter: SnapshotChangesFilter,
   ) => Promise<StoredChangeEvent[]>;
+  queryBootstrapSnapshotEvents: (
+    filter: SnapshotChangesFilter,
+  ) => Promise<NostrEvent[]>;
 };
 
 export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
@@ -116,6 +120,89 @@ export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
           sig: row.sig,
         },
       }));
+    },
+    async queryBootstrapSnapshotEvents(filter) {
+      const authorFilter = filter.authors;
+      if (!Array.isArray(authorFilter) || authorFilter.length !== 1) {
+        throw new Error(
+          "snapshot CHANGES currently requires exactly one author",
+        );
+      }
+
+      const conditions = [
+        eq(syncSnapshots.authorPubkey, authorFilter[0]),
+        eq(syncSnapshots.payloadRetained, 1),
+      ];
+
+      const documentFilter = filter["#d"];
+      if (Array.isArray(documentFilter) && documentFilter.length > 0) {
+        conditions.push(inArray(syncSnapshots.dTag, documentFilter));
+      }
+
+      const rows = await db
+        .select({
+          authorPubkey: syncSnapshots.authorPubkey,
+          dTag: syncSnapshots.dTag,
+          snapshotId: syncSnapshots.snapshotId,
+          vectorClock: syncSnapshots.vectorClock,
+          id: syncPayloads.eventId,
+          pubkey: syncPayloads.pubkey,
+          created_at: syncPayloads.createdAt,
+          kind: syncPayloads.kind,
+          tags: syncPayloads.tags,
+          content: syncPayloads.content,
+          sig: syncPayloads.sig,
+        })
+        .from(syncSnapshots)
+        .innerJoin(
+          syncPayloads,
+          eq(syncSnapshots.eventId, syncPayloads.eventId),
+        )
+        .where(and(...conditions))
+        .orderBy(asc(syncPayloads.createdAt))
+        .limit(filter.limit !== undefined ? Math.max(0, filter.limit) : 10_000);
+
+      const rowsByDocument = new Map<string, typeof rows>();
+      for (const row of rows) {
+        const key = `${row.authorPubkey}:${row.dTag}`;
+        const group = rowsByDocument.get(key);
+        if (group) {
+          group.push(row);
+        } else {
+          rowsByDocument.set(key, [row]);
+        }
+      }
+
+      const events: NostrEvent[] = [];
+      for (const group of rowsByDocument.values()) {
+        const nondominated = selectNondominatedSnapshotIds(
+          group.map((row) => ({
+            snapshotId: row.snapshotId,
+            vectorClock: row.vectorClock,
+          })),
+        );
+        for (const row of group) {
+          if (!nondominated.has(row.snapshotId)) {
+            continue;
+          }
+          events.push({
+            id: row.id,
+            pubkey: row.pubkey,
+            created_at: row.created_at,
+            kind: row.kind,
+            tags: row.tags,
+            content: row.content,
+            sig: row.sig,
+          });
+        }
+      }
+
+      return events.sort((left, right) => {
+        if (left.created_at !== right.created_at) {
+          return left.created_at - right.created_at;
+        }
+        return left.id.localeCompare(right.id);
+      });
     },
   };
 }

@@ -56,6 +56,7 @@ export function createSnapshotStore(db: SnapshotRelayDb): SnapshotStore {
           snapshotId: envelope.event.id,
           op: envelope.op,
           mtime: envelope.mtime,
+          vectorClock: envelope.vectorClock,
           entityType: envelope.entityType,
           eventId: envelope.event.id,
           createdAt: envelope.event.created_at,

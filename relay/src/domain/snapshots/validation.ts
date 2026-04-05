@@ -5,6 +5,7 @@ import {
   type SnapshotEnvelope,
   type SnapshotOp,
 } from "../../types";
+import { parseVisibleVectorClockFromTags } from "./vector-clock";
 
 function getSingleTag(tags: string[][], name: string): string | null {
   const tag = tags.find(([tagName]) => tagName === name);
@@ -12,7 +13,7 @@ function getSingleTag(tags: string[][], name: string): string | null {
 }
 
 function getEntityTypeTag(tags: string[][]): string | null {
-  return getSingleTag(tags, "type");
+  return getSingleTag(tags, "c");
 }
 
 function parseSnapshotOp(value: string | null): SnapshotOp | null {
@@ -32,8 +33,9 @@ export function parseSnapshotEnvelope(
   const documentCoord = getSingleTag(event.tags, "d");
   const op = parseSnapshotOp(getSingleTag(event.tags, "o"));
   const mtime = event.created_at * 1000;
+  const vectorClock = parseVisibleVectorClockFromTags(event.tags);
 
-  if (!documentCoord || !op) {
+  if (!documentCoord || !op || !vectorClock) {
     return null;
   }
 
@@ -42,6 +44,7 @@ export function parseSnapshotEnvelope(
     documentCoord,
     op,
     mtime,
+    vectorClock,
     entityType: getEntityTypeTag(event.tags),
     event,
   };

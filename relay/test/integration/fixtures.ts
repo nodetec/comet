@@ -21,6 +21,9 @@ export function snapshotEvent(
   documentCoord = "doc-1",
   op: "put" | "del" = "put",
   authorPubkey = "author-1",
+  vectorClock: Record<string, number> = {
+    "DEVICE-A": mtime,
+  },
 ): NostrEvent {
   return {
     id: `event-${snapshotId}`,
@@ -31,6 +34,9 @@ export function snapshotEvent(
       ["d", documentCoord],
       ["o", op],
       ["c", "notes"],
+      ...Object.entries(vectorClock)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([deviceId, counter]) => ["vc", deviceId, String(counter)]),
     ],
     content: `ciphertext-${snapshotId}`,
     sig: `sig-${snapshotId}`,

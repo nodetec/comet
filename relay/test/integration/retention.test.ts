@@ -268,6 +268,107 @@ describe("relay integration > retention", () => {
     ]);
   });
 
+  test("retains an older concurrent snapshot during compaction", async () => {
+    const ctx = await startTestSnapshotRelay(39456);
+    contexts.push(ctx);
+
+    const trace = traceOptions(ctx, "client");
+    const ws = await connectWs(ctx.port, trace);
+    const compactedOldest = snapshotEvent(
+      "snapshot-1",
+      1_700_000_000_000,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 1 },
+    );
+    const retainedConcurrent = snapshotEvent(
+      "snapshot-2",
+      1_700_000_000_100,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-B": 1 },
+    );
+    const dominatedA = snapshotEvent(
+      "snapshot-3",
+      1_700_000_000_200,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 2 },
+    );
+    const dominatedB = snapshotEvent(
+      "snapshot-4",
+      1_700_000_000_300,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 3 },
+    );
+    const dominatedC = snapshotEvent(
+      "snapshot-5",
+      1_700_000_000_400,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 4 },
+    );
+    const currentEvent = snapshotEvent(
+      "snapshot-6",
+      1_700_000_000_500,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 5 },
+    );
+
+    for (const event of [
+      compactedOldest,
+      retainedConcurrent,
+      dominatedA,
+      dominatedB,
+      dominatedC,
+      currentEvent,
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
+
+    expect(await ctx.compactPayloadsBefore(1_800_000_000_000)).toBe(2);
+
+    sendJson(
+      ws,
+      [
+        "REQ",
+        "fetch-concurrent-retention",
+        {
+          ids: [compactedOldest.id, retainedConcurrent.id, currentEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
+        },
+      ],
+      trace,
+    );
+
+    expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
+      ["EVENT", "fetch-concurrent-retention", retainedConcurrent],
+      ["EVENT", "fetch-concurrent-retention", currentEvent],
+      [
+        "EVENT-STATUS",
+        "fetch-concurrent-retention",
+        { id: compactedOldest.id, status: "payload_compacted" },
+      ],
+      ["EOSE", "fetch-concurrent-retention"],
+    ]);
+  });
+
   test("retains the latest tombstone snapshot during compaction", async () => {
     const ctx = await startTestSnapshotRelay(39455);
     contexts.push(ctx);

@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, lt, min } from "drizzle-orm";
 
 import type { SnapshotRelayDb } from "../db";
 import { syncPayloads, syncSnapshots } from "./schema";
+import { selectNondominatedSnapshotIds } from "../domain/snapshots/vector-clock";
 
 const RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT = 4;
 
@@ -20,6 +21,7 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
           snapshotId: syncSnapshots.snapshotId,
           eventId: syncSnapshots.eventId,
           mtime: syncSnapshots.mtime,
+          vectorClock: syncSnapshots.vectorClock,
           createdAt: syncSnapshots.createdAt,
         })
         .from(syncSnapshots)
@@ -39,6 +41,10 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
           authorPubkey: syncSnapshots.authorPubkey,
           dTag: syncSnapshots.dTag,
           snapshotId: syncSnapshots.snapshotId,
+          vectorClock: syncSnapshots.vectorClock,
+          eventId: syncSnapshots.eventId,
+          mtime: syncSnapshots.mtime,
+          createdAt: syncSnapshots.createdAt,
         })
         .from(syncSnapshots)
         .where(eq(syncSnapshots.payloadRetained, 1))
@@ -51,13 +57,39 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
         );
 
       const retainedKeys = new Set<string>();
-      const retainedCounts = new Map<string, number>();
+      const rowsByDocument = new Map<string, typeof latestRetainedRows>();
+
       for (const row of latestRetainedRows) {
         const documentKey = `${row.authorPubkey}:${row.dTag}`;
-        const retainedCount = retainedCounts.get(documentKey) ?? 0;
-        if (retainedCount < RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT) {
-          retainedCounts.set(documentKey, retainedCount + 1);
-          retainedKeys.add(`${documentKey}:${row.snapshotId}`);
+        const group = rowsByDocument.get(documentKey);
+        if (group) {
+          group.push(row);
+        } else {
+          rowsByDocument.set(documentKey, [row]);
+        }
+      }
+
+      for (const [documentKey, group] of rowsByDocument) {
+        const nondominated = selectNondominatedSnapshotIds(
+          group.map((row) => ({
+            snapshotId: row.snapshotId,
+            vectorClock: row.vectorClock,
+          })),
+        );
+
+        for (const snapshotId of nondominated) {
+          retainedKeys.add(`${documentKey}:${snapshotId}`);
+        }
+
+        let retainedCount = nondominated.size;
+        for (const row of group) {
+          if (retainedKeys.has(`${documentKey}:${row.snapshotId}`)) {
+            continue;
+          }
+          if (retainedCount < RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT) {
+            retainedKeys.add(`${documentKey}:${row.snapshotId}`);
+            retainedCount += 1;
+          }
         }
       }
 

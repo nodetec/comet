@@ -36,7 +36,7 @@ Current implementation defaults:
 - local keeps all unresolved conflict snapshots
 - local keeps the current tombstone for deleted notes
 - local keeps the last `10` additional dominated snapshots per note
-- relay keeps the most recent `4` retained snapshot payloads per document
+- relay keeps all nondominated current snapshots plus enough dominated snapshots to reach a total retained payload window of `4` snapshots per document when possible
 - relay keeps replay independently from retained snapshot payloads
 - local retained snapshots may be surfaced as bounded note history
 
@@ -94,6 +94,8 @@ This is the simplest invariant for bootstrap:
 
 - current state is always fetchable
 - older dominated history is the first compaction target
+
+When a profile exposes relay-visible causal metadata, such as Comet `vc` tags, the relay should use that metadata to decide which snapshots are nondominated before applying any bounded recent-history window.
 
 ## Required Compatibility Properties
 
@@ -171,7 +173,7 @@ Recommended shape:
   "min_seq": 125000,
   "current_snapshots_fetchable": true,
   "snapshot_retention": {
-    "mode": "bounded_recent_history",
+    "mode": "nondominated_plus_recent_history",
     "recent_count": 4,
     "min_created_at": 1730000000
   }
@@ -223,12 +225,6 @@ For that reason:
 
 - retained-snapshot bootstrap is safer under compaction than full-history repair
 - relays should make compaction state visible before clients attempt deep historical restore
-
-## Open Questions
-
-- Should relays advertise only retained current snapshots, or also a bounded recent-history count?
-- Should the compacted response identify the missing snapshot by document id, event id, or both?
-- Should recent-history retention be configured globally, per kind, or per document?
 
 ## Future Work
 

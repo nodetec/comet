@@ -74,9 +74,12 @@ This means:
 
 - full document identity is `(pubkey, d)`
 
-This draft does not define current-state ordering in relay-visible tags.
+This draft does not define one universal current-state ordering scheme in relay-visible tags.
 
-Profiles in this range may determine supersedence and conflict using encrypted payload data such as vector clocks.
+Profiles in this range may determine supersedence and conflict using:
+
+- encrypted payload data such as vector clocks
+- or profile-defined relay-visible metadata that duplicates enough causal state for relay-side retention and bootstrap
 
 The Nostr `created_at` field remains the event timestamp, but profiles are free to define richer local-first ordering or conflict metadata inside encrypted payloads.
 
@@ -166,7 +169,7 @@ This draft does not require the relay to derive current state or conflict winner
 Profiles may choose either:
 
 - dumb-relay operation, where the relay stores and replays encrypted snapshots and clients compare payload metadata locally
-- smarter relay operation, where a profile exposes enough cleartext metadata for relay-side materialization
+- smarter relay operation, where a profile exposes enough cleartext metadata for relay-side retention and bootstrap decisions
 
 ## Client Expectations
 

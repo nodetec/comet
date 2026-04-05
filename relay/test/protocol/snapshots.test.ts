@@ -14,6 +14,7 @@ describe("parseSnapshotEnvelope", () => {
         ["d", "doc-1"],
         ["o", "put"],
         ["c", "notes"],
+        ["vc", "DEVICE-A", "1700000000000"],
       ],
       content: "ciphertext",
       sig: "sig-1",
@@ -25,7 +26,7 @@ describe("parseSnapshotEnvelope", () => {
       documentCoord: "doc-1",
       op: "put",
       mtime: 1_700_000_000_000,
-      entityType: null,
+      entityType: "notes",
     });
   });
 

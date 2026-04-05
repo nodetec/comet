@@ -27,7 +27,7 @@ The feed is responsible for:
 
 This draft defines both:
 
-- bootstrap of retained snapshots
+- bootstrap of retained current snapshots
 - relay-tail replay and live follow after bootstrap
 
 ## Goals
@@ -172,7 +172,7 @@ For bootstrap:
 
 - `since` and `until_seq` are not required
 - `mode` should be `"bootstrap"`
-- relays should interpret the filter as a retained-snapshot query at one stable snapshot
+- relays should interpret the filter as a retained-current-snapshot query at one stable snapshot
 
 ## Bootstrap Semantics
 
@@ -182,21 +182,21 @@ When a relay accepts a `CHANGES` request with `mode = "bootstrap"`, it should:
 
 1. validate the filter as a sync-range bootstrap filter
 2. capture `snapshot_seq`
-3. resolve the retained sync snapshots matching the filter at that snapshot
+3. resolve the retained current sync snapshots matching the filter at that snapshot
 4. send `STATUS` with `snapshot_seq`
-5. stream one `SNAPSHOT` event per retained matching snapshot
+5. stream one `SNAPSHOT` event per retained current matching snapshot
 6. send `EOSE` with `last_seq = snapshot_seq`
 
 Important semantics:
 
-- the returned events are the retained snapshots at `snapshot_seq`
+- the returned events are the retained current snapshots at `snapshot_seq`
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
-- the relay is not required to know which encrypted snapshots are current or concurrent
+- a relay may use relay-visible profile metadata such as Comet `vc` tags to determine nondominated current snapshots
 - the client compares payload metadata such as vector clocks after decrypting the returned snapshots
 
 Bootstrap does not attempt full-history reconciliation.
 
-Bootstrap is retained-snapshot-only in this version of the draft.
+Bootstrap is retained-current-snapshot-only in this version of the draft.
 
 Clients may materialize a bounded local note-history feature from retained snapshots, but that history is a client feature layered on top of bootstrap and replay rather than a distinct transport concept.
 
@@ -254,7 +254,7 @@ Bootstrap is concerned with current and retained snapshot transport only.
 
 This gives the protocols clear responsibilities:
 
-- `CHANGES` in bootstrap mode answers "what retained sync snapshots existed at snapshot `S`?"
+- `CHANGES` in bootstrap mode answers "what retained current sync snapshots existed at snapshot `S`?"
 - `CHANGES` in tail mode answers "what happened after snapshot `S`?"
 
 ## Logical Delete vs Hard Delete
@@ -295,9 +295,10 @@ For the simple local-first model, the relay should:
 - store and replay encrypted sync snapshots
 - filter by relay-visible sync metadata only
 - maintain relay-local `seq` ordering
-- avoid deriving current state from encrypted payloads
+- avoid deriving note content from encrypted payloads
+- optionally use relay-visible causal metadata to retain and bootstrap nondominated current snapshots
 
-This keeps the relay simple and lets the client compare vector clocks after decryption.
+This keeps the relay simple and lets the client verify vector clocks after decryption.
 
 ## Retention And Compaction
 
@@ -319,7 +320,6 @@ Snapshot bootstrap is intentionally more compaction-friendly than full-history r
 ## Open Questions
 
 - Should the feed later expose metadata-only replay modes in addition to full events?
-- How should relays advertise replay and payload retention boundaries?
 
 ## Future Work
 

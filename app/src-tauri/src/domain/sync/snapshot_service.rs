@@ -131,9 +131,12 @@ fn note_snapshot_clock(
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| fallback_device_id.to_string());
-    let vector_clock = parse_vector_clock(&fields.vector_clock)
-        .or_else(|_| increment_vector_clock(&VectorClock::new(), &device_id))
-        .map_err(AppError::custom)?;
+    let parsed_clock = parse_vector_clock(&fields.vector_clock).unwrap_or_default();
+    let vector_clock = if parsed_clock.is_empty() {
+        increment_vector_clock(&VectorClock::new(), &device_id).map_err(AppError::custom)?
+    } else {
+        parsed_clock
+    };
     Ok((device_id, vector_clock))
 }
 
@@ -400,8 +403,12 @@ pub fn build_pending_note_deletion_snapshot(
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| author_pubkey.clone());
-    let vector_clock =
-        parse_vector_clock(&deletion_fields.vector_clock).map_err(AppError::custom)?;
+    let parsed_clock = parse_vector_clock(&deletion_fields.vector_clock).unwrap_or_default();
+    let vector_clock = if parsed_clock.is_empty() {
+        increment_vector_clock(&VectorClock::new(), &device_id).map_err(AppError::custom)?
+    } else {
+        parsed_clock
+    };
     let payload = NoteSnapshotPayload {
         version: 1,
         device_id,

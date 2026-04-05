@@ -99,6 +99,13 @@
       "when": 1775390639000,
       "tag": "0013_reset_sync_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775404800000,
+      "tag": "0014_snapshot_visible_vector_clocks",
+      "breakpoints": true
     }
   ]
 }

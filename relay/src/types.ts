@@ -1,4 +1,5 @@
 import type { NostrEvent } from "@comet/nostr";
+import type { VisibleVectorClock } from "./domain/snapshots/vector-clock";
 
 export const SNAPSHOT_SYNC_EVENT_KIND = 42061;
 export const RELAY_AUTH_EVENT_KIND = 22242;
@@ -10,6 +11,7 @@ export type SnapshotEnvelope = {
   documentCoord: string;
   op: SnapshotOp;
   mtime: number;
+  vectorClock: VisibleVectorClock;
   entityType: string | null;
   event: NostrEvent;
 };

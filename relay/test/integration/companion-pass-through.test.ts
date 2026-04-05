@@ -17,7 +17,12 @@ import {
   waitForMessages,
   type SnapshotRelayTestContext,
 } from "../helpers";
-import { cleanupContexts, genericEvent, traceOptions } from "./fixtures";
+import {
+  cleanupContexts,
+  genericEvent,
+  snapshotEvent,
+  traceOptions,
+} from "./fixtures";
 
 describe("relay integration > companion/pass-through", () => {
   const contexts: SnapshotRelayTestContext[] = [];
@@ -224,18 +229,22 @@ describe("relay integration > companion/pass-through", () => {
     const snapshotEventOne = genericEvent("ignored-generic-2", 1, [
       ["p", "author-1"],
     ]);
-    const syncOne = genericEvent("snapshot-1", SNAPSHOT_SYNC_EVENT_KIND, [
-      ["d", "doc-1"],
-      ["o", "put"],
-      ["c", "notes"],
-    ]);
-    syncOne.pubkey = "author-1";
-    const syncTwo = genericEvent("snapshot-2", SNAPSHOT_SYNC_EVENT_KIND, [
-      ["d", "doc-1"],
-      ["o", "put"],
-      ["c", "notes"],
-    ]);
-    syncTwo.pubkey = "author-1";
+    const syncOne = snapshotEvent(
+      "snapshot-1",
+      1_700_000_000_000,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+    );
+    const syncTwo = snapshotEvent(
+      "snapshot-2",
+      1_700_000_000_100,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+    );
 
     const firstLive = waitForMessage(subscriber, 3_000, subscriberTrace);
     sendJson(publisher, ["EVENT", snapshotOne], publisherTrace);

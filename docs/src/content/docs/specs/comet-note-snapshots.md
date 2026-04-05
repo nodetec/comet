@@ -29,6 +29,7 @@ This draft also defines Comet as a local-first note system:
 - the canonical local object is the note record
 - sync transmits encrypted full-note snapshots
 - vector clocks determine whether snapshots are newer, older, or concurrent
+- the same vector clock is duplicated into relay-visible metadata so relays can retain and bootstrap current snapshots more intelligently
 - bounded recent history is a product feature, not the permanent sync substrate
 - retained local snapshots now back an explicit local note-history feature
 
@@ -96,7 +97,7 @@ Current implementation defaults:
 - local keeps all unresolved conflict snapshots
 - local keeps the current tombstone while a note remains deleted
 - local keeps the last `10` additional dominated snapshots per note
-- relay keeps a retained payload window of `4` snapshots per document
+- relay keeps all nondominated current snapshots plus enough dominated snapshots to reach a total retained payload window of `4` snapshots per document when possible
 - local note history is derived from the retained local snapshot set
 
 ## Sync Metadata
@@ -105,12 +106,14 @@ Current implementation defaults:
 
 - required: `d`, `o`
 - optional: `c`
+- profile-required for Comet: repeatable `vc`
 
 For Comet note snapshots:
 
 - `d` should be a randomly generated UUIDv4
 - `d` should be serialized in canonical uppercase hyphenated form
 - `c` should normally be `notes` when present
+- `vc` should be emitted once per vector-clock entry as `["vc", "<device_id>", "<counter>"]`
 
 Example document coordinate:
 
@@ -125,6 +128,8 @@ Each Comet device should have a stable `device_id`.
 The `device_id` is used only for sync ordering and conflict detection.
 
 It is not a document identifier.
+
+For Comet, `device_id` should be an opaque randomly generated stable identifier, not a human-readable device label.
 
 ## Vector Clock Model
 
@@ -151,6 +156,16 @@ Clock comparison rules:
 - if neither dominates, the snapshots are concurrent and the note is conflicted
 
 This means Comet no longer needs a permanent explicit ancestry graph to decide whether one note state supersedes another.
+
+For relay-facing metadata, the same vector clock is duplicated into cleartext `vc` tags.
+
+That allows a relay to:
+
+- retain all nondominated current snapshots
+- compact dominated snapshots more safely
+- bootstrap current snapshots rather than a blind recent window
+
+Clients should still verify that the cleartext `vc` tags match the encrypted payload vector clock after decryption.
 
 ## Encryption
 
@@ -210,7 +225,7 @@ Field guidance:
 For tombstones:
 
 - outer `o` is `del`
-- the payload should still include `version`, `device_id`, and `vector_clock`
+- the payload should still include `version`, `device_id`, `vector_clock`, and `deleted_at`
 - note body fields may be omitted or represented minimally
 - the current tombstone should remain durable while the note stays deleted
 
@@ -311,7 +326,7 @@ Current Comet defaults:
 - local keeps all unresolved conflict snapshots
 - local keeps the current tombstone for deleted notes
 - local keeps the last `10` additional dominated snapshots per note
-- relay keeps a small retained payload window per document, currently `4` snapshots
+- relay keeps all nondominated current snapshots plus enough dominated snapshots to reach a total retained payload window of `4` snapshots per document when possible
 
 This gives Comet:
 
@@ -322,16 +337,16 @@ This gives Comet:
 
 ## Relay Expectations
 
-The first Comet profile should work with a dumb relay.
+The first Comet profile should work with a relay that remains blind to note content but can inspect relay-visible vector-clock metadata.
 
 That means:
 
 - the relay stores and replays encrypted note snapshots
 - the relay does not need to decrypt payloads
-- the relay does not need to compare vector clocks
-- the client compares vector clocks locally during bootstrap and replay
+- the relay may compare cleartext `vc` tags to determine nondominated current snapshots
+- the client still verifies the encrypted payload vector clock after decryption and remains the final authority for local materialization
 
-This is intentionally simpler than asking the relay to materialize current state from encrypted payload metadata.
+This keeps the relay blind to note content while still allowing better retention and bootstrap decisions.
 
 ## Current Direction
 
@@ -342,10 +357,6 @@ The intended direction is:
 - vector-clock supersedence
 - bounded recent history
 - explicit user-visible conflict resolution
-
-## Open Questions
-
-- Should `vector_clock` remain fully encrypted, or should a future profile expose a relay-visible summary?
 
 ## Future Work
 

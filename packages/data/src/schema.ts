@@ -183,6 +183,9 @@ export const syncSnapshots = pgTable(
     snapshotId: text("snapshot_id").notNull(),
     op: text("op", { enum: ["put", "del"] }).notNull(),
     mtime: bigint("mtime", { mode: "number" }).notNull(),
+    vectorClock: jsonb("vector_clock")
+      .notNull()
+      .$type<Record<string, number>>(),
     entityType: text("entity_type"),
     eventId: text("event_id"),
     payloadRetained: integer("payload_retained").notNull().default(1),

@@ -99,6 +99,72 @@ describe("relay integration > changes", () => {
     ]);
   });
 
+  test("bootstrap returns only nondominated current snapshots for one document", async () => {
+    const ctx = await startTestSnapshotRelay(39464);
+    contexts.push(ctx);
+
+    const trace = traceOptions(ctx, "client");
+    const ws = await connectWs(ctx.port, trace);
+    const staleEvent = snapshotEvent(
+      "snapshot-stale",
+      1_700_000_000_000,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 1 },
+    );
+    const currentLeft = snapshotEvent(
+      "snapshot-left",
+      1_700_000_000_100,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-A": 2 },
+    );
+    const currentRight = snapshotEvent(
+      "snapshot-right",
+      1_700_000_000_200,
+      [],
+      "doc-1",
+      "put",
+      "author-1",
+      { "DEVICE-B": 1 },
+    );
+
+    for (const event of [staleEvent, currentLeft, currentRight]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
+
+    sendJson(
+      ws,
+      [
+        "CHANGES",
+        "bootstrap-current",
+        {
+          mode: "bootstrap",
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
+        },
+      ],
+      trace,
+    );
+
+    expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
+      [
+        "CHANGES",
+        "bootstrap-current",
+        "STATUS",
+        { mode: "bootstrap", snapshot_seq: 3 },
+      ],
+      ["CHANGES", "bootstrap-current", "SNAPSHOT", currentLeft],
+      ["CHANGES", "bootstrap-current", "SNAPSHOT", currentRight],
+      ["CHANGES", "bootstrap-current", "EOSE", 3],
+    ]);
+  });
+
   test("streams live CHANGES events after the initial EOSE", async () => {
     const ctx = await startTestSnapshotRelay(39418);
     contexts.push(ctx);

@@ -391,10 +391,8 @@ export function createClientMessageHandler(options: {
         if (mode === "bootstrap") {
           const snapshotSeq = await options.changeStore.currentSequence();
           const bootstrapEvents =
-            await options.changeStore.queryStoredSnapshotEvents({
+            await options.changeStore.queryBootstrapSnapshotEvents({
               ...filter,
-              since: 0,
-              until_seq: snapshotSeq,
               live: false,
             });
 
@@ -406,7 +404,7 @@ export function createClientMessageHandler(options: {
               { mode: "bootstrap", snapshot_seq: snapshotSeq },
             ],
             ...bootstrapEvents.map(
-              ({ event }): ServerMessage => [
+              (event): ServerMessage => [
                 "CHANGES",
                 subscriptionId,
                 "SNAPSHOT",

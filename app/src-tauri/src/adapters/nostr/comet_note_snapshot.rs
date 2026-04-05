@@ -167,7 +167,73 @@ pub fn decrypt_note_snapshot_payload(
     NoteSnapshotPayload::from_canonical_json(&json)
 }
 
-pub fn build_note_snapshot_tags(meta: &NoteSnapshotEventMeta) -> Result<Vec<Tag>, AppError> {
+fn build_visible_vector_clock_tags(payload: &NoteSnapshotPayload) -> Result<Vec<Tag>, AppError> {
+    let vector_clock =
+        canonicalize_vector_clock(&payload.vector_clock).map_err(AppError::custom)?;
+    if vector_clock.is_empty() {
+        return Err(AppError::custom(
+            "Note snapshot payload vector_clock must be non-empty",
+        ));
+    }
+
+    Ok(vector_clock
+        .into_iter()
+        .map(|(device_id, counter)| {
+            Tag::custom(TagKind::custom("vc"), vec![device_id, counter.to_string()])
+        })
+        .collect())
+}
+
+fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppError> {
+    let mut vector_clock = BTreeMap::new();
+
+    for tag in event
+        .tags
+        .iter()
+        .filter(|tag| tag.kind() == TagKind::custom("vc"))
+    {
+        let values = tag.as_slice();
+        let device_id = values
+            .get(1)
+            .cloned()
+            .ok_or_else(|| AppError::custom("Snapshot vc tag must include a device id"))?;
+        let counter_text = values
+            .get(2)
+            .cloned()
+            .ok_or_else(|| AppError::custom("Snapshot vc tag must include a counter"))?;
+
+        if device_id.trim().is_empty() {
+            return Err(AppError::custom(
+                "Snapshot vc tag device id must be non-empty",
+            ));
+        }
+
+        let counter = counter_text.parse::<u64>().map_err(|_| {
+            AppError::custom(format!(
+                "Snapshot vc tag counter must be an unsigned integer: {counter_text}"
+            ))
+        })?;
+
+        if vector_clock.insert(device_id.clone(), counter).is_some() {
+            return Err(AppError::custom(format!(
+                "Duplicate snapshot vc tag for device id: {device_id}"
+            )));
+        }
+    }
+
+    if vector_clock.is_empty() {
+        return Err(AppError::custom(
+            "Missing visible vector clock tags in note snapshot event",
+        ));
+    }
+
+    canonicalize_vector_clock(&vector_clock).map_err(AppError::custom)
+}
+
+pub fn build_note_snapshot_tags(
+    meta: &NoteSnapshotEventMeta,
+    payload: &NoteSnapshotPayload,
+) -> Result<Vec<Tag>, AppError> {
     if meta.document_id.trim().is_empty() {
         return Err(AppError::custom("Missing d tag in note snapshot event"));
     }
@@ -183,6 +249,7 @@ pub fn build_note_snapshot_tags(meta: &NoteSnapshotEventMeta) -> Result<Vec<Tag>
         Tag::identifier(&meta.document_id),
         Tag::custom(TagKind::custom("o"), vec![meta.operation.clone()]),
     ];
+    tags.extend(build_visible_vector_clock_tags(payload)?);
 
     if let Some(collection) = &meta.collection {
         if collection.trim().is_empty() {
@@ -222,8 +289,8 @@ pub fn build_note_snapshot_event(
 
     let content = encrypt_note_snapshot_payload(keys, payload)?;
 
-    let builder =
-        EventBuilder::new(COMET_NOTE_SNAPSHOT_KIND, content).tags(build_note_snapshot_tags(meta)?);
+    let builder = EventBuilder::new(COMET_NOTE_SNAPSHOT_KIND, content)
+        .tags(build_note_snapshot_tags(meta, payload)?);
     let builder = if let Some(created_at_ms) = meta.created_at_ms {
         let created_at_secs = u64::try_from(created_at_ms.div_euclid(1000)).map_err(|_| {
             AppError::custom(format!(
@@ -291,6 +358,14 @@ pub fn parse_note_snapshot_event(
     }
 
     let payload = payload.expect("payload presence validated above");
+    let visible_vector_clock = parse_visible_vector_clock_tags(event)?;
+    let payload_vector_clock =
+        canonicalize_vector_clock(&payload.vector_clock).map_err(AppError::custom)?;
+    if visible_vector_clock != payload_vector_clock {
+        return Err(AppError::custom(
+            "Visible snapshot vector clock does not match encrypted payload vector clock",
+        ));
+    }
     if operation == "put" && payload.deleted_at.is_some() {
         return Err(AppError::custom(
             "Put note snapshot payloads must not include deleted_at",
@@ -429,6 +504,14 @@ mod tests {
         let parsed = parse_note_snapshot_event(&keys, &event).unwrap();
 
         assert_eq!(event.kind, COMET_NOTE_SNAPSHOT_KIND);
+        assert_eq!(
+            event
+                .tags
+                .iter()
+                .filter(|tag| tag.kind() == TagKind::custom("vc"))
+                .count(),
+            1
+        );
         assert_eq!(parsed.document_id, meta.document_id);
         assert_eq!(parsed.operation, "put");
         assert_eq!(parsed.collection.as_deref(), Some(COMET_NOTE_COLLECTION));
@@ -465,5 +548,36 @@ mod tests {
         assert_eq!(parsed.operation, "del");
         assert_eq!(parsed.payload.unwrap(), payload.canonicalized().unwrap());
         assert!(!event.content.is_empty());
+    }
+
+    #[test]
+    fn parse_rejects_visible_vector_clock_mismatch() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        tags.push(Tag::custom(
+            TagKind::custom("vc"),
+            vec!["DEVICE-A".to_string(), "999".to_string()],
+        ));
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let error = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("Visible snapshot vector clock does not match"));
     }
 }
