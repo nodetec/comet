@@ -56,6 +56,16 @@ app-check:
 relay-dev:
   pnpm --filter @comet/relay dev
 
+relay-db-create db_name="relay":
+  createdb {{db_name}}
+
+relay-db-drop db_name="relay":
+  dropdb {{db_name}}
+
+relay-db-reset db_name="relay":
+  -dropdb {{db_name}}
+  createdb {{db_name}}
+
 relay-dev-multi count="3" start_port="3400":
   pnpm --filter @comet/relay dev:multi -- --count {{count}} --start-port {{start_port}}
 
