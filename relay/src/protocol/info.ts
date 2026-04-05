@@ -13,7 +13,6 @@ export type SnapshotRelayInfoDocument = {
     changes_feed: boolean;
     author_scoped: boolean;
     retention: {
-      current_snapshots_fetchable: boolean;
       snapshot_retention: {
         mode: typeof SNAPSHOT_RETENTION_MODE;
         recent_count: number;
@@ -25,7 +24,6 @@ export type SnapshotRelayInfoDocument = {
 
 export function getSnapshotRelayInfoDocument(input: {
   minSeq: number;
-  currentSnapshotsFetchable: boolean;
   snapshotRetention: {
     mode: typeof SNAPSHOT_RETENTION_MODE;
     recentCount: number;
@@ -46,7 +44,6 @@ export function getSnapshotRelayInfoDocument(input: {
       changes_feed: true,
       author_scoped: true,
       retention: {
-        current_snapshots_fetchable: input.currentSnapshotsFetchable,
         snapshot_retention: {
           mode: input.snapshotRetention.mode,
           recent_count: input.snapshotRetention.recentCount,

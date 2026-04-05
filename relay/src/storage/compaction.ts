@@ -12,7 +12,6 @@ export type CompactionStore = {
   compactPayloadsBefore: (mtime: number) => Promise<number>;
   minRetainedCreatedAt: () => Promise<number | null>;
   retentionInfo: () => Promise<{
-    currentSnapshotsFetchable: boolean;
     snapshotRetention: {
       mode: typeof SNAPSHOT_RETENTION_MODE;
       recentCount: number;
@@ -158,7 +157,6 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
       const minCreatedAt = await minRetainedCreatedAt();
 
       return {
-        currentSnapshotsFetchable: true,
         snapshotRetention: {
           mode: SNAPSHOT_RETENTION_MODE,
           recentCount: RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT,

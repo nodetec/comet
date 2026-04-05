@@ -118,6 +118,7 @@ Normalization and validation rules:
 - `counter` must be a base-10 positive integer string
 - `counter = 0` is invalid because a missing vector-clock entry already implies `0`
 - `counter` must be within the safe integer range `1..9007199254740991`
+- an event must contain at most `32` `vc` entries
 - the same `device_id` must not appear more than once in one event
 - repeated `vc` tags must be emitted in ascending lexicographic order by `device_id`
 - relays and clients should reject malformed or non-canonical `vc` sets rather than silently rewriting them

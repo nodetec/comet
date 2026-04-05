@@ -7,6 +7,7 @@ export type VectorClockComparison =
   | "concurrent";
 
 export const MAX_SAFE_VECTOR_CLOCK_COUNTER = 9_007_199_254_740_991;
+export const MAX_VISIBLE_VECTOR_CLOCK_ENTRIES = 32;
 
 function compareDeviceIds(left: string, right: string): number {
   if (left < right) {
@@ -23,6 +24,9 @@ export function parseVisibleVectorClockFromTags(
 ): VisibleVectorClock | null {
   const entries = tags.filter(([name]) => name === "vc");
   if (entries.length === 0) {
+    return null;
+  }
+  if (entries.length > MAX_VISIBLE_VECTOR_CLOCK_ENTRIES) {
     return null;
   }
 

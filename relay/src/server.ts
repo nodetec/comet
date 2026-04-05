@@ -113,8 +113,6 @@ export async function createSnapshotRelayServer(
             return Response.json(
               getSnapshotRelayInfoDocument({
                 minSeq,
-                currentSnapshotsFetchable:
-                  retentionInfo.currentSnapshotsFetchable,
                 snapshotRetention: retentionInfo.snapshotRetention,
               }),
               {

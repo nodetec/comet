@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  MAX_VISIBLE_VECTOR_CLOCK_ENTRIES,
   MAX_SAFE_VECTOR_CLOCK_COUNTER,
   parseVisibleVectorClockFromTags,
 } from "./vector-clock";
@@ -45,5 +46,13 @@ describe("visible vector clock parsing", () => {
     expect(
       parseVisibleVectorClockFromTags([["vc", "DEVICE-A", "1", "unexpected"]]),
     ).toBeNull();
+  });
+
+  test("rejects more than 32 visible vector clock entries", () => {
+    const tags = Array.from(
+      { length: MAX_VISIBLE_VECTOR_CLOCK_ENTRIES + 1 },
+      (_, index) => ["vc", `DEVICE-${index.toString().padStart(2, "0")}`, "1"],
+    );
+    expect(parseVisibleVectorClockFromTags(tags)).toBeNull();
   });
 });

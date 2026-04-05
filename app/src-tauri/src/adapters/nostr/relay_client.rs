@@ -38,7 +38,6 @@ pub struct SnapshotRelaySyncInfo {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SnapshotRelayRetentionInfo {
-    pub current_snapshots_fetchable: bool,
     pub snapshot_retention: SnapshotRelaySnapshotRetentionInfo,
 }
 

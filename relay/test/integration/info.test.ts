@@ -36,7 +36,6 @@ describe("relay integration > info", () => {
         changes_feed: true,
         author_scoped: true,
         retention: {
-          current_snapshots_fetchable: true,
           snapshot_retention: {
             mode: "nondominated_plus_recent_history",
             recent_count: 4,

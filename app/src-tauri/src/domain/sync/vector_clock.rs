@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 pub type VectorClock = BTreeMap<String, u64>;
 pub const MAX_SAFE_VECTOR_CLOCK_COUNTER: u64 = 9_007_199_254_740_991;
+pub const MAX_VECTOR_CLOCK_ENTRIES: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VectorClockComparison {
@@ -12,6 +13,12 @@ pub enum VectorClockComparison {
 }
 
 pub fn canonicalize_vector_clock(clock: &VectorClock) -> Result<VectorClock, String> {
+    if clock.len() > MAX_VECTOR_CLOCK_ENTRIES {
+        return Err(format!(
+            "Vector clock must contain at most {MAX_VECTOR_CLOCK_ENTRIES} entries"
+        ));
+    }
+
     let mut canonical = BTreeMap::new();
 
     for (device_id, counter) in clock {
@@ -52,6 +59,11 @@ pub fn increment_vector_clock(clock: &VectorClock, device_id: &str) -> Result<Ve
     }
 
     let mut next = canonicalize_vector_clock(clock)?;
+    if !next.contains_key(device_id) && next.len() >= MAX_VECTOR_CLOCK_ENTRIES {
+        return Err(format!(
+            "Vector clock must contain at most {MAX_VECTOR_CLOCK_ENTRIES} entries"
+        ));
+    }
     let counter = next.entry(device_id.to_string()).or_insert(0);
     *counter += 1;
     Ok(next)
@@ -137,5 +149,15 @@ mod tests {
         assert!(canonicalize_vector_clock(&clock)
             .unwrap_err()
             .contains(&MAX_SAFE_VECTOR_CLOCK_COUNTER.to_string()));
+    }
+
+    #[test]
+    fn rejects_more_than_max_entries() {
+        let clock = (0..=MAX_VECTOR_CLOCK_ENTRIES)
+            .map(|index| (format!("DEVICE-{index:02}"), 1_u64))
+            .collect::<BTreeMap<_, _>>();
+        assert!(canonicalize_vector_clock(&clock)
+            .unwrap_err()
+            .contains(&MAX_VECTOR_CLOCK_ENTRIES.to_string()));
     }
 }

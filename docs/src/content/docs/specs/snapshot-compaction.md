@@ -163,7 +163,6 @@ Relays should advertise retention boundaries explicitly.
 Recommended relay info shape:
 
 - `changes_feed.min_seq`: minimum replayable sequence
-- `snapshot_sync.retention.current_snapshots_fetchable`: boolean
 - `snapshot_sync.retention.snapshot_retention`: object describing retained current and recent-history policy
 
 Recommended shape:
@@ -177,7 +176,6 @@ Recommended shape:
     "changes_feed": true,
     "author_scoped": true,
     "retention": {
-      "current_snapshots_fetchable": true,
       "snapshot_retention": {
         "mode": "nondominated_plus_recent_history",
         "recent_count": 4,
@@ -191,7 +189,6 @@ Recommended shape:
 Field meanings:
 
 - `changes_feed.min_seq`: earliest replayable sequence in the changes feed
-- `snapshot_sync.retention.current_snapshots_fetchable`: whether current snapshots are guaranteed fetchable
 - `snapshot_sync.retention.snapshot_retention.mode`: current snapshot/history retention policy
 - `snapshot_sync.retention.snapshot_retention.recent_count`: bounded retained recent-history count when applicable
 - `snapshot_sync.retention.snapshot_retention.min_created_at`: earliest retained snapshot timestamp generally expected to remain fetchable

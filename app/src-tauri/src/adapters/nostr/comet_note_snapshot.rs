@@ -14,6 +14,9 @@ use crate::domain::sync::vector_clock::{
 };
 use crate::error::AppError;
 
+#[cfg(test)]
+use crate::domain::sync::vector_clock::MAX_VECTOR_CLOCK_ENTRIES;
+
 pub const COMET_NOTE_SNAPSHOT_KIND: Kind = Kind::Custom(42061);
 pub const COMET_NOTE_SNAPSHOT_VERSION: u32 = 1;
 pub const COMET_NOTE_COLLECTION: &str = "notes";
@@ -795,5 +798,38 @@ mod tests {
 
         let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
         assert!(err.to_string().contains("exactly 3 elements"));
+    }
+
+    #[test]
+    fn parse_rejects_more_than_max_visible_vector_clock_entries() {
+        let keys = Keys::generate();
+        let payload = sample_payload();
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let mut tags = event.tags.to_vec();
+        tags.retain(|tag| tag.kind() != TagKind::custom("vc"));
+        for index in 0..=MAX_VECTOR_CLOCK_ENTRIES {
+            tags.push(Tag::custom(
+                TagKind::custom("vc"),
+                vec![format!("DEVICE-{index:02}"), "1".to_string()],
+            ));
+        }
+
+        let tampered = EventBuilder::new(event.kind, event.content.clone())
+            .tags(tags)
+            .custom_created_at(event.created_at)
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        let err = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains(&MAX_VECTOR_CLOCK_ENTRIES.to_string()));
     }
 }
