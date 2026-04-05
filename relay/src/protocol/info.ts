@@ -1,3 +1,5 @@
+import type { SNAPSHOT_RETENTION_MODE } from "../domain/snapshots/retention";
+
 export type SnapshotRelayInfoDocument = {
   name: string;
   description: string;
@@ -11,14 +13,24 @@ export type SnapshotRelayInfoDocument = {
     changes_feed: boolean;
     author_scoped: boolean;
     retention: {
-      min_payload_mtime: number | null;
+      current_snapshots_fetchable: boolean;
+      snapshot_retention: {
+        mode: typeof SNAPSHOT_RETENTION_MODE;
+        recent_count: number;
+        min_created_at: number | null;
+      };
     };
   };
 };
 
 export function getSnapshotRelayInfoDocument(input: {
   minSeq: number;
-  minPayloadMtime: number | null;
+  currentSnapshotsFetchable: boolean;
+  snapshotRetention: {
+    mode: typeof SNAPSHOT_RETENTION_MODE;
+    recentCount: number;
+    minCreatedAt: number | null;
+  };
 }): SnapshotRelayInfoDocument {
   return {
     name: "Relay",
@@ -34,7 +46,12 @@ export function getSnapshotRelayInfoDocument(input: {
       changes_feed: true,
       author_scoped: true,
       retention: {
-        min_payload_mtime: input.minPayloadMtime,
+        current_snapshots_fetchable: input.currentSnapshotsFetchable,
+        snapshot_retention: {
+          mode: input.snapshotRetention.mode,
+          recent_count: input.snapshotRetention.recentCount,
+          min_created_at: input.snapshotRetention.minCreatedAt,
+        },
       },
     },
   };

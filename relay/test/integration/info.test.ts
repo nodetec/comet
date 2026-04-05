@@ -36,7 +36,12 @@ describe("relay integration > info", () => {
         changes_feed: true,
         author_scoped: true,
         retention: {
-          min_payload_mtime: null,
+          current_snapshots_fetchable: true,
+          snapshot_retention: {
+            mode: "nondominated_plus_recent_history",
+            recent_count: 4,
+            min_created_at: null,
+          },
         },
       },
     });

@@ -306,21 +306,33 @@ Important compatibility point:
 
 - relay-local `seq` replay is only meaningful inside the relay's retained history window
 
-Recommended future advertisement fields include:
+Relays should advertise replay retention through relay info metadata.
 
-- a minimum retained `seq`
-- any snapshot-retention boundary if older dominated snapshots may be compacted
+Richer snapshot-retention metadata may also be advertised separately as described in [Snapshot Retention And Compaction](/specs/snapshot-compaction/).
+
+Minimum required field:
+
+```json
+{
+  "changes_feed": {
+    "min_seq": 125000
+  }
+}
+```
+
+Field meaning:
+
+- `min_seq`: earliest replayable relay-local sequence on this relay
 
 If a client has fallen behind the retained replay window, the client should fall back to bootstrap rather than assume the feed alone can restore full state.
+
+Recommended client rule:
+
+- if a saved relay checkpoint is less than `min_seq`, replay alone is insufficient
+- the client should bootstrap first, then resume tail replay from the returned `snapshot_seq`
 
 Snapshot bootstrap is intentionally more compaction-friendly than full-history repair.
 
 ## Open Questions
 
 - Should the feed later expose metadata-only replay modes in addition to full events?
-
-## Future Work
-
-- Define replay retention advertisement
-- Define compaction signaling for historical fetches
-- Define concrete application profiles on top of causal snapshot sync events

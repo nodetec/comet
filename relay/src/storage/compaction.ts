@@ -2,16 +2,35 @@ import { and, desc, eq, inArray, lt, min } from "drizzle-orm";
 
 import type { SnapshotRelayDb } from "../db";
 import { syncPayloads, syncSnapshots } from "./schema";
+import {
+  RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT,
+  SNAPSHOT_RETENTION_MODE,
+} from "../domain/snapshots/retention";
 import { selectNondominatedSnapshotIds } from "../domain/snapshots/vector-clock";
-
-const RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT = 4;
 
 export type CompactionStore = {
   compactPayloadsBefore: (mtime: number) => Promise<number>;
-  minPayloadMtime: () => Promise<number | null>;
+  minRetainedCreatedAt: () => Promise<number | null>;
+  retentionInfo: () => Promise<{
+    currentSnapshotsFetchable: boolean;
+    snapshotRetention: {
+      mode: typeof SNAPSHOT_RETENTION_MODE;
+      recentCount: number;
+      minCreatedAt: number | null;
+    };
+  }>;
 };
 
 export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
+  const minRetainedCreatedAt = async () => {
+    const [row] = await db
+      .select({ createdAt: min(syncSnapshots.createdAt) })
+      .from(syncSnapshots)
+      .where(eq(syncSnapshots.payloadRetained, 1));
+
+    return row.createdAt ?? null;
+  };
+
   return {
     async compactPayloadsBefore(mtime) {
       const rows = await db
@@ -134,13 +153,18 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
 
       return candidates.length;
     },
-    async minPayloadMtime() {
-      const [row] = await db
-        .select({ mtime: min(syncSnapshots.mtime) })
-        .from(syncSnapshots)
-        .where(eq(syncSnapshots.payloadRetained, 1));
+    minRetainedCreatedAt,
+    async retentionInfo() {
+      const minCreatedAt = await minRetainedCreatedAt();
 
-      return row.mtime ?? null;
+      return {
+        currentSnapshotsFetchable: true,
+        snapshotRetention: {
+          mode: SNAPSHOT_RETENTION_MODE,
+          recentCount: RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT,
+          minCreatedAt,
+        },
+      };
     },
   };
 }

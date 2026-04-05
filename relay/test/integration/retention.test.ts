@@ -70,7 +70,12 @@ describe("relay integration > retention", () => {
         changes_feed: true,
         author_scoped: true,
         retention: {
-          min_payload_mtime: 1_750_000_000_000,
+          current_snapshots_fetchable: true,
+          snapshot_retention: {
+            mode: "nondominated_plus_recent_history",
+            recent_count: 4,
+            min_created_at: 1_750_000_000,
+          },
         },
       },
     });

@@ -28,7 +28,7 @@ This draft separates:
 
 Those are related, but they are not the same thing.
 
-## Current Comet Defaults
+## Example Defaults
 
 Current implementation defaults:
 
@@ -59,7 +59,7 @@ Current implementation defaults:
 
 Current snapshot retention means the relay or client keeps the snapshots still needed for current sync and conflict handling.
 
-For a note-sync profile such as Comet, that usually means:
+For a causal snapshot sync profile, that usually means:
 
 - the latest known snapshot for a note
 - any unresolved concurrent snapshots for that note
@@ -95,7 +95,7 @@ This is the simplest invariant for bootstrap:
 - current state is always fetchable
 - older dominated history is the first compaction target
 
-When a profile exposes relay-visible causal metadata, such as Comet `vc` tags, the relay should use that metadata to decide which snapshots are nondominated before applying any bounded recent-history window.
+When a profile exposes relay-visible causal metadata such as `vc` tags, the relay should use that metadata to decide which snapshots are nondominated before applying any bounded recent-history window.
 
 ## Required Compatibility Properties
 
@@ -160,33 +160,47 @@ That means a relay may choose all of the following at once:
 
 Relays should advertise retention boundaries explicitly.
 
-Recommended advertisement fields:
+Recommended relay info shape:
 
-- `min_seq`: minimum replayable sequence
-- `current_snapshots_fetchable`: boolean
-- `snapshot_retention`: object describing retained current and recent-history policy
+- `changes_feed.min_seq`: minimum replayable sequence
+- `snapshot_sync.retention.current_snapshots_fetchable`: boolean
+- `snapshot_sync.retention.snapshot_retention`: object describing retained current and recent-history policy
 
 Recommended shape:
 
 ```json
 {
-  "min_seq": 125000,
-  "current_snapshots_fetchable": true,
-  "snapshot_retention": {
-    "mode": "nondominated_plus_recent_history",
-    "recent_count": 4,
-    "min_created_at": 1730000000
+  "changes_feed": {
+    "min_seq": 125000
+  },
+  "snapshot_sync": {
+    "changes_feed": true,
+    "author_scoped": true,
+    "retention": {
+      "current_snapshots_fetchable": true,
+      "snapshot_retention": {
+        "mode": "nondominated_plus_recent_history",
+        "recent_count": 4,
+        "min_created_at": 1730000000
+      }
+    }
   }
 }
 ```
 
 Field meanings:
 
-- `min_seq`: earliest replayable sequence in the changes feed
-- `current_snapshots_fetchable`: whether current snapshots are guaranteed fetchable
-- `snapshot_retention.mode`: current snapshot/history retention policy
-- `snapshot_retention.recent_count`: bounded retained recent-history count when applicable
-- `snapshot_retention.min_created_at`: earliest retained snapshot timestamp generally expected to remain fetchable
+- `changes_feed.min_seq`: earliest replayable sequence in the changes feed
+- `snapshot_sync.retention.current_snapshots_fetchable`: whether current snapshots are guaranteed fetchable
+- `snapshot_sync.retention.snapshot_retention.mode`: current snapshot/history retention policy
+- `snapshot_sync.retention.snapshot_retention.recent_count`: bounded retained recent-history count when applicable
+- `snapshot_sync.retention.snapshot_retention.min_created_at`: earliest retained snapshot timestamp generally expected to remain fetchable
+
+Recommended `snapshot_retention.mode` values:
+
+- `current_only`
+- `nondominated_plus_recent_history`
+- `full_retention`
 
 ## Historical Fetch Behavior
 

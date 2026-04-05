@@ -106,14 +106,16 @@ export async function createSnapshotRelayServer(
         const accept = request.headers.get("accept") ?? "";
         if (accept.includes("application/nostr+json")) {
           return (async () => {
-            const [minSeq, minPayloadMtime] = await Promise.all([
+            const [minSeq, retentionInfo] = await Promise.all([
               changes.minSequence(),
-              compaction.minPayloadMtime(),
+              compaction.retentionInfo(),
             ]);
             return Response.json(
               getSnapshotRelayInfoDocument({
                 minSeq,
-                minPayloadMtime,
+                currentSnapshotsFetchable:
+                  retentionInfo.currentSnapshotsFetchable,
+                snapshotRetention: retentionInfo.snapshotRetention,
               }),
               {
                 status: 200,
@@ -179,7 +181,7 @@ export async function createSnapshotRelayServer(
     access,
     port: server.port,
     minSequence: changes.minSequence,
-    minPayloadMtime: compaction.minPayloadMtime,
+    minRetainedCreatedAt: compaction.minRetainedCreatedAt,
     stop: async () => {
       retention.stop();
       void server.stop(true);
