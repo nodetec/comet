@@ -74,6 +74,11 @@ async fn bootstrap_with_keys_and_changes(
     let author_pubkey = keys.public_key().to_hex();
     let conn = open_sync_db(db_path)?;
     let local_snapshot_ids = local_known_snapshot_ids(&conn, &author_pubkey)?;
+    let min_retained_created_at = relay_info
+        .snapshot_sync
+        .retention
+        .snapshot_retention
+        .min_created_at;
 
     upsert_sync_relay_state(
         &conn,
@@ -81,7 +86,7 @@ async fn bootstrap_with_keys_and_changes(
         None,
         None,
         None,
-        relay_info.snapshot_sync.retention.min_payload_mtime,
+        min_retained_created_at,
     )?;
 
     let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
@@ -178,12 +183,12 @@ async fn bootstrap_with_keys_and_changes(
         .cloned()
         .collect::<Vec<_>>();
 
-    if !need.is_empty() {
-        let mut conn = open_sync_db(db_path)?;
-        let tx = conn.transaction()?;
-        let mut invalidated_notes = BTreeSet::new();
-        let mut applied_changes = Vec::new();
+    let mut conn = open_sync_db(db_path)?;
+    let tx = conn.transaction()?;
+    let mut invalidated_notes = BTreeSet::new();
+    let mut applied_changes = Vec::new();
 
+    if !need.is_empty() {
         for event in remote_snapshot_events.iter().filter(|event| {
             snapshot_id_from_event(event).is_ok_and(|snapshot_id| need.contains(&snapshot_id))
         }) {
@@ -195,28 +200,26 @@ async fn bootstrap_with_keys_and_changes(
                 applied_changes.push(change);
             }
         }
-
-        tx.commit()?;
-
-        for note_id in invalidated_notes {
-            invalidate_cache(&note_id);
-        }
-        for change in applied_changes {
-            on_change(change);
-        }
     }
-
-    let conn = open_sync_db(db_path)?;
-    // Record the bootstrap handoff boundary so the live `CHANGES`
-    // subscription can resume from the exact snapshot we just applied.
+    // Record the bootstrap handoff boundary in the same transaction as the
+    // applied bootstrap snapshots so restart/retry cannot observe a state
+    // where snapshots landed but the relay checkpoint did not.
     upsert_sync_relay_state(
-        &conn,
+        &tx,
         relay_ws_url,
         None,
         Some(snapshot_seq),
         Some(crate::domain::common::time::now_millis()),
-        relay_info.snapshot_sync.retention.min_payload_mtime,
+        min_retained_created_at,
     )?;
+    tx.commit()?;
+
+    for note_id in invalidated_notes {
+        invalidate_cache(&note_id);
+    }
+    for change in applied_changes {
+        on_change(change);
+    }
 
     Ok(SnapshotBootstrapResult {
         connection,

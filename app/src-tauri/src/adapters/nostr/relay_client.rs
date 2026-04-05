@@ -38,7 +38,15 @@ pub struct SnapshotRelaySyncInfo {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SnapshotRelayRetentionInfo {
-    pub min_payload_mtime: Option<i64>,
+    pub current_snapshots_fetchable: bool,
+    pub snapshot_retention: SnapshotRelaySnapshotRetentionInfo,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct SnapshotRelaySnapshotRetentionInfo {
+    pub mode: String,
+    pub recent_count: usize,
+    pub min_created_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
