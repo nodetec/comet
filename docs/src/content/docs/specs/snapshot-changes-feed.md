@@ -166,8 +166,6 @@ Typical replay filters:
 }
 ```
 
-For the first Comet note profile, the concrete sync kind is `42061`.
-
 For bootstrap:
 
 - `since` and `until_seq` are not required
@@ -191,7 +189,7 @@ Important semantics:
 
 - the returned events are the retained current snapshots at `snapshot_seq`
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
-- a relay may use relay-visible profile metadata such as Comet `vc` tags to determine nondominated current snapshots
+- a relay may use relay-visible profile metadata to determine nondominated current snapshots
 - the client decrypts the returned snapshots, hydrates profile state, and compares vector clocks locally before applying
 
 Bootstrap does not attempt full-history reconciliation.
