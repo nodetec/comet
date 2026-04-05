@@ -8,9 +8,11 @@ use crate::adapters::sqlite::snapshot_repository::{
 };
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::common::text::title_from_markdown;
-use crate::domain::sync::vector_clock::{
-    increment_vector_clock, parse_vector_clock, serialize_vector_clock, VectorClock,
+use crate::domain::sync::history_entry::{
+    note_snapshot_history_entry, tombstone_snapshot_history_entry,
 };
+use crate::domain::sync::model::{SyncedNote, SyncedTombstone};
+use crate::domain::sync::vector_clock::{increment_vector_clock, parse_vector_clock, VectorClock};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -299,23 +301,25 @@ pub fn build_pending_note_snapshot(
         mtime: fields.modified_at,
         event,
         op: "put".to_string(),
-        history: LocalNoteSnapshotHistoryEntry {
-            snapshot_event_id: event_id.clone(),
-            note_id: note_id.to_string(),
-            op: "put".to_string(),
-            device_id: payload.device_id.clone(),
-            vector_clock: serialize_vector_clock(&payload.vector_clock)
-                .map_err(AppError::custom)?,
-            title: Some(title_from_markdown(&payload.markdown)),
-            markdown: Some(payload.markdown.clone()),
-            modified_at: fields.modified_at,
-            edited_at: Some(payload.edited_at),
-            deleted_at: payload.deleted_at,
-            archived_at: payload.archived_at,
-            pinned_at: payload.pinned_at,
-            readonly: payload.readonly,
-            created_at: fields.modified_at,
-        },
+        history: note_snapshot_history_entry(
+            &event_id,
+            &SyncedNote {
+                id: note_id.to_string(),
+                device_id: payload.device_id.clone(),
+                vector_clock: payload.vector_clock.clone(),
+                title: title_from_markdown(&payload.markdown),
+                markdown: payload.markdown.clone(),
+                created_at: fields.created_at,
+                modified_at: fields.modified_at,
+                edited_at: payload.edited_at,
+                archived_at: payload.archived_at,
+                deleted_at: payload.deleted_at,
+                pinned_at: payload.pinned_at,
+                readonly: payload.readonly,
+                tags: payload.tags.clone(),
+            },
+            fields.modified_at,
+        )?,
     })
 }
 
@@ -432,23 +436,16 @@ pub fn build_pending_note_deletion_snapshot(
         event,
         op: "del".to_string(),
         entity_type: "note".to_string(),
-        history: LocalNoteSnapshotHistoryEntry {
-            snapshot_event_id: event_id.clone(),
-            note_id: note_id.to_string(),
-            op: "del".to_string(),
-            device_id: payload.device_id.clone(),
-            vector_clock: serialize_vector_clock(&payload.vector_clock)
-                .map_err(AppError::custom)?,
-            title: None,
-            markdown: None,
-            modified_at: now,
-            edited_at: Some(payload.edited_at),
-            deleted_at: payload.deleted_at,
-            archived_at: None,
-            pinned_at: None,
-            readonly: false,
-            created_at: now,
-        },
+        history: tombstone_snapshot_history_entry(
+            &event_id,
+            &SyncedTombstone {
+                id: note_id.to_string(),
+                device_id: payload.device_id.clone(),
+                vector_clock: payload.vector_clock.clone(),
+                deleted_at: payload.deleted_at.unwrap_or(now),
+            },
+            now,
+        )?,
     })
 }
 

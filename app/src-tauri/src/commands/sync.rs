@@ -1,7 +1,6 @@
 use crate::db::database_connection;
 use crate::domain::relay::service::normalize_relay_url;
 use crate::error::AppError;
-use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -11,26 +10,6 @@ fn restart_sync_async(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         let _ = crate::adapters::nostr::sync_manager::start_if_ready(&app_clone).await;
     });
-}
-
-fn clear_local_sync_state(conn: &Connection) -> Result<(), AppError> {
-    crate::adapters::sqlite::tag_index::clear_tag_index(conn)?;
-    conn.execute_batch(
-        "DELETE FROM notes_fts;
-         DELETE FROM note_conflicts;
-         DELETE FROM note_tombstones;
-         DELETE FROM notes;
-         DELETE FROM blob_meta;
-         DELETE FROM blob_uploads;
-         DELETE FROM pending_blob_uploads;
-         DELETE FROM pending_deletions;
-         DELETE FROM note_snapshot_history;
-         DELETE FROM sync_snapshots;
-         DELETE FROM sync_relay_state;
-         DELETE FROM sync_relays;
-         DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
-    )?;
-    Ok(())
 }
 
 #[tauri::command]
@@ -378,7 +357,7 @@ pub async fn resync(app: AppHandle) -> Result<(), AppError> {
     manager.stop().await;
 
     let conn = database_connection(&app)?;
-    clear_local_sync_state(&conn)?;
+    crate::adapters::sqlite::snapshot_repository::clear_local_snapshot_state(&conn)?;
 
     crate::adapters::nostr::sync_manager::start_if_ready(&app).await?;
     Ok(())
@@ -402,114 +381,4 @@ pub async fn unlock_current_account(app: AppHandle) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn unlock_sync(app: AppHandle) -> Result<(), AppError> {
     unlock_current_account(app).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::clear_local_sync_state;
-    use crate::adapters::sqlite::migrations::account_migrations;
-    use rusqlite::{Connection, OptionalExtension};
-
-    #[test]
-    fn clear_local_sync_state_wipes_sync_state_and_blob_bookkeeping() {
-        let mut conn = Connection::open_in_memory().unwrap();
-        account_migrations().to_latest(&mut conn).unwrap();
-
-        conn.execute_batch(
-            "INSERT INTO relays (url, kind, created_at)
-                 VALUES ('wss://relay.example', 'sync', 1);
-             INSERT INTO sync_relays (relay_url, created_at)
-                 VALUES ('wss://relay.example', 1);
-             INSERT INTO sync_relay_state (relay_url, checkpoint_seq, snapshot_seq, last_synced_at, min_payload_mtime, updated_at)
-                 VALUES ('wss://relay.example', 10, 20, 30, 40, 50);
-             INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, snapshot_event_id, locally_modified)
-                 VALUES ('note-1', 'Title', '# Title', 1, 2, 2, 'event-1', 1);
-             INSERT INTO notes_fts (note_id, title, markdown)
-                 VALUES ('note-1', 'Title', '# Title');
-             INSERT INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
-                 VALUES ('plain-1', 'https://blobs.example.com', 'pubkey-1', 'cipher-1', 'key-1');
-             INSERT INTO blob_uploads (object_hash, server_url, encrypted, size_bytes, uploaded_at)
-                 VALUES ('cipher-1', 'https://blobs.example.com', 1, 123, 1);
-             INSERT INTO pending_blob_uploads (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key, ciphertext, content_type, size_bytes, created_at, updated_at)
-                 VALUES ('plain-1', 'https://blobs.example.com', 'pubkey-1', 'cipher-1', 'key-1', X'01', 'image/png', 123, 1, 1);
-             INSERT INTO pending_deletions (entity_id, created_at)
-                 VALUES ('note-1', 1);
-             INSERT INTO sync_snapshots (author_pubkey, d_tag, snapshot_id, op, mtime, entity_type, event_id, relay_url, stored_seq, created_at)
-                 VALUES ('author-1', 'doc-1', 'snapshot-1', 'put', 2, 'note', 'event-1', 'wss://relay.example', 10, 1);
-             INSERT INTO tags (id, path, parent_id, last_segment, depth, pinned, hide_subtag_notes, icon, created_at, updated_at)
-                 VALUES (1, 'alpha', NULL, 'alpha', 0, 0, 0, NULL, 1, 1);
-             INSERT INTO note_tag_links (note_id, tag_id, is_direct)
-                 VALUES ('note-1', 1, 1);
-             INSERT INTO app_settings (key, value)
-                 VALUES ('active_sync_relay_url', 'wss://relay.example');",
-        )
-        .unwrap();
-
-        clear_local_sync_state(&conn).unwrap();
-
-        let notes: i64 = conn
-            .query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))
-            .unwrap();
-        let notes_fts: i64 = conn
-            .query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))
-            .unwrap();
-        let blob_meta: i64 = conn
-            .query_row("SELECT COUNT(*) FROM blob_meta", [], |row| row.get(0))
-            .unwrap();
-        let blob_uploads: i64 = conn
-            .query_row("SELECT COUNT(*) FROM blob_uploads", [], |row| row.get(0))
-            .unwrap();
-        let pending_blob_uploads: i64 = conn
-            .query_row("SELECT COUNT(*) FROM pending_blob_uploads", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let pending_deletions: i64 = conn
-            .query_row("SELECT COUNT(*) FROM pending_deletions", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let sync_snapshots: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_snapshots", [], |row| row.get(0))
-            .unwrap();
-        let sync_relay_state: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_relay_state", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let sync_relays: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_relays", [], |row| row.get(0))
-            .unwrap();
-        let relays: i64 = conn
-            .query_row("SELECT COUNT(*) FROM relays", [], |row| row.get(0))
-            .unwrap();
-        let tags: i64 = conn
-            .query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))
-            .unwrap();
-        let note_tag_links: i64 = conn
-            .query_row("SELECT COUNT(*) FROM note_tag_links", [], |row| row.get(0))
-            .unwrap();
-        let active_sync_relay_url: Option<String> = conn
-            .query_row(
-                "SELECT value FROM app_settings WHERE key = 'active_sync_relay_url'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()
-            .unwrap();
-
-        assert_eq!(notes, 0);
-        assert_eq!(notes_fts, 0);
-        assert_eq!(blob_meta, 0);
-        assert_eq!(blob_uploads, 0);
-        assert_eq!(pending_blob_uploads, 0);
-        assert_eq!(pending_deletions, 0);
-        assert_eq!(sync_snapshots, 0);
-        assert_eq!(sync_relay_state, 0);
-        assert_eq!(sync_relays, 0);
-        assert_eq!(tags, 0);
-        assert_eq!(note_tag_links, 0);
-        assert_eq!(active_sync_relay_url, None);
-        assert_eq!(relays, 1);
-    }
 }

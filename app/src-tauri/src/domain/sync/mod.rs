@@ -1,5 +1,6 @@
 pub(crate) mod apply_support;
 pub(crate) mod conflict_store;
+pub(crate) mod history_entry;
 pub mod model;
 pub(crate) mod note_apply;
 pub mod service;
