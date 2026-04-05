@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
+use uuid::Uuid;
 
 use crate::domain::common::text::{extract_tags, preview_from_markdown, strip_tags_from_markdown};
 use crate::domain::common::time::now_millis;
@@ -11,9 +12,13 @@ use crate::domain::notes::model::{
     ExportNotesInput, NoteFilterInput, NotePagePayload, NoteQueryInput, NoteSortDirection,
     NoteSortField, NoteSummary, SearchResult,
 };
+use crate::domain::sync::vector_clock::{
+    increment_vector_clock, parse_vector_clock, serialize_vector_clock,
+};
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 
 const LAST_OPEN_NOTE_KEY: &str = "last_open_note_id";
+const DEVICE_ID_KEY: &str = "sync_device_id";
 const MAX_NOTES_PAGE_SIZE: usize = 100;
 const SEARCH_RESULTS_LIMIT: usize = 20;
 
@@ -22,6 +27,14 @@ const SEARCH_RESULTS_LIMIT: usize = 20;
 #[allow(clippy::needless_pass_by_value)]
 fn map_err(e: rusqlite::Error) -> NoteError {
     NoteError::Storage(e.to_string())
+}
+
+fn map_clock_err(error: String) -> NoteError {
+    NoteError::Storage(error)
+}
+
+fn generate_device_id() -> String {
+    Uuid::new_v4().hyphenated().to_string().to_uppercase()
 }
 
 // ── Search helpers ────────────────────────────────────────────────────
@@ -455,6 +468,67 @@ pub struct SqliteNoteRepository<'a> {
     conn: &'a Connection,
 }
 
+impl SqliteNoteRepository<'_> {
+    fn current_device_id(&self) -> Result<String, NoteError> {
+        let existing: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                params![DEVICE_ID_KEY],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_err)?;
+
+        if let Some(device_id) = existing {
+            if !device_id.trim().is_empty() {
+                return Ok(device_id);
+            }
+        }
+
+        let device_id = generate_device_id();
+        self.conn
+            .execute(
+                "INSERT INTO app_settings (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![DEVICE_ID_KEY, device_id],
+            )
+            .map_err(map_err)?;
+
+        self.conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                params![DEVICE_ID_KEY],
+                |row| row.get(0),
+            )
+            .map_err(map_err)
+    }
+
+    fn next_vector_clock_json(&self, note_id: &str) -> Result<(String, String), NoteError> {
+        let device_id = self.current_device_id()?;
+        let existing: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT vector_clock FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_err)?;
+
+        let current_clock = existing
+            .as_deref()
+            .map(parse_vector_clock)
+            .transpose()
+            .map_err(map_clock_err)?
+            .unwrap_or_default();
+        let next_clock =
+            increment_vector_clock(&current_clock, &device_id).map_err(map_clock_err)?;
+        let next_clock_json = serialize_vector_clock(&next_clock).map_err(map_clock_err)?;
+        Ok((device_id, next_clock_json))
+    }
+}
+
 impl<'a> SqliteNoteRepository<'a> {
     pub fn new(conn: &'a Connection) -> Self {
         Self { conn }
@@ -588,11 +662,15 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         markdown: &str,
         now: i64,
     ) -> Result<(), NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
-                "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
-                 VALUES (?1, ?2, ?3, ?4, ?4, ?4, 1)",
-                params![note_id, title, markdown, now],
+                "INSERT INTO notes (
+                   id, title, markdown, created_at, modified_at, edited_at,
+                   last_edit_device_id, vector_clock, locally_modified
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?4, ?4, ?5, ?6, 1)",
+                params![note_id, title, markdown, now, device_id, vector_clock],
             )
             .map_err(map_err)?;
 
@@ -606,11 +684,20 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         markdown: &str,
         now: i64,
     ) -> Result<(), NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         let updated = self
             .conn
             .execute(
-                "UPDATE notes SET title = ?1, markdown = ?2, modified_at = ?3, edited_at = ?3, locally_modified = 1 WHERE id = ?4",
-                params![title, markdown, now, note_id],
+                "UPDATE notes
+                 SET title = ?1,
+                     markdown = ?2,
+                     modified_at = ?3,
+                     edited_at = ?3,
+                     last_edit_device_id = ?4,
+                     vector_clock = ?5,
+                     locally_modified = 1
+                 WHERE id = ?6",
+                params![title, markdown, now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)?;
 
@@ -648,13 +735,18 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         title: &str,
         markdown: &str,
     ) -> Result<(), NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         let updated = self
             .conn
             .execute(
                 "UPDATE notes
-                 SET title = ?1, markdown = ?2, locally_modified = 1
-                 WHERE id = ?3",
-                params![title, markdown, note_id],
+                 SET title = ?1,
+                     markdown = ?2,
+                     last_edit_device_id = ?3,
+                     vector_clock = ?4,
+                     locally_modified = 1
+                 WHERE id = ?5",
+                params![title, markdown, device_id, vector_clock, note_id],
             )
             .map_err(map_err)?;
 
@@ -666,83 +758,114 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     }
 
     fn set_readonly(&self, note_id: &str, readonly: bool, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET readonly = ?1, modified_at = ?2, locally_modified = 1
-                 WHERE id = ?3",
-                params![i32::from(readonly), now, note_id],
+                 SET readonly = ?1,
+                     modified_at = ?2,
+                     last_edit_device_id = ?3,
+                     vector_clock = ?4,
+                     locally_modified = 1
+                 WHERE id = ?5",
+                params![i32::from(readonly), now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn archive_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET archived_at = ?1, modified_at = ?1, locally_modified = 1
-                 WHERE id = ?2 AND archived_at IS NULL",
-                params![now, note_id],
+                 SET archived_at = ?1,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4 AND archived_at IS NULL",
+                params![now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn restore_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET archived_at = NULL, modified_at = ?1, locally_modified = 1
-                 WHERE id = ?2 AND archived_at IS NOT NULL",
-                params![now, note_id],
+                 SET archived_at = NULL,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4 AND archived_at IS NOT NULL",
+                params![now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn trash_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET deleted_at = ?1, modified_at = ?1, locally_modified = 1
-                 WHERE id = ?2 AND deleted_at IS NULL",
-                params![now, note_id],
+                 SET deleted_at = ?1,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4 AND deleted_at IS NULL",
+                params![now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn restore_from_trash(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET deleted_at = NULL, modified_at = ?1, locally_modified = 1
-                 WHERE id = ?2 AND deleted_at IS NOT NULL",
-                params![now, note_id],
+                 SET deleted_at = NULL,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4 AND deleted_at IS NOT NULL",
+                params![now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn pin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
                 "UPDATE notes
-                 SET pinned_at = ?1, modified_at = ?1, locally_modified = 1
-                 WHERE id = ?2",
-                params![now, note_id],
+                 SET pinned_at = ?1,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4",
+                params![now, device_id, vector_clock, note_id],
             )
             .map_err(map_err)
     }
 
     fn unpin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn
             .execute(
-                "UPDATE notes SET pinned_at = NULL, modified_at = ?1, locally_modified = 1 WHERE id = ?2",
-                params![now, note_id],
+                "UPDATE notes
+                 SET pinned_at = NULL,
+                     modified_at = ?1,
+                     last_edit_device_id = ?2,
+                     vector_clock = ?3,
+                     locally_modified = 1
+                 WHERE id = ?4",
+                params![now, device_id, vector_clock, note_id],
             )
-            .map_err(map_err)
-    }
-
-    fn delete_note(&self, note_id: &str) -> Result<usize, NoteError> {
-        self.conn
-            .execute("DELETE FROM notes WHERE id = ?1", params![note_id])
             .map_err(map_err)
     }
 
@@ -757,17 +880,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             ids.push(row.map_err(map_err)?);
         }
         Ok(ids)
-    }
-
-    fn delete_trashed_notes(&self) -> Result<(), NoteError> {
-        self.conn
-            .execute_batch(
-                "DELETE FROM notes_fts WHERE note_id IN (SELECT id FROM notes WHERE deleted_at IS NOT NULL);
-                 DELETE FROM notes WHERE deleted_at IS NOT NULL;",
-            )
-            .map_err(map_err)?;
-
-        Ok(())
     }
 
     // ── FTS / tags ────────────────────────────────────────────────────
@@ -786,13 +898,6 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                 "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
                 params![note_id, title, markdown],
             )
-            .map_err(map_err)?;
-        Ok(())
-    }
-
-    fn delete_search_document(&self, note_id: &str) -> Result<(), NoteError> {
-        self.conn
-            .execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note_id])
             .map_err(map_err)?;
         Ok(())
     }
@@ -851,12 +956,8 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             "SELECT n.id, n.title, n.markdown, n.edited_at, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
                     EXISTS (
                       SELECT 1
-                      FROM sync_revisions sr_current
-                      JOIN sync_heads sh
-                        ON sh.recipient = sr_current.recipient
-                       AND sh.d_tag = sr_current.d_tag
-                      WHERE sr_current.rev = n.current_rev
-                        AND sh.rev != n.current_rev
+                      FROM note_conflicts nc
+                      WHERE nc.note_id = n.id
                     ) AS has_conflict
              FROM notes n",
         );
@@ -870,12 +971,8 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                         "SELECT n.id, n.title, n.markdown, n.modified_at, n.archived_at, n.deleted_at, n.pinned_at, n.readonly,
                                 EXISTS (
                                   SELECT 1
-                                  FROM sync_revisions sr_current
-                                  JOIN sync_heads sh
-                                    ON sh.recipient = sr_current.recipient
-                                   AND sh.d_tag = sr_current.d_tag
-                                  WHERE sr_current.rev = n.current_rev
-                                    AND sh.rev != n.current_rev
+                                  FROM note_conflicts nc
+                                  WHERE nc.note_id = n.id
                                 ) AS has_conflict
                          FROM notes n
                          JOIN notes_fts ON notes_fts.note_id = n.id",

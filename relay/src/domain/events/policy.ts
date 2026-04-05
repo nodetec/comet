@@ -1,7 +1,7 @@
 import type { NostrEvent } from "@comet/nostr";
 
 import {
-  REVISION_SYNC_EVENT_KIND,
+  SNAPSHOT_SYNC_EVENT_KIND,
   type RelayKindClassification,
 } from "../../types";
 
@@ -14,8 +14,8 @@ export function classifyEventKind(
   kind: number,
   policy: KindPolicy,
 ): RelayKindClassification {
-  if (kind === REVISION_SYNC_EVENT_KIND) {
-    return "revision";
+  if (kind === SNAPSHOT_SYNC_EVENT_KIND) {
+    return "snapshot";
   }
   if (policy.companionKinds.includes(kind)) {
     return "companion";

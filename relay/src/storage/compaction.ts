@@ -1,28 +1,30 @@
-import { and, eq, inArray, lt, min } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, min } from "drizzle-orm";
 
-import type { RevisionRelayDb } from "../db";
-import { syncHeads, syncPayloads, syncRevisions } from "./schema";
+import type { SnapshotRelayDb } from "../db";
+import { syncPayloads, syncSnapshots } from "./schema";
 
 export type CompactionStore = {
   compactPayloadsBefore: (mtime: number) => Promise<number>;
   minPayloadMtime: () => Promise<number | null>;
 };
 
-export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
+export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
   return {
     async compactPayloadsBefore(mtime) {
       const rows = await db
         .select({
-          authorPubkey: syncRevisions.recipient,
-          dTag: syncRevisions.dTag,
-          rev: syncRevisions.rev,
-          payloadEventId: syncRevisions.payloadEventId,
+          authorPubkey: syncSnapshots.authorPubkey,
+          dTag: syncSnapshots.dTag,
+          snapshotId: syncSnapshots.snapshotId,
+          eventId: syncSnapshots.eventId,
+          mtime: syncSnapshots.mtime,
+          createdAt: syncSnapshots.createdAt,
         })
-        .from(syncRevisions)
+        .from(syncSnapshots)
         .where(
           and(
-            eq(syncRevisions.payloadRetained, 1),
-            lt(syncRevisions.mtime, mtime),
+            eq(syncSnapshots.payloadRetained, 1),
+            lt(syncSnapshots.mtime, mtime),
           ),
         );
 
@@ -30,22 +32,37 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
         return 0;
       }
 
-      const currentHeads = await db
+      const latestRetainedRows = await db
         .select({
-          authorPubkey: syncHeads.recipient,
-          dTag: syncHeads.dTag,
-          rev: syncHeads.rev,
+          authorPubkey: syncSnapshots.authorPubkey,
+          dTag: syncSnapshots.dTag,
+          snapshotId: syncSnapshots.snapshotId,
         })
-        .from(syncHeads);
+        .from(syncSnapshots)
+        .where(eq(syncSnapshots.payloadRetained, 1))
+        .orderBy(
+          syncSnapshots.authorPubkey,
+          syncSnapshots.dTag,
+          desc(syncSnapshots.mtime),
+          desc(syncSnapshots.createdAt),
+          desc(syncSnapshots.snapshotId),
+        );
 
-      const headKeys = new Set(
-        currentHeads.map(
-          (head) => `${head.authorPubkey}:${head.dTag}:${head.rev}`,
-        ),
-      );
+      const latestRetainedKeys = new Set<string>();
+      const seenDocuments = new Set<string>();
+      for (const row of latestRetainedRows) {
+        const documentKey = `${row.authorPubkey}:${row.dTag}`;
+        if (!seenDocuments.has(documentKey)) {
+          seenDocuments.add(documentKey);
+          latestRetainedKeys.add(`${documentKey}:${row.snapshotId}`);
+        }
+      }
 
       const candidates = rows.filter(
-        (row) => !headKeys.has(`${row.authorPubkey}:${row.dTag}:${row.rev}`),
+        (row) =>
+          !latestRetainedKeys.has(
+            `${row.authorPubkey}:${row.dTag}:${row.snapshotId}`,
+          ),
       );
 
       if (candidates.length === 0) {
@@ -53,7 +70,7 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
       }
 
       const payloadEventIds = candidates
-        .map((row) => row.payloadEventId)
+        .map((row) => row.eventId)
         .filter((eventId): eventId is string => typeof eventId === "string");
 
       await db.transaction(async (tx) => {
@@ -65,16 +82,16 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
 
         for (const row of candidates) {
           await tx
-            .update(syncRevisions)
+            .update(syncSnapshots)
             .set({
               payloadRetained: 0,
-              payloadEventId: null,
+              eventId: null,
             })
             .where(
               and(
-                eq(syncRevisions.recipient, row.authorPubkey),
-                eq(syncRevisions.dTag, row.dTag),
-                eq(syncRevisions.rev, row.rev),
+                eq(syncSnapshots.authorPubkey, row.authorPubkey),
+                eq(syncSnapshots.dTag, row.dTag),
+                eq(syncSnapshots.snapshotId, row.snapshotId),
               ),
             );
         }
@@ -84,9 +101,9 @@ export function createCompactionStore(db: RevisionRelayDb): CompactionStore {
     },
     async minPayloadMtime() {
       const [row] = await db
-        .select({ mtime: min(syncRevisions.mtime) })
-        .from(syncRevisions)
-        .where(eq(syncRevisions.payloadRetained, 1));
+        .select({ mtime: min(syncSnapshots.mtime) })
+        .from(syncSnapshots)
+        .where(eq(syncSnapshots.payloadRetained, 1));
 
       return row.mtime ?? null;
     },

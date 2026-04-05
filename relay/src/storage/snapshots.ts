@@ -1,35 +1,29 @@
 import type { NostrEvent } from "@comet/nostr";
 
-import type { RevisionRelayDb } from "../db";
-import type { RelayFilter, RevisionEnvelope } from "../types";
-import {
-  syncChanges,
-  syncHeads,
-  syncPayloads,
-  syncRevisionParents,
-  syncRevisions,
-} from "./schema";
+import type { SnapshotRelayDb } from "../db";
+import type { RelayFilter, SnapshotEnvelope } from "../types";
+import { syncChanges, syncPayloads, syncSnapshots } from "./schema";
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 
-export type RevisionStore = {
-  insertRevision: (
-    envelope: RevisionEnvelope,
+export type SnapshotStore = {
+  insertSnapshot: (
+    envelope: SnapshotEnvelope,
   ) => Promise<{ stored: boolean; reason?: string; seq?: number }>;
-  queryRevisionEvents: (filters: RelayFilter[]) => Promise<NostrEvent[]>;
-  queryCompactedRevisionIds: (filters: RelayFilter[]) => Promise<string[]>;
+  querySnapshotEvents: (filters: RelayFilter[]) => Promise<NostrEvent[]>;
+  queryCompactedSnapshotIds: (filters: RelayFilter[]) => Promise<string[]>;
 };
 
-export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
+export function createSnapshotStore(db: SnapshotRelayDb): SnapshotStore {
   return {
-    async insertRevision(envelope) {
+    async insertSnapshot(envelope) {
       const existing = await db
-        .select({ rev: syncRevisions.rev })
-        .from(syncRevisions)
+        .select({ snapshotId: syncSnapshots.snapshotId })
+        .from(syncSnapshots)
         .where(
           and(
-            eq(syncRevisions.recipient, envelope.authorPubkey),
-            eq(syncRevisions.dTag, envelope.documentCoord),
-            eq(syncRevisions.rev, envelope.revisionId),
+            eq(syncSnapshots.authorPubkey, envelope.authorPubkey),
+            eq(syncSnapshots.dTag, envelope.documentCoord),
+            eq(syncSnapshots.snapshotId, envelope.event.id),
           ),
         )
         .limit(1);
@@ -37,7 +31,7 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
       if (existing.length > 0) {
         return {
           stored: false,
-          reason: "duplicate: revision already exists",
+          reason: "duplicate: snapshot already exists",
         };
       }
 
@@ -45,9 +39,9 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
       await db.transaction(async (tx) => {
         await tx.insert(syncPayloads).values({
           eventId: envelope.event.id,
-          recipient: envelope.authorPubkey,
+          authorPubkey: envelope.authorPubkey,
           dTag: envelope.documentCoord,
-          rev: envelope.revisionId,
+          snapshotId: envelope.event.id,
           pubkey: envelope.event.pubkey,
           kind: envelope.event.kind,
           createdAt: envelope.event.created_at,
@@ -56,52 +50,23 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
           sig: envelope.event.sig,
         });
 
-        await tx.insert(syncRevisions).values({
-          recipient: envelope.authorPubkey,
+        await tx.insert(syncSnapshots).values({
+          authorPubkey: envelope.authorPubkey,
           dTag: envelope.documentCoord,
-          rev: envelope.revisionId,
+          snapshotId: envelope.event.id,
           op: envelope.op,
           mtime: envelope.mtime,
           entityType: envelope.entityType,
-          payloadEventId: envelope.event.id,
+          eventId: envelope.event.id,
           createdAt: envelope.event.created_at,
-        });
-
-        if (envelope.parentRevisionIds.length > 0) {
-          await tx.insert(syncRevisionParents).values(
-            envelope.parentRevisionIds.map((parentRev) => ({
-              recipient: envelope.authorPubkey,
-              dTag: envelope.documentCoord,
-              rev: envelope.revisionId,
-              parentRev,
-            })),
-          );
-
-          await tx
-            .delete(syncHeads)
-            .where(
-              and(
-                eq(syncHeads.recipient, envelope.authorPubkey),
-                eq(syncHeads.dTag, envelope.documentCoord),
-                inArray(syncHeads.rev, envelope.parentRevisionIds),
-              ),
-            );
-        }
-
-        await tx.insert(syncHeads).values({
-          recipient: envelope.authorPubkey,
-          dTag: envelope.documentCoord,
-          rev: envelope.revisionId,
-          op: envelope.op,
-          mtime: envelope.mtime,
         });
 
         const [change] = await tx
           .insert(syncChanges)
           .values({
-            recipient: envelope.authorPubkey,
+            authorPubkey: envelope.authorPubkey,
             dTag: envelope.documentCoord,
-            rev: envelope.revisionId,
+            snapshotId: envelope.event.id,
             eventId: envelope.event.id,
             op: envelope.op,
             mtime: envelope.mtime,
@@ -110,20 +75,20 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         storedSeq = change.seq;
 
         await tx
-          .update(syncRevisions)
+          .update(syncSnapshots)
           .set({ storedSeq: change.seq })
           .where(
             and(
-              eq(syncRevisions.recipient, envelope.authorPubkey),
-              eq(syncRevisions.dTag, envelope.documentCoord),
-              eq(syncRevisions.rev, envelope.revisionId),
+              eq(syncSnapshots.authorPubkey, envelope.authorPubkey),
+              eq(syncSnapshots.dTag, envelope.documentCoord),
+              eq(syncSnapshots.snapshotId, envelope.event.id),
             ),
           );
       });
 
       return { stored: true, seq: storedSeq };
     },
-    async queryRevisionEvents(filters) {
+    async querySnapshotEvents(filters) {
       if (filters.length === 0) {
         return [];
       }
@@ -152,11 +117,6 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         const documentValues = asStringArray(filter["#d"]);
         if (documentValues.length > 0) {
           conditions.push(inArray(syncPayloads.dTag, documentValues));
-        }
-
-        const revisionValues = asStringArray(filter["#r"]);
-        if (revisionValues.length > 0) {
-          conditions.push(inArray(syncPayloads.rev, revisionValues));
         }
 
         const query = db
@@ -197,42 +157,41 @@ export function createRevisionStore(db: RevisionRelayDb): RevisionStore {
         return left.id.localeCompare(right.id);
       });
     },
-    async queryCompactedRevisionIds(filters) {
+    async queryCompactedSnapshotIds(filters) {
       if (filters.length === 0) {
         return [];
       }
 
-      const revisions = new Set<string>();
+      const snapshotIds = new Set<string>();
 
       for (const filter of filters) {
-        const revisionValues = asStringArray(filter["#r"]);
-        if (revisionValues.length === 0) {
+        const eventIds = filter.ids;
+        if (!Array.isArray(eventIds) || eventIds.length === 0) {
           continue;
         }
 
-        const conditions = [eq(syncRevisions.payloadRetained, 0)];
+        const conditions = [eq(syncSnapshots.payloadRetained, 0)];
 
         const documentValues = asStringArray(filter["#d"]);
         if (documentValues.length > 0) {
-          conditions.push(inArray(syncRevisions.dTag, documentValues));
+          conditions.push(inArray(syncSnapshots.dTag, documentValues));
         }
-
-        conditions.push(inArray(syncRevisions.rev, revisionValues));
+        conditions.push(inArray(syncSnapshots.snapshotId, eventIds));
 
         const rows = await db
-          .select({ rev: syncRevisions.rev })
-          .from(syncRevisions)
+          .select({ snapshotId: syncSnapshots.snapshotId })
+          .from(syncSnapshots)
           .where(and(...conditions))
           .limit(
             filter.limit !== undefined ? Math.max(0, filter.limit) : 10_000,
           );
 
         for (const row of rows) {
-          revisions.add(row.rev);
+          snapshotIds.add(row.snapshotId);
         }
       }
 
-      return Array.from(revisions.values()).sort();
+      return Array.from(snapshotIds.values()).sort();
     },
   };
 }

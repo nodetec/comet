@@ -3,27 +3,27 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
   cleanupContexts,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
 describe("relay integration > publish", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
   test("returns NOTICE for malformed JSON input", async () => {
-    const ctx = await startTestRevisionRelay(39436);
+    const ctx = await startTestSnapshotRelay(39436);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -39,7 +39,7 @@ describe("relay integration > publish", () => {
   });
 
   test("returns NOTICE for non-array JSON input", async () => {
-    const ctx = await startTestRevisionRelay(39437);
+    const ctx = await startTestSnapshotRelay(39437);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -55,7 +55,7 @@ describe("relay integration > publish", () => {
   });
 
   test("rejects binary websocket messages with NOTICE", async () => {
-    const ctx = await startTestRevisionRelay(39438);
+    const ctx = await startTestSnapshotRelay(39438);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -70,20 +70,20 @@ describe("relay integration > publish", () => {
     ]);
   });
 
-  test("returns duplicate response when the same revision is published twice", async () => {
-    const ctx = await startTestRevisionRelay(39431);
+  test("returns duplicate response when the same snapshot is published twice", async () => {
+    const ctx = await startTestSnapshotRelay(39431);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
 
     sendJson(ws, ["EVENT", event], trace);
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
       "OK",
       event.id,
       true,
-      `stored: revision ${REV_A}`,
+      `stored: snapshot ${event.id}`,
     ]);
 
     sendJson(ws, ["EVENT", event], trace);
@@ -91,12 +91,12 @@ describe("relay integration > publish", () => {
       "OK",
       event.id,
       false,
-      "duplicate: revision already exists",
+      "duplicate: snapshot already exists",
     ]);
   });
 
-  test("rejects unsupported non-revision event kinds", async () => {
-    const ctx = await startTestRevisionRelay(39439);
+  test("rejects unsupported non-snapshot event kinds", async () => {
+    const ctx = await startTestSnapshotRelay(39439);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -116,26 +116,23 @@ describe("relay integration > publish", () => {
       "OK",
       event.id,
       false,
-      "unsupported: non-revision event kind requires explicit classification",
+      "unsupported: non-snapshot event kind requires explicit classification",
     ]);
   });
 
-  test("rejects revision events with malformed metadata", async () => {
-    const ctx = await startTestRevisionRelay(39440);
+  test("rejects snapshot events with malformed metadata", async () => {
+    const ctx = await startTestSnapshotRelay(39440);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
     const invalidEvent = {
-      ...revisionEvent(REV_A),
-      id: "event-invalid-revision",
+      ...snapshotEvent(REV_A),
+      id: "event-invalid-snapshot",
       tags: [
-        ["p", "recipient-1"],
         ["d", "doc-1"],
         ["op", "put"],
-        ["m", "1700000000000"],
-        ["type", "note"],
-        ["v", "2"],
+        ["c", "notes"],
       ],
     };
 
@@ -144,28 +141,23 @@ describe("relay integration > publish", () => {
       "OK",
       invalidEvent.id,
       false,
-      "invalid: missing or malformed revision metadata",
+      "invalid: missing or malformed snapshot metadata",
     ]);
   });
 
-  test("rejects revision events with malformed prev values", async () => {
-    const ctx = await startTestRevisionRelay(39441);
+  test("rejects snapshot events with malformed operation tags", async () => {
+    const ctx = await startTestSnapshotRelay(39441);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
     const invalidEvent = {
-      ...revisionEvent(REV_B),
+      ...snapshotEvent(REV_B),
       id: "event-invalid-prev",
       tags: [
-        ["p", "recipient-1"],
         ["d", "doc-1"],
-        ["r", REV_B],
-        ["prev", "not-hex"],
-        ["op", "put"],
-        ["m", "1700000000000"],
-        ["type", "note"],
-        ["v", "2"],
+        ["o", "merge"],
+        ["c", "notes"],
       ],
     };
 
@@ -174,7 +166,7 @@ describe("relay integration > publish", () => {
       "OK",
       invalidEvent.id,
       false,
-      "invalid: missing or malformed revision metadata",
+      "invalid: missing or malformed snapshot metadata",
     ]);
   });
 });

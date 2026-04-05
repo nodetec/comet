@@ -35,24 +35,28 @@ export type LoadedNote = {
   title: string;
 };
 
-export type NoteConflictHead = {
+export type NoteConflictSnapshot = {
+  deletedAt: number | null;
   isAvailable: boolean;
   isCurrent: boolean;
   markdown: string | null;
   mtime: number;
   op: string;
   preview: string | null;
-  revisionId: string;
+  snapshotId: string;
   title: string | null;
 };
 
 export type NoteConflictInfo = {
-  currentRevisionId: string | null;
-  headCount: number;
-  heads: NoteConflictHead[];
+  currentSnapshotId: string | null;
+  hasDeleteCandidate: boolean;
+  snapshotCount: number;
+  snapshots: NoteConflictSnapshot[];
   noteId: string;
   relayUrl: string | null;
 };
+
+export type ResolveNoteConflictAction = "restore" | "keep_deleted" | "merge";
 
 export type BootstrapPayload = {
   npub: string;

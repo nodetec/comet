@@ -4,8 +4,6 @@ export {
   relayEventTags,
   relaySettings,
   syncChanges,
-  syncHeads,
   syncPayloads,
-  syncRevisionParents,
-  syncRevisions,
+  syncSnapshots,
 } from "@comet/data";

@@ -1,8 +1,20 @@
 import type { NostrEvent } from "@comet/nostr";
 
-import type { RevisionChangesFilter } from "../types";
+import type { SnapshotChangesFilter } from "../types";
 
-export type ChangesRequestMessage = ["CHANGES", string, RevisionChangesFilter];
+export type ChangesRequestMessage = ["CHANGES", string, SnapshotChangesFilter];
+export type ChangesStatusMessage = [
+  "CHANGES",
+  string,
+  "STATUS",
+  { mode: "bootstrap"; snapshot_seq: number },
+];
+export type ChangesSnapshotMessage = [
+  "CHANGES",
+  string,
+  "SNAPSHOT",
+  NostrEvent,
+];
 export type ChangesEventMessage = [
   "CHANGES",
   string,

@@ -1,13 +1,10 @@
 use crate::adapters::nostr::relay_client::{
-    fetch_relay_info, RevisionRelayConnection, RevisionRelayIncomingMessage,
+    fetch_relay_info, SnapshotRelayConnection, SnapshotRelayIncomingMessage,
 };
-use crate::adapters::sqlite::revision_sync_repository::{
-    list_sync_heads_for_author, upsert_sync_relay_state,
-};
+use crate::adapters::sqlite::snapshot_sync_repository::upsert_sync_relay_state;
 use crate::db::{active_account, database_connection};
 use crate::domain::sync::model::SyncChangePayload;
-use crate::domain::sync::revision_apply_service::apply_remote_revision_event;
-use crate::domain::sync::revision_negentropy::{RevisionNegentropyItem, RevisionNegentropySession};
+use crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event;
 use crate::error::AppError;
 use nostr_sdk::prelude::{Event, Keys};
 use rusqlite::Connection;
@@ -20,10 +17,10 @@ use url::Url;
 
 const BOOTSTRAP_MESSAGE_TIMEOUT: Duration = Duration::from_secs(15);
 
-pub struct RevisionBootstrapResult {
-    pub connection: RevisionRelayConnection,
-    // `NEG-STATUS.snapshot_seq`: the relay sequence boundary that separates the
-    // negotiated head snapshot from the live `CHANGES` tail that follows it.
+pub struct SnapshotBootstrapResult {
+    pub connection: SnapshotRelayConnection,
+    // `CHANGES STATUS.snapshot_seq`: the relay sequence boundary that
+    // separates the bootstrap snapshot replay from the live `CHANGES` tail.
     pub snapshot_seq: i64,
     #[cfg_attr(not(test), allow(dead_code))]
     pub have: Vec<String>,
@@ -35,7 +32,7 @@ pub struct RevisionBootstrapResult {
 pub async fn bootstrap_relay_connection(
     app: &AppHandle,
     relay_ws_url: &str,
-) -> Result<RevisionBootstrapResult, AppError> {
+) -> Result<SnapshotBootstrapResult, AppError> {
     let conn = database_connection(app)?;
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
     let db_path = active_account(app)?.db_path;
@@ -59,7 +56,7 @@ pub async fn bootstrap_with_keys(
     keys: &Keys,
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
-) -> Result<RevisionBootstrapResult, AppError> {
+) -> Result<SnapshotBootstrapResult, AppError> {
     bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, &mut invalidate_cache, |_| {})
         .await
 }
@@ -70,20 +67,13 @@ async fn bootstrap_with_keys_and_changes(
     relay_ws_url: &str,
     mut invalidate_cache: impl FnMut(&str),
     mut on_change: impl FnMut(SyncChangePayload),
-) -> Result<RevisionBootstrapResult, AppError> {
+) -> Result<SnapshotBootstrapResult, AppError> {
     let relay_http_url = relay_http_url_from_ws(relay_ws_url)?;
     let relay_info = fetch_relay_info(&relay_http_url).await?;
 
     let author_pubkey = keys.public_key().to_hex();
     let conn = open_sync_db(db_path)?;
-    let heads = list_sync_heads_for_author(&conn, &author_pubkey)?;
-    let local_items = heads
-        .into_iter()
-        .map(|head| RevisionNegentropyItem {
-            revision_id: head.rev,
-            mtime: head.mtime as u64,
-        })
-        .collect::<Vec<_>>();
+    let local_snapshot_ids = local_known_snapshot_ids(&conn, &author_pubkey)?;
 
     upsert_sync_relay_state(
         &conn,
@@ -91,224 +81,144 @@ async fn bootstrap_with_keys_and_changes(
         None,
         None,
         None,
-        relay_info.revision_sync.retention.min_payload_mtime,
+        relay_info.snapshot_sync.retention.min_payload_mtime,
     )?;
 
-    let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
+    let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
     connection
-        .send_neg_open("bootstrap", &author_pubkey)
+        .send_changes_bootstrap("bootstrap", &author_pubkey)
         .await?;
 
+    let mut snapshot_seq = None;
+    let mut remote_snapshot_events = Vec::<Event>::new();
+
+    loop {
+        match recv_bootstrap_message(&mut connection, relay_ws_url, "CHANGES bootstrap").await? {
+            SnapshotRelayIncomingMessage::ChangesStatus {
+                subscription_id,
+                mode,
+                snapshot_seq: next_snapshot_seq,
+            } => {
+                if subscription_id != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected CHANGES STATUS subscription id: {subscription_id}"
+                    )));
+                }
+                if mode != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected CHANGES STATUS mode: {mode}"
+                    )));
+                }
+                snapshot_seq = Some(next_snapshot_seq);
+            }
+            SnapshotRelayIncomingMessage::ChangesSnapshot {
+                subscription_id,
+                event,
+            } => {
+                if subscription_id != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected CHANGES SNAPSHOT subscription id: {subscription_id}"
+                    )));
+                }
+                remote_snapshot_events.push(event);
+            }
+            SnapshotRelayIncomingMessage::ChangesEose {
+                subscription_id,
+                last_seq,
+            } => {
+                if subscription_id != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected CHANGES EOSE subscription id: {subscription_id}"
+                    )));
+                }
+                if let Some(snapshot_seq) = snapshot_seq {
+                    if last_seq != snapshot_seq {
+                        return Err(AppError::custom(format!(
+                            "Bootstrap EOSE last_seq mismatch: expected {snapshot_seq}, got {last_seq}"
+                        )));
+                    }
+                }
+                break;
+            }
+            SnapshotRelayIncomingMessage::ChangesErr {
+                subscription_id,
+                message,
+            } => {
+                if subscription_id != "bootstrap" {
+                    return Err(AppError::custom(format!(
+                        "Unexpected CHANGES ERR subscription id: {subscription_id}"
+                    )));
+                }
+                return Err(AppError::custom(format!(
+                    "Snapshot relay bootstrap failed: {message}"
+                )));
+            }
+            other => {
+                return Err(AppError::custom(format!(
+                    "Unexpected relay response during bootstrap: {other:?}"
+                )));
+            }
+        }
+    }
+
     let snapshot_seq =
-        match recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-STATUS").await? {
-            RevisionRelayIncomingMessage::NegStatus {
-                subscription_id,
-                strategy,
-                snapshot_seq,
-            } => {
-                if subscription_id != "bootstrap" {
-                    return Err(AppError::custom(format!(
-                        "Unexpected NEG-STATUS subscription id: {subscription_id}"
-                    )));
-                }
-                if strategy != relay_info.revision_sync.strategy {
-                    return Err(AppError::custom(format!(
-                        "Revision relay strategy mismatch: expected {}, got {strategy}",
-                        relay_info.revision_sync.strategy
-                    )));
-                }
-                snapshot_seq
-            }
-            RevisionRelayIncomingMessage::NegErr { message, .. } => {
-                return Err(AppError::custom(format!(
-                    "Revision relay NEG-OPEN failed: {message}"
-                )))
-            }
-            other => {
-                return Err(AppError::custom(format!(
-                    "Unexpected relay response to NEG-OPEN: {other:?}"
-                )))
-            }
-        };
+        snapshot_seq.ok_or_else(|| AppError::custom("Bootstrap did not return snapshot_seq"))?;
 
-    let mut negentropy = RevisionNegentropySession::new(&local_items, 0)?;
-    let mut message = Some(negentropy.initiate_hex()?);
-    let mut have = BTreeSet::new();
-    let mut need = BTreeSet::new();
+    let remote_snapshot_ids = remote_snapshot_events
+        .iter()
+        .map(snapshot_id_from_event)
+        .collect::<Result<BTreeSet<_>, _>>()?;
 
-    while let Some(outgoing_payload) = message {
-        connection
-            .send_neg_msg("bootstrap", &outgoing_payload)
-            .await?;
-        let response = recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-MSG").await?;
-        match response {
-            RevisionRelayIncomingMessage::NegMsg {
-                subscription_id,
-                payload: incoming_payload,
-            } => {
-                if subscription_id != "bootstrap" {
-                    return Err(AppError::custom(format!(
-                        "Unexpected NEG-MSG subscription id: {subscription_id}"
-                    )));
-                }
-                let result = negentropy.reconcile_with_ids_hex(&incoming_payload)?;
-                have.extend(result.have);
-                need.extend(result.need);
-                message = result.next_message_hex;
-            }
-            RevisionRelayIncomingMessage::NegErr { message, .. } => {
-                return Err(AppError::custom(format!(
-                    "Revision relay NEG-MSG failed: {message}"
-                )))
-            }
-            other => {
-                return Err(AppError::custom(format!(
-                    "Unexpected relay response during NEG-MSG: {other:?}"
-                )))
-            }
-        }
-    }
+    let have = local_snapshot_ids
+        .difference(&remote_snapshot_ids)
+        .cloned()
+        .collect::<Vec<_>>();
+    let need = remote_snapshot_ids
+        .difference(&local_snapshot_ids)
+        .cloned()
+        .collect::<Vec<_>>();
 
-    connection.send_neg_close("bootstrap").await?;
-    match recv_bootstrap_message(&mut connection, relay_ws_url, "NEG-CLOSE").await? {
-        RevisionRelayIncomingMessage::Closed {
-            subscription_id, ..
-        } if subscription_id == "bootstrap" => {}
-        other => {
-            return Err(AppError::custom(format!(
-                "Unexpected relay response to NEG-CLOSE: {other:?}"
-            )))
-        }
-    }
-
-    let need = need.into_iter().collect::<Vec<_>>();
     if !need.is_empty() {
-        if relay_info.revision_sync.batch_fetch {
-            connection
-                .send_req_revisions_batch("bootstrap-fetch", &author_pubkey, &need)
-                .await?;
-        } else {
-            connection
-                .send_req_revisions("bootstrap-fetch", &author_pubkey, &need)
-                .await?;
-        }
+        let mut conn = open_sync_db(db_path)?;
+        let tx = conn.transaction()?;
+        let mut invalidated_notes = BTreeSet::new();
+        let mut applied_changes = Vec::new();
 
-        let mut fetched_events = Vec::<Event>::new();
-        let mut compacted_revisions = Vec::new();
-
-        loop {
-            match connection.recv_message().await? {
-                RevisionRelayIncomingMessage::Event {
-                    subscription_id,
-                    event,
-                } => {
-                    if subscription_id != "bootstrap-fetch" {
-                        return Err(AppError::custom(format!(
-                            "Unexpected revision fetch subscription id: {subscription_id}"
-                        )));
-                    }
-                    fetched_events.push(event);
-                }
-                RevisionRelayIncomingMessage::EventsBatch {
-                    subscription_id,
-                    events,
-                } => {
-                    if subscription_id != "bootstrap-fetch" {
-                        return Err(AppError::custom(format!(
-                            "Unexpected batched revision fetch subscription id: {subscription_id}"
-                        )));
-                    }
-
-                    fetched_events.extend(events);
-                }
-                RevisionRelayIncomingMessage::EventStatus {
-                    subscription_id,
-                    rev,
-                    status,
-                } => {
-                    if subscription_id != "bootstrap-fetch" {
-                        return Err(AppError::custom(format!(
-                            "Unexpected revision fetch status subscription id: {subscription_id}"
-                        )));
-                    }
-                    if status == "payload_compacted" {
-                        compacted_revisions.push(rev);
-                    } else {
-                        return Err(AppError::custom(format!(
-                            "Unexpected revision fetch status: {status}"
-                        )));
-                    }
-                }
-                RevisionRelayIncomingMessage::Eose { subscription_id } => {
-                    if subscription_id == "bootstrap-fetch" {
-                        break;
-                    }
-                    return Err(AppError::custom(format!(
-                        "Unexpected EOSE subscription id: {subscription_id}"
-                    )));
-                }
-                other => {
-                    return Err(AppError::custom(format!(
-                        "Unexpected relay response during bootstrap fetch: {other:?}"
-                    )))
-                }
+        for event in remote_snapshot_events.iter().filter(|event| {
+            snapshot_id_from_event(event).is_ok_and(|snapshot_id| need.contains(&snapshot_id))
+        }) {
+            if let Some(change) =
+                apply_remote_snapshot_event(&tx, relay_ws_url, keys, event, None, |note_id| {
+                    invalidated_notes.insert(note_id.to_string());
+                })?
+            {
+                applied_changes.push(change);
             }
         }
 
-        if !compacted_revisions.is_empty() {
-            let retention_hint = relay_info
-                .revision_sync
-                .retention
-                .min_payload_mtime
-                .map(|mtime| format!(" relay min_payload_mtime={mtime}."))
-                .unwrap_or_default();
-            return Err(AppError::custom(format!(
-                "Revision relay no longer retains payloads for revisions: {}.{}",
-                compacted_revisions.join(", "),
-                retention_hint
-            )));
+        tx.commit()?;
+
+        for note_id in invalidated_notes {
+            invalidate_cache(&note_id);
         }
-
-        if !fetched_events.is_empty() {
-            let mut conn = open_sync_db(db_path)?;
-            let tx = conn.transaction()?;
-            let mut invalidated_notes = BTreeSet::new();
-            let mut applied_changes = Vec::new();
-
-            for event in &fetched_events {
-                if let Some(change) =
-                    apply_remote_revision_event(&tx, relay_ws_url, keys, event, None, |note_id| {
-                        invalidated_notes.insert(note_id.to_string());
-                    })?
-                {
-                    applied_changes.push(change);
-                }
-            }
-
-            tx.commit()?;
-
-            for note_id in invalidated_notes {
-                invalidate_cache(&note_id);
-            }
-            for change in applied_changes {
-                on_change(change);
-            }
+        for change in applied_changes {
+            on_change(change);
         }
     }
 
     let conn = open_sync_db(db_path)?;
-    // Record the Negentropy handoff boundary so the live `CHANGES` subscription
-    // can resume from the exact snapshot we just reconciled against.
+    // Record the bootstrap handoff boundary so the live `CHANGES`
+    // subscription can resume from the exact snapshot we just applied.
     upsert_sync_relay_state(
         &conn,
         relay_ws_url,
         None,
         Some(snapshot_seq),
         Some(crate::domain::common::time::now_millis()),
-        relay_info.revision_sync.retention.min_payload_mtime,
+        relay_info.snapshot_sync.retention.min_payload_mtime,
     )?;
 
-    Ok(RevisionBootstrapResult {
+    Ok(SnapshotBootstrapResult {
         connection,
         snapshot_seq,
         have: have.into_iter().collect(),
@@ -318,16 +228,34 @@ async fn bootstrap_with_keys_and_changes(
 }
 
 async fn recv_bootstrap_message(
-    connection: &mut RevisionRelayConnection,
+    connection: &mut SnapshotRelayConnection,
     relay_ws_url: &str,
     step: &str,
-) -> Result<RevisionRelayIncomingMessage, AppError> {
+) -> Result<SnapshotRelayIncomingMessage, AppError> {
     match timeout(BOOTSTRAP_MESSAGE_TIMEOUT, connection.recv_message()).await {
         Ok(result) => result,
         Err(_) => Err(AppError::custom(format!(
-            "Timed out waiting for revision relay during bootstrap ({step}) on {relay_ws_url}"
+            "Timed out waiting for snapshot relay during bootstrap ({step}) on {relay_ws_url}"
         ))),
     }
+}
+
+fn snapshot_id_from_event(event: &Event) -> Result<String, AppError> {
+    Ok(event.id.to_hex())
+}
+
+fn local_known_snapshot_ids(
+    conn: &Connection,
+    author_pubkey: &str,
+) -> Result<BTreeSet<String>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT snapshot_id
+         FROM sync_snapshots
+         WHERE author_pubkey = ?1
+         ORDER BY snapshot_id ASC",
+    )?;
+    let rows = stmt.query_map([author_pubkey], |row| row.get::<_, String>(0))?;
+    Ok(rows.collect::<Result<BTreeSet<_>, _>>()?)
 }
 
 pub fn relay_http_url_from_ws(relay_ws_url: &str) -> Result<String, AppError> {
@@ -365,15 +293,15 @@ fn open_sync_db(db_path: &Path) -> Result<Connection, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::nostr::comet_note_revision::{
-        build_note_revision_event, compute_note_revision_id, parse_note_revision_event,
-        NoteRevisionEventMeta, NoteRevisionPayload, COMET_NOTE_COLLECTION,
+    use crate::adapters::nostr::comet_note_snapshot::{
+        build_note_snapshot_event, parse_note_snapshot_event, NoteSnapshotEventMeta,
+        NoteSnapshotPayload, COMET_NOTE_COLLECTION,
     };
     use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state;
-    use crate::domain::sync::revision_service::{
-        build_pending_note_deletion_revision, build_pending_note_revision,
-        persist_local_deletion_revision, persist_local_note_revision,
+    use crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state;
+    use crate::domain::sync::snapshot_service::{
+        build_pending_note_deletion_snapshot, build_pending_note_snapshot,
+        persist_local_deletion_snapshot, persist_local_note_snapshot,
     };
     use nostr_sdk::prelude::Event;
     use nostr_sdk::prelude::Keys;
@@ -409,14 +337,14 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39420).await;
+        let relay = TestSnapshotRelay::start(39420).await;
         let event =
             make_remote_note_event(&keys, "note-1", "Remote Title", "# Remote Title\n\nBody");
         relay.publish_event(&event).await;
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-bootstrap-test-{}.db",
+            "comet-snapshot-bootstrap-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -430,35 +358,35 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need.len(), 1);
 
-        let current_rev: Option<String> = conn
+        let sync_event_id: Option<String> = conn
             .query_row(
-                "SELECT current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert!(current_rev.is_some());
+        assert!(sync_event_id.is_some());
 
         let _ = std::fs::remove_file(db_path);
         relay.stop();
     }
 
     #[tokio::test]
-    async fn pushes_local_revision_and_bootstraps_it_into_second_db() {
+    async fn pushes_local_snapshot_and_bootstraps_it_into_second_db() {
         if !external_relay_test_prereqs_available() {
             return;
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39421).await;
+        let relay = TestSnapshotRelay::start(39421).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-push-source-test-{}.db",
+            "comet-snapshot-push-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-push-destination-test-{}.db",
+            "comet-snapshot-push-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -473,8 +401,8 @@ mod tests {
             "# Local Title\n\nLocal Body",
         );
 
-        let pushed_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let pushed_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -486,11 +414,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.snapshot_seq, 1);
-        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+        assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, current_rev): (String, String, Option<String>) = destination_conn
+        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
             .query_row(
-                "SELECT title, markdown, current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -498,7 +426,7 @@ mod tests {
 
         assert_eq!(title, "Local Title");
         assert_eq!(markdown, "# Local Title\n\nLocal Body");
-        assert_eq!(current_rev, Some(pushed_revision_id));
+        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -506,13 +434,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bootstraps_revision_blob_metadata_without_rewriting_attachment_urls() {
+    async fn bootstraps_snapshot_blob_metadata_without_rewriting_attachment_urls() {
         if !external_relay_test_prereqs_available() {
             return;
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39441).await;
+        let relay = TestSnapshotRelay::start(39441).await;
         let hash = "a".repeat(64);
         let ciphertext_hash = "b".repeat(64);
         let key_hex = "c".repeat(64);
@@ -520,11 +448,11 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-blob-source-test-{}.db",
+            "comet-snapshot-blob-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-blob-destination-test-{}.db",
+            "comet-snapshot-blob-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -547,8 +475,8 @@ mod tests {
             )
             .unwrap();
 
-        let pushed_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-blob").await;
+        let pushed_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-blob").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -566,17 +494,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.snapshot_seq, 1);
-        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+        assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (stored_markdown, current_rev): (String, Option<String>) = destination_conn
+        let (stored_markdown, sync_event_id): (String, Option<String>) = destination_conn
             .query_row(
-                "SELECT markdown, current_rev FROM notes WHERE id = 'note-blob'",
+                "SELECT markdown, sync_event_id FROM notes WHERE id = 'note-blob'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
         assert_eq!(stored_markdown, markdown);
-        assert_eq!(current_rev, Some(pushed_revision_id));
+        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
 
         let stored_blob_meta: (String, String, String) = destination_conn
             .query_row(
@@ -602,21 +530,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pushes_local_revision_and_bootstraps_it_into_second_db_via_root_websocket_url() {
+    async fn pushes_local_snapshot_and_bootstraps_it_into_second_db_via_root_websocket_url() {
         if !external_relay_test_prereqs_available() {
             return;
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39435).await;
+        let relay = TestSnapshotRelay::start(39435).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-push-root-source-test-{}.db",
+            "comet-snapshot-push-root-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-push-root-destination-test-{}.db",
+            "comet-snapshot-push-root-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -631,8 +559,8 @@ mod tests {
             "# Root Path Title\n\nLocal Body",
         );
 
-        let pushed_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.root_ws_url, "note-1").await;
+        let pushed_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.root_ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -644,11 +572,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.snapshot_seq, 1);
-        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+        assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, current_rev): (String, String, Option<String>) = destination_conn
+        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
             .query_row(
-                "SELECT title, markdown, current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -656,7 +584,7 @@ mod tests {
 
         assert_eq!(title, "Root Path Title");
         assert_eq!(markdown, "# Root Path Title\n\nLocal Body");
-        assert_eq!(current_rev, Some(pushed_revision_id));
+        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -664,21 +592,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pushes_pinned_local_revision_and_bootstraps_it_into_second_db() {
+    async fn pushes_pinned_local_snapshot_and_bootstraps_it_into_second_db() {
         if !external_relay_test_prereqs_available() {
             return;
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39436).await;
+        let relay = TestSnapshotRelay::start(39436).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-pinned-source-test-{}.db",
+            "comet-snapshot-pinned-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-pinned-destination-test-{}.db",
+            "comet-snapshot-pinned-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -694,8 +622,8 @@ mod tests {
             250,
         );
 
-        let pushed_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let pushed_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -707,16 +635,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.snapshot_seq, 1);
-        assert_eq!(result.need, vec![pushed_revision_id.clone()]);
+        assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, current_rev, pinned_at): (
+        let (title, markdown, sync_event_id, pinned_at): (
             String,
             String,
             Option<String>,
             Option<i64>,
         ) = destination_conn
             .query_row(
-                "SELECT title, markdown, current_rev, pinned_at FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, sync_event_id, pinned_at FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
@@ -724,7 +652,7 @@ mod tests {
 
         assert_eq!(title, "Pinned Title");
         assert_eq!(markdown, "# Pinned Title\n\nPinned Body");
-        assert_eq!(current_rev, Some(pushed_revision_id));
+        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
         assert_eq!(pinned_at, Some(250));
 
         let _ = std::fs::remove_file(source_db_path);
@@ -739,15 +667,15 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39423).await;
+        let relay = TestSnapshotRelay::start(39423).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-delete-source-test-{}.db",
+            "comet-snapshot-delete-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-delete-destination-test-{}.db",
+            "comet-snapshot-delete-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -757,8 +685,8 @@ mod tests {
         account_migrations().to_latest(&mut source_conn).unwrap();
         seed_note(&source_conn, "note-1", "Delete Me", "# Delete Me\n\nBody");
 
-        let initial_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let initial_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -770,20 +698,20 @@ mod tests {
                 .await
                 .unwrap();
 
-        assert_eq!(first_bootstrap.need, vec![initial_revision_id.clone()]);
+        assert_eq!(first_bootstrap.need, vec![initial_snapshot_id.clone()]);
 
-        let first_current_rev: Option<String> = destination_conn
+        let first_sync_event_id: Option<String> = destination_conn
             .query_row(
-                "SELECT current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(first_current_rev, Some(initial_revision_id));
+        assert_eq!(first_sync_event_id, Some(initial_snapshot_id));
 
         delete_local_note(&source_conn, "note-1");
-        let deletion_revision_id =
-            push_local_note_deletion_revision(&source_db_path, &keys, &relay.ws_url, "note-1")
+        let deletion_snapshot_id =
+            push_local_note_deletion_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1")
                 .await;
 
         let second_bootstrap =
@@ -791,7 +719,7 @@ mod tests {
                 .await
                 .unwrap();
 
-        assert_eq!(second_bootstrap.need, vec![deletion_revision_id.clone()]);
+        assert_eq!(second_bootstrap.need, vec![deletion_snapshot_id.clone()]);
 
         let remaining_notes: i64 = destination_conn
             .query_row(
@@ -802,14 +730,14 @@ mod tests {
             .unwrap();
         assert_eq!(remaining_notes, 0);
 
-        let head_op: String = destination_conn
+        let tombstone_sync_event_id: String = destination_conn
             .query_row(
-                "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
-                rusqlite::params![keys.public_key().to_hex(), "note-1"],
+                "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
+                rusqlite::params!["note-1"],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(head_op, "del");
+        assert_eq!(tombstone_sync_event_id, deletion_snapshot_id);
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -823,15 +751,15 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39424).await;
+        let relay = TestSnapshotRelay::start(39424).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-live-source-test-{}.db",
+            "comet-snapshot-live-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-live-destination-test-{}.db",
+            "comet-snapshot-live-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -846,8 +774,8 @@ mod tests {
             "# Local Title\n\nLocal Body",
         );
 
-        let initial_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let initial_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -858,7 +786,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(bootstrap.need, vec![initial_revision_id]);
+        assert_eq!(bootstrap.need, vec![initial_snapshot_id]);
 
         bootstrap
             .connection
@@ -872,7 +800,7 @@ mod tests {
             .unwrap();
 
         match bootstrap.connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEose {
+            SnapshotRelayIncomingMessage::ChangesEose {
                 subscription_id,
                 last_seq,
             } => {
@@ -889,11 +817,11 @@ mod tests {
             "# Updated Title\n\nUpdated Body",
             400,
         );
-        let updated_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let updated_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let (seq, event) = match bootstrap.connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEvent {
+            SnapshotRelayIncomingMessage::ChangesEvent {
                 subscription_id,
                 seq,
                 event,
@@ -905,12 +833,12 @@ mod tests {
         };
 
         let conn = Connection::open(&destination_db_path).unwrap();
-        apply_remote_revision_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
+        apply_remote_snapshot_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
             .unwrap();
 
-        let (title, markdown, current_rev): (String, String, Option<String>) = destination_conn
+        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
             .query_row(
-                "SELECT title, markdown, current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -918,7 +846,7 @@ mod tests {
 
         assert_eq!(title, "Updated Title");
         assert_eq!(markdown, "# Updated Title\n\nUpdated Body");
-        assert_eq!(current_rev, Some(updated_revision_id));
+        assert_eq!(sync_event_id, Some(updated_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -932,11 +860,11 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start_private(39430).await;
+        let relay = TestSnapshotRelay::start_private(39430).await;
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-private-bootstrap-fail-test-{}.db",
+            "comet-snapshot-private-bootstrap-fail-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -966,7 +894,7 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start_private(39431).await;
+        let relay = TestSnapshotRelay::start_private(39431).await;
         relay.allow_pubkey(&keys.public_key().to_hex()).await;
 
         let event =
@@ -975,7 +903,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-private-bootstrap-success-test-{}.db",
+            "comet-snapshot-private-bootstrap-success-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -1007,16 +935,16 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start_private(39432).await;
+        let relay = TestSnapshotRelay::start_private(39432).await;
         relay.allow_pubkey(&keys.public_key().to_hex()).await;
 
         let temp_dir = std::env::temp_dir();
         let source_db_path = temp_dir.join(format!(
-            "comet-revision-private-live-source-test-{}.db",
+            "comet-snapshot-private-live-source-test-{}.db",
             std::process::id()
         ));
         let destination_db_path = temp_dir.join(format!(
-            "comet-revision-private-live-destination-test-{}.db",
+            "comet-snapshot-private-live-destination-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&source_db_path);
@@ -1031,8 +959,8 @@ mod tests {
             "# Local Title\n\nLocal Body",
         );
 
-        let initial_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let initial_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut destination_conn = Connection::open(&destination_db_path).unwrap();
         account_migrations()
@@ -1043,7 +971,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(bootstrap.need, vec![initial_revision_id]);
+        assert_eq!(bootstrap.need, vec![initial_snapshot_id]);
 
         bootstrap
             .connection
@@ -1057,7 +985,7 @@ mod tests {
             .unwrap();
 
         match bootstrap.connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEose {
+            SnapshotRelayIncomingMessage::ChangesEose {
                 subscription_id,
                 last_seq,
             } => {
@@ -1074,11 +1002,11 @@ mod tests {
             "# Updated Title\n\nUpdated Body",
             400,
         );
-        let updated_revision_id =
-            push_local_note_revision(&source_db_path, &keys, &relay.ws_url, "note-1").await;
+        let updated_snapshot_id =
+            push_local_note_snapshot(&source_db_path, &keys, &relay.ws_url, "note-1").await;
 
         let (seq, event) = match bootstrap.connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEvent {
+            SnapshotRelayIncomingMessage::ChangesEvent {
                 subscription_id,
                 seq,
                 event,
@@ -1090,12 +1018,12 @@ mod tests {
         };
 
         let conn = Connection::open(&destination_db_path).unwrap();
-        apply_remote_revision_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
+        apply_remote_snapshot_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
             .unwrap();
 
-        let (title, markdown, current_rev): (String, String, Option<String>) = destination_conn
+        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
             .query_row(
-                "SELECT title, markdown, current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
@@ -1103,7 +1031,7 @@ mod tests {
 
         assert_eq!(title, "Updated Title");
         assert_eq!(markdown, "# Updated Title\n\nUpdated Body");
-        assert_eq!(current_rev, Some(updated_revision_id));
+        assert_eq!(sync_event_id, Some(updated_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -1117,11 +1045,11 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay = TestRevisionRelay::start(39425).await;
+        let relay = TestSnapshotRelay::start(39425).await;
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-live-publish-test-{}.db",
+            "comet-snapshot-live-publish-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -1130,11 +1058,11 @@ mod tests {
         account_migrations().to_latest(&mut conn).unwrap();
         seed_note(&conn, "note-1", "Initial Title", "# Initial Title\n\nBody");
 
-        let initial_revision_id =
-            push_local_note_revision(&db_path, &keys, &relay.ws_url, "note-1").await;
+        let initial_snapshot_id =
+            push_local_note_snapshot(&db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut live_connection =
-            RevisionRelayConnection::connect_authenticated(&relay.ws_url, &keys)
+            SnapshotRelayConnection::connect_authenticated(&relay.ws_url, &keys)
                 .await
                 .unwrap();
         live_connection
@@ -1143,7 +1071,7 @@ mod tests {
             .unwrap();
 
         match live_connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEose {
+            SnapshotRelayIncomingMessage::ChangesEose {
                 subscription_id,
                 last_seq,
             } => {
@@ -1160,21 +1088,22 @@ mod tests {
             "# Updated Title\n\nUpdated Body",
             400,
         );
-        let updated_revision_id =
-            push_local_note_revision(&db_path, &keys, &relay.ws_url, "note-1").await;
+        let updated_snapshot_id =
+            push_local_note_snapshot(&db_path, &keys, &relay.ws_url, "note-1").await;
 
-        assert_ne!(initial_revision_id, updated_revision_id);
+        assert_ne!(initial_snapshot_id, updated_snapshot_id);
 
         match live_connection.recv_message().await.unwrap() {
-            RevisionRelayIncomingMessage::ChangesEvent {
+            SnapshotRelayIncomingMessage::ChangesEvent {
                 subscription_id,
                 seq,
                 event,
             } => {
                 assert_eq!(subscription_id, "live-sync");
                 assert_eq!(seq, 2);
-                let parsed = parse_note_revision_event(&keys, &event).unwrap();
-                assert_eq!(parsed.revision_id, updated_revision_id);
+                let parsed = parse_note_snapshot_event(&keys, &event).unwrap();
+                assert_eq!(parsed.document_id, "note-1");
+                assert_eq!(event.id.to_hex(), updated_snapshot_id);
             }
             other => panic!("unexpected live changes event: {other:?}"),
         }
@@ -1190,8 +1119,8 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay_a = TestRevisionRelay::start(39426).await;
-        let relay_b = TestRevisionRelay::start(39427).await;
+        let relay_a = TestSnapshotRelay::start(39426).await;
+        let relay_b = TestSnapshotRelay::start(39427).await;
 
         let event_a = make_remote_note_event(&keys, "note-1", "Relay A", "# Relay A\n\nBody A");
         let event_b = make_remote_note_event(&keys, "note-2", "Relay B", "# Relay B\n\nBody B");
@@ -1200,7 +1129,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-multi-relay-additive-test-{}.db",
+            "comet-snapshot-multi-relay-additive-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -1237,26 +1166,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn does_not_refetch_same_logical_revision_from_second_relay() {
+    async fn does_not_refetch_same_logical_snapshot_from_second_relay() {
         if !external_relay_test_prereqs_available() {
             return;
         }
 
         let keys = Keys::generate();
-        let relay_a = TestRevisionRelay::start(39428).await;
-        let relay_b = TestRevisionRelay::start(39429).await;
+        let relay_a = TestSnapshotRelay::start(39428).await;
+        let relay_b = TestSnapshotRelay::start(39429).await;
 
         let event_a = make_remote_note_event(
             &keys,
             "note-1",
-            "Same Revision",
-            "# Same Revision\n\nShared Body",
+            "Same Snapshot",
+            "# Same Snapshot\n\nShared Body",
         );
         let event_b = make_remote_note_event(
             &keys,
             "note-1",
-            "Same Revision",
-            "# Same Revision\n\nShared Body",
+            "Same Snapshot",
+            "# Same Snapshot\n\nShared Body",
         );
         assert_ne!(event_a.id, event_b.id);
 
@@ -1265,7 +1194,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-multi-relay-dedupe-test-{}.db",
+            "comet-snapshot-multi-relay-dedupe-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -1292,14 +1221,14 @@ mod tests {
             .unwrap();
         assert_eq!(note_count, 1);
 
-        let revision_count: i64 = conn
+        let snapshot_count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM sync_revisions WHERE recipient = ?1",
+                "SELECT COUNT(*) FROM sync_snapshots WHERE author_pubkey = ?1",
                 rusqlite::params![keys.public_key().to_hex()],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(revision_count, 1);
+        assert_eq!(snapshot_count, 1);
 
         let state_a = get_sync_relay_state(&conn, &relay_a.ws_url)
             .unwrap()
@@ -1322,8 +1251,8 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let relay_open = TestRevisionRelay::start(39433).await;
-        let relay_private = TestRevisionRelay::start_private(39434).await;
+        let relay_open = TestSnapshotRelay::start(39433).await;
+        let relay_private = TestSnapshotRelay::start_private(39434).await;
         relay_private
             .allow_pubkey(&keys.public_key().to_hex())
             .await;
@@ -1338,7 +1267,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!(
-            "comet-revision-mixed-access-test-{}.db",
+            "comet-snapshot-mixed-access-test-{}.db",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&db_path);
@@ -1365,7 +1294,7 @@ mod tests {
         relay_private.stop();
     }
 
-    struct TestRevisionRelay {
+    struct TestSnapshotRelay {
         child: Child,
         ws_url: String,
         root_ws_url: String,
@@ -1374,7 +1303,7 @@ mod tests {
         _db_name: String,
     }
 
-    impl TestRevisionRelay {
+    impl TestSnapshotRelay {
         async fn start(port: u16) -> Self {
             Self::start_with_options(port, false).await
         }
@@ -1433,25 +1362,25 @@ mod tests {
         }
 
         async fn publish_event(&self, event: &Event) {
-            let mut connection = RevisionRelayConnection::connect(&self.ws_url)
+            let mut connection = SnapshotRelayConnection::connect(&self.ws_url)
                 .await
                 .unwrap();
             connection.send_event(event).await.unwrap();
             let response = connection.recv_message().await.unwrap();
             match response {
-                RevisionRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
+                SnapshotRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
                 other => panic!("unexpected publish response: {other:?}"),
             }
         }
 
         async fn publish_event_with_keys(&self, keys: &Keys, event: &Event) {
-            let mut connection = RevisionRelayConnection::connect_authenticated(&self.ws_url, keys)
+            let mut connection = SnapshotRelayConnection::connect_authenticated(&self.ws_url, keys)
                 .await
                 .unwrap();
             connection.send_event(event).await.unwrap();
             let response = connection.recv_message().await.unwrap();
             match response {
-                RevisionRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
+                SnapshotRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
                 other => panic!("unexpected publish response: {other:?}"),
             }
         }
@@ -1486,32 +1415,24 @@ mod tests {
     }
 
     fn make_remote_note_event(keys: &Keys, note_id: &str, _title: &str, markdown: &str) -> Event {
-        let payload = NoteRevisionPayload {
+        let payload = NoteSnapshotPayload {
             version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([("DEVICE-A".to_string(), 200)]),
             markdown: markdown.to_string(),
             note_created_at: 100,
             edited_at: 200,
+            deleted_at: None,
             archived_at: None,
             pinned_at: None,
             readonly: false,
             tags: vec![],
             attachments: vec![],
         };
-        let revision_id = compute_note_revision_id(
-            note_id,
-            &[],
-            "put",
-            Some(COMET_NOTE_COLLECTION),
-            Some(&payload),
-        )
-        .unwrap();
-
-        build_note_revision_event(
+        build_note_snapshot_event(
             keys,
-            &NoteRevisionEventMeta {
+            &NoteSnapshotEventMeta {
                 document_id: note_id.to_string(),
-                revision_id,
-                parent_revision_ids: vec![],
                 operation: "put".to_string(),
                 collection: Some(COMET_NOTE_COLLECTION.to_string()),
                 created_at_ms: Some(200),
@@ -1521,29 +1442,29 @@ mod tests {
         .unwrap()
     }
 
-    async fn push_local_note_revision(
+    async fn push_local_note_snapshot(
         db_path: &Path,
         keys: &Keys,
         relay_ws_url: &str,
         note_id: &str,
     ) -> String {
         let author_pubkey = keys.public_key();
-        let (event, revision_id) = {
+        let (event, snapshot_id) = {
             let conn = Connection::open(db_path).unwrap();
             let pending =
-                build_pending_note_revision(&conn, keys, &author_pubkey, note_id).unwrap();
-            persist_local_note_revision(&conn, &pending).unwrap();
+                build_pending_note_snapshot(&conn, keys, &author_pubkey, note_id).unwrap();
+            persist_local_note_snapshot(&conn, &pending).unwrap();
             let event = pending.event;
-            (event, pending.revision_id)
+            (event, pending.event_id)
         };
 
-        let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys)
+        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys)
             .await
             .unwrap();
         connection.send_event(&event).await.unwrap();
         let response = connection.recv_message().await.unwrap();
         match response {
-            RevisionRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
+            SnapshotRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
             other => panic!("unexpected publish response: {other:?}"),
         }
 
@@ -1554,38 +1475,38 @@ mod tests {
         )
         .unwrap();
 
-        revision_id
+        snapshot_id
     }
 
-    async fn push_local_note_deletion_revision(
+    async fn push_local_note_deletion_snapshot(
         db_path: &Path,
         keys: &Keys,
         relay_ws_url: &str,
         note_id: &str,
     ) -> String {
         let author_pubkey = keys.public_key();
-        let (event, revision_id) = {
+        let (event, snapshot_id) = {
             let conn = Connection::open(db_path).unwrap();
             let pending =
-                build_pending_note_deletion_revision(&conn, keys, &author_pubkey, note_id, 300)
+                build_pending_note_deletion_snapshot(&conn, keys, &author_pubkey, note_id, 300)
                     .unwrap();
-            persist_local_deletion_revision(&conn, &pending).unwrap();
+            persist_local_deletion_snapshot(&conn, &pending).unwrap();
             let event = pending.event;
-            (event, pending.revision_id)
+            (event, pending.event_id)
         };
 
         publish_local_event(relay_ws_url, keys, &event).await;
-        revision_id
+        snapshot_id
     }
 
     async fn publish_local_event(relay_ws_url: &str, keys: &Keys, event: &Event) {
-        let mut connection = RevisionRelayConnection::connect_authenticated(relay_ws_url, keys)
+        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys)
             .await
             .unwrap();
         connection.send_event(event).await.unwrap();
         let response = connection.recv_message().await.unwrap();
         match response {
-            RevisionRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
+            SnapshotRelayIncomingMessage::Ok { accepted, .. } => assert!(accepted),
             other => panic!("unexpected publish response: {other:?}"),
         }
     }
@@ -1713,7 +1634,7 @@ mod tests {
         if !available {
             EXTERNAL_TEST_PREREQ_WARNING.call_once(|| {
                 eprintln!(
-                    "skipping revision relay process tests: TEST_DATABASE_URL and bun are required"
+                    "skipping snapshot relay process tests: TEST_DATABASE_URL and bun are required"
                 );
             });
         }

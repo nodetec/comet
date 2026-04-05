@@ -14,42 +14,25 @@ CREATE TABLE IF NOT EXISTS "relay_event_tags" (
 	"tag_value" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "sync_revisions" (
-	"recipient" text NOT NULL,
+CREATE TABLE IF NOT EXISTS "sync_snapshots" (
+	"author_pubkey" text NOT NULL,
 	"d_tag" text NOT NULL,
-	"rev" text NOT NULL,
+	"snapshot_id" text NOT NULL,
 	"op" text NOT NULL,
 	"mtime" bigint NOT NULL,
 	"entity_type" text,
-	"payload_event_id" text,
+	"event_id" text,
 	"payload_retained" integer DEFAULT 1 NOT NULL,
 	"stored_seq" bigint,
 	"created_at" bigint NOT NULL,
-	CONSTRAINT "sync_revisions_recipient_d_tag_rev_pk" PRIMARY KEY("recipient","d_tag","rev")
-);
---> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "sync_revision_parents" (
-	"recipient" text NOT NULL,
-	"d_tag" text NOT NULL,
-	"rev" text NOT NULL,
-	"parent_rev" text NOT NULL,
-	CONSTRAINT "sync_revision_parents_recipient_d_tag_rev_parent_rev_pk" PRIMARY KEY("recipient","d_tag","rev","parent_rev")
-);
---> statement-breakpoint
-CREATE TABLE IF NOT EXISTS "sync_heads" (
-	"recipient" text NOT NULL,
-	"d_tag" text NOT NULL,
-	"rev" text NOT NULL,
-	"op" text NOT NULL,
-	"mtime" bigint NOT NULL,
-	CONSTRAINT "sync_heads_recipient_d_tag_rev_pk" PRIMARY KEY("recipient","d_tag","rev")
+	CONSTRAINT "sync_snapshots_author_pubkey_d_tag_snapshot_id_pk" PRIMARY KEY("author_pubkey","d_tag","snapshot_id")
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "sync_payloads" (
 	"event_id" text PRIMARY KEY NOT NULL,
-	"recipient" text NOT NULL,
+	"author_pubkey" text NOT NULL,
 	"d_tag" text NOT NULL,
-	"rev" text NOT NULL,
+	"snapshot_id" text NOT NULL,
 	"pubkey" text NOT NULL,
 	"kind" integer NOT NULL,
 	"created_at" bigint NOT NULL,
@@ -60,9 +43,9 @@ CREATE TABLE IF NOT EXISTS "sync_payloads" (
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "sync_changes" (
 	"seq" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "sync_changes_seq_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
-	"recipient" text NOT NULL,
+	"author_pubkey" text NOT NULL,
 	"d_tag" text NOT NULL,
-	"rev" text NOT NULL,
+	"snapshot_id" text NOT NULL,
 	"event_id" text NOT NULL,
 	"op" text NOT NULL,
 	"mtime" bigint NOT NULL
@@ -104,27 +87,19 @@ CREATE INDEX IF NOT EXISTS "idx_relay_events_kind_created_at" ON "relay_events" 
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_relay_event_tags_lookup" ON "relay_event_tags" USING btree ("tag_name","tag_value");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_revisions_scope" ON "sync_revisions" USING btree ("recipient","d_tag");
+CREATE INDEX IF NOT EXISTS "idx_sync_snapshots_scope" ON "sync_snapshots" USING btree ("author_pubkey","d_tag");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_revisions_rev" ON "sync_revisions" USING btree ("rev");
+CREATE INDEX IF NOT EXISTS "idx_sync_snapshots_snapshot_id" ON "sync_snapshots" USING btree ("snapshot_id");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_revisions_mtime" ON "sync_revisions" USING btree ("mtime");
+CREATE INDEX IF NOT EXISTS "idx_sync_snapshots_mtime" ON "sync_snapshots" USING btree ("mtime");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_revision_parents_rev" ON "sync_revision_parents" USING btree ("recipient","d_tag","rev");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_revision_parents_parent_rev" ON "sync_revision_parents" USING btree ("recipient","d_tag","parent_rev");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_heads_scope" ON "sync_heads" USING btree ("recipient","d_tag");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_heads_mtime" ON "sync_heads" USING btree ("mtime");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_payloads_rev" ON "sync_payloads" USING btree ("recipient","d_tag","rev");
+CREATE INDEX IF NOT EXISTS "idx_sync_payloads_snapshot_id" ON "sync_payloads" USING btree ("author_pubkey","d_tag","snapshot_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_sync_changes_seq" ON "sync_changes" USING btree ("seq");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_changes_scope_seq" ON "sync_changes" USING btree ("recipient","seq");
+CREATE INDEX IF NOT EXISTS "idx_sync_changes_scope_seq" ON "sync_changes" USING btree ("author_pubkey","seq");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_sync_changes_document_seq" ON "sync_changes" USING btree ("recipient","d_tag","seq");
+CREATE INDEX IF NOT EXISTS "idx_sync_changes_document_seq" ON "sync_changes" USING btree ("author_pubkey","d_tag","seq");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_sync_change_tags_lookup" ON "sync_change_tags" USING btree ("tag_name","tag_value");
 --> statement-breakpoint

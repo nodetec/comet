@@ -36,6 +36,22 @@ const TAURI_EVENT_NEW_NOTE = "menu-new-note";
 const TAURI_EVENT_NOTES_SEARCH = "menu-notes-search";
 const TAURI_EVENT_SETTINGS = "menu-settings";
 
+function conflictDialogCopy(hasDeleteCandidate: boolean) {
+  if (hasDeleteCandidate) {
+    return {
+      description:
+        "You can keep the deleted version, restore the note version currently shown, or merge the current draft into a new snapshot.",
+      title: "Resolve this note conflict",
+    };
+  }
+
+  return {
+    description:
+      "You can publish the version currently shown or merge the current draft into a new snapshot.",
+    title: "Choose how to resolve this conflict",
+  };
+}
+
 function App() {
   useTheme();
   const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
@@ -175,22 +191,16 @@ function App() {
     );
   }
 
-  const chooseConflictActionVariant = chooseConflictDialogProps.deleteSelected
-    ? "destructive"
-    : "default";
-  const chooseConflictActionLabel = chooseConflictDialogProps.deleteSelected
-    ? "Delete note"
-    : "Choose";
-  const chooseConflictPendingLabel = chooseConflictDialogProps.deleteSelected
-    ? "Deleting…"
-    : "Choosing…";
-  const chooseConflictDialogTitle = chooseConflictDialogProps.deleteSelected
-    ? "Delete this note?"
-    : "Choose this version?";
-  const chooseConflictDialogDescription =
-    chooseConflictDialogProps.deleteSelected
-      ? "This will publish the deleted version currently shown and remove the note as the chosen resolution for this conflict."
-      : "This will publish the version currently shown in the editor as the chosen resolution for this conflict.";
+  const chooseConflictDialog = conflictDialogCopy(
+    chooseConflictDialogProps.hasDeleteCandidate,
+  );
+  const defaultRestoreConflictLabel =
+    chooseConflictDialogProps.hasDeleteCandidate
+      ? "Restore note"
+      : "Choose shown version";
+  const restoreConflictLabel = chooseConflictDialogProps.pending
+    ? "Restoring…"
+    : defaultRestoreConflictLabel;
 
   return (
     <div
@@ -254,24 +264,42 @@ function App() {
           <DialogBackdrop />
           <DialogPopup className="w-full max-w-sm p-6">
             <DialogTitle className="text-base font-semibold">
-              {chooseConflictDialogTitle}
+              {chooseConflictDialog.title}
             </DialogTitle>
             <p className="text-muted-foreground mt-2 text-sm">
-              {chooseConflictDialogDescription}
+              {chooseConflictDialog.description}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
                 Cancel
               </DialogClose>
+              {chooseConflictDialogProps.hasDeleteCandidate ? (
+                <Button
+                  disabled={chooseConflictDialogProps.pending}
+                  onClick={chooseConflictDialogProps.onKeepDeleted}
+                  size="sm"
+                  variant="destructive"
+                >
+                  {chooseConflictDialogProps.pending
+                    ? "Deleting…"
+                    : "Keep deleted"}
+                </Button>
+              ) : null}
               <Button
                 disabled={chooseConflictDialogProps.pending}
-                onClick={chooseConflictDialogProps.onConfirm}
+                onClick={chooseConflictDialogProps.onRestore}
                 size="sm"
-                variant={chooseConflictActionVariant}
+                variant="secondary"
               >
-                {chooseConflictDialogProps.pending
-                  ? chooseConflictPendingLabel
-                  : chooseConflictActionLabel}
+                {restoreConflictLabel}
+              </Button>
+              <Button
+                disabled={chooseConflictDialogProps.pending}
+                onClick={chooseConflictDialogProps.onMerge}
+                size="sm"
+                variant="default"
+              >
+                {chooseConflictDialogProps.pending ? "Merging…" : "Merge draft"}
               </Button>
             </div>
           </DialogPopup>

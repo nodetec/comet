@@ -2,7 +2,7 @@ import { createServer } from "node:net";
 
 import postgres from "postgres";
 
-import { createRevisionRelayServer } from "../src/server";
+import { createSnapshotRelayServer } from "../src/server";
 
 const TEST_DB_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/postgres";
@@ -12,7 +12,7 @@ const TEST_LOGS_ENABLED =
   process.env.REVISION_RELAY_TEST_LOGS === "1";
 const START_RELAY_MAX_ATTEMPTS = 5;
 
-export type RevisionRelayTestContext = {
+export type SnapshotRelayTestContext = {
   port: number;
   relayUrl: string;
   httpUrl: string;
@@ -25,7 +25,7 @@ export type RevisionRelayTestContext = {
   cleanup: () => Promise<void>;
 };
 
-export async function startTestRevisionRelay(
+export async function startTestSnapshotRelay(
   portHint: number,
   options: {
     adminToken?: string | null;
@@ -33,7 +33,7 @@ export async function startTestRevisionRelay(
     companionKinds?: number[];
     passThroughKinds?: number[];
   } = {},
-): Promise<RevisionRelayTestContext> {
+): Promise<SnapshotRelayTestContext> {
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= START_RELAY_MAX_ATTEMPTS; attempt += 1) {
@@ -58,7 +58,7 @@ export async function startTestRevisionRelay(
     };
 
     try {
-      const runtime = await createRevisionRelayServer({
+      const runtime = await createSnapshotRelayServer({
         port,
         host: TEST_HOST,
         databaseUrl,
@@ -107,7 +107,7 @@ export async function startTestRevisionRelay(
 }
 
 type TraceOptions = {
-  context?: RevisionRelayTestContext;
+  context?: SnapshotRelayTestContext;
   label?: string;
 };
 
@@ -232,35 +232,47 @@ export function expectNoMessage(
   });
 }
 
-export async function waitForNegentropyConvergence(
+export async function waitForBootstrapSnapshots(
   ws: WebSocket,
   subscriptionId: string,
-  localItems: { id: string; timestamp: number }[],
   options: TraceOptions = {},
 ) {
-  const { createNegentropySession } =
-    await import("../src/domain/revisions/negentropy-adapter");
-  const client = createNegentropySession(localItems);
+  const snapshots: unknown[] = [];
+  let snapshotSeq: number | null = null;
 
-  let message: string | null = await client.initiate();
-  let finalHave: string[] = [];
-  let finalNeed: string[] = [];
-
-  while (message !== null) {
+  while (true) {
     const responsePromise = waitForMessage(ws, 3_000, options);
-    sendJson(ws, ["NEG-MSG", subscriptionId, message], options);
     const response = await responsePromise;
-    if (!Array.isArray(response) || response[0] !== "NEG-MSG") {
-      throw new Error(`unexpected NEG response: ${JSON.stringify(response)}`);
+    if (!Array.isArray(response) || response[0] !== "CHANGES") {
+      throw new Error(
+        `unexpected bootstrap response: ${JSON.stringify(response)}`,
+      );
     }
 
-    const result = await client.reconcile(response[2] as string);
-    finalHave = result.have;
-    finalNeed = result.need;
-    message = result.nextMessage;
-  }
+    if (response[1] !== subscriptionId) {
+      throw new Error(
+        `unexpected bootstrap subscription: ${JSON.stringify(response)}`,
+      );
+    }
 
-  return { have: finalHave, need: finalNeed };
+    if (response[2] === "STATUS") {
+      snapshotSeq = (response[3] as { snapshot_seq: number }).snapshot_seq;
+      continue;
+    }
+
+    if (response[2] === "SNAPSHOT") {
+      snapshots.push(response[3]);
+      continue;
+    }
+
+    if (response[2] === "EOSE") {
+      return { snapshotSeq: snapshotSeq ?? 0, snapshots };
+    }
+
+    throw new Error(
+      `unexpected bootstrap response: ${JSON.stringify(response)}`,
+    );
+  }
 }
 
 export async function waitFor(
@@ -268,7 +280,7 @@ export async function waitFor(
   options: {
     timeoutMs?: number;
     intervalMs?: number;
-    context?: RevisionRelayTestContext;
+    context?: SnapshotRelayTestContext;
     label?: string;
   } = {},
 ): Promise<void> {

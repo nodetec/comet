@@ -1,12 +1,12 @@
-import { loadRevisionRelayConfig } from "./infra/config";
-import { createRevisionRelayServer } from "./server";
+import { loadSnapshotRelayConfig } from "./infra/config";
+import { createSnapshotRelayServer } from "./server";
 
 async function main() {
-  const config = loadRevisionRelayConfig();
-  const runtime = await createRevisionRelayServer(config);
+  const config = loadSnapshotRelayConfig();
+  const runtime = await createSnapshotRelayServer(config);
 
   console.log(
-    `Revision relay listening on ${config.relayUrl} (port ${runtime.port})`,
+    `Snapshot relay listening on ${config.relayUrl} (port ${runtime.port})`,
   );
 
   const shutdown = async (signal: string) => {

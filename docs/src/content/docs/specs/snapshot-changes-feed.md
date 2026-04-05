@@ -1,6 +1,6 @@
 ---
-title: Sync Changes Feed
-description: Draft relay-local bootstrap, replay, and live-follow protocol for sync-range events.
+title: Snapshot Changes Feed
+description: Draft relay-local bootstrap, replay, and live-follow protocol for snapshot-oriented sync events.
 sidebar:
   label: Changes Feed
   order: 3
@@ -10,8 +10,8 @@ sidebar:
 
 Related drafts:
 
-- [Revision Sync Range](/specs/revision-sync-range/)
-- [Sync Retention And Compaction](/specs/revision-compaction/)
+- [Snapshot Sync Range](/specs/snapshot-sync-range/)
+- [Snapshot Retention And Compaction](/specs/snapshot-compaction/)
 
 ## Summary
 
@@ -19,7 +19,7 @@ This draft defines a relay-local changes feed for sync-range events.
 
 The feed is responsible for:
 
-- current-head bootstrap against a stable relay snapshot
+- snapshot bootstrap against a stable relay snapshot
 - ordered incremental replay
 - reconnect after temporary disconnect
 - live follow after catch-up
@@ -27,22 +27,22 @@ The feed is responsible for:
 
 This draft defines both:
 
-- bootstrap of current heads
+- bootstrap of retained snapshots
 - relay-tail replay and live follow after bootstrap
 
 ## Goals
 
-- Efficient current-state bootstrap
+- Efficient current-state bootstrap for local-first clients
 - Ordered incremental sync for sync-range events
 - Live updates after catch-up
 - Relay-local checkpoints
-- Compatibility with immutable revision events
+- Compatibility with encrypted snapshot events
 - Clear distinction between logical deletion and hard relay-side removal
 
 ## Non-Goals
 
 - Full-history anti-entropy
-- Historical repair of every superseded revision
+- Requiring relays to decrypt payloads or compare vector clocks
 - Defining application-specific payload semantics
 - Defining conflict winner semantics
 - Defining cross-relay comparable sequence numbers
@@ -54,14 +54,14 @@ The changes feed streams accepted sync events in relay sequence order.
 For sync-range events:
 
 - event kind identifies the sync protocol family
-- sync metadata identifies document and revision relationships
+- sync metadata identifies document scope and operation
 - relay sequence identifies local acceptance order on one relay
 
 That means a client can:
 
-- load the current head set at a stable relay snapshot
+- load the retained snapshot set at a stable relay snapshot
 - resume from a saved relay-local cursor
-- apply newly accepted revisions in order
+- apply newly accepted sync snapshots in order
 - keep one checkpoint per relay
 
 ## Message Shape
@@ -85,10 +85,10 @@ All requests use the same message family:
 ]
 ```
 
-### Relay bootstrap head event
+### Relay bootstrap snapshot event
 
 ```json
-["CHANGES", "<subscription-id>", "HEAD", <event>]
+["CHANGES", "<subscription-id>", "SNAPSHOT", <event>]
 ```
 
 ### Relay replay or live-follow event
@@ -142,7 +142,7 @@ Recommended rules:
 - `mode` is required
 - `kinds` is required
 - each requested kind must be inside the reserved sync range
-- clients should use metadata filters such as `#d`, `#r`, `#b`, `#o`, and `#c` only with sync-range kinds
+- clients should use metadata filters such as `#d`, `#o`, and `#c` only with sync-range kinds
 
 Typical replay filters:
 
@@ -172,32 +172,31 @@ For bootstrap:
 
 - `since` and `until_seq` are not required
 - `mode` should be `"bootstrap"`
-- relays should interpret the filter as a current-head query at one stable snapshot
+- relays should interpret the filter as a retained-snapshot query at one stable snapshot
 
 ## Bootstrap Semantics
 
-Bootstrap is current-head-oriented.
+Bootstrap is snapshot-oriented.
 
 When a relay accepts a `CHANGES` request with `mode = "bootstrap"`, it should:
 
 1. validate the filter as a sync-range bootstrap filter
 2. capture `snapshot_seq`
-3. resolve the current materialized heads matching the filter at that snapshot
+3. resolve the retained sync snapshots matching the filter at that snapshot
 4. send `STATUS` with `snapshot_seq`
-5. stream one `HEAD` event per matching current head
+5. stream one `SNAPSHOT` event per retained matching snapshot
 6. send `EOSE` with `last_seq = snapshot_seq`
 
 Important semantics:
 
-- the returned events are the current heads at `snapshot_seq`
+- the returned events are the retained snapshots at `snapshot_seq`
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
-- if multiple heads exist for one document, the relay should return all of them
+- the relay is not required to know which encrypted snapshots are current or concurrent
+- the client compares payload metadata such as vector clocks after decrypting the returned snapshots
 
 Bootstrap does not attempt full-history reconciliation.
 
-Bootstrap is current-head-only in this version of the draft.
-
-Reduced or metadata-only bootstrap modes are deferred.
+Bootstrap is retained-snapshot-only in this version of the draft.
 
 ## Sequence Model
 
@@ -207,7 +206,7 @@ That means:
 
 - the client must keep one cursor per relay
 - two relays may assign different `seq` values to the same sync event
-- cross-relay convergence happens through event identity and sync metadata, not through `seq`
+- cross-relay convergence happens through note identity plus decrypted payload metadata, not through `seq`
 
 The feed is ordered by relay acceptance, not by `created_at`.
 
@@ -219,7 +218,7 @@ That distinction matters:
 
 ## EOSE And Checkpoints
 
-After replaying the requested range, or after completing bootstrap head delivery, the relay should send:
+After replaying the requested range, or after completing bootstrap snapshot delivery, the relay should send:
 
 ```json
 ["CHANGES", "<subscription-id>", "EOSE", <last_seq>]
@@ -231,22 +230,23 @@ If `live` is `true`, the relay keeps the subscription open after `EOSE` and cont
 
 ## Bootstrap Handoff Into Tail Replay
 
-The purpose of bootstrap `snapshot_seq` is to avoid a race window between current-head loading and relay-tail replay.
+The purpose of bootstrap `snapshot_seq` is to avoid a race window between bootstrap snapshot loading and relay-tail replay.
 
 Recommended client flow:
 
 1. open `CHANGES` with `mode = "bootstrap"`
 2. receive `snapshot_seq = S`
-3. load and apply all returned head events
-4. compare the returned remote head set with the local head set
-5. run conflict checks and any local policy hooks
-6. upload missing local heads only after remote apply and conflict/policy evaluation
-7. start `CHANGES` with `mode = "tail"`, `since = S`, and `live = true`
-8. continue from the relay tail
+3. load and decrypt all returned bootstrap events
+4. compare their payload metadata, such as vector clocks, with local note state
+5. apply remote snapshots that dominate local state
+6. surface concurrent snapshots as conflicts
+7. upload missing or newly merged local snapshots only after conflict/policy evaluation
+8. start `CHANGES` with `mode = "tail"`, `since = S`, and `live = true`
+9. continue from the relay tail
 
 This gives the protocols clear responsibilities:
 
-- `CHANGES` in bootstrap mode answers "what are the current heads at snapshot `S`?"
+- `CHANGES` in bootstrap mode answers "what retained sync snapshots existed at snapshot `S`?"
 - `CHANGES` in tail mode answers "what happened after snapshot `S`?"
 
 ## Logical Delete vs Hard Delete
@@ -267,39 +267,29 @@ When a client receives a sync event through bootstrap or the changes feed, it sh
 
 - validate that the event kind is inside the reserved sync range
 - validate required sync metadata
-- store the revision if new
-- update the local revision graph for `(pubkey, d)`
-- recalculate the local head set for that document
-- treat multiple heads as a real conflict until application logic resolves them
+- decrypt the payload for concrete profiles that require local comparison
+- compare the incoming snapshot against local state using profile-defined ordering metadata such as vector clocks
+- apply dominating snapshots
+- ignore stale dominated snapshots
+- treat nondominated concurrent snapshots as real conflicts until application logic resolves them
 
-The changes feed does not define any built-in winner among conflicting heads.
+The changes feed does not define any built-in winner among conflicting snapshots.
 
-Recommended client behavior for unresolved multi-head state:
+Recommended client behavior for unresolved concurrent state:
 
 - make the document read-only
 - require explicit user resolution before further editing continues on that document
 
 ## Relay Expectations
 
-To support bootstrap and the changes feed well, the relay should:
+For the simple local-first model, the relay should:
 
-- assign a sequence number to each accepted sync event
-- classify sync events by kind range
-- index the sync metadata tags used for filtering
-- retain enough revision metadata to preserve graph semantics
-- maintain one changes cursor namespace per relay instance
-- materialize the current head set
-- evaluate bootstrap against a stable snapshot
+- store and replay encrypted sync snapshots
+- filter by relay-visible sync metadata only
+- maintain relay-local `seq` ordering
+- avoid deriving current state from encrypted payloads
 
-Recommended first-class filter surface:
-
-- `authors`
-- `kinds`
-- `#d`
-- `#r`
-- `#b`
-- `#o`
-- optional `#c`
+This keeps the relay simple and lets the client compare vector clocks after decryption.
 
 ## Retention And Compaction
 
@@ -312,11 +302,11 @@ Important compatibility point:
 Recommended future advertisement fields include:
 
 - a minimum retained `seq`
-- any payload-retention boundary if non-head payloads may be compacted
+- any snapshot-retention boundary if older dominated snapshots may be compacted
 
 If a client has fallen behind the retained replay window, the client should fall back to bootstrap rather than assume the feed alone can restore full state.
 
-Current-head bootstrap is intentionally more compaction-friendly than full-history repair.
+Snapshot bootstrap is intentionally more compaction-friendly than full-history repair.
 
 ## Open Questions
 

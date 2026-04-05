@@ -1,16 +1,14 @@
 # Relay
 
-Relay is the Bun-based workspace for the revision-sync extension currently
-being designed in the Comet repo.
+Relay is the Bun-based workspace for Comet's snapshot-sync extension.
 
-It has a revision-native data model:
+It implements a local-first sync transport:
 
-- immutable revision metadata
-- explicit parent edges
-- materialized current heads
-- fetchable encrypted payload bodies
-- relay-local `CHANGES`
-- revision-aware Negentropy bootstrap
+- encrypted note snapshot events
+- relay-local `CHANGES` bootstrap and tail replay
+- bounded payload retention and compaction
+- author-scoped access control
+- companion and pass-through kinds alongside snapshot sync
 
 ## Commands
 
@@ -21,22 +19,15 @@ It has a revision-native data model:
 
 ## Railway Deploy
 
-Railway's default builder does not include Bun, so the relay should be deployed
-with [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile) instead
-of the plain package build command.
+Railway's default builder does not include Bun, so deploy this workspace with [`Dockerfile`](/Users/chris/Repos/project/comet/relay/Dockerfile).
 
 Recommended Railway setup:
 
 - Root directory: repo root
 - Dockerfile path: `relay/Dockerfile`
-- Railway config file path: `/relay/railway.toml` if you want Railway to read the checked-in deploy config
+- Railway config file path: `/relay/railway.toml`
 - Port: `3400`
 - Healthcheck path: `/healthz`
-
-If you are configuring the service entirely through the Railway UI instead of a
-checked-in config file, set:
-
-- `RAILWAY_DOCKERFILE_PATH=/relay/Dockerfile`
 
 Required environment variables:
 
@@ -50,15 +41,7 @@ Recommended environment variables:
 - `RELAY_DEFAULT_PAYLOAD_RETENTION_DAYS=90`
 - `RELAY_DEFAULT_COMPACTION_INTERVAL_SECONDS=300`
 
-Example `RELAY_URL`:
-
-```sh
-RELAY_URL=wss://relay.comet.md
-```
-
-### Local Multi-Relay Harness
-
-To spin up several local relays backed by separate local Postgres databases:
+## Local Multi-Relay Harness
 
 ```sh
 bun run src/dev/multi-relay.ts --count 3 --start-port 3400
@@ -75,13 +58,11 @@ Useful options:
 - `--count <n>`: number of relays to start
 - `--start-port <n>`: first relay port
 - `--admin-db <url>`: admin Postgres URL used to create/drop relay databases
-- `--keep-databases`: leave the created databases in place after shutdown
-
-The harness prints each relay websocket URL and cleans up the processes and temporary databases on `Ctrl+C`.
+- `--keep-databases`: leave created databases in place after shutdown
 
 ## Admin Retention API
 
-The relay exposes a small HTTP admin API for payload-retention policy:
+The relay exposes a small HTTP admin API for payload retention:
 
 - `GET /admin/retention`
 - `PATCH /admin/retention`
@@ -99,20 +80,9 @@ Fields:
 
 - `payload_retention_days`
   - `null` disables automatic payload compaction
-  - non-head revision payloads older than this many days become eligible
+  - older superseded snapshot payloads become eligible
 - `compaction_interval_seconds`
   - how often the relay runs the compaction pass
-
-Environment variables:
-
-- `PRIVATE_MODE`
-  - when `true`, the relay sends websocket `AUTH` challenges and requires NIP-42 authentication for revision reads and writes
-- `RELAY_ADMIN_TOKEN`
-  - bearer token used for protected admin endpoints
-- `RELAY_DEFAULT_PAYLOAD_RETENTION_DAYS`
-  - default policy before any admin API update is persisted
-- `RELAY_DEFAULT_COMPACTION_INTERVAL_SECONDS`
-  - default scheduler interval before any admin API update is persisted
 
 ## Access Admin API
 
@@ -126,16 +96,16 @@ The relay also exposes protected operator endpoints for access control and conne
 Notes:
 
 - `/admin/allowlist` and `/admin/connections` require `RELAY_ADMIN_TOKEN`
-- in `PRIVATE_MODE`, revision websocket clients must authenticate and the authenticated pubkey must be present on the allowlist
+- in `PRIVATE_MODE`, snapshot websocket clients must authenticate and the authenticated pubkey must be present on the allowlist
 - `/admin/connections` reports authenticated pubkeys and active live `CHANGES` subscription ids per websocket connection
 
 ## Current State
 
-This workspace now has:
+This workspace currently has:
 
-- revision-native Postgres schema and migrations
-- revision publish, head materialization, and live `CHANGES`
-- revision-aware Negentropy bootstrap with `snapshot_seq` handoff
+- snapshot-oriented Postgres schema and migrations
+- snapshot publish and fetch
+- bootstrap and live `CHANGES`
 - payload-retention advertisement and payload compaction
 - an HTTP admin API for runtime retention policy updates
 - a local multi-relay harness and a broad relay integration suite

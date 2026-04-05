@@ -1,11 +1,11 @@
 use crate::adapters::sqlite::migrations::account_migrations;
-use crate::domain::sync::revision_service::materialize_note_revision_locally;
+use crate::domain::sync::snapshot_service::materialize_note_snapshot_locally;
 use crate::error::AppError;
 use nostr_sdk::prelude::Keys;
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-pub fn seed_initial_note_revisions(db_path: &Path, nsec: &str) -> Result<usize, AppError> {
+pub fn seed_initial_note_snapshots(db_path: &Path, nsec: &str) -> Result<usize, AppError> {
     let keys =
         Keys::parse(nsec).map_err(|error| AppError::custom(format!("Invalid nsec: {error}")))?;
     let author_pubkey = keys.public_key();
@@ -17,15 +17,21 @@ pub fn seed_initial_note_revisions(db_path: &Path, nsec: &str) -> Result<usize, 
     let mut stmt = conn.prepare(
         "SELECT id
          FROM notes
-         WHERE current_rev IS NULL
+         WHERE id NOT IN (
+           SELECT DISTINCT d_tag
+           FROM sync_snapshots
+           WHERE author_pubkey = ?1
+         )
          ORDER BY created_at ASC, id ASC",
     )?;
-    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let rows = stmt.query_map(params![author_pubkey.to_hex()], |row| {
+        row.get::<_, String>(0)
+    })?;
     let note_ids = rows.collect::<Result<Vec<_>, _>>()?;
     drop(stmt);
 
     for note_id in &note_ids {
-        materialize_note_revision_locally(&conn, &keys, &author_pubkey, note_id, true)?;
+        materialize_note_snapshot_locally(&conn, &keys, &author_pubkey, note_id, true)?;
         conn.execute(
             "UPDATE notes
              SET locally_modified = CASE

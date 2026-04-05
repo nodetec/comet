@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   AUTH_PUBKEY,
@@ -15,7 +15,7 @@ import {
   traceOptions,
 } from "./fixtures";
 
-const contexts: RevisionRelayTestContext[] = [];
+const contexts: SnapshotRelayTestContext[] = [];
 
 describe("relay integration > admin connections", () => {
   afterEach(async () => {
@@ -23,7 +23,7 @@ describe("relay integration > admin connections", () => {
   });
 
   test("returns 503 when admin token is not configured", async () => {
-    const ctx = await startTestRevisionRelay(35230);
+    const ctx = await startTestSnapshotRelay(35230);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/connections`);
@@ -32,7 +32,7 @@ describe("relay integration > admin connections", () => {
   });
 
   test("lists authenticated connections and live subscription ids", async () => {
-    const ctx = await startTestRevisionRelay(35231, {
+    const ctx = await startTestSnapshotRelay(35231, {
       privateMode: true,
       adminToken: "secret-token",
     });
@@ -67,7 +67,7 @@ describe("relay integration > admin connections", () => {
         "sync",
         {
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: [AUTH_PUBKEY],
           live: true,
         },

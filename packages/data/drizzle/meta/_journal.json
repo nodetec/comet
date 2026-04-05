@@ -69,7 +69,7 @@
       "idx": 9,
       "version": "7",
       "when": 1774393200000,
-      "tag": "0009_relay_revision_sync",
+      "tag": "0009_relay_snapshot_sync",
       "breakpoints": true
     },
     {
@@ -83,7 +83,7 @@
       "idx": 11,
       "version": "7",
       "when": 1774419000000,
-      "tag": "0011_index_sync_revisions_entity_type",
+      "tag": "0011_index_sync_snapshots_entity_type",
       "breakpoints": true
     },
     {

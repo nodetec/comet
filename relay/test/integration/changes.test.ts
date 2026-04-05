@@ -1,45 +1,45 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   expectNoMessage,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitFor,
   waitForMessage,
   waitForMessages,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
   cleanupContexts,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
 describe("relay integration > changes", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
-  test("stores a revision event and replays it through CHANGES", async () => {
-    const ctx = await startTestRevisionRelay(39410);
+  test("stores a snapshot event and replays it through CHANGES", async () => {
+    const ctx = await startTestSnapshotRelay(39410);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
 
     sendJson(ws, ["EVENT", event], trace);
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
       "OK",
       event.id,
       true,
-      `stored: revision ${REV_A}`,
+      `stored: snapshot ${event.id}`,
     ]);
 
     sendJson(
@@ -48,9 +48,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "sync-1",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -63,13 +64,13 @@ describe("relay integration > changes", () => {
   });
 
   test("filters CHANGES replay by document id", async () => {
-    const ctx = await startTestRevisionRelay(39463);
+    const ctx = await startTestSnapshotRelay(39463);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2");
+    const firstEvent = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-1");
+    const secondEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2");
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
@@ -82,9 +83,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "doc-filter",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           "#d": ["doc-2"],
         },
       ],
@@ -97,43 +99,8 @@ describe("relay integration > changes", () => {
     ]);
   });
 
-  test("filters CHANGES replay by revision id", async () => {
-    const ctx = await startTestRevisionRelay(39464);
-    contexts.push(ctx);
-
-    const trace = traceOptions(ctx, "client");
-    const ws = await connectWs(ctx.port, trace);
-    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-1");
-
-    for (const event of [firstEvent, secondEvent]) {
-      sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
-    }
-
-    sendJson(
-      ws,
-      [
-        "CHANGES",
-        "rev-filter",
-        {
-          since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_B],
-        },
-      ],
-      trace,
-    );
-
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
-      ["CHANGES", "rev-filter", "EVENT", 2, secondEvent],
-      ["CHANGES", "rev-filter", "EOSE", 2],
-    ]);
-  });
-
   test("streams live CHANGES events after the initial EOSE", async () => {
-    const ctx = await startTestRevisionRelay(39418);
+    const ctx = await startTestSnapshotRelay(39418);
     contexts.push(ctx);
 
     const subscriberTrace = traceOptions(ctx, "subscriber");
@@ -147,9 +114,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "live-1",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -162,7 +130,7 @@ describe("relay integration > changes", () => {
       0,
     ]);
 
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
     const livePromise = waitForMessage(subscriber, 3_000, subscriberTrace);
     sendJson(publisher, ["EVENT", event], publisherTrace);
 
@@ -170,13 +138,13 @@ describe("relay integration > changes", () => {
       "OK",
       event.id,
       true,
-      `stored: revision ${REV_A}`,
+      `stored: snapshot ${event.id}`,
     ]);
     expect(await livePromise).toEqual(["CHANGES", "live-1", "EVENT", 1, event]);
   });
 
   test("removes a live CHANGES subscription after CLOSE", async () => {
-    const ctx = await startTestRevisionRelay(39433);
+    const ctx = await startTestSnapshotRelay(39433);
     contexts.push(ctx);
 
     const subscriberTrace = traceOptions(ctx, "subscriber");
@@ -191,8 +159,8 @@ describe("relay integration > changes", () => {
         "live-close",
         {
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -212,20 +180,20 @@ describe("relay integration > changes", () => {
       "closed",
     ]);
 
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
     sendJson(publisher, ["EVENT", event], publisherTrace);
     expect(await waitForMessage(publisher, 3_000, publisherTrace)).toEqual([
       "OK",
       event.id,
       true,
-      `stored: revision ${REV_A}`,
+      `stored: snapshot ${event.id}`,
     ]);
 
     await expectNoMessage(subscriber, 300, subscriberTrace);
   });
 
   test("returns CHANGES ERR when the authors filter is missing", async () => {
-    const ctx = await startTestRevisionRelay(39442);
+    const ctx = await startTestSnapshotRelay(39442);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -233,7 +201,11 @@ describe("relay integration > changes", () => {
 
     sendJson(
       ws,
-      ["CHANGES", "bad-scope", { since: 0, kinds: [REVISION_SYNC_EVENT_KIND] }],
+      [
+        "CHANGES",
+        "bad-scope",
+        { mode: "tail", since: 0, kinds: [SNAPSHOT_SYNC_EVENT_KIND] },
+      ],
       trace,
     );
 
@@ -241,12 +213,12 @@ describe("relay integration > changes", () => {
       "CHANGES",
       "bad-scope",
       "ERR",
-      "revision CHANGES currently requires exactly one author",
+      "snapshot CHANGES currently requires exactly one author",
     ]);
   });
 
   test("returns CHANGES ERR when multiple authors are requested", async () => {
-    const ctx = await startTestRevisionRelay(39443);
+    const ctx = await startTestSnapshotRelay(39443);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -258,9 +230,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "bad-scope-multi",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1", "recipient-2"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1", "author-2"],
         },
       ],
       trace,
@@ -270,12 +243,12 @@ describe("relay integration > changes", () => {
       "CHANGES",
       "bad-scope-multi",
       "ERR",
-      "revision CHANGES currently requires exactly one author",
+      "snapshot CHANGES currently requires exactly one author",
     ]);
   });
 
   test("returns CLOSED when CLOSE is used on a non-live subscription id", async () => {
-    const ctx = await startTestRevisionRelay(39447);
+    const ctx = await startTestSnapshotRelay(39447);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -290,7 +263,7 @@ describe("relay integration > changes", () => {
   });
 
   test("assigns monotonic seq values when two clients publish different documents", async () => {
-    const ctx = await startTestRevisionRelay(39450);
+    const ctx = await startTestSnapshotRelay(39450);
     contexts.push(ctx);
 
     const leftTrace = traceOptions(ctx, "left");
@@ -300,8 +273,8 @@ describe("relay integration > changes", () => {
     const rightWs = await connectWs(ctx.port, rightTrace);
     const readerWs = await connectWs(ctx.port, readerTrace);
 
-    const leftEvent = revisionEvent(REV_A, 1_700_000_000_200, [], "doc-left");
-    const rightEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-right");
+    const leftEvent = snapshotEvent(REV_A, 1_700_000_000_200, [], "doc-left");
+    const rightEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-right");
 
     sendJson(leftWs, ["EVENT", leftEvent], leftTrace);
     sendJson(rightWs, ["EVENT", rightEvent], rightTrace);
@@ -314,9 +287,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "all-docs",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       readerTrace,
@@ -336,7 +310,7 @@ describe("relay integration > changes", () => {
   });
 
   test("broadcasts the same live change to multiple subscribers", async () => {
-    const ctx = await startTestRevisionRelay(39452);
+    const ctx = await startTestSnapshotRelay(39452);
     contexts.push(ctx);
 
     const leftTrace = traceOptions(ctx, "left-subscriber");
@@ -356,9 +330,10 @@ describe("relay integration > changes", () => {
           "CHANGES",
           subscriptionId,
           {
+            mode: "tail",
             since: 0,
-            kinds: [REVISION_SYNC_EVENT_KIND],
-            authors: ["recipient-1"],
+            kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+            authors: ["author-1"],
             live: true,
           },
         ],
@@ -372,7 +347,7 @@ describe("relay integration > changes", () => {
       ]);
     }
 
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
     const leftEventPromise = waitForMessage(leftWs, 3_000, leftTrace);
     const rightEventPromise = waitForMessage(rightWs, 3_000, rightTrace);
 
@@ -396,7 +371,7 @@ describe("relay integration > changes", () => {
   });
 
   test("replaces an existing live subscription when the same subscription id is reused on one socket", async () => {
-    const ctx = await startTestRevisionRelay(39471);
+    const ctx = await startTestSnapshotRelay(39471);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -410,9 +385,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "dup-live",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           "#d": ["doc-1"],
           live: true,
         },
@@ -432,9 +408,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "dup-live",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           "#d": ["doc-2"],
           live: true,
         },
@@ -448,8 +425,8 @@ describe("relay integration > changes", () => {
       0,
     ]);
 
-    const ignoredEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
-    const deliveredEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2");
+    const ignoredEvent = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-1");
+    const deliveredEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2");
 
     sendJson(publisherWs, ["EVENT", ignoredEvent], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
@@ -468,7 +445,7 @@ describe("relay integration > changes", () => {
   });
 
   test("replays missed changes after a subscriber disconnects and reconnects", async () => {
-    const ctx = await startTestRevisionRelay(39453);
+    const ctx = await startTestSnapshotRelay(39453);
     contexts.push(ctx);
 
     const firstTrace = traceOptions(ctx, "first-client");
@@ -483,9 +460,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "live-reconnect",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -501,7 +479,7 @@ describe("relay integration > changes", () => {
     firstWs.close();
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const event = revisionEvent(REV_A);
+    const event = snapshotEvent(REV_A);
     sendJson(publisherWs, ["EVENT", event], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
 
@@ -512,9 +490,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "catchup",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       reconnectTrace,
@@ -529,7 +508,7 @@ describe("relay integration > changes", () => {
   });
 
   test("replays only later changes when reconnecting with a nonzero since cursor", async () => {
-    const ctx = await startTestRevisionRelay(39465);
+    const ctx = await startTestSnapshotRelay(39465);
     contexts.push(ctx);
 
     const firstTrace = traceOptions(ctx, "first-client");
@@ -544,9 +523,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "live-since",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -559,7 +539,7 @@ describe("relay integration > changes", () => {
       0,
     ]);
 
-    const firstEvent = revisionEvent(REV_A);
+    const firstEvent = snapshotEvent(REV_A);
     const firstLiveEvent = waitForMessage(firstWs, 3_000, firstTrace);
     sendJson(publisherWs, ["EVENT", firstEvent], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
@@ -574,7 +554,7 @@ describe("relay integration > changes", () => {
     firstWs.close();
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [REV_A]);
+    const secondEvent = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
     sendJson(publisherWs, ["EVENT", secondEvent], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
 
@@ -585,9 +565,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "catchup-since-1",
         {
+          mode: "tail",
           since: 1,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       reconnectTrace,
@@ -602,7 +583,7 @@ describe("relay integration > changes", () => {
   });
 
   test("removes live subscriptions when the websocket closes", async () => {
-    const ctx = await startTestRevisionRelay(39466);
+    const ctx = await startTestSnapshotRelay(39466);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -614,9 +595,10 @@ describe("relay integration > changes", () => {
         "CHANGES",
         "live-close-socket",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],

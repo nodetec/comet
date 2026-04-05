@@ -1,6 +1,6 @@
-use crate::adapters::nostr::revision_bootstrap::bootstrap_relay_connection;
-use crate::adapters::nostr::revision_push::{
-    push_deletion_revision, push_note_revisions_batch, retry_pending_blob_uploads,
+use crate::adapters::nostr::snapshot_bootstrap::bootstrap_relay_connection;
+use crate::adapters::nostr::snapshot_push::{
+    push_deletion_snapshot, push_note_snapshots_batch, retry_pending_blob_uploads,
 };
 use crate::adapters::sqlite::sync_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
@@ -19,7 +19,7 @@ use super::sync_manager::{set_state, sync_log};
 
 const BLOB_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
-pub(super) async fn run_revision_sync_connection(
+pub(super) async fn run_snapshot_sync_connection(
     app: &AppHandle,
     state: &Arc<Mutex<SyncState>>,
     shutdown_rx: &mut watch::Receiver<bool>,
@@ -54,7 +54,7 @@ pub(super) async fn run_revision_sync_connection(
             Err(error) => {
                 sync_log(
                     app,
-                    &format!("revision bootstrap relay error relay={relay_url}: {error}"),
+                    &format!("snapshot bootstrap relay error relay={relay_url}: {error}"),
                 );
                 bootstrap_errors.push(format!("{relay_url}: {error}"));
             }
@@ -74,9 +74,9 @@ pub(super) async fn run_revision_sync_connection(
     }
 
     let author_pubkey = bootstrap.author_pubkey.clone();
-    // `snapshot_seq` is the bootstrap handoff boundary returned by Negentropy.
-    // The live `CHANGES` subscription starts from that boundary, while
-    // `checkpoint_seq` later advances as events are actually applied.
+    // `snapshot_seq` is the bootstrap handoff boundary returned by
+    // `CHANGES STATUS`. The live `CHANGES` subscription starts from that
+    // boundary, while `checkpoint_seq` later advances as events are applied.
     let snapshot_seq = bootstrap.snapshot_seq;
     let mut connection = bootstrap.connection;
     let backup_relay_urls = configured_relay_urls
@@ -111,7 +111,7 @@ pub(super) async fn run_revision_sync_connection(
         tokio::select! {
             () = &mut wake_sleep => {}
             cmd = push_rx.recv() => {
-                handle_revision_push_command(
+                handle_snapshot_push_command(
                     app,
                     &relay_url,
                     &backup_relay_urls,
@@ -124,7 +124,7 @@ pub(super) async fn run_revision_sync_connection(
             }
             _ = shutdown_rx.changed() => return Ok(()),
             incoming = connection.recv_message() => {
-                handle_revision_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
+                handle_snapshot_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
                 continue;
             }
         }
@@ -132,7 +132,7 @@ pub(super) async fn run_revision_sync_connection(
         let now = tokio::time::Instant::now();
         if now >= next_blob_retry_at {
             if let Err(error) = retry_pending_blob_uploads(app, &keys).await {
-                sync_log(app, &format!("revision blob retry error: {error}"));
+                sync_log(app, &format!("snapshot blob retry error: {error}"));
             }
             next_blob_retry_at = now + BLOB_RETRY_INTERVAL;
         }
@@ -148,9 +148,9 @@ pub(super) async fn run_revision_sync_connection(
         }
 
         if let Err(error) =
-            push_note_revisions_batch(app, &relay_url, &backup_relay_urls, &keys, &ready).await
+            push_note_snapshots_batch(app, &relay_url, &backup_relay_urls, &keys, &ready).await
         {
-            sync_log(app, &format!("revision push batch error: {error}"));
+            sync_log(app, &format!("snapshot push batch error: {error}"));
         }
     }
 }
@@ -227,16 +227,16 @@ async fn flush_pending_local_changes(
 
     for entity_id in pending_deletion_ids {
         if let Err(error) =
-            push_deletion_revision(app, active_relay_url, backup_relay_urls, keys, &entity_id).await
+            push_deletion_snapshot(app, active_relay_url, backup_relay_urls, keys, &entity_id).await
         {
             sync_log(
                 app,
-                &format!("revision delete push error: {entity_id}: {error}"),
+                &format!("snapshot delete push error: {entity_id}: {error}"),
             );
         }
     }
 
-    if let Err(error) = push_note_revisions_batch(
+    if let Err(error) = push_note_snapshots_batch(
         app,
         active_relay_url,
         backup_relay_urls,
@@ -245,13 +245,13 @@ async fn flush_pending_local_changes(
     )
     .await
     {
-        sync_log(app, &format!("revision push batch error: {error}"));
+        sync_log(app, &format!("snapshot push batch error: {error}"));
     }
 
     Ok(())
 }
 
-async fn handle_revision_push_command(
+async fn handle_snapshot_push_command(
     app: &AppHandle,
     active_relay_url: &str,
     backup_relay_urls: &[String],
@@ -262,14 +262,14 @@ async fn handle_revision_push_command(
 ) -> Result<(), AppError> {
     match cmd {
         Some(SyncCommand::PushNote(note_id)) => {
-            sync_log(app, &format!("queued revision push {note_id}"));
+            sync_log(app, &format!("queued snapshot push {note_id}"));
             pending_pushes.insert(note_id, tokio::time::Instant::now() + debounce_duration);
         }
         Some(SyncCommand::PushDeletion(id)) => {
             if let Err(error) =
-                push_deletion_revision(app, active_relay_url, backup_relay_urls, keys, &id).await
+                push_deletion_snapshot(app, active_relay_url, backup_relay_urls, keys, &id).await
             {
-                sync_log(app, &format!("revision delete push error: {id}: {error}"));
+                sync_log(app, &format!("snapshot delete push error: {id}: {error}"));
             }
         }
         None => return Ok(()),
@@ -278,23 +278,23 @@ async fn handle_revision_push_command(
     Ok(())
 }
 
-async fn handle_revision_incoming_message(
+async fn handle_snapshot_incoming_message(
     app: &AppHandle,
-    message: crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage,
+    message: crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage,
     keys: &Keys,
     relay_url: &str,
     state: &Arc<Mutex<SyncState>>,
     connected: &mut bool,
 ) -> Result<(), AppError> {
     match message {
-        crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::ChangesEvent {
+        crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage::ChangesEvent {
             seq,
             event,
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
             if let Some(change) =
-                crate::domain::sync::revision_apply_service::apply_remote_revision_event(
+                crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event(
                     &conn,
                     relay_url,
                     keys,
@@ -306,13 +306,13 @@ async fn handle_revision_incoming_message(
                 emit_sync_remote_change(app, change);
             }
         }
-        crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::ChangesEose {
+        crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage::ChangesEose {
             last_seq,
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
             let relay_state =
-                crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
+                crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state(
                     &conn, relay_url,
                 )?;
             let min_payload_mtime = relay_state
@@ -322,7 +322,7 @@ async fn handle_revision_incoming_message(
             // `last_seq` is the live `CHANGES` progress marker. Preserve the
             // original bootstrap `snapshot_seq` so the handoff boundary remains
             // distinguishable from the live checkpoint.
-            crate::adapters::sqlite::revision_sync_repository::upsert_sync_relay_state(
+            crate::adapters::sqlite::snapshot_sync_repository::upsert_sync_relay_state(
                 &conn,
                 relay_url,
                 Some(last_seq),
@@ -335,24 +335,16 @@ async fn handle_revision_incoming_message(
                 set_state(state, SyncState::Connected, app).await;
             }
         }
-        crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::ChangesErr {
+        crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage::ChangesErr {
             message,
             ..
         } => {
             return Err(AppError::custom(format!(
-                "Revision relay CHANGES error: {message}"
+                "Snapshot relay CHANGES error: {message}"
             )));
         }
-        crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::Notice(message) => {
+        crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage::Notice(message) => {
             sync_log(app, &format!("relay notice: {message}"));
-        }
-        crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::NegErr {
-            message,
-            ..
-        } => {
-            return Err(AppError::custom(format!(
-                "Revision relay NEG error: {message}"
-            )));
         }
         _ => {}
     }

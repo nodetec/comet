@@ -4,31 +4,30 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createAccessControl } from "./access";
 import { createClientMessageHandler } from "./protocol/relay";
 import { createRetentionPolicyRuntime } from "./application/relay/retention-policy";
-import { createRevisionRelayDb, type RevisionRelayDb } from "./db";
+import { createSnapshotRelayDb, type SnapshotRelayDb } from "./db";
 import { createConnectionRegistry } from "./infra/connections";
 import type { ConnectionRegistry } from "./infra/connections";
-import type { RevisionRelayConfig } from "./types";
+import type { SnapshotRelayConfig } from "./types";
 import { createChangeStore } from "./storage/changes";
 import { createCompactionStore } from "./storage/compaction";
 import { createGenericEventStore } from "./storage/events";
-import { createHeadStore } from "./storage/heads";
 import { migrationsFolder } from "./migrations";
-import { getRevisionRelayInfoDocument } from "./protocol/info";
-import { createRevisionStore } from "./storage/revisions";
+import { getSnapshotRelayInfoDocument } from "./protocol/info";
+import { createSnapshotStore } from "./storage/snapshots";
 import { createRelaySettingsStore } from "./storage/settings";
 
-export type RevisionRelayRuntime = Awaited<
-  ReturnType<typeof createRevisionRelayServer>
+export type SnapshotRelayRuntime = Awaited<
+  ReturnType<typeof createSnapshotRelayServer>
 >;
 
 type WebSocketData = {
   connectionId: string;
 };
 
-export async function createRevisionRelayServer(
-  config: RevisionRelayConfig & { resetDatabase?: boolean },
+export async function createSnapshotRelayServer(
+  config: SnapshotRelayConfig & { resetDatabase?: boolean },
 ) {
-  const { db, sql } = createRevisionRelayDb(config.databaseUrl);
+  const { db, sql } = createSnapshotRelayDb(config.databaseUrl);
   await migrate(db, { migrationsFolder });
   if (config.resetDatabase) {
     await truncateAll(db);
@@ -37,8 +36,7 @@ export async function createRevisionRelayServer(
   const access = createAccessControl(db, config.privateMode);
   const genericEvents = createGenericEventStore(db);
   const changes = createChangeStore(db);
-  const revisions = createRevisionStore(db);
-  const heads = createHeadStore(db);
+  const snapshots = createSnapshotStore(db);
   const compaction = createCompactionStore(db);
   const settings = createRelaySettingsStore(db, {
     payloadRetentionDays: config.defaultPayloadRetentionDays,
@@ -57,8 +55,7 @@ export async function createRevisionRelayServer(
     },
     changeStore: changes,
     genericEventStore: genericEvents,
-    revisionStore: revisions,
-    headStore: heads,
+    snapshotStore: snapshots,
     connections,
     access,
   });
@@ -114,7 +111,7 @@ export async function createRevisionRelayServer(
               compaction.minPayloadMtime(),
             ]);
             return Response.json(
-              getRevisionRelayInfoDocument({
+              getSnapshotRelayInfoDocument({
                 minSeq,
                 minPayloadMtime,
               }),
@@ -134,7 +131,7 @@ export async function createRevisionRelayServer(
       if (url.pathname === "/healthz") {
         return new Response("ok");
       }
-      return new Response("Revision relay", { status: 200 });
+      return new Response("Snapshot relay", { status: 200 });
     },
     websocket: {
       open(ws) {
@@ -173,8 +170,7 @@ export async function createRevisionRelayServer(
     sql,
     server,
     genericEvents,
-    revisions,
-    heads,
+    snapshots,
     changes,
     compaction,
     settings,
@@ -252,7 +248,7 @@ async function handleRetentionApiRequest(
       );
     }
 
-    const { policy, compactedRevisions } = await options.retention.applyPolicy({
+    const { policy, compactedSnapshots } = await options.retention.applyPolicy({
       payloadRetentionDays:
         payloadRetentionDays === undefined ? undefined : payloadRetentionDays,
       compactionIntervalSeconds: compactionIntervalSeconds ?? undefined,
@@ -262,16 +258,16 @@ async function handleRetentionApiRequest(
       payload_retention_days: policy.payloadRetentionDays,
       compaction_interval_seconds: policy.compactionIntervalSeconds,
       updated_at: policy.updatedAt,
-      compacted_revisions: compactedRevisions,
+      compacted_snapshots: compactedSnapshots,
     });
   }
 
   return jsonResponse({ error: "method not allowed" }, { status: 405 });
 }
 
-async function truncateAll(db: RevisionRelayDb) {
+async function truncateAll(db: SnapshotRelayDb) {
   await db.execute(
-    rawSql`TRUNCATE relay_allowed_users, relay_settings, sync_changes, sync_heads, sync_revision_parents, sync_revisions, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
+    rawSql`TRUNCATE relay_allowed_users, relay_settings, sync_changes, sync_snapshots, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
   );
 }
 

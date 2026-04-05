@@ -34,10 +34,11 @@ pub struct LoadedNote {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct NoteConflictHead {
-    pub revision_id: String,
+pub struct NoteConflictSnapshot {
+    pub snapshot_id: String,
     pub mtime: i64,
     pub op: String,
+    pub deleted_at: Option<i64>,
     pub title: Option<String>,
     pub markdown: Option<String>,
     pub preview: Option<String>,
@@ -49,10 +50,19 @@ pub struct NoteConflictHead {
 #[serde(rename_all = "camelCase")]
 pub struct NoteConflictInfo {
     pub note_id: String,
-    pub current_revision_id: Option<String>,
-    pub head_count: usize,
+    pub current_snapshot_id: Option<String>,
+    pub snapshot_count: usize,
     pub relay_url: Option<String>,
-    pub heads: Vec<NoteConflictHead>,
+    pub has_delete_candidate: bool,
+    pub snapshots: Vec<NoteConflictSnapshot>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolveNoteConflictAction {
+    Restore,
+    KeepDeleted,
+    Merge,
 }
 
 #[derive(Debug, Clone, Serialize)]

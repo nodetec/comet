@@ -103,7 +103,7 @@ export function useSyncListener(deps: SyncListenerDeps) {
           getNoteConflict(currentDraftId).catch(() => null),
         ])
           .then(([freshNote, conflict]) => {
-            if (conflict && conflict.headCount > 1) {
+            if (conflict && conflict.snapshotCount > 1) {
               if (pendingSaveTimeoutRef.current !== null) {
                 window.clearTimeout(pendingSaveTimeoutRef.current);
                 pendingSaveTimeoutRef.current = null;
@@ -127,7 +127,7 @@ export function useSyncListener(deps: SyncListenerDeps) {
         if (action === "delete") {
           pendingBatchRef.current.deletedIds.add(noteId);
           pendingBatchRef.current.upsertedIds.delete(noteId);
-        } else if (action === "upsert") {
+        } else if (action === "upsert" || action === "conflict") {
           pendingBatchRef.current.upsertedIds.add(noteId);
         }
 

@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
-  startTestRevisionRelay,
-  type RevisionRelayTestContext,
+  startTestSnapshotRelay,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import { cleanupContexts } from "./fixtures";
 
 describe("relay integration > info", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
-  test("advertises revision-sync capabilities at the relay root", async () => {
-    const ctx = await startTestRevisionRelay(39414);
+  test("advertises snapshot-sync capabilities at the relay root", async () => {
+    const ctx = await startTestSnapshotRelay(39414);
     contexts.push(ctx);
 
     const response = await fetch(`http://127.0.0.1:${ctx.port}/`, {
@@ -25,19 +25,16 @@ describe("relay integration > info", () => {
     expect(await response.json()).toEqual({
       name: "Relay",
       description:
-        "Relay implementation for revision-scoped sync with current-head Negentropy and relay-local changes feed.",
+        "Relay implementation for author-scoped snapshot sync with bootstrap replay and relay-local changes feed.",
       software: "relay",
       version: "0.1.0",
-      supported_nips: [11, "CF", "NEG-REV"],
+      supported_nips: [11, "CF"],
       changes_feed: {
         min_seq: 0,
       },
-      revision_sync: {
-        strategy: "revision-sync.v1",
-        current_head_negentropy: true,
+      snapshot_sync: {
         changes_feed: true,
         author_scoped: true,
-        batch_fetch: true,
         retention: {
           min_payload_mtime: null,
         },
@@ -46,7 +43,7 @@ describe("relay integration > info", () => {
   });
 
   test("accepts websocket upgrades on the relay root", async () => {
-    const ctx = await startTestRevisionRelay(39415);
+    const ctx = await startTestSnapshotRelay(39415);
     contexts.push(ctx);
 
     const ws = new WebSocket(`ws://127.0.0.1:${ctx.port}/`);

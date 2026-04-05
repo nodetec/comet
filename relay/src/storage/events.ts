@@ -1,7 +1,7 @@
 import type { NostrEvent } from "@comet/nostr";
 import { eq } from "drizzle-orm";
 
-import type { RevisionRelayDb } from "../db";
+import type { SnapshotRelayDb } from "../db";
 import { relayEvents, relayEventTags } from "./schema";
 
 export type GenericEventStore = {
@@ -9,7 +9,7 @@ export type GenericEventStore = {
 };
 
 export function createGenericEventStore(
-  db: RevisionRelayDb,
+  db: SnapshotRelayDb,
 ): GenericEventStore {
   return {
     async publish(event) {

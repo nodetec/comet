@@ -1,31 +1,31 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   AUTH_PUBKEY,
   REV_A,
   authEvent,
   cleanupContexts,
-  revisionEventForAuthor,
+  snapshotEventForAuthor,
   traceOptions,
 } from "./fixtures";
 
-const contexts: RevisionRelayTestContext[] = [];
+const contexts: SnapshotRelayTestContext[] = [];
 
 describe("relay integration > private mode", () => {
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
-  test("sends an AUTH challenge and rejects revision writes before authentication", async () => {
-    const ctx = await startTestRevisionRelay(35220, { privateMode: true });
+  test("sends an AUTH challenge and rejects snapshot writes before authentication", async () => {
+    const ctx = await startTestSnapshotRelay(35220, { privateMode: true });
     contexts.push(ctx);
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "private-open"));
@@ -37,7 +37,7 @@ describe("relay integration > private mode", () => {
     expect(challenge[0]).toBe("AUTH");
     expect(typeof challenge[1]).toBe("string");
 
-    const event = revisionEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
+    const event = snapshotEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
     sendJson(ws, ["EVENT", event], traceOptions(ctx, "private-open"));
 
     expect(
@@ -46,12 +46,12 @@ describe("relay integration > private mode", () => {
       "OK",
       event.id,
       false,
-      "auth-required: authentication required for revision writes",
+      "auth-required: authentication required for snapshot writes",
     ]);
   });
 
   test("rejects AUTH for pubkeys that are not on the allowlist", async () => {
-    const ctx = await startTestRevisionRelay(35221, {
+    const ctx = await startTestSnapshotRelay(35221, {
       privateMode: true,
       adminToken: "secret-token",
     });
@@ -81,8 +81,8 @@ describe("relay integration > private mode", () => {
     ]);
   });
 
-  test("authenticates an allowlisted pubkey and authorizes scoped revision traffic", async () => {
-    const ctx = await startTestRevisionRelay(35222, {
+  test("authenticates an allowlisted pubkey and authorizes scoped snapshot traffic", async () => {
+    const ctx = await startTestSnapshotRelay(35222, {
       privateMode: true,
       adminToken: "secret-token",
     });
@@ -111,11 +111,11 @@ describe("relay integration > private mode", () => {
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
     ).toEqual(["OK", auth.id, true, ""]);
 
-    const event = revisionEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
+    const event = snapshotEventForAuthor(REV_A, AUTH_PUBKEY, 1_700_000_000_000);
     sendJson(ws, ["EVENT", event], traceOptions(ctx, "private-auth-ok"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
-    ).toEqual(["OK", event.id, true, `stored: revision ${REV_A}`]);
+    ).toEqual(["OK", event.id, true, `stored: snapshot ${event.id}`]);
 
     sendJson(
       ws,
@@ -123,9 +123,9 @@ describe("relay integration > private mode", () => {
         "REQ",
         "private-fetch",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: [AUTH_PUBKEY],
-          "#r": [REV_A],
+          ids: [event.id],
         },
       ],
       traceOptions(ctx, "private-auth-ok"),
@@ -138,8 +138,8 @@ describe("relay integration > private mode", () => {
     ).toEqual(["EOSE", "private-fetch"]);
   });
 
-  test("rejects revision queries scoped to a different author namespace", async () => {
-    const ctx = await startTestRevisionRelay(35223, {
+  test("rejects snapshot queries scoped to a different author namespace", async () => {
+    const ctx = await startTestSnapshotRelay(35223, {
       privateMode: true,
       adminToken: "secret-token",
     });
@@ -173,11 +173,11 @@ describe("relay integration > private mode", () => {
         "REQ",
         "wrong-author",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: [
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           ],
-          "#r": [REV_A],
+          ids: [`event-${REV_A}`],
         },
       ],
       traceOptions(ctx, "private-scope"),
@@ -188,7 +188,7 @@ describe("relay integration > private mode", () => {
     ).toEqual([
       "CLOSED",
       "wrong-author",
-      "restricted: can only query your own revision state",
+      "restricted: can only query your own snapshot state",
     ]);
   });
 });

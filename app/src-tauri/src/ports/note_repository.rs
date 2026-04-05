@@ -71,9 +71,7 @@ pub trait NoteRepository {
     fn restore_from_trash(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
     fn pin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
     fn unpin_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
-    fn delete_note(&self, note_id: &str) -> Result<usize, NoteError>;
     fn trashed_note_ids(&self) -> Result<Vec<String>, NoteError>;
-    fn delete_trashed_notes(&self) -> Result<(), NoteError>;
 
     // ── FTS / tags ──────────────────────────────────────────────────────
 
@@ -83,7 +81,6 @@ pub trait NoteRepository {
         title: &str,
         markdown: &str,
     ) -> Result<(), NoteError>;
-    fn delete_search_document(&self, note_id: &str) -> Result<(), NoteError>;
     fn replace_tags(&self, note_id: &str, markdown: &str) -> Result<(), NoteError>;
     fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError>;
     fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError>;

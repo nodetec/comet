@@ -17,6 +17,7 @@ import {
   type PublishNoteInput,
   type PublishShortNoteInput,
   type RenameTagInput,
+  type ResolveNoteConflictAction,
   type ThemeData,
   type ThemeSummary,
   type SetHideSubtagNotesInput,
@@ -167,9 +168,10 @@ export async function deletePublishedNote(noteId: string) {
 
 export async function resolveNoteConflict(
   noteId: string,
-  deleteSelected = false,
+  action: ResolveNoteConflictAction,
+  markdown?: string,
 ) {
-  return invoke("resolve_note_conflict", { deleteSelected, noteId });
+  return invoke("resolve_note_conflict", { action, markdown, noteId });
 }
 
 export async function exportNotes(input: ExportNotesInput) {

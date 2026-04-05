@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import type { RevisionRelayDb } from "../db";
+import type { SnapshotRelayDb } from "../db";
 import type { RelayRetentionPolicy } from "../types";
 
 import { relaySettings } from "./schema";
@@ -16,7 +16,7 @@ export type RelaySettingsStore = {
 };
 
 export function createRelaySettingsStore(
-  db: RevisionRelayDb,
+  db: SnapshotRelayDb,
   defaults: {
     payloadRetentionDays: number | null;
     compactionIntervalSeconds: number;

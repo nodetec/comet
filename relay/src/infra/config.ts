@@ -1,4 +1,4 @@
-import type { RevisionRelayConfig } from "../types";
+import type { SnapshotRelayConfig } from "../types";
 
 function parseKindList(value: string | undefined): number[] {
   if (!value) {
@@ -20,9 +20,9 @@ function parseOptionalInt(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function loadRevisionRelayConfig(
+export function loadSnapshotRelayConfig(
   env: NodeJS.ProcessEnv = process.env,
-): RevisionRelayConfig {
+): SnapshotRelayConfig {
   const port = Number.parseInt(env.PORT ?? "3400", 10);
   const host = env.HOST ?? "0.0.0.0";
   const databaseUrl = env.DATABASE_URL ?? "postgres://localhost/relay";

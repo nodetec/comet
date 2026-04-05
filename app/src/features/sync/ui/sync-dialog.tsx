@@ -34,7 +34,7 @@ type SyncInfo = {
   preferredRelayUrl: string | null;
   blossomUrl: string | null;
   npub: string | null;
-  revisionManagedNotes: number;
+  snapshotManagedNotes: number;
   relayBackedNotes: number;
   pendingChanges: number;
   totalNotes: number;
@@ -191,8 +191,8 @@ function SyncInfoPanel({ info }: { info: SyncInfo }) {
 
         <InfoRow
           icon={<HardDrive className="size-3.5" />}
-          label="Revision-managed"
-          value={`${info.revisionManagedNotes} / ${info.totalNotes}`}
+          label="Snapshot-managed"
+          value={`${info.snapshotManagedNotes} / ${info.totalNotes}`}
         />
 
         <InfoRow

@@ -197,6 +197,6 @@ async fn run_sync_connection(
         return Err(AppError::custom("No sync relay configured"));
     }
 
-    super::revision_sync_connection::run_revision_sync_connection(app, state, shutdown_rx, push_rx)
+    super::snapshot_sync_connection::run_snapshot_sync_connection(app, state, shutdown_rx, push_rx)
         .await
 }

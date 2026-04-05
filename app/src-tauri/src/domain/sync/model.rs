@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::domain::sync::vector_clock::VectorClock;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum SyncState {
@@ -31,9 +33,11 @@ pub struct SyncChangePayload {
     pub action: String,
 }
 
-/// Note fields extracted from a synced event rumor.
+/// Note fields extracted from a synced snapshot event.
 pub struct SyncedNote {
     pub id: String,
+    pub device_id: String,
+    pub vector_clock: VectorClock,
     pub title: String,
     pub markdown: String,
     pub created_at: i64,
@@ -44,4 +48,11 @@ pub struct SyncedNote {
     pub pinned_at: Option<i64>,
     pub readonly: bool,
     pub tags: Vec<String>,
+}
+
+pub struct SyncedTombstone {
+    pub id: String,
+    pub device_id: String,
+    pub vector_clock: VectorClock,
+    pub deleted_at: i64,
 }

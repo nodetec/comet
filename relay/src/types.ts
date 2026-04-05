@@ -1,39 +1,21 @@
 import type { NostrEvent } from "@comet/nostr";
 
-export const REVISION_SYNC_EVENT_KIND = 42061;
-export const REVISION_NEGENTROPY_STRATEGY = "revision-sync.v1";
+export const SNAPSHOT_SYNC_EVENT_KIND = 42061;
 export const RELAY_AUTH_EVENT_KIND = 22242;
 
-export type RevisionOp = "put" | "del";
+export type SnapshotOp = "put" | "del";
 
-export type RevisionEnvelope = {
+export type SnapshotEnvelope = {
   authorPubkey: string;
   documentCoord: string;
-  revisionId: string;
-  parentRevisionIds: string[];
-  op: RevisionOp;
+  op: SnapshotOp;
   mtime: number;
   entityType: string | null;
-  schemaVersion: string | null;
   event: NostrEvent;
 };
 
-export type RevisionHead = {
-  authorPubkey: string;
-  documentCoord: string;
-  revisionId: string;
-  op: RevisionOp;
-  mtime: number;
-};
-
-export type RevisionScope = {
-  authorPubkey: string;
-  documentCoords?: string[];
-  revisionIds?: string[];
-};
-
 export type RelayKindClassification =
-  | "revision"
+  | "snapshot"
   | "companion"
   | "pass-through"
   | "unsupported";
@@ -48,7 +30,8 @@ export type RelayFilter = {
   [key: `#${string}`]: string[] | undefined | number;
 };
 
-export type RevisionChangesFilter = {
+export type SnapshotChangesFilter = {
+  mode?: "bootstrap" | "tail";
   since?: number;
   until_seq?: number;
   limit?: number;
@@ -58,12 +41,7 @@ export type RevisionChangesFilter = {
   [key: `#${string}`]: string[] | undefined | number | boolean;
 };
 
-export type NegentropyItem = {
-  id: string;
-  timestamp: number;
-};
-
-export type RevisionRelayConfig = {
+export type SnapshotRelayConfig = {
   port: number;
   host: string;
   databaseUrl: string;

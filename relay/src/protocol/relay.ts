@@ -2,37 +2,31 @@ import type { NostrEvent } from "@comet/nostr";
 
 import type { AccessControl } from "../access";
 import { classifyEvent } from "../domain/events/policy";
-import { parseRevisionEnvelope } from "../domain/revisions/validation";
-import { createNegentropySessionManager } from "../application/revisions/negentropy-sessions";
+import { parseSnapshotEnvelope } from "../domain/snapshots/validation";
 import type { KindPolicy } from "../domain/events/policy";
 import {
-  REVISION_SYNC_EVENT_KIND,
+  SNAPSHOT_SYNC_EVENT_KIND,
   type RelayFilter,
-  type RevisionChangesFilter,
+  type SnapshotChangesFilter,
 } from "../types";
 import { publishGenericEvent } from "../application/relay/publish-event";
-import { publishRevision } from "../application/revisions/publish-revision";
+import { publishSnapshot } from "../application/snapshots/publish-snapshot";
 import type { GenericEventStore } from "../storage/events";
-import type { RevisionStore } from "../storage/revisions";
+import type { SnapshotStore } from "../storage/snapshots";
 import type { ChangeStore } from "../storage/changes";
-import type { HeadStore } from "../storage/heads";
 import type { ConnectionRegistry } from "../infra/connections";
 import {
   isAuthorizedForChangesFilter,
-  isAuthorizedForRevisionFilters,
-  isAuthorizedForRevisionAuthor,
+  isAuthorizedForSnapshotFilters,
+  isAuthorizedForSnapshotAuthor,
   validateAuthEvent,
 } from "./auth";
 import {
-  createNegErrMessage,
-  type NegMsgMessage,
-  type NegErrMessage,
-  type NegStatusMessage,
-  isNegCloseMessage,
-  isNegMsgMessage,
-  isNegOpenMessage,
-} from "./negentropy";
-import { type ChangesEventMessage, isChangesRequestMessage } from "./changes";
+  type ChangesEventMessage,
+  type ChangesSnapshotMessage,
+  type ChangesStatusMessage,
+  isChangesRequestMessage,
+} from "./changes";
 
 export type EventMessage = ["EVENT", NostrEvent];
 export type AuthMessage = ["AUTH", NostrEvent];
@@ -46,7 +40,7 @@ export type EoseMessage = ["EOSE", string];
 export type EventStatusMessage = [
   "EVENT-STATUS",
   string,
-  { rev: string; status: "payload_compacted" },
+  { id: string; status: "payload_compacted" },
 ];
 
 export type ClientMessage =
@@ -63,11 +57,12 @@ export type ServerMessage =
   | EoseMessage
   | EventStatusMessage
   | ChangesEventMessage
-  | NegMsgMessage
-  | NegErrMessage
-  | NegStatusMessage
+  | ChangesSnapshotMessage
+  | ChangesStatusMessage
   | ["EVENT", string, NostrEvent]
   | ["EVENTS", string, NostrEvent[]]
+  | ["CHANGES", string, "STATUS", { mode: "bootstrap"; snapshot_seq: number }]
+  | ["CHANGES", string, "SNAPSHOT", NostrEvent]
   | ["CHANGES", string, "EOSE", number]
   | ["CHANGES", string, "ERR", string];
 
@@ -148,16 +143,10 @@ export function createClientMessageHandler(options: {
   kindPolicy: KindPolicy;
   changeStore: ChangeStore;
   genericEventStore: GenericEventStore;
-  revisionStore: RevisionStore;
-  headStore: HeadStore;
+  snapshotStore: SnapshotStore;
   connections: ConnectionRegistry;
   access: AccessControl;
 }): ClientMessageHandler {
-  const negentropySessions = createNegentropySessionManager({
-    headStore: options.headStore,
-    changeStore: options.changeStore,
-  });
-
   return async (raw, context) => {
     const parsed = parseClientMessage(raw);
     if (!parsed) {
@@ -169,11 +158,11 @@ export function createClientMessageHandler(options: {
       const authedPubkeys = options.connections.getAuthedPubkeys(
         context.connectionId,
       );
-      const revisionEnvelope = parseRevisionEnvelope(event);
-      if (revisionEnvelope) {
+      const snapshotEnvelope = parseSnapshotEnvelope(event);
+      if (snapshotEnvelope) {
         if (options.access.privateMode) {
-          const auth = isAuthorizedForRevisionAuthor(
-            revisionEnvelope.authorPubkey,
+          const auth = isAuthorizedForSnapshotAuthor(
+            snapshotEnvelope.authorPubkey,
             authedPubkeys,
           );
           if (!auth.authorized) {
@@ -181,18 +170,17 @@ export function createClientMessageHandler(options: {
           }
         }
 
-        const result = await publishRevision({
-          store: options.revisionStore,
-          envelope: revisionEnvelope,
+        const result = await publishSnapshot({
+          store: options.snapshotStore,
+          envelope: snapshotEnvelope,
         });
 
         if (result.stored && result.seq !== undefined) {
           options.connections.broadcastRevisionChange({
             seq: result.seq,
             event,
-            authorPubkey: revisionEnvelope.authorPubkey,
-            documentCoord: revisionEnvelope.documentCoord,
-            revisionId: revisionEnvelope.revisionId,
+            authorPubkey: snapshotEnvelope.authorPubkey,
+            documentCoord: snapshotEnvelope.documentCoord,
           });
         }
 
@@ -202,19 +190,19 @@ export function createClientMessageHandler(options: {
             event.id,
             result.stored,
             result.stored
-              ? `stored: revision ${revisionEnvelope.revisionId}`
-              : (result.reason ?? "duplicate: revision exists"),
+              ? `stored: snapshot ${event.id}`
+              : (result.reason ?? "duplicate: snapshot exists"),
           ],
         ];
       }
 
-      if (event.kind === REVISION_SYNC_EVENT_KIND) {
+      if (event.kind === SNAPSHOT_SYNC_EVENT_KIND) {
         return [
           [
             "OK",
             event.id,
             false,
-            "invalid: missing or malformed revision metadata",
+            "invalid: missing or malformed snapshot metadata",
           ],
         ];
       }
@@ -253,7 +241,7 @@ export function createClientMessageHandler(options: {
           "OK",
           event.id,
           false,
-          "unsupported: non-revision event kind requires explicit classification",
+          "unsupported: non-snapshot event kind requires explicit classification",
         ],
       ];
     }
@@ -309,7 +297,7 @@ export function createClientMessageHandler(options: {
     if (isReqMessage(parsed)) {
       const message = parsed as ReqMessage;
       if (options.access.privateMode) {
-        const auth = isAuthorizedForRevisionFilters(
+        const auth = isAuthorizedForSnapshotFilters(
           message.slice(2) as RelayFilter[],
           options.connections.getAuthedPubkeys(context.connectionId),
         );
@@ -318,22 +306,22 @@ export function createClientMessageHandler(options: {
         }
       }
 
-      const revisionEvents = await options.revisionStore.queryRevisionEvents(
+      const snapshotEvents = await options.snapshotStore.querySnapshotEvents(
         message.slice(2) as RelayFilter[],
       );
-      const compactedRevisionIds =
-        await options.revisionStore.queryCompactedRevisionIds(
+      const compactedSnapshotIds =
+        await options.snapshotStore.queryCompactedSnapshotIds(
           message.slice(2) as RelayFilter[],
         );
       return [
-        ...revisionEvents.map(
+        ...snapshotEvents.map(
           (event): ServerMessage => ["EVENT", message[1], event],
         ),
-        ...compactedRevisionIds.map(
-          (rev): ServerMessage => [
+        ...compactedSnapshotIds.map(
+          (id): ServerMessage => [
             "EVENT-STATUS",
             message[1],
-            { rev, status: "payload_compacted" },
+            { id, status: "payload_compacted" },
           ],
         ),
         ["EOSE", message[1]],
@@ -343,7 +331,7 @@ export function createClientMessageHandler(options: {
     if (isReqBatchMessage(parsed)) {
       const message = parsed as ReqBatchMessage;
       if (options.access.privateMode) {
-        const auth = isAuthorizedForRevisionFilters(
+        const auth = isAuthorizedForSnapshotFilters(
           message.slice(2) as RelayFilter[],
           options.connections.getAuthedPubkeys(context.connectionId),
         );
@@ -352,24 +340,24 @@ export function createClientMessageHandler(options: {
         }
       }
 
-      const revisionEvents = await options.revisionStore.queryRevisionEvents(
+      const snapshotEvents = await options.snapshotStore.querySnapshotEvents(
         message.slice(2) as RelayFilter[],
       );
-      const compactedRevisionIds =
-        await options.revisionStore.queryCompactedRevisionIds(
+      const compactedSnapshotIds =
+        await options.snapshotStore.queryCompactedSnapshotIds(
           message.slice(2) as RelayFilter[],
         );
-      const eventBatches = chunkEvents(revisionEvents);
+      const eventBatches = chunkEvents(snapshotEvents);
 
       return [
         ...eventBatches.map(
           (events): ServerMessage => ["EVENTS", message[1], events],
         ),
-        ...compactedRevisionIds.map(
-          (rev): ServerMessage => [
+        ...compactedSnapshotIds.map(
+          (id): ServerMessage => [
             "EVENT-STATUS",
             message[1],
-            { rev, status: "payload_compacted" },
+            { id, status: "payload_compacted" },
           ],
         ),
         ["EOSE", message[1]],
@@ -386,7 +374,7 @@ export function createClientMessageHandler(options: {
 
     if (isChangesRequestMessage(parsed)) {
       const subscriptionId = parsed[1];
-      const filter: RevisionChangesFilter = parsed[2];
+      const filter: SnapshotChangesFilter = parsed[2];
 
       if (options.access.privateMode) {
         const auth = isAuthorizedForChangesFilter(
@@ -399,8 +387,38 @@ export function createClientMessageHandler(options: {
       }
 
       try {
+        const mode = filter.mode ?? "tail";
+        if (mode === "bootstrap") {
+          const snapshotSeq = await options.changeStore.currentSequence();
+          const bootstrapEvents =
+            await options.changeStore.queryStoredSnapshotEvents({
+              ...filter,
+              since: 0,
+              until_seq: snapshotSeq,
+              live: false,
+            });
+
+          return [
+            [
+              "CHANGES",
+              subscriptionId,
+              "STATUS",
+              { mode: "bootstrap", snapshot_seq: snapshotSeq },
+            ],
+            ...bootstrapEvents.map(
+              ({ event }): ServerMessage => [
+                "CHANGES",
+                subscriptionId,
+                "SNAPSHOT",
+                event,
+              ],
+            ),
+            ["CHANGES", subscriptionId, "EOSE", snapshotSeq],
+          ];
+        }
+
         const events =
-          await options.changeStore.queryStoredRevisionEvents(filter);
+          await options.changeStore.queryStoredSnapshotEvents(filter);
         const lastSeq = await options.changeStore.currentSequence();
         if (filter.live === true) {
           options.connections.addLiveChangesSubscription(
@@ -431,47 +449,6 @@ export function createClientMessageHandler(options: {
           ],
         ];
       }
-    }
-
-    if (isNegOpenMessage(parsed)) {
-      if (options.access.privateMode) {
-        const auth = isAuthorizedForChangesFilter(
-          parsed[2],
-          options.connections.getAuthedPubkeys(context.connectionId),
-        );
-        if (!auth.authorized) {
-          return [createNegErrMessage(parsed[1], auth.reason)];
-        }
-      }
-
-      try {
-        return [await negentropySessions.open(parsed)];
-      } catch (error) {
-        return [
-          createNegErrMessage(
-            parsed[1],
-            error instanceof Error ? error.message : "unknown negentropy error",
-          ),
-        ];
-      }
-    }
-
-    if (isNegMsgMessage(parsed)) {
-      try {
-        return [await negentropySessions.reconcile(parsed)];
-      } catch (error) {
-        return [
-          createNegErrMessage(
-            parsed[1],
-            error instanceof Error ? error.message : "unknown negentropy error",
-          ),
-        ];
-      }
-    }
-
-    if (isNegCloseMessage(parsed)) {
-      negentropySessions.close(parsed[1]);
-      return [["CLOSED", parsed[1], "negentropy session closed"]];
     }
 
     return [["NOTICE", "unsupported: message routing skeleton only"]];

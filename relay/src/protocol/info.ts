@@ -1,4 +1,4 @@
-export type RevisionRelayInfoDocument = {
+export type SnapshotRelayInfoDocument = {
   name: string;
   description: string;
   software: string;
@@ -7,38 +7,32 @@ export type RevisionRelayInfoDocument = {
   changes_feed: {
     min_seq: number;
   };
-  revision_sync: {
-    strategy: string;
-    current_head_negentropy: boolean;
+  snapshot_sync: {
     changes_feed: boolean;
     author_scoped: boolean;
-    batch_fetch: boolean;
     retention: {
       min_payload_mtime: number | null;
     };
   };
 };
 
-export function getRevisionRelayInfoDocument(input: {
+export function getSnapshotRelayInfoDocument(input: {
   minSeq: number;
   minPayloadMtime: number | null;
-}): RevisionRelayInfoDocument {
+}): SnapshotRelayInfoDocument {
   return {
     name: "Relay",
     description:
-      "Relay implementation for revision-scoped sync with current-head Negentropy and relay-local changes feed.",
+      "Relay implementation for author-scoped snapshot sync with bootstrap replay and relay-local changes feed.",
     software: "relay",
     version: "0.1.0",
-    supported_nips: [11, "CF", "NEG-REV"],
+    supported_nips: [11, "CF"],
     changes_feed: {
       min_seq: input.minSeq,
     },
-    revision_sync: {
-      strategy: "revision-sync.v1",
-      current_head_negentropy: true,
+    snapshot_sync: {
       changes_feed: true,
       author_scoped: true,
-      batch_fetch: true,
       retention: {
         min_payload_mtime: input.minPayloadMtime,
       },

@@ -1,8 +1,8 @@
 import { type NostrEvent } from "@comet/nostr";
 import { finalizeEvent, getPublicKey } from "nostr-tools";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
-import type { RevisionRelayTestContext } from "../helpers";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
+import type { SnapshotRelayTestContext } from "../helpers";
 
 export const REV_A =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -14,41 +14,39 @@ export const AUTH_SECRET_HEX =
   "1111111111111111111111111111111111111111111111111111111111111111";
 export const AUTH_PUBKEY = getPublicKey(hexToBytes(AUTH_SECRET_HEX));
 
-export function revisionEvent(
-  revisionId: string,
+export function snapshotEvent(
+  snapshotId: string,
   mtime = 1_700_000_000_000,
-  parentRevisionIds: string[] = [],
+  _ignoredParents: string[] = [],
   documentCoord = "doc-1",
   op: "put" | "del" = "put",
-  authorPubkey = "recipient-1",
+  authorPubkey = "author-1",
 ): NostrEvent {
   return {
-    id: `event-${revisionId}`,
+    id: `event-${snapshotId}`,
     pubkey: authorPubkey,
     created_at: Math.floor(mtime / 1000),
-    kind: REVISION_SYNC_EVENT_KIND,
+    kind: SNAPSHOT_SYNC_EVENT_KIND,
     tags: [
       ["d", documentCoord],
-      ["r", revisionId],
-      ...parentRevisionIds.map((parentRevisionId) => ["b", parentRevisionId]),
       ["o", op],
       ["c", "notes"],
     ],
-    content: `ciphertext-${revisionId}`,
-    sig: `sig-${revisionId}`,
+    content: `ciphertext-${snapshotId}`,
+    sig: `sig-${snapshotId}`,
   };
 }
 
-export function revisionEventForAuthor(
-  revisionId: string,
+export function snapshotEventForAuthor(
+  snapshotId: string,
   authorPubkey: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
   documentCoord = "doc-1",
   op: "put" | "del" = "put",
 ): NostrEvent {
-  return revisionEvent(
-    revisionId,
+  return snapshotEvent(
+    snapshotId,
     mtime,
     parentRevisionIds,
     documentCoord,
@@ -57,14 +55,14 @@ export function revisionEventForAuthor(
   );
 }
 
-export function deletionRevisionEvent(
-  revisionId: string,
+export function deletionSnapshotEvent(
+  snapshotId: string,
   mtime = 1_700_000_000_000,
   parentRevisionIds: string[] = [],
   documentCoord = "doc-1",
 ): NostrEvent {
-  return revisionEvent(
-    revisionId,
+  return snapshotEvent(
+    snapshotId,
     mtime,
     parentRevisionIds,
     documentCoord,
@@ -112,11 +110,11 @@ export function genericEvent(
   };
 }
 
-export function traceOptions(context: RevisionRelayTestContext, label: string) {
+export function traceOptions(context: SnapshotRelayTestContext, label: string) {
   return { context, label };
 }
 
-export async function cleanupContexts(contexts: RevisionRelayTestContext[]) {
+export async function cleanupContexts(contexts: SnapshotRelayTestContext[]) {
   while (contexts.length > 0) {
     const context = contexts.pop();
     if (context) {

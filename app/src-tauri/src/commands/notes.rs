@@ -1,6 +1,3 @@
-use crate::adapters::nostr::comet_note_revision::{
-    parse_note_revision_event, payload_to_synced_note,
-};
 use crate::adapters::sqlite::note_repository::SqliteNoteRepository;
 use crate::db::database_connection;
 use crate::domain::common::text::preview_from_markdown;
@@ -140,159 +137,116 @@ pub async fn get_note_conflict(
     note_id: String,
 ) -> Result<Option<NoteConflictInfo>, AppError> {
     let conn = database_connection(&app)?;
-    if !crate::adapters::tauri::key_store::is_current_identity_unlocked(&app, &conn)? {
-        return Ok(None);
-    }
-
-    let current_note: Option<(Option<String>, String, String)> = conn
+    let current_note: Option<(Option<String>, String, String, i64)> = conn
         .query_row(
-            "SELECT current_rev, title, markdown FROM notes WHERE id = ?1",
+            "SELECT sync_event_id, title, markdown, modified_at FROM notes WHERE id = ?1",
             params![note_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()?;
+    let current_tombstone: Option<(Option<String>, i64)> = if current_note.is_none() {
+        conn.query_row(
+            "SELECT sync_event_id, deleted_at FROM note_tombstones WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?
+    } else {
+        None
+    };
 
-    let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
-    let author_pubkey = keys.public_key().to_hex();
-    let document_coord = note_id.clone();
-    let current_revision_id = current_note.as_ref().and_then(|(rev, _, _)| rev.clone());
-    let relay_url = preferred_conflict_relay_url(&conn);
-    let scope_heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
-        &conn,
-        &author_pubkey,
-        &document_coord,
-    )?;
-    if scope_heads.len() <= 1 {
-        return Ok(None);
+    let mut snapshots = Vec::new();
+    let current_snapshot_id = current_note
+        .as_ref()
+        .map(|(sync_event_id, _, _, _)| {
+            sync_event_id
+                .clone()
+                .unwrap_or_else(|| format!("local:{note_id}"))
+        })
+        .or_else(|| {
+            current_tombstone.as_ref().map(|(sync_event_id, _)| {
+                sync_event_id
+                    .clone()
+                    .unwrap_or_else(|| format!("local-deleted:{note_id}"))
+            })
+        });
+
+    if let Some((sync_event_id, title, markdown, modified_at)) = current_note.as_ref() {
+        snapshots.push(NoteConflictSnapshot {
+            snapshot_id: sync_event_id
+                .clone()
+                .unwrap_or_else(|| format!("local:{note_id}")),
+            mtime: *modified_at,
+            op: "put".to_string(),
+            deleted_at: None,
+            title: Some(title.clone()),
+            markdown: Some(markdown.clone()),
+            preview: Some(preview_from_markdown(markdown)),
+            is_current: true,
+            is_available: true,
+        });
     }
-
-    let mut heads = scope_heads
-        .into_iter()
-        .map(|head| NoteConflictHead {
-            revision_id: head.rev.clone(),
-            mtime: head.mtime,
-            op: head.op,
+    if let Some((sync_event_id, deleted_at)) = current_tombstone.as_ref() {
+        snapshots.push(NoteConflictSnapshot {
+            snapshot_id: sync_event_id
+                .clone()
+                .unwrap_or_else(|| format!("local-deleted:{note_id}")),
+            mtime: *deleted_at,
+            op: "del".to_string(),
+            deleted_at: Some(*deleted_at),
             title: None,
             markdown: None,
             preview: None,
-            is_current: current_revision_id.as_deref() == Some(head.rev.as_str()),
-            is_available: false,
+            is_current: true,
+            is_available: true,
+        });
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT sync_event_id, op, modified_at, deleted_at, title, markdown
+         FROM note_conflicts
+         WHERE note_id = ?1
+         ORDER BY modified_at DESC, sync_event_id ASC",
+    )?;
+    let rows = stmt.query_map(params![note_id], |row| {
+        let markdown: Option<String> = row.get(5)?;
+        Ok(NoteConflictSnapshot {
+            snapshot_id: row.get(0)?,
+            op: row.get(1)?,
+            mtime: row.get(2)?,
+            deleted_at: row.get(3)?,
+            title: row.get(4)?,
+            preview: markdown.as_ref().map(|value| preview_from_markdown(value)),
+            markdown,
+            is_current: false,
+            is_available: true,
         })
-        .collect::<Vec<_>>();
-
-    if let Some((Some(current_rev), title, markdown)) = current_note.as_ref() {
-        if let Some(head) = heads
-            .iter_mut()
-            .find(|head| head.revision_id == *current_rev)
-        {
-            head.title = Some(title.clone());
-            head.markdown = Some(markdown.clone());
-            head.preview = Some(preview_from_markdown(markdown));
-            head.is_available = true;
-        }
+    })?;
+    for row in rows {
+        snapshots.push(row?);
     }
 
-    if let Some(ref relay_url) = relay_url {
-        let revision_ids = heads
-            .iter()
-            .map(|head| head.revision_id.clone())
-            .collect::<Vec<_>>();
-
-        if let Ok(mut connection) =
-            crate::adapters::nostr::relay_client::RevisionRelayConnection::connect_authenticated(
-                relay_url, &keys,
-            )
-            .await
-        {
-            if connection
-                .send_req_revisions("conflict-inspect", &author_pubkey, &revision_ids)
-                .await
-                .is_ok()
-            {
-                loop {
-                    match connection.recv_message().await {
-                        Ok(crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::Event {
-                            subscription_id,
-                            event,
-                        }) if subscription_id == "conflict-inspect" => {
-                            let parsed = parse_note_revision_event(&keys, &event)?;
-                            let Some(head) = heads
-                                .iter_mut()
-                                .find(|head| head.revision_id == parsed.revision_id)
-                            else {
-                                continue;
-                            };
-
-                            if parsed.operation == "del" {
-                                head.title = head.title.clone().or_else(|| Some("Deleted".into()));
-                                head.preview = Some("Deleted".into());
-                                head.is_available = true;
-                                continue;
-                            }
-
-                            let Some(payload) = parsed.payload.as_ref() else {
-                                continue;
-                            };
-                            let note = payload_to_synced_note(
-                                &parsed.document_id,
-                                event.created_at.as_secs() as i64 * 1000,
-                                payload,
-                            );
-                            head.title = Some(note.title.clone());
-                            head.preview = Some(preview_from_markdown(&note.markdown));
-                            head.markdown = Some(note.markdown);
-                            head.is_available = true;
-                        }
-                        Ok(
-                            crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::EventStatus {
-                                subscription_id,
-                                rev,
-                                status,
-                            },
-                        ) if subscription_id == "conflict-inspect" => {
-                            if status == "payload_compacted" {
-                                if let Some(head) =
-                                    heads.iter_mut().find(|head| head.revision_id == rev)
-                                {
-                                    head.preview =
-                                        Some("Payload compacted on the relay".into());
-                                }
-                            }
-                        }
-                        Ok(
-                            crate::adapters::nostr::relay_client::RevisionRelayIncomingMessage::Eose {
-                                subscription_id,
-                            },
-                        ) if subscription_id == "conflict-inspect" => break,
-                        Ok(_) => {}
-                        Err(error) => {
-                            eprintln!(
-                                "[sync] conflict inspection failed note={} relay={}: {}",
-                                note_id, relay_url, error
-                            );
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+    if snapshots.len() <= 1 {
+        return Ok(None);
     }
+    let has_delete_candidate = snapshots.iter().any(|snapshot| snapshot.op == "del");
 
-    heads.sort_by(|left, right| {
+    snapshots.sort_by(|left, right| {
         right
             .is_current
             .cmp(&left.is_current)
             .then_with(|| right.is_available.cmp(&left.is_available))
             .then_with(|| right.mtime.cmp(&left.mtime))
-            .then_with(|| left.revision_id.cmp(&right.revision_id))
+            .then_with(|| left.snapshot_id.cmp(&right.snapshot_id))
     });
 
     Ok(Some(NoteConflictInfo {
         note_id,
-        current_revision_id,
-        head_count: heads.len(),
-        relay_url,
-        heads,
+        current_snapshot_id,
+        snapshot_count: snapshots.len(),
+        relay_url: None,
+        has_delete_candidate,
+        snapshots,
     }))
 }
 
@@ -300,19 +254,34 @@ pub async fn get_note_conflict(
 pub async fn resolve_note_conflict(
     app: AppHandle,
     note_id: String,
-    delete_selected: Option<bool>,
+    action: ResolveNoteConflictAction,
+    markdown: Option<String>,
 ) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
-    let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
-    let author_pubkey = keys.public_key().to_hex();
-    let document_coord = note_id.clone();
-    let heads = crate::adapters::sqlite::revision_sync_repository::list_sync_heads_for_scope(
-        &conn,
-        &author_pubkey,
-        &document_coord,
+    let conflict_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM note_conflicts WHERE note_id = ?1",
+        params![note_id],
+        |row| row.get(0),
     )?;
-    if heads.len() <= 1 {
+    if conflict_count == 0 {
         return Err(AppError::custom("Note is not conflicted."));
+    }
+
+    let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(&app, &conn)?;
+    if matches!(
+        action,
+        ResolveNoteConflictAction::Restore | ResolveNoteConflictAction::Merge
+    ) {
+        let repo = SqliteNoteRepository::new(&conn);
+        let conflict_markdown =
+            markdown.ok_or_else(|| AppError::custom("Conflict resolution requires markdown"))?;
+        let _ = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: note_id.clone(),
+                markdown: conflict_markdown,
+            },
+        )?;
     }
 
     let relay_urls =
@@ -325,25 +294,31 @@ pub async fn resolve_note_conflict(
         .collect::<Vec<_>>();
     drop(conn);
 
-    if delete_selected.unwrap_or(false) {
-        crate::adapters::nostr::revision_push::push_deletion_revision(
-            &app,
-            &active_relay_url,
-            &backup_relay_urls,
-            &keys,
-            &note_id,
-        )
-        .await?;
-    } else {
-        crate::adapters::nostr::revision_push::push_note_revision(
-            &app,
-            &active_relay_url,
-            &backup_relay_urls,
-            &keys,
-            &note_id,
-        )
-        .await?;
+    match action {
+        ResolveNoteConflictAction::KeepDeleted => {
+            crate::adapters::nostr::snapshot_push::push_deletion_snapshot(
+                &app,
+                &active_relay_url,
+                &backup_relay_urls,
+                &keys,
+                &note_id,
+            )
+            .await?;
+        }
+        ResolveNoteConflictAction::Restore | ResolveNoteConflictAction::Merge => {
+            crate::adapters::nostr::snapshot_push::push_note_snapshot(
+                &app,
+                &active_relay_url,
+                &backup_relay_urls,
+                &keys,
+                &note_id,
+            )
+            .await?;
+        }
     }
+
+    let conn = database_connection(&app)?;
+    crate::domain::sync::service::clear_note_conflicts(&conn, &note_id)?;
 
     Ok(())
 }
@@ -491,7 +466,16 @@ pub fn delete_note_permanently(app: AppHandle, note_id: String) -> Result<(), Ap
         crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &[note_id.clone()])?;
 
     let repo = SqliteNoteRepository::new(&conn);
-    NoteService::delete_permanently(&repo, &note_id)?;
+    let tombstoned =
+        crate::domain::sync::service::tombstone_note_locally(&conn, &note_id, now_millis())?;
+    if !tombstoned {
+        return Err(AppError::custom(format!("Note not found: {note_id}")));
+    }
+
+    if repo.last_open_note_id()?.as_deref() == Some(note_id.as_str()) {
+        let next = repo.next_active_note_id(Some(&note_id))?;
+        repo.set_last_open_note_id(next.as_deref())?;
+    }
 
     // Blob cleanup (needs AppHandle).
     let blossom_deletions =
@@ -516,8 +500,12 @@ pub fn empty_trash(app: AppHandle) -> Result<(), AppError> {
     let repo = SqliteNoteRepository::new(&conn);
     let trashed_ids: Vec<String> = repo.trashed_note_ids()?;
     let orphaned = crate::domain::blob::service::find_orphaned_blob_hashes(&conn, &trashed_ids)?;
-
-    let note_ids = NoteService::empty_trash(&repo)?;
+    let mut note_ids = Vec::new();
+    for note_id in trashed_ids {
+        if crate::domain::sync::service::tombstone_note_locally(&conn, &note_id, now_millis())? {
+            note_ids.push(note_id);
+        }
+    }
 
     // Blob cleanup.
     let blossom_deletions =

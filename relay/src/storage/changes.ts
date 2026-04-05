@@ -1,10 +1,10 @@
 import { and, asc, eq, gt, inArray, lte, max } from "drizzle-orm";
 
-import type { RevisionRelayDb } from "../db";
+import type { SnapshotRelayDb } from "../db";
 import type { NostrEvent } from "@comet/nostr";
 
 import { syncChanges, syncPayloads } from "./schema";
-import type { RevisionChangesFilter } from "../types";
+import type { SnapshotChangesFilter } from "../types";
 
 export type StoredChangeEvent = {
   seq: number;
@@ -14,20 +14,19 @@ export type StoredChangeEvent = {
 export type ChangeStore = {
   currentSequence: () => Promise<number>;
   minSequence: () => Promise<number>;
-  appendStoredRevisionChange: (input: {
+  appendStoredSnapshotChange: (input: {
     authorPubkey: string;
     documentCoord: string;
-    revisionId: string;
     eventId: string;
     op: "put" | "del";
     mtime: number;
   }) => Promise<number>;
-  queryStoredRevisionEvents: (
-    filter: RevisionChangesFilter,
+  queryStoredSnapshotEvents: (
+    filter: SnapshotChangesFilter,
   ) => Promise<StoredChangeEvent[]>;
 };
 
-export function createChangeStore(db: RevisionRelayDb): ChangeStore {
+export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
   return {
     async currentSequence() {
       const [row] = await db
@@ -42,13 +41,13 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
       const row = rows[0];
       return row.seq === null ? 0 : Number(row.seq);
     },
-    async appendStoredRevisionChange(input) {
+    async appendStoredSnapshotChange(input) {
       const [row] = await db
         .insert(syncChanges)
         .values({
-          recipient: input.authorPubkey,
+          authorPubkey: input.authorPubkey,
           dTag: input.documentCoord,
-          rev: input.revisionId,
+          snapshotId: input.eventId,
           eventId: input.eventId,
           op: input.op,
           mtime: input.mtime,
@@ -57,17 +56,17 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
 
       return row.seq;
     },
-    async queryStoredRevisionEvents(filter) {
+    async queryStoredSnapshotEvents(filter) {
       const since = filter.since ?? 0;
       const authorFilter = filter.authors;
       if (!Array.isArray(authorFilter) || authorFilter.length !== 1) {
         throw new Error(
-          "revision CHANGES currently requires exactly one author",
+          "snapshot CHANGES currently requires exactly one author",
         );
       }
 
       const conditions = [
-        eq(syncChanges.recipient, authorFilter[0]),
+        eq(syncChanges.authorPubkey, authorFilter[0]),
         gt(syncChanges.seq, since),
       ];
 
@@ -86,11 +85,6 @@ export function createChangeStore(db: RevisionRelayDb): ChangeStore {
       const documentFilter = filter["#d"];
       if (Array.isArray(documentFilter) && documentFilter.length > 0) {
         conditions.push(inArray(syncChanges.dTag, documentFilter));
-      }
-
-      const revFilter = filter["#r"];
-      if (Array.isArray(revFilter) && revFilter.length > 0) {
-        conditions.push(inArray(syncChanges.rev, revFilter));
       }
 
       const rows = await db

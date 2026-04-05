@@ -399,33 +399,6 @@ impl NoteService {
         repo.note_by_id(note_id)?.ok_or(NoteError::NotFound)
     }
 
-    /// Permanently deletes a note from the database and updates navigation.
-    /// Returns the IDs of trashed notes that were deleted (just `[note_id]`).
-    /// Blob cleanup must be handled by the caller.
-    pub fn delete_permanently(repo: &dyn NoteRepository, note_id: &str) -> Result<(), NoteError> {
-        validate_note_id(note_id)?;
-        repo.delete_search_document(note_id)?;
-        let deleted = repo.delete_note(note_id)?;
-        if deleted == 0 {
-            return Err(NoteError::NotFound);
-        }
-
-        if repo.last_open_note_id()?.as_deref() == Some(note_id) {
-            let next = repo.next_active_note_id(Some(note_id))?;
-            repo.set_last_open_note_id(next.as_deref())?;
-        }
-
-        Ok(())
-    }
-
-    /// Permanently deletes all trashed notes. Returns the IDs of deleted notes.
-    /// Blob cleanup must be handled by the caller.
-    pub fn empty_trash(repo: &dyn NoteRepository) -> Result<Vec<String>, NoteError> {
-        let note_ids = repo.trashed_note_ids()?;
-        repo.delete_trashed_notes()?;
-        Ok(note_ids)
-    }
-
     pub fn pin_note(repo: &dyn NoteRepository, note_id: &str) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let now = now_millis();
@@ -798,17 +771,6 @@ mod tests {
             }
         }
 
-        fn delete_note(&self, note_id: &str) -> Result<usize, NoteError> {
-            match self.notes.borrow_mut().remove(note_id) {
-                Some(_) => Ok(1),
-                None => Ok(0),
-            }
-        }
-
-        fn delete_search_document(&self, _note_id: &str) -> Result<(), NoteError> {
-            Ok(())
-        }
-
         fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError> {
             Ok(self.pinned_tags.borrow().contains(path))
         }
@@ -860,13 +822,6 @@ mod tests {
                 .filter(|n| n.deleted_at.is_some())
                 .map(|n| n.id.clone())
                 .collect())
-        }
-
-        fn delete_trashed_notes(&self) -> Result<(), NoteError> {
-            self.notes
-                .borrow_mut()
-                .retain(|_, n| n.deleted_at.is_none());
-            Ok(())
         }
 
         // ── Remaining stubs ─────────────────────────────────────────────
@@ -1154,48 +1109,6 @@ mod tests {
         let record = NoteService::restore_from_trash(&repo, "n1").unwrap();
 
         assert!(record.deleted_at.is_none());
-    }
-
-    // ── delete_permanently ─────────────────────────────────────────────
-
-    #[test]
-    fn delete_permanently_removes_note_and_navigates() {
-        let repo = MockNoteRepository::new()
-            .with_note(make_note("n1", "# One"))
-            .with_note(make_note("n2", "# Two"));
-        repo.set_last_open_note_id(Some("n1")).unwrap();
-
-        NoteService::delete_permanently(&repo, "n1").unwrap();
-
-        assert!(repo.notes.borrow().get("n1").is_none());
-        assert_eq!(repo.last_open_note_id.borrow().as_deref(), Some("n2"));
-    }
-
-    #[test]
-    fn delete_permanently_not_found() {
-        let repo = MockNoteRepository::new();
-
-        let result = NoteService::delete_permanently(&repo, "missing");
-
-        assert!(matches!(result, Err(NoteError::NotFound)));
-    }
-
-    // ── empty_trash ────────────────────────────────────────────────────
-
-    #[test]
-    fn empty_trash_returns_deleted_ids() {
-        let mut trashed = make_note("t1", "# Trashed");
-        trashed.deleted_at = Some(100);
-        let repo = MockNoteRepository::new()
-            .with_note(trashed)
-            .with_note(make_note("active", "# Active"));
-
-        let ids = NoteService::empty_trash(&repo).unwrap();
-
-        assert_eq!(ids, vec!["t1"]);
-        // trashed note removed, active note still present
-        assert!(repo.notes.borrow().get("t1").is_none());
-        assert!(repo.notes.borrow().get("active").is_some());
     }
 
     // ── pin_note / unpin_note ──────────────────────────────────────────

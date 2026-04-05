@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
-  startTestRevisionRelay,
-  type RevisionRelayTestContext,
+  startTestSnapshotRelay,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import { cleanupContexts } from "./fixtures";
 
-const contexts: RevisionRelayTestContext[] = [];
+const contexts: SnapshotRelayTestContext[] = [];
 
 describe("relay integration > allowlist admin", () => {
   afterEach(async () => {
@@ -14,7 +14,7 @@ describe("relay integration > allowlist admin", () => {
   });
 
   test("returns 503 when admin token is not configured", async () => {
-    const ctx = await startTestRevisionRelay(35210);
+    const ctx = await startTestSnapshotRelay(35210);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/allowlist`);
@@ -23,7 +23,7 @@ describe("relay integration > allowlist admin", () => {
   });
 
   test("lists, upserts, and revokes allowlist entries", async () => {
-    const ctx = await startTestRevisionRelay(35211, {
+    const ctx = await startTestSnapshotRelay(35211, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);

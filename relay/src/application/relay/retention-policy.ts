@@ -9,7 +9,7 @@ export type RetentionPolicyRuntime = {
   applyPolicy: (input: {
     payloadRetentionDays?: number | null;
     compactionIntervalSeconds?: number;
-  }) => Promise<{ policy: RelayRetentionPolicy; compactedRevisions: number }>;
+  }) => Promise<{ policy: RelayRetentionPolicy; compactedSnapshots: number }>;
   stop: () => void;
 };
 
@@ -71,8 +71,8 @@ export function createRetentionPolicyRuntime(options: {
     async applyPolicy(input) {
       const policy = await options.settings.updateRetentionPolicy(input);
       schedule(policy);
-      const compactedRevisions = await runCompaction(policy);
-      return { policy, compactedRevisions };
+      const compactedSnapshots = await runCompaction(policy);
+      return { policy, compactedSnapshots };
     },
 
     stop() {

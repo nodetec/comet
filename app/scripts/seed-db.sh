@@ -36,7 +36,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 if ! command -v cargo >/dev/null 2>&1; then
-  echo "cargo is required to seed initial revisions"
+  echo "cargo is required to seed initial snapshots"
   exit 1
 fi
 
@@ -71,6 +71,12 @@ ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
 NOW_MS="$(($(date +%s) * 1000))"
 
 node "$SCRIPT_DIR/generate-seed-notes.mjs" "$TEST_NOTES_DIR" "$NOW_MS" >"$GENERATED_SQL_PATH"
+node \
+  "$SCRIPT_DIR/generate-seed-blob-meta.mjs" \
+  "$TEST_ATTACHMENTS_DIR" \
+  "$PUBLIC_KEY" \
+  "https://media.comet.md" \
+  >>"$GENERATED_SQL_PATH"
 TEMP_DB_PATH="$(mktemp "${ACCOUNT_DIR}/comet.seed.XXXXXX.db")"
 
 sqlite3 "$TEMP_DB_PATH" <<SQL
@@ -80,20 +86,20 @@ BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS notes_fts;
 DROP TABLE IF EXISTS notes;
-DROP TABLE IF EXISTS sync_heads;
-DROP TABLE IF EXISTS sync_revision_parents;
-DROP TABLE IF EXISTS sync_revisions;
+DROP TABLE IF EXISTS note_tombstones;
+DROP TABLE IF EXISTS note_conflicts;
+DROP TABLE IF EXISTS sync_snapshots;
 DROP TABLE IF EXISTS sync_relay_state;
 DROP TABLE IF EXISTS sync_relays;
 DROP TABLE IF EXISTS note_tag_links;
 DROP TABLE IF EXISTS note_tags;
 DROP TABLE IF EXISTS tags;
-DROP TABLE IF EXISTS notebooks;
 DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS relays;
 DROP TABLE IF EXISTS nostr_identity;
 DROP TABLE IF EXISTS blob_meta;
 DROP TABLE IF EXISTS blob_uploads;
+DROP TABLE IF EXISTS pending_blob_uploads;
 DROP TABLE IF EXISTS pending_deletions;
 DROP TABLE IF EXISTS _rusqlite_migration;
 DROP TABLE IF EXISTS _rusqlite_migration_version;
@@ -101,15 +107,6 @@ DROP TABLE IF EXISTS _rusqlite_migration_version;
 CREATE TABLE app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
-);
-
-CREATE TABLE notebooks (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  sync_event_id TEXT,
-  locally_modified INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE relays (
@@ -123,16 +120,16 @@ CREATE TABLE notes (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   markdown TEXT NOT NULL,
-  notebook_id TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
   created_at INTEGER NOT NULL,
   modified_at INTEGER NOT NULL,
+  last_edit_device_id TEXT,
+  vector_clock TEXT NOT NULL DEFAULT '{}',
   archived_at INTEGER,
   pinned_at INTEGER,
   readonly INTEGER NOT NULL DEFAULT 0 CHECK (readonly IN (0, 1)),
   nostr_d_tag TEXT,
   published_at INTEGER,
   sync_event_id TEXT,
-  current_rev TEXT,
   edited_at INTEGER,
   locally_modified INTEGER NOT NULL DEFAULT 0,
   deleted_at INTEGER,
@@ -204,36 +201,19 @@ CREATE TABLE sync_relay_state (
   updated_at INTEGER NOT NULL
 );
 
-CREATE TABLE sync_revisions (
-  recipient TEXT NOT NULL,
+CREATE TABLE sync_snapshots (
+  author_pubkey TEXT NOT NULL,
   d_tag TEXT NOT NULL,
-  rev TEXT NOT NULL,
+  snapshot_id TEXT NOT NULL,
   op TEXT NOT NULL CHECK (op IN ('put', 'del')),
   mtime INTEGER NOT NULL,
   entity_type TEXT,
-  payload_event_id TEXT,
+  event_id TEXT,
   payload_retained INTEGER NOT NULL DEFAULT 1 CHECK (payload_retained IN (0, 1)),
   relay_url TEXT,
   stored_seq INTEGER,
   created_at INTEGER NOT NULL,
-  PRIMARY KEY (recipient, d_tag, rev)
-);
-
-CREATE TABLE sync_revision_parents (
-  recipient TEXT NOT NULL,
-  d_tag TEXT NOT NULL,
-  rev TEXT NOT NULL,
-  parent_rev TEXT NOT NULL,
-  PRIMARY KEY (recipient, d_tag, rev, parent_rev)
-);
-
-CREATE TABLE sync_heads (
-  recipient TEXT NOT NULL,
-  d_tag TEXT NOT NULL,
-  rev TEXT NOT NULL,
-  op TEXT NOT NULL CHECK (op IN ('put', 'del')),
-  mtime INTEGER NOT NULL,
-  PRIMARY KEY (recipient, d_tag, rev)
+  PRIMARY KEY (author_pubkey, d_tag, snapshot_id)
 );
 
 CREATE VIRTUAL TABLE notes_fts USING fts5(
@@ -245,8 +225,6 @@ CREATE VIRTUAL TABLE notes_fts USING fts5(
 
 CREATE INDEX idx_notes_modified_at ON notes(modified_at DESC);
 CREATE INDEX idx_notes_edited_at ON notes(edited_at DESC);
-CREATE INDEX idx_notes_active_notebook ON notes(notebook_id)
-  WHERE archived_at IS NULL;
 CREATE INDEX idx_notes_archived_at ON notes(archived_at);
 CREATE INDEX idx_notes_pinned_at ON notes(pinned_at DESC);
 CREATE INDEX idx_notes_deleted_at ON notes(deleted_at);
@@ -255,13 +233,9 @@ CREATE INDEX idx_tags_depth_path ON tags(depth, path);
 CREATE INDEX idx_note_tag_links_tag_id_note_id ON note_tag_links(tag_id, note_id);
 CREATE INDEX idx_note_tag_links_tag_id_direct_note_id ON note_tag_links(tag_id, is_direct, note_id);
 CREATE INDEX idx_note_tag_links_note_id_direct ON note_tag_links(note_id, is_direct);
-CREATE INDEX idx_sync_revisions_scope ON sync_revisions(recipient, d_tag);
-CREATE INDEX idx_sync_revisions_rev ON sync_revisions(rev);
-CREATE INDEX idx_sync_revisions_mtime ON sync_revisions(mtime DESC);
-CREATE INDEX idx_sync_revision_parents_rev ON sync_revision_parents(recipient, d_tag, rev);
-CREATE INDEX idx_sync_revision_parents_parent_rev ON sync_revision_parents(recipient, d_tag, parent_rev);
-CREATE INDEX idx_sync_heads_scope ON sync_heads(recipient, d_tag);
-CREATE INDEX idx_sync_heads_mtime ON sync_heads(mtime DESC);
+CREATE INDEX idx_sync_snapshots_scope ON sync_snapshots(author_pubkey, d_tag);
+CREATE INDEX idx_sync_snapshots_snapshot_id ON sync_snapshots(snapshot_id);
+CREATE INDEX idx_sync_snapshots_mtime ON sync_snapshots(mtime DESC);
 
 .read $GENERATED_SQL_PATH
 
@@ -286,6 +260,8 @@ INSERT INTO relays (url, kind, created_at) VALUES
   ('wss://relay.comet.md', 'sync', $NOW_MS),
   ('wss://relay.damus.io', 'publish', $NOW_MS);
 
+-- This handcrafted seed schema intentionally stops at migration 6.
+-- The seed-snapshots binary then applies later account migrations on top.
 PRAGMA user_version = 6;
 
 COMMIT;
@@ -296,7 +272,7 @@ SQL
 cargo run \
   --quiet \
   --manifest-path "$SCRIPT_DIR/../src-tauri/Cargo.toml" \
-  --bin seed-revisions \
+  --bin seed-snapshots \
   -- "$TEMP_DB_PATH" "$NSEC"
 
 rm -f "$DB_PATH" "${DB_PATH}-shm" "${DB_PATH}-wal"

@@ -122,7 +122,7 @@ async function main() {
       });
     }
 
-    console.log("\nRevision relay cluster ready:\n");
+    console.log("\nSnapshot relay cluster ready:\n");
     for (const relay of relays) {
       console.log(
         `${relay.name.padEnd(7)} ws=${relay.wsUrl} db=${relay.dbName}`,

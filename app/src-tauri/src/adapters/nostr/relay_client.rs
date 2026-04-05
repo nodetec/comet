@@ -1,4 +1,4 @@
-use crate::adapters::nostr::comet_note_revision::COMET_NOTE_REVISION_KIND;
+use crate::adapters::nostr::comet_note_snapshot::COMET_NOTE_SNAPSHOT_KIND;
 use crate::error::AppError;
 use futures_util::{SinkExt, StreamExt};
 use nostr_sdk::prelude::{Event, EventBuilder, JsonUtil, Keys, RelayUrl};
@@ -9,44 +9,40 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-type RevisionRelayStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
-type RevisionRelayWrite = futures_util::stream::SplitSink<RevisionRelayStream, Message>;
-type RevisionRelayRead = futures_util::stream::SplitStream<RevisionRelayStream>;
+type SnapshotRelayStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+type SnapshotRelayWrite = futures_util::stream::SplitSink<SnapshotRelayStream, Message>;
+type SnapshotRelayRead = futures_util::stream::SplitStream<SnapshotRelayStream>;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct RevisionRelayInfoDocument {
+pub struct SnapshotRelayInfoDocument {
     pub name: String,
     pub description: String,
     pub software: String,
     pub version: String,
     pub supported_nips: Vec<serde_json::Value>,
-    pub changes_feed: RevisionRelayChangesFeedInfo,
-    pub revision_sync: RevisionRelaySyncInfo,
+    pub changes_feed: SnapshotRelayChangesFeedInfo,
+    pub snapshot_sync: SnapshotRelaySyncInfo,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct RevisionRelayChangesFeedInfo {
+pub struct SnapshotRelayChangesFeedInfo {
     pub min_seq: i64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct RevisionRelaySyncInfo {
-    pub strategy: String,
-    pub current_head_negentropy: bool,
+pub struct SnapshotRelaySyncInfo {
     pub changes_feed: bool,
     pub author_scoped: bool,
-    #[serde(default)]
-    pub batch_fetch: bool,
-    pub retention: RevisionRelayRetentionInfo,
+    pub retention: SnapshotRelayRetentionInfo,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct RevisionRelayRetentionInfo {
+pub struct SnapshotRelayRetentionInfo {
     pub min_payload_mtime: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum RevisionRelayIncomingMessage {
+pub enum SnapshotRelayIncomingMessage {
     Ok {
         event_id: String,
         accepted: bool,
@@ -70,24 +66,20 @@ pub enum RevisionRelayIncomingMessage {
     },
     EventStatus {
         subscription_id: String,
-        rev: String,
+        id: String,
         status: String,
     },
-    NegStatus {
+    ChangesStatus {
         subscription_id: String,
-        strategy: String,
+        mode: String,
         snapshot_seq: i64,
-    },
-    NegMsg {
-        subscription_id: String,
-        payload: String,
-    },
-    NegErr {
-        subscription_id: String,
-        message: String,
     },
     AuthChallenge {
         challenge: String,
+    },
+    ChangesSnapshot {
+        subscription_id: String,
+        event: Event,
     },
     ChangesEvent {
         subscription_id: String,
@@ -104,13 +96,13 @@ pub enum RevisionRelayIncomingMessage {
     },
 }
 
-pub struct RevisionRelayConnection {
-    write: RevisionRelayWrite,
-    read: RevisionRelayRead,
-    pending: VecDeque<RevisionRelayIncomingMessage>,
+pub struct SnapshotRelayConnection {
+    write: SnapshotRelayWrite,
+    read: SnapshotRelayRead,
+    pending: VecDeque<SnapshotRelayIncomingMessage>,
 }
 
-impl RevisionRelayConnection {
+impl SnapshotRelayConnection {
     pub async fn connect(relay_url: &str) -> Result<Self, AppError> {
         let (stream, _) = connect_async(relay_url)
             .await
@@ -135,67 +127,18 @@ impl RevisionRelayConnection {
             .await
     }
 
-    pub async fn send_neg_open(
+    pub async fn send_changes_bootstrap(
         &mut self,
         subscription_id: &str,
         author_pubkey: &str,
     ) -> Result<(), AppError> {
         self.send_json(serde_json::json!([
-            "NEG-OPEN",
+            "CHANGES",
             subscription_id,
             {
-                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "mode": "bootstrap",
+                "kinds": [COMET_NOTE_SNAPSHOT_KIND.as_u16()],
                 "authors": [author_pubkey]
-            }
-        ]))
-        .await
-    }
-
-    pub async fn send_neg_msg(
-        &mut self,
-        subscription_id: &str,
-        payload: &str,
-    ) -> Result<(), AppError> {
-        self.send_json(serde_json::json!(["NEG-MSG", subscription_id, payload]))
-            .await
-    }
-
-    pub async fn send_neg_close(&mut self, subscription_id: &str) -> Result<(), AppError> {
-        self.send_json(serde_json::json!(["NEG-CLOSE", subscription_id]))
-            .await
-    }
-
-    pub async fn send_req_revisions(
-        &mut self,
-        subscription_id: &str,
-        author_pubkey: &str,
-        revision_ids: &[String],
-    ) -> Result<(), AppError> {
-        self.send_json(serde_json::json!([
-            "REQ",
-            subscription_id,
-            {
-                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
-                "authors": [author_pubkey],
-                "#r": revision_ids,
-            }
-        ]))
-        .await
-    }
-
-    pub async fn send_req_revisions_batch(
-        &mut self,
-        subscription_id: &str,
-        author_pubkey: &str,
-        revision_ids: &[String],
-    ) -> Result<(), AppError> {
-        self.send_json(serde_json::json!([
-            "REQ-BATCH",
-            subscription_id,
-            {
-                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
-                "authors": [author_pubkey],
-                "#r": revision_ids,
             }
         ]))
         .await
@@ -212,8 +155,9 @@ impl RevisionRelayConnection {
             "CHANGES",
             subscription_id,
             {
+                "mode": "tail",
                 "since": since,
-                "kinds": [COMET_NOTE_REVISION_KIND.as_u16()],
+                "kinds": [COMET_NOTE_SNAPSHOT_KIND.as_u16()],
                 "authors": [author_pubkey],
                 "live": live
             }
@@ -221,7 +165,7 @@ impl RevisionRelayConnection {
         .await
     }
 
-    pub async fn recv_message(&mut self) -> Result<RevisionRelayIncomingMessage, AppError> {
+    pub async fn recv_message(&mut self) -> Result<SnapshotRelayIncomingMessage, AppError> {
         if let Some(message) = self.pending.pop_front() {
             return Ok(message);
         }
@@ -296,11 +240,11 @@ impl RevisionRelayConnection {
 
         let message = parse_relay_message(&text)?;
         match message {
-            RevisionRelayIncomingMessage::AuthChallenge { challenge } => {
+            SnapshotRelayIncomingMessage::AuthChallenge { challenge } => {
                 self.send_auth(keys, relay_url, &challenge).await?;
                 match self.recv_message().await? {
-                    RevisionRelayIncomingMessage::Ok { accepted: true, .. } => Ok(()),
-                    RevisionRelayIncomingMessage::Ok {
+                    SnapshotRelayIncomingMessage::Ok { accepted: true, .. } => Ok(()),
+                    SnapshotRelayIncomingMessage::Ok {
                         accepted: false,
                         message,
                         ..
@@ -336,7 +280,7 @@ impl RevisionRelayConnection {
     }
 }
 
-pub async fn fetch_relay_info(relay_http_url: &str) -> Result<RevisionRelayInfoDocument, AppError> {
+pub async fn fetch_relay_info(relay_http_url: &str) -> Result<SnapshotRelayInfoDocument, AppError> {
     let response = reqwest::Client::new()
         .get(relay_http_url)
         .header("Accept", "application/nostr+json")
@@ -346,7 +290,7 @@ pub async fn fetch_relay_info(relay_http_url: &str) -> Result<RevisionRelayInfoD
 
     if !response.status().is_success() {
         return Err(AppError::custom(format!(
-            "Revision relay info request failed with status {}",
+            "Snapshot relay info request failed with status {}",
             response.status()
         )));
     }
@@ -356,18 +300,18 @@ pub async fn fetch_relay_info(relay_http_url: &str) -> Result<RevisionRelayInfoD
         .await
         .map_err(|e| AppError::custom(format!("Failed to read relay info body: {e}")))?;
 
-    serde_json::from_str::<RevisionRelayInfoDocument>(&body)
+    serde_json::from_str::<SnapshotRelayInfoDocument>(&body)
         .map_err(|e| AppError::custom(format!("Failed to parse relay info: {e}")))
 }
 
-pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, AppError> {
+pub fn parse_relay_message(text: &str) -> Result<SnapshotRelayIncomingMessage, AppError> {
     let value: serde_json::Value = serde_json::from_str(text)?;
     let arr = value
         .as_array()
-        .ok_or_else(|| AppError::custom("Revision relay message was not an array"))?;
+        .ok_or_else(|| AppError::custom("Snapshot relay message was not an array"))?;
 
     match arr.first().and_then(|value| value.as_str()) {
-        Some("OK") => Ok(RevisionRelayIncomingMessage::Ok {
+        Some("OK") => Ok(SnapshotRelayIncomingMessage::Ok {
             event_id: arr
                 .get(1)
                 .and_then(serde_json::Value::as_str)
@@ -383,13 +327,13 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 .unwrap_or_default()
                 .to_string(),
         }),
-        Some("NOTICE") => Ok(RevisionRelayIncomingMessage::Notice(
+        Some("NOTICE") => Ok(SnapshotRelayIncomingMessage::Notice(
             arr.get(1)
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
                 .to_string(),
         )),
-        Some("CLOSED") => Ok(RevisionRelayIncomingMessage::Closed {
+        Some("CLOSED") => Ok(SnapshotRelayIncomingMessage::Closed {
             subscription_id: arr
                 .get(1)
                 .and_then(serde_json::Value::as_str)
@@ -401,7 +345,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 .unwrap_or_default()
                 .to_string(),
         }),
-        Some("EOSE") => Ok(RevisionRelayIncomingMessage::Eose {
+        Some("EOSE") => Ok(SnapshotRelayIncomingMessage::Eose {
             subscription_id: arr
                 .get(1)
                 .and_then(serde_json::Value::as_str)
@@ -414,7 +358,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 .ok_or_else(|| AppError::custom("Missing event in EVENT response"))?;
             let event = Event::from_json(event_json.to_string())
                 .map_err(|e| AppError::custom(format!("Invalid relay event: {e}")))?;
-            Ok(RevisionRelayIncomingMessage::Event {
+            Ok(SnapshotRelayIncomingMessage::Event {
                 subscription_id: arr
                     .get(1)
                     .and_then(serde_json::Value::as_str)
@@ -434,7 +378,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                     .map_err(|e| AppError::custom(format!("Invalid relay event in EVENTS: {e}")))?;
                 events.push(event);
             }
-            Ok(RevisionRelayIncomingMessage::EventsBatch {
+            Ok(SnapshotRelayIncomingMessage::EventsBatch {
                 subscription_id: arr
                     .get(1)
                     .and_then(serde_json::Value::as_str)
@@ -443,16 +387,16 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 events,
             })
         }
-        Some("EVENT-STATUS") => Ok(RevisionRelayIncomingMessage::EventStatus {
+        Some("EVENT-STATUS") => Ok(SnapshotRelayIncomingMessage::EventStatus {
             subscription_id: arr
                 .get(1)
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
                 .to_string(),
-            rev: arr
+            id: arr
                 .get(2)
                 .and_then(serde_json::Value::as_object)
-                .and_then(|value| value.get("rev"))
+                .and_then(|value| value.get("id"))
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
                 .to_string(),
@@ -464,51 +408,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 .unwrap_or_default()
                 .to_string(),
         }),
-        Some("NEG-STATUS") => Ok(RevisionRelayIncomingMessage::NegStatus {
-            subscription_id: arr
-                .get(1)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            strategy: arr
-                .get(2)
-                .and_then(serde_json::Value::as_object)
-                .and_then(|value| value.get("strategy"))
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            snapshot_seq: arr
-                .get(2)
-                .and_then(serde_json::Value::as_object)
-                .and_then(|value| value.get("snapshot_seq"))
-                .and_then(serde_json::Value::as_i64)
-                .unwrap_or(0),
-        }),
-        Some("NEG-MSG") => Ok(RevisionRelayIncomingMessage::NegMsg {
-            subscription_id: arr
-                .get(1)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            payload: arr
-                .get(2)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        }),
-        Some("NEG-ERR") => Ok(RevisionRelayIncomingMessage::NegErr {
-            subscription_id: arr
-                .get(1)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            message: arr
-                .get(2)
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        }),
-        Some("AUTH") => Ok(RevisionRelayIncomingMessage::AuthChallenge {
+        Some("AUTH") => Ok(SnapshotRelayIncomingMessage::AuthChallenge {
             challenge: arr
                 .get(1)
                 .and_then(serde_json::Value::as_str)
@@ -516,6 +416,42 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 .to_string(),
         }),
         Some("CHANGES") => match arr.get(2).and_then(serde_json::Value::as_str) {
+            Some("STATUS") => Ok(SnapshotRelayIncomingMessage::ChangesStatus {
+                subscription_id: arr
+                    .get(1)
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                mode: arr
+                    .get(3)
+                    .and_then(serde_json::Value::as_object)
+                    .and_then(|value| value.get("mode"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                snapshot_seq: arr
+                    .get(3)
+                    .and_then(serde_json::Value::as_object)
+                    .and_then(|value| value.get("snapshot_seq"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0),
+            }),
+            Some("SNAPSHOT") => {
+                let event_json = arr
+                    .get(3)
+                    .ok_or_else(|| AppError::custom("Missing event in CHANGES SNAPSHOT"))?;
+                let event = Event::from_json(event_json.to_string()).map_err(|e| {
+                    AppError::custom(format!("Invalid event in CHANGES SNAPSHOT: {e}"))
+                })?;
+                Ok(SnapshotRelayIncomingMessage::ChangesSnapshot {
+                    subscription_id: arr
+                        .get(1)
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    event,
+                })
+            }
             Some("EVENT") => {
                 let event_json = arr
                     .get(4)
@@ -523,7 +459,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                 let event = Event::from_json(event_json.to_string()).map_err(|e| {
                     AppError::custom(format!("Invalid event in CHANGES EVENT: {e}"))
                 })?;
-                Ok(RevisionRelayIncomingMessage::ChangesEvent {
+                Ok(SnapshotRelayIncomingMessage::ChangesEvent {
                     subscription_id: arr
                         .get(1)
                         .and_then(serde_json::Value::as_str)
@@ -533,7 +469,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                     event,
                 })
             }
-            Some("EOSE") => Ok(RevisionRelayIncomingMessage::ChangesEose {
+            Some("EOSE") => Ok(SnapshotRelayIncomingMessage::ChangesEose {
                 subscription_id: arr
                     .get(1)
                     .and_then(serde_json::Value::as_str)
@@ -541,7 +477,7 @@ pub fn parse_relay_message(text: &str) -> Result<RevisionRelayIncomingMessage, A
                     .to_string(),
                 last_seq: arr.get(3).and_then(serde_json::Value::as_i64).unwrap_or(0),
             }),
-            Some("ERR") => Ok(RevisionRelayIncomingMessage::ChangesErr {
+            Some("ERR") => Ok(SnapshotRelayIncomingMessage::ChangesErr {
                 subscription_id: arr
                     .get(1)
                     .and_then(serde_json::Value::as_str)
@@ -565,17 +501,17 @@ mod tests {
     use nostr_sdk::Kind;
 
     #[test]
-    fn parses_neg_status_message() {
+    fn parses_changes_status_message() {
         let message = parse_relay_message(
-            r#"["NEG-STATUS","neg-1",{"strategy":"revision-sync.v1","snapshot_seq":42}]"#,
+            r#"["CHANGES","bootstrap-1","STATUS",{"mode":"bootstrap","snapshot_seq":42}]"#,
         )
         .unwrap();
 
         assert_eq!(
             message,
-            RevisionRelayIncomingMessage::NegStatus {
-                subscription_id: "neg-1".into(),
-                strategy: "revision-sync.v1".into(),
+            SnapshotRelayIncomingMessage::ChangesStatus {
+                subscription_id: "bootstrap-1".into(),
+                mode: "bootstrap".into(),
                 snapshot_seq: 42,
             }
         );
@@ -588,7 +524,7 @@ mod tests {
             "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
             "created_at": 1700000000,
             "kind": 42061,
-            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["o","put"],["c","notes"]],
+            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["o","put"],["c","notes"]],
             "content": "ciphertext",
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });
@@ -598,7 +534,7 @@ mod tests {
                 .unwrap();
 
         match message {
-            RevisionRelayIncomingMessage::Event {
+            SnapshotRelayIncomingMessage::Event {
                 subscription_id,
                 event,
             } => {
@@ -616,7 +552,7 @@ mod tests {
             "pubkey": "1111111111111111111111111111111111111111111111111111111111111111",
             "created_at": 1700000000,
             "kind": 42061,
-            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["r","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],["o","put"],["c","notes"]],
+            "tags": [["d","B181093E-A1A3-492F-BF55-6E661BFEA397"],["o","put"],["c","notes"]],
             "content": "ciphertext",
             "sig": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
         });
@@ -626,7 +562,7 @@ mod tests {
                 .unwrap();
 
         match message {
-            RevisionRelayIncomingMessage::EventsBatch {
+            SnapshotRelayIncomingMessage::EventsBatch {
                 subscription_id,
                 events,
             } => {
@@ -641,15 +577,15 @@ mod tests {
     #[test]
     fn parses_event_status_message() {
         let message = parse_relay_message(
-            r#"["EVENT-STATUS","fetch-1",{"rev":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"payload_compacted"}]"#,
+            r#"["EVENT-STATUS","fetch-1",{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"payload_compacted"}]"#,
         )
         .unwrap();
 
         assert_eq!(
             message,
-            RevisionRelayIncomingMessage::EventStatus {
+            SnapshotRelayIncomingMessage::EventStatus {
                 subscription_id: "fetch-1".into(),
-                rev: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 status: "payload_compacted".into(),
             }
         );
@@ -661,7 +597,7 @@ mod tests {
 
         assert_eq!(
             message,
-            RevisionRelayIncomingMessage::AuthChallenge {
+            SnapshotRelayIncomingMessage::AuthChallenge {
                 challenge: "challenge-123".into(),
             }
         );

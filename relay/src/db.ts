@@ -3,9 +3,9 @@ import postgres from "postgres";
 
 import * as schema from "@comet/data";
 
-export type RevisionRelayDb = ReturnType<typeof createRevisionRelayDb>["db"];
+export type SnapshotRelayDb = ReturnType<typeof createSnapshotRelayDb>["db"];
 
-export function createRevisionRelayDb(url?: string) {
+export function createSnapshotRelayDb(url?: string) {
   const connectionString = url ?? process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is required");

@@ -1,10 +1,10 @@
-use crate::adapters::nostr::relay_client::{RevisionRelayConnection, RevisionRelayIncomingMessage};
+use crate::adapters::nostr::relay_client::{SnapshotRelayConnection, SnapshotRelayIncomingMessage};
 use crate::adapters::sqlite::sync_repository::get_blossom_url;
 use crate::db::database_connection;
 use crate::domain::blob::service::extract_attachment_hashes;
-use crate::domain::sync::revision_service::{
-    build_materialized_note_revision_for_publish, build_pending_note_deletion_revision,
-    build_pending_note_revision, persist_local_deletion_revision, persist_local_note_revision,
+use crate::domain::sync::snapshot_service::{
+    build_materialized_note_snapshot_for_publish, build_pending_note_deletion_snapshot,
+    build_pending_note_snapshot, persist_local_deletion_snapshot, persist_local_note_snapshot,
 };
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
@@ -16,19 +16,19 @@ use tauri::{AppHandle, Emitter};
 
 use super::sync_manager::sync_log;
 
-pub struct PreparedNoteRevisionPublish {
+pub struct PreparedNoteSnapshotPublish {
     pub note_id: String,
     pub event: Event,
 }
 
-pub async fn push_note_revision(
+pub async fn push_note_snapshot(
     app: &AppHandle,
     active_relay_url: &str,
     backup_relay_urls: &[String],
     keys: &Keys,
     note_id: &str,
 ) -> Result<(), AppError> {
-    push_note_revisions_batch(
+    push_note_snapshots_batch(
         app,
         active_relay_url,
         backup_relay_urls,
@@ -38,11 +38,11 @@ pub async fn push_note_revision(
     .await
 }
 
-pub async fn prepare_note_revision_publishes_batch(
+pub async fn prepare_note_snapshot_publishes_batch(
     app: &AppHandle,
     keys: &Keys,
     note_ids: &[String],
-) -> Vec<(String, Result<PreparedNoteRevisionPublish, AppError>)> {
+) -> Vec<(String, Result<PreparedNoteSnapshotPublish, AppError>)> {
     let upload_summary = match maybe_upload_note_attachments_batch(app, note_ids, keys).await {
         Ok(summary) => summary,
         Err(error) => {
@@ -62,13 +62,13 @@ pub async fn prepare_note_revision_publishes_batch(
                 return (note_id, Err(AppError::custom(message)));
             }
 
-            let result = build_prepared_note_revision_publish(app, keys, &note_id);
+            let result = build_prepared_note_snapshot_publish(app, keys, &note_id);
             (note_id, result)
         })
         .collect()
 }
 
-pub async fn push_note_revisions_batch(
+pub async fn push_note_snapshots_batch(
     app: &AppHandle,
     active_relay_url: &str,
     backup_relay_urls: &[String],
@@ -79,14 +79,14 @@ pub async fn push_note_revisions_batch(
         return Ok(());
     }
 
-    let prepared_results = prepare_note_revision_publishes_batch(app, keys, note_ids).await;
+    let prepared_results = prepare_note_snapshot_publishes_batch(app, keys, note_ids).await;
     let mut prepared_publishes = Vec::new();
 
     for (note_id, result) in prepared_results {
         match result {
             Ok(prepared) => prepared_publishes.push(prepared),
             Err(error) => {
-                sync_log(app, &format!("revision push error: {note_id}: {error}"));
+                sync_log(app, &format!("snapshot push error: {note_id}: {error}"));
             }
         }
     }
@@ -116,10 +116,10 @@ pub async fn push_note_revisions_batch(
                 return;
             };
 
-            if let Err(error) = mark_note_revision_published(app, note_id, event_id) {
+            if let Err(error) = mark_note_snapshot_published(app, note_id, event_id) {
                 sync_log(
                     app,
-                    &format!("revision push finalize error: {}: {}", note_id, error),
+                    &format!("snapshot push finalize error: {}: {}", note_id, error),
                 );
                 return;
             }
@@ -127,7 +127,7 @@ pub async fn push_note_revisions_batch(
             acked += 1;
             sync_log(
                 app,
-                &format!("revision relay ack {acked}/{ack_total} note={note_id}"),
+                &format!("snapshot relay ack {acked}/{ack_total} note={note_id}"),
             );
             let _ = app.emit("sync-progress", ());
         },
@@ -137,7 +137,7 @@ pub async fn push_note_revisions_batch(
     sync_log(
         app,
         &format!(
-            "revision parallel start notes={} publishable={} relay={}",
+            "snapshot parallel start notes={} publishable={} relay={}",
             note_ids.len(),
             prepared_publishes.len(),
             active_relay_url
@@ -160,7 +160,7 @@ pub async fn push_note_revisions_batch(
     sync_log(
         app,
         &format!(
-            "revision parallel complete notes={} total_ms={} publish_ms={} blob_ms={} overlap_ms={}",
+            "snapshot parallel complete notes={} total_ms={} publish_ms={} blob_ms={} overlap_ms={}",
             prepared_publishes.len(),
             total_ms,
             publish_ms,
@@ -170,7 +170,7 @@ pub async fn push_note_revisions_batch(
     );
 
     if let Err(error) = blob_flush_result {
-        sync_log(app, &format!("revision blossom queue error: {error}"));
+        sync_log(app, &format!("snapshot blossom queue error: {error}"));
     }
     let _ = app.emit("sync-progress", ());
 
@@ -182,7 +182,7 @@ pub async fn push_note_revisions_batch(
                 if let Some(message) = batch_publish_failure_message(&event_id, &fanout) {
                     sync_log(
                         app,
-                        &format!("revision push error: {}: {}", prepared.note_id, message),
+                        &format!("snapshot push error: {}: {}", prepared.note_id, message),
                     );
                 }
             }
@@ -190,7 +190,7 @@ pub async fn push_note_revisions_batch(
             sync_log(
                 app,
                 &format!(
-                    "revision relay publish complete acked={}/{} failed={} relays={}",
+                    "snapshot relay publish complete acked={}/{} failed={} relays={}",
                     acked, ack_total, failed_count, fanout.relay_count
                 ),
             );
@@ -201,7 +201,7 @@ pub async fn push_note_revisions_batch(
             for prepared in prepared_publishes {
                 sync_log(
                     app,
-                    &format!("revision push error: {}: {}", prepared.note_id, error),
+                    &format!("snapshot push error: {}: {}", prepared.note_id, error),
                 );
             }
 
@@ -300,7 +300,7 @@ async fn maybe_upload_note_attachments_batch(
         sync_log(
             app,
             &format!(
-                "revision blossom batch skip notes={} attachments={} but no blossom url configured",
+                "snapshot blossom batch skip notes={} attachments={} but no blossom url configured",
                 note_ids.len(),
                 total_attachment_refs
             ),
@@ -321,7 +321,7 @@ async fn maybe_upload_note_attachments_batch(
     sync_log(
         app,
         &format!(
-            "revision blossom batch queue notes={} attachment_refs={} unique_attachments={} url={}",
+            "snapshot blossom batch queue notes={} attachment_refs={} unique_attachments={} url={}",
             note_ids.len(),
             total_attachment_refs,
             unique_hashes.len(),
@@ -381,7 +381,7 @@ async fn maybe_upload_note_attachments_batch(
         else {
             failed_hash_errors.insert(
                 hash.clone(),
-                format!("Local attachment missing for revision sync: {hash}"),
+                format!("Local attachment missing for snapshot sync: {hash}"),
             );
             continue;
         };
@@ -405,7 +405,7 @@ async fn maybe_upload_note_attachments_batch(
     sync_log(
         app,
         &format!(
-            "revision blossom batch queued notes={} queued={} reused={} failed={} queue_ms={}",
+            "snapshot blossom batch queued notes={} queued={} reused={} failed={} queue_ms={}",
             note_ids.len(),
             queued,
             reused,
@@ -420,33 +420,33 @@ async fn maybe_upload_note_attachments_batch(
     })
 }
 
-fn build_prepared_note_revision_publish(
+fn build_prepared_note_snapshot_publish(
     app: &AppHandle,
     keys: &Keys,
     note_id: &str,
-) -> Result<PreparedNoteRevisionPublish, AppError> {
+) -> Result<PreparedNoteSnapshotPublish, AppError> {
     let author_pubkey = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
         let pending = if let Some(existing) =
-            build_materialized_note_revision_for_publish(&conn, keys, &author_pubkey, note_id)?
+            build_materialized_note_snapshot_for_publish(&conn, keys, &author_pubkey, note_id)?
         {
             existing
         } else {
-            let pending = build_pending_note_revision(&conn, keys, &author_pubkey, note_id)?;
-            persist_local_note_revision(&conn, &pending)?;
+            let pending = build_pending_note_snapshot(&conn, keys, &author_pubkey, note_id)?;
+            persist_local_note_snapshot(&conn, &pending)?;
             pending
         };
         pending.event
     };
 
-    Ok(PreparedNoteRevisionPublish {
+    Ok(PreparedNoteSnapshotPublish {
         note_id: note_id.to_string(),
         event,
     })
 }
 
-pub fn mark_note_revision_published(
+pub fn mark_note_snapshot_published(
     app: &AppHandle,
     note_id: &str,
     event_id_hex: &str,
@@ -629,7 +629,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
         sync_log(
             app,
             &format!(
-                "revision blossom queued upload blobs={} url={}",
+                "snapshot blossom queued upload blobs={} url={}",
                 uploads.len(),
                 server_url
             ),
@@ -688,7 +688,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
             Err(error) if error.to_string().contains("batch upload unsupported") => {
                 sync_log(
                     app,
-                    "revision blossom batch upload unsupported, falling back to single uploads",
+                    "snapshot blossom batch upload unsupported, falling back to single uploads",
                 );
                 for upload in uploads {
                     match crate::adapters::blossom::client::upload_blob(
@@ -726,7 +726,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
         sync_log(
             app,
             &format!(
-                "revision blossom queued upload ready blobs={} uploaded={} failed={} elapsed_ms={}",
+                "snapshot blossom queued upload ready blobs={} uploaded={} failed={} elapsed_ms={}",
                 batch_items.len(),
                 uploaded,
                 failed,
@@ -742,7 +742,7 @@ pub async fn retry_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<
     flush_pending_blob_uploads(app, keys).await
 }
 
-pub async fn push_deletion_revision(
+pub async fn push_deletion_snapshot(
     app: &AppHandle,
     active_relay_url: &str,
     backup_relay_urls: &[String],
@@ -752,20 +752,27 @@ pub async fn push_deletion_revision(
     let author_pubkey = keys.public_key();
     let event = {
         let conn = database_connection(app)?;
-        let pending = build_pending_note_deletion_revision(
+        let pending = build_pending_note_deletion_snapshot(
             &conn,
             keys,
             &author_pubkey,
             entity_id,
             crate::domain::common::time::now_millis(),
         )?;
-        persist_local_deletion_revision(&conn, &pending)?;
+        persist_local_deletion_snapshot(&conn, &pending)?;
         pending.event
     };
 
     let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
 
     let conn = database_connection(app)?;
+    let _ = conn.execute(
+        "UPDATE note_tombstones
+         SET sync_event_id = ?1,
+             locally_modified = 0
+         WHERE id = ?2",
+        rusqlite::params![event.id.to_hex(), entity_id],
+    );
     let _ = conn.execute(
         "DELETE FROM pending_deletions WHERE entity_id = ?1",
         rusqlite::params![entity_id],
@@ -774,7 +781,7 @@ pub async fn push_deletion_revision(
     sync_log(
         app,
         &format!(
-            "pushed revision delete {entity_id} to {}/{} relays",
+            "pushed snapshot delete {entity_id} to {}/{} relays",
             fanout.success_count, fanout.relay_count
         ),
     );
@@ -802,7 +809,7 @@ async fn send_event_to_relays(
     let mut success_count = 0usize;
     let relay_count = 1 + backup_relay_urls.len();
 
-    match RevisionRelayConnection::connect_authenticated(active_relay_url, keys).await {
+    match SnapshotRelayConnection::connect_authenticated(active_relay_url, keys).await {
         Ok(mut connection) => {
             if send_event_on_connection(&mut connection, event).await? {
                 success_count += 1;
@@ -810,31 +817,31 @@ async fn send_event_to_relays(
         }
         Err(error) => {
             eprintln!(
-                "[sync] revision active push connect error relay={active_relay_url}: {error}"
+                "[sync] snapshot active push connect error relay={active_relay_url}: {error}"
             );
         }
     }
 
     for relay_url in backup_relay_urls {
-        match RevisionRelayConnection::connect_authenticated(relay_url, keys).await {
+        match SnapshotRelayConnection::connect_authenticated(relay_url, keys).await {
             Ok(mut connection) => match send_event_on_connection(&mut connection, event).await {
                 Ok(true) => {
                     success_count += 1;
                 }
                 Ok(false) => {}
                 Err(error) => {
-                    eprintln!("[sync] revision backup push error relay={relay_url}: {error}");
+                    eprintln!("[sync] snapshot backup push error relay={relay_url}: {error}");
                 }
             },
             Err(error) => {
-                eprintln!("[sync] revision backup connect error relay={relay_url}: {error}");
+                eprintln!("[sync] snapshot backup connect error relay={relay_url}: {error}");
             }
         }
     }
 
     if success_count == 0 {
         return Err(AppError::custom(
-            "Revision push failed on every configured sync relay",
+            "Snapshot push failed on every configured sync relay",
         ));
     }
 
@@ -861,7 +868,7 @@ pub async fn send_events_to_relays_batch(
     let mut any_success = false;
 
     for relay_url in relay_urls {
-        match RevisionRelayConnection::connect_authenticated(relay_url, keys).await {
+        match SnapshotRelayConnection::connect_authenticated(relay_url, keys).await {
             Ok(mut connection) => {
                 match send_events_on_connection(&mut connection, events, |event_id| {
                     let entry = success_counts.entry(event_id.to_string()).or_insert(0);
@@ -879,19 +886,19 @@ pub async fn send_events_to_relays_batch(
                         }
                     }
                     Err(error) => {
-                        eprintln!("[sync] revision batch push error relay={relay_url}: {error}");
+                        eprintln!("[sync] snapshot batch push error relay={relay_url}: {error}");
                     }
                 }
             }
             Err(error) => {
-                eprintln!("[sync] revision batch connect error relay={relay_url}: {error}");
+                eprintln!("[sync] snapshot batch connect error relay={relay_url}: {error}");
             }
         }
     }
 
     if !any_success {
         return Err(AppError::custom(
-            "Revision push failed on every configured sync relay",
+            "Snapshot push failed on every configured sync relay",
         ));
     }
 
@@ -907,23 +914,23 @@ struct RelayBatchConnectionResult {
 }
 
 async fn send_event_on_connection(
-    connection: &mut RevisionRelayConnection,
+    connection: &mut SnapshotRelayConnection,
     event: &Event,
 ) -> Result<bool, AppError> {
     connection.send_event(event).await?;
     match connection.recv_message().await? {
-        RevisionRelayIncomingMessage::Ok { accepted: true, .. } => Ok(true),
-        RevisionRelayIncomingMessage::Ok {
+        SnapshotRelayIncomingMessage::Ok { accepted: true, .. } => Ok(true),
+        SnapshotRelayIncomingMessage::Ok {
             accepted: false,
             message,
             ..
         } if message.starts_with("duplicate:") => Ok(true),
-        RevisionRelayIncomingMessage::Ok {
+        SnapshotRelayIncomingMessage::Ok {
             accepted: false,
             message,
             ..
         } => Err(AppError::custom(format!(
-            "Revision relay rejected event: {message}"
+            "Snapshot relay rejected event: {message}"
         ))),
         other => Err(AppError::custom(format!(
             "Unexpected relay publish response: {other:?}"
@@ -932,7 +939,7 @@ async fn send_event_on_connection(
 }
 
 async fn send_events_on_connection(
-    connection: &mut RevisionRelayConnection,
+    connection: &mut SnapshotRelayConnection,
     events: &[Event],
     mut on_accepted: impl FnMut(&str),
 ) -> Result<RelayBatchConnectionResult, AppError> {
@@ -948,7 +955,7 @@ async fn send_events_on_connection(
 
     while !pending_event_ids.is_empty() {
         match connection.recv_message().await? {
-            RevisionRelayIncomingMessage::Ok {
+            SnapshotRelayIncomingMessage::Ok {
                 event_id,
                 accepted: true,
                 ..
@@ -957,7 +964,7 @@ async fn send_events_on_connection(
                     on_accepted(&event_id);
                 }
             }
-            RevisionRelayIncomingMessage::Ok {
+            SnapshotRelayIncomingMessage::Ok {
                 event_id,
                 accepted: false,
                 message,
@@ -966,7 +973,7 @@ async fn send_events_on_connection(
                     on_accepted(&event_id);
                 }
             }
-            RevisionRelayIncomingMessage::Ok {
+            SnapshotRelayIncomingMessage::Ok {
                 event_id,
                 accepted: false,
                 message,
@@ -975,8 +982,8 @@ async fn send_events_on_connection(
                     rejected_event_ids.insert(event_id, message);
                 }
             }
-            RevisionRelayIncomingMessage::Notice(message) => {
-                eprintln!("[sync] revision batch relay notice: {message}");
+            SnapshotRelayIncomingMessage::Notice(message) => {
+                eprintln!("[sync] snapshot batch relay notice: {message}");
             }
             other => {
                 return Err(AppError::custom(format!(
@@ -992,9 +999,9 @@ async fn send_events_on_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::nostr::comet_note_revision::{
-        build_note_revision_event, compute_note_revision_id, NoteRevisionEventMeta,
-        NoteRevisionPayload, COMET_NOTE_COLLECTION,
+    use crate::adapters::nostr::comet_note_snapshot::{
+        build_note_snapshot_event, NoteSnapshotEventMeta, NoteSnapshotPayload,
+        COMET_NOTE_COLLECTION,
     };
     use ::url::Url;
     use postgres::{Client as PgClient, NoTls};
@@ -1015,7 +1022,7 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let backup = TestRevisionRelay::start(39437).await;
+        let backup = TestSnapshotRelay::start(39437).await;
         let event = make_remote_note_event(&keys, "note-1", "Fallback", "# Fallback\n\nBody");
 
         let result = send_event_to_relays(
@@ -1040,8 +1047,8 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let active_private = TestRevisionRelay::start_private(39438).await;
-        let backup = TestRevisionRelay::start(39439).await;
+        let active_private = TestSnapshotRelay::start_private(39438).await;
+        let backup = TestSnapshotRelay::start(39439).await;
         let event = make_remote_note_event(
             &keys,
             "note-1",
@@ -1072,7 +1079,7 @@ mod tests {
         }
 
         let keys = Keys::generate();
-        let private_backup = TestRevisionRelay::start_private(39440).await;
+        let private_backup = TestSnapshotRelay::start_private(39440).await;
         let event = make_remote_note_event(&keys, "note-1", "No Relay", "# No Relay\n\nBody");
 
         let error = send_event_to_relays(
@@ -1087,7 +1094,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("Revision push failed on every configured sync relay"),
+                .contains("Snapshot push failed on every configured sync relay"),
             "unexpected error: {error}"
         );
 
@@ -1139,13 +1146,13 @@ mod tests {
         );
     }
 
-    struct TestRevisionRelay {
+    struct TestSnapshotRelay {
         child: Child,
         ws_url: String,
         _db_name: String,
     }
 
-    impl TestRevisionRelay {
+    impl TestSnapshotRelay {
         async fn start(port: u16) -> Self {
             Self::start_with_options(port, false).await
         }
@@ -1203,32 +1210,24 @@ mod tests {
     }
 
     fn make_remote_note_event(keys: &Keys, note_id: &str, _title: &str, markdown: &str) -> Event {
-        let payload = NoteRevisionPayload {
+        let payload = NoteSnapshotPayload {
             version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([("DEVICE-A".to_string(), 200)]),
             markdown: markdown.to_string(),
             note_created_at: 100,
             edited_at: 200,
+            deleted_at: None,
             archived_at: None,
             pinned_at: None,
             readonly: false,
             tags: vec![],
             attachments: vec![],
         };
-        let revision_id = compute_note_revision_id(
-            note_id,
-            &[],
-            "put",
-            Some(COMET_NOTE_COLLECTION),
-            Some(&payload),
-        )
-        .unwrap();
-
-        build_note_revision_event(
+        build_note_snapshot_event(
             keys,
-            &NoteRevisionEventMeta {
+            &NoteSnapshotEventMeta {
                 document_id: note_id.to_string(),
-                revision_id,
-                parent_revision_ids: vec![],
                 operation: "put".to_string(),
                 collection: Some(COMET_NOTE_COLLECTION.to_string()),
                 created_at_ms: Some(200),
@@ -1256,7 +1255,7 @@ mod tests {
         } else {
             EXTERNAL_TEST_PREREQ_WARNING.call_once(|| {
                 eprintln!(
-                    "skipping revision relay process tests: TEST_DATABASE_URL and bun are required"
+                    "skipping snapshot relay process tests: TEST_DATABASE_URL and bun are required"
                 );
             });
             false

@@ -174,75 +174,27 @@ export const relayEventTags = pgTable(
   ],
 );
 
-// Immutable revision metadata keyed by recipient + document scope + revision id.
-// This is the revision graph record, not the app's current materialized state.
-export const syncRevisions = pgTable(
-  "sync_revisions",
+// Immutable snapshot metadata keyed by author + document scope + event id.
+export const syncSnapshots = pgTable(
+  "sync_snapshots",
   {
-    recipient: text("recipient").notNull(),
+    authorPubkey: text("author_pubkey").notNull(),
     dTag: text("d_tag").notNull(),
-    rev: text("rev").notNull(),
+    snapshotId: text("snapshot_id").notNull(),
     op: text("op", { enum: ["put", "del"] }).notNull(),
     mtime: bigint("mtime", { mode: "number" }).notNull(),
     entityType: text("entity_type"),
-    payloadEventId: text("payload_event_id"),
+    eventId: text("event_id"),
     payloadRetained: integer("payload_retained").notNull().default(1),
     storedSeq: bigint("stored_seq", { mode: "number" }),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.recipient, table.dTag, table.rev] }),
-    index("idx_sync_revisions_scope").on(table.recipient, table.dTag),
-    index("idx_sync_revisions_rev").on(table.rev),
-    index("idx_sync_revisions_mtime").on(table.mtime),
-    index("idx_sync_revisions_entity_type").on(table.entityType),
-  ],
-);
-
-export const syncRevisionParents = pgTable(
-  "sync_revision_parents",
-  {
-    recipient: text("recipient").notNull(),
-    dTag: text("d_tag").notNull(),
-    rev: text("rev").notNull(),
-    parentRev: text("parent_rev").notNull(),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.recipient, table.dTag, table.rev, table.parentRev],
-    }),
-    index("idx_sync_revision_parents_rev").on(
-      table.recipient,
-      table.dTag,
-      table.rev,
-    ),
-    index("idx_sync_revision_parents_parent_rev").on(
-      table.recipient,
-      table.dTag,
-      table.parentRev,
-    ),
-  ],
-);
-
-// The full current head set for each sync document scope. This may contain
-// multiple rows for a single `(recipient, d_tag)` when the document is
-// conflicted.
-//
-// App-local `current_rev` pointers are a separate materialization concern and
-// intentionally do not replace this head set.
-export const syncHeads = pgTable(
-  "sync_heads",
-  {
-    recipient: text("recipient").notNull(),
-    dTag: text("d_tag").notNull(),
-    rev: text("rev").notNull(),
-    op: text("op", { enum: ["put", "del"] }).notNull(),
-    mtime: bigint("mtime", { mode: "number" }).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.recipient, table.dTag, table.rev] }),
-    index("idx_sync_heads_scope").on(table.recipient, table.dTag),
-    index("idx_sync_heads_mtime").on(table.mtime),
+    primaryKey({ columns: [table.authorPubkey, table.dTag, table.snapshotId] }),
+    index("idx_sync_snapshots_scope").on(table.authorPubkey, table.dTag),
+    index("idx_sync_snapshots_snapshot_id").on(table.snapshotId),
+    index("idx_sync_snapshots_mtime").on(table.mtime),
+    index("idx_sync_snapshots_entity_type").on(table.entityType),
   ],
 );
 
@@ -250,9 +202,9 @@ export const syncPayloads = pgTable(
   "sync_payloads",
   {
     eventId: text("event_id").primaryKey(),
-    recipient: text("recipient").notNull(),
+    authorPubkey: text("author_pubkey").notNull(),
     dTag: text("d_tag").notNull(),
-    rev: text("rev").notNull(),
+    snapshotId: text("snapshot_id").notNull(),
     pubkey: text("pubkey").notNull(),
     kind: integer("kind").notNull(),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
@@ -261,7 +213,11 @@ export const syncPayloads = pgTable(
     sig: text("sig").notNull(),
   },
   (table) => [
-    index("idx_sync_payloads_rev").on(table.recipient, table.dTag, table.rev),
+    index("idx_sync_payloads_snapshot_id").on(
+      table.authorPubkey,
+      table.dTag,
+      table.snapshotId,
+    ),
   ],
 );
 
@@ -271,18 +227,18 @@ export const syncChanges = pgTable(
     seq: bigint("seq", { mode: "number" })
       .generatedAlwaysAsIdentity()
       .primaryKey(),
-    recipient: text("recipient").notNull(),
+    authorPubkey: text("author_pubkey").notNull(),
     dTag: text("d_tag").notNull(),
-    rev: text("rev").notNull(),
+    snapshotId: text("snapshot_id").notNull(),
     eventId: text("event_id").notNull(),
     op: text("op", { enum: ["put", "del"] }).notNull(),
     mtime: bigint("mtime", { mode: "number" }).notNull(),
   },
   (table) => [
     index("idx_sync_changes_seq").on(table.seq),
-    index("idx_sync_changes_scope_seq").on(table.recipient, table.seq),
+    index("idx_sync_changes_scope_seq").on(table.authorPubkey, table.seq),
     index("idx_sync_changes_document_seq").on(
-      table.recipient,
+      table.authorPubkey,
       table.dTag,
       table.seq,
     ),

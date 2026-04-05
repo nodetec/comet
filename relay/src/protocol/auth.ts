@@ -2,15 +2,15 @@ import { validateAndVerifyEvent, type NostrEvent } from "@comet/nostr";
 
 import {
   RELAY_AUTH_EVENT_KIND,
-  REVISION_SYNC_EVENT_KIND,
+  SNAPSHOT_SYNC_EVENT_KIND,
   type RelayFilter,
-  type RevisionChangesFilter,
+  type SnapshotChangesFilter,
 } from "../types";
 
 const AUTH_WINDOW_SECONDS = 600;
 
 export function requiresAuthForEventKind(kind: number): boolean {
-  return kind === REVISION_SYNC_EVENT_KIND;
+  return kind === SNAPSHOT_SYNC_EVENT_KIND;
 }
 
 export function validateAuthEvent(
@@ -51,14 +51,14 @@ export function validateAuthEvent(
   return { ok: true, pubkey: nostrEvent.pubkey, reason: "" };
 }
 
-export function isAuthorizedForRevisionFilters(
+export function isAuthorizedForSnapshotFilters(
   filters: RelayFilter[],
   authedPubkeys: Set<string>,
 ): { authorized: boolean; reason: string } {
   if (authedPubkeys.size === 0) {
     return {
       authorized: false,
-      reason: "auth-required: authentication required for revision queries",
+      reason: "auth-required: authentication required for snapshot queries",
     };
   }
 
@@ -67,7 +67,7 @@ export function isAuthorizedForRevisionFilters(
     if (!Array.isArray(authorValues) || authorValues.length === 0) {
       return {
         authorized: false,
-        reason: "restricted: revision queries must include an authors filter",
+        reason: "restricted: snapshot queries must include an authors filter",
       };
     }
 
@@ -75,7 +75,7 @@ export function isAuthorizedForRevisionFilters(
       if (!authedPubkeys.has(author)) {
         return {
           authorized: false,
-          reason: "restricted: can only query your own revision state",
+          reason: "restricted: can only query your own snapshot state",
         };
       }
     }
@@ -85,13 +85,13 @@ export function isAuthorizedForRevisionFilters(
 }
 
 export function isAuthorizedForChangesFilter(
-  filter: RevisionChangesFilter,
+  filter: SnapshotChangesFilter,
   authedPubkeys: Set<string>,
 ): { authorized: boolean; reason: string } {
   if (authedPubkeys.size === 0) {
     return {
       authorized: false,
-      reason: "auth-required: authentication required for revision changes",
+      reason: "auth-required: authentication required for snapshot changes",
     };
   }
 
@@ -99,7 +99,7 @@ export function isAuthorizedForChangesFilter(
   if (!Array.isArray(authorValues) || authorValues.length === 0) {
     return {
       authorized: false,
-      reason: "restricted: revision CHANGES must include an authors filter",
+      reason: "restricted: snapshot CHANGES must include an authors filter",
     };
   }
 
@@ -107,7 +107,7 @@ export function isAuthorizedForChangesFilter(
     if (!authedPubkeys.has(author)) {
       return {
         authorized: false,
-        reason: "restricted: can only query your own revision changes",
+        reason: "restricted: can only query your own snapshot changes",
       };
     }
   }
@@ -115,21 +115,21 @@ export function isAuthorizedForChangesFilter(
   return { authorized: true, reason: "" };
 }
 
-export function isAuthorizedForRevisionAuthor(
+export function isAuthorizedForSnapshotAuthor(
   authorPubkey: string,
   authedPubkeys: Set<string>,
 ): { authorized: boolean; reason: string } {
   if (authedPubkeys.size === 0) {
     return {
       authorized: false,
-      reason: "auth-required: authentication required for revision writes",
+      reason: "auth-required: authentication required for snapshot writes",
     };
   }
 
   if (!authedPubkeys.has(authorPubkey)) {
     return {
       authorized: false,
-      reason: "restricted: can only write your own revision state",
+      reason: "restricted: can only write your own snapshot state",
     };
   }
 

@@ -26,6 +26,7 @@ import {
   type NoteSortField,
   type PublishNoteInput,
   type PublishShortNoteInput,
+  type ResolveNoteConflictAction,
 } from "@/shared/api/types";
 import { usePublishState } from "@/features/publishing";
 
@@ -59,7 +60,7 @@ export function useShellController() {
   const [chooseConflictNoteId, setChooseConflictNoteId] = useState<
     string | null
   >(null);
-  const [selectedConflictRevisionId, setSelectedConflictRevisionId] = useState<
+  const [selectedConflictSnapshotId, setSelectedConflictSnapshotId] = useState<
     string | null
   >(null);
   const [isResolveConflictPending, setIsResolveConflictPending] =
@@ -120,7 +121,7 @@ export function useShellController() {
 
   const bumpSyncEditorRevision = useCallback(
     (_reason: string, _details: Record<string, unknown> = {}) => {
-      setSyncEditorRevision((revision) => revision + 1);
+      setSyncEditorRevision((value) => value + 1);
     },
     [],
   );
@@ -249,11 +250,7 @@ export function useShellController() {
   const currentNoteConflict = selectedNoteId
     ? noteConflictQuery.data
     : undefined;
-  const isCurrentNoteConflicted = (currentNoteConflict?.headCount ?? 0) > 1;
-  const selectedConflictHead =
-    currentNoteConflict?.heads.find(
-      (head) => head.revisionId === selectedConflictRevisionId,
-    ) ?? null;
+  const isCurrentNoteConflicted = (currentNoteConflict?.snapshotCount ?? 0) > 1;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
     (bootstrapQuery.isSuccess &&
@@ -288,7 +285,7 @@ export function useShellController() {
   useEffect(() => {
     if (!currentNote) {
       previousConflictNoteIdRef.current = null;
-      setSelectedConflictRevisionId(null);
+      setSelectedConflictSnapshotId(null);
       return;
     }
 
@@ -330,29 +327,29 @@ export function useShellController() {
 
   useEffect(() => {
     if (!currentNote || !currentNoteConflict || !isCurrentNoteConflicted) {
-      setSelectedConflictRevisionId(null);
+      setSelectedConflictSnapshotId(null);
       return;
     }
 
     if (
-      selectedConflictRevisionId &&
-      currentNoteConflict.heads.some(
-        (head) => head.revisionId === selectedConflictRevisionId,
+      selectedConflictSnapshotId &&
+      currentNoteConflict.snapshots.some(
+        (snapshot) => snapshot.snapshotId === selectedConflictSnapshotId,
       )
     ) {
       return;
     }
 
-    setSelectedConflictRevisionId(
-      currentNoteConflict.currentRevisionId ??
-        currentNoteConflict.heads[0]?.revisionId ??
+    setSelectedConflictSnapshotId(
+      currentNoteConflict.currentSnapshotId ??
+        currentNoteConflict.snapshots[0]?.snapshotId ??
         null,
     );
   }, [
     currentNote,
     currentNoteConflict,
     isCurrentNoteConflicted,
-    selectedConflictRevisionId,
+    selectedConflictSnapshotId,
   ]);
 
   useEffect(() => {
@@ -1049,44 +1046,39 @@ export function useShellController() {
     handleSetNotePinned,
     handleSetNoteReadonly,
     handleSelectTagPath,
-    async handleResolveCurrentNoteConflict() {
-      if (!currentNote) {
+    async handleResolveCurrentNoteConflict(action: ResolveNoteConflictAction) {
+      const resolvedNoteId =
+        currentNote?.id ?? chooseConflictNoteId ?? selectedNoteId;
+      if (
+        (!currentNote || !resolvedNoteId) &&
+        (action === "restore" || action === "merge")
+      ) {
         return;
       }
 
       setIsResolveConflictPending(true);
-      if (
-        selectedConflictHead?.op !== "del" &&
-        draftNoteId === currentNote.id &&
-        draftMarkdown !== currentNote.markdown
-      ) {
-        try {
-          await saveNoteMutation.mutateAsync({
-            id: currentNote.id,
-            markdown: draftMarkdown,
-          });
-          setChooseConflictDialogOpen(false);
-          setChooseConflictNoteId(null);
-          return;
-        } finally {
-          setIsResolveConflictPending(false);
-        }
-      }
-
+      const preferredResolutionMarkdown =
+        currentNote && draftNoteId === currentNote.id
+          ? draftMarkdown
+          : currentNote?.markdown;
+      const resolutionMarkdown =
+        action === "keep_deleted" ? undefined : preferredResolutionMarkdown;
       try {
         await resolveNoteConflict(
-          currentNote.id,
-          selectedConflictHead?.op === "del",
+          resolvedNoteId ?? "",
+          action,
+          resolutionMarkdown,
         );
         setChooseConflictDialogOpen(false);
         setChooseConflictNoteId(null);
+        setSelectedConflictSnapshotId(null);
         toast.success("Conflict resolution published.", {
           id: "resolve-note-conflict-success",
         });
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["note", currentNote.id] }),
+          queryClient.invalidateQueries({ queryKey: ["note", resolvedNoteId] }),
           queryClient.invalidateQueries({
-            queryKey: ["note-conflict", currentNote.id],
+            queryKey: ["note-conflict", resolvedNoteId],
           }),
           queryClient.invalidateQueries({ queryKey: ["notes"] }),
           queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
@@ -1100,16 +1092,16 @@ export function useShellController() {
         setIsResolveConflictPending(false);
       }
     },
-    handleLoadConflictHead(revisionId: string, markdown: string | null) {
+    handleLoadConflictHead(snapshotId: string, markdown: string | null) {
       if (!currentNote) {
         return;
       }
-      setSelectedConflictRevisionId(revisionId);
+      setSelectedConflictSnapshotId(snapshotId);
       if (markdown !== null) {
         setDraft(currentNote.id, markdown);
-        bumpSyncEditorRevision("load-conflict-head", {
+        bumpSyncEditorRevision("load-conflict-snapshot", {
           noteId: currentNote.id,
-          revisionId,
+          snapshotId,
           markdownLength: markdown.length,
         });
       }
@@ -1137,7 +1129,7 @@ export function useShellController() {
       publishedAt: currentNote?.publishedAt ?? null,
       publishedKind: currentNote?.publishedKind ?? null,
       readonly: currentNote?.readonly ?? false,
-      selectedConflictRevisionId,
+      selectedConflictSnapshotId,
       searchQuery,
       isDeletePublishedNotePending,
       isResolveConflictPending,
@@ -1197,8 +1189,8 @@ export function useShellController() {
           setDraft(currentNote.id, markdown);
         }
       },
-      onLoadConflictHead(revisionId: string, markdown: string | null) {
-        latestRef.current.handleLoadConflictHead(revisionId, markdown);
+      onLoadConflictHead(snapshotId: string, markdown: string | null) {
+        latestRef.current.handleLoadConflictHead(snapshotId, markdown);
       },
       onResolveConflict() {
         setChooseConflictNoteId(currentNote?.id ?? null);
@@ -1219,7 +1211,7 @@ export function useShellController() {
       isResolveConflictPending,
       pendingAutoFocusEditorNoteId,
       searchQuery,
-      selectedConflictRevisionId,
+      selectedConflictSnapshotId,
       setChooseConflictNoteId,
       setChooseConflictDialogOpen,
       setDeletePublishDialogOpen,
@@ -1313,7 +1305,7 @@ export function useShellController() {
 
   const chooseConflictDialogProps = useMemo(
     () => ({
-      deleteSelected: selectedConflictHead?.op === "del",
+      hasDeleteCandidate: currentNoteConflict?.hasDeleteCandidate ?? false,
       open: chooseConflictDialogOpen,
       pending: isResolveConflictPending,
       onOpenChange(open: boolean) {
@@ -1322,16 +1314,26 @@ export function useShellController() {
           setChooseConflictNoteId(null);
         }
       },
-      onConfirm() {
+      onKeepDeleted() {
         void latestRef.current
-          .handleResolveCurrentNoteConflict()
+          .handleResolveCurrentNoteConflict("keep_deleted")
+          .catch(() => {});
+      },
+      onRestore() {
+        void latestRef.current
+          .handleResolveCurrentNoteConflict("restore")
+          .catch(() => {});
+      },
+      onMerge() {
+        void latestRef.current
+          .handleResolveCurrentNoteConflict("merge")
           .catch(() => {});
       },
     }),
     [
+      currentNoteConflict?.hasDeleteCandidate,
       chooseConflictDialogOpen,
       isResolveConflictPending,
-      selectedConflictHead?.op,
       setChooseConflictNoteId,
       setChooseConflictDialogOpen,
     ],

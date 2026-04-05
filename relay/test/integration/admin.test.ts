@@ -1,22 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
   cleanupContexts,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
-const contexts: RevisionRelayTestContext[] = [];
+const contexts: SnapshotRelayTestContext[] = [];
 
 describe("relay integration > admin retention api", () => {
   afterEach(async () => {
@@ -24,7 +24,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("returns the default retention policy", async () => {
-    const ctx = await startTestRevisionRelay(35200);
+    const ctx = await startTestSnapshotRelay(35200);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/retention`);
@@ -37,7 +37,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("requires bearer auth for retention updates when an admin token is configured", async () => {
-    const ctx = await startTestRevisionRelay(35201, {
+    const ctx = await startTestSnapshotRelay(35201, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -53,7 +53,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("updates and persists the retention policy through the admin api", async () => {
-    const ctx = await startTestRevisionRelay(35202, {
+    const ctx = await startTestSnapshotRelay(35202, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -75,11 +75,11 @@ describe("relay integration > admin retention api", () => {
       payload_retention_days: number | null;
       compaction_interval_seconds: number;
       updated_at: number | null;
-      compacted_revisions: number;
+      compacted_snapshots: number;
     };
     expect(updated.payload_retention_days).toBe(45);
     expect(updated.compaction_interval_seconds).toBe(600);
-    expect(updated.compacted_revisions).toBe(0);
+    expect(updated.compacted_snapshots).toBe(0);
     expect(typeof updated.updated_at).toBe("number");
 
     const readBack = await fetch(`${ctx.httpUrl}/admin/retention`);
@@ -91,25 +91,25 @@ describe("relay integration > admin retention api", () => {
     });
   });
 
-  test("applies the updated retention policy immediately to old non-head payloads", async () => {
-    const ctx = await startTestRevisionRelay(35203, {
+  test("applies the updated retention policy immediately to older snapshot payloads", async () => {
+    const ctx = await startTestSnapshotRelay(35203, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "admin-apply"));
-    const parent = revisionEvent(REV_A, 1_700_000_000_000);
-    const head = revisionEvent(REV_B, 1_700_000_000_100, [REV_A]);
+    const parent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const head = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
 
     sendJson(ws, ["EVENT", parent], traceOptions(ctx, "admin-apply"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
-    ).toEqual(["OK", parent.id, true, `stored: revision ${REV_A}`]);
+    ).toEqual(["OK", parent.id, true, `stored: snapshot ${parent.id}`]);
 
     sendJson(ws, ["EVENT", head], traceOptions(ctx, "admin-apply"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
-    ).toEqual(["OK", head.id, true, `stored: revision ${REV_B}`]);
+    ).toEqual(["OK", head.id, true, `stored: snapshot ${head.id}`]);
 
     const update = await fetch(`${ctx.httpUrl}/admin/retention`, {
       method: "PATCH",
@@ -126,7 +126,7 @@ describe("relay integration > admin retention api", () => {
     expect(update.status).toBe(200);
     expect(await update.json()).toMatchObject({
       payload_retention_days: 1,
-      compacted_revisions: 1,
+      compacted_snapshots: 1,
     });
 
     sendJson(
@@ -135,9 +135,9 @@ describe("relay integration > admin retention api", () => {
         "REQ",
         "retention-fetch",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_A, REV_B],
+          ids: [parent.id, head.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       traceOptions(ctx, "admin-apply"),
@@ -151,7 +151,7 @@ describe("relay integration > admin retention api", () => {
     ).toEqual([
       "EVENT-STATUS",
       "retention-fetch",
-      { rev: REV_A, status: "payload_compacted" },
+      { id: parent.id, status: "payload_compacted" },
     ]);
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),

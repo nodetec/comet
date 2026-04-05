@@ -1,84 +1,32 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
-import { createRevisionRelayDb } from "../../src/db";
-import { createHeadStore } from "../../src/storage/heads";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
-  waitForNegentropyConvergence,
+  startTestSnapshotRelay,
+  waitForBootstrapSnapshots,
   waitForMessage,
   waitForMessages,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
-  REV_C,
   cleanupContexts,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
 describe("relay integration > concurrency", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
-  test("keeps sibling revisions as conflict heads when two clients publish against the same parent", async () => {
-    const ctx = await startTestRevisionRelay(39448);
-    contexts.push(ctx);
-
-    const parentTrace = traceOptions(ctx, "parent");
-    const leftTrace = traceOptions(ctx, "left");
-    const rightTrace = traceOptions(ctx, "right");
-    const parentWs = await connectWs(ctx.port, parentTrace);
-    const leftWs = await connectWs(ctx.port, leftTrace);
-    const rightWs = await connectWs(ctx.port, rightTrace);
-
-    const parentEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const leftEvent = revisionEvent(REV_B, 1_700_000_000_100, [REV_A]);
-    const rightEvent = revisionEvent(REV_C, 1_700_000_000_200, [REV_A]);
-
-    sendJson(parentWs, ["EVENT", parentEvent], parentTrace);
-    await waitForMessage(parentWs, 3_000, parentTrace);
-
-    sendJson(leftWs, ["EVENT", leftEvent], leftTrace);
-    sendJson(rightWs, ["EVENT", rightEvent], rightTrace);
-    await waitForMessage(leftWs, 3_000, leftTrace);
-    await waitForMessage(rightWs, 3_000, rightTrace);
-
-    const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
-    try {
-      const headStore = createHeadStore(db);
-      expect(
-        await headStore.listHeads({ authorPubkey: "recipient-1" }),
-      ).toEqual([
-        {
-          authorPubkey: "recipient-1",
-          documentCoord: "doc-1",
-          revisionId: REV_B,
-          op: "put",
-          mtime: 1_700_000_000_000,
-        },
-        {
-          authorPubkey: "recipient-1",
-          documentCoord: "doc-1",
-          revisionId: REV_C,
-          op: "put",
-          mtime: 1_700_000_000_000,
-        },
-      ]);
-    } finally {
-      await sql.end({ timeout: 5 });
-    }
-  });
-
   test("keeps live subscribers and bootstrap clients consistent while a third client publishes", async () => {
-    const ctx = await startTestRevisionRelay(39449);
+    const ctx = await startTestSnapshotRelay(39449);
     contexts.push(ctx);
 
     const publisherTrace = traceOptions(ctx, "publisher");
@@ -88,8 +36,8 @@ describe("relay integration > concurrency", () => {
     const liveWs = await connectWs(ctx.port, liveTrace);
     const bootstrapWs = await connectWs(ctx.port, bootstrapTrace);
 
-    const initialEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const laterEvent = revisionEvent(REV_B, 1_700_000_000_100, [REV_A]);
+    const initialEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const laterEvent = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
 
     sendJson(publisherWs, ["EVENT", initialEvent], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
@@ -100,9 +48,10 @@ describe("relay integration > concurrency", () => {
         "CHANGES",
         "live-mixed",
         {
+          mode: "tail",
           since: 1,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -118,30 +67,27 @@ describe("relay integration > concurrency", () => {
     sendJson(
       bootstrapWs,
       [
-        "NEG-OPEN",
+        "CHANGES",
         "mixed-bootstrap",
-        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
+        {
+          mode: "bootstrap",
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
+        },
       ],
       bootstrapTrace,
     );
-    expect(await waitForMessage(bootstrapWs, 3_000, bootstrapTrace)).toEqual([
-      "NEG-STATUS",
+    const bootstrap = await waitForBootstrapSnapshots(
+      bootstrapWs,
       "mixed-bootstrap",
-      { strategy: "revision-sync.v1", snapshot_seq: 1 },
-    ]);
+      bootstrapTrace,
+    );
+    expect(bootstrap.snapshotSeq).toEqual(1);
+    expect(bootstrap.snapshots).toEqual([initialEvent]);
 
     const liveEventPromise = waitForMessage(liveWs, 3_000, liveTrace);
     sendJson(publisherWs, ["EVENT", laterEvent], publisherTrace);
     await waitForMessage(publisherWs, 3_000, publisherTrace);
-
-    expect(
-      await waitForNegentropyConvergence(
-        bootstrapWs,
-        "mixed-bootstrap",
-        [],
-        bootstrapTrace,
-      ),
-    ).toEqual({ have: [], need: [REV_A] });
 
     expect(await liveEventPromise).toEqual([
       "CHANGES",
@@ -157,9 +103,10 @@ describe("relay integration > concurrency", () => {
         "CHANGES",
         "mixed-tail",
         {
+          mode: "tail",
           since: 1,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       bootstrapTrace,

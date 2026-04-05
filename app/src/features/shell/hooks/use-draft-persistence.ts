@@ -52,7 +52,7 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
       if (noteId && markdown) {
         void getNoteConflict(noteId)
           .then((conflict) => {
-            if (conflict && conflict.headCount > 1) {
+            if (conflict && conflict.snapshotCount > 1) {
               localStorage.removeItem(draftKey);
               return;
             }

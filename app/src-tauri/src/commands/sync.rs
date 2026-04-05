@@ -17,14 +17,14 @@ fn clear_local_sync_state(conn: &Connection) -> Result<(), AppError> {
     crate::adapters::sqlite::tag_index::clear_tag_index(conn)?;
     conn.execute_batch(
         "DELETE FROM notes_fts;
+         DELETE FROM note_conflicts;
+         DELETE FROM note_tombstones;
          DELETE FROM notes;
          DELETE FROM blob_meta;
          DELETE FROM blob_uploads;
          DELETE FROM pending_blob_uploads;
          DELETE FROM pending_deletions;
-         DELETE FROM sync_revision_parents;
-         DELETE FROM sync_heads;
-         DELETE FROM sync_revisions;
+         DELETE FROM sync_snapshots;
          DELETE FROM sync_relay_state;
          DELETE FROM sync_relays;
          DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
@@ -218,7 +218,7 @@ pub struct SyncInfo {
     preferred_relay_url: Option<String>,
     blossom_url: Option<String>,
     npub: Option<String>,
-    revision_managed_notes: i64,
+    snapshot_managed_notes: i64,
     relay_backed_notes: i64,
     pending_changes: i64,
     total_notes: i64,
@@ -251,8 +251,8 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         })
         .optional()?;
 
-    let revision_managed_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE current_rev IS NOT NULL AND deleted_at IS NULL",
+    let snapshot_managed_notes: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
@@ -279,7 +279,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
     let checkpoint_seq = relay_url
         .as_deref()
         .map(|relay_url| {
-            crate::adapters::sqlite::revision_sync_repository::get_sync_relay_state(
+            crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state(
                 &conn, relay_url,
             )
         })
@@ -303,7 +303,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         preferred_relay_url,
         blossom_url,
         npub,
-        revision_managed_notes,
+        snapshot_managed_notes,
         relay_backed_notes,
         pending_changes,
         total_notes,
@@ -401,7 +401,7 @@ mod tests {
     use rusqlite::{Connection, OptionalExtension};
 
     #[test]
-    fn clear_local_sync_state_wipes_sync_graph_and_blob_bookkeeping() {
+    fn clear_local_sync_state_wipes_sync_state_and_blob_bookkeeping() {
         let mut conn = Connection::open_in_memory().unwrap();
         account_migrations().to_latest(&mut conn).unwrap();
 
@@ -412,8 +412,8 @@ mod tests {
                  VALUES ('wss://relay.example', 1);
              INSERT INTO sync_relay_state (relay_url, checkpoint_seq, snapshot_seq, last_synced_at, min_payload_mtime, updated_at)
                  VALUES ('wss://relay.example', 10, 20, 30, 40, 50);
-             INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, current_rev, sync_event_id, locally_modified)
-                 VALUES ('note-1', 'Title', '# Title', 1, 2, 2, 'rev-1', 'event-1', 1);
+             INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id, locally_modified)
+                 VALUES ('note-1', 'Title', '# Title', 1, 2, 2, 'event-1', 1);
              INSERT INTO notes_fts (note_id, title, markdown)
                  VALUES ('note-1', 'Title', '# Title');
              INSERT INTO blob_meta (plaintext_hash, server_url, pubkey, ciphertext_hash, encryption_key)
@@ -424,12 +424,8 @@ mod tests {
                  VALUES ('plain-1', 'https://blobs.example.com', 'pubkey-1', 'cipher-1', 'key-1', X'01', 'image/png', 123, 1, 1);
              INSERT INTO pending_deletions (entity_id, created_at)
                  VALUES ('note-1', 1);
-             INSERT INTO sync_revisions (recipient, d_tag, rev, op, mtime, entity_type, payload_event_id, relay_url, stored_seq, created_at)
-                 VALUES ('recipient-1', 'doc-1', 'rev-1', 'put', 2, 'note', 'event-1', 'wss://relay.example', 10, 1);
-             INSERT INTO sync_revision_parents (recipient, d_tag, rev, parent_rev)
-                 VALUES ('recipient-1', 'doc-1', 'rev-1', 'parent-1');
-             INSERT INTO sync_heads (recipient, d_tag, rev, op, mtime)
-                 VALUES ('recipient-1', 'doc-1', 'rev-1', 'put', 2);
+             INSERT INTO sync_snapshots (author_pubkey, d_tag, snapshot_id, op, mtime, entity_type, event_id, relay_url, stored_seq, created_at)
+                 VALUES ('author-1', 'doc-1', 'snapshot-1', 'put', 2, 'note', 'event-1', 'wss://relay.example', 10, 1);
              INSERT INTO tags (id, path, parent_id, last_segment, depth, pinned, hide_subtag_notes, icon, created_at, updated_at)
                  VALUES (1, 'alpha', NULL, 'alpha', 0, 0, 0, NULL, 1, 1);
              INSERT INTO note_tag_links (note_id, tag_id, is_direct)
@@ -463,16 +459,8 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        let sync_revisions: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_revisions", [], |row| row.get(0))
-            .unwrap();
-        let sync_revision_parents: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_revision_parents", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let sync_heads: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sync_heads", [], |row| row.get(0))
+        let sync_snapshots: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sync_snapshots", [], |row| row.get(0))
             .unwrap();
         let sync_relay_state: i64 = conn
             .query_row("SELECT COUNT(*) FROM sync_relay_state", [], |row| {
@@ -506,9 +494,7 @@ mod tests {
         assert_eq!(blob_uploads, 0);
         assert_eq!(pending_blob_uploads, 0);
         assert_eq!(pending_deletions, 0);
-        assert_eq!(sync_revisions, 0);
-        assert_eq!(sync_revision_parents, 0);
-        assert_eq!(sync_heads, 0);
+        assert_eq!(sync_snapshots, 0);
         assert_eq!(sync_relay_state, 0);
         assert_eq!(sync_relays, 0);
         assert_eq!(tags, 0);

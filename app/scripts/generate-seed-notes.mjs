@@ -26,21 +26,8 @@ const ARCHIVED_BASENAMES = new Set([
   "36-eclipse-tour-brochure",
 ]);
 
-const NOTEBOOKS = [
-  ["notebook-missions", "Missions"],
-  ["notebook-science", "Science"],
-  ["notebook-operations", "Operations"],
-  ["notebook-engineering", "Engineering"],
-  ["notebook-habitat", "Habitat"],
-  ["notebook-culture", "Culture"],
-];
-
 function sqlText(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function sqlNullableText(value) {
-  return value == null ? "NULL" : sqlText(value);
 }
 
 function sqlNullableInteger(value) {
@@ -133,7 +120,7 @@ function canonicalizeTagPath(raw) {
   const canonicalSegments = [];
 
   for (const segment of segments) {
-    const normalized = segment.trim().split(/\s+/u).filter(Boolean).join(" ");
+    const normalized = segment.trim();
     if (!normalized) {
       return null;
     }
@@ -144,7 +131,7 @@ function canonicalizeTagPath(raw) {
         hasLetter = true;
       }
 
-      if (!(isTagSegmentChar(character) || character === " ")) {
+      if (!isTagSegmentChar(character)) {
         return null;
       }
     }
@@ -379,7 +366,6 @@ const notes = files.map((file, index) => {
     title,
     markdown,
     tags,
-    notebookId: chooseNotebookId(tags, basename),
     createdAt: editedAt,
     modifiedAt: editedAt,
     editedAt,
@@ -435,17 +421,12 @@ const sortedTags = [...tagMeta.values()].sort(
 );
 const tagIds = new Map(sortedTags.map((tag, index) => [tag.path, index + 1]));
 
-const notebookSql = NOTEBOOKS.map(
-  ([id, name]) => `  (${sqlText(id)}, ${sqlText(name)}, ${nowMs}, ${nowMs})`,
-).join(",\n");
-
 const notesSql = notes
   .map(
     (note) => `  (
     ${sqlText(note.id)},
     ${sqlText(note.title)},
     ${sqlText(note.markdown)},
-    ${sqlNullableText(note.notebookId)},
     ${note.createdAt},
     ${note.modifiedAt},
     ${note.editedAt},
@@ -479,15 +460,10 @@ const noteLinksSql = noteLinks
   )
   .join(",\n");
 
-process.stdout
-  .write(`INSERT INTO notebooks (id, name, created_at, updated_at) VALUES
-${notebookSql};
-
-INSERT INTO notes (
+process.stdout.write(`INSERT INTO notes (
   id,
   title,
   markdown,
-  notebook_id,
   created_at,
   modified_at,
   edited_at,

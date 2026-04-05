@@ -1,6 +1,6 @@
 import type { NostrEvent } from "@comet/nostr";
 
-import type { RevisionChangesFilter } from "../types";
+import type { SnapshotChangesFilter } from "../types";
 
 type LiveSocket = {
   send(data: string): unknown;
@@ -11,7 +11,7 @@ export type ConnectionRecord = {
   challenge: string;
   socket: LiveSocket;
   authedPubkeys: Set<string>;
-  liveChangesSubscriptions: Map<string, RevisionChangesFilter>;
+  liveChangesSubscriptions: Map<string, SnapshotChangesFilter>;
 };
 
 export type ConnectionRegistry = ReturnType<typeof createConnectionRegistry>;
@@ -26,7 +26,7 @@ export function createConnectionRegistry() {
         challenge,
         socket,
         authedPubkeys: new Set<string>(),
-        liveChangesSubscriptions: new Map<string, RevisionChangesFilter>(),
+        liveChangesSubscriptions: new Map<string, SnapshotChangesFilter>(),
       };
       connections.set(id, record);
       return record;
@@ -50,7 +50,7 @@ export function createConnectionRegistry() {
     addLiveChangesSubscription(
       id: string,
       subscriptionId: string,
-      filter: RevisionChangesFilter,
+      filter: SnapshotChangesFilter,
     ) {
       const record = connections.get(id);
       if (!record) {
@@ -70,7 +70,6 @@ export function createConnectionRegistry() {
       event: NostrEvent;
       authorPubkey: string;
       documentCoord: string;
-      revisionId: string;
     }) {
       for (const record of connections.values()) {
         for (const [
@@ -103,13 +102,12 @@ export function createConnectionRegistry() {
 }
 
 function matchesLiveChangesFilter(
-  filter: RevisionChangesFilter,
+  filter: SnapshotChangesFilter,
   input: {
     seq: number;
     event: NostrEvent;
     authorPubkey: string;
     documentCoord: string;
-    revisionId: string;
   },
 ) {
   if (filter.since !== undefined && input.seq <= filter.since) {
@@ -129,11 +127,6 @@ function matchesLiveChangesFilter(
     documentFilter.length > 0 &&
     !documentFilter.includes(input.documentCoord)
   ) {
-    return false;
-  }
-
-  const revisionFilter = asStringArray(filter["#r"]);
-  if (revisionFilter.length > 0 && !revisionFilter.includes(input.revisionId)) {
     return false;
   }
 

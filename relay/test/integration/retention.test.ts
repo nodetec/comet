@@ -1,44 +1,43 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { count } from "drizzle-orm";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
-import { createRevisionRelayDb } from "../../src/db";
-import { createHeadStore } from "../../src/storage/heads";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
+import { createSnapshotRelayDb } from "../../src/db";
 import { relayEvents } from "../../src/storage/schema";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
   waitForMessages,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
   REV_C,
   cleanupContexts,
-  deletionRevisionEvent,
+  deletionSnapshotEvent,
   genericEvent,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
 describe("relay integration > retention", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
   test("advertises payload retention boundaries after payload compaction", async () => {
-    const ctx = await startTestRevisionRelay(39417);
+    const ctx = await startTestSnapshotRelay(39417);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const newEvent = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", oldEvent], trace);
     await waitForMessage(ws, 3_000, trace);
@@ -54,19 +53,16 @@ describe("relay integration > retention", () => {
     expect(await response.json()).toEqual({
       name: "Relay",
       description:
-        "Relay implementation for revision-scoped sync with current-head Negentropy and relay-local changes feed.",
+        "Relay implementation for author-scoped snapshot sync with bootstrap replay and relay-local changes feed.",
       software: "relay",
       version: "0.1.0",
-      supported_nips: [11, "CF", "NEG-REV"],
+      supported_nips: [11, "CF"],
       changes_feed: {
         min_seq: 1,
       },
-      revision_sync: {
-        strategy: "revision-sync.v1",
-        current_head_negentropy: true,
+      snapshot_sync: {
         changes_feed: true,
         author_scoped: true,
-        batch_fetch: true,
         retention: {
           min_payload_mtime: 1_800_000_000_000,
         },
@@ -74,14 +70,14 @@ describe("relay integration > retention", () => {
     });
   });
 
-  test("returns EVENT-STATUS when a known revision payload was compacted", async () => {
-    const ctx = await startTestRevisionRelay(39419);
+  test("returns EVENT-STATUS when a known snapshot payload was compacted", async () => {
+    const ctx = await startTestSnapshotRelay(39419);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const newEvent = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", oldEvent], trace);
     await waitForMessage(ws, 3_000, trace);
@@ -96,9 +92,9 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-compacted",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_A],
+          ids: [oldEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -108,20 +104,20 @@ describe("relay integration > retention", () => {
       [
         "EVENT-STATUS",
         "fetch-compacted",
-        { rev: REV_A, status: "payload_compacted" },
+        { id: oldEvent.id, status: "payload_compacted" },
       ],
       ["EOSE", "fetch-compacted"],
     ]);
   });
 
-  test("returns retained and compacted revisions together in a mixed REQ fetch", async () => {
-    const ctx = await startTestRevisionRelay(39434);
+  test("returns retained and compacted snapshots together in a mixed REQ fetch", async () => {
+    const ctx = await startTestSnapshotRelay(39434);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const newEvent = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", oldEvent], trace);
     await waitForMessage(ws, 3_000, trace);
@@ -136,9 +132,9 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-mixed",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_A, REV_B],
+          ids: [oldEvent.id, newEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -149,20 +145,20 @@ describe("relay integration > retention", () => {
       [
         "EVENT-STATUS",
         "fetch-mixed",
-        { rev: REV_A, status: "payload_compacted" },
+        { id: oldEvent.id, status: "payload_compacted" },
       ],
       ["EOSE", "fetch-mixed"],
     ]);
   });
 
-  test("retains the current head payload after compacting older ancestors", async () => {
-    const ctx = await startTestRevisionRelay(39451);
+  test("retains the latest snapshot payload after compacting older snapshots", async () => {
+    const ctx = await startTestSnapshotRelay(39451);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const headEvent = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const headEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", oldEvent], trace);
     await waitForMessage(ws, 3_000, trace);
@@ -177,9 +173,9 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-head",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_B],
+          ids: [headEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -191,22 +187,22 @@ describe("relay integration > retention", () => {
     ]);
   });
 
-  test("retains unresolved conflict head payloads during compaction", async () => {
-    const ctx = await startTestRevisionRelay(39454);
+  test("retains only the most recent snapshot payload for a document during compaction", async () => {
+    const ctx = await startTestSnapshotRelay(39454);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const baseEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const leftHead = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
-    const rightHead = revisionEvent(REV_C, 1_800_000_000_100, [REV_A]);
+    const baseEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const leftHead = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const rightHead = snapshotEvent(REV_C, 1_800_000_000_100, [REV_A]);
 
     for (const event of [baseEvent, leftHead, rightHead]) {
       sendJson(ws, ["EVENT", event], trace);
       await waitForMessage(ws, 3_000, trace);
     }
 
-    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(2);
 
     sendJson(
       ws,
@@ -214,29 +210,33 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-conflict-heads",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_B, REV_C],
+          ids: [leftHead.id, rightHead.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
     );
 
     expect(await waitForMessages(ws, 3, 3_000, trace)).toEqual([
-      ["EVENT", "fetch-conflict-heads", leftHead],
       ["EVENT", "fetch-conflict-heads", rightHead],
+      [
+        "EVENT-STATUS",
+        "fetch-conflict-heads",
+        { id: leftHead.id, status: "payload_compacted" },
+      ],
       ["EOSE", "fetch-conflict-heads"],
     ]);
   });
 
-  test("retains the latest tombstone head payload during compaction", async () => {
-    const ctx = await startTestRevisionRelay(39455);
+  test("retains the latest tombstone snapshot during compaction", async () => {
+    const ctx = await startTestSnapshotRelay(39455);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const baseEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const tombstoneEvent = deletionRevisionEvent(REV_B, 1_800_000_000_000, [
+    const baseEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const tombstoneEvent = deletionSnapshotEvent(REV_B, 1_800_000_000_000, [
       REV_A,
     ]);
 
@@ -253,9 +253,9 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-tombstone",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_B],
+          ids: [tombstoneEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -267,67 +267,20 @@ describe("relay integration > retention", () => {
     ]);
   });
 
-  test("preserves snapshot head derivation after compacting a longer revision chain", async () => {
-    const ctx = await startTestRevisionRelay(39467);
-    contexts.push(ctx);
-
-    const trace = traceOptions(ctx, "client");
-    const ws = await connectWs(ctx.port, trace);
-    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [REV_A]);
-    const thirdEvent = revisionEvent(REV_C, 1_700_000_000_200, [REV_B]);
-
-    for (const event of [firstEvent, secondEvent, thirdEvent]) {
-      sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
-    }
-
-    expect(await ctx.compactPayloadsBefore(1_800_000_000_000)).toBe(2);
-
-    const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
-    try {
-      const headStore = createHeadStore(db);
-      expect(
-        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 2),
-      ).toEqual([
-        {
-          authorPubkey: "recipient-1",
-          documentCoord: "doc-1",
-          revisionId: REV_B,
-          op: "put",
-          mtime: 1_700_000_000_000,
-        },
-      ]);
-      expect(
-        await headStore.listHeadsAtSnapshot({ authorPubkey: "recipient-1" }, 3),
-      ).toEqual([
-        {
-          authorPubkey: "recipient-1",
-          documentCoord: "doc-1",
-          revisionId: REV_C,
-          op: "put",
-          mtime: 1_700_000_000_000,
-        },
-      ]);
-    } finally {
-      await sql.end({ timeout: 5 });
-    }
-  });
-
   test("compacts payloads independently across multiple documents in one author namespace", async () => {
-    const ctx = await startTestRevisionRelay(39468);
+    const ctx = await startTestSnapshotRelay(39468);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldDocBase = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-old");
-    const oldDocHead = revisionEvent(
+    const oldDocBase = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-old");
+    const oldDocHead = snapshotEvent(
       REV_B,
       1_800_000_000_000,
       [REV_A],
       "doc-old",
     );
-    const otherDocHead = revisionEvent(
+    const otherDocHead = snapshotEvent(
       REV_C,
       1_850_000_000_000,
       [],
@@ -347,9 +300,9 @@ describe("relay integration > retention", () => {
         "REQ",
         "multi-doc-retention",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_A, REV_B, REV_C],
+          ids: [oldDocBase.id, oldDocHead.id, otherDocHead.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -361,14 +314,14 @@ describe("relay integration > retention", () => {
       [
         "EVENT-STATUS",
         "multi-doc-retention",
-        { rev: REV_A, status: "payload_compacted" },
+        { id: oldDocBase.id, status: "payload_compacted" },
       ],
       ["EOSE", "multi-doc-retention"],
     ]);
   });
 
   test("does not compact configured generic event storage", async () => {
-    const ctx = await startTestRevisionRelay(39469, {
+    const ctx = await startTestSnapshotRelay(39469, {
       companionKinds: [10002],
     });
     contexts.push(ctx);
@@ -376,10 +329,10 @@ describe("relay integration > retention", () => {
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
     const generic = genericEvent("generic-retained", 10002, [
-      ["p", "recipient-1"],
+      ["p", "author-1"],
     ]);
-    const oldEvent = revisionEvent(REV_A, 1_700_000_000_000);
-    const headEvent = revisionEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
+    const headEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", generic], trace);
     await waitForMessage(ws, 3_000, trace);
@@ -390,7 +343,7 @@ describe("relay integration > retention", () => {
 
     expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(1);
 
-    const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
+    const { db, sql } = createSnapshotRelayDb(ctx.databaseUrl);
     try {
       const [genericCountRow] = await db
         .select({ value: count() })

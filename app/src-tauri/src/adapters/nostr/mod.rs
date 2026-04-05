@@ -1,8 +1,8 @@
-pub mod comet_note_revision;
+pub mod comet_note_snapshot;
 pub mod nip44_ext;
 pub mod protocol;
 pub mod relay_client;
-pub mod revision_bootstrap;
-pub(crate) mod revision_push;
-mod revision_sync_connection;
+pub mod snapshot_bootstrap;
+pub(crate) mod snapshot_push;
+mod snapshot_sync_connection;
 pub mod sync_manager;

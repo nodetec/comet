@@ -70,7 +70,7 @@ type EditorPaneProps = {
   publishedAt: number | null;
   publishedKind: number | null;
   readonly: boolean;
-  selectedConflictRevisionId: string | null;
+  selectedConflictSnapshotId: string | null;
   searchQuery: string;
   onAutoFocusEditorHandled(): void;
   onDeletePublishedNote(): void;
@@ -80,7 +80,7 @@ type EditorPaneProps = {
   onResolveConflict(): void;
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
-  onLoadConflictHead(revisionId: string, markdown: string | null): void;
+  onLoadConflictHead(snapshotId: string, markdown: string | null): void;
   onChange(markdown: string): void;
 };
 
@@ -342,7 +342,7 @@ function useFindBar({
       return;
     }
 
-    setFindScrollRevision((revision) => revision + 1);
+    setFindScrollRevision((value) => value + 1);
   }, [findMatchCount, findQuery]);
 
   useLayoutEffect(() => {
@@ -438,7 +438,7 @@ export function EditorPane({
   publishedAt,
   publishedKind,
   readonly,
-  selectedConflictRevisionId,
+  selectedConflictSnapshotId,
   searchQuery,
   onAutoFocusEditorHandled,
   onDeletePublishedNote,
@@ -466,47 +466,39 @@ export function EditorPane({
   const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const noteTitle = firstLineH1Title(markdown);
-  const hasConflict = (noteConflict?.headCount ?? 0) > 1;
-  const isReadOnly = readonly || isSystemReadOnly || hasConflict;
-  const viewableConflictHeads =
-    noteConflict?.heads.filter(
-      (head) => head.op === "del" || Boolean(head.markdown),
+  const hasConflict = (noteConflict?.snapshotCount ?? 0) > 1;
+  const viewableConflictSnapshots =
+    noteConflict?.snapshots.filter(
+      (snapshot) => snapshot.op === "del" || Boolean(snapshot.markdown),
     ) ?? [];
-  const viewedConflictHeadIndex = (() => {
-    if (viewableConflictHeads.length === 0) {
+  const viewedConflictSnapshotIndex = (() => {
+    if (viewableConflictSnapshots.length === 0) {
       return -1;
     }
 
-    const selectedRevisionIndex = viewableConflictHeads.findIndex(
-      (head) => head.revisionId === selectedConflictRevisionId,
+    const selectedSnapshotIndex = viewableConflictSnapshots.findIndex(
+      (snapshot) => snapshot.snapshotId === selectedConflictSnapshotId,
     );
-    if (selectedRevisionIndex !== -1) {
-      return selectedRevisionIndex;
+    if (selectedSnapshotIndex !== -1) {
+      return selectedSnapshotIndex;
     }
 
-    const currentHeadIndex = viewableConflictHeads.findIndex(
-      (head) => head.isCurrent,
+    const currentSnapshotIndex = viewableConflictSnapshots.findIndex(
+      (snapshot) => snapshot.isCurrent,
     );
-    if (currentHeadIndex !== -1) {
-      return currentHeadIndex;
+    if (currentSnapshotIndex !== -1) {
+      return currentSnapshotIndex;
     }
 
     return 0;
   })();
-  const viewedConflictHead =
-    viewedConflictHeadIndex >= 0
-      ? viewableConflictHeads[viewedConflictHeadIndex]
+  const viewedConflictSnapshot =
+    viewedConflictSnapshotIndex >= 0
+      ? viewableConflictSnapshots[viewedConflictSnapshotIndex]
       : null;
-  const isViewingDeletedConflictHead = viewedConflictHead?.op === "del";
-  const conflictPrimaryActionVariant = isViewingDeletedConflictHead
-    ? "destructive"
-    : "default";
-  const conflictPrimaryActionLabel = isViewingDeletedConflictHead
-    ? "Delete note"
-    : "Choose";
-  const conflictPrimaryActionPendingLabel = isViewingDeletedConflictHead
-    ? "Deleting…"
-    : "Choosing…";
+  const isViewingDeletedConflictSnapshot = viewedConflictSnapshot?.op === "del";
+  const isReadOnly =
+    readonly || isSystemReadOnly || isViewingDeletedConflictSnapshot;
 
   const find = useFindBar({ noteId, searchQuery, editorRef, setFocusedPane });
   const {
@@ -537,7 +529,7 @@ export function EditorPane({
       return null;
     }
 
-    if (isViewingDeletedConflictHead) {
+    if (isViewingDeletedConflictSnapshot) {
       return (
         <div className="flex min-h-full items-center justify-center px-6">
           <div className="max-w-sm text-center">
@@ -545,8 +537,8 @@ export function EditorPane({
               This version deletes the note
             </p>
             <p className="text-muted-foreground mt-2 text-sm">
-              Choose Delete note to apply this version and remove the note from
-              sync.
+              Use the conflict actions below to keep the deletion, restore the
+              note, or merge a new version.
             </p>
           </div>
         </div>
@@ -735,19 +727,29 @@ export function EditorPane({
   }
 
   let toolbarSlot: React.ReactNode = null;
-  if (readonly || hasConflict) {
+  if (readonly || isViewingDeletedConflictSnapshot) {
     toolbarSlot = (
       <Tooltip>
         <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
           <span
-            aria-label={hasConflict ? "Resolve conflict to edit" : "Read-only"}
-            title={hasConflict ? "Resolve conflict to edit" : "Read-only"}
+            aria-label={
+              isViewingDeletedConflictSnapshot
+                ? "Choose or merge a note version to edit"
+                : "Read-only"
+            }
+            title={
+              isViewingDeletedConflictSnapshot
+                ? "Choose or merge a note version to edit"
+                : "Read-only"
+            }
           >
             <PencilOff className="size-[1.2rem]" />
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {hasConflict ? "Resolve conflict to edit" : "Read-only"}
+          {isViewingDeletedConflictSnapshot
+            ? "Choose or merge a note version to edit"
+            : "Read-only"}
         </TooltipContent>
       </Tooltip>
     );
@@ -800,7 +802,7 @@ export function EditorPane({
         <div className="border-primary/20 bg-primary/10 sticky top-0 z-30 border-b px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">
-              Conflicting revisions detected
+              Conflicting note versions detected
             </p>
           </div>
         </div>
@@ -960,16 +962,16 @@ export function EditorPane({
           <div className="flex h-13 items-center justify-between gap-4 px-4">
             <div className="min-w-0">
               <p className="text-foreground truncate text-xs font-medium">
-                {viewedConflictHead?.title ??
-                  (viewedConflictHead?.op === "del"
-                    ? "Deleted version"
-                    : "Conflicting revision")}
+                {viewedConflictSnapshot?.title ??
+                  (viewedConflictSnapshot?.op === "del"
+                    ? "Deleted snapshot"
+                    : "Conflicting snapshot")}
               </p>
               <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
                 <span>
-                  {viewedConflictHead
-                    ? formatConflictHeadTimestamp(viewedConflictHead.mtime)
-                    : "No previewable revision available"}
+                  {viewedConflictSnapshot
+                    ? formatConflictHeadTimestamp(viewedConflictSnapshot.mtime)
+                    : "No previewable snapshot available"}
                 </span>
               </div>
             </div>
@@ -981,23 +983,23 @@ export function EditorPane({
                 onClick={onResolveConflict}
                 size="sm"
                 type="button"
-                variant={conflictPrimaryActionVariant}
+                variant="default"
               >
-                {isResolveConflictPending
-                  ? conflictPrimaryActionPendingLabel
-                  : conflictPrimaryActionLabel}
+                {isResolveConflictPending ? "Resolving…" : "Resolve"}
               </Button>
               <Button
                 className="text-muted-foreground"
-                disabled={viewedConflictHeadIndex <= 0}
+                disabled={viewedConflictSnapshotIndex <= 0}
                 onClick={() => {
                   const previousHead =
-                    viewedConflictHeadIndex > 0
-                      ? viewableConflictHeads[viewedConflictHeadIndex - 1]
+                    viewedConflictSnapshotIndex > 0
+                      ? viewableConflictSnapshots[
+                          viewedConflictSnapshotIndex - 1
+                        ]
                       : null;
                   if (previousHead) {
                     onLoadConflictHead(
-                      previousHead.revisionId,
+                      previousHead.snapshotId,
                       previousHead.markdown,
                     );
                   }
@@ -1011,17 +1013,21 @@ export function EditorPane({
               <Button
                 className="text-muted-foreground"
                 disabled={
-                  viewedConflictHeadIndex < 0 ||
-                  viewedConflictHeadIndex >= viewableConflictHeads.length - 1
+                  viewedConflictSnapshotIndex < 0 ||
+                  viewedConflictSnapshotIndex >=
+                    viewableConflictSnapshots.length - 1
                 }
                 onClick={() => {
                   const nextHead =
-                    viewedConflictHeadIndex >= 0 &&
-                    viewedConflictHeadIndex < viewableConflictHeads.length - 1
-                      ? viewableConflictHeads[viewedConflictHeadIndex + 1]
+                    viewedConflictSnapshotIndex >= 0 &&
+                    viewedConflictSnapshotIndex <
+                      viewableConflictSnapshots.length - 1
+                      ? viewableConflictSnapshots[
+                          viewedConflictSnapshotIndex + 1
+                        ]
                       : null;
                   if (nextHead) {
-                    onLoadConflictHead(nextHead.revisionId, nextHead.markdown);
+                    onLoadConflictHead(nextHead.snapshotId, nextHead.markdown);
                   }
                 }}
                 size="icon-sm"

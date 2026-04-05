@@ -1,37 +1,37 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
+  startTestSnapshotRelay,
   waitForMessage,
   waitForMessages,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import {
   REV_A,
   REV_B,
   cleanupContexts,
-  revisionEvent,
+  snapshotEvent,
   traceOptions,
 } from "./fixtures";
 
 describe("relay integration > req", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
   test("filters REQ by ids", async () => {
-    const ctx = await startTestRevisionRelay(39460);
+    const ctx = await startTestSnapshotRelay(39460);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2");
+    const firstEvent = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-1");
+    const secondEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2");
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
@@ -45,7 +45,7 @@ describe("relay integration > req", () => {
         "filter-ids",
         {
           ids: [secondEvent.id],
-          kinds: [REVISION_SYNC_EVENT_KIND],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
         },
       ],
       trace,
@@ -57,18 +57,18 @@ describe("relay integration > req", () => {
     ]);
   });
 
-  test("filters REQ by authors, kind, document, and revision id together", async () => {
-    const ctx = await startTestRevisionRelay(39461);
+  test("filters REQ by authors, kind, document, and event id together", async () => {
+    const ctx = await startTestSnapshotRelay(39461);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
     const firstEvent = {
-      ...revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1"),
+      ...snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-1"),
       pubkey: "sender-a",
     };
     const secondEvent = {
-      ...revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2"),
+      ...snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2"),
       pubkey: "sender-b",
     };
 
@@ -83,10 +83,10 @@ describe("relay integration > req", () => {
         "REQ",
         "filter-combo",
         {
+          ids: [secondEvent.id],
           authors: ["sender-b"],
-          kinds: [REVISION_SYNC_EVENT_KIND],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           "#d": ["doc-2"],
-          "#r": [REV_B],
         },
       ],
       trace,
@@ -99,7 +99,7 @@ describe("relay integration > req", () => {
   });
 
   test("returns NOTICE for malformed REQ filters", async () => {
-    const ctx = await startTestRevisionRelay(39462);
+    const ctx = await startTestSnapshotRelay(39462);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -112,14 +112,14 @@ describe("relay integration > req", () => {
     ]);
   });
 
-  test("returns batched revision events for REQ-BATCH", async () => {
-    const ctx = await startTestRevisionRelay(39463);
+  test("returns batched snapshot events for REQ-BATCH", async () => {
+    const ctx = await startTestSnapshotRelay(39463);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const firstEvent = revisionEvent(REV_A, 1_700_000_000_000, [], "doc-1");
-    const secondEvent = revisionEvent(REV_B, 1_700_000_000_100, [], "doc-2");
+    const firstEvent = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-1");
+    const secondEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2");
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
@@ -132,9 +132,9 @@ describe("relay integration > req", () => {
         "REQ-BATCH",
         "filter-batch",
         {
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
-          "#r": [REV_A, REV_B],
+          ids: [firstEvent.id, secondEvent.id],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
@@ -147,7 +147,7 @@ describe("relay integration > req", () => {
   });
 
   test("returns NOTICE for malformed REQ-BATCH filters", async () => {
-    const ctx = await startTestRevisionRelay(39464);
+    const ctx = await startTestSnapshotRelay(39464);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");

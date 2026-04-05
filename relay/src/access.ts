@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import type { RevisionRelayDb } from "./db";
+import type { SnapshotRelayDb } from "./db";
 import type { AllowedUser } from "./types";
 
 import { relayAllowedUsers } from "./storage/schema";
@@ -18,7 +18,7 @@ export type AccessControl = {
 };
 
 export function createAccessControl(
-  db: RevisionRelayDb,
+  db: SnapshotRelayDb,
   privateMode: boolean,
 ): AccessControl {
   return {

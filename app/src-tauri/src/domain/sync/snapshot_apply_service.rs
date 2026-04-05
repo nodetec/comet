@@ -1,18 +1,16 @@
-use crate::adapters::nostr::comet_note_revision::{
-    parse_note_revision_event, payload_to_synced_note,
+use crate::adapters::nostr::comet_note_snapshot::{
+    parse_note_snapshot_event, payload_to_synced_note, payload_to_synced_tombstone,
 };
-use crate::adapters::sqlite::revision_sync_repository::{
-    apply_sync_head_update, get_sync_relay_state, list_sync_heads_for_scope,
-    replace_sync_revision_parents, upsert_sync_relay_state, upsert_sync_revision,
-    LocalSyncRevision,
+use crate::adapters::sqlite::snapshot_sync_repository::{
+    get_sync_relay_state, upsert_sync_relay_state, upsert_sync_snapshot, LocalSyncSnapshot,
 };
 use crate::domain::sync::model::SyncChangePayload;
-use crate::domain::sync::service::{delete_note_from_sync, upsert_from_sync};
+use crate::domain::sync::service::{upsert_from_sync, upsert_tombstone_from_sync};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
-pub fn apply_remote_revision_event(
+pub fn apply_remote_snapshot_event(
     conn: &Connection,
     relay_url: &str,
     keys: &Keys,
@@ -20,9 +18,9 @@ pub fn apply_remote_revision_event(
     stored_seq: Option<i64>,
     mut invalidate_cache: impl FnMut(&str),
 ) -> Result<Option<SyncChangePayload>, AppError> {
-    let parsed = parse_note_revision_event(keys, event)?;
+    let parsed = parse_note_snapshot_event(keys, event)?;
     let author_pubkey = event.pubkey.to_hex();
-    let revision_timestamp_ms = event.created_at.as_secs() as i64 * 1000;
+    let snapshot_timestamp_ms = event.created_at.as_secs() as i64 * 1000;
     let preferred_blossom_url: Option<String> = conn
         .query_row(
             "SELECT value FROM app_settings WHERE key = 'blossom_url'",
@@ -32,56 +30,54 @@ pub fn apply_remote_revision_event(
         .optional()?;
 
     let change_payload = if parsed.operation == "del" {
-        let entity_id = parsed.document_id.clone();
+        let payload = parsed
+            .payload
+            .as_ref()
+            .ok_or_else(|| AppError::custom("Delete note snapshot event is missing payload"))?;
+        let tombstone = payload_to_synced_tombstone(&parsed.document_id, payload)?;
 
-        upsert_sync_revision(
+        upsert_sync_snapshot(
             conn,
-            &LocalSyncRevision {
+            &LocalSyncSnapshot {
                 author_pubkey: author_pubkey.clone(),
                 d_tag: parsed.document_id.clone(),
-                rev: parsed.revision_id.clone(),
+                snapshot_id: event.id.to_hex(),
                 op: parsed.operation.clone(),
-                mtime: revision_timestamp_ms,
+                mtime: snapshot_timestamp_ms,
                 entity_type: Some("note".to_string()),
-                payload_event_id: Some(event.id.to_hex()),
+                event_id: Some(event.id.to_hex()),
                 payload_retained: true,
                 relay_url: Some(relay_url.to_string()),
                 stored_seq,
                 created_at: event.created_at.as_secs() as i64,
             },
         )?;
-        replace_sync_revision_parents(
-            conn,
-            &author_pubkey,
-            &parsed.document_id,
-            &parsed.revision_id,
-            &parsed.parent_revision_ids,
-        )?;
-        apply_sync_head_update(
-            conn,
-            &author_pubkey,
-            &parsed.document_id,
-            &parsed.revision_id,
-            &parsed.operation,
-            revision_timestamp_ms,
-            &parsed.parent_revision_ids,
-        )?;
-        let remaining_heads = list_sync_heads_for_scope(conn, &author_pubkey, &parsed.document_id)?;
-        let has_content_head = remaining_heads.iter().any(|head| head.op == "put");
-        if has_content_head {
-            None
-        } else {
-            delete_note_from_sync(conn, &entity_id, |note_id| invalidate_cache(note_id))?;
+        let updated =
+            upsert_tombstone_from_sync(conn, &tombstone, &event.id.to_hex(), |note_id| {
+                invalidate_cache(note_id)
+            })?;
+        if let Some(note_id) = updated {
+            let conflict_count: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM note_conflicts WHERE note_id = ?1",
+                params![note_id],
+                |row| row.get(0),
+            )?;
             Some(SyncChangePayload {
-                note_id: entity_id,
-                action: "delete".to_string(),
+                note_id,
+                action: if conflict_count > 0 {
+                    "conflict".to_string()
+                } else {
+                    "delete".to_string()
+                },
             })
+        } else {
+            None
         }
     } else {
         let payload = parsed
             .payload
             .as_ref()
-            .ok_or_else(|| AppError::custom("Put note revision event is missing payload"))?;
+            .ok_or_else(|| AppError::custom("Put note snapshot event is missing payload"))?;
 
         if let Some(ref blossom_url) = preferred_blossom_url {
             for attachment in &payload.attachments {
@@ -99,52 +95,41 @@ pub fn apply_remote_revision_event(
             }
         }
 
-        let note = payload_to_synced_note(&parsed.document_id, revision_timestamp_ms, payload);
+        let note = payload_to_synced_note(&parsed.document_id, snapshot_timestamp_ms, payload);
         let note_id = note.id.clone();
         let updated = upsert_from_sync(conn, &note, &event.id.to_hex())?;
 
-        upsert_sync_revision(
+        upsert_sync_snapshot(
             conn,
-            &LocalSyncRevision {
+            &LocalSyncSnapshot {
                 author_pubkey: author_pubkey.clone(),
                 d_tag: parsed.document_id.clone(),
-                rev: parsed.revision_id.clone(),
+                snapshot_id: event.id.to_hex(),
                 op: parsed.operation.clone(),
-                mtime: revision_timestamp_ms,
+                mtime: snapshot_timestamp_ms,
                 entity_type: Some("note".to_string()),
-                payload_event_id: Some(event.id.to_hex()),
+                event_id: Some(event.id.to_hex()),
                 payload_retained: true,
                 relay_url: Some(relay_url.to_string()),
                 stored_seq,
                 created_at: event.created_at.as_secs() as i64,
             },
         )?;
-        replace_sync_revision_parents(
-            conn,
-            &author_pubkey,
-            &parsed.document_id,
-            &parsed.revision_id,
-            &parsed.parent_revision_ids,
-        )?;
-        apply_sync_head_update(
-            conn,
-            &author_pubkey,
-            &parsed.document_id,
-            &parsed.revision_id,
-            &parsed.operation,
-            revision_timestamp_ms,
-            &parsed.parent_revision_ids,
-        )?;
 
-        if updated.is_some() {
-            conn.execute(
-                "UPDATE notes SET current_rev = ?1 WHERE id = ?2",
-                params![parsed.revision_id, note_id],
-            )?;
+        let conflict_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM note_conflicts WHERE note_id = ?1",
+            params![note_id],
+            |row| row.get(0),
+        )?;
+        if updated.is_some() || conflict_count > 0 {
             invalidate_cache(&note_id);
             Some(SyncChangePayload {
                 note_id,
-                action: "upsert".to_string(),
+                action: if conflict_count > 0 {
+                    "conflict".to_string()
+                } else {
+                    "upsert".to_string()
+                },
             })
         } else {
             None
@@ -171,9 +156,9 @@ pub fn apply_remote_revision_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::nostr::comet_note_revision::{
-        build_note_revision_event, compute_note_revision_id, NoteRevisionAttachment,
-        NoteRevisionEventMeta, NoteRevisionPayload, COMET_NOTE_COLLECTION,
+    use crate::adapters::nostr::comet_note_snapshot::{
+        build_note_snapshot_event, NoteSnapshotAttachment, NoteSnapshotEventMeta,
+        NoteSnapshotPayload, COMET_NOTE_COLLECTION,
     };
     use crate::adapters::sqlite::migrations::account_migrations;
     use rusqlite::Connection;
@@ -194,81 +179,76 @@ mod tests {
         pinned_at: Option<i64>,
         readonly: bool,
         tags: Vec<String>,
-        attachments: Vec<NoteRevisionAttachment>,
-        parent_revision_ids: Vec<String>,
+        attachments: Vec<NoteSnapshotAttachment>,
         created_at_ms: i64,
-    ) -> (Event, String) {
-        let payload = NoteRevisionPayload {
+    ) -> Event {
+        let payload = NoteSnapshotPayload {
             version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([(
+                "DEVICE-A".to_string(),
+                created_at_ms as u64,
+            )]),
             markdown: markdown.to_string(),
             note_created_at,
             edited_at,
+            deleted_at: None,
             archived_at,
             pinned_at,
             readonly,
             tags,
             attachments,
         };
-        let revision_id = compute_note_revision_id(
-            note_id,
-            &parent_revision_ids,
-            "put",
-            Some(COMET_NOTE_COLLECTION),
-            Some(&payload),
-        )
-        .unwrap();
-        let event = build_note_revision_event(
+        build_note_snapshot_event(
             keys,
-            &NoteRevisionEventMeta {
+            &NoteSnapshotEventMeta {
                 document_id: note_id.to_string(),
-                revision_id: revision_id.clone(),
-                parent_revision_ids,
                 operation: "put".to_string(),
                 collection: Some(COMET_NOTE_COLLECTION.to_string()),
                 created_at_ms: Some(created_at_ms),
             },
             Some(&payload),
         )
-        .unwrap();
-        (event, revision_id)
+        .unwrap()
     }
 
-    fn make_delete_event(
-        keys: &Keys,
-        note_id: &str,
-        parent_revision_ids: Vec<String>,
-        created_at_ms: i64,
-    ) -> (Event, String) {
-        let revision_id = compute_note_revision_id(
-            note_id,
-            &parent_revision_ids,
-            "del",
-            Some(COMET_NOTE_COLLECTION),
-            None,
-        )
-        .unwrap();
-        let event = build_note_revision_event(
+    fn make_delete_event(keys: &Keys, note_id: &str, created_at_ms: i64) -> Event {
+        let payload = NoteSnapshotPayload {
+            version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([(
+                "DEVICE-A".to_string(),
+                created_at_ms as u64,
+            )]),
+            markdown: String::new(),
+            note_created_at: 0,
+            edited_at: created_at_ms,
+            deleted_at: Some(created_at_ms),
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+        };
+        build_note_snapshot_event(
             keys,
-            &NoteRevisionEventMeta {
+            &NoteSnapshotEventMeta {
                 document_id: note_id.to_string(),
-                revision_id: revision_id.clone(),
-                parent_revision_ids,
                 operation: "del".to_string(),
                 collection: Some(COMET_NOTE_COLLECTION.to_string()),
                 created_at_ms: Some(created_at_ms),
             },
-            None,
+            Some(&payload),
         )
-        .unwrap();
-        (event, revision_id)
+        .unwrap()
     }
 
     #[test]
-    fn applies_remote_note_revision_and_updates_current_rev() {
+    fn applies_remote_note_snapshot_and_updates_sync_event_id() {
         let conn = setup_db();
         let keys = Keys::generate();
         let note_id = "note-1";
-        let (event, revision_id) = make_put_event(
+        let event = make_put_event(
             &keys,
             note_id,
             "# Title\n\nBody",
@@ -279,11 +259,10 @@ mod tests {
             false,
             vec![],
             vec![],
-            vec![],
             200,
         );
 
-        let change = apply_remote_revision_event(
+        let change = apply_remote_snapshot_event(
             &conn,
             "wss://relay.example",
             &keys,
@@ -293,14 +272,14 @@ mod tests {
         )
         .unwrap();
 
-        let current_rev: Option<String> = conn
+        let sync_event_id: Option<String> = conn
             .query_row(
-                "SELECT current_rev FROM notes WHERE id = 'note-1'",
+                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(current_rev, Some(revision_id));
+        assert_eq!(sync_event_id, Some(event.id.to_hex()));
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
             Some(("note-1".to_string(), "upsert".to_string()))
@@ -316,7 +295,7 @@ mod tests {
 
         upsert_sync_relay_state(&conn, relay_url, None, Some(12), Some(1000), Some(500)).unwrap();
 
-        let (event, _) = make_put_event(
+        let event = make_put_event(
             &keys,
             note_id,
             "# Title\n\nBody",
@@ -327,11 +306,10 @@ mod tests {
             false,
             vec![],
             vec![],
-            vec![],
             200,
         );
 
-        apply_remote_revision_event(&conn, relay_url, &keys, &event, Some(20), |_| {}).unwrap();
+        apply_remote_snapshot_event(&conn, relay_url, &keys, &event, Some(20), |_| {}).unwrap();
 
         let state = get_sync_relay_state(&conn, relay_url).unwrap().unwrap();
         assert_eq!(state.snapshot_seq, Some(12));
@@ -340,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn applies_remote_note_revision_persists_blob_metadata() {
+    fn applies_remote_note_snapshot_persists_blob_metadata() {
         let conn = setup_db();
         let keys = Keys::generate();
         let note_id = "note-blob";
@@ -355,7 +333,7 @@ mod tests {
         .unwrap();
 
         let markdown = format!("# Title\n\n![img](attachment://{hash}.png)");
-        let (event, _) = make_put_event(
+        let event = make_put_event(
             &keys,
             note_id,
             &markdown,
@@ -365,16 +343,15 @@ mod tests {
             None,
             false,
             vec![],
-            vec![NoteRevisionAttachment {
+            vec![NoteSnapshotAttachment {
                 plaintext_hash: hash.clone(),
                 ciphertext_hash: ciphertext_hash.clone(),
                 key: key_hex.clone(),
             }],
-            vec![],
             200,
         );
 
-        let change = apply_remote_revision_event(
+        let change = apply_remote_snapshot_event(
             &conn,
             "ws://relay.example",
             &keys,
@@ -410,11 +387,11 @@ mod tests {
     }
 
     #[test]
-    fn applies_remote_note_revision_uses_event_created_at_as_modified_at() {
+    fn applies_remote_note_snapshot_uses_event_created_at_as_modified_at() {
         let conn = setup_db();
         let keys = Keys::generate();
         let note_id = "note-bad-mtime";
-        let (event, revision_id) = make_put_event(
+        let event = make_put_event(
             &keys,
             note_id,
             "# Title\n\nBody",
@@ -425,11 +402,10 @@ mod tests {
             false,
             vec![],
             vec![],
-            vec![],
             201,
         );
 
-        let change = apply_remote_revision_event(
+        let change = apply_remote_snapshot_event(
             &conn,
             "wss://relay.example",
             &keys,
@@ -439,15 +415,15 @@ mod tests {
         )
         .unwrap();
 
-        let (current_rev, modified_at): (Option<String>, i64) = conn
+        let (sync_event_id, modified_at): (Option<String>, i64) = conn
             .query_row(
-                "SELECT current_rev, modified_at FROM notes WHERE id = ?1",
+                "SELECT sync_event_id, modified_at FROM notes WHERE id = ?1",
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
 
-        assert_eq!(current_rev, Some(revision_id));
+        assert_eq!(sync_event_id, Some(event.id.to_hex()));
         assert_eq!(modified_at, 0);
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
@@ -456,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn applies_remote_note_deletion_revision() {
+    fn applies_remote_note_deletion_snapshot() {
         let conn = setup_db();
         conn.execute(
             "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at)
@@ -473,9 +449,9 @@ mod tests {
 
         let keys = Keys::generate();
         let author_pubkey = keys.public_key();
-        let (event, _revision_id) = make_delete_event(&keys, "note-1", vec![], 300);
+        let event = make_delete_event(&keys, "note-1", 300);
 
-        apply_remote_revision_event(&conn, "wss://relay.example", &keys, &event, Some(8), |_| {})
+        apply_remote_snapshot_event(&conn, "wss://relay.example", &keys, &event, Some(8), |_| {})
             .unwrap();
 
         let remaining: i64 = conn
@@ -486,14 +462,21 @@ mod tests {
             )
             .unwrap();
         assert_eq!(remaining, 0);
-
-        let head_op: String = conn
+        let tombstones: i64 = conn
             .query_row(
-                "SELECT op FROM sync_heads WHERE recipient = ?1 AND d_tag = ?2",
+                "SELECT COUNT(*) FROM note_tombstones WHERE id = 'note-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(tombstones, 1);
+        let stored_op: String = conn
+            .query_row(
+                "SELECT op FROM sync_snapshots WHERE author_pubkey = ?1 AND d_tag = ?2 ORDER BY created_at DESC LIMIT 1",
                 params![author_pubkey.to_hex(), "note-1"],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(head_op, "del");
+        assert_eq!(stored_op, "del");
     }
 }

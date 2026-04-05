@@ -1,42 +1,40 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { count } from "drizzle-orm";
 
-import { createRevisionRelayDb } from "../../src/db";
+import { createSnapshotRelayDb } from "../../src/db";
 import {
   relayEvents,
   syncChanges,
-  syncRevisions,
+  syncSnapshots,
 } from "../../src/storage/schema";
-import { REVISION_SYNC_EVENT_KIND } from "../../src/types";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
-  startTestRevisionRelay,
-  waitForNegentropyConvergence,
+  startTestSnapshotRelay,
+  waitForBootstrapSnapshots,
   waitForMessage,
   waitForMessages,
-  type RevisionRelayTestContext,
+  type SnapshotRelayTestContext,
 } from "../helpers";
 import { cleanupContexts, genericEvent, traceOptions } from "./fixtures";
 
 describe("relay integration > companion/pass-through", () => {
-  const contexts: RevisionRelayTestContext[] = [];
+  const contexts: SnapshotRelayTestContext[] = [];
 
   afterEach(async () => {
     await cleanupContexts(contexts);
   });
 
-  test("stores explicitly configured companion kinds without entering revision state", async () => {
-    const ctx = await startTestRevisionRelay(39456, {
+  test("stores explicitly configured companion kinds without entering snapshot sync state", async () => {
+    const ctx = await startTestSnapshotRelay(39456, {
       companionKinds: [10002],
     });
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const event = genericEvent("companion-event-1", 10002, [
-      ["p", "recipient-1"],
-    ]);
+    const event = genericEvent("companion-event-1", 10002, [["p", "author-1"]]);
 
     sendJson(ws, ["EVENT", event], trace);
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
@@ -46,37 +44,35 @@ describe("relay integration > companion/pass-through", () => {
       "stored: companion event kind=10002",
     ]);
 
-    const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
+    const { db, sql } = createSnapshotRelayDb(ctx.databaseUrl);
     try {
       const [genericCountRow] = await db
         .select({ value: count() })
         .from(relayEvents);
-      const [revisionCountRow] = await db
+      const [snapshotCountRow] = await db
         .select({ value: count() })
-        .from(syncRevisions);
+        .from(syncSnapshots);
       const [changeCountRow] = await db
         .select({ value: count() })
         .from(syncChanges);
 
       expect(genericCountRow.value).toBe(1);
-      expect(revisionCountRow.value).toBe(0);
+      expect(snapshotCountRow.value).toBe(0);
       expect(changeCountRow.value).toBe(0);
     } finally {
       await sql.end({ timeout: 5 });
     }
   });
 
-  test("stores explicitly configured pass-through kinds without entering revision state", async () => {
-    const ctx = await startTestRevisionRelay(39457, {
+  test("stores explicitly configured pass-through kinds without entering snapshot sync state", async () => {
+    const ctx = await startTestSnapshotRelay(39457, {
       passThroughKinds: [1],
     });
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const event = genericEvent("pass-through-event-1", 1, [
-      ["p", "recipient-1"],
-    ]);
+    const event = genericEvent("pass-through-event-1", 1, [["p", "author-1"]]);
 
     sendJson(ws, ["EVENT", event], trace);
     expect(await waitForMessage(ws, 3_000, trace)).toEqual([
@@ -86,20 +82,20 @@ describe("relay integration > companion/pass-through", () => {
       "stored: pass-through event kind=1",
     ]);
 
-    const { db, sql } = createRevisionRelayDb(ctx.databaseUrl);
+    const { db, sql } = createSnapshotRelayDb(ctx.databaseUrl);
     try {
       const [genericCountRow] = await db
         .select({ value: count() })
         .from(relayEvents);
-      const [revisionCountRow] = await db
+      const [snapshotCountRow] = await db
         .select({ value: count() })
-        .from(syncRevisions);
+        .from(syncSnapshots);
       const [changeCountRow] = await db
         .select({ value: count() })
         .from(syncChanges);
 
       expect(genericCountRow.value).toBe(1);
-      expect(revisionCountRow.value).toBe(0);
+      expect(snapshotCountRow.value).toBe(0);
       expect(changeCountRow.value).toBe(0);
     } finally {
       await sql.end({ timeout: 5 });
@@ -107,7 +103,7 @@ describe("relay integration > companion/pass-through", () => {
   });
 
   test("returns duplicate semantics for configured companion events", async () => {
-    const ctx = await startTestRevisionRelay(39458, {
+    const ctx = await startTestSnapshotRelay(39458, {
       companionKinds: [10002],
     });
     contexts.push(ctx);
@@ -128,8 +124,8 @@ describe("relay integration > companion/pass-through", () => {
     ]);
   });
 
-  test("excludes configured generic kinds from revision CHANGES and Negentropy", async () => {
-    const ctx = await startTestRevisionRelay(39459, {
+  test("excludes configured generic kinds from snapshot CHANGES and bootstrap", async () => {
+    const ctx = await startTestSnapshotRelay(39459, {
       companionKinds: [10002],
       passThroughKinds: [1],
     });
@@ -138,10 +134,10 @@ describe("relay integration > companion/pass-through", () => {
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
     const companionEvent = genericEvent("companion-event-scope", 10002, [
-      ["p", "recipient-1"],
+      ["p", "author-1"],
     ]);
     const passThroughEvent = genericEvent("pass-through-event-scope", 1, [
-      ["p", "recipient-1"],
+      ["p", "author-1"],
     ]);
 
     sendJson(ws, ["EVENT", companionEvent], trace);
@@ -153,41 +149,43 @@ describe("relay integration > companion/pass-through", () => {
       ws,
       [
         "CHANGES",
-        "revision-only",
+        "snapshot-only",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
         },
       ],
       trace,
     );
     expect(await waitForMessages(ws, 1, 3_000, trace)).toEqual([
-      ["CHANGES", "revision-only", "EOSE", 0],
+      ["CHANGES", "snapshot-only", "EOSE", 0],
     ]);
 
     sendJson(
       ws,
       [
-        "NEG-OPEN",
+        "CHANGES",
         "generic-scope",
-        { kinds: [REVISION_SYNC_EVENT_KIND], authors: ["recipient-1"] },
+        {
+          mode: "bootstrap",
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
+        },
       ],
       trace,
     );
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
-      "NEG-STATUS",
-      "generic-scope",
-      { strategy: "revision-sync.v1", snapshot_seq: 0 },
-    ]);
-
-    expect(
-      await waitForNegentropyConvergence(ws, "generic-scope", [], trace),
-    ).toEqual({ have: [], need: [] });
+    expect(await waitForBootstrapSnapshots(ws, "generic-scope", trace)).toEqual(
+      {
+        snapshotSeq: 0,
+        snapshots: [],
+      },
+    );
   });
 
-  test("keeps live revision CHANGES isolated while generic traffic is interleaved", async () => {
-    const ctx = await startTestRevisionRelay(39470, {
+  test("keeps live snapshot CHANGES isolated while generic traffic is interleaved", async () => {
+    const ctx = await startTestSnapshotRelay(39470, {
       companionKinds: [10002],
       passThroughKinds: [1],
     });
@@ -202,11 +200,12 @@ describe("relay integration > companion/pass-through", () => {
       subscriber,
       [
         "CHANGES",
-        "revision-live",
+        "snapshot-live",
         {
+          mode: "tail",
           since: 0,
-          kinds: [REVISION_SYNC_EVENT_KIND],
-          authors: ["recipient-1"],
+          kinds: [SNAPSHOT_SYNC_EVENT_KIND],
+          authors: ["author-1"],
           live: true,
         },
       ],
@@ -214,54 +213,51 @@ describe("relay integration > companion/pass-through", () => {
     );
     expect(await waitForMessage(subscriber, 3_000, subscriberTrace)).toEqual([
       "CHANGES",
-      "revision-live",
+      "snapshot-live",
       "EOSE",
       0,
     ]);
 
-    const revisionOne = genericEvent("ignored-generic-1", 10002, [
-      ["p", "recipient-1"],
+    const snapshotOne = genericEvent("ignored-generic-1", 10002, [
+      ["p", "author-1"],
     ]);
-    const revisionEventOne = genericEvent("ignored-generic-2", 1, [
-      ["p", "recipient-1"],
+    const snapshotEventOne = genericEvent("ignored-generic-2", 1, [
+      ["p", "author-1"],
     ]);
-    const syncOne = genericEvent("revision-1", REVISION_SYNC_EVENT_KIND, [
+    const syncOne = genericEvent("snapshot-1", SNAPSHOT_SYNC_EVENT_KIND, [
       ["d", "doc-1"],
-      ["r", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
       ["o", "put"],
       ["c", "notes"],
     ]);
-    syncOne.pubkey = "recipient-1";
-    const syncTwo = genericEvent("revision-2", REVISION_SYNC_EVENT_KIND, [
+    syncOne.pubkey = "author-1";
+    const syncTwo = genericEvent("snapshot-2", SNAPSHOT_SYNC_EVENT_KIND, [
       ["d", "doc-1"],
-      ["r", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
-      ["b", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
       ["o", "put"],
       ["c", "notes"],
     ]);
-    syncTwo.pubkey = "recipient-1";
+    syncTwo.pubkey = "author-1";
 
     const firstLive = waitForMessage(subscriber, 3_000, subscriberTrace);
-    sendJson(publisher, ["EVENT", revisionOne], publisherTrace);
+    sendJson(publisher, ["EVENT", snapshotOne], publisherTrace);
     await waitForMessage(publisher, 3_000, publisherTrace);
     sendJson(publisher, ["EVENT", syncOne], publisherTrace);
     await waitForMessage(publisher, 3_000, publisherTrace);
     expect(await firstLive).toEqual([
       "CHANGES",
-      "revision-live",
+      "snapshot-live",
       "EVENT",
       1,
       syncOne,
     ]);
 
     const secondLive = waitForMessage(subscriber, 3_000, subscriberTrace);
-    sendJson(publisher, ["EVENT", revisionEventOne], publisherTrace);
+    sendJson(publisher, ["EVENT", snapshotEventOne], publisherTrace);
     await waitForMessage(publisher, 3_000, publisherTrace);
     sendJson(publisher, ["EVENT", syncTwo], publisherTrace);
     await waitForMessage(publisher, 3_000, publisherTrace);
     expect(await secondLive).toEqual([
       "CHANGES",
-      "revision-live",
+      "snapshot-live",
       "EVENT",
       2,
       syncTwo,
