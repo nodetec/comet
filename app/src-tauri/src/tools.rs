@@ -55,7 +55,7 @@ pub fn seed_initial_note_snapshots(db_path: &Path, nsec: &str) -> Result<usize, 
         conn.execute(
             "UPDATE notes
              SET locally_modified = CASE
-               WHEN sync_event_id IS NULL THEN 1
+               WHEN snapshot_event_id IS NULL THEN 1
                ELSE locally_modified
              END
              WHERE id = ?1",

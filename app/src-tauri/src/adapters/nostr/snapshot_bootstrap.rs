@@ -1,7 +1,7 @@
 use crate::adapters::nostr::relay_client::{
     fetch_relay_info, SnapshotRelayConnection, SnapshotRelayIncomingMessage,
 };
-use crate::adapters::sqlite::snapshot_sync_repository::upsert_sync_relay_state;
+use crate::adapters::sqlite::snapshot_repository::upsert_sync_relay_state;
 use crate::db::{active_account, database_connection};
 use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event;
@@ -298,7 +298,7 @@ mod tests {
         NoteSnapshotPayload, COMET_NOTE_COLLECTION,
     };
     use crate::adapters::sqlite::migrations::account_migrations;
-    use crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state;
+    use crate::adapters::sqlite::snapshot_repository::get_sync_relay_state;
     use crate::domain::sync::snapshot_service::{
         build_pending_note_deletion_snapshot, build_pending_note_snapshot,
         persist_local_deletion_snapshot, persist_local_note_snapshot,
@@ -358,14 +358,14 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need.len(), 1);
 
-        let sync_event_id: Option<String> = conn
+        let snapshot_event_id: Option<String> = conn
             .query_row(
-                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
+                "SELECT snapshot_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert!(sync_event_id.is_some());
+        assert!(snapshot_event_id.is_some());
 
         let _ = std::fs::remove_file(db_path);
         relay.stop();
@@ -416,17 +416,18 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
-            .query_row(
-                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .unwrap();
+        let (title, markdown, snapshot_event_id): (String, String, Option<String>) =
+            destination_conn
+                .query_row(
+                    "SELECT title, markdown, snapshot_event_id FROM notes WHERE id = 'note-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
 
         assert_eq!(title, "Local Title");
         assert_eq!(markdown, "# Local Title\n\nLocal Body");
-        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(pushed_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -496,15 +497,15 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (stored_markdown, sync_event_id): (String, Option<String>) = destination_conn
+        let (stored_markdown, snapshot_event_id): (String, Option<String>) = destination_conn
             .query_row(
-                "SELECT markdown, sync_event_id FROM notes WHERE id = 'note-blob'",
+                "SELECT markdown, snapshot_event_id FROM notes WHERE id = 'note-blob'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
         assert_eq!(stored_markdown, markdown);
-        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(pushed_snapshot_id));
 
         let stored_blob_meta: (String, String, String) = destination_conn
             .query_row(
@@ -574,17 +575,18 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
-            .query_row(
-                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .unwrap();
+        let (title, markdown, snapshot_event_id): (String, String, Option<String>) =
+            destination_conn
+                .query_row(
+                    "SELECT title, markdown, snapshot_event_id FROM notes WHERE id = 'note-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
 
         assert_eq!(title, "Root Path Title");
         assert_eq!(markdown, "# Root Path Title\n\nLocal Body");
-        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(pushed_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -637,14 +639,14 @@ mod tests {
         assert_eq!(result.snapshot_seq, 1);
         assert_eq!(result.need, vec![pushed_snapshot_id.clone()]);
 
-        let (title, markdown, sync_event_id, pinned_at): (
+        let (title, markdown, snapshot_event_id, pinned_at): (
             String,
             String,
             Option<String>,
             Option<i64>,
         ) = destination_conn
             .query_row(
-                "SELECT title, markdown, sync_event_id, pinned_at FROM notes WHERE id = 'note-1'",
+                "SELECT title, markdown, snapshot_event_id, pinned_at FROM notes WHERE id = 'note-1'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
@@ -652,7 +654,7 @@ mod tests {
 
         assert_eq!(title, "Pinned Title");
         assert_eq!(markdown, "# Pinned Title\n\nPinned Body");
-        assert_eq!(sync_event_id, Some(pushed_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(pushed_snapshot_id));
         assert_eq!(pinned_at, Some(250));
 
         let _ = std::fs::remove_file(source_db_path);
@@ -700,14 +702,14 @@ mod tests {
 
         assert_eq!(first_bootstrap.need, vec![initial_snapshot_id.clone()]);
 
-        let first_sync_event_id: Option<String> = destination_conn
+        let first_snapshot_event_id: Option<String> = destination_conn
             .query_row(
-                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
+                "SELECT snapshot_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(first_sync_event_id, Some(initial_snapshot_id));
+        assert_eq!(first_snapshot_event_id, Some(initial_snapshot_id));
 
         delete_local_note(&source_conn, "note-1");
         let deletion_snapshot_id =
@@ -730,14 +732,14 @@ mod tests {
             .unwrap();
         assert_eq!(remaining_notes, 0);
 
-        let tombstone_sync_event_id: String = destination_conn
+        let tombstone_snapshot_event_id: String = destination_conn
             .query_row(
-                "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
+                "SELECT snapshot_event_id FROM note_tombstones WHERE id = ?1",
                 rusqlite::params!["note-1"],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(tombstone_sync_event_id, deletion_snapshot_id);
+        assert_eq!(tombstone_snapshot_event_id, deletion_snapshot_id);
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -836,17 +838,18 @@ mod tests {
         apply_remote_snapshot_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
             .unwrap();
 
-        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
-            .query_row(
-                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .unwrap();
+        let (title, markdown, snapshot_event_id): (String, String, Option<String>) =
+            destination_conn
+                .query_row(
+                    "SELECT title, markdown, snapshot_event_id FROM notes WHERE id = 'note-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
 
         assert_eq!(title, "Updated Title");
         assert_eq!(markdown, "# Updated Title\n\nUpdated Body");
-        assert_eq!(sync_event_id, Some(updated_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(updated_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -1021,17 +1024,18 @@ mod tests {
         apply_remote_snapshot_event(&conn, &relay.ws_url, &keys, &event, Some(seq), |_| {})
             .unwrap();
 
-        let (title, markdown, sync_event_id): (String, String, Option<String>) = destination_conn
-            .query_row(
-                "SELECT title, markdown, sync_event_id FROM notes WHERE id = 'note-1'",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .unwrap();
+        let (title, markdown, snapshot_event_id): (String, String, Option<String>) =
+            destination_conn
+                .query_row(
+                    "SELECT title, markdown, snapshot_event_id FROM notes WHERE id = 'note-1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
 
         assert_eq!(title, "Updated Title");
         assert_eq!(markdown, "# Updated Title\n\nUpdated Body");
-        assert_eq!(sync_event_id, Some(updated_snapshot_id));
+        assert_eq!(snapshot_event_id, Some(updated_snapshot_id));
 
         let _ = std::fs::remove_file(source_db_path);
         let _ = std::fs::remove_file(destination_db_path);
@@ -1470,7 +1474,7 @@ mod tests {
 
         let conn = Connection::open(db_path).unwrap();
         conn.execute(
-            "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
+            "UPDATE notes SET snapshot_event_id = ?1, locally_modified = 0 WHERE id = ?2",
             rusqlite::params![event.id.to_hex(), note_id],
         )
         .unwrap();

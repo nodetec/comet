@@ -49,7 +49,7 @@ pub fn account_migrations() -> Migrations<'static> {
                readonly INTEGER NOT NULL DEFAULT 0 CHECK (readonly IN (0, 1)),
                nostr_d_tag TEXT,
                published_at INTEGER,
-               sync_event_id TEXT,
+               snapshot_event_id TEXT,
                edited_at INTEGER,
                locally_modified INTEGER NOT NULL DEFAULT 0,
                deleted_at INTEGER,
@@ -195,7 +195,7 @@ pub fn account_migrations() -> Migrations<'static> {
                deleted_at INTEGER NOT NULL,
                last_edit_device_id TEXT NOT NULL,
                vector_clock TEXT NOT NULL DEFAULT '{}',
-               sync_event_id TEXT,
+               snapshot_event_id TEXT,
                locally_modified INTEGER NOT NULL DEFAULT 0 CHECK (locally_modified IN (0, 1))
              );
              CREATE INDEX idx_note_tombstones_deleted_at
@@ -203,7 +203,7 @@ pub fn account_migrations() -> Migrations<'static> {
         ),
         M::up(
             "CREATE TABLE note_conflicts (
-               sync_event_id TEXT PRIMARY KEY,
+               snapshot_event_id TEXT PRIMARY KEY,
                note_id TEXT NOT NULL,
                op TEXT NOT NULL CHECK (op IN ('put', 'del')),
                device_id TEXT NOT NULL,
@@ -223,7 +223,7 @@ pub fn account_migrations() -> Migrations<'static> {
         ),
         M::up(
             "CREATE TABLE note_snapshot_history (
-               sync_event_id TEXT PRIMARY KEY,
+               snapshot_event_id TEXT PRIMARY KEY,
                note_id TEXT NOT NULL,
                op TEXT NOT NULL CHECK (op IN ('put', 'del')),
                device_id TEXT NOT NULL,
@@ -239,7 +239,7 @@ pub fn account_migrations() -> Migrations<'static> {
                created_at INTEGER NOT NULL
              );
              CREATE INDEX idx_note_snapshot_history_note_id
-               ON note_snapshot_history(note_id, modified_at DESC, sync_event_id ASC);",
+               ON note_snapshot_history(note_id, modified_at DESC, snapshot_event_id ASC);",
         ),
     ])
 }

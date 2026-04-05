@@ -129,7 +129,7 @@ CREATE TABLE notes (
   readonly INTEGER NOT NULL DEFAULT 0 CHECK (readonly IN (0, 1)),
   nostr_d_tag TEXT,
   published_at INTEGER,
-  sync_event_id TEXT,
+  snapshot_event_id TEXT,
   edited_at INTEGER,
   locally_modified INTEGER NOT NULL DEFAULT 0,
   deleted_at INTEGER,

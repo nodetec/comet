@@ -1,5 +1,9 @@
+pub(crate) mod apply_support;
+pub(crate) mod conflict_store;
 pub mod model;
+pub(crate) mod note_apply;
 pub mod service;
 pub mod snapshot_apply_service;
 pub mod snapshot_service;
+pub(crate) mod tombstone_apply;
 pub mod vector_clock;

@@ -1,5 +1,5 @@
 use crate::adapters::nostr::relay_client::{SnapshotRelayConnection, SnapshotRelayIncomingMessage};
-use crate::adapters::sqlite::sync_repository::get_blossom_url;
+use crate::adapters::sqlite::sync_settings_repository::get_blossom_url;
 use crate::db::database_connection;
 use crate::domain::blob::service::extract_attachment_hashes;
 use crate::domain::sync::snapshot_service::{
@@ -453,7 +453,7 @@ pub fn mark_note_snapshot_published(
 ) -> Result<(), AppError> {
     let conn = database_connection(app)?;
     conn.execute(
-        "UPDATE notes SET sync_event_id = ?1, locally_modified = 0 WHERE id = ?2",
+        "UPDATE notes SET snapshot_event_id = ?1, locally_modified = 0 WHERE id = ?2",
         rusqlite::params![event_id_hex, note_id],
     )?;
     Ok(())
@@ -768,7 +768,7 @@ pub async fn push_deletion_snapshot(
     let conn = database_connection(app)?;
     let _ = conn.execute(
         "UPDATE note_tombstones
-         SET sync_event_id = ?1,
+         SET snapshot_event_id = ?1,
              locally_modified = 0
          WHERE id = ?2",
         rusqlite::params![event.id.to_hex(), entity_id],

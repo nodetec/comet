@@ -2,7 +2,7 @@ use crate::adapters::nostr::comet_note_snapshot::{
     build_note_snapshot_event, NoteSnapshotAttachment, NoteSnapshotEventMeta, NoteSnapshotPayload,
     COMET_NOTE_COLLECTION,
 };
-use crate::adapters::sqlite::snapshot_sync_repository::{
+use crate::adapters::sqlite::snapshot_repository::{
     upsert_note_snapshot_history, upsert_sync_snapshot, LocalNoteSnapshotHistoryEntry,
     LocalSyncSnapshot,
 };
@@ -46,7 +46,7 @@ struct NoteSnapshotFields {
     archived_at: Option<i64>,
     readonly: bool,
     pinned_at: Option<i64>,
-    sync_event_id: Option<String>,
+    snapshot_event_id: Option<String>,
 }
 
 struct NoteDeletionFields {
@@ -72,7 +72,7 @@ fn load_note_snapshot_fields(
         Option<String>,
     )> = conn
         .query_row(
-            "SELECT markdown, created_at, modified_at, last_edit_device_id, vector_clock, edited_at, archived_at, readonly, pinned_at, sync_event_id
+            "SELECT markdown, created_at, modified_at, last_edit_device_id, vector_clock, edited_at, archived_at, readonly, pinned_at, snapshot_event_id
              FROM notes
              WHERE id = ?1",
             params![note_id],
@@ -103,7 +103,7 @@ fn load_note_snapshot_fields(
         archived_at,
         readonly,
         pinned_at,
-        sync_event_id,
+        snapshot_event_id,
     ) = row.ok_or_else(|| AppError::custom(format!("Note not found: {note_id}")))?;
 
     Ok(NoteSnapshotFields {
@@ -116,7 +116,7 @@ fn load_note_snapshot_fields(
         archived_at,
         readonly,
         pinned_at,
-        sync_event_id,
+        snapshot_event_id,
     })
 }
 
@@ -300,7 +300,7 @@ pub fn build_pending_note_snapshot(
         event,
         op: "put".to_string(),
         history: LocalNoteSnapshotHistoryEntry {
-            sync_event_id: event_id.clone(),
+            snapshot_event_id: event_id.clone(),
             note_id: note_id.to_string(),
             op: "put".to_string(),
             device_id: payload.device_id.clone(),
@@ -326,7 +326,7 @@ pub fn build_materialized_note_snapshot_for_publish(
     note_id: &str,
 ) -> Result<Option<PendingNoteSnapshot>, AppError> {
     let fields = load_note_snapshot_fields(conn, note_id)?;
-    if fields.sync_event_id.is_some() {
+    if fields.snapshot_event_id.is_some() {
         return Ok(None);
     }
     drop(fields);
@@ -346,7 +346,7 @@ pub fn materialize_note_snapshot_locally(
     conn.execute(
         "UPDATE notes
          SET locally_modified = CASE
-               WHEN ?2 = 1 AND sync_event_id IS NULL THEN 1
+               WHEN ?2 = 1 AND snapshot_event_id IS NULL THEN 1
                ELSE locally_modified
              END
          WHERE id = ?1",
@@ -433,7 +433,7 @@ pub fn build_pending_note_deletion_snapshot(
         op: "del".to_string(),
         entity_type: "note".to_string(),
         history: LocalNoteSnapshotHistoryEntry {
-            sync_event_id: event_id.clone(),
+            snapshot_event_id: event_id.clone(),
             note_id: note_id.to_string(),
             op: "del".to_string(),
             device_id: payload.device_id.clone(),
@@ -572,7 +572,7 @@ mod tests {
             .unwrap();
         let stored_markdown: Option<String> = conn
             .query_row(
-                "SELECT markdown FROM note_snapshot_history WHERE sync_event_id = ?1",
+                "SELECT markdown FROM note_snapshot_history WHERE snapshot_event_id = ?1",
                 params![snapshot.event_id],
                 |row| row.get(0),
             )

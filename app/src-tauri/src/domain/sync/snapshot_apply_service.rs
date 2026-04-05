@@ -1,7 +1,7 @@
 use crate::adapters::nostr::comet_note_snapshot::{
     parse_note_snapshot_event, payload_to_synced_note, payload_to_synced_tombstone,
 };
-use crate::adapters::sqlite::snapshot_sync_repository::{
+use crate::adapters::sqlite::snapshot_repository::{
     get_sync_relay_state, upsert_note_snapshot_history, upsert_sync_relay_state,
     upsert_sync_snapshot, LocalNoteSnapshotHistoryEntry, LocalSyncSnapshot,
 };
@@ -41,7 +41,7 @@ pub fn apply_remote_snapshot_event(
         upsert_note_snapshot_history(
             conn,
             &LocalNoteSnapshotHistoryEntry {
-                sync_event_id: event.id.to_hex(),
+                snapshot_event_id: event.id.to_hex(),
                 note_id: parsed.document_id.clone(),
                 op: parsed.operation.clone(),
                 device_id: tombstone.device_id.clone(),
@@ -124,7 +124,7 @@ pub fn apply_remote_snapshot_event(
         upsert_note_snapshot_history(
             conn,
             &LocalNoteSnapshotHistoryEntry {
-                sync_event_id: event.id.to_hex(),
+                snapshot_event_id: event.id.to_hex(),
                 note_id: note.id.clone(),
                 op: parsed.operation.clone(),
                 device_id: note.device_id.clone(),
@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn applies_remote_note_snapshot_and_updates_sync_event_id() {
+    fn applies_remote_note_snapshot_and_updates_snapshot_event_id() {
         let conn = setup_db();
         let keys = Keys::generate();
         let note_id = "note-1";
@@ -318,14 +318,14 @@ mod tests {
         )
         .unwrap();
 
-        let sync_event_id: Option<String> = conn
+        let snapshot_event_id: Option<String> = conn
             .query_row(
-                "SELECT sync_event_id FROM notes WHERE id = 'note-1'",
+                "SELECT snapshot_event_id FROM notes WHERE id = 'note-1'",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(sync_event_id, Some(event.id.to_hex()));
+        assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
             Some(("note-1".to_string(), "upsert".to_string()))
@@ -461,15 +461,15 @@ mod tests {
         )
         .unwrap();
 
-        let (sync_event_id, modified_at): (Option<String>, i64) = conn
+        let (snapshot_event_id, modified_at): (Option<String>, i64) = conn
             .query_row(
-                "SELECT sync_event_id, modified_at FROM notes WHERE id = ?1",
+                "SELECT snapshot_event_id, modified_at FROM notes WHERE id = ?1",
                 params![note_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
 
-        assert_eq!(sync_event_id, Some(event.id.to_hex()));
+        assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
         assert_eq!(modified_at, 0);
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
@@ -525,7 +525,7 @@ mod tests {
             .unwrap();
         let stored_deleted_at: Option<i64> = conn
             .query_row(
-                "SELECT deleted_at FROM note_snapshot_history WHERE sync_event_id = ?1",
+                "SELECT deleted_at FROM note_snapshot_history WHERE snapshot_event_id = ?1",
                 params![event.id.to_hex()],
                 |row| row.get(0),
             )

@@ -38,7 +38,7 @@ pub struct LocalSyncSnapshot {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalNoteSnapshotHistoryEntry {
-    pub sync_event_id: String,
+    pub snapshot_event_id: String,
     pub note_id: String,
     pub op: String,
     pub device_id: String,
@@ -169,9 +169,9 @@ pub fn upsert_note_snapshot_history(
 ) -> Result<(), AppError> {
     conn.execute(
         "INSERT INTO note_snapshot_history
-           (sync_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+           (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
-         ON CONFLICT(sync_event_id) DO UPDATE SET
+         ON CONFLICT(snapshot_event_id) DO UPDATE SET
            note_id = excluded.note_id,
            op = excluded.op,
            device_id = excluded.device_id,
@@ -186,7 +186,7 @@ pub fn upsert_note_snapshot_history(
            readonly = excluded.readonly,
            created_at = excluded.created_at",
         params![
-            snapshot.sync_event_id,
+            snapshot.snapshot_event_id,
             snapshot.note_id,
             snapshot.op,
             snapshot.device_id,
@@ -211,32 +211,33 @@ fn protected_snapshot_ids_for_document(
 ) -> Result<HashSet<String>, AppError> {
     let mut protected = HashSet::new();
 
-    let note_sync_event_id = conn
+    let note_snapshot_event_id = conn
         .query_row(
-            "SELECT sync_event_id FROM notes WHERE id = ?1",
+            "SELECT snapshot_event_id FROM notes WHERE id = ?1",
             params![d_tag],
             |row| row.get::<_, Option<String>>(0),
         )
         .optional()?
         .flatten();
-    if let Some(snapshot_id) = note_sync_event_id.filter(|value| !value.trim().is_empty()) {
+    if let Some(snapshot_id) = note_snapshot_event_id.filter(|value| !value.trim().is_empty()) {
         protected.insert(snapshot_id);
     }
 
-    let tombstone_sync_event_id = conn
+    let tombstone_snapshot_event_id = conn
         .query_row(
-            "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
+            "SELECT snapshot_event_id FROM note_tombstones WHERE id = ?1",
             params![d_tag],
             |row| row.get::<_, Option<String>>(0),
         )
         .optional()?
         .flatten();
-    if let Some(snapshot_id) = tombstone_sync_event_id.filter(|value| !value.trim().is_empty()) {
+    if let Some(snapshot_id) = tombstone_snapshot_event_id.filter(|value| !value.trim().is_empty())
+    {
         protected.insert(snapshot_id);
     }
 
     let mut stmt = conn.prepare(
-        "SELECT sync_event_id
+        "SELECT snapshot_event_id
          FROM note_conflicts
          WHERE note_id = ?1",
     )?;
@@ -291,7 +292,7 @@ fn prune_sync_snapshots_for_document(
         )?;
         conn.execute(
             "DELETE FROM note_snapshot_history
-             WHERE sync_event_id = ?1",
+             WHERE snapshot_event_id = ?1",
             params![snapshot_id],
         )?;
     }
@@ -340,13 +341,13 @@ mod tests {
     fn prunes_old_unprotected_snapshots_per_document() {
         let conn = setup_db();
         conn.execute(
-            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id)
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, snapshot_event_id)
              VALUES ('note-1', 'Title', '# Title', 1, 1, 1, 'snapshot-current')",
             [],
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO note_conflicts (sync_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+            "INSERT INTO note_conflicts (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
              VALUES ('snapshot-conflict', 'note-1', 'put', 'DEVICE-A', '{}', 'Conflict', '# Conflict', 20, 20, NULL, NULL, NULL, 0, 20)",
             [],
         )
@@ -447,7 +448,7 @@ mod tests {
     fn prunes_history_rows_with_old_unprotected_snapshots() {
         let conn = setup_db();
         conn.execute(
-            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id)
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, snapshot_event_id)
              VALUES ('note-1', 'Title', '# Title', 1, 1, 1, 'snapshot-current')",
             [],
         )
@@ -475,7 +476,7 @@ mod tests {
             upsert_note_snapshot_history(
                 &conn,
                 &LocalNoteSnapshotHistoryEntry {
-                    sync_event_id: snapshot_id.clone(),
+                    snapshot_event_id: snapshot_id.clone(),
                     note_id: "note-1".to_string(),
                     op: "put".to_string(),
                     device_id: "DEVICE-A".to_string(),
@@ -514,7 +515,7 @@ mod tests {
         upsert_note_snapshot_history(
             &conn,
             &LocalNoteSnapshotHistoryEntry {
-                sync_event_id: "snapshot-current".to_string(),
+                snapshot_event_id: "snapshot-current".to_string(),
                 note_id: "note-1".to_string(),
                 op: "put".to_string(),
                 device_id: "DEVICE-A".to_string(),
@@ -541,7 +542,7 @@ mod tests {
 
         let oldest_history_exists: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM note_snapshot_history WHERE sync_event_id = 'snapshot-00'",
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE snapshot_event_id = 'snapshot-00'",
                 [],
                 |row| row.get(0),
             )
@@ -550,7 +551,7 @@ mod tests {
 
         let current_history_exists: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM note_snapshot_history WHERE sync_event_id = 'snapshot-current'",
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE snapshot_event_id = 'snapshot-current'",
                 [],
                 |row| row.get(0),
             )

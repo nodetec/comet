@@ -15,9 +15,7 @@ pub enum BlobFetchStatus {
 #[tauri::command]
 pub fn get_blossom_url(app: AppHandle) -> Result<Option<String>, AppError> {
     let conn = database_connection(&app)?;
-    Ok(crate::adapters::sqlite::sync_repository::get_blossom_url(
-        &conn,
-    ))
+    Ok(crate::adapters::sqlite::sync_settings_repository::get_blossom_url(&conn))
 }
 
 #[tauri::command]
@@ -58,7 +56,8 @@ pub async fn fetch_blob(app: AppHandle, hash: String) -> Result<BlobFetchStatus,
     }
 
     let conn = database_connection(&app)?;
-    let preferred_blossom_url = crate::adapters::sqlite::sync_repository::get_blossom_url(&conn);
+    let preferred_blossom_url =
+        crate::adapters::sqlite::sync_settings_repository::get_blossom_url(&conn);
     log::info!(
         "[blob] lookup plaintext_hash={hash} preferred_blossom_url={preferred_blossom_url:?}"
     );

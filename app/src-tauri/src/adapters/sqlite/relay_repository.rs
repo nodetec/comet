@@ -6,11 +6,11 @@ use rusqlite::{params, Connection};
 
 pub fn list_relays(conn: &Connection) -> Result<Vec<Relay>, AppError> {
     let paused_sync_relays =
-        crate::adapters::sqlite::sync_repository::list_paused_sync_relay_urls(conn);
+        crate::adapters::sqlite::sync_settings_repository::list_paused_sync_relay_urls(conn);
     let preferred_sync_relay =
-        crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(conn);
+        crate::adapters::sqlite::sync_settings_repository::get_preferred_sync_relay_url(conn);
     let active_sync_relay =
-        crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(conn);
+        crate::adapters::sqlite::sync_settings_repository::get_active_sync_relay_url(conn);
     let mut stmt = conn.prepare("SELECT url, kind, created_at FROM relays ORDER BY created_at")?;
     let relays = stmt
         .query_map([], |row| {

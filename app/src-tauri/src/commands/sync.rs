@@ -47,8 +47,10 @@ pub fn set_sync_relay(
     let conn = database_connection(&app)?;
     let normalized_url = normalize_relay_url(&url)?;
     let relays = crate::adapters::sqlite::relay_repository::set_sync_relay(&conn, &normalized_url)?;
-    if crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn).is_none() {
-        crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(
+    if crate::adapters::sqlite::sync_settings_repository::get_preferred_sync_relay_url(&conn)
+        .is_none()
+    {
+        crate::adapters::sqlite::sync_settings_repository::save_preferred_sync_relay_url(
             &conn,
             &normalized_url,
         )?;
@@ -64,41 +66,47 @@ pub fn remove_sync_relay(
 ) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     let active_relay_url =
-        crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn);
+        crate::adapters::sqlite::sync_settings_repository::get_active_sync_relay_url(&conn);
     let relays =
         crate::adapters::sqlite::relay_repository::remove_sync_relay(&conn, url.as_deref())?;
     if let Some(removed_url) = url.as_deref().map(normalize_relay_url).transpose()? {
-        let _ =
-            crate::adapters::sqlite::sync_repository::clear_paused_sync_relay(&conn, &removed_url);
-        if crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn).as_deref()
+        let _ = crate::adapters::sqlite::sync_settings_repository::clear_paused_sync_relay(
+            &conn,
+            &removed_url,
+        );
+        if crate::adapters::sqlite::sync_settings_repository::get_preferred_sync_relay_url(&conn)
+            .as_deref()
             == Some(removed_url.as_str())
         {
-            let fallback = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn)
-                .into_iter()
-                .next();
+            let fallback =
+                crate::adapters::sqlite::sync_settings_repository::list_sync_relay_urls(&conn)
+                    .into_iter()
+                    .next();
             if let Some(next_url) = fallback {
-                crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(
+                crate::adapters::sqlite::sync_settings_repository::save_preferred_sync_relay_url(
                     &conn, &next_url,
                 )?;
             } else {
-                crate::adapters::sqlite::sync_repository::clear_preferred_sync_relay_url(&conn);
+                crate::adapters::sqlite::sync_settings_repository::clear_preferred_sync_relay_url(
+                    &conn,
+                );
             }
         }
     } else {
-        crate::adapters::sqlite::sync_repository::clear_paused_sync_relay_urls(&conn);
-        crate::adapters::sqlite::sync_repository::clear_preferred_sync_relay_url(&conn);
+        crate::adapters::sqlite::sync_settings_repository::clear_paused_sync_relay_urls(&conn);
+        crate::adapters::sqlite::sync_settings_repository::clear_preferred_sync_relay_url(&conn);
     }
     if url
         .as_ref()
         .zip(active_relay_url.as_ref())
         .is_some_and(|(removed, active)| removed == active)
     {
-        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+        crate::adapters::sqlite::sync_settings_repository::clear_active_sync_relay_url(&conn);
     }
     let remaining_sync_relays =
-        crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+        crate::adapters::sqlite::sync_settings_repository::list_sync_relay_urls(&conn);
     if remaining_sync_relays.is_empty() {
-        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+        crate::adapters::sqlite::sync_settings_repository::clear_active_sync_relay_url(&conn);
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             app_clone
@@ -119,7 +127,8 @@ pub fn set_preferred_sync_relay(
 ) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     let url = normalize_relay_url(&url)?;
-    let configured_relays = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    let configured_relays =
+        crate::adapters::sqlite::sync_settings_repository::list_sync_relay_urls(&conn);
     if !configured_relays
         .iter()
         .any(|configured| configured == &url)
@@ -129,7 +138,7 @@ pub fn set_preferred_sync_relay(
         )));
     }
 
-    crate::adapters::sqlite::sync_repository::save_preferred_sync_relay_url(&conn, &url)?;
+    crate::adapters::sqlite::sync_settings_repository::save_preferred_sync_relay_url(&conn, &url)?;
     let relays = crate::adapters::sqlite::relay_repository::list_relays(&conn)?;
     restart_sync_async(&app);
     Ok(relays)
@@ -143,7 +152,8 @@ pub fn pause_sync_relay(
 ) -> Result<Vec<crate::domain::relay::model::Relay>, AppError> {
     let conn = database_connection(&app)?;
     let url = normalize_relay_url(&url)?;
-    let configured_relays = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    let configured_relays =
+        crate::adapters::sqlite::sync_settings_repository::list_sync_relay_urls(&conn);
     if !configured_relays
         .iter()
         .any(|configured| configured == &url)
@@ -153,12 +163,13 @@ pub fn pause_sync_relay(
         )));
     }
 
-    crate::adapters::sqlite::sync_repository::set_sync_relay_paused(&conn, &url, paused)?;
+    crate::adapters::sqlite::sync_settings_repository::set_sync_relay_paused(&conn, &url, paused)?;
     if paused
-        && crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn).as_deref()
+        && crate::adapters::sqlite::sync_settings_repository::get_active_sync_relay_url(&conn)
+            .as_deref()
             == Some(url.as_str())
     {
-        crate::adapters::sqlite::sync_repository::clear_active_sync_relay_url(&conn);
+        crate::adapters::sqlite::sync_settings_repository::clear_active_sync_relay_url(&conn);
     }
 
     let relays = crate::adapters::sqlite::relay_repository::list_relays(&conn)?;
@@ -235,17 +246,17 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
 
     let conn = database_connection(&app)?;
 
-    let relay_urls = crate::adapters::sqlite::sync_repository::list_sync_relay_urls(&conn);
+    let relay_urls = crate::adapters::sqlite::sync_settings_repository::list_sync_relay_urls(&conn);
     let active_relay_url =
-        crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(&conn)
+        crate::adapters::sqlite::sync_settings_repository::get_active_sync_relay_url(&conn)
             .filter(|url| relay_urls.contains(url));
     let preferred_relay_url =
-        crate::adapters::sqlite::sync_repository::get_preferred_sync_relay_url(&conn)
+        crate::adapters::sqlite::sync_settings_repository::get_preferred_sync_relay_url(&conn)
             .filter(|url| relay_urls.contains(url));
     let relay_url = active_relay_url
         .clone()
         .or_else(|| relay_urls.first().cloned());
-    let blossom_url = crate::adapters::sqlite::sync_repository::get_blossom_url(&conn);
+    let blossom_url = crate::adapters::sqlite::sync_settings_repository::get_blossom_url(&conn);
     let npub: Option<String> = conn
         .query_row("SELECT npub FROM nostr_identity LIMIT 1", [], |row| {
             row.get(0)
@@ -253,12 +264,12 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
         .optional()?;
 
     let snapshot_managed_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND deleted_at IS NULL",
+        "SELECT COUNT(*) FROM notes WHERE snapshot_event_id IS NOT NULL AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
     let relay_backed_notes: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM notes WHERE sync_event_id IS NOT NULL AND deleted_at IS NULL",
+        "SELECT COUNT(*) FROM notes WHERE snapshot_event_id IS NOT NULL AND deleted_at IS NULL",
         [],
         |row| row.get(0),
     )?;
@@ -280,9 +291,7 @@ pub async fn get_sync_info(app: AppHandle) -> Result<SyncInfo, AppError> {
     let checkpoint_seq = relay_url
         .as_deref()
         .map(|relay_url| {
-            crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state(
-                &conn, relay_url,
-            )
+            crate::adapters::sqlite::snapshot_repository::get_sync_relay_state(&conn, relay_url)
         })
         .transpose()?
         .flatten()
@@ -413,7 +422,7 @@ mod tests {
                  VALUES ('wss://relay.example', 1);
              INSERT INTO sync_relay_state (relay_url, checkpoint_seq, snapshot_seq, last_synced_at, min_payload_mtime, updated_at)
                  VALUES ('wss://relay.example', 10, 20, 30, 40, 50);
-             INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id, locally_modified)
+             INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, snapshot_event_id, locally_modified)
                  VALUES ('note-1', 'Title', '# Title', 1, 2, 2, 'event-1', 1);
              INSERT INTO notes_fts (note_id, title, markdown)
                  VALUES ('note-1', 'Title', '# Title');

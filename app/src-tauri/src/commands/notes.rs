@@ -1,14 +1,13 @@
 use crate::adapters::sqlite::note_repository::SqliteNoteRepository;
+use crate::adapters::sqlite::snapshot_view_repository::SqliteSnapshotViewRepository;
 use crate::db::database_connection;
-use crate::domain::common::text::preview_from_markdown;
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::model::*;
 use crate::domain::notes::service::NoteService;
 use crate::domain::sync::model::SyncCommand;
 use crate::error::AppError;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
-use rusqlite::{params, OptionalExtension};
-use std::collections::HashSet;
+use rusqlite::params;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -48,8 +47,8 @@ fn record_to_loaded_note(
 
 fn preferred_conflict_relay_url(conn: &rusqlite::Connection) -> Option<String> {
     let available =
-        crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(conn);
-    let active = crate::adapters::sqlite::sync_repository::get_active_sync_relay_url(conn);
+        crate::adapters::sqlite::sync_settings_repository::ordered_available_sync_relay_urls(conn);
+    let active = crate::adapters::sqlite::sync_settings_repository::get_active_sync_relay_url(conn);
     active
         .filter(|relay_url| available.contains(relay_url))
         .or_else(|| available.into_iter().next())
@@ -135,67 +134,8 @@ pub fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError
 #[tauri::command]
 pub fn get_note_history(app: AppHandle, note_id: String) -> Result<NoteHistoryInfo, AppError> {
     let conn = database_connection(&app)?;
-    let current_note_snapshot_id = conn
-        .query_row(
-            "SELECT sync_event_id FROM notes WHERE id = ?1",
-            params![&note_id],
-            |row| row.get::<_, Option<String>>(0),
-        )
-        .optional()?
-        .flatten();
-    let current_tombstone_snapshot_id = conn
-        .query_row(
-            "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
-            params![&note_id],
-            |row| row.get::<_, Option<String>>(0),
-        )
-        .optional()?
-        .flatten();
-    let current_snapshot_id = current_note_snapshot_id.or(current_tombstone_snapshot_id);
-
-    let mut conflict_ids = HashSet::new();
-    let mut conflict_stmt = conn.prepare(
-        "SELECT sync_event_id
-         FROM note_conflicts
-         WHERE note_id = ?1",
-    )?;
-    let conflict_rows =
-        conflict_stmt.query_map(params![&note_id], |row| row.get::<_, String>(0))?;
-    for row in conflict_rows {
-        conflict_ids.insert(row?);
-    }
-
-    let mut snapshots = Vec::new();
-    let mut stmt = conn.prepare(
-        "SELECT sync_event_id, op, modified_at, deleted_at, title, markdown
-         FROM note_snapshot_history
-         WHERE note_id = ?1
-         ORDER BY modified_at DESC, sync_event_id ASC",
-    )?;
-    let rows = stmt.query_map(params![&note_id], |row| {
-        let markdown: Option<String> = row.get(5)?;
-        let snapshot_id: String = row.get(0)?;
-        Ok(NoteHistorySnapshot {
-            is_current: current_snapshot_id.as_ref() == Some(&snapshot_id),
-            is_conflict: conflict_ids.contains(&snapshot_id),
-            snapshot_id,
-            op: row.get(1)?,
-            mtime: row.get(2)?,
-            deleted_at: row.get(3)?,
-            title: row.get(4)?,
-            preview: markdown.as_ref().map(|value| preview_from_markdown(value)),
-            markdown,
-        })
-    })?;
-    for row in rows {
-        snapshots.push(row?);
-    }
-
-    Ok(NoteHistoryInfo {
-        note_id,
-        snapshot_count: snapshots.len(),
-        snapshots,
-    })
+    let repo = SqliteSnapshotViewRepository::new(&conn);
+    repo.get_note_history(&note_id)
 }
 
 #[tauri::command]
@@ -204,117 +144,8 @@ pub async fn get_note_conflict(
     note_id: String,
 ) -> Result<Option<NoteConflictInfo>, AppError> {
     let conn = database_connection(&app)?;
-    let current_note: Option<(Option<String>, String, String, i64)> = conn
-        .query_row(
-            "SELECT sync_event_id, title, markdown, modified_at FROM notes WHERE id = ?1",
-            params![note_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .optional()?;
-    let current_tombstone: Option<(Option<String>, i64)> = if current_note.is_none() {
-        conn.query_row(
-            "SELECT sync_event_id, deleted_at FROM note_tombstones WHERE id = ?1",
-            params![note_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?
-    } else {
-        None
-    };
-
-    let mut snapshots = Vec::new();
-    let current_snapshot_id = current_note
-        .as_ref()
-        .map(|(sync_event_id, _, _, _)| {
-            sync_event_id
-                .clone()
-                .unwrap_or_else(|| format!("local:{note_id}"))
-        })
-        .or_else(|| {
-            current_tombstone.as_ref().map(|(sync_event_id, _)| {
-                sync_event_id
-                    .clone()
-                    .unwrap_or_else(|| format!("local-deleted:{note_id}"))
-            })
-        });
-
-    if let Some((sync_event_id, title, markdown, modified_at)) = current_note.as_ref() {
-        snapshots.push(NoteConflictSnapshot {
-            snapshot_id: sync_event_id
-                .clone()
-                .unwrap_or_else(|| format!("local:{note_id}")),
-            mtime: *modified_at,
-            op: "put".to_string(),
-            deleted_at: None,
-            title: Some(title.clone()),
-            markdown: Some(markdown.clone()),
-            preview: Some(preview_from_markdown(markdown)),
-            is_current: true,
-            is_available: true,
-        });
-    }
-    if let Some((sync_event_id, deleted_at)) = current_tombstone.as_ref() {
-        snapshots.push(NoteConflictSnapshot {
-            snapshot_id: sync_event_id
-                .clone()
-                .unwrap_or_else(|| format!("local-deleted:{note_id}")),
-            mtime: *deleted_at,
-            op: "del".to_string(),
-            deleted_at: Some(*deleted_at),
-            title: None,
-            markdown: None,
-            preview: None,
-            is_current: true,
-            is_available: true,
-        });
-    }
-
-    let mut stmt = conn.prepare(
-        "SELECT sync_event_id, op, modified_at, deleted_at, title, markdown
-         FROM note_conflicts
-         WHERE note_id = ?1
-         ORDER BY modified_at DESC, sync_event_id ASC",
-    )?;
-    let rows = stmt.query_map(params![note_id], |row| {
-        let markdown: Option<String> = row.get(5)?;
-        Ok(NoteConflictSnapshot {
-            snapshot_id: row.get(0)?,
-            op: row.get(1)?,
-            mtime: row.get(2)?,
-            deleted_at: row.get(3)?,
-            title: row.get(4)?,
-            preview: markdown.as_ref().map(|value| preview_from_markdown(value)),
-            markdown,
-            is_current: false,
-            is_available: true,
-        })
-    })?;
-    for row in rows {
-        snapshots.push(row?);
-    }
-
-    if snapshots.len() <= 1 {
-        return Ok(None);
-    }
-    let has_delete_candidate = snapshots.iter().any(|snapshot| snapshot.op == "del");
-
-    snapshots.sort_by(|left, right| {
-        right
-            .is_current
-            .cmp(&left.is_current)
-            .then_with(|| right.is_available.cmp(&left.is_available))
-            .then_with(|| right.mtime.cmp(&left.mtime))
-            .then_with(|| left.snapshot_id.cmp(&right.snapshot_id))
-    });
-
-    Ok(Some(NoteConflictInfo {
-        note_id,
-        current_snapshot_id,
-        snapshot_count: snapshots.len(),
-        relay_url: None,
-        has_delete_candidate,
-        snapshots,
-    }))
+    let repo = SqliteSnapshotViewRepository::new(&conn);
+    repo.get_note_conflict(&note_id)
 }
 
 #[tauri::command]
@@ -352,7 +183,7 @@ pub async fn resolve_note_conflict(
     }
 
     let relay_urls =
-        crate::adapters::sqlite::sync_repository::ordered_available_sync_relay_urls(&conn);
+        crate::adapters::sqlite::sync_settings_repository::ordered_available_sync_relay_urls(&conn);
     let active_relay_url = preferred_conflict_relay_url(&conn)
         .ok_or_else(|| AppError::custom("No sync relay configured"))?;
     let backup_relay_urls = relay_urls

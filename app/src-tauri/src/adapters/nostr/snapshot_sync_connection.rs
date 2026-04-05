@@ -2,7 +2,7 @@ use crate::adapters::nostr::snapshot_bootstrap::bootstrap_relay_connection;
 use crate::adapters::nostr::snapshot_push::{
     push_deletion_snapshot, push_note_snapshots_batch, retry_pending_blob_uploads,
 };
-use crate::adapters::sqlite::sync_repository::{
+use crate::adapters::sqlite::sync_settings_repository::{
     ordered_available_sync_relay_urls, save_active_sync_relay_url,
 };
 use crate::domain::sync::model::{SyncChangePayload, SyncCommand, SyncState};
@@ -311,10 +311,9 @@ async fn handle_snapshot_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
-            let relay_state =
-                crate::adapters::sqlite::snapshot_sync_repository::get_sync_relay_state(
-                    &conn, relay_url,
-                )?;
+            let relay_state = crate::adapters::sqlite::snapshot_repository::get_sync_relay_state(
+                &conn, relay_url,
+            )?;
             let min_payload_mtime = relay_state
                 .as_ref()
                 .and_then(|state| state.min_payload_mtime);
@@ -322,7 +321,7 @@ async fn handle_snapshot_incoming_message(
             // `last_seq` is the live `CHANGES` progress marker. Preserve the
             // original bootstrap `snapshot_seq` so the handoff boundary remains
             // distinguishable from the live checkpoint.
-            crate::adapters::sqlite::snapshot_sync_repository::upsert_sync_relay_state(
+            crate::adapters::sqlite::snapshot_repository::upsert_sync_relay_state(
                 &conn,
                 relay_url,
                 Some(last_seq),

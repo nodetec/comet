@@ -1,4 +1,4 @@
-use crate::adapters::sqlite::sync_repository::get_sync_relay_url;
+use crate::adapters::sqlite::sync_settings_repository::get_sync_relay_url;
 use crate::domain::sync::model::{SyncCommand, SyncState, SyncStatusPayload};
 use crate::error::AppError;
 use rusqlite::OptionalExtension;
