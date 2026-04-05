@@ -1,7 +1,10 @@
 use crate::adapters::nostr::relay_client::{
     fetch_relay_info, SnapshotRelayConnection, SnapshotRelayIncomingMessage,
 };
-use crate::adapters::sqlite::snapshot_repository::upsert_sync_relay_state;
+use crate::adapters::sqlite::snapshot_repository::{
+    clear_bootstrap_snapshot_stage, for_each_staged_bootstrap_snapshot_event,
+    stage_bootstrap_snapshot_event, upsert_sync_relay_state,
+};
 use crate::db::{active_account, database_connection};
 use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event;
@@ -55,30 +58,30 @@ pub async fn bootstrap_with_keys(
     db_path: &Path,
     keys: &Keys,
     relay_ws_url: &str,
-    mut invalidate_cache: impl FnMut(&str),
+    mut _invalidate_cache: impl FnMut(&str),
 ) -> Result<SnapshotBootstrapResult, AppError> {
-    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, &mut invalidate_cache, |_| {})
-        .await
+    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, |_| {}, |_| {}).await
 }
 
 async fn bootstrap_with_keys_and_changes(
     db_path: &Path,
     keys: &Keys,
     relay_ws_url: &str,
-    mut invalidate_cache: impl FnMut(&str),
+    _invalidate_cache: impl FnMut(&str),
     mut on_change: impl FnMut(SyncChangePayload),
 ) -> Result<SnapshotBootstrapResult, AppError> {
     let relay_http_url = relay_http_url_from_ws(relay_ws_url)?;
     let relay_info = fetch_relay_info(&relay_http_url).await?;
 
     let author_pubkey = keys.public_key().to_hex();
-    let conn = open_sync_db(db_path)?;
+    let mut conn = open_sync_db(db_path)?;
     let local_snapshot_ids = local_known_snapshot_ids(&conn, &author_pubkey)?;
     let min_retained_created_at = relay_info
         .snapshot_sync
         .retention
         .snapshot_retention
         .min_created_at;
+    clear_bootstrap_snapshot_stage(&conn, relay_ws_url)?;
 
     upsert_sync_relay_state(
         &conn,
@@ -95,7 +98,7 @@ async fn bootstrap_with_keys_and_changes(
         .await?;
 
     let mut snapshot_seq = None;
-    let mut remote_snapshot_events = Vec::<Event>::new();
+    let mut remote_snapshot_ids = BTreeSet::new();
 
     loop {
         match recv_bootstrap_message(&mut connection, relay_ws_url, "CHANGES bootstrap").await? {
@@ -125,7 +128,9 @@ async fn bootstrap_with_keys_and_changes(
                         "Unexpected CHANGES SNAPSHOT subscription id: {subscription_id}"
                     )));
                 }
-                remote_snapshot_events.push(event);
+                let snapshot_id = snapshot_id_from_event(&event)?;
+                stage_bootstrap_snapshot_event(&conn, relay_ws_url, &event)?;
+                remote_snapshot_ids.insert(snapshot_id);
             }
             SnapshotRelayIncomingMessage::ChangesEose {
                 subscription_id,
@@ -169,11 +174,6 @@ async fn bootstrap_with_keys_and_changes(
     let snapshot_seq =
         snapshot_seq.ok_or_else(|| AppError::custom("Bootstrap did not return snapshot_seq"))?;
 
-    let remote_snapshot_ids = remote_snapshot_events
-        .iter()
-        .map(snapshot_id_from_event)
-        .collect::<Result<BTreeSet<_>, _>>()?;
-
     let have = local_snapshot_ids
         .difference(&remote_snapshot_ids)
         .cloned()
@@ -182,24 +182,26 @@ async fn bootstrap_with_keys_and_changes(
         .difference(&local_snapshot_ids)
         .cloned()
         .collect::<Vec<_>>();
+    let need_set = need.iter().cloned().collect::<BTreeSet<_>>();
 
-    let mut conn = open_sync_db(db_path)?;
     let tx = conn.transaction()?;
-    let mut invalidated_notes = BTreeSet::new();
-    let mut applied_changes = Vec::new();
+    let mut bootstrap_changed = false;
 
     if !need.is_empty() {
-        for event in remote_snapshot_events.iter().filter(|event| {
-            snapshot_id_from_event(event).is_ok_and(|snapshot_id| need.contains(&snapshot_id))
-        }) {
-            if let Some(change) =
-                apply_remote_snapshot_event(&tx, relay_ws_url, keys, event, None, |note_id| {
-                    invalidated_notes.insert(note_id.to_string());
-                })?
-            {
-                applied_changes.push(change);
+        for_each_staged_bootstrap_snapshot_event(&tx, relay_ws_url, |snapshot_id, event| {
+            if !need_set.contains(snapshot_id) {
+                return Ok(());
             }
-        }
+
+            if let Some(change) =
+                apply_remote_snapshot_event(&tx, relay_ws_url, keys, &event, None, |_| {})?
+            {
+                let _ = change;
+                bootstrap_changed = true;
+            }
+
+            Ok(())
+        })?;
     }
     // Record the bootstrap handoff boundary in the same transaction as the
     // applied bootstrap snapshots so restart/retry cannot observe a state
@@ -212,13 +214,14 @@ async fn bootstrap_with_keys_and_changes(
         Some(crate::domain::common::time::now_millis()),
         min_retained_created_at,
     )?;
+    clear_bootstrap_snapshot_stage(&tx, relay_ws_url)?;
     tx.commit()?;
 
-    for note_id in invalidated_notes {
-        invalidate_cache(&note_id);
-    }
-    for change in applied_changes {
-        on_change(change);
+    if bootstrap_changed {
+        on_change(SyncChangePayload {
+            note_id: String::new(),
+            action: "bootstrap".to_string(),
+        });
     }
 
     Ok(SnapshotBootstrapResult {
@@ -369,6 +372,12 @@ mod tests {
             )
             .unwrap();
         assert!(snapshot_event_id.is_some());
+        let staged_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bootstrap_snapshot_stage", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(staged_count, 0);
 
         let _ = std::fs::remove_file(db_path);
         relay.stop();

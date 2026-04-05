@@ -42,24 +42,85 @@ export function useSyncListener(deps: SyncListenerDeps) {
     bumpSyncEditorRevision,
   } = deps;
   const pendingBatchRef = useRef<{
+    bootstrapApplied: boolean;
     deletedIds: Set<string>;
     upsertedIds: Set<string>;
   }>({
+    bootstrapApplied: false,
     deletedIds: new Set(),
     upsertedIds: new Set(),
   });
   const flushTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const refreshCurrentOpenNote = (
+      currentOpenNoteId: string,
+      currentDraftId: string | null,
+      hasPendingSave: boolean,
+      reason: string,
+    ) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["note", currentOpenNoteId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["note-conflict", currentOpenNoteId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["note-history", currentOpenNoteId],
+      });
+
+      void Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ["note", currentOpenNoteId],
+          queryFn: () => loadNote(currentOpenNoteId),
+        }),
+        getNoteConflict(currentOpenNoteId).catch(() => null),
+      ])
+        .then(([freshNote, conflict]) => {
+          if (!freshNote) {
+            queryClient.removeQueries({
+              exact: true,
+              queryKey: ["note", currentOpenNoteId],
+            });
+            useShellStore.getState().setDraft("", "");
+            useShellStore.getState().setSelectedNoteId(null);
+            bumpSyncEditorRevision(reason, {
+              noteId: currentOpenNoteId,
+            });
+            return;
+          }
+
+          if (conflict && conflict.snapshotCount > 1) {
+            if (pendingSaveTimeoutRef.current !== null) {
+              window.clearTimeout(pendingSaveTimeoutRef.current);
+              pendingSaveTimeoutRef.current = null;
+            }
+            handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
+            return;
+          }
+
+          if (!hasPendingSave || currentDraftId !== currentOpenNoteId) {
+            handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
+          }
+        })
+        .catch(() => {});
+    };
+
     const flushPendingBatch = () => {
       flushTimerRef.current = null;
 
+      const bootstrapApplied = pendingBatchRef.current.bootstrapApplied;
       const deletedIds = new Set(pendingBatchRef.current.deletedIds);
       const upsertedIds = new Set(pendingBatchRef.current.upsertedIds);
+      pendingBatchRef.current.bootstrapApplied = false;
       pendingBatchRef.current.deletedIds.clear();
       pendingBatchRef.current.upsertedIds.clear();
 
-      if (deletedIds.size === 0 && upsertedIds.size === 0) {
+      if (
+        !bootstrapApplied &&
+        deletedIds.size === 0 &&
+        upsertedIds.size === 0
+      ) {
         return;
       }
 
@@ -68,14 +129,16 @@ export function useSyncListener(deps: SyncListenerDeps) {
       void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
       void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
 
-      for (const noteId of changedIds) {
-        void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-        void queryClient.invalidateQueries({
-          queryKey: ["note-conflict", noteId],
-        });
-        void queryClient.invalidateQueries({
-          queryKey: ["note-history", noteId],
-        });
+      if (!bootstrapApplied) {
+        for (const noteId of changedIds) {
+          void queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+          void queryClient.invalidateQueries({
+            queryKey: ["note-conflict", noteId],
+          });
+          void queryClient.invalidateQueries({
+            queryKey: ["note-history", noteId],
+          });
+        }
       }
 
       const { draftNoteId: currentDraftId, selectedNoteId: currentSelectedId } =
@@ -97,40 +160,46 @@ export function useSyncListener(deps: SyncListenerDeps) {
         return;
       }
 
-      if (currentDraftId && upsertedIds.has(currentDraftId)) {
-        void Promise.all([
-          queryClient.fetchQuery({
-            queryKey: ["note", currentDraftId],
-            queryFn: () => loadNote(currentDraftId),
-          }),
-          getNoteConflict(currentDraftId).catch(() => null),
-        ])
-          .then(([freshNote, conflict]) => {
-            if (conflict && conflict.snapshotCount > 1) {
-              if (pendingSaveTimeoutRef.current !== null) {
-                window.clearTimeout(pendingSaveTimeoutRef.current);
-                pendingSaveTimeoutRef.current = null;
-              }
-              handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
-              return;
-            }
+      if (bootstrapApplied && currentOpenNoteId) {
+        refreshCurrentOpenNote(
+          currentOpenNoteId,
+          currentDraftId,
+          hasPendingSave,
+          "sync-remote-bootstrap-delete",
+        );
+        return;
+      }
 
-            if (!hasPendingSave) {
-              handleFreshNote(freshNote, queryClient, bumpSyncEditorRevision);
-            }
-          })
-          .catch(() => {});
+      if (currentDraftId && upsertedIds.has(currentDraftId)) {
+        refreshCurrentOpenNote(
+          currentDraftId,
+          currentDraftId,
+          hasPendingSave,
+          "sync-remote-delete",
+        );
       }
     };
 
-    const unlisten = listen<{ noteId: string; action: string }>(
+    const unlisten = listen<{ noteId?: string; action: string }>(
       "sync-remote-change",
       (event) => {
         const { noteId, action } = event.payload;
-        if (action === "delete") {
+        if (action === "bootstrap") {
+          pendingBatchRef.current.bootstrapApplied = true;
+          pendingBatchRef.current.deletedIds.clear();
+          pendingBatchRef.current.upsertedIds.clear();
+        } else if (
+          action === "delete" &&
+          typeof noteId === "string" &&
+          noteId.length > 0
+        ) {
           pendingBatchRef.current.deletedIds.add(noteId);
           pendingBatchRef.current.upsertedIds.delete(noteId);
-        } else if (action === "upsert" || action === "conflict") {
+        } else if (
+          (action === "upsert" || action === "conflict") &&
+          typeof noteId === "string" &&
+          noteId.length > 0
+        ) {
           pendingBatchRef.current.upsertedIds.add(noteId);
         }
 

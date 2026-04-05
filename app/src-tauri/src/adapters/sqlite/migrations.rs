@@ -241,5 +241,16 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_note_snapshot_history_note_id
                ON note_snapshot_history(note_id, modified_at DESC, snapshot_event_id ASC);",
         ),
+        M::up(
+            "CREATE TABLE bootstrap_snapshot_stage (
+               relay_url TEXT NOT NULL,
+               snapshot_event_id TEXT NOT NULL,
+               created_at INTEGER NOT NULL,
+               raw_event_json TEXT NOT NULL,
+               PRIMARY KEY (relay_url, snapshot_event_id)
+             );
+             CREATE INDEX idx_bootstrap_snapshot_stage_relay_order
+               ON bootstrap_snapshot_stage(relay_url, created_at ASC, snapshot_event_id ASC);",
+        ),
     ])
 }

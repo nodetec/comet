@@ -1,5 +1,6 @@
 use crate::domain::common::time::now_millis;
 use crate::error::AppError;
+use nostr_sdk::prelude::{Event, JsonUtil};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 
@@ -58,6 +59,7 @@ pub fn clear_local_snapshot_state(conn: &Connection) -> Result<(), AppError> {
     crate::adapters::sqlite::tag_index::clear_tag_index(conn)?;
     conn.execute_batch(
         "DELETE FROM notes_fts;
+         DELETE FROM bootstrap_snapshot_stage;
          DELETE FROM note_conflicts;
          DELETE FROM note_tombstones;
          DELETE FROM notes;
@@ -71,6 +73,67 @@ pub fn clear_local_snapshot_state(conn: &Connection) -> Result<(), AppError> {
          DELETE FROM sync_relays;
          DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
     )?;
+    Ok(())
+}
+
+pub fn clear_bootstrap_snapshot_stage(
+    conn: &Connection,
+    relay_url: &str,
+) -> Result<(), AppError> {
+    conn.execute(
+        "DELETE FROM bootstrap_snapshot_stage WHERE relay_url = ?1",
+        params![relay_url],
+    )?;
+    Ok(())
+}
+
+pub fn stage_bootstrap_snapshot_event(
+    conn: &Connection,
+    relay_url: &str,
+    event: &Event,
+) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT INTO bootstrap_snapshot_stage
+           (relay_url, snapshot_event_id, created_at, raw_event_json)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(relay_url, snapshot_event_id) DO UPDATE SET
+           created_at = excluded.created_at,
+           raw_event_json = excluded.raw_event_json",
+        params![
+            relay_url,
+            event.id.to_hex(),
+            event.created_at.as_secs() as i64,
+            event.as_json()
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn for_each_staged_bootstrap_snapshot_event(
+    conn: &Connection,
+    relay_url: &str,
+    mut callback: impl FnMut(&str, Event) -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT snapshot_event_id, raw_event_json
+         FROM bootstrap_snapshot_stage
+         WHERE relay_url = ?1
+         ORDER BY created_at ASC, snapshot_event_id ASC",
+    )?;
+    let rows = stmt.query_map(params![relay_url], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+
+    for row in rows {
+        let (snapshot_event_id, raw_event_json) = row?;
+        let event = Event::from_json(raw_event_json).map_err(|error| {
+            AppError::custom(format!(
+                "Failed to parse staged bootstrap snapshot event {snapshot_event_id}: {error}"
+            ))
+        })?;
+        callback(&snapshot_event_id, event)?;
+    }
+
     Ok(())
 }
 
@@ -324,6 +387,7 @@ fn prune_sync_snapshots_for_document(
 mod tests {
     use super::*;
     use crate::adapters::sqlite::migrations::account_migrations;
+    use nostr_sdk::prelude::{EventBuilder, Keys, Tag};
     use rusqlite::{Connection, OptionalExtension};
 
     fn setup_db() -> Connection {
@@ -355,6 +419,51 @@ mod tests {
         assert_eq!(state.snapshot_seq, Some(12));
         assert_eq!(state.last_synced_at, Some(15));
         assert_eq!(state.min_payload_mtime, Some(1_700_000_000_000));
+    }
+
+    #[test]
+    fn stages_and_clears_bootstrap_snapshot_events() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let event = EventBuilder::text_note("hello")
+            .tags([
+                Tag::custom(
+                    nostr_sdk::prelude::TagKind::custom("d"),
+                    vec!["note-1".to_string()],
+                ),
+                Tag::custom(
+                    nostr_sdk::prelude::TagKind::custom("o"),
+                    vec!["put".to_string()],
+                ),
+                Tag::custom(
+                    nostr_sdk::prelude::TagKind::custom("vc"),
+                    vec!["DEVICE-A".to_string(), "1".to_string()],
+                ),
+            ])
+            .sign_with_keys(&keys)
+            .unwrap();
+
+        stage_bootstrap_snapshot_event(&conn, "wss://relay.example", &event).unwrap();
+
+        let mut seen = Vec::new();
+        for_each_staged_bootstrap_snapshot_event(&conn, "wss://relay.example", |snapshot_id, row| {
+            seen.push((snapshot_id.to_string(), row.id.to_hex()));
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(seen, vec![(event.id.to_hex(), event.id.to_hex())]);
+
+        clear_bootstrap_snapshot_stage(&conn, "wss://relay.example").unwrap();
+
+        let staged_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM bootstrap_snapshot_stage WHERE relay_url = ?1",
+                params!["wss://relay.example"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(staged_count, 0);
     }
 
     #[test]
