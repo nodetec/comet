@@ -12,10 +12,8 @@ import {
   relayEvents,
   relayAllowedUsers,
   syncChanges,
-  syncHeads,
   syncPayloads,
-  syncRevisionParents,
-  syncRevisions,
+  syncSnapshots,
 } from "@comet/data";
 import { DEFAULT_STORAGE_LIMIT_BYTES } from "~/lib/utils";
 import { getAdminErrorMessage } from "~/server/admin/http";
@@ -41,9 +39,9 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
         FROM relay_events
         GROUP BY pubkey
         UNION ALL
-        SELECT recipient AS user_pubkey, COUNT(*)::bigint AS event_count
+        SELECT author_pubkey AS user_pubkey, COUNT(*)::bigint AS event_count
         FROM sync_payloads
-        GROUP BY recipient
+        GROUP BY author_pubkey
         UNION ALL
         SELECT COALESCE(recipient, pubkey) AS user_pubkey, COUNT(*)::bigint AS event_count
         FROM events
@@ -116,7 +114,7 @@ export const deleteUserData = createServerFn({ method: "POST" })
           tx
             .select({ val: count() })
             .from(syncPayloads)
-            .where(eq(syncPayloads.recipient, data.pubkey)),
+            .where(eq(syncPayloads.authorPubkey, data.pubkey)),
           tx
             .select({ val: count() })
             .from(events)
@@ -130,17 +128,13 @@ export const deleteUserData = createServerFn({ method: "POST" })
 
       await tx
         .delete(syncChanges)
-        .where(eq(syncChanges.recipient, data.pubkey));
-      await tx.delete(syncHeads).where(eq(syncHeads.recipient, data.pubkey));
+        .where(eq(syncChanges.authorPubkey, data.pubkey));
       await tx
-        .delete(syncRevisionParents)
-        .where(eq(syncRevisionParents.recipient, data.pubkey));
-      await tx
-        .delete(syncRevisions)
-        .where(eq(syncRevisions.recipient, data.pubkey));
+        .delete(syncSnapshots)
+        .where(eq(syncSnapshots.authorPubkey, data.pubkey));
       await tx
         .delete(syncPayloads)
-        .where(eq(syncPayloads.recipient, data.pubkey));
+        .where(eq(syncPayloads.authorPubkey, data.pubkey));
 
       await tx.delete(relayEvents).where(eq(relayEvents.pubkey, data.pubkey));
 
