@@ -122,6 +122,13 @@ Normalization and validation rules:
 - repeated `vc` tags must be emitted in ascending lexicographic order by `device_id`
 - relays and clients should reject malformed or non-canonical `vc` sets rather than silently rewriting them
 
+Important encoding rule:
+
+- tag order is part of the signed Nostr event encoding
+- clients must emit `vc` tags in canonical order before signing
+- relays must preserve the original tag order and must not rewrite `vc` tags in transit
+- vector-clock semantics are order-independent after successful parse because comparison operates on the normalized `(device_id -> counter)` mapping
+
 Vector-clock comparison rules:
 
 - missing device entries are treated as `0`
