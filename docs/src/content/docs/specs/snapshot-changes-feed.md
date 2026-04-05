@@ -192,7 +192,7 @@ Important semantics:
 - the returned events are the retained current snapshots at `snapshot_seq`
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
 - a relay may use relay-visible profile metadata such as Comet `vc` tags to determine nondominated current snapshots
-- the client compares payload metadata such as vector clocks after decrypting the returned snapshots
+- the client decrypts the returned snapshots, hydrates profile state, and compares vector clocks locally before applying
 
 Bootstrap does not attempt full-history reconciliation.
 

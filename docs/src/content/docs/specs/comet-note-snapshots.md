@@ -157,7 +157,7 @@ Clock comparison rules:
 
 This means Comet no longer needs a permanent explicit ancestry graph to decide whether one note state supersedes another.
 
-For relay-facing metadata, the same vector clock is duplicated into cleartext `vc` tags.
+For relay-facing metadata, the vector clock is carried in cleartext `vc` tags.
 
 That allows a relay to:
 
@@ -165,7 +165,7 @@ That allows a relay to:
 - compact dominated snapshots more safely
 - bootstrap current snapshots rather than a blind recent window
 
-Clients should still verify that the cleartext `vc` tags match the encrypted payload vector clock after decryption.
+Clients should treat the `vc` tags as the wire source of truth for vector-clock state and hydrate local in-memory snapshot objects from those tags after decryption.
 
 ## Encryption
 
@@ -187,10 +187,6 @@ The canonical payload for `kind:42061` should be a JSON object with this shape:
 {
   "version": 1,
   "device_id": "MBP-4f2c",
-  "vector_clock": {
-    "MBP-4f2c": 12,
-    "IPHONE-a91d": 3
-  },
   "markdown": "# Title\n\nBody",
   "note_created_at": 1712345678000,
   "edited_at": 1712345678000,
@@ -212,7 +208,6 @@ Field guidance:
 
 - `version` versions the Comet note payload format
 - `device_id` identifies the device that produced this snapshot
-- `vector_clock` is the note's version vector
 - `markdown` is the canonical note body
 - `note_created_at` is the document-level creation timestamp
 - `edited_at` is the last content-edit timestamp
@@ -225,7 +220,7 @@ Field guidance:
 For tombstones:
 
 - outer `o` is `del`
-- the payload should still include `version`, `device_id`, `vector_clock`, and `deleted_at`
+- the payload should still include `version`, `device_id`, and `deleted_at`
 - note body fields may be omitted or represented minimally
 - the current tombstone should remain durable while the note stays deleted
 
@@ -237,13 +232,12 @@ Comet should use these rules:
 
 - serialize the payload as UTF-8 JSON
 - apply RFC 8785 JSON Canonicalization Scheme semantics to object serialization
-- `version`, `device_id`, `vector_clock`, `tags`, and `attachments` are always present
+- `version`, `device_id`, `tags`, and `attachments` are always present
 - `markdown`, `note_created_at`, and `edited_at` are always present for `o=put`
 - `archived_at` and `pinned_at` are omitted when absent
 - `readonly` is omitted when false and included only when true
 - `tags` must be canonicalized, deduplicated, and sorted lexicographically
 - `attachments` must be deduplicated by `plaintext_hash` and sorted lexicographically by `plaintext_hash`
-- `vector_clock` keys must be sorted lexicographically by `device_id`
 - `note_created_at`, `edited_at`, `archived_at`, and `pinned_at` are millisecond Unix timestamps
 - `markdown` is preserved exactly as authored and is not normalized beyond normal JSON string escaping
 
@@ -275,6 +269,8 @@ The canonical encrypted payload should not include:
 
 - `deleted_at`
   because deletion is represented by sync metadata `o=del`
+- `vector_clock`
+  because vector-clock state is carried in cleartext `vc` tags
 - `title`
   because title should be derived locally from markdown
 - `type`

@@ -78,8 +78,8 @@ This draft does not define one universal current-state ordering scheme in relay-
 
 Profiles in this range may determine supersedence and conflict using:
 
-- encrypted payload data such as vector clocks
-- or profile-defined relay-visible metadata that duplicates enough causal state for relay-side retention and bootstrap
+- relay-visible metadata that duplicates enough causal state for relay-side retention and bootstrap
+- and any additional profile-defined decrypted state needed by clients during local apply
 
 The Nostr `created_at` field remains the event timestamp, but profiles are free to define richer local-first ordering or conflict metadata inside encrypted payloads.
 

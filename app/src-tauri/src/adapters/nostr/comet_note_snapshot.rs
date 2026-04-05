@@ -27,6 +27,7 @@ pub struct NoteSnapshotAttachment {
 pub struct NoteSnapshotPayload {
     pub version: u32,
     pub device_id: String,
+    #[serde(skip, default)]
     pub vector_clock: VectorClock,
     pub markdown: String,
     pub note_created_at: i64,
@@ -121,8 +122,7 @@ impl NoteSnapshotPayload {
         Ok(Self {
             version: self.version,
             device_id: self.device_id.clone(),
-            vector_clock: canonicalize_vector_clock(&self.vector_clock)
-                .map_err(AppError::custom)?,
+            vector_clock: canonicalize_vector_clock(&self.vector_clock).unwrap_or_default(),
             markdown: self.markdown.clone(),
             note_created_at: self.note_created_at,
             edited_at: self.edited_at,
@@ -357,15 +357,8 @@ pub fn parse_note_snapshot_event(
         ));
     }
 
-    let payload = payload.expect("payload presence validated above");
-    let visible_vector_clock = parse_visible_vector_clock_tags(event)?;
-    let payload_vector_clock =
-        canonicalize_vector_clock(&payload.vector_clock).map_err(AppError::custom)?;
-    if visible_vector_clock != payload_vector_clock {
-        return Err(AppError::custom(
-            "Visible snapshot vector clock does not match encrypted payload vector clock",
-        ));
-    }
+    let mut payload = payload.expect("payload presence validated above");
+    payload.vector_clock = parse_visible_vector_clock_tags(event)?;
     if operation == "put" && payload.deleted_at.is_some() {
         return Err(AppError::custom(
             "Put note snapshot payloads must not include deleted_at",
@@ -465,7 +458,7 @@ mod tests {
 
         assert_eq!(
             json,
-            "{\"version\":1,\"device_id\":\"DEVICE-A\",\"vector_clock\":{\"DEVICE-A\":2},\"markdown\":\"# Title\\n\\nBody\",\"note_created_at\":100,\"edited_at\":200,\"tags\":[\"roadmap\",\"work/project-alpha\"],\"attachments\":[{\"plaintext_hash\":\"a\",\"ciphertext_hash\":\"cipher-a\",\"key\":\"key-a\"},{\"plaintext_hash\":\"b\",\"ciphertext_hash\":\"cipher-b\",\"key\":\"key-b\"}]}"
+            "{\"version\":1,\"device_id\":\"DEVICE-A\",\"markdown\":\"# Title\\n\\nBody\",\"note_created_at\":100,\"edited_at\":200,\"tags\":[\"roadmap\",\"work/project-alpha\"],\"attachments\":[{\"plaintext_hash\":\"a\",\"ciphertext_hash\":\"cipher-a\",\"key\":\"key-a\"},{\"plaintext_hash\":\"b\",\"ciphertext_hash\":\"cipher-b\",\"key\":\"key-b\"}]}"
         );
     }
 
@@ -486,7 +479,9 @@ mod tests {
         let encrypted = encrypt_note_snapshot_payload(&keys, &payload).unwrap();
         let decrypted = decrypt_note_snapshot_payload(&keys, &encrypted).unwrap();
 
-        assert_eq!(decrypted, payload.canonicalized().unwrap());
+        let mut expected = payload.canonicalized().unwrap();
+        expected.vector_clock.clear();
+        assert_eq!(decrypted, expected);
     }
 
     #[test]
@@ -551,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_rejects_visible_vector_clock_mismatch() {
+    fn parse_uses_visible_vector_clock_as_source_of_truth() {
         let keys = Keys::generate();
         let payload = sample_payload();
         let meta = NoteSnapshotEventMeta {
@@ -575,9 +570,10 @@ mod tests {
             .sign_with_keys(&keys)
             .unwrap();
 
-        let error = parse_note_snapshot_event(&keys, &tampered).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("Visible snapshot vector clock does not match"));
+        let parsed = parse_note_snapshot_event(&keys, &tampered).unwrap();
+        assert_eq!(
+            parsed.payload.unwrap().vector_clock,
+            BTreeMap::from([("DEVICE-A".to_string(), 999)])
+        );
     }
 }
