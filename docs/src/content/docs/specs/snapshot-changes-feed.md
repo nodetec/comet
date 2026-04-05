@@ -141,6 +141,8 @@ Recommended rules:
 
 - `mode` is required
 - `kinds` is required
+- `authors` is required
+- `authors` must contain exactly one author pubkey
 - each requested kind must be inside the reserved sync range
 - clients should use metadata filters such as `#d`, `#o`, and `#c` only with causal snapshot sync kinds
 
@@ -170,6 +172,7 @@ For bootstrap:
 
 - `since` and `until_seq` are not required
 - `mode` should be `"bootstrap"`
+- `authors` must contain exactly one author pubkey
 - relays should interpret the filter as a retained-current-snapshot query at one stable snapshot
 
 ## Bootstrap Semantics
@@ -191,6 +194,7 @@ Important semantics:
 - events accepted after `snapshot_seq` are outside the bootstrap snapshot
 - because this sync family exposes relay-visible causal metadata, a relay should use that metadata to determine nondominated current snapshots
 - retained dominated history is not part of bootstrap output by default
+- bootstrap `SNAPSHOT` events should be emitted in deterministic order, using ascending `created_at` and then ascending event id as the recommended tie-breaker
 - the client decrypts the returned snapshots, hydrates profile state, and compares vector clocks locally before applying
 
 Bootstrap does not attempt full-history reconciliation.
