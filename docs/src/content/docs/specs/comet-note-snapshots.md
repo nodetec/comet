@@ -29,7 +29,7 @@ This draft also defines Comet as a local-first note system:
 - the canonical local object is the note record
 - sync transmits encrypted full-note snapshots
 - vector clocks determine whether snapshots are newer, older, or concurrent
-- the same vector clock is duplicated into relay-visible metadata so relays can retain and bootstrap current snapshots more intelligently
+- relay-visible `vc` tags carry the wire vector-clock state so relays can retain and bootstrap current snapshots more intelligently
 - bounded recent history is a product feature, not the permanent sync substrate
 - retained local snapshots now back an explicit local note-history feature
 
@@ -339,7 +339,7 @@ That means:
 - the relay stores and replays encrypted note snapshots
 - the relay does not need to decrypt payloads
 - the relay may compare cleartext `vc` tags to determine nondominated current snapshots
-- the client still verifies the encrypted payload vector clock after decryption and remains the final authority for local materialization
+- the client remains the final authority for local materialization after decrypting the profile payload and applying the relay-visible `vc` clock
 
 This keeps the relay blind to note content while still allowing better retention and bootstrap decisions.
 
