@@ -139,7 +139,7 @@ export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
         conditions.push(inArray(syncSnapshots.dTag, documentFilter));
       }
 
-      const rows = await db
+      const query = db
         .select({
           authorPubkey: syncSnapshots.authorPubkey,
           dTag: syncSnapshots.dTag,
@@ -159,8 +159,12 @@ export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
           eq(syncSnapshots.eventId, syncPayloads.eventId),
         )
         .where(and(...conditions))
-        .orderBy(asc(syncPayloads.createdAt))
-        .limit(filter.limit !== undefined ? Math.max(0, filter.limit) : 10_000);
+        .orderBy(asc(syncPayloads.createdAt));
+
+      const rows =
+        filter.limit !== undefined
+          ? await query.limit(Math.max(0, filter.limit))
+          : await query;
 
       const rowsByDocument = new Map<string, typeof rows>();
       for (const row of rows) {
