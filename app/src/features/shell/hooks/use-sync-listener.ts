@@ -73,6 +73,9 @@ export function useSyncListener(deps: SyncListenerDeps) {
         void queryClient.invalidateQueries({
           queryKey: ["note-conflict", noteId],
         });
+        void queryClient.invalidateQueries({
+          queryKey: ["note-history", noteId],
+        });
       }
 
       const { draftNoteId: currentDraftId, selectedNoteId: currentSelectedId } =

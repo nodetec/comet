@@ -24,6 +24,7 @@ fn clear_local_sync_state(conn: &Connection) -> Result<(), AppError> {
          DELETE FROM blob_uploads;
          DELETE FROM pending_blob_uploads;
          DELETE FROM pending_deletions;
+         DELETE FROM note_snapshot_history;
          DELETE FROM sync_snapshots;
          DELETE FROM sync_relay_state;
          DELETE FROM sync_relays;

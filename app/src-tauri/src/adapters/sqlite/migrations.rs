@@ -221,5 +221,25 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_note_conflicts_note_id
                ON note_conflicts(note_id, modified_at DESC);",
         ),
+        M::up(
+            "CREATE TABLE note_snapshot_history (
+               sync_event_id TEXT PRIMARY KEY,
+               note_id TEXT NOT NULL,
+               op TEXT NOT NULL CHECK (op IN ('put', 'del')),
+               device_id TEXT NOT NULL,
+               vector_clock TEXT NOT NULL DEFAULT '{}',
+               title TEXT,
+               markdown TEXT,
+               modified_at INTEGER NOT NULL,
+               edited_at INTEGER,
+               deleted_at INTEGER,
+               archived_at INTEGER,
+               pinned_at INTEGER,
+               readonly INTEGER NOT NULL DEFAULT 0 CHECK (readonly IN (0, 1)),
+               created_at INTEGER NOT NULL
+             );
+             CREATE INDEX idx_note_snapshot_history_note_id
+               ON note_snapshot_history(note_id, modified_at DESC, sync_event_id ASC);",
+        ),
     ])
 }

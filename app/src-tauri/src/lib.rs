@@ -163,6 +163,7 @@ pub fn run() {
             commands::notes::query_notes,
             commands::notes::contextual_tags,
             commands::notes::load_note,
+            commands::notes::get_note_history,
             commands::notes::get_note_conflict,
             commands::notes::resolve_note_conflict,
             commands::notes::create_note,

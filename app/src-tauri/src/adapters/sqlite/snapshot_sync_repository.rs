@@ -1,6 +1,9 @@
 use crate::domain::common::time::now_millis;
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
+use std::collections::HashSet;
+
+const LOCAL_RECENT_SNAPSHOT_WINDOW: usize = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncRelayState {
@@ -30,6 +33,24 @@ pub struct LocalSyncSnapshot {
     pub payload_retained: bool,
     pub relay_url: Option<String>,
     pub stored_seq: Option<i64>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalNoteSnapshotHistoryEntry {
+    pub sync_event_id: String,
+    pub note_id: String,
+    pub op: String,
+    pub device_id: String,
+    pub vector_clock: String,
+    pub title: Option<String>,
+    pub markdown: Option<String>,
+    pub modified_at: i64,
+    pub edited_at: Option<i64>,
+    pub deleted_at: Option<i64>,
+    pub archived_at: Option<i64>,
+    pub pinned_at: Option<i64>,
+    pub readonly: bool,
     pub created_at: i64,
 }
 
@@ -133,7 +154,149 @@ pub fn upsert_sync_snapshot(
             snapshot.created_at
         ],
     )?;
+    prune_sync_snapshots_for_document(
+        conn,
+        &snapshot.author_pubkey,
+        &snapshot.d_tag,
+        LOCAL_RECENT_SNAPSHOT_WINDOW,
+    )?;
     Ok(())
+}
+
+pub fn upsert_note_snapshot_history(
+    conn: &Connection,
+    snapshot: &LocalNoteSnapshotHistoryEntry,
+) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT INTO note_snapshot_history
+           (sync_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+         ON CONFLICT(sync_event_id) DO UPDATE SET
+           note_id = excluded.note_id,
+           op = excluded.op,
+           device_id = excluded.device_id,
+           vector_clock = excluded.vector_clock,
+           title = excluded.title,
+           markdown = excluded.markdown,
+           modified_at = excluded.modified_at,
+           edited_at = excluded.edited_at,
+           deleted_at = excluded.deleted_at,
+           archived_at = excluded.archived_at,
+           pinned_at = excluded.pinned_at,
+           readonly = excluded.readonly,
+           created_at = excluded.created_at",
+        params![
+            snapshot.sync_event_id,
+            snapshot.note_id,
+            snapshot.op,
+            snapshot.device_id,
+            snapshot.vector_clock,
+            snapshot.title,
+            snapshot.markdown,
+            snapshot.modified_at,
+            snapshot.edited_at,
+            snapshot.deleted_at,
+            snapshot.archived_at,
+            snapshot.pinned_at,
+            i32::from(snapshot.readonly),
+            snapshot.created_at
+        ],
+    )?;
+    Ok(())
+}
+
+fn protected_snapshot_ids_for_document(
+    conn: &Connection,
+    d_tag: &str,
+) -> Result<HashSet<String>, AppError> {
+    let mut protected = HashSet::new();
+
+    let note_sync_event_id = conn
+        .query_row(
+            "SELECT sync_event_id FROM notes WHERE id = ?1",
+            params![d_tag],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten();
+    if let Some(snapshot_id) = note_sync_event_id.filter(|value| !value.trim().is_empty()) {
+        protected.insert(snapshot_id);
+    }
+
+    let tombstone_sync_event_id = conn
+        .query_row(
+            "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
+            params![d_tag],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten();
+    if let Some(snapshot_id) = tombstone_sync_event_id.filter(|value| !value.trim().is_empty()) {
+        protected.insert(snapshot_id);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT sync_event_id
+         FROM note_conflicts
+         WHERE note_id = ?1",
+    )?;
+    let rows = stmt.query_map(params![d_tag], |row| row.get::<_, String>(0))?;
+    for row in rows {
+        let snapshot_id = row?;
+        if !snapshot_id.trim().is_empty() {
+            protected.insert(snapshot_id);
+        }
+    }
+
+    Ok(protected)
+}
+
+fn prune_sync_snapshots_for_document(
+    conn: &Connection,
+    author_pubkey: &str,
+    d_tag: &str,
+    recent_window: usize,
+) -> Result<usize, AppError> {
+    let protected_ids = protected_snapshot_ids_for_document(conn, d_tag)?;
+    let mut stmt = conn.prepare(
+        "SELECT snapshot_id
+         FROM sync_snapshots
+         WHERE author_pubkey = ?1 AND d_tag = ?2
+         ORDER BY created_at DESC, mtime DESC, snapshot_id DESC",
+    )?;
+    let rows = stmt.query_map(params![author_pubkey, d_tag], |row| row.get::<_, String>(0))?;
+
+    let mut keep_ids = protected_ids;
+    let mut kept_recent = 0usize;
+    let mut delete_ids = Vec::new();
+
+    for row in rows {
+        let snapshot_id = row?;
+        if keep_ids.contains(&snapshot_id) {
+            continue;
+        }
+        if kept_recent < recent_window {
+            keep_ids.insert(snapshot_id);
+            kept_recent += 1;
+        } else {
+            delete_ids.push(snapshot_id);
+        }
+    }
+
+    for snapshot_id in &delete_ids {
+        conn.execute(
+            "DELETE FROM sync_snapshots
+             WHERE author_pubkey = ?1 AND d_tag = ?2 AND snapshot_id = ?3",
+            params![author_pubkey, d_tag, snapshot_id],
+        )?;
+        conn.execute(
+            "DELETE FROM note_snapshot_history
+             WHERE sync_event_id = ?1",
+            params![snapshot_id],
+        )?;
+    }
+
+    Ok(delete_ids.len())
 }
 
 #[cfg(test)]
@@ -171,5 +334,227 @@ mod tests {
         assert_eq!(state.snapshot_seq, Some(12));
         assert_eq!(state.last_synced_at, Some(15));
         assert_eq!(state.min_payload_mtime, Some(1_700_000_000_000));
+    }
+
+    #[test]
+    fn prunes_old_unprotected_snapshots_per_document() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id)
+             VALUES ('note-1', 'Title', '# Title', 1, 1, 1, 'snapshot-current')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflicts (sync_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES ('snapshot-conflict', 'note-1', 'put', 'DEVICE-A', '{}', 'Conflict', '# Conflict', 20, 20, NULL, NULL, NULL, 0, 20)",
+            [],
+        )
+        .unwrap();
+
+        for index in 0..15 {
+            upsert_sync_snapshot(
+                &conn,
+                &LocalSyncSnapshot {
+                    author_pubkey: "author-1".to_string(),
+                    d_tag: "note-1".to_string(),
+                    snapshot_id: format!("snapshot-{index:02}"),
+                    op: "put".to_string(),
+                    mtime: index as i64,
+                    entity_type: Some("note".to_string()),
+                    event_id: Some(format!("snapshot-{index:02}")),
+                    payload_retained: true,
+                    relay_url: None,
+                    stored_seq: None,
+                    created_at: index as i64,
+                },
+            )
+            .unwrap();
+        }
+
+        upsert_sync_snapshot(
+            &conn,
+            &LocalSyncSnapshot {
+                author_pubkey: "author-1".to_string(),
+                d_tag: "note-1".to_string(),
+                snapshot_id: "snapshot-current".to_string(),
+                op: "put".to_string(),
+                mtime: 100,
+                entity_type: Some("note".to_string()),
+                event_id: Some("snapshot-current".to_string()),
+                payload_retained: true,
+                relay_url: None,
+                stored_seq: None,
+                created_at: 100,
+            },
+        )
+        .unwrap();
+        upsert_sync_snapshot(
+            &conn,
+            &LocalSyncSnapshot {
+                author_pubkey: "author-1".to_string(),
+                d_tag: "note-1".to_string(),
+                snapshot_id: "snapshot-conflict".to_string(),
+                op: "put".to_string(),
+                mtime: 101,
+                entity_type: Some("note".to_string()),
+                event_id: Some("snapshot-conflict".to_string()),
+                payload_retained: true,
+                relay_url: None,
+                stored_seq: None,
+                created_at: 101,
+            },
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE author_pubkey = 'author-1' AND d_tag = 'note-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 12);
+
+        let has_current: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE snapshot_id = 'snapshot-current'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let has_conflict: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE snapshot_id = 'snapshot-conflict'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let pruned_oldest: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE snapshot_id = 'snapshot-00'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(has_current, 1);
+        assert_eq!(has_conflict, 1);
+        assert_eq!(pruned_oldest, 0);
+    }
+
+    #[test]
+    fn prunes_history_rows_with_old_unprotected_snapshots() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, sync_event_id)
+             VALUES ('note-1', 'Title', '# Title', 1, 1, 1, 'snapshot-current')",
+            [],
+        )
+        .unwrap();
+
+        for index in 0..12 {
+            let snapshot_id = format!("snapshot-{index:02}");
+            upsert_sync_snapshot(
+                &conn,
+                &LocalSyncSnapshot {
+                    author_pubkey: "author-1".to_string(),
+                    d_tag: "note-1".to_string(),
+                    snapshot_id: snapshot_id.clone(),
+                    op: "put".to_string(),
+                    mtime: index as i64,
+                    entity_type: Some("note".to_string()),
+                    event_id: Some(snapshot_id.clone()),
+                    payload_retained: true,
+                    relay_url: None,
+                    stored_seq: None,
+                    created_at: index as i64,
+                },
+            )
+            .unwrap();
+            upsert_note_snapshot_history(
+                &conn,
+                &LocalNoteSnapshotHistoryEntry {
+                    sync_event_id: snapshot_id.clone(),
+                    note_id: "note-1".to_string(),
+                    op: "put".to_string(),
+                    device_id: "DEVICE-A".to_string(),
+                    vector_clock: "{}".to_string(),
+                    title: Some(format!("Title {index}")),
+                    markdown: Some(format!("# Title {index}")),
+                    modified_at: index as i64,
+                    edited_at: Some(index as i64),
+                    deleted_at: None,
+                    archived_at: None,
+                    pinned_at: None,
+                    readonly: false,
+                    created_at: index as i64,
+                },
+            )
+            .unwrap();
+        }
+
+        upsert_sync_snapshot(
+            &conn,
+            &LocalSyncSnapshot {
+                author_pubkey: "author-1".to_string(),
+                d_tag: "note-1".to_string(),
+                snapshot_id: "snapshot-current".to_string(),
+                op: "put".to_string(),
+                mtime: 100,
+                entity_type: Some("note".to_string()),
+                event_id: Some("snapshot-current".to_string()),
+                payload_retained: true,
+                relay_url: None,
+                stored_seq: None,
+                created_at: 100,
+            },
+        )
+        .unwrap();
+        upsert_note_snapshot_history(
+            &conn,
+            &LocalNoteSnapshotHistoryEntry {
+                sync_event_id: "snapshot-current".to_string(),
+                note_id: "note-1".to_string(),
+                op: "put".to_string(),
+                device_id: "DEVICE-A".to_string(),
+                vector_clock: "{}".to_string(),
+                title: Some("Current".to_string()),
+                markdown: Some("# Current".to_string()),
+                modified_at: 100,
+                edited_at: Some(100),
+                deleted_at: None,
+                archived_at: None,
+                pinned_at: None,
+                readonly: false,
+                created_at: 100,
+            },
+        )
+        .unwrap();
+
+        let history_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM note_snapshot_history", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(history_count, 11);
+
+        let oldest_history_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE sync_event_id = 'snapshot-00'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(oldest_history_exists, 0);
+
+        let current_history_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE sync_event_id = 'snapshot-current'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(current_history_exists, 1);
     }
 }

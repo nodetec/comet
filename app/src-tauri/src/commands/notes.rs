@@ -8,6 +8,7 @@ use crate::domain::sync::model::SyncCommand;
 use crate::error::AppError;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
 use rusqlite::{params, OptionalExtension};
+use std::collections::HashSet;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,72 @@ pub fn load_note(app: AppHandle, note_id: String) -> Result<LoadedNote, AppError
     let repo = SqliteNoteRepository::new(&conn);
     let record = NoteService::load_note(&repo, &note_id)?;
     record_to_loaded_note(record, &repo)
+}
+
+#[tauri::command]
+pub fn get_note_history(app: AppHandle, note_id: String) -> Result<NoteHistoryInfo, AppError> {
+    let conn = database_connection(&app)?;
+    let current_note_snapshot_id = conn
+        .query_row(
+            "SELECT sync_event_id FROM notes WHERE id = ?1",
+            params![&note_id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten();
+    let current_tombstone_snapshot_id = conn
+        .query_row(
+            "SELECT sync_event_id FROM note_tombstones WHERE id = ?1",
+            params![&note_id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten();
+    let current_snapshot_id = current_note_snapshot_id.or(current_tombstone_snapshot_id);
+
+    let mut conflict_ids = HashSet::new();
+    let mut conflict_stmt = conn.prepare(
+        "SELECT sync_event_id
+         FROM note_conflicts
+         WHERE note_id = ?1",
+    )?;
+    let conflict_rows =
+        conflict_stmt.query_map(params![&note_id], |row| row.get::<_, String>(0))?;
+    for row in conflict_rows {
+        conflict_ids.insert(row?);
+    }
+
+    let mut snapshots = Vec::new();
+    let mut stmt = conn.prepare(
+        "SELECT sync_event_id, op, modified_at, deleted_at, title, markdown
+         FROM note_snapshot_history
+         WHERE note_id = ?1
+         ORDER BY modified_at DESC, sync_event_id ASC",
+    )?;
+    let rows = stmt.query_map(params![&note_id], |row| {
+        let markdown: Option<String> = row.get(5)?;
+        let snapshot_id: String = row.get(0)?;
+        Ok(NoteHistorySnapshot {
+            is_current: current_snapshot_id.as_ref() == Some(&snapshot_id),
+            is_conflict: conflict_ids.contains(&snapshot_id),
+            snapshot_id,
+            op: row.get(1)?,
+            mtime: row.get(2)?,
+            deleted_at: row.get(3)?,
+            title: row.get(4)?,
+            preview: markdown.as_ref().map(|value| preview_from_markdown(value)),
+            markdown,
+        })
+    })?;
+    for row in rows {
+        snapshots.push(row?);
+    }
+
+    Ok(NoteHistoryInfo {
+        note_id,
+        snapshot_count: snapshots.len(),
+        snapshots,
+    })
 }
 
 #[tauri::command]

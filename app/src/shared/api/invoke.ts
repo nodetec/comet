@@ -11,6 +11,7 @@ import {
   type DeleteTagInput,
   type ExportNotesInput,
   type NoteConflictInfo,
+  type NoteHistoryInfo,
   type LoadedNote,
   type NotePagePayload,
   type NoteQueryInput,
@@ -85,6 +86,10 @@ export async function loadNote(noteId: string) {
 
 export async function getNoteConflict(noteId: string) {
   return invoke<NoteConflictInfo | null>("get_note_conflict", { noteId });
+}
+
+export async function getNoteHistory(noteId: string) {
+  return invoke<NoteHistoryInfo>("get_note_history", { noteId });
 }
 
 export async function createNote(input: { tags: string[]; markdown?: string }) {

@@ -65,6 +65,11 @@ export function useShellController() {
   >(null);
   const [isResolveConflictPending, setIsResolveConflictPending] =
     useState(false);
+  const [noteHistoryDialogOpen, setNoteHistoryDialogOpen] = useState(false);
+  const [selectedHistorySnapshotId, setSelectedHistorySnapshotId] = useState<
+    string | null
+  >(null);
+  const [isRestoreHistoryPending, setIsRestoreHistoryPending] = useState(false);
   const [isTagMutationPending, setIsTagMutationPending] = useState(false);
 
   const publish = usePublishState();
@@ -133,6 +138,7 @@ export function useShellController() {
     notesQuery,
     noteQuery,
     noteConflictQuery,
+    noteHistoryQuery,
     currentNotes,
     availableTagPaths,
     availableTagTree,
@@ -250,6 +256,7 @@ export function useShellController() {
   const currentNoteConflict = selectedNoteId
     ? noteConflictQuery.data
     : undefined;
+  const currentNoteHistory = selectedNoteId ? noteHistoryQuery.data : undefined;
   const isCurrentNoteConflicted = (currentNoteConflict?.snapshotCount ?? 0) > 1;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
@@ -350,6 +357,45 @@ export function useShellController() {
     currentNoteConflict,
     isCurrentNoteConflicted,
     selectedConflictSnapshotId,
+  ]);
+
+  useEffect(() => {
+    if (!noteHistoryDialogOpen) {
+      setSelectedHistorySnapshotId(null);
+      return;
+    }
+
+    if (!currentNoteId) {
+      setNoteHistoryDialogOpen(false);
+      setSelectedHistorySnapshotId(null);
+      return;
+    }
+
+    if (!currentNoteHistory || currentNoteHistory.snapshotCount === 0) {
+      setSelectedHistorySnapshotId(null);
+      return;
+    }
+
+    if (
+      selectedHistorySnapshotId &&
+      currentNoteHistory.snapshots.some(
+        (snapshot) => snapshot.snapshotId === selectedHistorySnapshotId,
+      )
+    ) {
+      return;
+    }
+
+    setSelectedHistorySnapshotId(
+      currentNoteHistory.snapshots.find((snapshot) => snapshot.isCurrent)
+        ?.snapshotId ??
+        currentNoteHistory.snapshots[0]?.snapshotId ??
+        null,
+    );
+  }, [
+    currentNoteHistory,
+    currentNoteId,
+    noteHistoryDialogOpen,
+    selectedHistorySnapshotId,
   ]);
 
   useEffect(() => {
@@ -1046,6 +1092,66 @@ export function useShellController() {
     handleSetNotePinned,
     handleSetNoteReadonly,
     handleSelectTagPath,
+    handleOpenNoteHistory() {
+      if (!currentNoteId) {
+        return;
+      }
+      setNoteHistoryDialogOpen(true);
+    },
+    handleSelectNoteHistorySnapshot(snapshotId: string) {
+      setSelectedHistorySnapshotId(snapshotId);
+    },
+    async handleRestoreSelectedNoteHistorySnapshot() {
+      if (!currentNoteId || !currentNoteHistory || !selectedHistorySnapshotId) {
+        return;
+      }
+
+      if (isCurrentNoteConflicted) {
+        toast.error(
+          "Resolve the current note conflict before restoring history.",
+          {
+            id: "restore-history-conflict-error",
+          },
+        );
+        return;
+      }
+
+      const snapshot = currentNoteHistory.snapshots.find(
+        (entry) => entry.snapshotId === selectedHistorySnapshotId,
+      );
+      if (!snapshot || snapshot.op === "del" || !snapshot.markdown) {
+        return;
+      }
+
+      setIsRestoreHistoryPending(true);
+      try {
+        discardPendingSave();
+        await saveNoteMutation.mutateAsync({
+          id: currentNoteId,
+          markdown: snapshot.markdown,
+        });
+        setDraft(currentNoteId, snapshot.markdown);
+        setNoteHistoryDialogOpen(false);
+        toast.success("Snapshot restored.", {
+          id: "restore-history-success",
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["note", currentNoteId] }),
+          queryClient.invalidateQueries({
+            queryKey: ["note-history", currentNoteId],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["notes"] }),
+          queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
+        ]);
+      } catch (error) {
+        toastErrorHandler(
+          "Couldn't restore snapshot",
+          "restore-history-error",
+        )(error);
+      } finally {
+        setIsRestoreHistoryPending(false);
+      }
+    },
     async handleResolveCurrentNoteConflict(action: ResolveNoteConflictAction) {
       const resolvedNoteId =
         currentNote?.id ?? chooseConflictNoteId ?? selectedNoteId;
@@ -1196,6 +1302,9 @@ export function useShellController() {
         setChooseConflictNoteId(currentNote?.id ?? null);
         setChooseConflictDialogOpen(true);
       },
+      onOpenHistory() {
+        latestRef.current.handleOpenNoteHistory();
+      },
     }),
     [
       availableTagPaths,
@@ -1336,6 +1445,37 @@ export function useShellController() {
       isResolveConflictPending,
       setChooseConflictNoteId,
       setChooseConflictDialogOpen,
+    ],
+  );
+
+  const noteHistoryDialogProps = useMemo(
+    () => ({
+      noteId: currentNoteId,
+      open: noteHistoryDialogOpen,
+      pending: isRestoreHistoryPending,
+      selectedSnapshotId: selectedHistorySnapshotId,
+      snapshots: currentNoteHistory?.snapshots ?? [],
+      hasConflict: isCurrentNoteConflicted,
+      onOpenChange(open: boolean) {
+        setNoteHistoryDialogOpen(open);
+        if (!open) {
+          setSelectedHistorySnapshotId(null);
+        }
+      },
+      onRestore() {
+        void latestRef.current.handleRestoreSelectedNoteHistorySnapshot();
+      },
+      onSelectSnapshot(snapshotId: string) {
+        latestRef.current.handleSelectNoteHistorySnapshot(snapshotId);
+      },
+    }),
+    [
+      currentNoteHistory?.snapshots,
+      currentNoteId,
+      isCurrentNoteConflicted,
+      isRestoreHistoryPending,
+      noteHistoryDialogOpen,
+      selectedHistorySnapshotId,
     ],
   );
 
@@ -1498,6 +1638,7 @@ export function useShellController() {
     publishShortNoteDialogProps,
     deletePublishDialogProps,
     chooseConflictDialogProps,
+    noteHistoryDialogProps,
     notesPaneProps,
     sidebarPaneProps,
   };

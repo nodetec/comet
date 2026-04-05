@@ -57,6 +57,28 @@ pub struct NoteConflictInfo {
     pub snapshots: Vec<NoteConflictSnapshot>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteHistorySnapshot {
+    pub snapshot_id: String,
+    pub mtime: i64,
+    pub op: String,
+    pub deleted_at: Option<i64>,
+    pub title: Option<String>,
+    pub markdown: Option<String>,
+    pub preview: Option<String>,
+    pub is_current: bool,
+    pub is_conflict: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteHistoryInfo {
+    pub note_id: String,
+    pub snapshot_count: usize,
+    pub snapshots: Vec<NoteHistorySnapshot>,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResolveNoteConflictAction {

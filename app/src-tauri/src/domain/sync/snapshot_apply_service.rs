@@ -2,8 +2,10 @@ use crate::adapters::nostr::comet_note_snapshot::{
     parse_note_snapshot_event, payload_to_synced_note, payload_to_synced_tombstone,
 };
 use crate::adapters::sqlite::snapshot_sync_repository::{
-    get_sync_relay_state, upsert_sync_relay_state, upsert_sync_snapshot, LocalSyncSnapshot,
+    get_sync_relay_state, upsert_note_snapshot_history, upsert_sync_relay_state,
+    upsert_sync_snapshot, LocalNoteSnapshotHistoryEntry, LocalSyncSnapshot,
 };
+use crate::domain::common::text::title_from_markdown;
 use crate::domain::sync::model::SyncChangePayload;
 use crate::domain::sync::service::{upsert_from_sync, upsert_tombstone_from_sync};
 use crate::error::AppError;
@@ -36,6 +38,28 @@ pub fn apply_remote_snapshot_event(
             .ok_or_else(|| AppError::custom("Delete note snapshot event is missing payload"))?;
         let tombstone = payload_to_synced_tombstone(&parsed.document_id, payload)?;
 
+        upsert_note_snapshot_history(
+            conn,
+            &LocalNoteSnapshotHistoryEntry {
+                sync_event_id: event.id.to_hex(),
+                note_id: parsed.document_id.clone(),
+                op: parsed.operation.clone(),
+                device_id: tombstone.device_id.clone(),
+                vector_clock: crate::domain::sync::vector_clock::serialize_vector_clock(
+                    &tombstone.vector_clock,
+                )
+                .map_err(AppError::custom)?,
+                title: None,
+                markdown: None,
+                modified_at: snapshot_timestamp_ms,
+                edited_at: Some(tombstone.deleted_at),
+                deleted_at: Some(tombstone.deleted_at),
+                archived_at: None,
+                pinned_at: None,
+                readonly: false,
+                created_at: snapshot_timestamp_ms,
+            },
+        )?;
         upsert_sync_snapshot(
             conn,
             &LocalSyncSnapshot {
@@ -97,6 +121,28 @@ pub fn apply_remote_snapshot_event(
 
         let note = payload_to_synced_note(&parsed.document_id, snapshot_timestamp_ms, payload);
         let note_id = note.id.clone();
+        upsert_note_snapshot_history(
+            conn,
+            &LocalNoteSnapshotHistoryEntry {
+                sync_event_id: event.id.to_hex(),
+                note_id: note.id.clone(),
+                op: parsed.operation.clone(),
+                device_id: note.device_id.clone(),
+                vector_clock: crate::domain::sync::vector_clock::serialize_vector_clock(
+                    &note.vector_clock,
+                )
+                .map_err(AppError::custom)?,
+                title: Some(title_from_markdown(&note.markdown)),
+                markdown: Some(note.markdown.clone()),
+                modified_at: note.modified_at,
+                edited_at: Some(note.edited_at),
+                deleted_at: note.deleted_at,
+                archived_at: note.archived_at,
+                pinned_at: note.pinned_at,
+                readonly: note.readonly,
+                created_at: snapshot_timestamp_ms,
+            },
+        )?;
         let updated = upsert_from_sync(conn, &note, &event.id.to_hex())?;
 
         upsert_sync_snapshot(
@@ -477,6 +523,14 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        let stored_deleted_at: Option<i64> = conn
+            .query_row(
+                "SELECT deleted_at FROM note_snapshot_history WHERE sync_event_id = ?1",
+                params![event.id.to_hex()],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(stored_op, "del");
+        assert_eq!(stored_deleted_at, Some(300));
     }
 }

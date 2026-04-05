@@ -8,13 +8,7 @@ import {
   waitForMessage,
   type SnapshotRelayTestContext,
 } from "../helpers";
-import {
-  REV_A,
-  REV_B,
-  cleanupContexts,
-  snapshotEvent,
-  traceOptions,
-} from "./fixtures";
+import { cleanupContexts, snapshotEvent, traceOptions } from "./fixtures";
 
 const contexts: SnapshotRelayTestContext[] = [];
 
@@ -98,18 +92,24 @@ describe("relay integration > admin retention api", () => {
     contexts.push(ctx);
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "admin-apply"));
-    const parent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const head = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
+    const compactedSnapshot = snapshotEvent("snapshot-1", 1_700_000_000_000);
+    const retainedSnapshotA = snapshotEvent("snapshot-2", 1_700_000_000_100);
+    const retainedSnapshotB = snapshotEvent("snapshot-3", 1_700_000_000_200);
+    const retainedSnapshotC = snapshotEvent("snapshot-4", 1_700_000_000_300);
+    const retainedSnapshotD = snapshotEvent("snapshot-5", 1_700_000_000_400);
 
-    sendJson(ws, ["EVENT", parent], traceOptions(ctx, "admin-apply"));
-    expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
-    ).toEqual(["OK", parent.id, true, `stored: snapshot ${parent.id}`]);
-
-    sendJson(ws, ["EVENT", head], traceOptions(ctx, "admin-apply"));
-    expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
-    ).toEqual(["OK", head.id, true, `stored: snapshot ${head.id}`]);
+    for (const event of [
+      compactedSnapshot,
+      retainedSnapshotA,
+      retainedSnapshotB,
+      retainedSnapshotC,
+      retainedSnapshotD,
+    ]) {
+      sendJson(ws, ["EVENT", event], traceOptions(ctx, "admin-apply"));
+      expect(
+        await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
+      ).toEqual(["OK", event.id, true, `stored: snapshot ${event.id}`]);
+    }
 
     const update = await fetch(`${ctx.httpUrl}/admin/retention`, {
       method: "PATCH",
@@ -135,7 +135,7 @@ describe("relay integration > admin retention api", () => {
         "REQ",
         "retention-fetch",
         {
-          ids: [parent.id, head.id],
+          ids: [compactedSnapshot.id, retainedSnapshotD.id],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -145,13 +145,13 @@ describe("relay integration > admin retention api", () => {
 
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
-    ).toEqual(["EVENT", "retention-fetch", head]);
+    ).toEqual(["EVENT", "retention-fetch", retainedSnapshotD]);
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
     ).toEqual([
       "EVENT-STATUS",
       "retention-fetch",
-      { id: parent.id, status: "payload_compacted" },
+      { id: compactedSnapshot.id, status: "payload_compacted" },
     ]);
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),

@@ -28,6 +28,17 @@ This draft separates:
 
 Those are related, but they are not the same thing.
 
+## Current Comet Defaults
+
+Current implementation defaults:
+
+- local keeps current materialized note state
+- local keeps all unresolved conflict snapshots
+- local keeps the current tombstone for deleted notes
+- local keeps the last `10` additional dominated snapshots per note
+- relay keeps the most recent `4` retained snapshot payloads per document
+- relay keeps replay independently from retained snapshot payloads
+
 ## Goals
 
 - Support storage reduction without breaking sync correctness

@@ -2,9 +2,15 @@ use crate::adapters::nostr::comet_note_snapshot::{
     build_note_snapshot_event, NoteSnapshotAttachment, NoteSnapshotEventMeta, NoteSnapshotPayload,
     COMET_NOTE_COLLECTION,
 };
-use crate::adapters::sqlite::snapshot_sync_repository::{upsert_sync_snapshot, LocalSyncSnapshot};
+use crate::adapters::sqlite::snapshot_sync_repository::{
+    upsert_note_snapshot_history, upsert_sync_snapshot, LocalNoteSnapshotHistoryEntry,
+    LocalSyncSnapshot,
+};
 use crate::domain::blob::service::extract_attachment_hashes;
-use crate::domain::sync::vector_clock::{increment_vector_clock, parse_vector_clock, VectorClock};
+use crate::domain::common::text::title_from_markdown;
+use crate::domain::sync::vector_clock::{
+    increment_vector_clock, parse_vector_clock, serialize_vector_clock, VectorClock,
+};
 use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -16,6 +22,7 @@ pub struct PendingNoteSnapshot {
     pub mtime: i64,
     pub event: Event,
     pub op: String,
+    pub history: LocalNoteSnapshotHistoryEntry,
 }
 
 pub struct PendingDeletionSnapshot {
@@ -26,6 +33,7 @@ pub struct PendingDeletionSnapshot {
     pub event: Event,
     pub op: String,
     pub entity_type: String,
+    pub history: LocalNoteSnapshotHistoryEntry,
 }
 
 struct NoteSnapshotFields {
@@ -287,10 +295,27 @@ pub fn build_pending_note_snapshot(
     Ok(PendingNoteSnapshot {
         author_pubkey,
         document_coord,
-        event_id,
+        event_id: event_id.clone(),
         mtime: fields.modified_at,
         event,
         op: "put".to_string(),
+        history: LocalNoteSnapshotHistoryEntry {
+            sync_event_id: event_id.clone(),
+            note_id: note_id.to_string(),
+            op: "put".to_string(),
+            device_id: payload.device_id.clone(),
+            vector_clock: serialize_vector_clock(&payload.vector_clock)
+                .map_err(AppError::custom)?,
+            title: Some(title_from_markdown(&payload.markdown)),
+            markdown: Some(payload.markdown.clone()),
+            modified_at: fields.modified_at,
+            edited_at: Some(payload.edited_at),
+            deleted_at: payload.deleted_at,
+            archived_at: payload.archived_at,
+            pinned_at: payload.pinned_at,
+            readonly: payload.readonly,
+            created_at: fields.modified_at,
+        },
     })
 }
 
@@ -335,6 +360,7 @@ pub fn persist_local_note_snapshot(
     conn: &Connection,
     snapshot: &PendingNoteSnapshot,
 ) -> Result<(), AppError> {
+    upsert_note_snapshot_history(conn, &snapshot.history)?;
     upsert_sync_snapshot(
         conn,
         &LocalSyncSnapshot {
@@ -401,11 +427,28 @@ pub fn build_pending_note_deletion_snapshot(
     Ok(PendingDeletionSnapshot {
         author_pubkey,
         document_coord,
-        event_id,
+        event_id: event_id.clone(),
         mtime: now,
         event,
         op: "del".to_string(),
         entity_type: "note".to_string(),
+        history: LocalNoteSnapshotHistoryEntry {
+            sync_event_id: event_id.clone(),
+            note_id: note_id.to_string(),
+            op: "del".to_string(),
+            device_id: payload.device_id.clone(),
+            vector_clock: serialize_vector_clock(&payload.vector_clock)
+                .map_err(AppError::custom)?,
+            title: None,
+            markdown: None,
+            modified_at: now,
+            edited_at: Some(payload.edited_at),
+            deleted_at: payload.deleted_at,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            created_at: now,
+        },
     })
 }
 
@@ -413,6 +456,7 @@ pub fn persist_local_deletion_snapshot(
     conn: &Connection,
     snapshot: &PendingDeletionSnapshot,
 ) -> Result<(), AppError> {
+    upsert_note_snapshot_history(conn, &snapshot.history)?;
     upsert_sync_snapshot(
         conn,
         &LocalSyncSnapshot {
@@ -526,8 +570,16 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        let stored_markdown: Option<String> = conn
+            .query_row(
+                "SELECT markdown FROM note_snapshot_history WHERE sync_event_id = ?1",
+                params![snapshot.event_id],
+                |row| row.get(0),
+            )
+            .unwrap();
 
         assert_eq!(stored_snapshot_id, snapshot.event_id);
+        assert_eq!(stored_markdown.as_deref(), Some("# Title\n\n#alpha #beta"));
     }
 
     #[test]

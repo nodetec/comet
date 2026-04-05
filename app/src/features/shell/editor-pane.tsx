@@ -78,6 +78,7 @@ type EditorPaneProps = {
   onOpenPublishDialog(): void;
   onPublishShortNote(): void;
   onResolveConflict(): void;
+  onOpenHistory(): void;
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
   onLoadConflictHead(snapshotId: string, markdown: string | null): void;
@@ -99,6 +100,7 @@ type EditorMenuContext = {
   onOpenPublishDialog(): void;
   onSetPinned(pinned: boolean): void;
   onDuplicateNote(): void;
+  onOpenHistory(): void;
 };
 
 async function buildEditorMenu(
@@ -156,6 +158,11 @@ async function buildEditorMenu(
         id: "editor-menu-duplicate",
         text: "Duplicate",
         action: ctx.onDuplicateNote,
+      },
+      {
+        id: "editor-menu-history",
+        text: "View History",
+        action: ctx.onOpenHistory,
       },
       ...publishItems,
     ],
@@ -446,6 +453,7 @@ export function EditorPane({
   onOpenPublishDialog,
   onPublishShortNote,
   onResolveConflict,
+  onOpenHistory,
   onSetPinned,
   onSetReadonly,
   onLoadConflictHead,
@@ -593,6 +601,7 @@ export function EditorPane({
         onOpenPublishDialog,
         onSetPinned,
         onDuplicateNote,
+        onOpenHistory,
       });
     },
     [
@@ -605,6 +614,7 @@ export function EditorPane({
       onPublishShortNote,
       onSetPinned,
       onSetReadonly,
+      onOpenHistory,
       pinnedAt,
       publishedAt,
       hasConflict,

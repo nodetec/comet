@@ -18,6 +18,7 @@ import { AccountSwitcherDialog } from "@/features/settings/account-switcher-dial
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
 import { EditorPane } from "@/features/shell/editor-pane";
+import { NoteHistoryDialog } from "@/features/shell/note-history-dialog";
 import { NotesPane } from "@/features/notes/ui/notes-pane";
 import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
@@ -62,6 +63,7 @@ function App() {
     chooseConflictDialogProps,
     deletePublishDialogProps,
     editorPaneProps,
+    noteHistoryDialogProps,
     notesPaneProps,
     publishDialogProps,
     publishShortNoteDialogProps,
@@ -256,6 +258,7 @@ function App() {
       </div>
       <PublishDialog {...publishDialogProps} />
       <PublishShortNoteDialog {...publishShortNoteDialogProps} />
+      <NoteHistoryDialog {...noteHistoryDialogProps} />
       <DialogRoot
         open={chooseConflictDialogProps.open}
         onOpenChange={chooseConflictDialogProps.onOpenChange}

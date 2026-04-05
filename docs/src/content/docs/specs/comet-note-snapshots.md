@@ -281,6 +281,14 @@ The intended retention direction is:
 - keep all unresolved concurrent snapshots until resolved
 - allow older dominated snapshots to be dropped locally and on relays
 
+Current Comet defaults:
+
+- local keeps current materialized state
+- local keeps all unresolved conflict snapshots
+- local keeps the current tombstone for deleted notes
+- local keeps the last `10` additional dominated snapshots per note
+- relay keeps a small retained payload window per document, currently `4` snapshots
+
 This gives Comet:
 
 - explicit conflict handling
@@ -315,13 +323,10 @@ The intended direction is:
 
 - Which encryption construction should `kind:42061` use for its payload?
 - Should `vector_clock` remain fully encrypted, or should a future profile expose a relay-visible summary?
-- How many recent dominated snapshots should Comet retain locally by default?
 
 ## Future Work
 
 - Implement vector-clock note sync locally
-- Define bounded local history policy
-- Define any relay-side retention defaults for dominated snapshots
 - Define any additional Comet sync kinds if notebooks or files need distinct profiles
 
 ## Implementation Assumption

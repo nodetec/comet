@@ -5,6 +5,7 @@ import {
   getBootstrap,
   getContextualTags,
   getNoteConflict,
+  getNoteHistory,
   getTodoCount,
   loadNote,
   NOTE_PAGE_SIZE,
@@ -160,6 +161,12 @@ export function useNoteQueries(params: NoteQueryParams) {
     queryKey: ["note-conflict", selectedNoteId],
   });
 
+  const noteHistoryQuery = useQuery({
+    enabled: Boolean(selectedNoteId),
+    queryFn: () => getNoteHistory(selectedNoteId!),
+    queryKey: ["note-history", selectedNoteId],
+  });
+
   return {
     bootstrapQuery,
     todoCountQuery,
@@ -173,5 +180,6 @@ export function useNoteQueries(params: NoteQueryParams) {
     activeNpub,
     initialSelectedNoteId,
     noteConflictQuery,
+    noteHistoryQuery,
   };
 }

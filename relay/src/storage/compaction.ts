@@ -3,6 +3,8 @@ import { and, desc, eq, inArray, lt, min } from "drizzle-orm";
 import type { SnapshotRelayDb } from "../db";
 import { syncPayloads, syncSnapshots } from "./schema";
 
+const RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT = 4;
+
 export type CompactionStore = {
   compactPayloadsBefore: (mtime: number) => Promise<number>;
   minPayloadMtime: () => Promise<number | null>;
@@ -48,19 +50,20 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
           desc(syncSnapshots.snapshotId),
         );
 
-      const latestRetainedKeys = new Set<string>();
-      const seenDocuments = new Set<string>();
+      const retainedKeys = new Set<string>();
+      const retainedCounts = new Map<string, number>();
       for (const row of latestRetainedRows) {
         const documentKey = `${row.authorPubkey}:${row.dTag}`;
-        if (!seenDocuments.has(documentKey)) {
-          seenDocuments.add(documentKey);
-          latestRetainedKeys.add(`${documentKey}:${row.snapshotId}`);
+        const retainedCount = retainedCounts.get(documentKey) ?? 0;
+        if (retainedCount < RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT) {
+          retainedCounts.set(documentKey, retainedCount + 1);
+          retainedKeys.add(`${documentKey}:${row.snapshotId}`);
         }
       }
 
       const candidates = rows.filter(
         (row) =>
-          !latestRetainedKeys.has(
+          !retainedKeys.has(
             `${row.authorPubkey}:${row.dTag}:${row.snapshotId}`,
           ),
       );

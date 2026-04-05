@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { count } from "drizzle-orm";
 
-import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import { createSnapshotRelayDb } from "../../src/db";
 import { relayEvents } from "../../src/storage/schema";
+import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
   sendJson,
@@ -13,9 +13,6 @@ import {
   type SnapshotRelayTestContext,
 } from "../helpers";
 import {
-  REV_A,
-  REV_B,
-  REV_C,
   cleanupContexts,
   deletionSnapshotEvent,
   genericEvent,
@@ -36,15 +33,24 @@ describe("relay integration > retention", () => {
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const compactedEvent = snapshotEvent("snapshot-1", 1_700_000_000_000);
+    const retainedEventA = snapshotEvent("snapshot-2", 1_750_000_000_000);
+    const retainedEventB = snapshotEvent("snapshot-3", 1_800_000_000_000);
+    const retainedEventC = snapshotEvent("snapshot-4", 1_850_000_000_000);
+    const retainedEventD = snapshotEvent("snapshot-5", 1_900_000_000_000);
 
-    sendJson(ws, ["EVENT", oldEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", newEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
+    for (const event of [
+      compactedEvent,
+      retainedEventA,
+      retainedEventB,
+      retainedEventC,
+      retainedEventD,
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
 
-    expect(await ctx.compactPayloadsBefore(1_750_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
 
     const response = await fetch(`http://127.0.0.1:${ctx.port}/`, {
       headers: { Accept: "application/nostr+json" },
@@ -64,7 +70,7 @@ describe("relay integration > retention", () => {
         changes_feed: true,
         author_scoped: true,
         retention: {
-          min_payload_mtime: 1_800_000_000_000,
+          min_payload_mtime: 1_750_000_000_000,
         },
       },
     });
@@ -76,15 +82,20 @@ describe("relay integration > retention", () => {
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const compactedEvent = snapshotEvent("snapshot-1", 1_700_000_000_000);
 
-    sendJson(ws, ["EVENT", oldEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", newEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
+    for (const event of [
+      compactedEvent,
+      snapshotEvent("snapshot-2", 1_750_000_000_000),
+      snapshotEvent("snapshot-3", 1_800_000_000_000),
+      snapshotEvent("snapshot-4", 1_850_000_000_000),
+      snapshotEvent("snapshot-5", 1_900_000_000_000),
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
 
-    expect(await ctx.compactPayloadsBefore(1_750_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
 
     sendJson(
       ws,
@@ -92,7 +103,7 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-compacted",
         {
-          ids: [oldEvent.id],
+          ids: [compactedEvent.id],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -104,7 +115,7 @@ describe("relay integration > retention", () => {
       [
         "EVENT-STATUS",
         "fetch-compacted",
-        { id: oldEvent.id, status: "payload_compacted" },
+        { id: compactedEvent.id, status: "payload_compacted" },
       ],
       ["EOSE", "fetch-compacted"],
     ]);
@@ -116,15 +127,21 @@ describe("relay integration > retention", () => {
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const newEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const compactedEvent = snapshotEvent("snapshot-1", 1_700_000_000_000);
+    const newestEvent = snapshotEvent("snapshot-5", 1_900_000_000_000);
 
-    sendJson(ws, ["EVENT", oldEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", newEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
+    for (const event of [
+      compactedEvent,
+      snapshotEvent("snapshot-2", 1_750_000_000_000),
+      snapshotEvent("snapshot-3", 1_800_000_000_000),
+      snapshotEvent("snapshot-4", 1_850_000_000_000),
+      newestEvent,
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
 
-    expect(await ctx.compactPayloadsBefore(1_750_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
 
     sendJson(
       ws,
@@ -132,7 +149,7 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-mixed",
         {
-          ids: [oldEvent.id, newEvent.id],
+          ids: [compactedEvent.id, newestEvent.id],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -141,31 +158,36 @@ describe("relay integration > retention", () => {
     );
 
     expect(await waitForMessages(ws, 3, 3_000, trace)).toEqual([
-      ["EVENT", "fetch-mixed", newEvent],
+      ["EVENT", "fetch-mixed", newestEvent],
       [
         "EVENT-STATUS",
         "fetch-mixed",
-        { id: oldEvent.id, status: "payload_compacted" },
+        { id: compactedEvent.id, status: "payload_compacted" },
       ],
       ["EOSE", "fetch-mixed"],
     ]);
   });
 
-  test("retains the latest snapshot payload after compacting older snapshots", async () => {
+  test("retains the newest snapshot payload after compacting older snapshots", async () => {
     const ctx = await startTestSnapshotRelay(39451);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const headEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
+    const newestEvent = snapshotEvent("snapshot-5", 1_900_000_000_000);
 
-    sendJson(ws, ["EVENT", oldEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", headEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
+    for (const event of [
+      snapshotEvent("snapshot-1", 1_700_000_000_000),
+      snapshotEvent("snapshot-2", 1_750_000_000_000),
+      snapshotEvent("snapshot-3", 1_800_000_000_000),
+      snapshotEvent("snapshot-4", 1_850_000_000_000),
+      newestEvent,
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
 
-    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
 
     sendJson(
       ws,
@@ -173,7 +195,7 @@ describe("relay integration > retention", () => {
         "REQ",
         "fetch-head",
         {
-          ids: [headEvent.id],
+          ids: [newestEvent.id],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -182,35 +204,49 @@ describe("relay integration > retention", () => {
     );
 
     expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
-      ["EVENT", "fetch-head", headEvent],
+      ["EVENT", "fetch-head", newestEvent],
       ["EOSE", "fetch-head"],
     ]);
   });
 
-  test("retains only the most recent snapshot payload for a document during compaction", async () => {
+  test("retains a recent per-document snapshot window during compaction", async () => {
     const ctx = await startTestSnapshotRelay(39454);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const baseEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const leftHead = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
-    const rightHead = snapshotEvent(REV_C, 1_800_000_000_100, [REV_A]);
+    const compactedEvent = snapshotEvent("snapshot-1", 1_700_000_000_000);
+    const retainedEventA = snapshotEvent("snapshot-2", 1_750_000_000_000);
+    const retainedEventB = snapshotEvent("snapshot-3", 1_800_000_000_000);
+    const retainedEventC = snapshotEvent("snapshot-4", 1_850_000_000_000);
+    const retainedEventD = snapshotEvent("snapshot-5", 1_900_000_000_000);
 
-    for (const event of [baseEvent, leftHead, rightHead]) {
+    for (const event of [
+      compactedEvent,
+      retainedEventA,
+      retainedEventB,
+      retainedEventC,
+      retainedEventD,
+    ]) {
       sendJson(ws, ["EVENT", event], trace);
       await waitForMessage(ws, 3_000, trace);
     }
 
-    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(2);
+    expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
 
     sendJson(
       ws,
       [
         "REQ",
-        "fetch-conflict-heads",
+        "fetch-retained-window",
         {
-          ids: [leftHead.id, rightHead.id],
+          ids: [
+            compactedEvent.id,
+            retainedEventA.id,
+            retainedEventB.id,
+            retainedEventC.id,
+            retainedEventD.id,
+          ],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -218,14 +254,17 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 3, 3_000, trace)).toEqual([
-      ["EVENT", "fetch-conflict-heads", rightHead],
+    expect(await waitForMessages(ws, 6, 3_000, trace)).toEqual([
+      ["EVENT", "fetch-retained-window", retainedEventA],
+      ["EVENT", "fetch-retained-window", retainedEventB],
+      ["EVENT", "fetch-retained-window", retainedEventC],
+      ["EVENT", "fetch-retained-window", retainedEventD],
       [
         "EVENT-STATUS",
-        "fetch-conflict-heads",
-        { id: leftHead.id, status: "payload_compacted" },
+        "fetch-retained-window",
+        { id: compactedEvent.id, status: "payload_compacted" },
       ],
-      ["EOSE", "fetch-conflict-heads"],
+      ["EOSE", "fetch-retained-window"],
     ]);
   });
 
@@ -235,17 +274,24 @@ describe("relay integration > retention", () => {
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const baseEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const tombstoneEvent = deletionSnapshotEvent(REV_B, 1_800_000_000_000, [
-      REV_A,
-    ]);
+    const tombstoneEvent = deletionSnapshotEvent(
+      "snapshot-5",
+      1_900_000_000_000,
+      [],
+    );
 
-    sendJson(ws, ["EVENT", baseEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", tombstoneEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
+    for (const event of [
+      snapshotEvent("snapshot-1", 1_700_000_000_000),
+      snapshotEvent("snapshot-2", 1_750_000_000_000),
+      snapshotEvent("snapshot-3", 1_800_000_000_000),
+      snapshotEvent("snapshot-4", 1_850_000_000_000),
+      tombstoneEvent,
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
 
-    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
 
     sendJson(
       ws,
@@ -273,26 +319,51 @@ describe("relay integration > retention", () => {
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const oldDocBase = snapshotEvent(REV_A, 1_700_000_000_000, [], "doc-old");
-    const oldDocHead = snapshotEvent(
-      REV_B,
-      1_800_000_000_000,
-      [REV_A],
+    const compactedOldDocEvent = snapshotEvent(
+      "old-1",
+      1_700_000_000_000,
+      [],
       "doc-old",
     );
+    const oldDocRetainedA = snapshotEvent(
+      "old-2",
+      1_750_000_000_000,
+      [],
+      "doc-old",
+    );
+    const oldDocRetainedB = snapshotEvent(
+      "old-3",
+      1_800_000_000_000,
+      [],
+      "doc-old",
+    );
+    const oldDocRetainedC = snapshotEvent(
+      "old-4",
+      1_850_000_000_000,
+      [],
+      "doc-old",
+    );
+    const oldDocHead = snapshotEvent("old-5", 1_900_000_000_000, [], "doc-old");
     const otherDocHead = snapshotEvent(
-      REV_C,
+      "other-1",
       1_850_000_000_000,
       [],
       "doc-other",
     );
 
-    for (const event of [oldDocBase, oldDocHead, otherDocHead]) {
+    for (const event of [
+      compactedOldDocEvent,
+      oldDocRetainedA,
+      oldDocRetainedB,
+      oldDocRetainedC,
+      oldDocHead,
+      otherDocHead,
+    ]) {
       sendJson(ws, ["EVENT", event], trace);
       await waitForMessage(ws, 3_000, trace);
     }
 
-    expect(await ctx.compactPayloadsBefore(1_825_000_000_000)).toBe(1);
+    expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
 
     sendJson(
       ws,
@@ -300,7 +371,7 @@ describe("relay integration > retention", () => {
         "REQ",
         "multi-doc-retention",
         {
-          ids: [oldDocBase.id, oldDocHead.id, otherDocHead.id],
+          ids: [compactedOldDocEvent.id, oldDocHead.id, otherDocHead.id],
           kinds: [SNAPSHOT_SYNC_EVENT_KIND],
           authors: ["author-1"],
         },
@@ -309,12 +380,12 @@ describe("relay integration > retention", () => {
     );
 
     expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
-      ["EVENT", "multi-doc-retention", oldDocHead],
       ["EVENT", "multi-doc-retention", otherDocHead],
+      ["EVENT", "multi-doc-retention", oldDocHead],
       [
         "EVENT-STATUS",
         "multi-doc-retention",
-        { id: oldDocBase.id, status: "payload_compacted" },
+        { id: compactedOldDocEvent.id, status: "payload_compacted" },
       ],
       ["EOSE", "multi-doc-retention"],
     ]);
@@ -331,17 +402,22 @@ describe("relay integration > retention", () => {
     const generic = genericEvent("generic-retained", 10002, [
       ["p", "author-1"],
     ]);
-    const oldEvent = snapshotEvent(REV_A, 1_700_000_000_000);
-    const headEvent = snapshotEvent(REV_B, 1_800_000_000_000, [REV_A]);
 
     sendJson(ws, ["EVENT", generic], trace);
     await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", oldEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
-    sendJson(ws, ["EVENT", headEvent], trace);
-    await waitForMessage(ws, 3_000, trace);
 
-    expect(await ctx.compactPayloadsBefore(1_900_000_000_000)).toBe(1);
+    for (const event of [
+      snapshotEvent("snapshot-1", 1_700_000_000_000),
+      snapshotEvent("snapshot-2", 1_750_000_000_000),
+      snapshotEvent("snapshot-3", 1_800_000_000_000),
+      snapshotEvent("snapshot-4", 1_850_000_000_000),
+      snapshotEvent("snapshot-5", 1_900_000_000_000),
+    ]) {
+      sendJson(ws, ["EVENT", event], trace);
+      await waitForMessage(ws, 3_000, trace);
+    }
+
+    expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
 
     const { db, sql } = createSnapshotRelayDb(ctx.databaseUrl);
     try {

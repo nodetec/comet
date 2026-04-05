@@ -56,6 +56,24 @@ export type NoteConflictInfo = {
   relayUrl: string | null;
 };
 
+export type NoteHistorySnapshot = {
+  deletedAt: number | null;
+  isConflict: boolean;
+  isCurrent: boolean;
+  markdown: string | null;
+  mtime: number;
+  op: string;
+  preview: string | null;
+  snapshotId: string;
+  title: string | null;
+};
+
+export type NoteHistoryInfo = {
+  noteId: string;
+  snapshotCount: number;
+  snapshots: NoteHistorySnapshot[];
+};
+
 export type ResolveNoteConflictAction = "restore" | "keep_deleted" | "merge";
 
 export type BootstrapPayload = {
