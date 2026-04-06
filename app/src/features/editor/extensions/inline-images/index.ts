@@ -32,6 +32,9 @@ type InlineImageMatch = {
 
 const INLINE_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
+const YOUTUBE_URL_RE =
+  /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+
 function isInsideCodeBlock(
   tree: ReturnType<typeof syntaxTree>,
   pos: number,
@@ -104,6 +107,70 @@ class InlineImageWidget extends WidgetType {
     });
 
     wrapper.append(image);
+    return wrapper;
+  }
+}
+
+function extractYouTubeVideoId(src: string): string | null {
+  const match = YOUTUBE_URL_RE.exec(src);
+  return match ? (match[1] ?? null) : null;
+}
+
+class InlineYouTubeWidget extends WidgetType {
+  private readonly videoId: string;
+
+  constructor(
+    private readonly from: number,
+    private readonly to: number,
+    videoId: string,
+  ) {
+    super();
+    this.videoId = videoId;
+  }
+
+  override eq(other: WidgetType): boolean {
+    return (
+      other instanceof InlineYouTubeWidget &&
+      other.from === this.from &&
+      other.to === this.to &&
+      other.videoId === this.videoId
+    );
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
+  }
+
+  override toDOM(view: EditorView): HTMLElement {
+    const wrapper = document.createElement("span");
+    wrapper.className = "cm-inline-youtube";
+
+    const iframe = document.createElement("iframe");
+    iframe.className = "cm-inline-youtube-element";
+    iframe.src = `https://www.youtube.com/embed/${this.videoId}`;
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+
+    wrapper.addEventListener("mousedown", (event) => {
+      if (event.button !== 0 || event.target === iframe) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const rect = wrapper.getBoundingClientRect();
+      const position =
+        event.clientX < rect.left + rect.width / 2 ? this.from : this.to;
+
+      view.dispatch({
+        selection: EditorSelection.cursor(position),
+      });
+      view.focus();
+    });
+
+    wrapper.append(iframe);
     return wrapper;
   }
 }
@@ -195,18 +262,15 @@ function buildInlineImageDecorations(
       continue;
     }
 
+    const youtubeId = extractYouTubeVideoId(match.src);
+    const widget = youtubeId
+      ? new InlineYouTubeWidget(match.from, match.to, youtubeId)
+      : new InlineImageWidget(match.from, match.to, match.src, match.altText);
+
     builder.add(
       match.from,
       match.to,
-      Decoration.replace({
-        inclusive: false,
-        widget: new InlineImageWidget(
-          match.from,
-          match.to,
-          match.src,
-          match.altText,
-        ),
-      }),
+      Decoration.replace({ inclusive: false, widget }),
     );
   }
 
@@ -265,6 +329,19 @@ const inlineImageTheme = EditorView.baseTheme({
     maxWidth: "min(100%, 32rem)",
     objectFit: "contain",
     userSelect: "none",
+  },
+  ".cm-inline-youtube": {
+    display: "inline-flex",
+    maxWidth: "100%",
+    verticalAlign: "top",
+    width: "min(100%, 32rem)",
+  },
+  ".cm-inline-youtube-element": {
+    aspectRatio: "16 / 9",
+    border: "none",
+    borderRadius: "var(--radius-md, 0.375rem)",
+    display: "block",
+    width: "100%",
   },
 });
 
