@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -271,6 +272,7 @@ function useFindBar({
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
   const [findScrollRevision, setFindScrollRevision] = useState(0);
   const findInputRef = useRef<HTMLInputElement | null>(null);
+  const lastActiveNoteIdRef = useRef(noteId);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
 
   const activeEditorSearch = resolveActiveEditorSearch({
@@ -279,24 +281,20 @@ function useFindBar({
   });
   const editorSearchQuery = activeEditorSearch.query;
   const isUsingEditorFindSearch = activeEditorSearch.source === "editor";
+  const activeEditorFindMatchCount = isUsingEditorFindSearch
+    ? findMatchCount
+    : 0;
+  const resolvedActiveFindMatchIndex =
+    activeEditorFindMatchCount === 0
+      ? 0
+      : Math.min(activeFindMatchIndex, activeEditorFindMatchCount - 1);
 
-  useEffect(() => {
-    setActiveFindMatchIndex(0);
-  }, [findQuery, noteId]);
-
-  useEffect(() => {
-    if (!isUsingEditorFindSearch) {
-      setFindMatchCount(0);
-    }
-  }, [isUsingEditorFindSearch]);
-
-  useEffect(() => {
-    if (findMatchCount === 0) {
+  if (lastActiveNoteIdRef.current !== noteId) {
+    lastActiveNoteIdRef.current = noteId;
+    if (activeFindMatchIndex !== 0) {
       setActiveFindMatchIndex(0);
-      return;
     }
-    setActiveFindMatchIndex((prev) => Math.min(prev, findMatchCount - 1));
-  }, [findMatchCount]);
+  }
 
   const closeFind = useCallback(
     (focusEditor: boolean) => {
@@ -332,25 +330,29 @@ function useFindBar({
 
   const stepActiveFindMatch = useCallback(
     (direction: 1 | -1) => {
-      if (findMatchCount === 0) return;
+      if (activeEditorFindMatchCount === 0) return;
       setActiveFindMatchIndex((prev) => {
-        const next = prev + direction;
-        if (next < 0) return findMatchCount - 1;
-        if (next >= findMatchCount) return 0;
+        const current =
+          activeEditorFindMatchCount === 0
+            ? 0
+            : Math.min(prev, activeEditorFindMatchCount - 1);
+        const next = current + direction;
+        if (next < 0) return activeEditorFindMatchCount - 1;
+        if (next >= activeEditorFindMatchCount) return 0;
         return next;
       });
       setFindScrollRevision((r) => r + 1);
     },
-    [findMatchCount],
+    [activeEditorFindMatchCount],
   );
 
   const ensureActiveFindMatch = useCallback(() => {
-    if (findMatchCount === 0 || findQuery.trim().length === 0) {
+    if (activeEditorFindMatchCount === 0 || findQuery.trim().length === 0) {
       return;
     }
 
     setFindScrollRevision((value) => value + 1);
-  }, [findMatchCount, findQuery]);
+  }, [activeEditorFindMatchCount, findQuery]);
 
   useLayoutEffect(() => {
     if (!findOpen || !noteId) {
@@ -360,43 +362,43 @@ function useFindBar({
     focusFindInput();
   }, [findOpen, focusFindInput, noteId]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
+  const handleGlobalFindKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.defaultPrevented) {
+      return;
+    }
 
-      if (isNotesSearchShortcut(event)) {
-        return;
-      }
+    if (isNotesSearchShortcut(event)) {
+      return;
+    }
 
-      if (isEditorFindShortcut(event)) {
-        event.preventDefault();
-        openFind();
-      }
-      if (event.key === "Escape" && findOpen) {
-        event.preventDefault();
-        closeFind(true);
-      }
-    };
-
-    const handleOpenEditorFind = () => {
+    if (isEditorFindShortcut(event)) {
+      event.preventDefault();
       openFind();
-    };
+    }
+    if (event.key === "Escape" && findOpen) {
+      event.preventDefault();
+      closeFind(true);
+    }
+  });
 
-    window.addEventListener("keydown", handleKeyDown);
+  const handleOpenEditorFind = useEffectEvent((_event: Event) => {
+    openFind();
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleGlobalFindKeyDown);
     window.addEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleGlobalFindKeyDown);
       window.removeEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
     };
-  }, [closeFind, findOpen, openFind]);
+  }, []);
 
   return {
     findOpen,
-    findMatchCount,
+    findMatchCount: activeEditorFindMatchCount,
     findQuery,
-    activeFindMatchIndex,
+    activeFindMatchIndex: resolvedActiveFindMatchIndex,
     findScrollRevision,
     findInputRef,
     editorSearchQuery,
@@ -657,37 +659,38 @@ export function EditorPane({
     editorRef.current?.focus();
   };
 
+  const handleGlobalHistoryKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (!noteId || !(event.metaKey || event.ctrlKey)) {
+      return;
+    }
+
+    if (isEditableElement(event.target)) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    let handled = false;
+    if (key === "z") {
+      handled = event.shiftKey
+        ? (editorRef.current?.redo() ?? false)
+        : (editorRef.current?.undo() ?? false);
+    } else if (key === "y") {
+      handled = editorRef.current?.redo() ?? false;
+    }
+
+    if (!handled) {
+      return;
+    }
+
+    event.preventDefault();
+    setFocusedPane("editor");
+  });
+
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!noteId || !(event.metaKey || event.ctrlKey)) {
-        return;
-      }
-
-      if (isEditableElement(event.target)) {
-        return;
-      }
-
-      const key = event.key.toLowerCase();
-      let handled = false;
-      if (key === "z") {
-        handled = event.shiftKey
-          ? (editorRef.current?.redo() ?? false)
-          : (editorRef.current?.undo() ?? false);
-      } else if (key === "y") {
-        handled = editorRef.current?.redo() ?? false;
-      }
-
-      if (!handled) {
-        return;
-      }
-
-      event.preventDefault();
-      setFocusedPane("editor");
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [noteId, setFocusedPane]);
+    window.addEventListener("keydown", handleGlobalHistoryKeyDown);
+    return () =>
+      window.removeEventListener("keydown", handleGlobalHistoryKeyDown);
+  }, []);
 
   const menuButton = (
     <Button
