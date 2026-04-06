@@ -1,5 +1,6 @@
 import { type RefObject, useEffect, useRef } from "react";
 import { type QueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { getNoteConflict, loadNote } from "@/shared/api/invoke";
@@ -216,4 +217,20 @@ export function useSyncListener(deps: SyncListenerDeps) {
       void unlisten.then((fn) => fn());
     };
   }, [queryClient, pendingSaveTimeoutRef, isSavingRef, bumpSyncEditorRevision]);
+
+  // Restart sync when the app becomes visible again (e.g. laptop wake).
+  // The WebSocket connection likely died during sleep, but the sync loop
+  // is still blocked waiting on the dead socket.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void invoke("restart_sync").catch(() => {});
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 }
