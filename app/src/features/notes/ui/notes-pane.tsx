@@ -104,31 +104,6 @@ type NotesPaneProps = {
   onSelectNote(noteId: string): void;
 };
 
-function handleCreateButtonPointerDown(
-  event: PointerEvent<HTMLButtonElement>,
-  isCreatingNote: boolean,
-  onCreateNote: () => void,
-) {
-  event.preventDefault();
-
-  if (event.pointerType !== "mouse" || isCreatingNote) {
-    return;
-  }
-
-  onCreateNote();
-}
-
-function handleCreateButtonClick(
-  event: MouseEvent<HTMLButtonElement>,
-  onCreateNote: () => void,
-) {
-  if (event.detail !== 0) {
-    return;
-  }
-
-  onCreateNote();
-}
-
 const HIGHLIGHT_CLASS_NAME =
   "bg-search-match text-search-match-foreground rounded-[3px] px-[0.08rem] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]";
 const MAX_HIGHLIGHT_MATCHES_PER_BLOCK = 24;
@@ -779,17 +754,8 @@ export function NotesPane({
                 <Button
                   className="text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   disabled={isCreatingNote || isArchive || isTrash}
-                  onClick={(event) =>
-                    handleCreateButtonClick(event, onCreateNote)
-                  }
+                  onClick={onCreateNote}
                   onMouseDown={(event) => event.preventDefault()}
-                  onPointerDown={(event) =>
-                    handleCreateButtonPointerDown(
-                      event,
-                      isCreatingNote,
-                      onCreateNote,
-                    )
-                  }
                   size="icon-sm"
                   variant="ghost"
                 >
