@@ -29,8 +29,6 @@ notify = "8.2.0"
 walkdir = "2.5.0"
 gray_matter = "0.3.2"
 html-escape = "0.2"
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
-objc2-foundation = { version = "0.3", features = ["NSString"] }
 rusqlite_migration = "2.4.1"
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 tauri-plugin-clipboard-manager = "2"
@@ -56,6 +54,10 @@ uuid = { version = "1", features = ["v4"] }
 tauri-plugin-log = "2.8.0"
 tauri-plugin-opener = "2"
 tauri-plugin-secure-storage = "1.4.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+objc2-foundation = { version = "0.3", features = ["NSString"] }
 
 [dev-dependencies]
 postgres = "0.19"
