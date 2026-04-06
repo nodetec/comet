@@ -1,7 +1,10 @@
 import { EditorSelection, type SelectionRange } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
-import { getEditorScrollContainer } from "@/features/editor/lib/view-utils";
+import {
+  getEditorScrollContainer,
+  holdEditorScrollPosition,
+} from "@/features/editor/lib/view-utils";
 
 export type GutterSide = "left" | "right";
 
@@ -319,7 +322,7 @@ export function getSelectionHeadFromPoint(
   );
 
   if (clientX <= contentRect.left || clientX >= contentRect.right) {
-    return getLineBoundaryCursor(view, clientY, side);
+    return getLineBoundaryCursor(view, clampedY, side);
   }
 
   const tableBoundarySelection = getTableBoundarySelection(
@@ -405,6 +408,11 @@ export function startSelectionEdgeAutoScroll(
   let animationFrame: number | null = null;
   let hasCapture = false;
   let latestPointer: DragPointerState | null = null;
+  let initialPointerY: number | null = null;
+  let dragConfirmed = false;
+  let releaseScrollHold: (() => void) | null =
+    holdEditorScrollPosition(scrollContainer);
+  const DRAG_MIN_DISTANCE = 5;
 
   const capturePointer = () => {
     if (hasCapture) {
@@ -487,6 +495,22 @@ export function startSelectionEdgeAutoScroll(
       target: event.target,
     };
 
+    if (initialPointerY == null) {
+      initialPointerY = event.clientY;
+    }
+
+    if (!dragConfirmed) {
+      if (Math.abs(event.clientY - initialPointerY) < DRAG_MIN_DISTANCE) {
+        if (options.updateSelectionOnPointerMove) {
+          updateSelection(latestPointer);
+        }
+        return;
+      }
+      dragConfirmed = true;
+      releaseScrollHold?.();
+      releaseScrollHold = null;
+    }
+
     const delta = getDragScrollDelta(
       scrollContainer,
       event.clientY,
@@ -521,6 +545,8 @@ export function startSelectionEdgeAutoScroll(
   };
 
   const cleanup = () => {
+    releaseScrollHold?.();
+    releaseScrollHold = null;
     stopAnimation();
     pointerTarget.removeEventListener("pointermove", handlePointerMove, true);
     pointerTarget.removeEventListener("pointerup", handlePointerDone, true);

@@ -112,7 +112,6 @@ import {
   importImage,
   unresolveImageSrc,
 } from "@/shared/lib/attachments";
-import { logEditorDebug, summarizeRanges } from "@/shared/lib/editor-debug";
 import { collectSearchMatches } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
 
@@ -567,6 +566,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                   selection: EditorSelection.cursor(
                     Math.min(savedCursor, view.state.doc.length),
                   ),
+                  scrollIntoView: false,
                 });
                 return true;
               },
@@ -588,29 +588,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
-            if (
-              update.viewportChanged ||
-              update.docChanged ||
-              update.selectionSet
-            ) {
-              const scrollContainer = getEditorScrollContainer(update.view);
-              logEditorDebug("editor-update", "editor view update", {
-                docChanged: update.docChanged,
-                docLength: update.state.doc.length,
-                docLines: update.state.doc.lines,
-                scrollTop: scrollContainer.scrollTop,
-                selection: {
-                  anchor: update.state.selection.main.anchor,
-                  empty: update.state.selection.main.empty,
-                  head: update.state.selection.main.head,
-                },
-                selectionSet: update.selectionSet,
-                visibleRanges: summarizeRanges(update.view.visibleRanges),
-                viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
-                viewportChanged: update.viewportChanged,
-              });
-            }
-
             if (update.docChanged && !applyingExternalChangeRef.current) {
               onChangeRef.current(update.state.doc.toString());
             }
@@ -775,11 +752,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               restoreSelection.anchor,
               restoreSelection.head,
             ),
+            scrollIntoView: false,
           });
         } else {
           const cursor = view.state.selection.main.head;
           view.dispatch({
             selection: EditorSelection.cursor(cursor),
+            scrollIntoView: false,
           });
         }
       }
@@ -916,6 +895,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       if (match) {
         view.dispatch({
           selection: EditorSelection.range(match.from, match.to),
+          scrollIntoView: false,
         });
         centerEditorPositionInView(view, match.from);
       }
