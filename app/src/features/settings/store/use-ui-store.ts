@@ -8,7 +8,13 @@ export type NoteSortPrefs = {
   direction: NoteSortDirection;
 };
 
-export type SettingsTab = "general" | "theme" | "editor" | "profile" | "relays";
+export type SettingsTab =
+  | "general"
+  | "theme"
+  | "editor"
+  | "profile"
+  | "sync"
+  | "publish";
 
 export const defaultNoteSortPrefs: NoteSortPrefs = {
   field: "modified_at",

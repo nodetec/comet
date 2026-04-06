@@ -1,5 +1,13 @@
 import { useEffect } from "react";
-import { Info, Palette, PenLine, Radio, User, X } from "lucide-react";
+import {
+  CloudUpload,
+  Info,
+  Palette,
+  PenLine,
+  Radio,
+  User,
+  X,
+} from "lucide-react";
 
 import {
   DialogRoot,
@@ -14,7 +22,7 @@ import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";
 import { ProfileSettings } from "./profile-settings";
-import { RelaysSettings } from "./relays-settings";
+import { SyncSettings, PublishSettings } from "./relays-settings";
 import { ThemeSettings } from "./theme-settings";
 
 const tabs = [
@@ -22,7 +30,8 @@ const tabs = [
   { id: "theme" as const, label: "Theme", icon: Palette },
   { id: "editor" as const, label: "Editor", icon: PenLine },
   { id: "profile" as const, label: "Profile", icon: User },
-  { id: "relays" as const, label: "Relays", icon: Radio },
+  { id: "sync" as const, label: "Sync", icon: CloudUpload },
+  { id: "publish" as const, label: "Publish", icon: Radio },
 ];
 
 const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
@@ -88,7 +97,8 @@ export function SettingsDialog() {
             {activeTab === "theme" && <ThemeSettings />}
             {activeTab === "editor" && <EditorSettings />}
             {activeTab === "profile" && <ProfileSettings />}
-            {activeTab === "relays" && <RelaysSettings />}
+            {activeTab === "sync" && <SyncSettings />}
+            {activeTab === "publish" && <PublishSettings />}
           </main>
         </DialogPopup>
       </DialogPortal>

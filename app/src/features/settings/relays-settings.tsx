@@ -25,8 +25,13 @@ type Relay = {
   active: boolean;
 };
 
-export function RelaysSettings() {
+export function SyncSettings() {
   const queryClient = useQueryClient();
+
+  const { data: currentKey } = useQuery({
+    queryKey: ["access-key"],
+    queryFn: getAccessKey,
+  });
 
   const { data: relays = [] } = useQuery({
     queryKey: ["relays"],
@@ -34,15 +39,38 @@ export function RelaysSettings() {
   });
 
   const syncRelays = relays.filter((r) => r.kind === "sync");
+
+  return (
+    <div className="space-y-8">
+      <AccessKeySection queryClient={queryClient} />
+      {currentKey ? (
+        <>
+          <SyncToggle />
+          <SyncRelaySection relays={syncRelays} queryClient={queryClient} />
+          <BlossomSection queryClient={queryClient} />
+          <ResyncSection queryClient={queryClient} />
+        </>
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          Enter an access key to enable sync.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function PublishSettings() {
+  const queryClient = useQueryClient();
+
+  const { data: relays = [] } = useQuery({
+    queryKey: ["relays"],
+    queryFn: () => invoke<Relay[]>("list_relays"),
+  });
+
   const publishRelays = relays.filter((r) => r.kind === "publish");
 
   return (
     <div className="space-y-8">
-      <SyncToggle />
-      <AccessKeySection queryClient={queryClient} />
-      <SyncRelaySection relays={syncRelays} queryClient={queryClient} />
-      <BlossomSection queryClient={queryClient} />
-      <ResyncSection queryClient={queryClient} />
       <PublishRelaysSection relays={publishRelays} queryClient={queryClient} />
     </div>
   );
