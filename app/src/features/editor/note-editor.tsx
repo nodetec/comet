@@ -2,7 +2,6 @@ import {
   forwardRef,
   useCallback,
   useEffect,
-  useEffectEvent,
   useImperativeHandle,
   useRef,
   useState,
@@ -221,6 +220,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
+    const onChangeRef = useRef(onChange);
+    const onEditorFocusChangeRef = useRef(onEditorFocusChange);
+    const onSearchMatchCountChangeRef = useRef(onSearchMatchCountChange);
     const initialAvailableTagPathsRef = useRef(availableTagPaths);
     const editableCompartmentRef = useRef(new Compartment());
     const autocompleteCompartmentRef = useRef(new Compartment());
@@ -246,15 +248,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialVimModeRef = useRef(vimMode);
     const selectAllCursorRef = useRef<number | null>(null);
     const [toolbarState, setToolbarState] = useState(DEFAULT_TOOLBAR_STATE);
-    const emitChange = useEffectEvent((nextMarkdown: string) => {
-      onChange(nextMarkdown);
-    });
-    const emitEditorFocusChange = useEffectEvent((focused: boolean) => {
-      onEditorFocusChange?.(focused);
-    });
-    const emitSearchMatchCountChange = useEffectEvent((count: number) => {
-      onSearchMatchCountChange?.(count);
-    });
+    onChangeRef.current = onChange;
+    onEditorFocusChangeRef.current = onEditorFocusChange;
+    onSearchMatchCountChangeRef.current = onSearchMatchCountChange;
 
     const applyToolbarMutation = useCallback(
       (
@@ -616,7 +612,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             }
 
             if (update.docChanged && !applyingExternalChangeRef.current) {
-              emitChange(update.state.doc.toString());
+              onChangeRef.current(update.state.doc.toString());
             }
 
             if (
@@ -629,7 +625,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
             if (update.docChanged) {
               const query = getSearchQuery(update.state);
-              emitSearchMatchCountChange(
+              onSearchMatchCountChangeRef.current?.(
                 countSearchMatches(update.state, query),
               );
             }
@@ -645,7 +641,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           }),
           EditorView.domEventHandlers({
             focus: () => {
-              emitEditorFocusChange(true);
+              onEditorFocusChangeRef.current?.(true);
             },
             blur: (event) => {
               const nextTarget = event.relatedTarget;
@@ -656,7 +652,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 return;
               }
 
-              emitEditorFocusChange(false);
+              onEditorFocusChangeRef.current?.(false);
             },
           }),
         ],
@@ -664,7 +660,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       });
 
       viewRef.current = view;
-      emitSearchMatchCountChange(0);
+      onSearchMatchCountChangeRef.current?.(0);
       setToolbarState(
         getToolbarState(view.state.doc.toString(), {
           anchor: view.state.selection.main.anchor,
@@ -819,7 +815,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       });
 
       const query = getSearchQuery(view.state);
-      emitSearchMatchCountChange(countSearchMatches(view.state, query));
+      onSearchMatchCountChangeRef.current?.(
+        countSearchMatches(view.state, query),
+      );
     }, [searchQuery]);
 
     useEffect(() => {
