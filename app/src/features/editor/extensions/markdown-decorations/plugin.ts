@@ -104,12 +104,24 @@ function selectionAffectsDecorations(
 
 function expandedVisibleRanges(
   view: EditorView,
-): readonly { from: number; to: number }[] {
+): { from: number; to: number }[] {
   const docLength = view.state.doc.length;
-  return view.visibleRanges.map(({ from, to }) => ({
-    from: Math.max(0, from - VISIBLE_RANGE_MARGIN),
-    to: Math.min(docLength, to + VISIBLE_RANGE_MARGIN),
-  }));
+  const ranges: { from: number; to: number }[] = [];
+
+  for (const { from, to } of view.visibleRanges) {
+    const expanded = {
+      from: Math.max(0, from - VISIBLE_RANGE_MARGIN),
+      to: Math.min(docLength, to + VISIBLE_RANGE_MARGIN),
+    };
+    const last = ranges.length > 0 ? ranges.at(-1) : undefined;
+    if (last && expanded.from <= last.to) {
+      last.to = Math.max(last.to, expanded.to);
+    } else {
+      ranges.push(expanded);
+    }
+  }
+
+  return ranges;
 }
 
 function buildDecorations(
