@@ -191,6 +191,7 @@ mod tests {
         markdown: &str,
         note_created_at: i64,
         edited_at: i64,
+        deleted_at: Option<i64>,
         archived_at: Option<i64>,
         pinned_at: Option<i64>,
         readonly: bool,
@@ -208,7 +209,7 @@ mod tests {
             markdown: markdown.to_string(),
             note_created_at,
             edited_at,
-            deleted_at: None,
+            deleted_at,
             archived_at,
             pinned_at,
             readonly,
@@ -272,6 +273,7 @@ mod tests {
             200,
             None,
             None,
+            None,
             false,
             vec![],
             vec![],
@@ -319,6 +321,7 @@ mod tests {
             200,
             None,
             None,
+            None,
             false,
             vec![],
             vec![],
@@ -355,6 +358,7 @@ mod tests {
             &markdown,
             100,
             200,
+            None,
             None,
             None,
             false,
@@ -413,6 +417,7 @@ mod tests {
             "# Title\n\nBody",
             100,
             200,
+            None,
             None,
             None,
             false,
@@ -502,5 +507,51 @@ mod tests {
             .unwrap();
         assert_eq!(stored_op, "del");
         assert_eq!(stored_deleted_at, Some(300));
+    }
+
+    #[test]
+    fn applies_remote_trashed_note_snapshot() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let note_id = "note-trashed";
+        let event = make_put_event(
+            &keys,
+            note_id,
+            "# Title\n\nBody",
+            100,
+            200,
+            Some(300),
+            None,
+            None,
+            false,
+            vec![],
+            vec![],
+            300,
+        );
+
+        let change = apply_remote_snapshot_event(
+            &conn,
+            "wss://relay.example",
+            &keys,
+            &event,
+            Some(9),
+            |_| {},
+        )
+        .unwrap();
+
+        let (snapshot_event_id, deleted_at): (Option<String>, Option<i64>) = conn
+            .query_row(
+                "SELECT snapshot_event_id, deleted_at FROM notes WHERE id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+
+        assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
+        assert_eq!(deleted_at, Some(300));
+        assert_eq!(
+            change.map(|payload| (payload.note_id, payload.action)),
+            Some((note_id.to_string(), "upsert".to_string()))
+        );
     }
 }

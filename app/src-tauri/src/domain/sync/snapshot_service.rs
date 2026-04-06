@@ -45,6 +45,7 @@ struct NoteSnapshotFields {
     last_edit_device_id: Option<String>,
     vector_clock: String,
     edited_at: i64,
+    deleted_at: Option<i64>,
     archived_at: Option<i64>,
     readonly: bool,
     pinned_at: Option<i64>,
@@ -69,12 +70,13 @@ fn load_note_snapshot_fields(
         String,
         Option<i64>,
         Option<i64>,
+        Option<i64>,
         bool,
         Option<i64>,
         Option<String>,
     )> = conn
         .query_row(
-            "SELECT markdown, created_at, modified_at, last_edit_device_id, vector_clock, edited_at, archived_at, readonly, pinned_at, snapshot_event_id
+            "SELECT markdown, created_at, modified_at, last_edit_device_id, vector_clock, edited_at, deleted_at, archived_at, readonly, pinned_at, snapshot_event_id
              FROM notes
              WHERE id = ?1",
             params![note_id],
@@ -87,9 +89,10 @@ fn load_note_snapshot_fields(
                     row.get(4)?,
                     row.get(5)?,
                     row.get(6)?,
-                    row.get::<_, i64>(7)? != 0,
-                    row.get(8)?,
+                    row.get(7)?,
+                    row.get::<_, i64>(8)? != 0,
                     row.get(9)?,
+                    row.get(10)?,
                 ))
             },
         )
@@ -102,6 +105,7 @@ fn load_note_snapshot_fields(
         last_edit_device_id,
         vector_clock,
         edited_at,
+        deleted_at,
         archived_at,
         readonly,
         pinned_at,
@@ -115,6 +119,7 @@ fn load_note_snapshot_fields(
         last_edit_device_id,
         vector_clock,
         edited_at: edited_at.unwrap_or(modified_at),
+        deleted_at,
         archived_at,
         readonly,
         pinned_at,
@@ -278,7 +283,7 @@ pub fn build_pending_note_snapshot(
         markdown: fields.markdown.clone(),
         note_created_at: fields.created_at,
         edited_at: fields.edited_at,
-        deleted_at: None,
+        deleted_at: fields.deleted_at,
         archived_at: fields.archived_at,
         pinned_at: fields.pinned_at,
         readonly: fields.readonly,
@@ -556,6 +561,27 @@ mod tests {
         assert_eq!(payload.attachments[0].plaintext_hash, hash);
         assert_eq!(payload.attachments[0].ciphertext_hash, ciphertext_hash);
         assert_eq!(payload.attachments[0].key, key_hex);
+    }
+
+    #[test]
+    fn builds_note_snapshot_with_deleted_at_for_trashed_note() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let author_pubkey = keys.public_key();
+
+        conn.execute("UPDATE notes SET deleted_at = 300 WHERE id = 'note-1'", [])
+            .unwrap();
+
+        let snapshot = build_pending_note_snapshot(&conn, &keys, &author_pubkey, "note-1").unwrap();
+        let parsed = crate::adapters::nostr::comet_note_snapshot::parse_note_snapshot_event(
+            &keys,
+            &snapshot.event,
+        )
+        .unwrap();
+        let payload = parsed.payload.expect("payload should be present");
+
+        assert_eq!(parsed.operation, "put");
+        assert_eq!(payload.deleted_at, Some(300));
     }
 
     #[test]

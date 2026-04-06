@@ -310,11 +310,6 @@ pub fn build_note_snapshot_event(
     }
 
     let payload = payload.expect("payload presence validated above");
-    if meta.operation == "put" && payload.deleted_at.is_some() {
-        return Err(AppError::custom(
-            "Put note snapshot payloads must not include deleted_at",
-        ));
-    }
     if meta.operation == "del" && payload.deleted_at.is_none() {
         return Err(AppError::custom(
             "Delete note snapshot payloads must include deleted_at",
@@ -393,11 +388,6 @@ pub fn parse_note_snapshot_event(
 
     let mut payload = payload.expect("payload presence validated above");
     payload.vector_clock = parse_visible_vector_clock_tags(event)?;
-    if operation == "put" && payload.deleted_at.is_some() {
-        return Err(AppError::custom(
-            "Put note snapshot payloads must not include deleted_at",
-        ));
-    }
     if operation == "del" && payload.deleted_at.is_none() {
         return Err(AppError::custom(
             "Delete note snapshot payloads must include deleted_at",
@@ -427,7 +417,7 @@ pub fn payload_to_synced_note(
         modified_at: snapshot_timestamp_ms,
         edited_at: payload.edited_at,
         archived_at: payload.archived_at,
-        deleted_at: None,
+        deleted_at: payload.deleted_at,
         pinned_at: payload.pinned_at,
         readonly: payload.readonly,
         tags: payload.tags.clone(),
@@ -544,6 +534,25 @@ mod tests {
         assert_eq!(parsed.document_id, meta.document_id);
         assert_eq!(parsed.operation, "put");
         assert_eq!(parsed.collection.as_deref(), Some(COMET_NOTE_COLLECTION));
+        assert_eq!(parsed.payload.unwrap(), payload.canonicalized().unwrap());
+    }
+
+    #[test]
+    fn build_and_parse_put_note_snapshot_event_preserves_deleted_at() {
+        let keys = Keys::generate();
+        let mut payload = sample_payload();
+        payload.deleted_at = Some(300);
+        let meta = NoteSnapshotEventMeta {
+            document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_NOTE_COLLECTION.to_string()),
+            created_at_ms: Some(2000),
+        };
+
+        let event = build_note_snapshot_event(&keys, &meta, Some(&payload)).unwrap();
+        let parsed = parse_note_snapshot_event(&keys, &event).unwrap();
+
+        assert_eq!(parsed.operation, "put");
         assert_eq!(parsed.payload.unwrap(), payload.canonicalized().unwrap());
     }
 
