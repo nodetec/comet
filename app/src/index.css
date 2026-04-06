@@ -30,7 +30,7 @@ body {
 
 :root {
   --radius: 0.5rem;
-  --editor-bottom-padding: clamp(10rem, 35dvh, 24rem);
+  --editor-bottom-padding: 70dvh;
 }
 
 @theme inline {
