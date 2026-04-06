@@ -113,7 +113,8 @@ function expandedVisibleRanges(
       from: Math.max(0, from - VISIBLE_RANGE_MARGIN),
       to: Math.min(docLength, to + VISIBLE_RANGE_MARGIN),
     };
-    const last = ranges.length > 0 ? ranges.at(-1) : undefined;
+    // eslint-disable-next-line unicorn/prefer-at
+    const last = ranges.length > 0 ? ranges[ranges.length - 1] : undefined;
     if (last && expanded.from <= last.to) {
       last.to = Math.max(last.to, expanded.to);
     } else {
