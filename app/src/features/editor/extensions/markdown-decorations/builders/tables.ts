@@ -90,6 +90,7 @@ type PendingCursorPosition = "end" | "lastLineStart" | "mapped" | "start";
 
 type PendingTableCellOpen = {
   activeCell: ActiveTableCell;
+  clickCoords?: { x: number; y: number };
   cursorPos: PendingCursorPosition;
   localSelection?: {
     anchor: number;
@@ -873,8 +874,11 @@ class MarkdownTableWidget extends WidgetType {
     return false;
   }
 
-  override ignoreEvent(): boolean {
-    return false;
+  override ignoreEvent(event: Event): boolean {
+    return (
+      event.target instanceof HTMLElement &&
+      event.target.closest(`.${ACTIVE_CELL_HOST_CLASS}`) != null
+    );
   }
 
   override get estimatedHeight() {
@@ -1641,6 +1645,10 @@ const nestedTableEditorTheme = EditorView.theme({
     font: "inherit",
     overflow: "visible",
   },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+    backgroundColor:
+      "color-mix(in oklab, var(--primary) 22%, transparent) !important",
+  },
   ".cm-selectionBackground": {
     backgroundColor: "color-mix(in oklab, var(--primary) 22%, transparent)",
   },
@@ -1655,8 +1663,14 @@ const nestedTableEditorTheme = EditorView.theme({
   ".cm-cursorLayer": {
     zIndex: "2 !important",
   },
-  "&.cm-focused .cm-content ::selection": {
+  "&.cm-editor.cm-focused .cm-content::selection, &.cm-editor.cm-focused .cm-content *::selection":
+    {
+      backgroundColor: "transparent !important",
+      color: "inherit !important",
+    },
+  "&.cm-editor .cm-content::selection, &.cm-editor .cm-content *::selection": {
     backgroundColor: "transparent !important",
+    color: "inherit !important",
   },
 });
 
@@ -2056,6 +2070,16 @@ class NestedTableEditorController {
       state,
     });
     this.editor.contentDOM.focus({ preventScroll: true });
+
+    if (pendingOpen?.clickCoords) {
+      const pos = this.editor.posAtCoords(pendingOpen.clickCoords);
+      if (pos != null) {
+        this.editor.dispatch({
+          selection: EditorSelection.cursor(pos),
+          scrollIntoView: false,
+        });
+      }
+    }
   }
 
   handleMainEditorUpdate(mainView: EditorView) {
@@ -2744,25 +2768,18 @@ const tableSelectionPointerPlugin = ViewPlugin.fromClass(
 const tableInteractionHandlers = EditorView.domEventHandlers({
   mousedown(event, view) {
     const target = event.target;
-    if (
-      target instanceof HTMLElement &&
-      target.closest(`.${ACTIVE_CELL_HOST_CLASS}`)
-    ) {
-      event.stopPropagation();
-      return true;
-    }
-
     const cellElement = getCellElementFromEventTarget(target);
     if (cellElement) {
-      event.preventDefault();
-      event.stopPropagation();
-
       const nextActiveCell = getCellTargetData(cellElement);
       if (!nextActiveCell) {
+        event.preventDefault();
+        event.stopPropagation();
         return true;
       }
 
       if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
         tableSelectionPointers.get(view)?.start(nextActiveCell.tableFrom);
         setOrExtendCellSelectionToCoords(
           activeCellToCoords(nextActiveCell),
@@ -2772,13 +2789,16 @@ const tableInteractionHandlers = EditorView.domEventHandlers({
         return true;
       }
 
-      if (
-        isSameActiveTableCell(getActiveTableCell(view.state), nextActiveCell)
-      ) {
-        nestedEditors.get(view)?.handleMainEditorUpdate(view);
-      } else {
-        dispatchActiveTableCellSelection(nextActiveCell, view);
-      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      rememberPendingTableCellOpen(view, nextActiveCell, "end");
+      pendingTableCellOpens.get(view)!.clickCoords = {
+        x: event.clientX,
+        y: event.clientY,
+      };
+
+      dispatchActiveTableCellSelection(nextActiveCell, view);
       return true;
     }
 
