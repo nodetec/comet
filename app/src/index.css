@@ -116,7 +116,6 @@ body {
   background: transparent;
   width: 100%;
   display: grid;
-  padding-bottom: var(--editor-bottom-padding);
   grid-template-columns:
     minmax(clamp(1rem, 4vw, 3rem), 1fr)
     minmax(0, 48rem)
@@ -139,6 +138,8 @@ body {
   max-width: 48rem;
   min-width: 0;
   position: relative;
+  box-sizing: border-box;
+  padding-bottom: var(--editor-bottom-padding);
 }
 
 .comet-editor-column::before {
