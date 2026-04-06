@@ -88,16 +88,16 @@ Fields:
 
 The relay also exposes protected operator endpoints for access control and connection inspection:
 
-- `GET /admin/allowlist`
-- `POST /admin/allowlist`
-- `DELETE /admin/allowlist/:pubkey`
+- `GET /admin/keys` — list access keys
+- `POST /admin/keys` — create access key
+- `DELETE /admin/keys/:key` — revoke access key
 - `GET /admin/connections`
 
 Notes:
 
-- `/admin/allowlist` and `/admin/connections` require `RELAY_ADMIN_TOKEN`
-- in `PRIVATE_MODE`, snapshot websocket clients must authenticate and the authenticated pubkey must be present on the allowlist
-- `/admin/connections` reports authenticated pubkeys and active live `CHANGES` subscription ids per websocket connection
+- `/admin/keys` and `/admin/connections` require `RELAY_ADMIN_TOKEN`
+- in `PRIVATE_MODE`, clients must send a `TOKEN` message with a valid access key before authenticating via NIP-42 `AUTH`
+- `/admin/connections` reports access keys, authenticated pubkeys, and active live `CHANGES` subscription ids per websocket connection
 
 ## Current State
 

@@ -38,6 +38,11 @@ pub async fn push_note_snapshot(
     .await
 }
 
+fn load_access_key(app: &AppHandle) -> Option<String> {
+    let conn = crate::db::database_connection(app).ok()?;
+    crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn)
+}
+
 pub async fn prepare_note_snapshot_publishes_batch(
     app: &AppHandle,
     keys: &Keys,
@@ -106,10 +111,12 @@ pub async fn push_note_snapshots_batch(
     let ack_total = prepared_publishes.len();
     let mut acked = 0usize;
 
+    let access_key = load_access_key(app);
     let publish_future = send_events_to_relays_batch(
         active_relay_url,
         backup_relay_urls,
         keys,
+        access_key.as_deref(),
         &events,
         |event_id| {
             let Some(note_id) = event_note_ids.get(event_id) else {
@@ -269,9 +276,10 @@ async fn maybe_upload_note_attachments_batch(
     keys: &Keys,
 ) -> Result<BatchAttachmentQueueSummary, AppError> {
     let queued_started_at = Instant::now();
-    let (blossom_url, note_hashes) = {
+    let (blossom_url, blossom_access_key, note_hashes) = {
         let conn = database_connection(app)?;
         let blossom_url = get_blossom_url(&conn);
+        let blossom_access_key = crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn);
         let mut note_hashes = HashMap::<String, Vec<String>>::new();
         let mut stmt = conn.prepare("SELECT markdown FROM notes WHERE id = ?1")?;
 
@@ -285,7 +293,7 @@ async fn maybe_upload_note_attachments_batch(
             note_hashes.insert(note_id.clone(), attachment_hashes);
         }
 
-        (blossom_url, note_hashes)
+        (blossom_url, blossom_access_key, note_hashes)
     };
 
     let total_attachment_refs = note_hashes.values().map(Vec::len).sum::<usize>();
@@ -662,6 +670,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
             &server_url,
             &batch_items,
             keys,
+            blossom_access_key.as_deref(),
         )
         .await
         {
@@ -696,6 +705,7 @@ async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), 
                         &server_url,
                         upload.ciphertext.clone(),
                         keys,
+                        blossom_access_key.as_deref(),
                     )
                     .await
                     {
@@ -763,7 +773,8 @@ pub async fn push_deletion_snapshot(
         pending.event
     };
 
-    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, &event).await?;
+    let access_key = load_access_key(app);
+    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, access_key.as_deref(), &event).await?;
 
     let conn = database_connection(app)?;
     let _ = conn.execute(
@@ -804,12 +815,13 @@ async fn send_event_to_relays(
     active_relay_url: &str,
     backup_relay_urls: &[String],
     keys: &Keys,
+    access_key: Option<&str>,
     event: &Event,
 ) -> Result<RelayFanoutResult, AppError> {
     let mut success_count = 0usize;
     let relay_count = 1 + backup_relay_urls.len();
 
-    match SnapshotRelayConnection::connect_authenticated(active_relay_url, keys).await {
+    match SnapshotRelayConnection::connect_authenticated(active_relay_url, keys, access_key).await {
         Ok(mut connection) => {
             if send_event_on_connection(&mut connection, event).await? {
                 success_count += 1;
@@ -823,7 +835,7 @@ async fn send_event_to_relays(
     }
 
     for relay_url in backup_relay_urls {
-        match SnapshotRelayConnection::connect_authenticated(relay_url, keys).await {
+        match SnapshotRelayConnection::connect_authenticated(relay_url, keys, access_key).await {
             Ok(mut connection) => match send_event_on_connection(&mut connection, event).await {
                 Ok(true) => {
                     success_count += 1;
@@ -855,6 +867,7 @@ pub async fn send_events_to_relays_batch(
     active_relay_url: &str,
     backup_relay_urls: &[String],
     keys: &Keys,
+    access_key: Option<&str>,
     events: &[Event],
     mut on_first_success: impl FnMut(&str),
 ) -> Result<BatchRelayFanoutResult, AppError> {
@@ -868,7 +881,7 @@ pub async fn send_events_to_relays_batch(
     let mut any_success = false;
 
     for relay_url in relay_urls {
-        match SnapshotRelayConnection::connect_authenticated(relay_url, keys).await {
+        match SnapshotRelayConnection::connect_authenticated(relay_url, keys, access_key).await {
             Ok(mut connection) => {
                 match send_events_on_connection(&mut connection, events, |event_id| {
                     let entry = success_counts.entry(event_id.to_string()).or_insert(0);
@@ -1029,6 +1042,7 @@ mod tests {
             "ws://127.0.0.1:39999/ws",
             std::slice::from_ref(&backup.ws_url),
             &keys,
+            None,
             &event,
         )
         .await
@@ -1060,6 +1074,7 @@ mod tests {
             &active_private.ws_url,
             std::slice::from_ref(&backup.ws_url),
             &keys,
+            None,
             &event,
         )
         .await
@@ -1086,6 +1101,7 @@ mod tests {
             "ws://127.0.0.1:39998/ws",
             std::slice::from_ref(&private_backup.ws_url),
             &keys,
+            None,
             &event,
         )
         .await

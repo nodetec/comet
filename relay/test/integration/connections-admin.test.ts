@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
+  createTestAccessKey,
   sendJson,
   startTestSnapshotRelay,
   waitForMessage,
@@ -38,14 +39,7 @@ describe("relay integration > admin connections", () => {
     });
     contexts.push(ctx);
 
-    await fetch(`${ctx.httpUrl}/admin/allowlist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer secret-token",
-      },
-      body: JSON.stringify({ pubkey: AUTH_PUBKEY }),
-    });
+    const accessKey = await createTestAccessKey(ctx.httpUrl, "secret-token");
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "connections"));
     const challengeMessage = await waitForMessage(
@@ -53,8 +47,11 @@ describe("relay integration > admin connections", () => {
       3_000,
       traceOptions(ctx, "connections"),
     );
-    const auth = authEvent(challengeMessage[1] as string, ctx.relayUrl);
 
+    sendJson(ws, ["TOKEN", accessKey], traceOptions(ctx, "connections"));
+    await waitForMessage(ws, 3_000, traceOptions(ctx, "connections"));
+
+    const auth = authEvent(challengeMessage[1] as string, ctx.relayUrl);
     sendJson(ws, ["AUTH", auth], traceOptions(ctx, "connections"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "connections")),
@@ -85,6 +82,7 @@ describe("relay integration > admin connections", () => {
       connections: [
         {
           id: expect.any(String),
+          access_key: accessKey,
           authed_pubkeys: [AUTH_PUBKEY],
           live_changes_subscription_ids: ["sync"],
         },

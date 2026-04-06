@@ -3,14 +3,17 @@
 
 export type RelayConnectionInfo = {
   id: string;
+  access_key?: string | null;
   authed_pubkeys?: string[];
   authedPubkeys?: string[];
 };
 
-export type RelayAllowedUser = {
-  pubkey: string;
-  expires_at: number | null;
+export type RelayAccessKey = {
+  key: string;
+  label: string | null;
   storage_limit_bytes: number | null;
+  expires_at: number | null;
+  revoked: boolean;
   created_at: number;
 };
 
@@ -41,7 +44,11 @@ async function relayAdminFetch(
 }
 
 export async function getRelayConnections(): Promise<{
-  connections: { id: string; authedPubkeys: string[] }[];
+  connections: {
+    id: string;
+    accessKey: string | null;
+    authedPubkeys: string[];
+  }[];
 }> {
   try {
     const res = await relayAdminFetch("/admin/connections");
@@ -53,6 +60,7 @@ export async function getRelayConnections(): Promise<{
     return {
       connections: body.connections.map((connection) => ({
         id: connection.id,
+        accessKey: connection.access_key ?? null,
         authedPubkeys:
           connection.authed_pubkeys ?? connection.authedPubkeys ?? [],
       })),
@@ -62,23 +70,23 @@ export async function getRelayConnections(): Promise<{
   }
 }
 
-export async function listRelayAllowedUsers(): Promise<{
+export async function listRelayAccessKeys(): Promise<{
   private_mode: boolean;
-  users: RelayAllowedUser[];
+  keys: RelayAccessKey[];
 }> {
-  const res = await relayAdminFetch("/admin/allowlist");
+  const res = await relayAdminFetch("/admin/keys");
   if (!res.ok) {
-    throw new Error(`Relay allowlist request failed: ${res.status}`);
+    throw new Error(`Relay keys request failed: ${res.status}`);
   }
   return res.json();
 }
 
-export async function allowRelayUser(input: {
-  pubkey: string;
+export async function createRelayAccessKey(input: {
+  label?: string | null;
   expires_at?: number | null;
   storage_limit_bytes?: number | null;
 }) {
-  const res = await relayAdminFetch("/admin/allowlist", {
+  const res = await relayAdminFetch("/admin/keys", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,20 +94,22 @@ export async function allowRelayUser(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) {
-    throw new Error(`Relay allowlist update failed: ${res.status}`);
+    throw new Error(`Relay key create failed: ${res.status}`);
   }
-  return res.json();
+  return res.json() as Promise<{
+    key: string;
+    label: string | null;
+    expires_at: number | null;
+    storage_limit_bytes: number | null;
+  }>;
 }
 
-export async function revokeRelayUser(pubkey: string) {
-  const res = await relayAdminFetch(
-    `/admin/allowlist/${encodeURIComponent(pubkey)}`,
-    {
-      method: "DELETE",
-    },
-  );
+export async function revokeRelayAccessKey(key: string) {
+  const res = await relayAdminFetch(`/admin/keys/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+  });
   if (!res.ok) {
-    throw new Error(`Relay allowlist revoke failed: ${res.status}`);
+    throw new Error(`Relay key revoke failed: ${res.status}`);
   }
   return res.json();
 }

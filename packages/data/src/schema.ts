@@ -134,6 +134,7 @@ export const blobOwners = pgTable(
       .notNull()
       .references(() => blobs.sha256, { onDelete: "cascade" }),
     pubkey: text("pubkey").notNull(),
+    accessKey: text("access_key"),
     createdAt: bigint("created_at", { mode: "number" })
       .notNull()
       .default(sql`(EXTRACT(EPOCH FROM NOW())::BIGINT)`),
@@ -141,6 +142,7 @@ export const blobOwners = pgTable(
   (table) => [
     primaryKey({ columns: [table.sha256, table.pubkey] }),
     index("idx_blob_owners_pubkey").on(table.pubkey),
+    index("idx_blob_owners_access_key").on(table.accessKey),
   ],
 );
 
@@ -257,13 +259,15 @@ export const relaySettings = pgTable("relay_settings", {
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 });
 
-export const relayAllowedUsers = pgTable(
-  "relay_allowed_users",
+export const accessKeys = pgTable(
+  "access_keys",
   {
-    pubkey: text("pubkey").primaryKey(),
-    expiresAt: bigint("expires_at", { mode: "number" }),
+    key: text("key").primaryKey(),
+    label: text("label"),
     storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }),
+    expiresAt: bigint("expires_at", { mode: "number" }),
+    revoked: boolean("revoked").notNull().default(false),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
   },
-  (table) => [index("idx_relay_allowed_users_created_at").on(table.createdAt)],
+  (table) => [index("idx_access_keys_created_at").on(table.createdAt)],
 );

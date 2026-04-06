@@ -2,6 +2,32 @@ use crate::domain::relay::service::normalize_relay_url;
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
 
+pub fn get_access_key(conn: &Connection) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM app_settings WHERE key = 'access_key'",
+        [],
+        |row| row.get(0),
+    )
+    .optional()
+    .ok()
+    .flatten()
+}
+
+pub fn save_access_key(conn: &Connection, key: &str) -> Result<(), AppError> {
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES ('access_key', ?1)",
+        params![key],
+    )?;
+    Ok(())
+}
+
+pub fn clear_access_key(conn: &Connection) {
+    let _ = conn.execute(
+        "DELETE FROM app_settings WHERE key = 'access_key'",
+        [],
+    );
+}
+
 pub fn get_blossom_url(conn: &Connection) -> Option<String> {
     conn.query_row(
         "SELECT value FROM app_settings WHERE key = 'blossom_url'",

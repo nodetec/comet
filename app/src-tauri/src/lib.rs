@@ -212,6 +212,9 @@ pub fn run() {
             commands::sync::unlock_current_account,
             commands::sync::unlock_sync,
             commands::sync::resync,
+            commands::sync::get_access_key,
+            commands::sync::set_access_key,
+            commands::sync::clear_access_key,
             // Blob
             commands::blob::get_blossom_url,
             commands::blob::set_blossom_url,

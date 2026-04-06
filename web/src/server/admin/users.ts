@@ -10,7 +10,6 @@ import {
   deletedEvents,
   events,
   relayEvents,
-  relayAllowedUsers,
   syncChanges,
   syncPayloads,
   syncSnapshots,
@@ -23,15 +22,13 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
   const [blobStats, eventCounts] = await Promise.all([
     db
       .select({
-        pubkey: relayAllowedUsers.pubkey,
-        storageLimitBytes: relayAllowedUsers.storageLimitBytes,
+        pubkey: blobOwners.pubkey,
         storageUsedBytes: sql<number>`COALESCE(SUM(${blobs.size}), 0)`,
         blobCount: sql<number>`COUNT(DISTINCT ${blobOwners.sha256})`,
       })
-      .from(relayAllowedUsers)
-      .leftJoin(blobOwners, eq(blobOwners.pubkey, relayAllowedUsers.pubkey))
+      .from(blobOwners)
       .leftJoin(blobs, eq(blobs.sha256, blobOwners.sha256))
-      .groupBy(relayAllowedUsers.pubkey, relayAllowedUsers.storageLimitBytes)
+      .groupBy(blobOwners.pubkey)
       .orderBy(sql`COALESCE(SUM(${blobs.size}), 0) DESC`),
     db.execute<{ user_pubkey: string; event_count: number | string }>(sql`
       WITH event_counts AS (
@@ -62,7 +59,7 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
     users: blobStats.map((r) => ({
       pubkey: r.pubkey,
       storageUsedBytes: Number(r.storageUsedBytes),
-      storageLimitBytes: r.storageLimitBytes,
+      storageLimitBytes: null,
       blobCount: Number(r.blobCount),
       eventCount: eventCountMap.get(r.pubkey) ?? 0,
     })),

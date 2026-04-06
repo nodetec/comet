@@ -303,6 +303,23 @@ export async function waitFor(
   }
 }
 
+export async function createTestAccessKey(
+  httpUrl: string,
+  adminToken: string,
+  label = "test",
+): Promise<string> {
+  const res = await fetch(`${httpUrl}/admin/keys`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ label }),
+  });
+  const body = (await res.json()) as { key: string };
+  return body.key;
+}
+
 async function createDatabase(databaseName: string) {
   assertSafeDatabaseName(databaseName);
   const admin = postgres(databaseUrlFor("postgres"), {

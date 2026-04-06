@@ -10,6 +10,7 @@ export type ConnectionRecord = {
   id: string;
   challenge: string;
   socket: LiveSocket;
+  accessKey: string | null;
   authedPubkeys: Set<string>;
   liveChangesSubscriptions: Map<string, SnapshotChangesFilter>;
 };
@@ -25,6 +26,7 @@ export function createConnectionRegistry() {
         id,
         challenge,
         socket,
+        accessKey: null as string | null,
         authedPubkeys: new Set<string>(),
         liveChangesSubscriptions: new Map<string, SnapshotChangesFilter>(),
       };
@@ -39,6 +41,16 @@ export function createConnectionRegistry() {
     },
     getAuthedPubkeys(id: string) {
       return connections.get(id)?.authedPubkeys ?? new Set<string>();
+    },
+    setAccessKey(id: string, key: string) {
+      const record = connections.get(id);
+      if (!record) {
+        return;
+      }
+      record.accessKey = key;
+    },
+    getAccessKey(id: string) {
+      return connections.get(id)?.accessKey ?? null;
     },
     addAuthedPubkey(id: string, pubkey: string) {
       const record = connections.get(id);

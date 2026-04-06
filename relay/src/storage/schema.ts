@@ -1,5 +1,5 @@
 export {
-  relayAllowedUsers,
+  accessKeys,
   relayEvents,
   relayEventTags,
   relaySettings,

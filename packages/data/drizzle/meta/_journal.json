@@ -106,6 +106,13 @@
       "when": 1775404800000,
       "tag": "0014_snapshot_visible_vector_clocks",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1775577600000,
+      "tag": "0015_access_keys",
+      "breakpoints": true
     }
   ]
 }

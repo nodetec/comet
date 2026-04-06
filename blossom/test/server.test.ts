@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as blobDb from "../src/blob-db";
 import { computeSha256Hex } from "../src/blob";
 import {
-  allowStorageForPubkey,
+  createAccessKeyForStorage,
   createAuthHeader,
   createSigner,
   startTestBlossom,
@@ -42,7 +42,7 @@ describe("blossom integration", () => {
 
   test("uploads a blob, persists metadata, and serves GET/HEAD/list", async () => {
     const signer = createSigner();
-    await allowStorageForPubkey(ctx!.db, signer.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const body = new TextEncoder().encode("hello blossom");
     const sha256 = await computeSha256Hex(body);
@@ -51,6 +51,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(signer, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -93,6 +94,7 @@ describe("blossom integration", () => {
     const listResponse = await fetch(`${ctx!.baseUrl}/list/${signer.pubkey}`, {
       headers: {
         Authorization: createAuthHeader(signer, "list"),
+        "X-Access-Key": accessKey,
       },
     });
     expect(listResponse.status).toBe(200);
@@ -111,7 +113,7 @@ describe("blossom integration", () => {
     ctx!.objectStorage.publicBaseUrl = ctx!.baseUrl;
 
     const signer = createSigner();
-    await allowStorageForPubkey(ctx!.db, signer.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const body = new TextEncoder().encode("loop-safe blob");
     const sha256 = await computeSha256Hex(body);
@@ -120,6 +122,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(signer, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -138,7 +141,7 @@ describe("blossom integration", () => {
   test("rejects list requests for a different pubkey", async () => {
     const owner = createSigner();
     const other = createSigner();
-    await allowStorageForPubkey(ctx!.db, owner.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const body = new TextEncoder().encode("private list");
     const uploadResponse = await fetch(`${ctx!.baseUrl}/upload`, {
@@ -146,6 +149,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(owner, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -154,6 +158,7 @@ describe("blossom integration", () => {
     const response = await fetch(`${ctx!.baseUrl}/list/${owner.pubkey}`, {
       headers: {
         Authorization: createAuthHeader(other, "list"),
+        "X-Access-Key": accessKey,
       },
     });
 
@@ -164,8 +169,7 @@ describe("blossom integration", () => {
   test("keeps shared blobs until the final owner deletes them", async () => {
     const firstOwner = createSigner();
     const secondOwner = createSigner();
-    await allowStorageForPubkey(ctx!.db, firstOwner.pubkey);
-    await allowStorageForPubkey(ctx!.db, secondOwner.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const body = new TextEncoder().encode("shared blob");
     const sha256 = await computeSha256Hex(body);
@@ -175,6 +179,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(firstOwner, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -185,6 +190,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(secondOwner, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -196,6 +202,7 @@ describe("blossom integration", () => {
       method: "DELETE",
       headers: {
         Authorization: createAuthHeader(nonOwner, "delete", { sha256 }),
+        "X-Access-Key": accessKey,
       },
     });
     expect(forbiddenDelete.status).toBe(403);
@@ -205,6 +212,7 @@ describe("blossom integration", () => {
       method: "DELETE",
       headers: {
         Authorization: createAuthHeader(firstOwner, "delete", { sha256 }),
+        "X-Access-Key": accessKey,
       },
     });
     expect(firstDelete.status).toBe(200);
@@ -215,6 +223,7 @@ describe("blossom integration", () => {
       method: "DELETE",
       headers: {
         Authorization: createAuthHeader(secondOwner, "delete", { sha256 }),
+        "X-Access-Key": accessKey,
       },
     });
     expect(secondDelete.status).toBe(200);
@@ -225,7 +234,7 @@ describe("blossom integration", () => {
 
   test("enforces storage limits before writing blob bytes", async () => {
     const signer = createSigner();
-    await allowStorageForPubkey(ctx!.db, signer.pubkey, 4);
+    const accessKey = await createAccessKeyForStorage(ctx!.db, 4);
 
     const body = new TextEncoder().encode("too big");
     const response = await fetch(`${ctx!.baseUrl}/upload`, {
@@ -233,6 +242,7 @@ describe("blossom integration", () => {
       headers: {
         Authorization: createAuthHeader(signer, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body,
     });
@@ -247,15 +257,34 @@ describe("blossom integration", () => {
     expect(ctx!.objectStorage.uploadCount).toBe(0);
   });
 
-  test("rejects uploads from pubkeys that are not on the allowlist", async () => {
+  test("rejects uploads without an access key", async () => {
     const signer = createSigner();
-    const body = new TextEncoder().encode("not allowlisted");
+    const body = new TextEncoder().encode("no key");
 
     const response = await fetch(`${ctx!.baseUrl}/upload`, {
       method: "PUT",
       headers: {
         Authorization: createAuthHeader(signer, "upload"),
         "Content-Type": "text/plain",
+      },
+      body,
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "access key required" });
+    expect(ctx!.objectStorage.uploadCount).toBe(0);
+  });
+
+  test("rejects uploads with an invalid access key", async () => {
+    const signer = createSigner();
+    const body = new TextEncoder().encode("bad key");
+
+    const response = await fetch(`${ctx!.baseUrl}/upload`, {
+      method: "PUT",
+      headers: {
+        Authorization: createAuthHeader(signer, "upload"),
+        "Content-Type": "text/plain",
+        "X-Access-Key": "sk_invalid",
       },
       body,
     });
@@ -267,7 +296,7 @@ describe("blossom integration", () => {
 
   test("uploads multiple blobs in a single batch request", async () => {
     const signer = createSigner();
-    await allowStorageForPubkey(ctx!.db, signer.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const firstBody = new TextEncoder().encode("batch one");
     const secondBody = new TextEncoder().encode("batch two");
@@ -311,6 +340,7 @@ describe("blossom integration", () => {
         Authorization: createAuthHeader(signer, "upload", {
           sha256s: [firstSha256, secondSha256],
         }),
+        "X-Access-Key": accessKey,
       },
       body: formData,
     });
@@ -339,7 +369,7 @@ describe("blossom integration", () => {
 
   test("returns partial success for batch uploads when later blobs exceed the storage limit", async () => {
     const signer = createSigner();
-    await allowStorageForPubkey(ctx!.db, signer.pubkey, 10);
+    const accessKey = await createAccessKeyForStorage(ctx!.db, 10);
 
     const firstBody = new TextEncoder().encode("12345");
     const secondBody = new TextEncoder().encode("678901");
@@ -381,6 +411,7 @@ describe("blossom integration", () => {
         Authorization: createAuthHeader(signer, "upload", {
           sha256s: [firstSha256, secondSha256],
         }),
+        "X-Access-Key": accessKey,
       },
       body: formData,
     });

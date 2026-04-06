@@ -80,20 +80,20 @@ export async function createSnapshotRelayServer(
           retention,
         });
       }
-      if (url.pathname === "/admin/allowlist") {
-        return handleAllowlistApiRequest(request, {
+      if (url.pathname === "/admin/keys") {
+        return handleKeysApiRequest(request, {
           adminToken: config.adminToken,
           access,
         });
       }
-      if (url.pathname.startsWith("/admin/allowlist/")) {
-        const pubkey = decodeURIComponent(
-          url.pathname.slice("/admin/allowlist/".length),
+      if (url.pathname.startsWith("/admin/keys/")) {
+        const key = decodeURIComponent(
+          url.pathname.slice("/admin/keys/".length),
         );
-        return handleAllowlistUserApiRequest(request, {
+        return handleKeyApiRequest(request, {
           adminToken: config.adminToken,
           access,
-          pubkey,
+          key,
         });
       }
       if (url.pathname === "/admin/connections") {
@@ -267,7 +267,7 @@ async function handleRetentionApiRequest(
 
 async function truncateAll(db: SnapshotRelayDb) {
   await db.execute(
-    rawSql`TRUNCATE relay_allowed_users, relay_settings, sync_changes, sync_snapshots, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
+    rawSql`TRUNCATE access_keys, relay_settings, sync_changes, sync_snapshots, sync_payloads, relay_event_tags, relay_events RESTART IDENTITY CASCADE`,
   );
 }
 
@@ -330,7 +330,15 @@ function isAdminAuthorized(request: Request, token: string | null) {
   return authorization === `Bearer ${token}`;
 }
 
-async function handleAllowlistApiRequest(
+function generateAccessKey(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const random = Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  return `sk_${random}`;
+}
+
+async function handleKeysApiRequest(
   request: Request,
   options: {
     adminToken: string | null;
@@ -350,14 +358,16 @@ async function handleAllowlistApiRequest(
       return authError;
     }
 
-    const users = await options.access.list();
+    const keys = await options.access.listKeys();
     return jsonResponse({
       private_mode: options.access.privateMode,
-      users: users.map((user) => ({
-        pubkey: user.pubkey,
-        expires_at: user.expiresAt,
-        storage_limit_bytes: user.storageLimitBytes,
-        created_at: user.createdAt,
+      keys: keys.map((k) => ({
+        key: k.key,
+        label: k.label,
+        storage_limit_bytes: k.storageLimitBytes,
+        expires_at: k.expiresAt,
+        revoked: k.revoked,
+        created_at: k.createdAt,
       })),
     });
   }
@@ -376,13 +386,10 @@ async function handleAllowlistApiRequest(
       );
     }
 
-    const pubkey = typeof body.pubkey === "string" ? body.pubkey : "";
-    if (!/^[a-f0-9]{64}$/.test(pubkey)) {
-      return jsonResponse(
-        { error: "pubkey must be a 64-character lowercase hex string" },
-        { status: 400 },
-      );
-    }
+    const label =
+      typeof body.label === "string" && body.label.length > 0
+        ? body.label
+        : null;
 
     const expiresAt = parseNullableNonNegativeInteger(body.expires_at);
     if (expiresAt === "invalid") {
@@ -402,15 +409,17 @@ async function handleAllowlistApiRequest(
       );
     }
 
-    await options.access.allow(
-      pubkey,
+    const key = generateAccessKey();
+    await options.access.createKey(
+      key,
+      label,
       expiresAt === undefined ? null : expiresAt,
-      storageLimitBytes === undefined ? undefined : storageLimitBytes,
+      storageLimitBytes === undefined ? null : storageLimitBytes,
     );
 
     return jsonResponse({
-      allowed: true,
-      pubkey,
+      key,
+      label,
       expires_at: expiresAt === undefined ? null : expiresAt,
       storage_limit_bytes:
         storageLimitBytes === undefined ? null : storageLimitBytes,
@@ -420,12 +429,12 @@ async function handleAllowlistApiRequest(
   return jsonResponse({ error: "method not allowed" }, { status: 405 });
 }
 
-async function handleAllowlistUserApiRequest(
+async function handleKeyApiRequest(
   request: Request,
   options: {
     adminToken: string | null;
     access: ReturnType<typeof createAccessControl>;
-    pubkey: string;
+    key: string;
   },
 ) {
   if (request.method === "DELETE") {
@@ -434,15 +443,8 @@ async function handleAllowlistUserApiRequest(
       return authError;
     }
 
-    if (!/^[a-f0-9]{64}$/.test(options.pubkey)) {
-      return jsonResponse(
-        { error: "pubkey must be a 64-character lowercase hex string" },
-        { status: 400 },
-      );
-    }
-
-    const revoked = await options.access.revoke(options.pubkey);
-    return jsonResponse({ revoked, pubkey: options.pubkey });
+    const revoked = await options.access.revokeKey(options.key);
+    return jsonResponse({ revoked, key: options.key });
   }
 
   return jsonResponse({ error: "method not allowed" }, { status: 405 });
@@ -465,6 +467,7 @@ function handleConnectionsApiRequest(
     for (const [id, state] of options.connections.entries()) {
       connections.push({
         id,
+        access_key: state.accessKey,
         authed_pubkeys: Array.from(state.authedPubkeys),
         live_changes_subscription_ids: Array.from(
           state.liveChangesSubscriptions.keys(),

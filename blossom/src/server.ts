@@ -10,7 +10,7 @@ import { createObjectStorage, type ObjectStorage } from "./object-storage";
 const corsHeaderEntries = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, PUT, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Access-Key",
   "Access-Control-Expose-Headers":
     "Content-Length, Content-Type, X-Content-Sha256",
 } as const;
@@ -191,6 +191,7 @@ async function storeBlobForPubkey(
   db: DB,
   objectStorage: ObjectStorage,
   pubkey: string,
+  accessKey: string | null,
   data: Uint8Array,
   contentType: string,
   currentUsage: number,
@@ -236,7 +237,14 @@ async function storeBlobForPubkey(
     );
   }
 
-  await blobDb.insertBlob(db, sha256, data.byteLength, contentType, pubkey);
+  await blobDb.insertBlob(
+    db,
+    sha256,
+    data.byteLength,
+    contentType,
+    pubkey,
+    accessKey,
+  );
   const uploaded = existingBlob?.uploaded_at ?? Math.floor(Date.now() / 1000);
 
   return {
@@ -395,34 +403,43 @@ export async function createBlossomServer(
           `[blossom] upload parsed pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} bytes=${data.byteLength} type=${contentType}`,
         );
 
-        const [currentUsage, storageLimit] = await Promise.all([
-          blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey),
-          blobDb.getPubkeyAccessPolicy(db, auth.pubkey),
+        const accessKey = request.headers.get("x-access-key");
+        if (!accessKey) {
+          console.warn(
+            `[blossom] upload forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} reason=no-access-key`,
+          );
+          return json({ error: "access key required" }, 401);
+        }
+
+        const [currentUsage, accessPolicy] = await Promise.all([
+          blobDb.getBlobTotalSizeByAccessKey(db, accessKey),
+          blobDb.getAccessKeyPolicy(db, accessKey),
         ]);
 
-        if (!storageLimit.allowed) {
+        if (!accessPolicy.allowed) {
           console.warn(
-            `[blossom] upload forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} reason=not-allowlisted`,
+            `[blossom] upload forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} reason=invalid-access-key`,
           );
           return json({ error: "forbidden" }, 403);
         }
         console.log(
-          `[blossom] upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes}`,
+          `[blossom] upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${currentUsage} limit=${accessPolicy.storageLimitBytes}`,
         );
 
         const stored = await storeBlobForPubkey(
           db,
           objectStorage,
           auth.pubkey,
+          accessKey,
           data,
           contentType,
           currentUsage,
-          storageLimit.storageLimitBytes,
+          accessPolicy.storageLimitBytes,
         );
         if (!stored.ok) {
           if (stored.status === 507) {
             console.warn(
-              `[blossom] upload over-limit pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} usage=${currentUsage} limit=${storageLimit.storageLimitBytes}`,
+              `[blossom] upload over-limit pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(sha256)} usage=${currentUsage} limit=${accessPolicy.storageLimitBytes}`,
             );
           }
           return json(stored.body, stored.status);
@@ -487,13 +504,21 @@ export async function createBlossomServer(
           return json({ error: auth.reason }, 401);
         }
 
-        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
+        const batchAccessKey = request.headers.get("x-access-key");
+        if (!batchAccessKey) {
+          console.warn(
+            `[blossom] batch upload forbidden pubkey=${shortPubkey(auth.pubkey)} reason=no-access-key`,
+          );
+          return json({ error: "access key required" }, 401);
+        }
+
+        const accessPolicy = await blobDb.getAccessKeyPolicy(
           db,
-          auth.pubkey,
+          batchAccessKey,
         );
         if (!accessPolicy.allowed) {
           console.warn(
-            `[blossom] batch upload forbidden pubkey=${shortPubkey(auth.pubkey)} reason=not-allowlisted`,
+            `[blossom] batch upload forbidden pubkey=${shortPubkey(auth.pubkey)} reason=invalid-access-key`,
           );
           return json({ error: "forbidden" }, 403);
         }
@@ -556,7 +581,10 @@ export async function createBlossomServer(
           });
         }
 
-        let usage = await blobDb.getBlobTotalSizeByPubkey(db, auth.pubkey);
+        let usage = await blobDb.getBlobTotalSizeByAccessKey(
+          db,
+          batchAccessKey,
+        );
         console.log(
           `[blossom] batch upload access ok pubkey=${shortPubkey(auth.pubkey)} usage=${usage} limit=${accessPolicy.storageLimitBytes} uploads=${parsedUploads.length}`,
         );
@@ -682,6 +710,7 @@ export async function createBlossomServer(
             plan.item.data.byteLength,
             plan.item.contentType,
             auth.pubkey,
+            batchAccessKey,
           );
 
           results.push({
@@ -800,13 +829,20 @@ export async function createBlossomServer(
         console.log(
           `[blossom] delete auth ok pubkey=${shortPubkey(auth.pubkey)}`,
         );
-        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
-          db,
-          auth.pubkey,
-        );
-        if (!accessPolicy.allowed) {
+        const deleteAccessKey = request.headers.get("x-access-key");
+        if (!deleteAccessKey) {
           console.warn(
-            `[blossom] delete forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(blobSha256)} reason=not-allowlisted`,
+            `[blossom] delete forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(blobSha256)} reason=no-access-key`,
+          );
+          return json({ error: "access key required" }, 401);
+        }
+        const deleteAccessPolicy = await blobDb.getAccessKeyPolicy(
+          db,
+          deleteAccessKey,
+        );
+        if (!deleteAccessPolicy.allowed) {
+          console.warn(
+            `[blossom] delete forbidden pubkey=${shortPubkey(auth.pubkey)} hash=${shortHash(blobSha256)} reason=invalid-access-key`,
           );
           return json({ error: "forbidden" }, 403);
         }
@@ -845,13 +881,20 @@ export async function createBlossomServer(
         console.log(
           `[blossom] list auth ok pubkey=${shortPubkey(auth.pubkey)}`,
         );
-        const accessPolicy = await blobDb.getPubkeyAccessPolicy(
-          db,
-          auth.pubkey,
-        );
-        if (!accessPolicy.allowed) {
+        const listAccessKey = request.headers.get("x-access-key");
+        if (!listAccessKey) {
           console.warn(
-            `[blossom] list forbidden pubkey=${shortPubkey(auth.pubkey)} reason=not-allowlisted`,
+            `[blossom] list forbidden pubkey=${shortPubkey(auth.pubkey)} reason=no-access-key`,
+          );
+          return json({ error: "access key required" }, 401);
+        }
+        const listAccessPolicy = await blobDb.getAccessKeyPolicy(
+          db,
+          listAccessKey,
+        );
+        if (!listAccessPolicy.allowed) {
+          console.warn(
+            `[blossom] list forbidden pubkey=${shortPubkey(auth.pubkey)} reason=invalid-access-key`,
           );
           return json({ error: "forbidden" }, 403);
         }

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { count, sql, eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { assertAdmin } from "~/server/middleware";
-import { blobs, blobOwners, relayAllowedUsers } from "@comet/data";
+import { blobs, blobOwners, accessKeys } from "@comet/data";
 import {
   buildStoredEventsByKindQuery,
   buildStoredEventsCountQuery,
@@ -19,7 +19,7 @@ export const getStats = createServerFn({ method: "GET" }).handler(async () => {
     db
       .select({ val: sql<number>`COALESCE(SUM(${blobs.size}), 0)` })
       .from(blobs),
-    db.select({ val: count() }).from(relayAllowedUsers),
+    db.select({ val: count() }).from(accessKeys),
   ]);
   return {
     events: Number(eventRow.val),

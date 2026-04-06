@@ -1,5 +1,5 @@
 import { count, desc, eq, sql } from "drizzle-orm";
-import { blobs, blobOwners, relayAllowedUsers } from "@comet/data";
+import { blobs, blobOwners, accessKeys } from "@comet/data";
 import type { DB } from "./db";
 
 export const DEFAULT_STORAGE_LIMIT_BYTES = 1024 * 1024 * 1024;
@@ -12,7 +12,7 @@ export type BlobRecord = {
 };
 
 export type RemoveOwnerResult = "not_owner" | "removed" | "removed_last_owner";
-export type PubkeyAccessPolicy = {
+export type AccessKeyPolicy = {
   allowed: boolean;
   storageLimitBytes: number;
 };
@@ -23,9 +23,13 @@ export async function insertBlob(
   size: number,
   type: string | null,
   pubkey: string,
+  accessKey: string | null,
 ): Promise<void> {
   await db.insert(blobs).values({ sha256, size, type }).onConflictDoNothing();
-  await db.insert(blobOwners).values({ sha256, pubkey }).onConflictDoNothing();
+  await db
+    .insert(blobOwners)
+    .values({ sha256, pubkey, accessKey })
+    .onConflictDoNothing();
 }
 
 export async function getBlob(
@@ -150,17 +154,31 @@ export async function getBlobTotalSizeByPubkey(
   return Number(rows[0]?.value ?? 0);
 }
 
-export async function getPubkeyAccessPolicy(
+export async function getBlobTotalSizeByAccessKey(
   db: DB,
-  pubkey: string,
-): Promise<PubkeyAccessPolicy> {
+  accessKey: string,
+): Promise<number> {
+  const rows = await db
+    .select({ value: sql<number>`COALESCE(SUM(${blobs.size}), 0)` })
+    .from(blobs)
+    .innerJoin(blobOwners, eq(blobs.sha256, blobOwners.sha256))
+    .where(eq(blobOwners.accessKey, accessKey));
+
+  return Number(rows[0]?.value ?? 0);
+}
+
+export async function getAccessKeyPolicy(
+  db: DB,
+  key: string,
+): Promise<AccessKeyPolicy> {
   const rows = await db
     .select({
-      expiresAt: relayAllowedUsers.expiresAt,
-      storageLimitBytes: relayAllowedUsers.storageLimitBytes,
+      expiresAt: accessKeys.expiresAt,
+      revoked: accessKeys.revoked,
+      storageLimitBytes: accessKeys.storageLimitBytes,
     })
-    .from(relayAllowedUsers)
-    .where(eq(relayAllowedUsers.pubkey, pubkey))
+    .from(accessKeys)
+    .where(eq(accessKeys.key, key))
     .limit(1);
 
   if (rows.length === 0) {
@@ -171,6 +189,13 @@ export async function getPubkeyAccessPolicy(
   }
 
   const row = rows[0];
+
+  if (row.revoked) {
+    return {
+      allowed: false,
+      storageLimitBytes: row.storageLimitBytes ?? DEFAULT_STORAGE_LIMIT_BYTES,
+    };
+  }
 
   const now = Math.floor(Date.now() / 1000);
   if (row.expiresAt !== null && row.expiresAt <= now) {

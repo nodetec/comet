@@ -3,7 +3,7 @@ import {
   generateSecretKey,
   getPublicKey,
 } from "nostr-tools/pure";
-import { relayAllowedUsers } from "@comet/data";
+import { accessKeys } from "@comet/data";
 import { KIND_BLOSSOM_AUTH, type NostrEvent } from "@comet/nostr";
 import { createBlossomServer } from "../src/server";
 import type { DB } from "../src/db";
@@ -150,17 +150,25 @@ export async function startTestBlossom(): Promise<BlossomTestContext> {
   };
 }
 
-export async function allowStorageForPubkey(
+export function generateTestAccessKey(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return `sk_test_${Array.from(bytes, (b) => chars[b % chars.length]).join("")}`;
+}
+
+export async function createAccessKeyForStorage(
   db: DB,
-  pubkey: string,
   storageLimitBytes: number | null = null,
-): Promise<void> {
+): Promise<string> {
+  const key = generateTestAccessKey();
   const now = Math.floor(Date.now() / 1000);
   await db
-    .insert(relayAllowedUsers)
-    .values({ pubkey, storageLimitBytes, createdAt: now })
+    .insert(accessKeys)
+    .values({ key, label: "test", storageLimitBytes, createdAt: now })
     .onConflictDoUpdate({
-      target: relayAllowedUsers.pubkey,
+      target: accessKeys.key,
       set: { storageLimitBytes },
     });
+  return key;
 }

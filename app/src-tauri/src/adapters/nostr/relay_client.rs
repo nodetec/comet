@@ -101,6 +101,11 @@ pub enum SnapshotRelayIncomingMessage {
         subscription_id: String,
         message: String,
     },
+    TokenResponse {
+        key: String,
+        accepted: bool,
+        message: String,
+    },
 }
 
 pub struct SnapshotRelayConnection {
@@ -122,9 +127,15 @@ impl SnapshotRelayConnection {
         })
     }
 
-    pub async fn connect_authenticated(relay_url: &str, keys: &Keys) -> Result<Self, AppError> {
+    pub async fn connect_authenticated(
+        relay_url: &str,
+        keys: &Keys,
+        access_key: Option<&str>,
+    ) -> Result<Self, AppError> {
         let mut connection = Self::connect(relay_url).await?;
-        connection.authenticate_if_needed(keys, relay_url).await?;
+        connection
+            .authenticate_if_needed(keys, relay_url, access_key)
+            .await?;
         Ok(connection)
     }
 
@@ -216,6 +227,7 @@ impl SnapshotRelayConnection {
         &mut self,
         keys: &Keys,
         relay_url: &str,
+        access_key: Option<&str>,
     ) -> Result<(), AppError> {
         let maybe_frame = timeout(Duration::from_millis(250), self.read.next()).await;
         let Some(frame) = (match maybe_frame {
@@ -248,6 +260,27 @@ impl SnapshotRelayConnection {
         let message = parse_relay_message(&text)?;
         match message {
             SnapshotRelayIncomingMessage::AuthChallenge { challenge } => {
+                if let Some(key) = access_key {
+                    self.send_token(key).await?;
+                    match self.recv_message().await? {
+                        SnapshotRelayIncomingMessage::TokenResponse { accepted: true, .. } => {}
+                        SnapshotRelayIncomingMessage::TokenResponse {
+                            accepted: false,
+                            message,
+                            ..
+                        } => {
+                            return Err(AppError::custom(format!(
+                                "Relay access key rejected: {message}"
+                            )));
+                        }
+                        other => {
+                            return Err(AppError::custom(format!(
+                                "Unexpected relay response to TOKEN: {other:?}"
+                            )));
+                        }
+                    }
+                }
+
                 self.send_auth(keys, relay_url, &challenge).await?;
                 match self.recv_message().await? {
                     SnapshotRelayIncomingMessage::Ok { accepted: true, .. } => Ok(()),
@@ -268,6 +301,10 @@ impl SnapshotRelayConnection {
                 Ok(())
             }
         }
+    }
+
+    async fn send_token(&mut self, key: &str) -> Result<(), AppError> {
+        self.send_json(serde_json::json!(["TOKEN", key])).await
     }
 
     async fn send_auth(
@@ -498,6 +535,22 @@ pub fn parse_relay_message(text: &str) -> Result<SnapshotRelayIncomingMessage, A
             }),
             _ => Err(AppError::custom("Unknown CHANGES response variant")),
         },
+        Some("TOKEN") => Ok(SnapshotRelayIncomingMessage::TokenResponse {
+            key: arr
+                .get(1)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            accepted: arr
+                .get(2)
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            message: arr
+                .get(3)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        }),
         _ => Err(AppError::custom("Unknown relay message type")),
     }
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
-  Shield,
+  KeyRound,
   HardDrive,
   FileText,
   Radio,
@@ -22,7 +22,7 @@ const navItems = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard", exact: true },
   { to: "/admin/events", icon: FileText, label: "Events" },
   { to: "/admin/blobs", icon: HardDrive, label: "Blobs" },
-  { to: "/admin/allowlist", icon: Shield, label: "Allowlist" },
+  { to: "/admin/access-keys", icon: KeyRound, label: "Access Keys" },
   { to: "/admin/users", icon: Users, label: "Users" },
   { to: "/admin/invite-codes", icon: Ticket, label: "Invite Codes" },
   { to: "/admin/connections", icon: Radio, label: "Connections" },

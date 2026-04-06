@@ -39,12 +39,14 @@ pub async fn bootstrap_relay_connection(
     let conn = database_connection(app)?;
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
     let db_path = active_account(app)?.db_path;
+    let access_key = crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn);
     drop(conn);
 
     bootstrap_with_keys_and_changes(
         &db_path,
         &keys,
         relay_ws_url,
+        access_key.as_deref(),
         |_| {},
         |change| {
             let _ = app.emit("sync-remote-change", change);
@@ -60,13 +62,14 @@ pub async fn bootstrap_with_keys(
     relay_ws_url: &str,
     mut _invalidate_cache: impl FnMut(&str),
 ) -> Result<SnapshotBootstrapResult, AppError> {
-    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, |_| {}, |_| {}).await
+    bootstrap_with_keys_and_changes(db_path, keys, relay_ws_url, None, |_| {}, |_| {}).await
 }
 
 async fn bootstrap_with_keys_and_changes(
     db_path: &Path,
     keys: &Keys,
     relay_ws_url: &str,
+    access_key: Option<&str>,
     _invalidate_cache: impl FnMut(&str),
     mut on_change: impl FnMut(SyncChangePayload),
 ) -> Result<SnapshotBootstrapResult, AppError> {
@@ -92,7 +95,7 @@ async fn bootstrap_with_keys_and_changes(
         min_retained_created_at,
     )?;
 
-    let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys).await?;
+    let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, access_key).await?;
     connection
         .send_changes_bootstrap("bootstrap", &author_pubkey)
         .await?;
@@ -1078,7 +1081,7 @@ mod tests {
             push_local_note_snapshot(&db_path, &keys, &relay.ws_url, "note-1").await;
 
         let mut live_connection =
-            SnapshotRelayConnection::connect_authenticated(&relay.ws_url, &keys)
+            SnapshotRelayConnection::connect_authenticated(&relay.ws_url, &keys, None)
                 .await
                 .unwrap();
         live_connection
@@ -1390,7 +1393,7 @@ mod tests {
         }
 
         async fn publish_event_with_keys(&self, keys: &Keys, event: &Event) {
-            let mut connection = SnapshotRelayConnection::connect_authenticated(&self.ws_url, keys)
+            let mut connection = SnapshotRelayConnection::connect_authenticated(&self.ws_url, keys, None)
                 .await
                 .unwrap();
             connection.send_event(event).await.unwrap();
@@ -1474,7 +1477,7 @@ mod tests {
             (event, pending.event_id)
         };
 
-        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys)
+        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
             .await
             .unwrap();
         connection.send_event(&event).await.unwrap();
@@ -1516,7 +1519,7 @@ mod tests {
     }
 
     async fn publish_local_event(relay_ws_url: &str, keys: &Keys, event: &Event) {
-        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys)
+        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
             .await
             .unwrap();
         connection.send_event(event).await.unwrap();

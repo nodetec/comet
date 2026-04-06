@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { SNAPSHOT_SYNC_EVENT_KIND } from "../../src/types";
 import {
   connectWs,
+  createTestAccessKey,
   sendJson,
   startTestSnapshotRelay,
   waitForMessage,
@@ -50,7 +51,7 @@ describe("relay integration > private mode", () => {
     ]);
   });
 
-  test("rejects AUTH for pubkeys that are not on the allowlist", async () => {
+  test("rejects AUTH without a valid access key", async () => {
     const ctx = await startTestSnapshotRelay(35221, {
       privateMode: true,
       adminToken: "secret-token",
@@ -77,25 +78,22 @@ describe("relay integration > private mode", () => {
       "OK",
       auth.id,
       false,
-      "restricted: pubkey not authorized on this relay",
+      "token-required: present a valid access token before authenticating",
     ]);
   });
 
-  test("authenticates an allowlisted pubkey and authorizes scoped snapshot traffic", async () => {
+  test("authenticates with a valid access key and authorizes scoped snapshot traffic", async () => {
     const ctx = await startTestSnapshotRelay(35222, {
       privateMode: true,
       adminToken: "secret-token",
     });
     contexts.push(ctx);
 
-    await fetch(`${ctx.httpUrl}/admin/allowlist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer secret-token",
-      },
-      body: JSON.stringify({ pubkey: AUTH_PUBKEY }),
-    });
+    const accessKey = await createTestAccessKey(
+      ctx.httpUrl,
+      "secret-token",
+      "test-user",
+    );
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "private-auth-ok"));
     const challengeMessage = await waitForMessage(
@@ -104,8 +102,13 @@ describe("relay integration > private mode", () => {
       traceOptions(ctx, "private-auth-ok"),
     );
     const challenge = challengeMessage[1] as string;
-    const auth = authEvent(challenge, ctx.relayUrl);
 
+    sendJson(ws, ["TOKEN", accessKey], traceOptions(ctx, "private-auth-ok"));
+    expect(
+      await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
+    ).toEqual(["TOKEN", accessKey, true, ""]);
+
+    const auth = authEvent(challenge, ctx.relayUrl);
     sendJson(ws, ["AUTH", auth], traceOptions(ctx, "private-auth-ok"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-auth-ok")),
@@ -145,14 +148,7 @@ describe("relay integration > private mode", () => {
     });
     contexts.push(ctx);
 
-    await fetch(`${ctx.httpUrl}/admin/allowlist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer secret-token",
-      },
-      body: JSON.stringify({ pubkey: AUTH_PUBKEY }),
-    });
+    const accessKey = await createTestAccessKey(ctx.httpUrl, "secret-token");
 
     const ws = await connectWs(ctx.port, traceOptions(ctx, "private-scope"));
     const challengeMessage = await waitForMessage(
@@ -160,8 +156,11 @@ describe("relay integration > private mode", () => {
       3_000,
       traceOptions(ctx, "private-scope"),
     );
-    const auth = authEvent(challengeMessage[1] as string, ctx.relayUrl);
 
+    sendJson(ws, ["TOKEN", accessKey], traceOptions(ctx, "private-scope"));
+    await waitForMessage(ws, 3_000, traceOptions(ctx, "private-scope"));
+
+    const auth = authEvent(challengeMessage[1] as string, ctx.relayUrl);
     sendJson(ws, ["AUTH", auth], traceOptions(ctx, "private-scope"));
     expect(
       await waitForMessage(ws, 3_000, traceOptions(ctx, "private-scope")),
@@ -189,6 +188,34 @@ describe("relay integration > private mode", () => {
       "CLOSED",
       "wrong-author",
       "restricted: can only query your own snapshot state",
+    ]);
+  });
+
+  test("rejects an invalid access key", async () => {
+    const ctx = await startTestSnapshotRelay(35224, {
+      privateMode: true,
+      adminToken: "secret-token",
+    });
+    contexts.push(ctx);
+
+    const ws = await connectWs(
+      ctx.port,
+      traceOptions(ctx, "private-bad-token"),
+    );
+    await waitForMessage(ws, 3_000, traceOptions(ctx, "private-bad-token"));
+
+    sendJson(
+      ws,
+      ["TOKEN", "sk_invalid_key"],
+      traceOptions(ctx, "private-bad-token"),
+    );
+    expect(
+      await waitForMessage(ws, 3_000, traceOptions(ctx, "private-bad-token")),
+    ).toEqual([
+      "TOKEN",
+      "sk_invalid_key",
+      false,
+      "token-invalid: access key rejected",
     ]);
   });
 });

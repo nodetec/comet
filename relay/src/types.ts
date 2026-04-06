@@ -62,9 +62,11 @@ export type RelayRetentionPolicy = {
   updatedAt: number | null;
 };
 
-export type AllowedUser = {
-  pubkey: string;
-  expiresAt: number | null;
+export type AccessKey = {
+  key: string;
+  label: string | null;
   storageLimitBytes: number | null;
+  expiresAt: number | null;
+  revoked: boolean;
   createdAt: number;
 };

@@ -1,6 +1,12 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, X } from "lucide-react";
+import {
+  getAccessKey,
+  setAccessKey,
+  clearAccessKey,
+} from "@/shared/api/invoke";
 import { toast } from "sonner";
 
 import { Button } from "@/shared/ui/button";
@@ -33,6 +39,7 @@ export function RelaysSettings() {
   return (
     <div className="space-y-8">
       <SyncToggle />
+      <AccessKeySection queryClient={queryClient} />
       <SyncRelaySection relays={syncRelays} queryClient={queryClient} />
       <BlossomSection queryClient={queryClient} />
       <ResyncSection queryClient={queryClient} />
@@ -82,6 +89,95 @@ function SyncToggle() {
         onCheckedChange={(checked) => toggleMutation.mutate(checked)}
       />
     </SettingRow>
+  );
+}
+
+function AccessKeySection({
+  queryClient,
+}: {
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const [input, setInput] = useState("");
+  const [editing, setEditing] = useState(false);
+
+  const { data: currentKey } = useQuery({
+    queryKey: ["access-key"],
+    queryFn: getAccessKey,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (key: string) => setAccessKey(key),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["access-key"] });
+      setEditing(false);
+      setInput("");
+    },
+    onError: (error) => toast.error(errorMessage(error, "Failed to save key.")),
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => clearAccessKey(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["access-key"] });
+    },
+  });
+
+  const masked = currentKey
+    ? `${currentKey.slice(0, 7)}...${currentKey.slice(-4)}`
+    : null;
+
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">Access Key</h3>
+      <p className="text-muted-foreground mb-3 text-xs">
+        API key for relay and blob storage access.
+      </p>
+
+      {masked && !editing && (
+        <div className="flex items-center gap-2">
+          <code className="text-muted-foreground text-xs">{masked}</code>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => clearMutation.mutate()}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
+      {(!currentKey || editing) && (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (input.trim()) saveMutation.mutate(input.trim());
+          }}
+        >
+          <input
+            type="password"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="sk_..."
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-8 w-60 rounded-md border px-2 text-xs focus-visible:ring-1 focus-visible:outline-none"
+          />
+          <Button size="sm" type="submit" disabled={!input.trim()}>
+            Save
+          </Button>
+          {currentKey && (
+            <Button
+              size="sm"
+              variant="ghost"
+              type="button"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+          )}
+        </form>
+      )}
+    </div>
   );
 }
 

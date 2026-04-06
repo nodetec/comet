@@ -46,9 +46,12 @@ export type EventStatusMessage = [
 export type ClientMessage =
   | EventMessage
   | AuthMessage
+  | TokenMessage
   | ReqMessage
   | ReqBatchMessage
   | CloseMessage;
+
+export type TokenResponseMessage = ["TOKEN", string, boolean, string];
 
 export type ServerMessage =
   | OkMessage
@@ -56,6 +59,7 @@ export type ServerMessage =
   | ClosedMessage
   | EoseMessage
   | EventStatusMessage
+  | TokenResponseMessage
   | ChangesEventMessage
   | ChangesSnapshotMessage
   | ChangesStatusMessage
@@ -135,6 +139,17 @@ function isCloseMessage(value: unknown): value is CloseMessage {
     Array.isArray(value) &&
     value.length === 2 &&
     value[0] === "CLOSE" &&
+    typeof value[1] === "string"
+  );
+}
+
+export type TokenMessage = ["TOKEN", string];
+
+function isTokenMessage(value: unknown): value is TokenMessage {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value[0] === "TOKEN" &&
     typeof value[1] === "string"
   );
 }
@@ -246,6 +261,16 @@ export function createClientMessageHandler(options: {
       ];
     }
 
+    if (isTokenMessage(parsed)) {
+      const key = parsed[1];
+      const result = await options.access.validateKey(key);
+      if (result.valid) {
+        options.connections.setAccessKey(context.connectionId, key);
+        return [["TOKEN", key, true, ""]];
+      }
+      return [["TOKEN", key, false, "token-invalid: access key rejected"]];
+    }
+
     if (isAuthMessage(parsed)) {
       const event = parsed[1];
       const challenge = options.connections.getChallenge(context.connectionId);
@@ -254,14 +279,14 @@ export function createClientMessageHandler(options: {
       if (result.ok && result.pubkey) {
         if (
           options.access.privateMode &&
-          !(await options.access.isAllowed(result.pubkey))
+          !options.connections.getAccessKey(context.connectionId)
         ) {
           return [
             [
               "OK",
               event.id,
               false,
-              "restricted: pubkey not authorized on this relay",
+              "token-required: present a valid access token before authenticating",
             ],
           ];
         }

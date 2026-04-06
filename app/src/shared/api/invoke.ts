@@ -216,3 +216,15 @@ export async function renameAccount(input: {
 }) {
   return invoke<void>("rename_account", input);
 }
+
+export async function getAccessKey() {
+  return invoke<string | null>("get_access_key");
+}
+
+export async function setAccessKey(key: string) {
+  return invoke<void>("set_access_key", { key });
+}
+
+export async function clearAccessKey() {
+  return invoke<void>("clear_access_key");
+}

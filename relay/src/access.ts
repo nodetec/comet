@@ -1,20 +1,23 @@
 import { eq } from "drizzle-orm";
 
 import type { SnapshotRelayDb } from "./db";
-import type { AllowedUser } from "./types";
+import type { AccessKey } from "./types";
 
-import { relayAllowedUsers } from "./storage/schema";
+import { accessKeys } from "./storage/schema";
 
 export type AccessControl = {
   privateMode: boolean;
-  isAllowed: (pubkey: string) => Promise<boolean>;
-  allow: (
-    pubkey: string,
+  validateKey: (
+    key: string,
+  ) => Promise<{ valid: boolean; storageLimitBytes?: number | null }>;
+  createKey: (
+    key: string,
+    label: string | null,
     expiresAt: number | null,
-    storageLimitBytes?: number | null,
+    storageLimitBytes: number | null,
   ) => Promise<void>;
-  revoke: (pubkey: string) => Promise<boolean>;
-  list: () => Promise<AllowedUser[]>;
+  revokeKey: (key: string) => Promise<boolean>;
+  listKeys: () => Promise<AccessKey[]>;
 };
 
 export function createAccessControl(
@@ -24,74 +27,86 @@ export function createAccessControl(
   return {
     privateMode,
 
-    async isAllowed(pubkey) {
+    async validateKey(key) {
       if (!privateMode) {
-        return true;
+        return { valid: true };
       }
 
       const rows = await db
-        .select({ expiresAt: relayAllowedUsers.expiresAt })
-        .from(relayAllowedUsers)
-        .where(eq(relayAllowedUsers.pubkey, pubkey))
+        .select({
+          expiresAt: accessKeys.expiresAt,
+          revoked: accessKeys.revoked,
+          storageLimitBytes: accessKeys.storageLimitBytes,
+        })
+        .from(accessKeys)
+        .where(eq(accessKeys.key, key))
         .limit(1);
 
       if (rows.length === 0) {
-        return false;
+        return { valid: false };
       }
 
-      const expiresAt = rows[0].expiresAt;
-      if (expiresAt === null) {
-        return true;
+      const row = rows[0];
+
+      if (row.revoked) {
+        return { valid: false };
       }
 
-      return expiresAt > Math.floor(Date.now() / 1000);
+      if (row.expiresAt !== null) {
+        const now = Math.floor(Date.now() / 1000);
+        if (row.expiresAt <= now) {
+          return { valid: false };
+        }
+      }
+
+      return { valid: true, storageLimitBytes: row.storageLimitBytes };
     },
 
-    async allow(pubkey, expiresAt, storageLimitBytes) {
+    async createKey(key, label, expiresAt, storageLimitBytes) {
       const createdAt = Math.floor(Date.now() / 1000);
       await db
-        .insert(relayAllowedUsers)
+        .insert(accessKeys)
         .values({
-          pubkey,
+          key,
+          label,
           expiresAt,
-          storageLimitBytes: storageLimitBytes ?? null,
+          storageLimitBytes,
           createdAt,
         })
         .onConflictDoUpdate({
-          target: relayAllowedUsers.pubkey,
+          target: accessKeys.key,
           set: {
+            label,
             expiresAt,
-            ...(storageLimitBytes !== undefined ? { storageLimitBytes } : {}),
+            storageLimitBytes,
           },
         });
     },
 
-    async revoke(pubkey) {
+    async revokeKey(key) {
       const rows = await db
-        .delete(relayAllowedUsers)
-        .where(eq(relayAllowedUsers.pubkey, pubkey))
-        .returning({ pubkey: relayAllowedUsers.pubkey });
+        .update(accessKeys)
+        .set({ revoked: true })
+        .where(eq(accessKeys.key, key))
+        .returning({ key: accessKeys.key });
 
       return rows.length > 0;
     },
 
-    async list() {
+    async listKeys() {
       const rows = await db
         .select({
-          pubkey: relayAllowedUsers.pubkey,
-          expiresAt: relayAllowedUsers.expiresAt,
-          storageLimitBytes: relayAllowedUsers.storageLimitBytes,
-          createdAt: relayAllowedUsers.createdAt,
+          key: accessKeys.key,
+          label: accessKeys.label,
+          storageLimitBytes: accessKeys.storageLimitBytes,
+          expiresAt: accessKeys.expiresAt,
+          revoked: accessKeys.revoked,
+          createdAt: accessKeys.createdAt,
         })
-        .from(relayAllowedUsers)
-        .orderBy(relayAllowedUsers.createdAt);
+        .from(accessKeys)
+        .orderBy(accessKeys.createdAt);
 
-      return rows.map((row) => ({
-        pubkey: row.pubkey,
-        expiresAt: row.expiresAt,
-        storageLimitBytes: row.storageLimitBytes,
-        createdAt: row.createdAt,
-      }));
+      return rows;
     },
   };
 }

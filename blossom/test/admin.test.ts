@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as blobDb from "../src/blob-db";
 import { computeSha256Hex } from "../src/blob";
 import {
-  allowStorageForPubkey,
+  createAccessKeyForStorage,
   createAuthHeader,
   createSigner,
   startTestBlossom,
@@ -55,8 +55,7 @@ describe("DELETE /admin/:sha256", () => {
   test("purges all blobs for a pubkey while preserving shared blobs", async () => {
     const owner = createSigner();
     const other = createSigner();
-    await allowStorageForPubkey(ctx!.db, owner.pubkey);
-    await allowStorageForPubkey(ctx!.db, other.pubkey);
+    const accessKey = await createAccessKeyForStorage(ctx!.db);
 
     const sharedBody = new TextEncoder().encode("shared blob");
     const sharedSha = await computeSha256Hex(sharedBody);
@@ -68,6 +67,7 @@ describe("DELETE /admin/:sha256", () => {
       headers: {
         Authorization: createAuthHeader(owner, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body: sharedBody,
     });
@@ -76,6 +76,7 @@ describe("DELETE /admin/:sha256", () => {
       headers: {
         Authorization: createAuthHeader(other, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body: sharedBody,
     });
@@ -84,6 +85,7 @@ describe("DELETE /admin/:sha256", () => {
       headers: {
         Authorization: createAuthHeader(owner, "upload"),
         "Content-Type": "text/plain",
+        "X-Access-Key": accessKey,
       },
       body: exclusiveBody,
     });

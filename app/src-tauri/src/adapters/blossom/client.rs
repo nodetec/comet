@@ -65,6 +65,7 @@ pub async fn upload_blob(
     blossom_url: &str,
     ciphertext: Vec<u8>,
     keys: &Keys,
+    access_key: Option<&str>,
 ) -> Result<String, AppError> {
     let mut hasher = Sha256::new();
     hasher.update(&ciphertext);
@@ -80,11 +81,15 @@ pub async fn upload_blob(
     let auth_header = sign_blossom_auth(keys, "upload", &ciphertext_hash, blossom_url)?;
     let url = format!("{}/upload", blossom_url.trim_end_matches('/'));
 
-    let resp = client
+    let mut request = client
         .put(&url)
         .header("Authorization", auth_header)
         .header("Content-Type", "application/octet-stream")
-        .header("X-SHA-256", &ciphertext_hash)
+        .header("X-SHA-256", &ciphertext_hash);
+    if let Some(key) = access_key {
+        request = request.header("X-Access-Key", key);
+    }
+    let resp = request
         .body(ciphertext)
         .send()
         .await
@@ -135,6 +140,7 @@ pub async fn upload_blobs_batch(
     blossom_url: &str,
     uploads: &[BlossomBatchUploadItem],
     keys: &Keys,
+    access_key: Option<&str>,
 ) -> Result<Vec<BlossomBatchUploadResult>, AppError> {
     if uploads.is_empty() {
         return Ok(Vec::new());
@@ -185,13 +191,17 @@ pub async fn upload_blobs_batch(
     body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
 
     let url = format!("{}/upload-batch", blossom_url.trim_end_matches('/'));
-    let resp = client
+    let mut request = client
         .post(&url)
         .header("Authorization", auth_header)
         .header(
             "Content-Type",
             format!("multipart/form-data; boundary={boundary}"),
-        )
+        );
+    if let Some(key) = access_key {
+        request = request.header("X-Access-Key", key);
+    }
+    let resp = request
         .body(body)
         .send()
         .await
