@@ -16,6 +16,7 @@ export type DragPointerState = {
 
 const HORIZONTAL_RULE_RE = /^[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
+const DRAG_MIN_DISTANCE = 5;
 const DRAG_SCROLL_EDGE_SIZE = 48;
 const DRAG_SCROLL_MAX_STEP = 24;
 
@@ -399,12 +400,14 @@ export function startSelectionEdgeAutoScroll(
     captureOnStart?: boolean;
     getAnchor(): number;
     getHead(pointer: DragPointerState): SelectionRange | null;
+    requireChangedNonEmptySelectionBeforeActivation?: boolean;
     updateSelectionOnPointerMove?: boolean;
   },
 ) {
   const pointerTarget = view.contentDOM;
   const ownerWindow = pointerTarget.ownerDocument.defaultView ?? window;
   const scrollContainer = getEditorScrollContainer(view);
+  const initialSelection = view.state.selection.main;
   let animationFrame: number | null = null;
   let hasCapture = false;
   let latestPointer: DragPointerState | null = null;
@@ -412,7 +415,6 @@ export function startSelectionEdgeAutoScroll(
   let dragConfirmed = false;
   let releaseScrollHold: (() => void) | null =
     holdEditorScrollPosition(scrollContainer);
-  const DRAG_MIN_DISTANCE = 5;
 
   const capturePointer = () => {
     if (hasCapture) {
@@ -500,16 +502,31 @@ export function startSelectionEdgeAutoScroll(
       initialPointerY = event.clientY;
     }
 
-    if (!dragConfirmed) {
-      if (Math.abs(event.clientY - initialPointerY) < DRAG_MIN_DISTANCE) {
-        if (options.updateSelectionOnPointerMove) {
-          updateSelection(latestPointer);
-        }
-        return;
+    if (
+      !dragConfirmed &&
+      isWithinDragConfirmationThreshold(initialPointerY, event.clientY)
+    ) {
+      if (options.updateSelectionOnPointerMove) {
+        updateSelection(latestPointer);
       }
+      return;
+    }
+
+    if (!dragConfirmed) {
       dragConfirmed = true;
       releaseScrollHold?.();
       releaseScrollHold = null;
+    }
+
+    if (
+      shouldWaitForSelectionActivation(
+        view.state.selection.main,
+        initialSelection,
+        options.requireChangedNonEmptySelectionBeforeActivation,
+      )
+    ) {
+      stopAnimation();
+      return;
     }
 
     const delta = getDragScrollDelta(
@@ -581,6 +598,35 @@ function isRectOnClickedRow(
   clientY: number,
 ) {
   return clientY >= rect.top && clientY <= rect.bottom;
+}
+
+function hasChangedNonEmptySelection(
+  currentSelection: SelectionRange,
+  initialSelection: SelectionRange,
+) {
+  return (
+    !currentSelection.empty &&
+    (currentSelection.anchor !== initialSelection.anchor ||
+      currentSelection.head !== initialSelection.head)
+  );
+}
+
+function isWithinDragConfirmationThreshold(
+  initialPointerY: number,
+  clientY: number,
+) {
+  return Math.abs(clientY - initialPointerY) < DRAG_MIN_DISTANCE;
+}
+
+function shouldWaitForSelectionActivation(
+  currentSelection: SelectionRange,
+  initialSelection: SelectionRange,
+  requireChangedNonEmptySelectionBeforeActivation: boolean | undefined,
+) {
+  return (
+    requireChangedNonEmptySelectionBeforeActivation &&
+    !hasChangedNonEmptySelection(currentSelection, initialSelection)
+  );
 }
 
 function findVisualFragmentBoundary(

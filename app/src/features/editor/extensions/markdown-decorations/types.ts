@@ -3,6 +3,7 @@ import type { EditorState } from "@codemirror/state";
 import type { SyntaxNodeRef } from "@lezer/common";
 
 export type DecorationEntry = {
+  atomic?: boolean;
   from: number;
   to: number;
   decoration: Decoration;

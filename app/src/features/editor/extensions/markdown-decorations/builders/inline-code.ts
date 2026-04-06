@@ -15,6 +15,7 @@ export function handleInlineCode(
   out: DecorationEntry[],
 ): void {
   const resolved = node.node;
+  const marks = resolved.getChildren("CodeMark");
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorRanges);
 
   // Always apply code styling to the full span
@@ -22,8 +23,9 @@ export function handleInlineCode(
 
   // Hide backtick delimiters when cursor is outside
   if (!onCursor) {
-    for (const child of resolved.getChildren("CodeMark")) {
+    for (const child of marks) {
       out.push({
+        atomic: true,
         from: child.from,
         to: child.to,
         decoration: Decoration.replace({}),

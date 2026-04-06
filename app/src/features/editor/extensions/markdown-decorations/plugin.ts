@@ -30,6 +30,7 @@ import {
 } from "@/features/editor/extensions/markdown-decorations/cursor";
 import type {
   BuilderContext,
+  DecorationEntry,
   NodeHandler,
 } from "@/features/editor/extensions/markdown-decorations/types";
 import {
@@ -128,7 +129,7 @@ function expandedVisibleRanges(
 function buildDecorations(
   view: EditorView,
   searchMatches: SearchMatch[],
-): DecorationSet {
+): { atomicRanges: DecorationSet; decorations: DecorationSet } {
   const { state } = view;
   const hasFocus = view.hasFocus;
   const debugEnabled = isEditorDebugEnabled();
@@ -140,8 +141,7 @@ function buildDecorations(
     searchMatches,
     view,
   };
-  const entries: Array<{ from: number; to: number; decoration: Decoration }> =
-    [];
+  const entries: DecorationEntry[] = [];
   const handlerCounts = debugEnabled ? new Map<string, number>() : null;
 
   for (const range of ranges) {
@@ -176,9 +176,13 @@ function buildDecorations(
   entries.sort((a, b) => a.from - b.from || a.to - b.to);
 
   const builder = new RangeSetBuilder<Decoration>();
+  const atomicBuilder = new RangeSetBuilder<Decoration>();
   for (const entry of entries) {
     if (entry.from <= entry.to) {
       builder.add(entry.from, entry.to, entry.decoration);
+      if (entry.atomic) {
+        atomicBuilder.add(entry.from, entry.to, entry.decoration);
+      }
     }
   }
 
@@ -196,12 +200,16 @@ function buildDecorations(
     });
   }
 
-  return builder.finish();
+  return {
+    atomicRanges: atomicBuilder.finish(),
+    decorations: builder.finish(),
+  };
 }
 
 export function markdownDecorationsPlugin(searchQuery = "") {
   return ViewPlugin.fromClass(
     class {
+      atomicRanges: DecorationSet;
       decorations: DecorationSet;
       searchMatches: SearchMatch[];
 
@@ -210,7 +218,12 @@ export function markdownDecorationsPlugin(searchQuery = "") {
           view.state.doc.toString(),
           searchQuery,
         );
-        this.decorations = buildDecorations(view, this.searchMatches);
+        const { atomicRanges, decorations } = buildDecorations(
+          view,
+          this.searchMatches,
+        );
+        this.atomicRanges = atomicRanges;
+        this.decorations = decorations;
       }
 
       update(update: ViewUpdate) {
@@ -243,10 +256,21 @@ export function markdownDecorationsPlugin(searchQuery = "") {
               viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
             });
           }
-          this.decorations = buildDecorations(update.view, this.searchMatches);
+          const { atomicRanges, decorations } = buildDecorations(
+            update.view,
+            this.searchMatches,
+          );
+          this.atomicRanges = atomicRanges;
+          this.decorations = decorations;
         }
       }
     },
-    { decorations: (v) => v.decorations },
+    {
+      decorations: (v) => v.decorations,
+      provide: (plugin) =>
+        EditorView.atomicRanges.of(
+          (view) => view.plugin(plugin)?.atomicRanges ?? Decoration.none,
+        ),
+    },
   );
 }

@@ -15,6 +15,7 @@ export function handleHighlight(
   out: DecorationEntry[],
 ): void {
   const resolved = node.node;
+  const marks = resolved.getChildren("HighlightMark");
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorRanges);
 
   // Always apply highlight styling
@@ -22,8 +23,9 @@ export function handleHighlight(
 
   // Hide == delimiters when off cursor
   if (!onCursor) {
-    for (const child of resolved.getChildren("HighlightMark")) {
+    for (const child of marks) {
       out.push({
+        atomic: true,
         from: child.from,
         to: child.to,
         decoration: Decoration.replace({}),

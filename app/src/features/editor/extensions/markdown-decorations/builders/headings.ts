@@ -55,6 +55,7 @@ function handleATXHeading(
     const firstMark = marks[0]!;
     const contentStart = Math.min(firstMark.to + 1, node.to);
     out.push({
+      atomic: true,
       from: node.from,
       to: contentStart,
       decoration: Decoration.replace({}),
@@ -64,6 +65,7 @@ function handleATXHeading(
       // eslint-disable-next-line unicorn/prefer-at
       const lastMark = marks[marks.length - 1]!;
       out.push({
+        atomic: true,
         from: lastMark.from,
         to: lastMark.to,
         decoration: Decoration.replace({}),

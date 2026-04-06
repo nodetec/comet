@@ -34,6 +34,7 @@ export function handleStrikethrough(
   if (!onCursor) {
     for (const child of marks) {
       out.push({
+        atomic: true,
         from: child.from,
         to: child.to,
         decoration: Decoration.replace({}),

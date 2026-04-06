@@ -18,6 +18,7 @@ export function handleEmphasis(
   const isStrong = node.name === "StrongEmphasis";
   const mark = isStrong ? strongMark : emphasisMark;
   const resolved = node.node;
+  const marks = resolved.getChildren("EmphasisMark");
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorRanges);
 
   // Always apply styling
@@ -25,8 +26,9 @@ export function handleEmphasis(
 
   // Hide delimiter marks when off cursor line
   if (!onCursor) {
-    for (const child of resolved.getChildren("EmphasisMark")) {
+    for (const child of marks) {
       out.push({
+        atomic: true,
         from: child.from,
         to: child.to,
         decoration: Decoration.replace({}),

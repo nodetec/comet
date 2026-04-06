@@ -60,6 +60,7 @@ export function handleLink(
   if (!onCursor) {
     // Hide opening `[`
     out.push({
+      atomic: true,
       from: openBracket.from,
       to: openBracket.to,
       decoration: Decoration.replace({}),
@@ -68,6 +69,7 @@ export function handleLink(
     // Hide everything from `]` to end of node: `](url)` or `](url "title")`
     if (closeBracket.from < node.to) {
       out.push({
+        atomic: true,
         from: closeBracket.from,
         to: node.to,
         decoration: Decoration.replace({}),

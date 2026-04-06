@@ -59,6 +59,7 @@ import {
 import { ensureNoteEditorVimNavigation } from "@/features/editor/lib/note-editor-vim";
 import { EditorToolbar } from "@/features/editor/ui/editor-toolbar";
 import { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations";
+import { getInlineSyntaxRightBoundaryAtCursor } from "@/features/editor/extensions/markdown-decorations/builders/inline-boundaries";
 import {
   TagGrammar,
   tagHighlightStyle,
@@ -125,6 +126,53 @@ function blurEditorView(view: EditorView) {
   }
 
   view.contentDOM.blur();
+}
+
+function trySnapInlineSyntaxRightBoundaryClick(
+  view: EditorView,
+  event: globalThis.MouseEvent,
+) {
+  if (event.button !== 0 || event.shiftKey) {
+    return false;
+  }
+
+  const contentRect = view.contentDOM.getBoundingClientRect();
+  if (event.clientX < contentRect.left || event.clientX > contentRect.right) {
+    return false;
+  }
+
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+  if (pos == null) {
+    return false;
+  }
+
+  const inlineSyntaxRightBoundary = getInlineSyntaxRightBoundaryAtCursor(
+    view.state,
+    pos,
+  );
+  if (inlineSyntaxRightBoundary == null) {
+    return false;
+  }
+
+  const contentEndRect =
+    view.coordsAtPos(inlineSyntaxRightBoundary.contentEnd, -1) ??
+    view.coordsAtPos(inlineSyntaxRightBoundary.contentEnd, 1);
+  if (!contentEndRect) {
+    return false;
+  }
+
+  const contentRightEdge = Math.max(contentEndRect.left, contentEndRect.right);
+  if (event.clientX <= contentRightEdge) {
+    return false;
+  }
+
+  event.preventDefault();
+  view.dispatch({
+    selection: EditorSelection.cursor(inlineSyntaxRightBoundary.syntaxEnd),
+    scrollIntoView: false,
+  });
+  view.focus();
+  return true;
 }
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
@@ -278,6 +326,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                       pointer.clientX,
                       pointer.clientY,
                     ),
+                  requireChangedNonEmptySelectionBeforeActivation: true,
                 });
 
               requestAnimationFrame(() => {
@@ -285,6 +334,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               });
             },
             mousedown(event, view) {
+              if (trySnapInlineSyntaxRightBoundaryClick(view, event)) {
+                return true;
+              }
+
               if (!view.hasFocus) {
                 useShellStore.getState().setFocusedPane("editor");
                 view.contentDOM.focus({ preventScroll: true });

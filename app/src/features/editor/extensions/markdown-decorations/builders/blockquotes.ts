@@ -70,6 +70,7 @@ export function handleQuoteMark(
         : afterMark;
 
     out.push({
+      atomic: true,
       from: node.from,
       to: endOfPrefix,
       decoration: Decoration.replace({}),

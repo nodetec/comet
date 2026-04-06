@@ -33,6 +33,7 @@ export function handleHorizontalRule(
 
   if (!onCursor) {
     out.push({
+      atomic: true,
       from: node.from,
       to: node.to,
       decoration: Decoration.replace({

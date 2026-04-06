@@ -2,6 +2,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
 
+import { getInlineSyntaxRightBoundaryAtCursor } from "@/features/editor/extensions/markdown-decorations/builders/inline-boundaries";
 import { isSpaceDelimitedATXHeading } from "@/features/editor/extensions/markdown-decorations/builders/headings";
 import {
   getCursorLineRanges,
@@ -79,5 +80,20 @@ describe("ATX heading delimiter rules", () => {
     expect(isSpaceDelimitedATXHeading(bareHash, 1, 1)).toBe(false);
     expect(isSpaceDelimitedATXHeading(hashWithSpace, 1, 2)).toBe(true);
     expect(isSpaceDelimitedATXHeading(hashWithText, 1, 9)).toBe(true);
+  });
+});
+
+describe("getInlineSyntaxRightBoundaryAtCursor", () => {
+  it("snaps bold/emphasis clicks from content end to syntax end", () => {
+    const state = createState("**test**");
+    expect(getInlineSyntaxRightBoundaryAtCursor(state, 6)).toEqual({
+      contentEnd: 6,
+      syntaxEnd: 8,
+    });
+  });
+
+  it("does not snap clicks inside visible content", () => {
+    const state = createState("**test**");
+    expect(getInlineSyntaxRightBoundaryAtCursor(state, 4)).toBeNull();
   });
 });
