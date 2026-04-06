@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { decryptBlob } from "~/lib/blob-crypto";
 import type { BlobRef } from "~/lib/nostr/rumor";
@@ -6,6 +6,10 @@ import type { BlobRef } from "~/lib/nostr/rumor";
 const blobUrlCache = new Map<string, string>();
 
 const blossomUrl = import.meta.env.VITE_BLOSSOM_URL as string;
+
+function getCachedBlobUrl(ciphertextHash: string): string | null {
+  return blobUrlCache.get(ciphertextHash) ?? null;
+}
 
 export function BlobImage({
   blobRef,
@@ -16,24 +20,30 @@ export function BlobImage({
   alt?: string;
   className?: string;
 }) {
-  const [url, setUrl] = useState<string | null>(
-    () => blobUrlCache.get(blobRef.ciphertextHash) ?? null,
-  );
-  const [error, setError] = useState(false);
-  const fetchedRef = useRef(false);
+  const blobKey = `${blobRef.ciphertextHash}:${blobRef.encryptionKey}`;
+  const cachedUrl = getCachedBlobUrl(blobRef.ciphertextHash);
+  const [loadState, setLoadState] = useState(() => ({
+    blobKey,
+    error: false,
+    url: cachedUrl,
+  }));
 
   useEffect(() => {
-    if (url || fetchedRef.current) return;
-    fetchedRef.current = true;
+    const initialUrl = getCachedBlobUrl(blobRef.ciphertextHash);
+    setLoadState({
+      blobKey,
+      error: false,
+      url: initialUrl,
+    });
+
+    if (initialUrl) {
+      return;
+    }
+
+    let cancelled = false;
 
     async function load() {
       try {
-        const cached = blobUrlCache.get(blobRef.ciphertextHash);
-        if (cached) {
-          setUrl(cached);
-          return;
-        }
-
         const fetchUrl = blossomUrl
           ? `${blossomUrl.replace(/\/$/, "")}/${blobRef.ciphertextHash}`
           : `/${blobRef.ciphertextHash}`;
@@ -42,17 +52,36 @@ export function BlobImage({
         if (!response.ok) throw new Error("fetch failed");
         const data = new Uint8Array(await response.arrayBuffer());
         const decrypted = decryptBlob(data, blobRef.encryptionKey);
+        if (cancelled) {
+          return;
+        }
         const blob = new Blob([decrypted as BlobPart]);
         const objectUrl = URL.createObjectURL(blob);
         blobUrlCache.set(blobRef.ciphertextHash, objectUrl);
-        setUrl(objectUrl);
+        setLoadState({
+          blobKey,
+          error: false,
+          url: objectUrl,
+        });
       } catch {
-        setError(true);
+        if (!cancelled) {
+          setLoadState({
+            blobKey,
+            error: true,
+            url: null,
+          });
+        }
       }
     }
 
     void load();
-  }, [blobRef, url]);
+    return () => {
+      cancelled = true;
+    };
+  }, [blobKey, blobRef.ciphertextHash, blobRef.encryptionKey]);
+
+  const url = loadState.blobKey === blobKey ? loadState.url : cachedUrl;
+  const error = loadState.blobKey === blobKey ? loadState.error : false;
 
   if (error) {
     return (
