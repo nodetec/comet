@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -24,19 +23,10 @@ import {
 import { Strikethrough, Table, TaskList } from "@lezer/markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import {
-  SearchQuery,
-  closeSearchPanel,
-  getSearchQuery,
-  openSearchPanel,
-  search,
-  searchPanelOpen,
-  setSearchQuery,
-} from "@codemirror/search";
+import { getSearchQuery, search } from "@codemirror/search";
 import {
   Compartment,
   EditorSelection,
-  type SelectionRange,
   EditorState,
   Transaction,
 } from "@codemirror/state";
@@ -47,7 +37,6 @@ import {
   keymap,
 } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 
 import {
   AUTOCOMPLETE_MENU_THEME,
@@ -56,24 +45,10 @@ import {
   MARKDOWN_EDITOR_THEME,
   MARKDOWN_HIGHLIGHT_STYLE,
 } from "@/features/editor/lib/note-editor-config";
-import {
-  centerEditorPositionInView,
-  countSearchMatches,
-  findMatchAtIndex,
-  revealEditorPositionIfNeeded,
-} from "@/features/editor/lib/note-editor-search";
+import { countSearchMatches } from "@/features/editor/lib/note-editor-search";
 import {
   DEFAULT_TOOLBAR_STATE,
-  cycleBlockType,
   getToolbarState,
-  insertCodeBlock,
-  insertMarkdownImage,
-  insertMarkdownTable,
-  toggleInlineFormat,
-} from "@/features/editor/lib/toolbar-state";
-import type {
-  InlineFormat,
-  SelectionSnapshot,
 } from "@/features/editor/lib/toolbar-state";
 import {
   createEditorContentAttributes,
@@ -103,17 +78,13 @@ import {
   TABLE_EDITOR_HOST_SELECTOR,
 } from "@/features/editor/lib/note-editor-selection";
 import type { GutterSide } from "@/features/editor/lib/note-editor-selection";
+import { useNoteEditorSearchSync } from "@/features/editor/hooks/use-note-editor-search-sync";
+import { useNoteEditorToolbarActions } from "@/features/editor/hooks/use-note-editor-toolbar-actions";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
-import {
-  IMAGE_EXTENSIONS,
-  importImage,
-  unresolveImageSrc,
-} from "@/shared/lib/attachments";
-import { collectSearchMatches } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
 
 type NoteEditorProps = {
@@ -156,46 +127,6 @@ function blurEditorView(view: EditorView) {
   view.contentDOM.blur();
 }
 
-function focusEditorViewWithoutScroll(view: EditorView) {
-  try {
-    view.contentDOM.focus({ preventScroll: true });
-  } catch {
-    view.focus();
-  }
-}
-
-function getContiguousMarkdownChange(
-  currentMarkdown: string,
-  nextMarkdown: string,
-) {
-  let start = 0;
-  const maxStart = Math.min(currentMarkdown.length, nextMarkdown.length);
-  while (
-    start < maxStart &&
-    currentMarkdown.codePointAt(start) === nextMarkdown.codePointAt(start)
-  ) {
-    start += 1;
-  }
-
-  let currentEnd = currentMarkdown.length;
-  let nextEnd = nextMarkdown.length;
-  while (
-    currentEnd > start &&
-    nextEnd > start &&
-    currentMarkdown.codePointAt(currentEnd - 1) ===
-      nextMarkdown.codePointAt(nextEnd - 1)
-  ) {
-    currentEnd -= 1;
-    nextEnd -= 1;
-  }
-
-  return {
-    from: start,
-    insert: nextMarkdown.slice(start, nextEnd),
-    to: currentEnd,
-  };
-}
-
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function NoteEditor(
     {
@@ -232,10 +163,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
-    const previousActiveFindRef = useRef(
-      searchQuery.trim().length > 0 && searchActiveMatchIndex != null,
-    );
-    const restoreSelectionRef = useRef<SelectionRange | null>(null);
     const gutterDragCleanupRef = useRef<(() => void) | null>(null);
     const gutterPointerIdRef = useRef<number | null>(null);
     const selectionAutoScrollCleanupRef = useRef<(() => void) | null>(null);
@@ -252,105 +179,28 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     onEditorFocusChangeRef.current = onEditorFocusChange;
     onSearchMatchCountChangeRef.current = onSearchMatchCountChange;
 
-    const applyToolbarMutation = useCallback(
-      (
-        transform: (
-          markdown: string,
-          selection: SelectionSnapshot,
-        ) => {
-          markdown: string;
-          selection: SelectionSnapshot;
-        },
-      ) => {
-        const view = viewRef.current;
-        if (!view || readOnly) {
-          return false;
-        }
+    const {
+      handleCycleBlockType,
+      handleInsertCodeBlock,
+      handleInsertImage,
+      handleInsertTable,
+      handleToggleInlineFormat,
+    } = useNoteEditorToolbarActions({
+      readOnly,
+      viewRef,
+    });
 
-        const currentMarkdown = view.state.doc.toString();
-        const currentSelection = view.state.selection.main;
-        const next = transform(currentMarkdown, {
-          anchor: currentSelection.anchor,
-          head: currentSelection.head,
-        });
-
-        if (
-          next.markdown === currentMarkdown &&
-          next.selection.anchor === currentSelection.anchor &&
-          next.selection.head === currentSelection.head
-        ) {
-          focusEditorViewWithoutScroll(view);
-          return false;
-        }
-
-        const change = getContiguousMarkdownChange(
-          currentMarkdown,
-          next.markdown,
-        );
-
-        view.dispatch({
-          changes: change,
-          selection: EditorSelection.range(
-            next.selection.anchor,
-            next.selection.head,
-          ),
-          scrollIntoView: false,
-        });
-        focusEditorViewWithoutScroll(view);
-        return true;
-      },
-      [readOnly],
-    );
-
-    const handleToggleInlineFormat = useCallback(
-      (format: InlineFormat) => {
-        applyToolbarMutation((currentMarkdown, selection) =>
-          toggleInlineFormat(currentMarkdown, selection, format),
-        );
-      },
-      [applyToolbarMutation],
-    );
-
-    const handleCycleBlockType = useCallback(() => {
-      applyToolbarMutation(cycleBlockType);
-    }, [applyToolbarMutation]);
-
-    const handleInsertCodeBlock = useCallback(() => {
-      applyToolbarMutation(insertCodeBlock);
-    }, [applyToolbarMutation]);
-
-    const handleInsertTable = useCallback(() => {
-      applyToolbarMutation(insertMarkdownTable);
-    }, [applyToolbarMutation]);
-
-    const handleInsertImage = useCallback(async () => {
-      if (readOnly) {
-        return;
-      }
-
-      const sourcePath = await openFileDialog({
-        filters: [
-          {
-            extensions: IMAGE_EXTENSIONS,
-            name: "Images",
-          },
-        ],
-        multiple: false,
-      });
-
-      if (typeof sourcePath !== "string") {
-        return;
-      }
-
-      const imported = await importImage(sourcePath);
-      const src = unresolveImageSrc(imported.assetUrl);
-      applyToolbarMutation((currentMarkdown, selection) =>
-        insertMarkdownImage(currentMarkdown, selection, {
-          altText: imported.altText,
-          src,
-        }),
-      );
-    }, [applyToolbarMutation, readOnly]);
+    useNoteEditorSearchSync({
+      loadKey,
+      markdown,
+      onSearchMatchCountChangeRef,
+      presentationCompartmentRef,
+      searchActiveMatchIndex,
+      searchHighlightAllMatchesYellow,
+      searchQuery,
+      searchScrollRevision,
+      viewRef,
+    });
 
     useEffect(() => {
       if (!containerRef.current) {
@@ -722,91 +572,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         return;
       }
 
-      view.dispatch({
-        effects: presentationCompartmentRef.current.reconfigure(
-          buildSearchAwarePresentationExtensions(searchQuery),
-        ),
-      });
-    }, [searchQuery]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view) {
-        return;
-      }
-
-      const isActiveFind =
-        searchQuery.trim().length > 0 && searchActiveMatchIndex != null;
-
-      if (
-        !previousActiveFindRef.current &&
-        isActiveFind &&
-        restoreSelectionRef.current == null
-      ) {
-        restoreSelectionRef.current = view.state.selection.main;
-      } else if (previousActiveFindRef.current && !isActiveFind) {
-        const restoreSelection = restoreSelectionRef.current;
-        restoreSelectionRef.current = null;
-
-        if (restoreSelection) {
-          view.dispatch({
-            selection: EditorSelection.range(
-              restoreSelection.anchor,
-              restoreSelection.head,
-            ),
-            scrollIntoView: false,
-          });
-        } else {
-          const cursor = view.state.selection.main.head;
-          view.dispatch({
-            selection: EditorSelection.cursor(cursor),
-            scrollIntoView: false,
-          });
-        }
-      }
-
-      previousActiveFindRef.current = isActiveFind;
-    }, [searchActiveMatchIndex, searchQuery]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view) {
-        return;
-      }
-
-      const currentQuery = getSearchQuery(view.state);
-      if (currentQuery.search === searchQuery) {
-        return;
-      }
-
-      const activeElement = document.activeElement;
-      if (searchQuery && !searchPanelOpen(view.state)) {
-        openSearchPanel(view);
-        if (activeElement instanceof HTMLElement) {
-          activeElement.focus();
-        }
-      } else if (!searchQuery && searchPanelOpen(view.state)) {
-        closeSearchPanel(view);
-      }
-
-      view.dispatch({
-        effects: setSearchQuery.of(
-          new SearchQuery({ search: searchQuery, literal: true }),
-        ),
-      });
-
-      const query = getSearchQuery(view.state);
-      onSearchMatchCountChangeRef.current?.(
-        countSearchMatches(view.state, query),
-      );
-    }, [searchQuery]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view) {
-        return;
-      }
-
       const nextMarkdown = markdown;
       const currentMarkdown = view.state.doc.toString();
       const isNewLoad = lastLoadKeyRef.current !== loadKey;
@@ -860,48 +625,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       applyingExternalChangeRef.current = false;
       lastLoadKeyRef.current = loadKey;
     }, [autoFocus, loadKey, markdown, onAutoFocusHandled]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view || !searchHighlightAllMatchesYellow || !searchQuery) {
-        return;
-      }
-
-      const frame = requestAnimationFrame(() => {
-        const [firstMatch] = collectSearchMatches(
-          view.state.doc.toString(),
-          searchQuery,
-        );
-        if (!firstMatch) {
-          return;
-        }
-
-        revealEditorPositionIfNeeded(view, firstMatch.from);
-      });
-
-      return () => cancelAnimationFrame(frame);
-    }, [loadKey, markdown, searchHighlightAllMatchesYellow, searchQuery]);
-
-    useEffect(() => {
-      const view = viewRef.current;
-      if (!view) {
-        return;
-      }
-
-      if (searchActiveMatchIndex == null || !searchQuery) {
-        return;
-      }
-
-      const query = getSearchQuery(view.state);
-      const match = findMatchAtIndex(view.state, query, searchActiveMatchIndex);
-      if (match) {
-        view.dispatch({
-          selection: EditorSelection.range(match.from, match.to),
-          scrollIntoView: false,
-        });
-        centerEditorPositionInView(view, match.from);
-      }
-    }, [searchActiveMatchIndex, searchQuery, searchScrollRevision]);
 
     useImperativeHandle(
       ref,
