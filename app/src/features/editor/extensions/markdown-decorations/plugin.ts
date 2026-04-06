@@ -76,18 +76,6 @@ const SEARCH_REVEAL_NODE_NAMES = new Set([
   "Strikethrough",
 ]);
 
-function caretCrossedLine(
-  previousState: EditorView["state"],
-  nextState: EditorView["state"],
-  previousHead: number,
-  nextHead: number,
-) {
-  if (previousHead === nextHead) return false;
-  const previousLine = previousState.doc.lineAt(previousHead);
-  const nextLine = nextState.doc.lineAt(nextHead);
-  return previousLine.from !== nextLine.from || previousLine.to !== nextLine.to;
-}
-
 function selectionAffectsDecorations(
   previousState: EditorView["state"],
   nextState: EditorView["state"],
@@ -102,16 +90,7 @@ function selectionAffectsDecorations(
     if (!nextRange || previousRange.empty !== nextRange.empty) return true;
 
     if (previousRange.empty) {
-      if (
-        caretCrossedLine(
-          previousState,
-          nextState,
-          previousRange.head,
-          nextRange.head,
-        )
-      ) {
-        return true;
-      }
+      if (previousRange.head !== nextRange.head) return true;
     } else if (
       previousRange.from !== nextRange.from ||
       previousRange.to !== nextRange.to
