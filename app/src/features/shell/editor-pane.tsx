@@ -508,7 +508,10 @@ export function EditorPane({
       : null;
   const isViewingDeletedConflictSnapshot = viewedConflictSnapshot?.op === "del";
   const isReadOnly =
-    readonly || isSystemReadOnly || isViewingDeletedConflictSnapshot;
+    readonly ||
+    isSystemReadOnly ||
+    hasConflict ||
+    isViewingDeletedConflictSnapshot;
 
   const find = useFindBar({ noteId, searchQuery, editorRef, setFocusedPane });
   const {
@@ -740,30 +743,22 @@ export function EditorPane({
   }
 
   let toolbarSlot: React.ReactNode = null;
-  if (readonly || isViewingDeletedConflictSnapshot) {
+  if (isReadOnly) {
+    let readOnlyTooltip = "Read-only";
+    if (isViewingDeletedConflictSnapshot) {
+      readOnlyTooltip = "Choose or merge a note version to edit";
+    } else if (hasConflict) {
+      readOnlyTooltip = "Resolve the conflict to edit";
+    }
+
     toolbarSlot = (
       <Tooltip>
         <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
-          <span
-            aria-label={
-              isViewingDeletedConflictSnapshot
-                ? "Choose or merge a note version to edit"
-                : "Read-only"
-            }
-            title={
-              isViewingDeletedConflictSnapshot
-                ? "Choose or merge a note version to edit"
-                : "Read-only"
-            }
-          >
+          <span aria-label={readOnlyTooltip} title={readOnlyTooltip}>
             <PencilOff className="size-[1.2rem]" />
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom">
-          {isViewingDeletedConflictSnapshot
-            ? "Choose or merge a note version to edit"
-            : "Read-only"}
-        </TooltipContent>
+        <TooltipContent side="bottom">{readOnlyTooltip}</TooltipContent>
       </Tooltip>
     );
   } else if (!isReadOnly) {
