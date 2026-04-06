@@ -10,6 +10,11 @@ TEST_NOTES_DIR="${SCRIPT_DIR}/test-notes"
 TEST_ATTACHMENTS_DIR="${SCRIPT_DIR}/test-attachments"
 GENERATED_SQL_PATH="$(mktemp -t comet-seed-notes.XXXXXX.sql)"
 TEMP_DB_PATH=""
+ACCOUNT_ONLY=0
+
+usage() {
+  echo "usage: sh ./scripts/seed-db.sh [--account-only]"
+}
 
 cleanup() {
   rm -f "$GENERATED_SQL_PATH"
@@ -20,19 +25,39 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-if [ ! -d "$TEST_NOTES_DIR" ]; then
-  echo "No test notes directory found at: $TEST_NOTES_DIR"
-  exit 1
-fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --account-only)
+      ACCOUNT_ONLY=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
 
-if [ ! -d "$TEST_ATTACHMENTS_DIR" ]; then
-  echo "No test attachments directory found at: $TEST_ATTACHMENTS_DIR"
-  exit 1
-fi
+if [ "$ACCOUNT_ONLY" -ne 1 ]; then
+  if [ ! -d "$TEST_NOTES_DIR" ]; then
+    echo "No test notes directory found at: $TEST_NOTES_DIR"
+    exit 1
+  fi
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "node is required to generate seed data"
-  exit 1
+  if [ ! -d "$TEST_ATTACHMENTS_DIR" ]; then
+    echo "No test attachments directory found at: $TEST_ATTACHMENTS_DIR"
+    exit 1
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    echo "node is required to generate seed data"
+    exit 1
+  fi
 fi
 
 if ! command -v cargo >/dev/null 2>&1; then
@@ -70,13 +95,22 @@ ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
 
 NOW_MS="$(($(date +%s) * 1000))"
 
-node "$SCRIPT_DIR/generate-seed-notes.mjs" "$TEST_NOTES_DIR" "$NOW_MS" >"$GENERATED_SQL_PATH"
-node \
-  "$SCRIPT_DIR/generate-seed-blob-meta.mjs" \
-  "$TEST_ATTACHMENTS_DIR" \
-  "$PUBLIC_KEY" \
-  "https://media.comet.md" \
-  >>"$GENERATED_SQL_PATH"
+READ_SEED_SQL=".read $GENERATED_SQL_PATH"
+LAST_OPEN_NOTE_SETTING="  ('last_open_note_id', 'note-01-luna-range-calibration'),"
+
+if [ "$ACCOUNT_ONLY" -ne 1 ]; then
+  node "$SCRIPT_DIR/generate-seed-notes.mjs" "$TEST_NOTES_DIR" "$NOW_MS" >"$GENERATED_SQL_PATH"
+  node \
+    "$SCRIPT_DIR/generate-seed-blob-meta.mjs" \
+    "$TEST_ATTACHMENTS_DIR" \
+    "$PUBLIC_KEY" \
+    "https://media.comet.md" \
+    >>"$GENERATED_SQL_PATH"
+else
+  READ_SEED_SQL=""
+  LAST_OPEN_NOTE_SETTING=""
+fi
+
 TEMP_DB_PATH="$(mktemp "${ACCOUNT_DIR}/comet.seed.XXXXXX.db")"
 
 sqlite3 "$TEMP_DB_PATH" <<SQL
@@ -237,10 +271,10 @@ CREATE INDEX idx_sync_snapshots_scope ON sync_snapshots(author_pubkey, d_tag);
 CREATE INDEX idx_sync_snapshots_snapshot_id ON sync_snapshots(snapshot_id);
 CREATE INDEX idx_sync_snapshots_mtime ON sync_snapshots(mtime DESC);
 
-.read $GENERATED_SQL_PATH
+$READ_SEED_SQL
 
 INSERT INTO app_settings (key, value) VALUES
-  ('last_open_note_id', 'note-01-luna-range-calibration'),
+$LAST_OPEN_NOTE_SETTING
   ('tag_index_version', 'tag_paths_v1'),
   ('tag_index_status', 'ready'),
   ('nsec_storage', 'database'),
@@ -288,7 +322,14 @@ security add-generic-password \
 
 rm -rf "$ATTACHMENTS_DIR"
 mkdir -p "$ATTACHMENTS_DIR"
-node "$SCRIPT_DIR/install-seed-attachments.mjs" "$TEST_ATTACHMENTS_DIR" "$ATTACHMENTS_DIR" >/dev/null
+
+if [ "$ACCOUNT_ONLY" -ne 1 ]; then
+  node "$SCRIPT_DIR/install-seed-attachments.mjs" "$TEST_ATTACHMENTS_DIR" "$ATTACHMENTS_DIR" >/dev/null
+fi
 
 echo "Seeded Comet database at: $DB_PATH"
-echo "Loaded 50 markdown fixtures from: $TEST_NOTES_DIR"
+if [ "$ACCOUNT_ONLY" -eq 1 ]; then
+  echo "Initialized active account only (no notes, blobs, or attachments)."
+else
+  echo "Loaded 50 markdown fixtures from: $TEST_NOTES_DIR"
+fi
