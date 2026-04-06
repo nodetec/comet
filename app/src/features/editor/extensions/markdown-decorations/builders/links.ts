@@ -303,6 +303,11 @@ function getExternalLinkTargetFromEvent(
 
   const hasPointerCoordinates = event.clientX !== 0 || event.clientY !== 0;
   if (hasPointerCoordinates) {
+    const contentRect = view.contentDOM.getBoundingClientRect();
+    if (event.clientX < contentRect.left || event.clientX > contentRect.right) {
+      return null;
+    }
+
     const position = view.posAtCoords(
       { x: event.clientX, y: event.clientY },
       false,
@@ -341,7 +346,7 @@ export function linkInteractions(): Extension {
       return true;
     },
     click(event, view) {
-      if (!shouldOpenLink(event)) {
+      if (!shouldOpenLink(event) || !view.state.selection.main.empty) {
         return false;
       }
 
