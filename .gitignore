@@ -6,6 +6,8 @@ dist/
 .wrangler/
 web/.env*
 !web/.env.example
+app/.env*
+!app/.env.example
 web/src/routeTree.gen.ts
 app/dist/
 app/src-tauri/target/

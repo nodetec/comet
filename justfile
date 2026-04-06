@@ -48,6 +48,9 @@ app-clippy:
 app-seed:
   pnpm --filter @comet/app seed:db
 
+app-seed-account:
+  pnpm --filter @comet/app seed:db -- --account-only
+
 app-check:
   pnpm format:check
   pnpm exec turbo run lint typecheck test build --filter=@comet/app
