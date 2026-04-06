@@ -216,6 +216,8 @@ pub fn run() {
             commands::blob::set_blossom_url,
             commands::blob::remove_blossom_url,
             commands::blob::fetch_blob,
+            // Web
+            commands::web::resolve_url_title,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

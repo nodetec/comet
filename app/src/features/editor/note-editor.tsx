@@ -89,6 +89,7 @@ import {
   tagHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/tag-syntax";
 import { tagAutocomplete } from "@/features/editor/extensions/tag-autocomplete";
+import { pasteLink } from "@/features/editor/extensions/paste-link";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
 import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import {
@@ -397,6 +398,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           AUTOCOMPLETE_MENU_THEME,
           presentationExtension,
           tagHighlightStyle,
+          pasteLink(),
           search(),
           EditorView.domEventHandlers({
             pointerdown(event, view) {

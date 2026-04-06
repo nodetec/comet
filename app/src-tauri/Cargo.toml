@@ -28,6 +28,9 @@ nostr-sdk = { version = "0.44.1", features = ["nip59"] }
 notify = "8.2.0"
 walkdir = "2.5.0"
 gray_matter = "0.3.2"
+html-escape = "0.2"
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+objc2-foundation = { version = "0.3", features = ["NSString"] }
 rusqlite_migration = "2.4.1"
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 tauri-plugin-clipboard-manager = "2"

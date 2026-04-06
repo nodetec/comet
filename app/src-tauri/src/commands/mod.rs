@@ -3,3 +3,4 @@ pub mod app;
 pub mod blob;
 pub mod notes;
 pub mod sync;
+pub mod web;
