@@ -657,11 +657,38 @@ function getGutterTableBoundarySelection(
   );
 }
 
+function getDocumentBoundaryCursorForVerticalOverflow(
+  view: EditorView,
+  clientY: number,
+) {
+  const startRect = view.coordsAtPos(0, 1) ?? view.coordsAtPos(0, -1);
+  if (startRect && clientY < startRect.top) {
+    return EditorSelection.cursor(0, 1);
+  }
+
+  const endPosition = view.state.doc.length;
+  const endRect =
+    view.coordsAtPos(endPosition, -1) ?? view.coordsAtPos(endPosition, 1);
+  if (endRect && clientY > endRect.bottom) {
+    return EditorSelection.cursor(endPosition, -1);
+  }
+
+  return null;
+}
+
 function getLineBoundaryCursor(
   view: EditorView,
   clientY: number,
   side: GutterSide,
 ) {
+  const documentBoundaryCursor = getDocumentBoundaryCursorForVerticalOverflow(
+    view,
+    clientY,
+  );
+  if (documentBoundaryCursor) {
+    return documentBoundaryCursor;
+  }
+
   const contentRect = view.contentDOM.getBoundingClientRect();
   const targetY = Math.min(
     contentRect.bottom - 1,
@@ -717,7 +744,7 @@ function getSelectionHeadFromPoint(
   );
 
   if (clientX <= contentRect.left || clientX >= contentRect.right) {
-    return getLineBoundaryCursor(view, clampedY, side);
+    return getLineBoundaryCursor(view, clientY, side);
   }
 
   const tableBoundarySelection = getTableBoundarySelection(
