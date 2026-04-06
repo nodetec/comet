@@ -52,3 +52,8 @@ pub async fn switch_account(
 ) -> Result<AccountSummary, AppError> {
     run_account_change(&app, || db::switch_account(&app, &public_key)).await
 }
+
+#[tauri::command]
+pub fn rename_account(app: AppHandle, public_key: String, name: String) -> Result<(), AppError> {
+    db::rename_account(&app, &public_key, &name)
+}

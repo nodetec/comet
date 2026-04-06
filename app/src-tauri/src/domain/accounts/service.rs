@@ -16,16 +16,18 @@ const STAGED_ACCOUNT_PREFIX: &str = ".staged-account-";
 pub fn list_accounts(app: &AppHandle) -> Result<Vec<AccountSummary>, AppError> {
     let conn = app_database_connection(app)?;
     let mut stmt = conn.prepare(
-        "SELECT public_key, npub, is_active
+        "SELECT public_key, npub, label, is_active
          FROM accounts
          ORDER BY is_active DESC, created_at ASC",
     )?;
     let rows = stmt
         .query_map([], |row| {
+            let label: Option<String> = row.get(2)?;
             Ok(AccountSummary {
                 public_key: row.get(0)?,
                 npub: row.get(1)?,
-                is_active: row.get::<_, i64>(2)? != 0,
+                name: label.unwrap_or_default(),
+                is_active: row.get::<_, i64>(3)? != 0,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -86,11 +88,13 @@ pub fn add_account(
         fs::rename(&staged_dir, &target_dir)?;
         moved_target_dir = Some(target_dir.clone());
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
-        register_account(&mut app_conn, &account, None, true)?;
+        let name = next_default_account_name(&app_conn)?;
+        register_account(&mut app_conn, &account, Some(&name), true)?;
 
         Ok(AccountSummary {
             public_key: account.public_key,
             npub: account.npub,
+            name,
             is_active: true,
         })
     })();
@@ -112,20 +116,21 @@ pub fn add_account(
 
 pub fn switch_account(app: &AppHandle, public_key: &str) -> Result<AccountSummary, AppError> {
     let mut conn = app_database_connection(app)?;
-    let account =
+    let (account, label) =
         load_account_record_by_public_key(app, &conn, public_key)?.ok_or(AccountError::NotFound)?;
     ensure_account_database_ready(&account)?;
     set_active_account(&mut conn, public_key)?;
     Ok(AccountSummary {
         public_key: account.public_key,
         npub: account.npub,
+        name: label.unwrap_or_default(),
         is_active: true,
     })
 }
 
 pub fn get_account_nsec(app: &AppHandle, public_key: &str) -> Result<String, AppError> {
     let conn = app_database_connection(app)?;
-    let account =
+    let (account, _label) =
         load_account_record_by_public_key(app, &conn, public_key)?.ok_or(AccountError::NotFound)?;
     ensure_account_database_ready(&account)?;
     let account_conn = Connection::open(&account.db_path)?;
@@ -202,7 +207,7 @@ pub(crate) fn create_initial_account(
         moved_target_dir = Some(target_dir.clone());
 
         account.db_path = target_dir.join(ACCOUNT_DATABASE_FILE);
-        register_account(app_conn, &account, None, true)?;
+        register_account(app_conn, &account, Some("Profile 1"), true)?;
         Ok(account)
     })();
 
@@ -222,21 +227,24 @@ fn load_account_record_by_public_key(
     app: &AppHandle,
     conn: &Connection,
     public_key: &str,
-) -> Result<Option<AccountRecord>, AppError> {
-    let row: Option<(String, String)> = conn
+) -> Result<Option<(AccountRecord, Option<String>)>, AppError> {
+    let row: Option<(String, String, Option<String>)> = conn
         .query_row(
-            "SELECT public_key, npub FROM accounts WHERE public_key = ?1 LIMIT 1",
+            "SELECT public_key, npub, label FROM accounts WHERE public_key = ?1 LIMIT 1",
             params![public_key],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()?;
 
-    row.map(|(public_key, npub)| {
-        Ok(AccountRecord {
-            db_path: account_db_path(app, &npub)?,
-            public_key,
-            npub,
-        })
+    row.map(|(public_key, npub, label)| {
+        Ok((
+            AccountRecord {
+                db_path: account_db_path(app, &npub)?,
+                public_key,
+                npub,
+            },
+            label,
+        ))
     })
     .transpose()
 }
@@ -342,6 +350,23 @@ fn account_identity_record(
     )
     .optional()
     .map_err(Into::into)
+}
+
+pub fn rename_account(app: &AppHandle, public_key: &str, name: &str) -> Result<(), AppError> {
+    let conn = app_database_connection(app)?;
+    let changed = conn.execute(
+        "UPDATE accounts SET label = ?1, updated_at = ?2 WHERE public_key = ?3",
+        params![name, now_millis(), public_key],
+    )?;
+    if changed == 0 {
+        return Err(AccountError::NotFound.into());
+    }
+    Ok(())
+}
+
+fn next_default_account_name(conn: &Connection) -> Result<String, AppError> {
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))?;
+    Ok(format!("Profile {}", count + 1))
 }
 
 fn staged_account_dir(app: &AppHandle) -> Result<PathBuf, AppError> {

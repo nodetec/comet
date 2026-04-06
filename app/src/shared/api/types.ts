@@ -88,6 +88,7 @@ export type BootstrapPayload = {
 export type AccountSummary = {
   publicKey: string;
   npub: string;
+  name: string;
   isActive: boolean;
 };
 

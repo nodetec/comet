@@ -209,3 +209,10 @@ export async function getSecretStorageStatus() {
 export async function moveSecretToKeychain() {
   return invoke<SecretStorageStatus>("move_secret_to_keychain");
 }
+
+export async function renameAccount(input: {
+  publicKey: string;
+  name: string;
+}) {
+  return invoke<void>("rename_account", input);
+}

@@ -20,6 +20,7 @@ pub struct AccountRecord {
 pub struct AccountSummary {
     pub public_key: String,
     pub npub: String,
+    pub name: String,
     pub is_active: bool,
 }
 

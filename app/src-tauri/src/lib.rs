@@ -192,6 +192,7 @@ pub fn run() {
             commands::accounts::move_secret_to_keychain,
             commands::accounts::add_account,
             commands::accounts::switch_account,
+            commands::accounts::rename_account,
             // Sync & Relays
             commands::sync::list_relays,
             commands::sync::set_sync_relay,

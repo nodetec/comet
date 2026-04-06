@@ -10,6 +10,7 @@ import {
   getSecretStorageStatus,
   listAccounts,
   moveSecretToKeychain,
+  renameAccount,
   switchAccount,
 } from "@/shared/api/invoke";
 import { Button } from "@/shared/ui/button";
@@ -18,6 +19,71 @@ import {
   prepareForAccountChange,
   preserveSettingsAcrossReload,
 } from "@/features/settings/lib/account-change";
+
+function truncatedNpub(npub: string) {
+  return npub.length > 20 ? `${npub.slice(0, 12)}...${npub.slice(-8)}` : npub;
+}
+
+function AccountNameEditor({
+  name,
+  publicKey,
+  onRename,
+}: {
+  name: string;
+  publicKey: string;
+  onRename: (publicKey: string, name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== name) {
+      onRename(publicKey, trimmed);
+    } else {
+      setValue(name);
+    }
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="text-foreground hover:bg-muted rounded px-1 py-0.5 text-sm font-medium transition-colors"
+        onClick={() => {
+          setValue(name);
+          setEditing(true);
+          requestAnimationFrame(() => inputRef.current?.select());
+        }}
+        title="Click to rename"
+      >
+        {name || "Unnamed"}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      autoFocus
+      type="text"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+        } else if (e.key === "Escape") {
+          setValue(name);
+          setEditing(false);
+        }
+      }}
+      className="bg-muted w-full max-w-60 rounded border px-1 py-0.5 text-sm"
+    />
+  );
+}
 
 export function ProfileSettings() {
   const queryClient = useQueryClient();
@@ -99,6 +165,16 @@ export function ProfileSettings() {
     },
   });
 
+  const renameAccountMutation = useMutation({
+    mutationFn: renameAccount,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Couldn't rename profile"));
+    },
+  });
+
   const moveSecretToKeychainMutation = useMutation({
     mutationFn: moveSecretToKeychain,
     onSuccess: async () => {
@@ -155,9 +231,6 @@ export function ProfileSettings() {
     copyNsecMutation.mutate(publicKey);
   };
 
-  const truncated =
-    npub.length > 20 ? `${npub.slice(0, 12)}...${npub.slice(-8)}` : npub;
-
   const secretStorageLabel =
     secretStorageStatus?.storage === "keychain"
       ? "OS keychain"
@@ -174,29 +247,43 @@ export function ProfileSettings() {
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="mb-4 text-sm font-medium">Active Account</h3>
+        <h3 className="mb-4 text-sm font-medium">Active Profile</h3>
 
-        <div>
-          <label className="text-muted-foreground mb-1 block text-xs">
-            Public Key
-          </label>
-          <div className="flex items-center gap-2">
-            <code className="bg-muted rounded px-2 py-1 text-sm">
-              {truncated}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopy}
-              disabled={!npub}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              title="Copy full npub"
-            >
-              {copied ? (
-                <Check className="size-4" />
-              ) : (
-                <Copy className="size-4" />
-              )}
-            </button>
+        <div className="space-y-3">
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">
+              Name
+            </label>
+            <AccountNameEditor
+              name={activeAccount?.name ?? ""}
+              publicKey={activeAccount?.publicKey ?? ""}
+              onRename={(publicKey, name) =>
+                renameAccountMutation.mutate({ publicKey, name })
+              }
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">
+              Public Key
+            </label>
+            <div className="flex items-center gap-2">
+              <code className="bg-muted rounded px-2 py-1 text-sm">
+                {truncatedNpub(npub)}
+              </code>
+              <button
+                type="button"
+                onClick={handleCopy}
+                disabled={!npub}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Copy full npub"
+              >
+                {copied ? (
+                  <Check className="size-4" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -244,7 +331,7 @@ export function ProfileSettings() {
 
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-medium">Accounts</h3>
+          <h3 className="text-sm font-medium">Profiles</h3>
           {addingAccount ? null : (
             <Button
               variant="link"
@@ -252,7 +339,7 @@ export function ProfileSettings() {
               onClick={() => setAddingAccount(true)}
               disabled={isAccountChangePending}
             >
-              Add Account
+              Add Profile
             </Button>
           )}
         </div>
@@ -274,17 +361,18 @@ export function ProfileSettings() {
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <code className="text-sm">
-                      {account.npub.length > 20
-                        ? `${account.npub.slice(0, 12)}...${account.npub.slice(-8)}`
-                        : account.npub}
-                    </code>
+                    <span className="truncate text-sm font-medium">
+                      {account.name || truncatedNpub(account.npub)}
+                    </span>
                     {account.isActive ? (
                       <span className="text-muted-foreground text-xs">
                         Active
                       </span>
                     ) : null}
                   </div>
+                  <code className="text-muted-foreground text-xs">
+                    {truncatedNpub(account.npub)}
+                  </code>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -325,7 +413,7 @@ export function ProfileSettings() {
         {addingAccount ? (
           <div className="mt-4 space-y-3">
             <p className="text-muted-foreground text-xs">
-              Adding an account creates a separate workspace for that Nostr
+              Adding a profile creates a separate workspace for that Nostr
               identity.
             </p>
             <input
@@ -355,7 +443,7 @@ export function ProfileSettings() {
             </label>
             {addAccountMutation.isError ? (
               <p className="text-destructive text-xs">
-                {errorMessage(addAccountMutation.error, "Add account failed")}
+                {errorMessage(addAccountMutation.error, "Add profile failed")}
               </p>
             ) : null}
             <div className="flex gap-2">
@@ -364,7 +452,7 @@ export function ProfileSettings() {
                 onClick={handleAddAccount}
                 disabled={!nsec.trim() || isAccountChangePending}
               >
-                {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+                {addAccountMutation.isPending ? "Adding..." : "Add Profile"}
               </Button>
               <Button
                 size="xs"

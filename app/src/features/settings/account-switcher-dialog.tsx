@@ -149,7 +149,7 @@ export function AccountSwitcherDialog({
     if (isLoading) {
       return (
         <div className="text-muted-foreground py-8 text-center text-sm">
-          Loading accounts…
+          Loading profiles…
         </div>
       );
     }
@@ -158,7 +158,7 @@ export function AccountSwitcherDialog({
       return (
         <div className="space-y-3">
           <p className="text-destructive text-sm">
-            {errorMessage(error, "Couldn't load accounts.")}
+            {errorMessage(error, "Couldn't load profiles.")}
           </p>
           <div className="flex justify-end">
             <Button
@@ -176,7 +176,7 @@ export function AccountSwitcherDialog({
     if (accounts.length === 0) {
       return (
         <div className="space-y-3">
-          <p className="text-muted-foreground text-sm">No accounts found.</p>
+          <p className="text-muted-foreground text-sm">No profiles found.</p>
           <div className="flex justify-end">
             <Button
               size="sm"
@@ -231,9 +231,12 @@ export function AccountSwitcherDialog({
                   <div className="flex items-center gap-2">
                     <UserRound className="text-muted-foreground size-4 shrink-0" />
                     <span className="truncate text-sm font-medium">
-                      {truncatedNpub(account.npub)}
+                      {account.name || truncatedNpub(account.npub)}
                     </span>
                   </div>
+                  <code className="text-muted-foreground ml-6 text-xs">
+                    {truncatedNpub(account.npub)}
+                  </code>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {isSwitching ? (
@@ -253,7 +256,7 @@ export function AccountSwitcherDialog({
 
         <div className="mt-4 flex items-center justify-between gap-3">
           <p className="text-muted-foreground text-xs">
-            Use ↑ and ↓ to choose an account, then press Enter to switch.
+            Use ↑ and ↓ to choose a profile, then press Enter to switch.
           </p>
           <Button
             size="sm"
@@ -266,13 +269,13 @@ export function AccountSwitcherDialog({
 
         {hasSwitchTarget ? null : (
           <p className="text-muted-foreground mt-3 text-xs">
-            Add another account in Settings to switch between identities.
+            Add another profile in Settings to switch between identities.
           </p>
         )}
 
         {isSwitchAccountError ? (
           <p className="text-destructive mt-3 text-xs">
-            {errorMessage(switchAccountError, "Couldn't switch accounts.")}
+            {errorMessage(switchAccountError, "Couldn't switch profiles.")}
           </p>
         ) : null}
       </>
@@ -301,10 +304,10 @@ export function AccountSwitcherDialog({
           onKeyDown={handleDialogKeyDown}
         >
           <DialogTitle className="text-base font-semibold">
-            Switch Account
+            Switch Profile
           </DialogTitle>
           <DialogDescription className="mt-1">
-            Jump to another account without opening Settings.
+            Jump to another profile without opening Settings.
           </DialogDescription>
           <div className="mt-4">{content}</div>
         </DialogPopup>
