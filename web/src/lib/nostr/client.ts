@@ -18,6 +18,7 @@ export interface NostrFilter {
   authors?: string[];
   kinds?: number[];
   "#p"?: string[];
+  "#c"?: string[];
   "#d"?: string[];
   since?: number;
   until?: number;

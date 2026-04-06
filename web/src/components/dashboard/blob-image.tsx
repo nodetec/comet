@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { decryptBlob } from "~/lib/blob-crypto";
-import type { BlobRef } from "~/lib/nostr/rumor";
+import type { BlobRef } from "~/lib/nostr/snapshot";
 
 const blobUrlCache = new Map<string, string>();
 

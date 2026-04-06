@@ -1,8 +1,12 @@
 import { useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNostr } from "~/lib/nostr/use-nostr";
-import { unwrapGiftWrap } from "~/lib/nostr/nip59";
-import { parseNoteRumor, getRumorType, type Note } from "~/lib/nostr/rumor";
+import {
+  COMET_NOTE_COLLECTION,
+  COMET_NOTE_SNAPSHOT_KIND,
+  parseNoteSnapshotEvent,
+  type Note,
+} from "~/lib/nostr/snapshot";
 import type { NostrFilter } from "~/lib/nostr/client";
 
 const PAGE_SIZE = 20;
@@ -18,8 +22,9 @@ export function useNotes() {
       if (!relay || !pubkey) return { notes: [], cursor: undefined };
 
       const filter: NostrFilter = {
-        kinds: [1059],
-        "#p": [pubkey],
+        authors: [pubkey],
+        kinds: [COMET_NOTE_SNAPSHOT_KIND],
+        "#c": [COMET_NOTE_COLLECTION],
         limit: PAGE_SIZE,
       };
       if (pageParam !== undefined) {
@@ -27,21 +32,17 @@ export function useNotes() {
       }
 
       const events = await relay.fetch([filter]);
-
-      const notes: Note[] = [];
-      for (const event of events) {
-        try {
-          const rumor = await unwrapGiftWrap(event);
-          if (getRumorType(rumor) === "note") {
-            const note = parseNoteRumor(rumor);
-            if (!note.deletedAt) {
-              notes.push(note);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to unwrap event:", err);
+      const results = await Promise.allSettled(
+        events.map((event) => parseNoteSnapshotEvent(event)),
+      );
+      const notes = results.flatMap((result) => {
+        if (result.status === "fulfilled") {
+          return result.value ? [result.value] : [];
         }
-      }
+
+        console.error("Failed to parse note snapshot:", result.reason);
+        return [];
+      });
 
       const cursor =
         events.length >= PAGE_SIZE
@@ -57,7 +58,7 @@ export function useNotes() {
     refetchOnWindowFocus: false,
   });
 
-  // Flatten and deduplicate notes across pages (LWW by modifiedAt)
+  // Flatten and deduplicate note snapshots across pages (LWW by modifiedAt).
   const notes = useMemo(() => {
     if (!query.data) return [];
 
@@ -71,9 +72,9 @@ export function useNotes() {
       }
     }
 
-    return Array.from(noteMap.values()).sort(
-      (a, b) => b.modifiedAt - a.modifiedAt,
-    );
+    return Array.from(noteMap.values())
+      .filter((note) => !note.deletedAt)
+      .sort((a, b) => b.modifiedAt - a.modifiedAt);
   }, [query.data]);
 
   return {

@@ -3,7 +3,7 @@ import { Loader2, Inbox } from "lucide-react";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
-import type { Note } from "~/lib/nostr/rumor";
+import type { Note } from "~/lib/nostr/snapshot";
 
 function formatRelativeDate(millis: number): string {
   const now = Date.now();

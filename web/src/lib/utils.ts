@@ -31,6 +31,7 @@ const KIND_LABELS: Record<number, string> = {
   9: "Delete",
   23: "Long-form",
   1059: "Gift Wrap",
+  42061: "Comet Snapshot",
   10002: "Relay List",
   24242: "Blossom Auth",
   30023: "Long-form",

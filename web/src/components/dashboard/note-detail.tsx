@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { BlobImage } from "~/components/dashboard/blob-image";
-import type { BlobRef, Note } from "~/lib/nostr/rumor";
+import type { BlobRef, Note } from "~/lib/nostr/snapshot";
 
 function formatFullDate(millis: number): string {
   return new Date(millis).toLocaleDateString(undefined, {
