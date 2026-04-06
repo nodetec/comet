@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -14,37 +14,43 @@ function formatFullDate(millis: number): string {
 }
 
 export function NoteDetail({ note }: { note: Note }) {
-  const blobMap = useRef<Map<string, BlobRef>>(new Map());
-
-  useEffect(() => {
-    blobMap.current.clear();
+  const blobMap = useMemo(() => {
+    const next = new Map<string, BlobRef>();
     for (const blob of note.blobs) {
-      blobMap.current.set(blob.plaintextHash, blob);
+      next.set(blob.plaintextHash, blob);
     }
+    return next;
   }, [note.blobs]);
 
-  const imgComponent = useCallback((props: React.ComponentProps<"img">) => {
-    const src = props.src ?? "";
+  const imgComponent = useCallback(
+    (props: React.ComponentProps<"img">) => {
+      const src = props.src ?? "";
 
-    if (src.startsWith("attachment://")) {
-      const plaintextHash = src
-        .replace("attachment://", "")
-        .replace(/\.\w+$/, "");
-      const blobRef = blobMap.current.get(plaintextHash);
-      if (blobRef) {
-        return <BlobImage blobRef={blobRef} alt={props.alt ?? undefined} />;
+      if (src.startsWith("attachment://")) {
+        const plaintextHash = src
+          .replace("attachment://", "")
+          .replace(/\.\w+$/, "");
+        const blobRef = blobMap.get(plaintextHash);
+        if (blobRef) {
+          return <BlobImage blobRef={blobRef} alt={props.alt ?? undefined} />;
+        }
+        return (
+          <span className="text-muted-foreground text-xs">
+            [missing attachment]
+          </span>
+        );
       }
-      return (
-        <span className="text-muted-foreground text-xs">
-          [missing attachment]
-        </span>
-      );
-    }
 
-    return (
-      <img src={src} alt={props.alt ?? ""} className="max-w-full rounded-md" />
-    );
-  }, []);
+      return (
+        <img
+          src={src}
+          alt={props.alt ?? ""}
+          className="max-w-full rounded-md"
+        />
+      );
+    },
+    [blobMap],
+  );
 
   // Strip the title from markdown since we render it in the header
   const content =
