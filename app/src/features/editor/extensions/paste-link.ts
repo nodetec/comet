@@ -32,7 +32,8 @@ function domainLabel(url: string): string {
     const hostname = new URL(url).hostname;
     const bare = hostname.replace(/^www\./, "");
     const parts = bare.split(".");
-    return parts.length > 1 ? (parts.at(-2) ?? bare) : bare;
+    // eslint-disable-next-line unicorn/prefer-at
+    return parts.length > 1 ? (parts[parts.length - 2] ?? bare) : bare;
   } catch {
     return url;
   }
@@ -68,27 +69,40 @@ export function pasteLink() {
 
       event.preventDefault();
 
+      const { from, to } = view.state.selection.main;
+
       if (clipboardHtmlTitle) {
-        // We already have a title — insert immediately.
         const markdown = formatLink(clipboardHtmlTitle, plainText);
-        const { from, to } = view.state.selection.main;
         view.dispatch({
           changes: { from, to, insert: markdown },
           selection: EditorSelection.cursor(from + markdown.length),
         });
       } else {
-        // Resolve title via backend (pasteboard + fetch), then insert.
-        const { from, to } = view.state.selection.main;
-        void invoke<string | null>("resolve_url_title", {
-          url: plainText,
-        })
+        const placeholder = formatLink("...", plainText);
+        view.dispatch({
+          changes: { from, to, insert: placeholder },
+          selection: EditorSelection.cursor(from + placeholder.length),
+        });
+
+        void invoke<string | null>("resolve_url_title", { url: plainText })
           .catch(() => null)
           .then((resolvedTitle) => {
             const title = resolvedTitle ?? domainLabel(plainText);
-            const markdown = formatLink(title, plainText);
+            const current = view.state.sliceDoc(
+              from,
+              from + placeholder.length,
+            );
+            if (current !== placeholder) {
+              return;
+            }
+
+            const updated = formatLink(title, plainText);
             view.dispatch({
-              changes: { from, to, insert: markdown },
-              selection: EditorSelection.cursor(from + markdown.length),
+              changes: {
+                from,
+                to: from + placeholder.length,
+                insert: updated,
+              },
             });
           });
       }

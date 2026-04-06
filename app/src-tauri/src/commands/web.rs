@@ -53,6 +53,22 @@ fn clipboard_url_name() -> Option<String> {
     None
 }
 
+fn trim_title_suffix(title: &str) -> &str {
+    let mut earliest: Option<usize> = None;
+    for delim in [" | ", " - ", " — ", " · ", " :: ", " » "] {
+        if let Some(pos) = title.find(delim) {
+            earliest = Some(match earliest {
+                Some(e) => e.min(pos),
+                None => pos,
+            });
+        }
+    }
+    match earliest {
+        Some(pos) if pos > 0 => title[..pos].trim(),
+        _ => title,
+    }
+}
+
 fn extract_title(html: &str) -> Option<String> {
     let lower = html.to_lowercase();
     let start = lower.find("<title")?;
@@ -60,6 +76,7 @@ fn extract_title(html: &str) -> Option<String> {
     let content_start = start + after_tag + 1;
     let content_end = lower[content_start..].find("</title")?;
     let raw = &html[content_start..content_start + content_end];
-    let title = html_escape::decode_html_entities(raw.trim()).into_owned();
-    if title.is_empty() { None } else { Some(title) }
+    let decoded = html_escape::decode_html_entities(raw.trim()).into_owned();
+    let title = trim_title_suffix(&decoded);
+    if title.is_empty() { None } else { Some(title.to_owned()) }
 }
