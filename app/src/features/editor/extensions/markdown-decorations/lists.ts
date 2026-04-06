@@ -1029,7 +1029,6 @@ function expandSelectionRangeToOverlappingMarkers(
 ) {
   let nextFrom = from;
   let nextTo = to;
-  let changed = false;
 
   for (const marker of buildListMarkerRanges(state)) {
     if (nextFrom >= marker.to || nextTo <= marker.from) {
@@ -1038,9 +1037,9 @@ function expandSelectionRangeToOverlappingMarkers(
 
     nextFrom = Math.min(nextFrom, marker.from);
     nextTo = Math.max(nextTo, marker.to);
-    changed = true;
   }
 
+  const changed = nextFrom !== from || nextTo !== to;
   return { changed, from: nextFrom, to: nextTo };
 }
 
