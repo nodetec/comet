@@ -71,6 +71,16 @@ function useDebouncedSearch(
   }, [searchTerm, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+function focusSelectedNoteRow() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLButtonElement>('[data-comet-selected-note="true"]')
+        ?.focus({ preventScroll: true });
+    });
+  });
+}
+
 export function CommandPalette({
   availableTagPaths,
   open,
@@ -83,6 +93,7 @@ export function CommandPalette({
   const [tagResults, setTagResults] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  const shouldFocusSelectedNoteOnCloseRef = useRef(false);
 
   const mode: SearchMode = query.startsWith("#") ? "tags" : "notes";
 
@@ -116,6 +127,7 @@ export function CommandPalette({
   );
 
   const handleSelectNote = (noteId: string) => {
+    shouldFocusSelectedNoteOnCloseRef.current = true;
     onSelectNote(noteId);
     onOpenChange(false);
   };
@@ -131,10 +143,26 @@ export function CommandPalette({
       : !!searchTerm && !(searching && !hasResults);
 
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
+    <DialogRoot
+      open={open}
+      onOpenChange={onOpenChange}
+      onOpenChangeComplete={(nextOpen) => {
+        if (nextOpen || !shouldFocusSelectedNoteOnCloseRef.current) {
+          return;
+        }
+
+        shouldFocusSelectedNoteOnCloseRef.current = false;
+        focusSelectedNoteRow();
+      }}
+    >
       <DialogPortal>
         <DialogBackdrop />
-        <DialogPopup className="fixed top-[20%] left-1/2 w-full max-w-lg -translate-x-1/2 translate-y-0 overflow-hidden p-0">
+        <DialogPopup
+          className="fixed top-[20%] left-1/2 w-full max-w-lg -translate-x-1/2 translate-y-0 overflow-hidden p-0"
+          finalFocus={() =>
+            shouldFocusSelectedNoteOnCloseRef.current ? false : true
+          }
+        >
           <CommandPrimitive className="flex flex-col" shouldFilter={false} loop>
             <div className="flex items-center px-3">
               <Search className="text-muted-foreground mr-2 size-4 shrink-0" />

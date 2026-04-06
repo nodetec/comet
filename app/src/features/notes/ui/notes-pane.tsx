@@ -400,7 +400,7 @@ function noteRowClassName(params: {
 }) {
   const { focusedPane, isActive, isSearchFocused } = params;
   return [
-    "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm",
+    "relative flex h-[6.75rem] w-full cursor-default flex-col items-start gap-2 overflow-hidden rounded-md px-3 py-2.5 text-left text-sm outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
     isActive ? "bg-accent/50" : "",
     isActive && focusedPane === "notes" && !isSearchFocused
       ? "before:bg-note-focus-indicator before:absolute before:inset-y-0 before:left-0 before:w-[5px]"
@@ -468,6 +468,7 @@ const NoteRow = memo(function NoteRow({
           isActive,
           isSearchFocused,
         })}
+        data-comet-selected-note={isActive ? "true" : undefined}
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
         onPointerDown={handleNoteRowPointerDown}
