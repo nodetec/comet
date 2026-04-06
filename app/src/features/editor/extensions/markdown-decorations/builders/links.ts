@@ -140,32 +140,35 @@ function isInsidePlainLinkExcludedSyntax(
 export function addPlainExternalLinkDecorations(
   ctx: BuilderContext,
   out: DecorationEntry[],
+  ranges: readonly { from: number; to: number }[],
 ): void {
-  const doc = ctx.state.doc.toString();
   const tree = syntaxTree(ctx.state);
 
-  for (const match of doc.matchAll(PLAIN_EXTERNAL_LINK_RE)) {
-    if (match.index == null) {
-      continue;
+  for (const range of ranges) {
+    const slice = ctx.state.doc.sliceString(range.from, range.to);
+    for (const match of slice.matchAll(PLAIN_EXTERNAL_LINK_RE)) {
+      if (match.index == null) {
+        continue;
+      }
+
+      const rawTarget = match[0];
+      const target = trimPlainExternalLink(rawTarget);
+      if (target.length === 0) {
+        continue;
+      }
+
+      const from = range.from + match.index;
+      const to = from + target.length;
+
+      if (
+        isInsidePlainLinkExcludedSyntax(tree, from) ||
+        isInsidePlainLinkExcludedSyntax(tree, to - 1)
+      ) {
+        continue;
+      }
+
+      out.push({ from, to, decoration: linkMark });
     }
-
-    const rawTarget = match[0];
-    const target = trimPlainExternalLink(rawTarget);
-    if (target.length === 0) {
-      continue;
-    }
-
-    const from = match.index;
-    const to = from + target.length;
-
-    if (
-      isInsidePlainLinkExcludedSyntax(tree, from) ||
-      isInsidePlainLinkExcludedSyntax(tree, to - 1)
-    ) {
-      continue;
-    }
-
-    out.push({ from, to, decoration: linkMark });
   }
 }
 

@@ -17,8 +17,11 @@ import {
 import { RangeSetBuilder } from "@codemirror/state";
 
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
+import type { SearchMatch } from "@/shared/lib/search";
 import { collectSearchMatches } from "@/shared/lib/search";
 import { resolveImageSrc } from "@/shared/lib/attachments";
+
+const VISIBLE_RANGE_MARGIN = 1000;
 
 type InlineImageMatch = {
   altText: string;
@@ -144,11 +147,50 @@ export function findInlineImageBeforeCursor(
   return null;
 }
 
-function buildInlineImageDecorations(state: EditorState, searchQuery: string) {
-  const builder = new RangeSetBuilder<Decoration>();
-  const searchMatches = collectSearchMatches(state.doc.toString(), searchQuery);
+function findInlineImagesInRanges(
+  state: EditorState,
+  ranges: readonly { from: number; to: number }[],
+): InlineImageMatch[] {
+  const tree = syntaxTree(state);
+  const matches: InlineImageMatch[] = [];
 
-  for (const match of findInlineImages(state)) {
+  for (const range of ranges) {
+    const slice = state.doc.sliceString(range.from, range.to);
+    const regex = new RegExp(INLINE_IMAGE_REGEX.source, "g");
+
+    let m;
+    while ((m = regex.exec(slice)) !== null) {
+      const from = range.from + m.index;
+      const to = from + m[0].length;
+
+      if (isInsideCodeBlock(tree, from)) {
+        continue;
+      }
+
+      matches.push({
+        altText: m[1] ?? "",
+        from,
+        src: m[2] ?? "",
+        to,
+      });
+    }
+  }
+
+  return matches;
+}
+
+function buildInlineImageDecorations(
+  view: EditorView,
+  searchMatches: SearchMatch[],
+) {
+  const builder = new RangeSetBuilder<Decoration>();
+  const docLength = view.state.doc.length;
+  const ranges = view.visibleRanges.map(({ from, to }) => ({
+    from: Math.max(0, from - VISIBLE_RANGE_MARGIN),
+    to: Math.min(docLength, to + VISIBLE_RANGE_MARGIN),
+  }));
+
+  for (const match of findInlineImagesInRanges(view.state, ranges)) {
     if (overlapsAny(match.from, match.to, searchMatches)) {
       continue;
     }
@@ -175,19 +217,34 @@ function inlineImagePlugin(searchQuery = "") {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
+      searchMatches: SearchMatch[];
 
       constructor(view: EditorView) {
-        this.decorations = buildInlineImageDecorations(view.state, searchQuery);
+        this.searchMatches = collectSearchMatches(
+          view.state.doc.toString(),
+          searchQuery,
+        );
+        this.decorations = buildInlineImageDecorations(
+          view,
+          this.searchMatches,
+        );
       }
 
       update(update: ViewUpdate) {
         if (
           update.docChanged ||
+          update.viewportChanged ||
           syntaxTree(update.state) !== syntaxTree(update.startState)
         ) {
+          if (update.docChanged) {
+            this.searchMatches = collectSearchMatches(
+              update.state.doc.toString(),
+              searchQuery,
+            );
+          }
           this.decorations = buildInlineImageDecorations(
-            update.state,
-            searchQuery,
+            update.view,
+            this.searchMatches,
           );
         }
       }

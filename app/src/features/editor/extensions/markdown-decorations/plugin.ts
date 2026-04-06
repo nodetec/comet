@@ -37,7 +37,10 @@ import {
   logEditorDebug,
   summarizeRanges,
 } from "@/shared/lib/editor-debug";
+import type { SearchMatch } from "@/shared/lib/search";
 import { collectSearchMatches } from "@/shared/lib/search";
+
+const VISIBLE_RANGE_MARGIN = 1000;
 
 const NODE_HANDLERS: Record<string, NodeHandler> = {
   ATXHeading1: handleHeading,
@@ -134,14 +137,24 @@ function caretHeadsChanged(
   return false;
 }
 
+function expandedVisibleRanges(
+  view: EditorView,
+): readonly { from: number; to: number }[] {
+  const docLength = view.state.doc.length;
+  return view.visibleRanges.map(({ from, to }) => ({
+    from: Math.max(0, from - VISIBLE_RANGE_MARGIN),
+    to: Math.min(docLength, to + VISIBLE_RANGE_MARGIN),
+  }));
+}
+
 function buildDecorations(
   view: EditorView,
-  searchQuery: string,
+  searchMatches: SearchMatch[],
 ): DecorationSet {
   const { state } = view;
   const hasFocus = view.hasFocus;
   const debugEnabled = isEditorDebugEnabled();
-  const searchMatches = collectSearchMatches(state.doc.toString(), searchQuery);
+  const ranges = expandedVisibleRanges(view);
   const ctx: BuilderContext = {
     state,
     cursorLines: hasFocus ? getCursorLineRanges(state) : [],
@@ -153,28 +166,33 @@ function buildDecorations(
     [];
   const handlerCounts = debugEnabled ? new Map<string, number>() : null;
 
-  syntaxTree(state).iterate({
-    from: 0,
-    to: state.doc.length,
-    enter(node) {
-      if (
-        SEARCH_REVEAL_NODE_NAMES.has(node.name) &&
-        overlapsAny(node.from, node.to, searchMatches)
-      ) {
-        return false;
-      }
-
-      const handler = NODE_HANDLERS[node.name];
-      if (handler) {
-        if (handlerCounts) {
-          handlerCounts.set(node.name, (handlerCounts.get(node.name) ?? 0) + 1);
+  for (const range of ranges) {
+    syntaxTree(state).iterate({
+      from: range.from,
+      to: range.to,
+      enter(node) {
+        if (
+          SEARCH_REVEAL_NODE_NAMES.has(node.name) &&
+          overlapsAny(node.from, node.to, searchMatches)
+        ) {
+          return false;
         }
-        handler(node, ctx, entries);
-      }
-    },
-  });
 
-  addPlainExternalLinkDecorations(ctx, entries);
+        const handler = NODE_HANDLERS[node.name];
+        if (handler) {
+          if (handlerCounts) {
+            handlerCounts.set(
+              node.name,
+              (handlerCounts.get(node.name) ?? 0) + 1,
+            );
+          }
+          handler(node, ctx, entries);
+        }
+      },
+    });
+  }
+
+  addPlainExternalLinkDecorations(ctx, entries, ranges);
 
   // RangeSetBuilder requires entries sorted by from position
   entries.sort((a, b) => a.from - b.from || a.to - b.to);
@@ -195,7 +213,6 @@ function buildDecorations(
         ? Object.fromEntries(handlerCounts.entries())
         : undefined,
       searchMatchCount: searchMatches.length,
-      searchQuery,
       visibleRanges: summarizeRanges(view.visibleRanges),
       viewport: `${view.viewport.from}-${view.viewport.to}`,
     });
@@ -208,9 +225,14 @@ export function markdownDecorationsPlugin(searchQuery = "") {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
+      searchMatches: SearchMatch[];
 
       constructor(view: EditorView) {
-        this.decorations = buildDecorations(view, searchQuery);
+        this.searchMatches = collectSearchMatches(
+          view.state.doc.toString(),
+          searchQuery,
+        );
+        this.decorations = buildDecorations(view, this.searchMatches);
       }
 
       update(update: ViewUpdate) {
@@ -229,6 +251,13 @@ export function markdownDecorationsPlugin(searchQuery = "") {
         }
 
         if (reasons.length > 0) {
+          if (update.docChanged) {
+            this.searchMatches = collectSearchMatches(
+              update.state.doc.toString(),
+              searchQuery,
+            );
+          }
+
           if (isEditorDebugEnabled()) {
             logEditorDebug("markdown-decorations", "plugin update", {
               reasons,
@@ -236,7 +265,7 @@ export function markdownDecorationsPlugin(searchQuery = "") {
               viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
             });
           }
-          this.decorations = buildDecorations(update.view, searchQuery);
+          this.decorations = buildDecorations(update.view, this.searchMatches);
         }
       }
     },
