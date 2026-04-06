@@ -1838,7 +1838,7 @@ const listTheme = EditorView.theme({
     color: "var(--primary)",
     content: '"•"',
     display: "inline-flex",
-    fontSize: "1.1em",
+    fontSize: "1.45em",
     justifyContent: "center",
     left: "50%",
     lineHeight: "1",
