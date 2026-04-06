@@ -276,10 +276,9 @@ async fn maybe_upload_note_attachments_batch(
     keys: &Keys,
 ) -> Result<BatchAttachmentQueueSummary, AppError> {
     let queued_started_at = Instant::now();
-    let (blossom_url, blossom_access_key, note_hashes) = {
+    let (blossom_url, note_hashes) = {
         let conn = database_connection(app)?;
         let blossom_url = get_blossom_url(&conn);
-        let blossom_access_key = crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn);
         let mut note_hashes = HashMap::<String, Vec<String>>::new();
         let mut stmt = conn.prepare("SELECT markdown FROM notes WHERE id = ?1")?;
 
@@ -293,7 +292,7 @@ async fn maybe_upload_note_attachments_batch(
             note_hashes.insert(note_id.clone(), attachment_hashes);
         }
 
-        (blossom_url, blossom_access_key, note_hashes)
+        (blossom_url, note_hashes)
     };
 
     let total_attachment_refs = note_hashes.values().map(Vec::len).sum::<usize>();
@@ -614,6 +613,7 @@ fn list_pending_blob_uploads(
 
 async fn flush_pending_blob_uploads(app: &AppHandle, keys: &Keys) -> Result<(), AppError> {
     let pubkey_hex = keys.public_key().to_hex();
+    let blossom_access_key = load_access_key(app);
     let pending_uploads = list_pending_blob_uploads(app, &pubkey_hex)?;
     if pending_uploads.is_empty() {
         return Ok(());
