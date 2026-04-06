@@ -12,6 +12,7 @@ use crate::domain::notes::model::{
     ExportNotesInput, NoteFilterInput, NotePagePayload, NoteQueryInput, NoteSortDirection,
     NoteSortField, NoteSummary, SearchResult,
 };
+use crate::domain::sync::conflict_store::merge_note_conflict_clocks;
 use crate::domain::sync::vector_clock::{
     increment_vector_clock, parse_vector_clock, serialize_vector_clock,
 };
@@ -504,7 +505,10 @@ impl SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
-    fn next_vector_clock_json(&self, note_id: &str) -> Result<(String, String), NoteError> {
+    pub(crate) fn next_vector_clock_json(
+        &self,
+        note_id: &str,
+    ) -> Result<(String, String), NoteError> {
         let device_id = self.current_device_id()?;
         let existing: Option<String> = self
             .conn
@@ -522,8 +526,10 @@ impl SqliteNoteRepository<'_> {
             .transpose()
             .map_err(map_clock_err)?
             .unwrap_or_default();
+        let merged_clock = merge_note_conflict_clocks(self.conn, note_id, &current_clock)
+            .map_err(|error| NoteError::Storage(error.to_string()))?;
         let next_clock =
-            increment_vector_clock(&current_clock, &device_id).map_err(map_clock_err)?;
+            increment_vector_clock(&merged_clock, &device_id).map_err(map_clock_err)?;
         let next_clock_json = serialize_vector_clock(&next_clock).map_err(map_clock_err)?;
         Ok((device_id, next_clock_json))
     }
@@ -1403,6 +1409,9 @@ impl NoteRepository for SqliteNoteRepository<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::sqlite::migrations::account_migrations;
+    use crate::domain::sync::vector_clock::parse_vector_clock;
+    use std::collections::BTreeMap;
 
     fn setup_export_repo() -> (Connection, PathBuf) {
         let conn = Connection::open_in_memory().unwrap();
@@ -1568,5 +1577,61 @@ mod tests {
         let work_results = repo.search_tags("work").unwrap();
         assert!(work_results.iter().any(|tag| tag == "work"));
         assert!(work_results.iter().any(|tag| tag == "work/project"));
+    }
+
+    #[test]
+    fn next_vector_clock_json_merges_conflict_clocks_before_incrementing() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES (?1, ?2)",
+            params![DEVICE_ID_KEY, "DEVICE-A"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes
+               (id, title, markdown, created_at, modified_at, edited_at, last_edit_device_id, vector_clock, locally_modified)
+             VALUES
+               (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1)",
+            params![
+                "note-1",
+                "Title",
+                "# Title",
+                1000,
+                1000,
+                1000,
+                "DEVICE-A",
+                "{\"DEVICE-A\":1}",
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflicts
+               (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES
+               (?1, ?2, 'put', ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, NULL, 0, ?9)",
+            params![
+                "evt-conflict-b",
+                "note-1",
+                "DEVICE-B",
+                "{\"DEVICE-B\":3}",
+                "Conflict",
+                "# Conflict",
+                2000,
+                2000,
+                1000,
+            ],
+        )
+        .unwrap();
+
+        let repo = SqliteNoteRepository::new(&conn);
+        let (device_id, next_clock_json) = repo.next_vector_clock_json("note-1").unwrap();
+        let next_clock = parse_vector_clock(&next_clock_json).unwrap();
+
+        assert_eq!(device_id, "DEVICE-A");
+        assert_eq!(
+            next_clock,
+            BTreeMap::from([("DEVICE-A".to_string(), 2), ("DEVICE-B".to_string(), 3),])
+        );
     }
 }

@@ -69,6 +69,17 @@ pub fn increment_vector_clock(clock: &VectorClock, device_id: &str) -> Result<Ve
     Ok(next)
 }
 
+pub fn merge_vector_clocks(left: &VectorClock, right: &VectorClock) -> Result<VectorClock, String> {
+    let mut merged = canonicalize_vector_clock(left)?;
+
+    for (device_id, counter) in canonicalize_vector_clock(right)? {
+        let entry = merged.entry(device_id).or_insert(0);
+        *entry = (*entry).max(counter);
+    }
+
+    canonicalize_vector_clock(&merged)
+}
+
 pub fn compare_vector_clocks(
     left: &VectorClock,
     right: &VectorClock,
@@ -133,6 +144,23 @@ mod tests {
     }
 
     #[test]
+    fn merges_vector_clocks_by_taking_max_counter_per_device() {
+        let left = BTreeMap::from([("A".to_string(), 2), ("B".to_string(), 1)]);
+        let right = BTreeMap::from([("A".to_string(), 1), ("C".to_string(), 5)]);
+
+        let merged = merge_vector_clocks(&left, &right).unwrap();
+
+        assert_eq!(
+            merged,
+            BTreeMap::from([
+                ("A".to_string(), 2),
+                ("B".to_string(), 1),
+                ("C".to_string(), 5),
+            ])
+        );
+    }
+
+    #[test]
     fn rejects_zero_counter() {
         let clock = BTreeMap::from([("A".to_string(), 0)]);
         assert!(canonicalize_vector_clock(&clock)
@@ -142,10 +170,7 @@ mod tests {
 
     #[test]
     fn rejects_counter_above_js_safe_integer_max() {
-        let clock = BTreeMap::from([(
-            "A".to_string(),
-            MAX_SAFE_VECTOR_CLOCK_COUNTER + 1,
-        )]);
+        let clock = BTreeMap::from([("A".to_string(), MAX_SAFE_VECTOR_CLOCK_COUNTER + 1)]);
         assert!(canonicalize_vector_clock(&clock)
             .unwrap_err()
             .contains(&MAX_SAFE_VECTOR_CLOCK_COUNTER.to_string()));

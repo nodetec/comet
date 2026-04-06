@@ -1,7 +1,10 @@
 use crate::domain::sync::apply_support::{
     clear_note_materialization, current_device_id, load_existing_note, load_existing_tombstone,
 };
-use crate::domain::sync::conflict_store::{clear_note_conflicts, store_tombstone_conflict};
+use crate::domain::sync::conflict_store::{
+    clear_note_conflicts, clear_resolved_note_conflicts, merge_note_conflict_clocks,
+    store_tombstone_conflict,
+};
 use crate::domain::sync::model::SyncedTombstone;
 use crate::domain::sync::vector_clock::{
     compare_vector_clocks, increment_vector_clock, parse_vector_clock, serialize_vector_clock,
@@ -15,7 +18,7 @@ pub fn tombstone_note_locally(
     note_id: &str,
     deleted_at: i64,
 ) -> Result<bool, AppError> {
-    let existing: Option<String> = conn
+    let existing_note_clock: Option<String> = conn
         .query_row(
             "SELECT COALESCE(vector_clock, '{}')
              FROM notes
@@ -25,17 +28,36 @@ pub fn tombstone_note_locally(
         )
         .optional()?;
 
-    let Some(vector_clock_json) = existing else {
+    let existing_tombstone: Option<(String, i64)> = conn
+        .query_row(
+            "SELECT vector_clock, deleted_at
+             FROM note_tombstones
+             WHERE id = ?1",
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+
+    let Some((vector_clock_json, effective_deleted_at, should_clear_materialized_note)) =
+        existing_note_clock
+            .map(|clock| (clock, deleted_at, true))
+            .or_else(|| {
+                existing_tombstone
+                    .map(|(clock, existing_deleted_at)| (clock, existing_deleted_at, false))
+            })
+    else {
         return Ok(false);
     };
 
     let device_id = current_device_id(conn)?;
     let current_clock = parse_vector_clock(&vector_clock_json).map_err(AppError::custom)?;
-    let next_clock =
-        increment_vector_clock(&current_clock, &device_id).map_err(AppError::custom)?;
+    let merged_clock = merge_note_conflict_clocks(conn, note_id, &current_clock)?;
+    let next_clock = increment_vector_clock(&merged_clock, &device_id).map_err(AppError::custom)?;
     let next_clock_json = serialize_vector_clock(&next_clock).map_err(AppError::custom)?;
 
-    clear_note_materialization(conn, note_id)?;
+    if should_clear_materialized_note {
+        clear_note_materialization(conn, note_id)?;
+    }
     clear_note_conflicts(conn, note_id)?;
     conn.execute(
         "INSERT INTO note_tombstones
@@ -47,7 +69,7 @@ pub fn tombstone_note_locally(
            vector_clock = excluded.vector_clock,
            locally_modified = 1,
            snapshot_event_id = NULL",
-        params![note_id, deleted_at, device_id, next_clock_json],
+        params![note_id, effective_deleted_at, device_id, next_clock_json],
     )?;
     Ok(true)
 }
@@ -91,7 +113,6 @@ pub fn upsert_tombstone_from_sync(
         params![tombstone.id],
     )?;
     clear_note_materialization(conn, &tombstone.id)?;
-    clear_note_conflicts(conn, &tombstone.id)?;
     conn.execute(
         "INSERT INTO note_tombstones
            (id, deleted_at, last_edit_device_id, vector_clock, snapshot_event_id, locally_modified)
@@ -110,6 +131,7 @@ pub fn upsert_tombstone_from_sync(
             snapshot_event_id,
         ],
     )?;
+    clear_resolved_note_conflicts(conn, &tombstone.id, &tombstone.vector_clock)?;
     invalidate_cache(&tombstone.id);
     Ok(Some(tombstone.id.clone()))
 }

@@ -1,5 +1,8 @@
 use crate::domain::sync::model::{SyncedNote, SyncedTombstone};
-use crate::domain::sync::vector_clock::serialize_vector_clock;
+use crate::domain::sync::vector_clock::{
+    compare_vector_clocks, merge_vector_clocks, parse_vector_clock, serialize_vector_clock,
+    VectorClock, VectorClockComparison,
+};
 use crate::error::AppError;
 use rusqlite::{params, Connection};
 
@@ -83,5 +86,66 @@ pub fn clear_note_conflicts(conn: &Connection, note_id: &str) -> Result<(), AppE
         "DELETE FROM note_conflicts WHERE note_id = ?1",
         params![note_id],
     )?;
+    Ok(())
+}
+
+pub fn merge_note_conflict_clocks(
+    conn: &Connection,
+    note_id: &str,
+    base_clock: &VectorClock,
+) -> Result<VectorClock, AppError> {
+    let mut merged_clock = base_clock.clone();
+    let mut stmt = conn.prepare(
+        "SELECT vector_clock
+         FROM note_conflicts
+         WHERE note_id = ?1",
+    )?;
+    let rows = stmt.query_map(params![note_id], |row| row.get::<_, String>(0))?;
+
+    for row in rows {
+        let conflict_clock = parse_vector_clock(&row?).map_err(AppError::custom)?;
+        merged_clock =
+            merge_vector_clocks(&merged_clock, &conflict_clock).map_err(AppError::custom)?;
+    }
+
+    Ok(merged_clock)
+}
+
+pub fn clear_resolved_note_conflicts(
+    conn: &Connection,
+    note_id: &str,
+    resolved_clock: &VectorClock,
+) -> Result<(), AppError> {
+    let mut resolved_snapshot_ids = Vec::new();
+    let mut stmt = conn.prepare(
+        "SELECT snapshot_event_id, vector_clock
+         FROM note_conflicts
+         WHERE note_id = ?1",
+    )?;
+    let rows = stmt.query_map(params![note_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+
+    for row in rows {
+        let (snapshot_event_id, vector_clock_json) = row?;
+        let conflict_clock = parse_vector_clock(&vector_clock_json).map_err(AppError::custom)?;
+        let comparison =
+            compare_vector_clocks(&conflict_clock, resolved_clock).map_err(AppError::custom)?;
+
+        if matches!(
+            comparison,
+            VectorClockComparison::Dominated | VectorClockComparison::Equal
+        ) {
+            resolved_snapshot_ids.push(snapshot_event_id);
+        }
+    }
+
+    for snapshot_event_id in resolved_snapshot_ids {
+        conn.execute(
+            "DELETE FROM note_conflicts WHERE snapshot_event_id = ?1",
+            params![snapshot_event_id],
+        )?;
+    }
+
     Ok(())
 }

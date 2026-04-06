@@ -3,7 +3,9 @@ use crate::domain::sync::apply_support::{
     clear_note_tombstone_state, load_existing_note, load_existing_tombstone,
     snapshot_content_matches,
 };
-use crate::domain::sync::conflict_store::{store_note_conflict, store_tombstone_conflict};
+use crate::domain::sync::conflict_store::{
+    clear_resolved_note_conflicts, store_note_conflict, store_tombstone_conflict,
+};
 use crate::domain::sync::model::{SyncedNote, SyncedTombstone};
 use crate::domain::sync::vector_clock::{
     compare_vector_clocks, parse_vector_clock, serialize_vector_clock, VectorClock,
@@ -133,10 +135,7 @@ pub fn upsert_from_sync(
         "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
         params![note.id, note.title, note.markdown],
     )?;
-    conn.execute(
-        "DELETE FROM note_conflicts WHERE snapshot_event_id = ?1",
-        params![snapshot_event_id],
-    )?;
+    clear_resolved_note_conflicts(conn, &note.id, &note.vector_clock)?;
 
     Ok(Some(note.id.clone()))
 }

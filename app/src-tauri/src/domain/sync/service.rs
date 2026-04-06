@@ -453,4 +453,111 @@ mod tests {
         assert_eq!(conflict_row.0, "del");
         assert_eq!(conflict_row.1, Some(3000));
     }
+
+    #[test]
+    fn local_tombstone_merges_conflict_clock_before_incrementing() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('sync_device_id', 'DEVICE-A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, last_edit_device_id, vector_clock)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "note-1",
+                "Title",
+                "# Title\n\nBody",
+                1000,
+                2000,
+                2000,
+                "DEVICE-A",
+                "{\"DEVICE-A\":1}"
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflicts
+               (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES
+               ('evt-conflict-b', 'note-1', 'put', 'DEVICE-B', '{\"DEVICE-B\":1}', 'Conflict', '# Conflict', 3000, 3000, NULL, NULL, NULL, 0, 1000)",
+            [],
+        )
+        .unwrap();
+
+        let tombstoned = tombstone_note_locally(&conn, "note-1", 4000).unwrap();
+        assert!(tombstoned);
+
+        let tombstone_clock: String = conn
+            .query_row(
+                "SELECT vector_clock FROM note_tombstones WHERE id = 'note-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(tombstone_clock, "{\"DEVICE-A\":2,\"DEVICE-B\":1}");
+    }
+
+    #[test]
+    fn upsert_clears_only_conflicts_dominated_by_incoming_resolution() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, last_edit_device_id, vector_clock)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "note-1",
+                "Local Title",
+                "# Local Title\n\nLocal body",
+                1000,
+                2000,
+                2000,
+                "DEVICE-B",
+                "{\"DEVICE-B\":1}"
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",
+            params!["note-1", "Local Title", "# Local Title\n\nLocal body"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflicts
+               (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES
+               ('evt-conflict-a', 'note-1', 'put', 'DEVICE-A', '{\"DEVICE-A\":1}', 'Conflict A', '# Conflict A', 2500, 2500, NULL, NULL, NULL, 0, 1000),
+               ('evt-conflict-c', 'note-1', 'put', 'DEVICE-C', '{\"DEVICE-C\":1}', 'Conflict C', '# Conflict C', 2600, 2600, NULL, NULL, NULL, 0, 1000)",
+            [],
+        )
+        .unwrap();
+
+        let mut note = make_synced_note("note-1", 4000);
+        note.device_id = "DEVICE-A".to_string();
+        note.vector_clock =
+            VectorClock::from([("DEVICE-A".to_string(), 2), ("DEVICE-B".to_string(), 1)]);
+        note.title = "Resolved Title".to_string();
+        note.markdown = "# Resolved Title\n\nResolved body".to_string();
+
+        let result = upsert_from_sync(&conn, &note, "evt-resolution").unwrap();
+        assert_eq!(result, Some("note-1".to_string()));
+
+        let remaining_conflicts: Vec<String> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT snapshot_event_id
+                     FROM note_conflicts
+                     WHERE note_id = 'note-1'
+                     ORDER BY snapshot_event_id ASC",
+                )
+                .unwrap();
+            stmt.query_map([], |row| row.get::<_, String>(0))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap()
+        };
+
+        assert_eq!(remaining_conflicts, vec!["evt-conflict-c".to_string()]);
+    }
 }

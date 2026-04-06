@@ -1,6 +1,7 @@
 use crate::adapters::sqlite::note_repository::SqliteNoteRepository;
 use crate::adapters::sqlite::snapshot_view_repository::SqliteSnapshotViewRepository;
 use crate::db::database_connection;
+use crate::domain::common::text::title_from_markdown;
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::model::*;
 use crate::domain::notes::service::NoteService;
@@ -173,13 +174,46 @@ pub async fn resolve_note_conflict(
         let repo = SqliteNoteRepository::new(&conn);
         let conflict_markdown =
             markdown.ok_or_else(|| AppError::custom("Conflict resolution requires markdown"))?;
-        let _ = NoteService::save_note(
-            &repo,
-            SaveNoteInput {
-                id: note_id.clone(),
-                markdown: conflict_markdown,
-            },
-        )?;
+        let title = title_from_markdown(&conflict_markdown);
+        let (existing_markdown, is_readonly) = repo.note_markdown_and_readonly(&note_id)?;
+        if is_readonly {
+            return Err(AppError::custom("Note is read-only."));
+        }
+
+        if existing_markdown != conflict_markdown {
+            let _ = NoteService::save_note(
+                &repo,
+                SaveNoteInput {
+                    id: note_id.clone(),
+                    markdown: conflict_markdown,
+                },
+            )?;
+        } else {
+            let now = now_millis();
+            let (device_id, vector_clock) = repo.next_vector_clock_json(&note_id)?;
+            conn.execute(
+                "UPDATE notes
+                 SET title = ?1,
+                     markdown = ?2,
+                     modified_at = ?3,
+                     edited_at = ?3,
+                     last_edit_device_id = ?4,
+                     vector_clock = ?5,
+                     snapshot_event_id = NULL,
+                     locally_modified = 1
+                 WHERE id = ?6",
+                params![
+                    title,
+                    conflict_markdown,
+                    now,
+                    device_id,
+                    vector_clock,
+                    note_id,
+                ],
+            )?;
+            repo.upsert_search_document(&note_id, &title, &conflict_markdown)?;
+            repo.replace_tags(&note_id, &conflict_markdown)?;
+        }
     }
 
     let relay_urls =
@@ -194,6 +228,16 @@ pub async fn resolve_note_conflict(
 
     match action {
         ResolveNoteConflictAction::KeepDeleted => {
+            let conn = database_connection(&app)?;
+            if !crate::domain::sync::service::tombstone_note_locally(&conn, &note_id, now_millis())?
+            {
+                return Err(AppError::custom(format!("Note not found: {note_id}")));
+            }
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO pending_deletions (entity_id, created_at) VALUES (?1, ?2)",
+                params![note_id, now_millis()],
+            );
+            drop(conn);
             crate::adapters::nostr::snapshot_push::push_deletion_snapshot(
                 &app,
                 &active_relay_url,
