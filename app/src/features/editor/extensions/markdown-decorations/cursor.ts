@@ -3,20 +3,16 @@ import type { EditorState } from "@codemirror/state";
 import type { LineRange } from "@/features/editor/extensions/markdown-decorations/types";
 
 /**
- * Returns merged line ranges for active selection heads.
- * Used by headings which reveal on the caret/head line (the `# ` prefix is at
- * the start of the line so element-level reveal would feel wrong).
+ * Returns merged line ranges covering all selections.
+ * For carets, returns the head line. For range selections, returns
+ * lines spanned by the selection. Used by headings.
  */
 export function getCursorLineRanges(state: EditorState): LineRange[] {
   const ranges: LineRange[] = [];
 
   for (const range of state.selection.ranges) {
-    if (!range.empty) {
-      continue;
-    }
-
-    const fromLine = state.doc.lineAt(range.head);
-    const toLine = fromLine;
+    const fromLine = state.doc.lineAt(range.empty ? range.head : range.from);
+    const toLine = range.empty ? fromLine : state.doc.lineAt(range.to);
     const lineRange: LineRange = {
       from: fromLine.from,
       to: toLine.to,
@@ -35,17 +31,16 @@ export function getCursorLineRanges(state: EditorState): LineRange[] {
 }
 
 /**
- * Returns active caret/head positions (not expanded to lines).
+ * Returns selection ranges (point for carets, span for range selections).
  * Used by inline elements (bold, italic, code, links, strikethrough) which
- * should only reveal syntax when the caret/head is inside the element.
+ * reveal syntax when the selection overlaps the element.
  */
 export function getCursorRanges(state: EditorState): LineRange[] {
-  return state.selection.ranges
-    .filter((range) => range.empty)
-    .map((range) => ({
-      from: range.head,
-      to: range.head,
-    }));
+  return state.selection.ranges.map((range) =>
+    range.empty
+      ? { from: range.head, to: range.head }
+      : { from: range.from, to: range.to },
+  );
 }
 
 /** Check whether a node overlaps any of the given ranges. */

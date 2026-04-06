@@ -1,4 +1,4 @@
-import { RangeSetBuilder, type SelectionRange } from "@codemirror/state";
+import { RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   type DecorationSet,
@@ -76,6 +76,18 @@ const SEARCH_REVEAL_NODE_NAMES = new Set([
   "Strikethrough",
 ]);
 
+function caretCrossedLine(
+  previousState: EditorView["state"],
+  nextState: EditorView["state"],
+  previousHead: number,
+  nextHead: number,
+) {
+  if (previousHead === nextHead) return false;
+  const previousLine = previousState.doc.lineAt(previousHead);
+  const nextLine = nextState.doc.lineAt(nextHead);
+  return previousLine.from !== nextLine.from || previousLine.to !== nextLine.to;
+}
+
 function selectionAffectsDecorations(
   previousState: EditorView["state"],
   nextState: EditorView["state"],
@@ -84,51 +96,25 @@ function selectionAffectsDecorations(
   const nextRanges = nextState.selection.ranges;
 
   if (previousRanges.length !== nextRanges.length) return true;
-  if (selectionEmptinessChanged(previousRanges, nextRanges)) return true;
-  if (!hasCaretSelection(nextRanges)) return false;
-  return caretHeadsChanged(previousState, nextState);
-}
 
-function selectionEmptinessChanged(
-  previousRanges: readonly SelectionRange[],
-  nextRanges: readonly SelectionRange[],
-) {
   for (const [index, previousRange] of previousRanges.entries()) {
     const nextRange = nextRanges[index];
-    if (!nextRange || previousRange.empty !== nextRange.empty) {
-      return true;
-    }
-  }
+    if (!nextRange || previousRange.empty !== nextRange.empty) return true;
 
-  return false;
-}
-
-function hasCaretSelection(ranges: readonly SelectionRange[]) {
-  return ranges.some((range) => range.empty);
-}
-
-function caretHeadsChanged(
-  previousState: EditorView["state"],
-  nextState: EditorView["state"],
-) {
-  for (const [
-    index,
-    previousRange,
-  ] of previousState.selection.ranges.entries()) {
-    const nextRange = nextState.selection.ranges[index];
-    if (!previousRange.empty && !nextRange?.empty) {
-      continue;
-    }
-
-    if (!nextRange || previousRange.head !== nextRange.head) {
-      return true;
-    }
-
-    const previousLine = previousState.doc.lineAt(previousRange.head);
-    const nextLine = nextState.doc.lineAt(nextRange.head);
-    if (
-      previousLine.from !== nextLine.from ||
-      previousLine.to !== nextLine.to
+    if (previousRange.empty) {
+      if (
+        caretCrossedLine(
+          previousState,
+          nextState,
+          previousRange.head,
+          nextRange.head,
+        )
+      ) {
+        return true;
+      }
+    } else if (
+      previousRange.from !== nextRange.from ||
+      previousRange.to !== nextRange.to
     ) {
       return true;
     }

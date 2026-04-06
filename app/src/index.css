@@ -114,6 +114,7 @@ body {
 
 .comet-editor-shell {
   background: transparent;
+  cursor: text;
   width: 100%;
   display: grid;
   grid-template-columns:

@@ -909,6 +909,16 @@ export function EditorPane({
           data-editor-scroll-container
           onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
+          onMouseUp={(event) => {
+            // Force WebKit to re-evaluate the cursor after drag-select.
+            // In fullscreen, the OS cursor state can get stuck when the
+            // pointer hits the screen edge during a drag.
+            const el = event.currentTarget;
+            el.style.cursor = "auto";
+            requestAnimationFrame(() => {
+              el.style.cursor = "";
+            });
+          }}
           onScroll={(event) => {
             scrollContainerCallbacks.onScroll(
               noteId,

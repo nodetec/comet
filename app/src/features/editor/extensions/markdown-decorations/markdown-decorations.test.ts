@@ -32,14 +32,14 @@ describe("cursor line ranges", () => {
     expect(ranges).toEqual([{ from: 0, to: 5 }]);
   });
 
-  it("returns empty for a non-empty range selection", () => {
+  it("returns line ranges covering a non-empty range selection", () => {
     const state = createState("aaa\nbbb\nccc\nddd", 5);
     const withSelection = state.update({
       selection: EditorSelection.range(1, 9),
     }).state;
     const ranges = getCursorLineRanges(withSelection);
 
-    expect(ranges).toEqual([]);
+    expect(ranges).toEqual([{ from: 0, to: 11 }]);
   });
 });
 

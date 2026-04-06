@@ -420,6 +420,7 @@ export function startSelectionEdgeAutoScroll(
     }
 
     pointerTarget.setPointerCapture(pointerId);
+    pointerTarget.ownerDocument.body.style.cursor = "text";
     hasCapture = true;
   };
 
@@ -556,8 +557,11 @@ export function startSelectionEdgeAutoScroll(
       handlePointerDone,
       true,
     );
-    if (hasCapture && pointerTarget.hasPointerCapture(pointerId)) {
-      pointerTarget.releasePointerCapture(pointerId);
+    if (hasCapture) {
+      pointerTarget.ownerDocument.body.style.cursor = "";
+      if (pointerTarget.hasPointerCapture(pointerId)) {
+        pointerTarget.releasePointerCapture(pointerId);
+      }
     }
   };
 
