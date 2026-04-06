@@ -471,6 +471,9 @@ const NoteRow = memo(function NoteRow({
         data-comet-selected-note={isActive ? "true" : undefined}
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
+        onFocus={() => {
+          useShellStore.getState().setFocusedPane("notes");
+        }}
         onPointerDown={handleNoteRowPointerDown}
         onMouseDown={(event) => {
           if (event.button === 2) {
