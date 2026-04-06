@@ -1075,6 +1075,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const gutterDragCleanupRef = useRef<(() => void) | null>(null);
     const gutterPointerIdRef = useRef<number | null>(null);
     const selectionAutoScrollCleanupRef = useRef<(() => void) | null>(null);
+    const initialAutoFocusRef = useRef(autoFocus);
+    const initialOnAutoFocusHandledRef = useRef(onAutoFocusHandled);
     const initialMarkdownRef = useRef(markdown);
     const initialReadOnlyRef = useRef(readOnly);
     const initialSearchQueryRef = useRef(searchQuery);
@@ -1510,6 +1512,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           head: view.state.selection.main.head,
         }),
       );
+
+      if (initialAutoFocusRef.current) {
+        view.dispatch({
+          selection: EditorSelection.cursor(view.state.doc.length),
+        });
+        view.focus();
+        initialOnAutoFocusHandledRef.current?.();
+      }
 
       return () => {
         view.destroy();
