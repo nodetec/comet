@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isEditorFindShortcut, isNotesSearchShortcut } from "./keyboard";
+import {
+  isCommandPaletteShortcut,
+  isEditorFindShortcut,
+  isNotesSearchShortcut,
+} from "./keyboard";
 
 function createKeyboardEvent(
   overrides: Partial<Parameters<typeof isEditorFindShortcut>[0]> = {},
@@ -8,12 +12,51 @@ function createKeyboardEvent(
   return {
     altKey: false,
     code: "KeyF",
+    ctrlKey: false,
     key: "f",
     metaKey: true,
     shiftKey: false,
     ...overrides,
   };
 }
+
+describe("isCommandPaletteShortcut", () => {
+  it("matches Cmd+O", () => {
+    expect(
+      isCommandPaletteShortcut(
+        createKeyboardEvent({
+          code: "KeyO",
+          key: "o",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Ctrl+O", () => {
+    expect(
+      isCommandPaletteShortcut(
+        createKeyboardEvent({
+          code: "KeyO",
+          ctrlKey: true,
+          key: "o",
+          metaKey: false,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match when Shift is also pressed", () => {
+    expect(
+      isCommandPaletteShortcut(
+        createKeyboardEvent({
+          code: "KeyO",
+          key: "O",
+          shiftKey: true,
+        }),
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("isEditorFindShortcut", () => {
   it("matches Cmd+F", () => {

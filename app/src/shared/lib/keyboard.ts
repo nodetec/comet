@@ -1,6 +1,6 @@
 type ShortcutEvent = Pick<
   KeyboardEvent,
-  "altKey" | "code" | "key" | "metaKey" | "shiftKey"
+  "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey"
 >;
 
 function matchesShortcut(
@@ -15,11 +15,19 @@ function matchesShortcut(
     shift?: boolean;
   },
 ) {
-  if (!event.metaKey || event.altKey || event.shiftKey !== shift) {
+  if (
+    (!event.metaKey && !event.ctrlKey) ||
+    event.altKey ||
+    event.shiftKey !== shift
+  ) {
     return false;
   }
 
   return event.code === code || event.key.toLowerCase() === key.toLowerCase();
+}
+
+export function isCommandPaletteShortcut(event: ShortcutEvent) {
+  return matchesShortcut(event, { code: "KeyO", key: "o" });
 }
 
 export function isEditorFindShortcut(event: ShortcutEvent) {

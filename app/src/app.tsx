@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useEffectEvent, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 import { useTheme } from "@/shared/hooks/use-theme";
@@ -26,6 +26,7 @@ import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import {
+  isCommandPaletteShortcut,
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
@@ -73,50 +74,89 @@ function App() {
   } = useShellController();
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const handleCreateNoteShortcut = notesPaneProps.onCreateNote;
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
 
+  const openCommandPalette = useEffectEvent(() => {
+    setCommandPaletteOpen(true);
+  });
+
+  const focusNotesSearch = useEffectEvent(() => {
+    window.dispatchEvent(new CustomEvent("comet:focus-search"));
+  });
+
+  const openEditorFind = useEffectEvent(() => {
+    window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
+  });
+
+  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (isCommandPaletteShortcut(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      openCommandPalette();
+      return;
+    }
+
+    if (isNotesSearchShortcut(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      focusNotesSearch();
+      return;
+    }
+
+    if (isEditorFindShortcut(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      openEditorFind();
+      return;
+    }
+
+    if (!event.metaKey) return;
+
+    const key = event.key.toLowerCase();
+    switch (key) {
+      case "s": {
+        event.preventDefault();
+        setAccountSwitcherOpen((open) => !open);
+        break;
+      }
+      case ",": {
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  });
+
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isNotesSearchShortcut(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        window.dispatchEvent(new CustomEvent("comet:focus-search"));
-        return;
-      }
-
-      if (isEditorFindShortcut(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
-        return;
-      }
-
-      if (!event.metaKey) return;
-
-      const key = event.key.toLowerCase();
-      switch (key) {
-        case "s": {
-          event.preventDefault();
-          setAccountSwitcherOpen((open) => !open);
-          break;
-        }
-        case ",": {
-          break;
-        }
-        default: {
-          break;
-        }
-      }
-    };
-
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [handleCreateNoteShortcut, setSettingsOpen]);
+  }, []);
+
+  const handleCommandPaletteMenuEvent = useEffectEvent(() => {
+    openCommandPalette();
+  });
+
+  const handleEditorFindMenuEvent = useEffectEvent(() => {
+    openEditorFind();
+  });
+
+  const handleNewNoteMenuEvent = useEffectEvent(() => {
+    notesPaneProps.onCreateNote();
+  });
+
+  const handleNotesSearchMenuEvent = useEffectEvent(() => {
+    focusNotesSearch();
+  });
+
+  const handleSettingsMenuEvent = useEffectEvent(() => {
+    setSettingsOpen(true);
+  });
 
   useEffect(() => {
     let unlistenCommandPalette: (() => void) | null = null;
@@ -126,21 +166,11 @@ function App() {
     let unlistenSettings: (() => void) | null = null;
 
     void Promise.all([
-      listen(TAURI_EVENT_COMMAND_PALETTE, () => {
-        setCommandPaletteOpen((open) => !open);
-      }),
-      listen(TAURI_EVENT_EDITOR_FIND, () => {
-        window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
-      }),
-      listen(TAURI_EVENT_NEW_NOTE, () => {
-        handleCreateNoteShortcut();
-      }),
-      listen(TAURI_EVENT_NOTES_SEARCH, () => {
-        window.dispatchEvent(new CustomEvent("comet:focus-search"));
-      }),
-      listen(TAURI_EVENT_SETTINGS, () => {
-        setSettingsOpen(true);
-      }),
+      listen(TAURI_EVENT_COMMAND_PALETTE, handleCommandPaletteMenuEvent),
+      listen(TAURI_EVENT_EDITOR_FIND, handleEditorFindMenuEvent),
+      listen(TAURI_EVENT_NEW_NOTE, handleNewNoteMenuEvent),
+      listen(TAURI_EVENT_NOTES_SEARCH, handleNotesSearchMenuEvent),
+      listen(TAURI_EVENT_SETTINGS, handleSettingsMenuEvent),
     ]).then(
       ([
         disposeCommandPalette,
@@ -164,7 +194,7 @@ function App() {
       unlistenNotesSearch?.();
       unlistenSettings?.();
     };
-  }, [handleCreateNoteShortcut, setSettingsOpen]);
+  }, []);
 
   useEffect(() => {
     if (readyToRevealWindow && !hasCompletedStartupReveal) {
