@@ -1,5 +1,9 @@
 import { syntaxTree } from "@codemirror/language";
-import { type EditorState, type Extension } from "@codemirror/state";
+import {
+  EditorSelection,
+  type EditorState,
+  type Extension,
+} from "@codemirror/state";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Decoration, EditorView } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
@@ -329,9 +333,59 @@ function getExternalLinkTargetFromEvent(
   }
 }
 
+function getLinkEndAtCursor(state: EditorState, pos: number): number | null {
+  const tree = syntaxTree(state);
+  const node = tree.resolveInner(pos, 1);
+
+  for (let n: SyntaxNode | null = node; n; n = n.parent) {
+    if (!LINK_NODE_NAMES.has(n.name)) {
+      continue;
+    }
+
+    const marks = n.getChildren("LinkMark");
+    if (marks.length < 2) {
+      continue;
+    }
+
+    const closeBracket = marks[1]!;
+    if (pos === closeBracket.from && n.to > pos) {
+      return n.to;
+    }
+  }
+
+  return null;
+}
+
 export function linkInteractions(): Extension {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
+      // When clicking to the right of a collapsed link, CM would place
+      // the cursor at the `]` position. Intercept and place it after `)`.
+      if (event.button === 0 && !event.shiftKey) {
+        const contentRect = view.contentDOM.getBoundingClientRect();
+        if (
+          event.clientX >= contentRect.left &&
+          event.clientX <= contentRect.right
+        ) {
+          const pos = view.posAtCoords(
+            { x: event.clientX, y: event.clientY },
+            false,
+          );
+          if (pos != null) {
+            const linkEnd = getLinkEndAtCursor(view.state, pos);
+            if (linkEnd != null) {
+              event.preventDefault();
+              view.dispatch({
+                selection: EditorSelection.cursor(linkEnd),
+                scrollIntoView: false,
+              });
+              view.focus();
+              return true;
+            }
+          }
+        }
+      }
+
       if (!shouldOpenLink(event)) {
         return false;
       }
