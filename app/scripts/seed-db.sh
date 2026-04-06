@@ -6,6 +6,8 @@ APP_DIR="${HOME}/Library/Application Support/md.comet-alpha.dev"
 APP_DB_PATH="${APP_DIR}/app.db"
 KEYCHAIN_SERVICE="comet"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+ENV_PATH="${SCRIPT_DIR}/../.env"
+SEED_IDENTITY_MANIFEST_PATH="${SCRIPT_DIR}/../src-tauri/Cargo.toml"
 TEST_NOTES_DIR="${SCRIPT_DIR}/test-notes"
 TEST_ATTACHMENTS_DIR="${SCRIPT_DIR}/test-attachments"
 GENERATED_SQL_PATH="$(mktemp -t comet-seed-notes.XXXXXX.sql)"
@@ -14,6 +16,19 @@ ACCOUNT_ONLY=0
 
 usage() {
   echo "usage: sh ./scripts/seed-db.sh [--account-only]"
+}
+
+load_env() {
+  if [ -f "$ENV_PATH" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_PATH"
+    set +a
+  fi
+}
+
+identity_value() {
+  printf '%s\n' "$1" | sed -n "s/^$2=//p"
 }
 
 cleanup() {
@@ -67,35 +82,59 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -f "$APP_DB_PATH" ]; then
-  echo "No app database found at: $APP_DB_PATH"
-  exit 1
-fi
+load_env
 
-ACTIVE_ACCOUNT_ROW="$(sqlite3 -separator '|' "$APP_DB_PATH" "SELECT public_key, npub FROM accounts WHERE is_active = 1 LIMIT 1;")"
-if [ -z "$ACTIVE_ACCOUNT_ROW" ]; then
-  echo "No active account configured in: $APP_DB_PATH"
-  exit 1
-fi
+mkdir -p "$APP_DIR"
+NOW_MS="$(($(date +%s) * 1000))"
 
-PUBLIC_KEY="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f1)"
-NPUB="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f2)"
+if [ -n "${COMET_SEED_NSEC:-}" ]; then
+  IDENTITY_OUTPUT="$(
+    cargo run \
+      --quiet \
+      --manifest-path "$SEED_IDENTITY_MANIFEST_PATH" \
+      --bin seed-identity \
+      -- derive "$COMET_SEED_NSEC"
+  )"
+  PUBLIC_KEY="$(identity_value "$IDENTITY_OUTPUT" "PUBLIC_KEY")"
+  NPUB="$(identity_value "$IDENTITY_OUTPUT" "NPUB")"
+  NSEC="$(identity_value "$IDENTITY_OUTPUT" "NSEC")"
+else
+  if [ ! -f "$APP_DB_PATH" ]; then
+    echo "No app database found at: $APP_DB_PATH"
+    exit 1
+  fi
+
+  ACTIVE_ACCOUNT_ROW="$(sqlite3 -separator '|' "$APP_DB_PATH" "SELECT public_key, npub FROM accounts WHERE is_active = 1 LIMIT 1;")"
+  if [ -z "$ACTIVE_ACCOUNT_ROW" ]; then
+    echo "No active account configured in: $APP_DB_PATH"
+    exit 1
+  fi
+
+  PUBLIC_KEY="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f1)"
+  NPUB="$(printf '%s' "$ACTIVE_ACCOUNT_ROW" | cut -d'|' -f2)"
+
+  ACCOUNT_DIR="${APP_DIR}/accounts/${NPUB}"
+  DB_PATH="${ACCOUNT_DIR}/comet.db"
+
+  mkdir -p "$(dirname "$DB_PATH")"
+  KEYCHAIN_ACCOUNT="nostr-nsec:${PUBLIC_KEY}"
+  NSEC="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null || true)"
+
+  if [ -z "$NSEC" ] && [ -f "$DB_PATH" ]; then
+    NSEC="$(sqlite3 "$DB_PATH" "SELECT nsec FROM nostr_identity LIMIT 1;" 2>/dev/null || true)"
+  fi
+
+  if [ -z "$NSEC" ]; then
+    echo "No nsec found for active account in keychain or account database: $PUBLIC_KEY"
+    exit 1
+  fi
+fi
 
 ACCOUNT_DIR="${APP_DIR}/accounts/${NPUB}"
 DB_PATH="${ACCOUNT_DIR}/comet.db"
-
 mkdir -p "$(dirname "$DB_PATH")"
 KEYCHAIN_ACCOUNT="nostr-nsec:${PUBLIC_KEY}"
-NSEC="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$KEYCHAIN_ACCOUNT" -w 2>/dev/null || true)"
-
-if [ -z "$NSEC" ]; then
-  echo "No secure-storage nsec found for active account: $PUBLIC_KEY"
-  exit 1
-fi
-
 ATTACHMENTS_DIR="${ACCOUNT_DIR}/attachments"
-
-NOW_MS="$(($(date +%s) * 1000))"
 
 READ_SEED_SQL=".read $GENERATED_SQL_PATH"
 LAST_OPEN_NOTE_SETTING="  ('last_open_note_id', 'note-01-luna-range-calibration'),"
@@ -314,6 +353,50 @@ cargo run \
 rm -f "$DB_PATH" "${DB_PATH}-shm" "${DB_PATH}-wal"
 mv "$TEMP_DB_PATH" "$DB_PATH"
 TEMP_DB_PATH=""
+
+sqlite3 "$APP_DB_PATH" <<SQL
+CREATE TABLE IF NOT EXISTS accounts (
+  public_key TEXT PRIMARY KEY,
+  npub       TEXT NOT NULL UNIQUE,
+  label      TEXT,
+  db_path    TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  is_active  INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0, 1))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_active
+  ON accounts(is_active)
+  WHERE is_active = 1;
+CREATE TABLE IF NOT EXISTS mcp_account_access (
+  principal          TEXT NOT NULL,
+  account_public_key TEXT NOT NULL REFERENCES accounts(public_key) ON DELETE CASCADE ON UPDATE CASCADE,
+  scope_mode         TEXT NOT NULL DEFAULT 'all' CHECK (scope_mode IN ('all', 'selected')),
+  can_read           INTEGER NOT NULL DEFAULT 1 CHECK (can_read IN (0, 1)),
+  can_write          INTEGER NOT NULL DEFAULT 1 CHECK (can_write IN (0, 1)),
+  can_publish        INTEGER NOT NULL DEFAULT 0 CHECK (can_publish IN (0, 1)),
+  allow_unfiled      INTEGER NOT NULL DEFAULT 1 CHECK (allow_unfiled IN (0, 1)),
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  PRIMARY KEY (principal, account_public_key)
+);
+UPDATE accounts SET is_active = 0 WHERE is_active = 1;
+INSERT INTO accounts (public_key, npub, label, db_path, created_at, updated_at, is_active)
+VALUES (
+  '$PUBLIC_KEY',
+  '$NPUB',
+  NULL,
+  'accounts/$NPUB/comet.db',
+  $NOW_MS,
+  $NOW_MS,
+  1
+)
+ON CONFLICT(public_key) DO UPDATE SET
+  npub = excluded.npub,
+  label = excluded.label,
+  db_path = excluded.db_path,
+  updated_at = excluded.updated_at,
+  is_active = excluded.is_active;
+SQL
 
 security add-generic-password \
   -U \

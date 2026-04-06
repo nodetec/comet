@@ -20,6 +20,8 @@ The full command surface lives in [justfile](/Users/chris/Repos/project/comet/ju
 Common commands:
 
 - `just app-dev`: run the Comet app in development
+- `just app-seed`: seed the app account with the fixture note set
+- `just app-seed-account`: seed only the app account, without notes or attachments
 - `just docs-dev`: run the standalone docs site in development
 - `just docs-build`: build the standalone docs site
 - `just docs-check`: run the standalone docs verification suite
@@ -31,6 +33,16 @@ Common commands:
 - `just format-check`: check formatting across the repo
 
 Comet keeps a root `app.db` plus per-account databases under `accounts/<npub>/comet.db`. The maintenance scripts and MCP server always resolve the active account through `app.db`.
+
+## Seed Data
+
+The app seed workflow uses a fixed seed identity from `app/.env` so repeated runs target the same account.
+
+1. Copy [`app/.env.example`](/Users/chris/Repos/project/comet/app/.env.example) to `app/.env`
+2. Set `COMET_SEED_NSEC` to the seed account secret you want to reuse
+3. Run `just app-seed` for the full fixture dataset, or `just app-seed-account` to create only the seeded account workspace
+
+`just app-seed-account` skips note fixtures, blob metadata, and attachment installation, but it still creates and activates the seeded account database.
 
 ## Repo Layout
 
