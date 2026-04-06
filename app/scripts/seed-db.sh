@@ -27,6 +27,8 @@ trap cleanup EXIT INT TERM
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --)
+      ;;
     --account-only)
       ACCOUNT_ONLY=1
       ;;
