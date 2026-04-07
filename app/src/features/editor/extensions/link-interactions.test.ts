@@ -8,9 +8,16 @@ import {
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { WikiLinkGrammar } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
+import { CREATE_NOTE_FROM_WIKILINK_EVENT } from "@/shared/lib/note-navigation";
 
-const { openUrlMock } = vi.hoisted(() => ({
+const { invokeMock, openUrlMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(),
   openUrlMock: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock,
 }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
@@ -23,7 +30,11 @@ import {
   resolveDraftWikiLinkTarget,
 } from "@/features/editor/extensions/markdown-decorations/builders/links";
 
-function createView(doc: string, readOnly = false) {
+function createView(
+  doc: string,
+  readOnly = false,
+  noteId: string | null = null,
+) {
   const parent = document.createElement("div");
   document.body.append(parent);
 
@@ -34,10 +45,11 @@ function createView(doc: string, readOnly = false) {
       extensions: [
         markdownLanguage({
           base: markdownLang,
+          extensions: [WikiLinkGrammar],
         }),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
-        markdownDecorations(),
+        markdownDecorations({ noteId }),
       ],
     }),
   });
@@ -52,6 +64,7 @@ async function flush() {
 }
 
 afterEach(() => {
+  invokeMock.mockReset();
   openUrlMock.mockClear();
   useShellStore.setState({
     draftMarkdown: "",
@@ -359,5 +372,48 @@ describe("Editor link interactions", () => {
         type: "wikilink",
       }),
     ).toBe("resolved-note");
+  });
+
+  it("dispatches create-note for unresolved wikilinks", async () => {
+    invokeMock.mockResolvedValueOnce(null);
+    const eventHandler = vi.fn();
+    window.addEventListener(CREATE_NOTE_FROM_WIKILINK_EVENT, eventHandler);
+
+    const { view } = createView("[[Target]]", false, "note-1");
+    await flush();
+
+    const link = view.dom.querySelector(".cm-md-link");
+    expect(link).not.toBeNull();
+
+    link?.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+      }),
+    );
+    link?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+      }),
+    );
+    await flush();
+
+    expect(invokeMock).toHaveBeenCalledWith("resolve_wikilink", {
+      input: {
+        location: 0,
+        sourceNoteId: "note-1",
+        title: "Target",
+      },
+    });
+    expect(eventHandler).toHaveBeenCalledTimes(1);
+    expect((eventHandler.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+      location: 0,
+      sourceNoteId: "note-1",
+      title: "Target",
+    });
+
+    window.removeEventListener(CREATE_NOTE_FROM_WIKILINK_EVENT, eventHandler);
+    view.destroy();
   });
 });

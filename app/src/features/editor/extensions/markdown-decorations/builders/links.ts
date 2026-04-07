@@ -16,7 +16,10 @@ import type {
   BuilderContext,
   DecorationEntry,
 } from "@/features/editor/extensions/markdown-decorations/types";
-import { dispatchFocusNote } from "@/shared/lib/note-navigation";
+import {
+  dispatchCreateNoteFromWikilink,
+  dispatchFocusNote,
+} from "@/shared/lib/note-navigation";
 
 type ExternalLinkTarget = {
   type: "external";
@@ -510,6 +513,11 @@ async function openWikiLink(
     dispatchFocusNote(resolvedNoteId);
   } else {
     console.warn("[wikilinks] unresolved wikilink", {
+      location: target.location,
+      sourceNoteId: noteId,
+      title: target.title,
+    });
+    dispatchCreateNoteFromWikilink({
       location: target.location,
       sourceNoteId: noteId,
       title: target.title,

@@ -382,6 +382,7 @@ type NoteRowProps = {
   searchWords: string[];
   selectedNoteId: string | null;
   setSlideInNoteId(noteId: string | null): void;
+  setShouldRestoreSelectedRowFocus(): void;
   shouldSkipAnimation: boolean;
 };
 
@@ -414,19 +415,19 @@ function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
   }
 
   useShellStore.getState().setFocusedPane("notes");
-
-  const activeElement = document.activeElement;
-  if (
-    activeElement instanceof HTMLElement &&
-    activeElement !== event.currentTarget &&
-    activeElement.closest(".cm-editor")
-  ) {
-    activeElement.blur();
-  }
+  event.preventDefault();
 
   window.getSelection()?.removeAllRanges();
+}
 
-  event.currentTarget.focus({ preventScroll: true });
+function focusSelectedNoteRow(root?: ParentNode | null) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      (root ?? document)
+        .querySelector<HTMLButtonElement>('[data-comet-selected-note="true"]')
+        ?.focus({ preventScroll: true });
+    });
+  });
 }
 
 const NoteRow = memo(function NoteRow({
@@ -442,6 +443,7 @@ const NoteRow = memo(function NoteRow({
   searchWords,
   selectedNoteId,
   setSlideInNoteId,
+  setShouldRestoreSelectedRowFocus,
   shouldSkipAnimation,
 }: NoteRowProps) {
   const isActive = note.id === selectedNoteId;
@@ -474,7 +476,10 @@ const NoteRow = memo(function NoteRow({
         onFocus={() => {
           useShellStore.getState().setFocusedPane("notes");
         }}
-        onPointerDown={handleNoteRowPointerDown}
+        onPointerDown={(event) => {
+          handleNoteRowPointerDown(event);
+          setShouldRestoreSelectedRowFocus();
+        }}
         onMouseDown={(event) => {
           if (event.button === 2) {
             event.preventDefault();
@@ -590,6 +595,7 @@ export function NotesPane({
 
   const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const shouldRestoreSelectedRowFocusRef = useRef(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -644,6 +650,17 @@ export function NotesPane({
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
   }, [activeTagPath, filteredNotes.length, noteFilter, searchQuery]);
+
+  useEffect(() => {
+    if (isSearchFocused || !selectedNoteId) {
+      return;
+    }
+
+    if (focusedPane === "notes" || shouldRestoreSelectedRowFocusRef.current) {
+      shouldRestoreSelectedRowFocusRef.current = false;
+      focusSelectedNoteRow(scrollContainerRef.current);
+    }
+  }, [filteredNotes.length, focusedPane, isSearchFocused, selectedNoteId]);
 
   useEffect(() => {
     if (!inView || !hasMoreNotes) {
@@ -807,6 +824,9 @@ export function NotesPane({
                       selectedNoteId={selectedNoteId}
                       setSlideInNoteId={setSlideInNoteId}
                       shouldSkipAnimation={shouldSkipAnimation}
+                      setShouldRestoreSelectedRowFocus={() => {
+                        shouldRestoreSelectedRowFocusRef.current = true;
+                      }}
                     />
                   );
                 })}

@@ -99,6 +99,16 @@ export const MARKDOWN_EDITOR_THEME = EditorView.theme({
   ".cm-cursorLayer": {
     zIndex: "2 !important",
   },
+  "&.comet-editor-inactive .cm-content": {
+    caretColor: "transparent",
+  },
+  "&.comet-editor-inactive .cm-cursorLayer": {
+    opacity: "0",
+  },
+  "&.comet-editor-inactive > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":
+    {
+      backgroundColor: "transparent",
+    },
   ".cm-tooltip": {
     border: "1px solid var(--border)",
     backgroundColor: "var(--popover)",

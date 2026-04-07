@@ -50,6 +50,12 @@ export interface NoteMutationDeps {
   setNoteFilter: (filter: NoteFilter) => void;
 }
 
+type CreateNoteMutationInput = {
+  tags: string[];
+  markdown?: string;
+  autoFocusEditor?: boolean;
+};
+
 function haveSameWikilinkResolutions(
   left: WikiLinkResolutionInput[],
   right: WikiLinkResolutionInput[],
@@ -108,11 +114,16 @@ export function useNoteMutations(deps: NoteMutationDeps) {
   };
 
   const createNoteMutation = useMutation({
-    mutationFn: createNote,
-    onSuccess: (note) => {
+    mutationFn: ({
+      autoFocusEditor: _autoFocusEditor,
+      ...input
+    }: CreateNoteMutationInput) => createNote(input),
+    onSuccess: (note, variables) => {
       queryClient.setQueryData(["note", note.id], note);
       setCreatingSelectedNoteId(note.id);
-      setPendingAutoFocusEditorNoteId(note.id);
+      setPendingAutoFocusEditorNoteId(
+        variables.autoFocusEditor === false ? null : note.id,
+      );
       setSelectedNoteId(note.id);
       setDraft(note.id, note.markdown, {
         wikilinkResolutions: note.wikilinkResolutions,

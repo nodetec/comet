@@ -133,6 +133,10 @@ function blurEditorView(view: EditorView) {
   view.contentDOM.blur();
 }
 
+function syncEditorPaneFocusState(view: EditorView, focusedPane: string) {
+  view.dom.classList.toggle("comet-editor-inactive", focusedPane !== "editor");
+}
+
 function trySnapInlineSyntaxRightBoundaryClick(
   view: EditorView,
   event: globalThis.MouseEvent,
@@ -566,12 +570,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         }),
       );
 
+      syncEditorPaneFocusState(view, prevPaneRef.current);
       const unsubscribeShell = useShellStore.subscribe((state) => {
-        const previousPane = prevPaneRef.current;
         prevPaneRef.current = state.focusedPane;
-        if (previousPane === "editor" && state.focusedPane !== "editor") {
-          view.contentDOM.blur();
-        }
+        syncEditorPaneFocusState(view, state.focusedPane);
       });
 
       if (initialAutoFocusRef.current) {
@@ -669,7 +671,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           view.focus();
           onAutoFocusHandled?.();
         } else {
-          blurEditorView(view);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               if (useShellStore.getState().focusedPane !== "editor") {

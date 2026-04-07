@@ -40,6 +40,8 @@ import {
   type FocusTagPathDetail,
 } from "@/shared/lib/tag-navigation";
 import {
+  CREATE_NOTE_FROM_WIKILINK_EVENT,
+  type CreateNoteFromWikilinkDetail,
   FOCUS_NOTE_EVENT,
   type FocusNoteDetail,
 } from "@/shared/lib/note-navigation";
@@ -613,6 +615,58 @@ export function useShellController() {
     };
   }, [setFocusedPane]);
 
+  useEffect(() => {
+    const handleCreateNoteFromWikilink = (event: Event) => {
+      const customEvent = event as CustomEvent<CreateNoteFromWikilinkDetail>;
+      const title = customEvent.detail?.title?.trim();
+      if (!title || isCreatingNote) {
+        return;
+      }
+
+      latestRef.current.flushCurrentDraft();
+      const tagsForNewNote =
+        tagViewActive && activeTagPath ? [activeTagPath] : [];
+      if (
+        !tagViewActive &&
+        noteFilter !== "today" &&
+        noteFilter !== "todo" &&
+        noteFilter !== "pinned" &&
+        noteFilter !== "untagged"
+      ) {
+        setNoteFilter("all");
+      }
+      setSearchQuery("");
+      setCreatingSelectedNoteId(null);
+      setFocusedPane("notes");
+      setIsCreatingNoteTransition(true);
+      createNoteMutation.mutate({
+        autoFocusEditor: false,
+        tags: tagsForNewNote,
+        markdown: `# ${title}`,
+      });
+    };
+
+    window.addEventListener(
+      CREATE_NOTE_FROM_WIKILINK_EVENT,
+      handleCreateNoteFromWikilink,
+    );
+    return () => {
+      window.removeEventListener(
+        CREATE_NOTE_FROM_WIKILINK_EVENT,
+        handleCreateNoteFromWikilink,
+      );
+    };
+  }, [
+    activeTagPath,
+    createNoteMutation,
+    isCreatingNote,
+    noteFilter,
+    setFocusedPane,
+    setNoteFilter,
+    setSearchQuery,
+    tagViewActive,
+  ]);
+
   // --- Handlers ---
   const handleCreateNote = () => {
     if (isCreatingNote) {
@@ -1136,6 +1190,7 @@ export function useShellController() {
   // Keep latest handler references for stable memoized callbacks
   const currentHandlers = {
     fetchNextPage: notesQuery.fetchNextPage,
+    flushCurrentDraft,
     flushCurrentDraftAsync,
     handleArchiveNote,
     handleCopyNoteContent,
