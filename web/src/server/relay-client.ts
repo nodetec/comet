@@ -11,6 +11,7 @@ export type RelayConnectionInfo = {
 export type RelayAccessKey = {
   key: string;
   label: string | null;
+  pubkey: string | null;
   storage_limit_bytes: number | null;
   expires_at: number | null;
   revoked: boolean;
@@ -83,6 +84,7 @@ export async function listRelayAccessKeys(): Promise<{
 
 export async function createRelayAccessKey(input: {
   label?: string | null;
+  pubkey?: string | null;
   expires_at?: number | null;
   storage_limit_bytes?: number | null;
 }) {

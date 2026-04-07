@@ -264,10 +264,14 @@ export const accessKeys = pgTable(
   {
     key: text("key").primaryKey(),
     label: text("label"),
+    pubkey: text("pubkey"),
     storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }),
     expiresAt: bigint("expires_at", { mode: "number" }),
     revoked: boolean("revoked").notNull().default(false),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
   },
-  (table) => [index("idx_access_keys_created_at").on(table.createdAt)],
+  (table) => [
+    index("idx_access_keys_created_at").on(table.createdAt),
+    index("idx_access_keys_pubkey").on(table.pubkey),
+  ],
 );

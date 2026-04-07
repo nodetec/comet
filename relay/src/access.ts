@@ -13,6 +13,7 @@ export type AccessControl = {
   createKey: (
     key: string,
     label: string | null,
+    pubkey: string | null,
     expiresAt: number | null,
     storageLimitBytes: number | null,
   ) => Promise<void>;
@@ -63,13 +64,14 @@ export function createAccessControl(
       return { valid: true, storageLimitBytes: row.storageLimitBytes };
     },
 
-    async createKey(key, label, expiresAt, storageLimitBytes) {
+    async createKey(key, label, pubkey, expiresAt, storageLimitBytes) {
       const createdAt = Math.floor(Date.now() / 1000);
       await db
         .insert(accessKeys)
         .values({
           key,
           label,
+          pubkey,
           expiresAt,
           storageLimitBytes,
           createdAt,
@@ -78,6 +80,7 @@ export function createAccessControl(
           target: accessKeys.key,
           set: {
             label,
+            pubkey,
             expiresAt,
             storageLimitBytes,
           },
@@ -108,6 +111,7 @@ export function createAccessControl(
         .select({
           key: accessKeys.key,
           label: accessKeys.label,
+          pubkey: accessKeys.pubkey,
           storageLimitBytes: accessKeys.storageLimitBytes,
           expiresAt: accessKeys.expiresAt,
           revoked: accessKeys.revoked,

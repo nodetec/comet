@@ -42,6 +42,7 @@ import {
   deleteAccessKey,
 } from "~/server/admin/access-keys";
 import { formatBytes, usagePercent, usageColor } from "~/lib/utils";
+import { resolvePubkeyInput } from "~/lib/pubkeys";
 
 export const Route = createFileRoute("/admin/access-keys")({
   component: AccessKeysPage,
@@ -50,6 +51,7 @@ export const Route = createFileRoute("/admin/access-keys")({
 type AccessKeyRow = {
   key: string;
   label: string | null;
+  pubkey: string | null;
   expiresAt: number | null;
   storageLimitBytes: number | null;
   revoked: boolean;
@@ -84,6 +86,7 @@ function CopyableKey({ value }: { value: string }) {
 function AccessKeysPage() {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
+  const [pubkeyInput, setPubkeyInput] = useState("");
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [createdKeyCopied, setCreatedKeyCopied] = useState(false);
 
@@ -95,11 +98,17 @@ function AccessKeysPage() {
   const defaultLimit = data?.defaultStorageLimitBytes ?? 1024 * 1024 * 1024;
 
   const createMutation = useMutation({
-    mutationFn: (label: string) =>
-      createAccessKey({ data: { label: label || null } }),
+    mutationFn: (input: { label: string; pubkey: string }) =>
+      createAccessKey({
+        data: {
+          label: input.label || null,
+          pubkey: input.pubkey || null,
+        },
+      }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "access-keys"] });
       setLabel("");
+      setPubkeyInput("");
       setCreatedKey(result.key);
     },
   });
@@ -120,7 +129,10 @@ function AccessKeysPage() {
 
   function handleCreate(e: FormEvent) {
     e.preventDefault();
-    createMutation.mutate(label);
+    const pubkey = pubkeyInput.trim()
+      ? (resolvePubkeyInput(pubkeyInput) ?? "")
+      : "";
+    createMutation.mutate({ label, pubkey });
   }
 
   function handleCopyCreated() {
@@ -146,6 +158,17 @@ function AccessKeysPage() {
             {row.original.label ?? (
               <span className="text-muted-foreground">-</span>
             )}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "pubkey",
+        header: "Pubkey",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground font-mono text-xs">
+            {row.original.pubkey
+              ? `${row.original.pubkey.slice(0, 8)}...${row.original.pubkey.slice(-4)}`
+              : "-"}
           </span>
         ),
       },
@@ -285,20 +308,25 @@ function AccessKeysPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={handleCreate}
-            className="flex flex-col gap-2 sm:flex-row"
-          >
-            <Input
-              placeholder="Label (optional)"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              className="flex-1 text-sm"
-            />
-            <Button type="submit" disabled={createMutation.isPending}>
-              <Plus className="mr-1 h-4 w-4" />
-              Create
-            </Button>
+          <form onSubmit={handleCreate} className="space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="Label (optional)"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                className="flex-1 text-sm"
+              />
+              <Input
+                placeholder="Pubkey — npub or hex (optional)"
+                value={pubkeyInput}
+                onChange={(e) => setPubkeyInput(e.target.value)}
+                className="flex-1 font-mono text-sm"
+              />
+              <Button type="submit" disabled={createMutation.isPending}>
+                <Plus className="mr-1 h-4 w-4" />
+                Create
+              </Button>
+            </div>
           </form>
           {createMutation.isError && (
             <p className="text-destructive mt-2 text-sm">

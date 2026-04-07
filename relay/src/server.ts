@@ -364,6 +364,7 @@ async function handleKeysApiRequest(
       keys: keys.map((k) => ({
         key: k.key,
         label: k.label,
+        pubkey: k.pubkey,
         storage_limit_bytes: k.storageLimitBytes,
         expires_at: k.expiresAt,
         revoked: k.revoked,
@@ -409,10 +410,16 @@ async function handleKeysApiRequest(
       );
     }
 
+    const pubkey =
+      typeof body.pubkey === "string" && /^[a-f0-9]{64}$/.test(body.pubkey)
+        ? body.pubkey
+        : null;
+
     const key = generateAccessKey();
     await options.access.createKey(
       key,
       label,
+      pubkey,
       expiresAt === undefined ? null : expiresAt,
       storageLimitBytes === undefined ? null : storageLimitBytes,
     );
@@ -420,6 +427,7 @@ async function handleKeysApiRequest(
     return jsonResponse({
       key,
       label,
+      pubkey,
       expires_at: expiresAt === undefined ? null : expiresAt,
       storage_limit_bytes:
         storageLimitBytes === undefined ? null : storageLimitBytes,

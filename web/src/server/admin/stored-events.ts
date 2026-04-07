@@ -119,33 +119,41 @@ export function buildStoredEventsListQuery(input: {
   `;
 }
 
-export function buildStoredEventsCountQuery() {
+export function buildStoredEventsCountQuery(filter?: { pubkey?: string }) {
+  const where = filter?.pubkey ? sql`WHERE pubkey = ${filter.pubkey}` : sql``;
   return sql`
     ${storedEventsCte()}
     SELECT COUNT(*)::bigint AS val
     FROM combined
+    ${where}
   `;
 }
 
-export function buildStoredEventsByKindQuery(limit: number) {
+export function buildStoredEventsByKindQuery(limit: number, pubkey?: string) {
+  const where = pubkey ? sql`WHERE pubkey = ${pubkey}` : sql``;
   return sql`
     ${storedEventsCte()}
     SELECT kind, COUNT(*)::bigint AS count
     FROM combined
+    ${where}
     GROUP BY kind
     ORDER BY COUNT(*) DESC
     LIMIT ${limit}
   `;
 }
 
-export function buildStoredEventsOverTimeQuery(thirtyDaysAgo: number) {
+export function buildStoredEventsOverTimeQuery(
+  thirtyDaysAgo: number,
+  pubkey?: string,
+) {
+  const pubkeyClause = pubkey ? sql` AND pubkey = ${pubkey}` : sql``;
   return sql`
     ${storedEventsCte()}
     SELECT
       TO_CHAR(TO_TIMESTAMP(created_at), 'YYYY-MM-DD') AS day,
       COUNT(*)::bigint AS count
     FROM combined
-    WHERE created_at >= ${thirtyDaysAgo}
+    WHERE created_at >= ${thirtyDaysAgo}${pubkeyClause}
     GROUP BY day
     ORDER BY day
   `;

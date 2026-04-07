@@ -38,6 +38,7 @@ export const listAccessKeys = createServerFn({ method: "GET" }).handler(
       keys: keysResponse.keys.map((key) => ({
         key: key.key,
         label: key.label,
+        pubkey: key.pubkey,
         expiresAt: key.expires_at,
         storageLimitBytes: key.storage_limit_bytes,
         revoked: key.revoked,
@@ -52,6 +53,7 @@ export const createAccessKey = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
       label?: string | null;
+      pubkey?: string | null;
       expiresAt?: number | null;
       storageLimitBytes?: number | null;
     }) => data,
@@ -60,6 +62,7 @@ export const createAccessKey = createServerFn({ method: "POST" })
     assertAdmin();
     return createRelayAccessKey({
       label: data.label ?? null,
+      pubkey: data.pubkey ?? null,
       expires_at: data.expiresAt ?? null,
       ...(data.storageLimitBytes !== undefined
         ? { storage_limit_bytes: data.storageLimitBytes }

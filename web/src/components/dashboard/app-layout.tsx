@@ -1,23 +1,24 @@
 import { useState } from "react";
-import { Link, useLocation } from "@tanstack/react-router";
-import { FileText, LogOut, Orbit, Menu } from "lucide-react";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, LogOut, Orbit, Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "~/components/ui/sheet";
-import { useNostr } from "~/lib/nostr/use-nostr";
+import { userLogout } from "~/server/user/auth";
 import { cn } from "~/lib/utils";
 
 const navItems = [
-  { to: "/", icon: FileText, label: "Notes", exact: true },
+  { to: "/", icon: LayoutDashboard, label: "Dashboard", exact: true },
 ] as const;
-
-function truncatePubkey(pubkey: string): string {
-  return `${pubkey.slice(0, 8)}...${pubkey.slice(-4)}`;
-}
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
-  const { pubkey, signOut } = useNostr();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await userLogout();
+    void navigate({ to: "/login" });
+  }
 
   return (
     <>
@@ -53,18 +54,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </nav>
       <Separator className="bg-sidebar-border" />
-      {pubkey && (
-        <div className="px-4 py-2">
-          <p
-            className="text-sidebar-foreground/50 truncate font-mono text-xs"
-            title={pubkey}
-          >
-            {truncatePubkey(pubkey)}
-          </p>
-        </div>
-      )}
       <div className="flex items-center justify-end p-2">
-        <Button variant="ghost" size="icon" onClick={signOut} title="Logout">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleSignOut}
+          title="Sign out"
+        >
           <LogOut className="h-4 w-4" />
         </Button>
       </div>
@@ -81,14 +77,11 @@ export function DashboardAppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar */}
       <aside className="border-sidebar-border bg-sidebar hidden w-56 shrink-0 flex-col border-r md:flex">
         <SidebarContent />
       </aside>
 
-      {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Mobile header */}
         <header className="border-border bg-background flex items-center gap-2 border-b px-4 py-3 md:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
@@ -104,9 +97,7 @@ export function DashboardAppLayout({
           <span className="text-sm font-semibold">Comet</span>
         </header>
 
-        <main className="bg-background flex flex-1 flex-col overflow-hidden">
-          {children}
-        </main>
+        <main className="bg-background flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

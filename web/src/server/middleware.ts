@@ -32,3 +32,31 @@ export function isAdminAuthenticated(): boolean {
   const token = getCookie(SESSION_COOKIE);
   return !!token && token === process.env.ADMIN_TOKEN;
 }
+
+const USER_SESSION_COOKIE = "user_session";
+
+export function setUserSession(pubkey: string): void {
+  setCookie(USER_SESSION_COOKIE, pubkey, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SEVEN_DAYS,
+    path: "/",
+  });
+}
+
+export function clearUserSession(): void {
+  deleteCookie(USER_SESSION_COOKIE);
+}
+
+export function getUserPubkey(): string | null {
+  return getCookie(USER_SESSION_COOKIE) ?? null;
+}
+
+export function assertUser(): string {
+  const pubkey = getUserPubkey();
+  if (!pubkey) {
+    throw new Error("Unauthorized");
+  }
+  return pubkey;
+}

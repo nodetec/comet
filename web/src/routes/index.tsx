@@ -1,15 +1,11 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { NostrProvider } from "~/lib/nostr/use-nostr";
 import { DashboardAppLayout } from "~/components/dashboard/app-layout";
-import { NotesPage } from "~/components/dashboard/notes-page";
+import { UserDashboard } from "~/components/dashboard/user-dashboard";
+import { checkUserAuth } from "~/server/user/auth";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    if (typeof window === "undefined") {
-      throw redirect({ to: "/login" });
-    }
-
-    const pubkey = window.localStorage.getItem("pubkey");
+  beforeLoad: async () => {
+    const { pubkey } = await checkUserAuth();
     if (!pubkey) {
       throw redirect({ to: "/login" });
     }
@@ -19,10 +15,8 @@ export const Route = createFileRoute("/")({
 
 function DashboardRoute() {
   return (
-    <NostrProvider>
-      <DashboardAppLayout>
-        <NotesPage />
-      </DashboardAppLayout>
-    </NostrProvider>
+    <DashboardAppLayout>
+      <UserDashboard />
+    </DashboardAppLayout>
   );
 }
