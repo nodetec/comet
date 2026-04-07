@@ -54,6 +54,16 @@ fn default_markdown(tags: &[String]) -> String {
     }
 }
 
+fn sort_wikilink_resolutions(resolutions: &mut [WikiLinkResolutionInput]) {
+    resolutions.sort_by(|left, right| {
+        left.location
+            .cmp(&right.location)
+            .then_with(|| left.title.cmp(&right.title))
+            .then_with(|| left.target_note_id.cmp(&right.target_note_id))
+            .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Service methods
 // ---------------------------------------------------------------------------
@@ -125,6 +135,15 @@ impl NoteService {
         tags: &[String],
         initial_markdown: Option<&str>,
     ) -> Result<NoteRecord, NoteError> {
+        Self::create_note_with_wikilinks(repo, tags, initial_markdown, &[])
+    }
+
+    fn create_note_with_wikilinks(
+        repo: &dyn NoteRepository,
+        tags: &[String],
+        initial_markdown: Option<&str>,
+        wikilink_resolutions: &[WikiLinkResolutionInput],
+    ) -> Result<NoteRecord, NoteError> {
         let note_id = generate_note_id();
         let markdown = initial_markdown
             .map(|md| md.to_string())
@@ -138,6 +157,8 @@ impl NoteService {
         if !extracted_tags.is_empty() {
             repo.replace_tags(&note_id, &markdown)?;
         }
+        repo.replace_wikilinks(&note_id, &markdown, wikilink_resolutions)?;
+        repo.refresh_wikilink_targets(std::slice::from_ref(&title))?;
         repo.set_last_open_note_id(Some(&note_id))?;
 
         repo.note_by_id(&note_id)?.ok_or(NoteError::NotFound)
@@ -149,25 +170,60 @@ impl NoteService {
     ) -> Result<NoteRecord, NoteError> {
         validate_note_id(note_id)?;
         let markdown = repo.note_markdown(note_id)?;
-        Self::create_note(repo, &[], Some(&markdown))
+        let wikilink_resolutions = repo
+            .wikilink_resolutions_for_note(note_id)?
+            .into_iter()
+            .map(|resolution| WikiLinkResolutionInput {
+                occurrence_id: None,
+                ..resolution
+            })
+            .collect::<Vec<_>>();
+        Self::create_note_with_wikilinks(repo, &[], Some(&markdown), &wikilink_resolutions)
     }
 
-    /// Returns `(record, content_changed)`.
+    /// Returns `(record, note_changed)`.
     pub fn save_note(
         repo: &dyn NoteRepository,
         input: SaveNoteInput,
     ) -> Result<(NoteRecord, bool), NoteError> {
+        log::info!(
+            "[wikilinks] save_note id={} wikilink_resolution_count={}",
+            input.id,
+            input.wikilink_resolutions.as_ref().map_or(0, Vec::len)
+        );
+        for resolution in input.wikilink_resolutions.iter().flatten() {
+            log::info!(
+                "[wikilinks] save_note resolution id={} occurrence_id={:?} location={} title={} target_note_id={}",
+                input.id,
+                resolution.occurrence_id,
+                resolution.location,
+                resolution.title,
+                resolution.target_note_id
+            );
+        }
+
         validate_note_id(&input.id)?;
         let title = title_from_markdown(&input.markdown);
-
-        let (existing_markdown, is_readonly) = repo.note_markdown_and_readonly(&input.id)?;
+        let existing = repo.note_by_id(&input.id)?.ok_or(NoteError::NotFound)?;
+        let existing_markdown = existing.markdown.clone();
+        let previous_title = existing.title;
+        let mut existing_wikilink_resolutions = repo.wikilink_resolutions_for_note(&input.id)?;
+        let is_readonly = existing.readonly;
         if is_readonly {
             return Err(NoteError::ReadOnly);
         }
 
-        let content_changed = existing_markdown != input.markdown;
+        let markdown_changed = existing_markdown != input.markdown;
+        let mut next_wikilink_resolutions = input
+            .wikilink_resolutions
+            .clone()
+            .unwrap_or_else(|| existing_wikilink_resolutions.clone());
+        sort_wikilink_resolutions(&mut existing_wikilink_resolutions);
+        sort_wikilink_resolutions(&mut next_wikilink_resolutions);
+        let wikilink_metadata_changed = existing_wikilink_resolutions != next_wikilink_resolutions;
+        let note_changed = markdown_changed || wikilink_metadata_changed;
 
-        if content_changed {
+        if note_changed {
             let now = now_millis();
             repo.update_note_content(&input.id, &title, &input.markdown, now)?;
         } else {
@@ -176,10 +232,12 @@ impl NoteService {
 
         repo.upsert_search_document(&input.id, &title, &input.markdown)?;
         repo.replace_tags(&input.id, &input.markdown)?;
+        repo.replace_wikilinks(&input.id, &input.markdown, &next_wikilink_resolutions)?;
+        repo.refresh_wikilink_targets(&[previous_title, title.clone()])?;
         repo.set_last_open_note_id(Some(&input.id))?;
 
         let record = repo.note_by_id(&input.id)?.ok_or(NoteError::NotFound)?;
-        Ok((record, content_changed))
+        Ok((record, note_changed))
     }
 
     pub fn set_readonly(
@@ -430,6 +488,22 @@ impl NoteService {
         repo.search_tags(query)
     }
 
+    pub fn backlinks_for_note(
+        repo: &dyn NoteRepository,
+        note_id: &str,
+    ) -> Result<Vec<NoteBacklink>, NoteError> {
+        validate_note_id(note_id)?;
+        repo.backlinks_for_note(note_id)
+    }
+
+    pub fn resolve_wikilink(
+        repo: &dyn NoteRepository,
+        input: ResolveWikilinkInput,
+    ) -> Result<Option<String>, NoteError> {
+        validate_note_id(&input.source_note_id)?;
+        repo.resolve_wikilink(&input)
+    }
+
     pub fn export_notes(
         repo: &dyn NoteRepository,
         mut input: ExportNotesInput,
@@ -508,6 +582,7 @@ mod tests {
 
     struct MockNoteRepository {
         notes: RefCell<HashMap<String, NoteRecord>>,
+        wikilinks: RefCell<HashMap<String, Vec<WikiLinkResolutionInput>>>,
         last_open_note_id: RefCell<Option<String>>,
         pinned_tags: RefCell<HashSet<String>>,
         hide_subtag_notes_tags: RefCell<HashSet<String>>,
@@ -517,6 +592,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 notes: RefCell::new(HashMap::new()),
+                wikilinks: RefCell::new(HashMap::new()),
                 last_open_note_id: RefCell::new(None),
                 pinned_tags: RefCell::new(HashSet::new()),
                 hide_subtag_notes_tags: RefCell::new(HashSet::new()),
@@ -525,6 +601,17 @@ mod tests {
 
         fn with_note(self, record: NoteRecord) -> Self {
             self.notes.borrow_mut().insert(record.id.clone(), record);
+            self
+        }
+
+        fn with_wikilink_resolutions(
+            self,
+            note_id: &str,
+            resolutions: Vec<WikiLinkResolutionInput>,
+        ) -> Self {
+            self.wikilinks
+                .borrow_mut()
+                .insert(note_id.to_string(), resolutions);
             self
         }
     }
@@ -578,6 +665,18 @@ mod tests {
             Ok(record.markdown.clone())
         }
 
+        fn wikilink_resolutions_for_note(
+            &self,
+            note_id: &str,
+        ) -> Result<Vec<WikiLinkResolutionInput>, NoteError> {
+            Ok(self
+                .wikilinks
+                .borrow()
+                .get(note_id)
+                .cloned()
+                .unwrap_or_default())
+        }
+
         fn insert_note(
             &self,
             note_id: &str,
@@ -612,6 +711,22 @@ mod tests {
         }
 
         fn replace_tags(&self, _note_id: &str, _markdown: &str) -> Result<(), NoteError> {
+            Ok(())
+        }
+
+        fn replace_wikilinks(
+            &self,
+            note_id: &str,
+            _markdown: &str,
+            resolutions: &[WikiLinkResolutionInput],
+        ) -> Result<(), NoteError> {
+            self.wikilinks
+                .borrow_mut()
+                .insert(note_id.to_string(), resolutions.to_vec());
+            Ok(())
+        }
+
+        fn refresh_wikilink_targets(&self, _titles: &[String]) -> Result<(), NoteError> {
             Ok(())
         }
 
@@ -841,6 +956,22 @@ mod tests {
         fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> {
             unimplemented!()
         }
+        fn backlinks_for_note(&self, _: &str) -> Result<Vec<NoteBacklink>, NoteError> {
+            Ok(Vec::new())
+        }
+        fn resolve_wikilink(
+            &self,
+            input: &ResolveWikilinkInput,
+        ) -> Result<Option<String>, NoteError> {
+            let notes = self.notes.borrow();
+            let mut matches = notes
+                .values()
+                .filter(|record| record.title.eq_ignore_ascii_case(&input.title))
+                .map(|record| record.id.clone())
+                .collect::<Vec<_>>();
+            matches.sort();
+            Ok((matches.len() == 1).then(|| matches[0].clone()))
+        }
         fn query_contextual_tags(
             &self,
             _: &ContextualTagsInput,
@@ -941,6 +1072,7 @@ mod tests {
             SaveNoteInput {
                 id: "note-ro".to_string(),
                 markdown: "# Changed".to_string(),
+                wikilink_resolutions: Some(Vec::new()),
             },
         );
 
@@ -969,6 +1101,7 @@ mod tests {
             SaveNoteInput {
                 id: "note-1".to_string(),
                 markdown: "# Original\n\nNew body".to_string(),
+                wikilink_resolutions: Some(Vec::new()),
             },
         )
         .expect("save should succeed");
@@ -999,11 +1132,109 @@ mod tests {
             SaveNoteInput {
                 id: "note-2".to_string(),
                 markdown,
+                wikilink_resolutions: Some(Vec::new()),
             },
         )
         .expect("save should succeed");
 
         assert!(!changed);
+    }
+
+    #[test]
+    fn save_note_detects_wikilink_resolution_only_change() {
+        let markdown = "# Same\n\n[[Alpha]]".to_string();
+        let record = NoteRecord {
+            id: "note-3".to_string(),
+            title: "Same".to_string(),
+            markdown: markdown.clone(),
+            modified_at: 1000,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new()
+            .with_note(record)
+            .with_wikilink_resolutions(
+                "note-3",
+                vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("A1".to_string()),
+                    is_explicit: true,
+                    location: 8,
+                    target_note_id: "target-old".to_string(),
+                    title: "Alpha".to_string(),
+                }],
+            );
+
+        let (saved, changed) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "note-3".to_string(),
+                markdown,
+                wikilink_resolutions: Some(vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("A1".to_string()),
+                    is_explicit: true,
+                    location: 8,
+                    target_note_id: "target-new".to_string(),
+                    title: "Alpha".to_string(),
+                }]),
+            },
+        )
+        .expect("save should succeed");
+
+        assert!(changed);
+        assert!(saved.modified_at > 1000);
+        let resolutions = repo.wikilink_resolutions_for_note("note-3").unwrap();
+        assert_eq!(resolutions.len(), 1);
+        assert_eq!(resolutions[0].target_note_id, "target-new");
+    }
+
+    #[test]
+    fn save_note_preserves_existing_wikilink_resolutions_when_omitted() {
+        let markdown = "# Same\n\n[[Alpha]]".to_string();
+        let record = NoteRecord {
+            id: "note-4".to_string(),
+            title: "Same".to_string(),
+            markdown: markdown.clone(),
+            modified_at: 1000,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new()
+            .with_note(record)
+            .with_wikilink_resolutions(
+                "note-4",
+                vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("A1".to_string()),
+                    is_explicit: true,
+                    location: 8,
+                    target_note_id: "target-a".to_string(),
+                    title: "Alpha".to_string(),
+                }],
+            );
+
+        let (_, changed) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "note-4".to_string(),
+                markdown: "# Same\n\nBody\n\n[[Alpha]]".to_string(),
+                wikilink_resolutions: None,
+            },
+        )
+        .expect("save should succeed");
+
+        assert!(changed);
+        let resolutions = repo.wikilink_resolutions_for_note("note-4").unwrap();
+        assert_eq!(resolutions.len(), 1);
+        assert_eq!(resolutions[0].target_note_id, "target-a");
     }
 
     #[test]
@@ -1015,6 +1246,7 @@ mod tests {
             SaveNoteInput {
                 id: "../escape".to_string(),
                 markdown: "# Hack".to_string(),
+                wikilink_resolutions: Some(Vec::new()),
             },
         );
 
@@ -1052,6 +1284,31 @@ mod tests {
 
         assert_ne!(dup.id, "orig");
         assert_eq!(dup.markdown, "# My Note\n\nBody text");
+    }
+
+    #[test]
+    fn duplicate_note_preserves_explicit_wikilink_targets_without_occurrence_ids() {
+        let repo = MockNoteRepository::new()
+            .with_note(make_note("orig", "# My Note\n\n[[Alpha]]"))
+            .with_wikilink_resolutions(
+                "orig",
+                vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("OCC1".to_string()),
+                    is_explicit: true,
+                    location: 10,
+                    target_note_id: "target-a".to_string(),
+                    title: "Alpha".to_string(),
+                }],
+            );
+
+        let dup = NoteService::duplicate_note(&repo, "orig").unwrap();
+        let duplicated_resolutions = repo.wikilink_resolutions_for_note(&dup.id).unwrap();
+
+        assert_eq!(duplicated_resolutions.len(), 1);
+        assert_eq!(duplicated_resolutions[0].target_note_id, "target-a");
+        assert_eq!(duplicated_resolutions[0].title, "Alpha");
+        assert_eq!(duplicated_resolutions[0].location, 10);
+        assert_eq!(duplicated_resolutions[0].occurrence_id, None);
     }
 
     // ── archive_note ───────────────────────────────────────────────────

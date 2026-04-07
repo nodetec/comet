@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import {
   getBootstrap,
+  getNoteBacklinks,
   getContextualTags,
   getNoteConflict,
   getNoteHistory,
@@ -167,6 +168,12 @@ export function useNoteQueries(params: NoteQueryParams) {
     queryKey: ["note-history", selectedNoteId],
   });
 
+  const noteBacklinksQuery = useQuery({
+    enabled: Boolean(selectedNoteId),
+    queryFn: () => getNoteBacklinks(selectedNoteId!),
+    queryKey: ["note-backlinks", selectedNoteId],
+  });
+
   return {
     bootstrapQuery,
     todoCountQuery,
@@ -181,5 +188,6 @@ export function useNoteQueries(params: NoteQueryParams) {
     initialSelectedNoteId,
     noteConflictQuery,
     noteHistoryQuery,
+    noteBacklinksQuery,
   };
 }

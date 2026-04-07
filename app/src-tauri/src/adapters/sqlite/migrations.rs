@@ -260,5 +260,92 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_bootstrap_snapshot_stage_relay_order
                ON bootstrap_snapshot_stage(relay_url, created_at ASC, snapshot_event_id ASC);",
         ),
+        M::up(
+            "CREATE TABLE note_wikilinks (
+               source_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+               location INTEGER NOT NULL,
+               title TEXT NOT NULL,
+               normalized_title TEXT NOT NULL,
+               target_note_id TEXT,
+               PRIMARY KEY (source_note_id, location)
+             );
+             CREATE INDEX idx_note_wikilinks_target_note_id
+               ON note_wikilinks(target_note_id, source_note_id, location);
+             CREATE INDEX idx_note_wikilinks_normalized_title
+               ON note_wikilinks(normalized_title, source_note_id, location);",
+        ),
+        M::up(
+            "ALTER TABLE note_wikilinks ADD COLUMN occurrence_id TEXT;
+             UPDATE note_wikilinks
+             SET occurrence_id = UPPER(hex(randomblob(16)))
+             WHERE occurrence_id IS NULL;
+             CREATE UNIQUE INDEX idx_note_wikilinks_occurrence_id
+               ON note_wikilinks(occurrence_id)
+               WHERE occurrence_id IS NOT NULL;",
+        ),
+        M::up(
+            "CREATE TABLE note_wikilinks_next (
+               source_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+               location INTEGER NOT NULL,
+               title TEXT NOT NULL,
+               normalized_title TEXT NOT NULL,
+               target_note_id TEXT,
+               occurrence_id TEXT,
+               PRIMARY KEY (source_note_id, location)
+             );
+             INSERT INTO note_wikilinks_next (
+               source_note_id,
+               location,
+               title,
+               normalized_title,
+               target_note_id,
+               occurrence_id
+             )
+             SELECT
+               source_note_id,
+               location,
+               title,
+               normalized_title,
+               target_note_id,
+               occurrence_id
+             FROM note_wikilinks;
+             DROP TABLE note_wikilinks;
+             ALTER TABLE note_wikilinks_next RENAME TO note_wikilinks;
+             CREATE INDEX idx_note_wikilinks_target_note_id
+               ON note_wikilinks(target_note_id, source_note_id, location);
+             CREATE INDEX idx_note_wikilinks_normalized_title
+               ON note_wikilinks(normalized_title, source_note_id, location);
+             CREATE UNIQUE INDEX idx_note_wikilinks_occurrence_id
+               ON note_wikilinks(occurrence_id)
+               WHERE occurrence_id IS NOT NULL;",
+        ),
+        M::up(
+            "ALTER TABLE note_wikilinks
+             ADD COLUMN is_explicit INTEGER NOT NULL DEFAULT 0 CHECK (is_explicit IN (0, 1));",
+        ),
+        M::up(
+            "CREATE TABLE note_conflict_wikilinks (
+               snapshot_event_id TEXT NOT NULL REFERENCES note_conflicts(snapshot_event_id) ON DELETE CASCADE,
+               occurrence_id TEXT,
+               location INTEGER NOT NULL,
+               title TEXT NOT NULL,
+               target_note_id TEXT NOT NULL,
+               PRIMARY KEY (snapshot_event_id, location)
+             );
+             CREATE INDEX idx_note_conflict_wikilinks_snapshot
+               ON note_conflict_wikilinks(snapshot_event_id, location);",
+        ),
+        M::up(
+            "CREATE TABLE note_snapshot_history_wikilinks (
+               snapshot_event_id TEXT NOT NULL REFERENCES note_snapshot_history(snapshot_event_id) ON DELETE CASCADE,
+               occurrence_id TEXT,
+               location INTEGER NOT NULL,
+               title TEXT NOT NULL,
+               target_note_id TEXT NOT NULL,
+               PRIMARY KEY (snapshot_event_id, location)
+             );
+             CREATE INDEX idx_note_snapshot_history_wikilinks_snapshot
+               ON note_snapshot_history_wikilinks(snapshot_event_id, location);",
+        ),
     ])
 }

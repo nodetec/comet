@@ -29,6 +29,8 @@ pub fn upsert_from_sync(
 
     let existing = load_existing_note(conn, &note.id)?;
 
+    let previous_title = existing.as_ref().map(|existing| existing.title.clone());
+
     if let Some(existing) = &existing {
         if existing.is_locally_modified {
             return Ok(None);
@@ -130,6 +132,17 @@ pub fn upsert_from_sync(
     }
 
     crate::adapters::sqlite::tag_index::rebuild_note_tag_index(conn, &note.id, &note.markdown)?;
+    crate::adapters::sqlite::wikilink_index::rebuild_note_wikilink_index(
+        conn,
+        &note.id,
+        &note.markdown,
+        &note.wikilink_resolutions,
+    )?;
+    let titles_to_refresh = previous_title
+        .into_iter()
+        .chain(std::iter::once(note.title.clone()))
+        .collect::<Vec<_>>();
+    crate::adapters::sqlite::wikilink_index::refresh_wikilink_targets(conn, &titles_to_refresh)?;
     conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", params![note.id])?;
     conn.execute(
         "INSERT INTO notes_fts (note_id, title, markdown) VALUES (?1, ?2, ?3)",

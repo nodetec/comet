@@ -23,6 +23,7 @@ pub fn note_snapshot_history_entry(
         pinned_at: note.pinned_at,
         readonly: note.readonly,
         created_at,
+        wikilink_resolutions: note.wikilink_resolutions.clone(),
     })
 }
 
@@ -46,5 +47,6 @@ pub fn tombstone_snapshot_history_entry(
         pinned_at: None,
         readonly: false,
         created_at,
+        wikilink_resolutions: vec![],
     })
 }

@@ -39,9 +39,31 @@ import {
   FOCUS_TAG_PATH_EVENT,
   type FocusTagPathDetail,
 } from "@/shared/lib/tag-navigation";
+import {
+  FOCUS_NOTE_EVENT,
+  type FocusNoteDetail,
+} from "@/shared/lib/note-navigation";
 
 function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
+}
+
+function haveSameWikilinkResolutions(
+  left: LoadedNote["wikilinkResolutions"],
+  right: LoadedNote["wikilinkResolutions"],
+) {
+  return (
+    left.length === right.length &&
+    left.every((resolution, index) => {
+      const candidate = right[index];
+      return (
+        candidate?.occurrenceId === resolution.occurrenceId &&
+        candidate?.location === resolution.location &&
+        candidate?.targetNoteId === resolution.targetNoteId &&
+        candidate?.title === resolution.title
+      );
+    })
+  );
 }
 
 export function useShellController() {
@@ -101,11 +123,17 @@ export function useShellController() {
   const activeTagPath = useShellStore((state) => state.activeTagPath);
   const draftMarkdown = useShellStore((state) => state.draftMarkdown);
   const draftNoteId = useShellStore((state) => state.draftNoteId);
+  const draftWikilinkResolutions = useShellStore(
+    (state) => state.draftWikilinkResolutions,
+  );
   const noteFilter = useShellStore((state) => state.noteFilter);
   const searchQuery = useShellStore((state) => state.searchQuery);
   const selectedNoteId = useShellStore((state) => state.selectedNoteId);
   const tagViewActive = useShellStore((state) => state.tagViewActive);
   const setDraft = useShellStore((state) => state.setDraft);
+  const clearDraftWikilinkResolutions = useShellStore(
+    (state) => state.clearDraftWikilinkResolutions,
+  );
   const setActiveTagPath = useShellStore((state) => state.setActiveTagPath);
   const setNoteFilter = useShellStore((state) => state.setNoteFilter);
   const setSearchQuery = useShellStore((state) => state.setSearchQuery);
@@ -139,6 +167,7 @@ export function useShellController() {
     noteQuery,
     noteConflictQuery,
     noteHistoryQuery,
+    noteBacklinksQuery,
     currentNotes,
     availableTagPaths,
     availableTagTree,
@@ -180,6 +209,7 @@ export function useShellController() {
     noteFilter: effectiveNoteFilter,
     activeNpub,
     isSavingRef,
+    clearDraftWikilinkResolutions,
     setSelectedNoteId,
     setDraft,
     setCreatingSelectedNoteId,
@@ -218,7 +248,9 @@ export function useShellController() {
     }
 
     if (noteQuery.data && noteQuery.data.id !== draftNoteId) {
-      setDraft(noteQuery.data.id, noteQuery.data.markdown);
+      setDraft(noteQuery.data.id, noteQuery.data.markdown, {
+        wikilinkResolutions: noteQuery.data.wikilinkResolutions,
+      });
     }
   }, [draftNoteId, noteQuery.data, selectedNoteId, setDraft]);
 
@@ -258,6 +290,12 @@ export function useShellController() {
     : undefined;
   const currentNoteHistory = selectedNoteId ? noteHistoryQuery.data : undefined;
   const isCurrentNoteConflicted = (currentNoteConflict?.snapshotCount ?? 0) > 1;
+  const hasPendingWikilinkResolutionChanges = currentNote
+    ? !haveSameWikilinkResolutions(
+        draftWikilinkResolutions,
+        currentNote.wikilinkResolutions,
+      )
+    : draftWikilinkResolutions.length > 0;
   const readyToRevealWindow =
     bootstrapQuery.isError ||
     (bootstrapQuery.isSuccess &&
@@ -282,6 +320,7 @@ export function useShellController() {
     currentNote,
     draftNoteId,
     draftMarkdown,
+    draftWikilinkResolutions,
     isCurrentNoteConflicted,
     saveNotePending,
     mutateSaveNote,
@@ -313,9 +352,12 @@ export function useShellController() {
 
     if (
       draftNoteId === currentNote.id &&
-      draftMarkdown !== currentNote.markdown
+      (draftMarkdown !== currentNote.markdown ||
+        hasPendingWikilinkResolutionChanges)
     ) {
-      setDraft(currentNote.id, currentNote.markdown);
+      setDraft(currentNote.id, currentNote.markdown, {
+        wikilinkResolutions: currentNote.wikilinkResolutions,
+      });
       bumpSyncEditorRevision("conflict-reset-to-current-note", {
         draftLength: draftMarkdown.length,
         noteId: currentNote.id,
@@ -327,6 +369,7 @@ export function useShellController() {
     currentNote,
     draftMarkdown,
     draftNoteId,
+    hasPendingWikilinkResolutionChanges,
     isCurrentNoteConflicted,
     pendingSaveTimeoutRef,
     setDraft,
@@ -428,7 +471,10 @@ export function useShellController() {
       return;
     }
 
-    if (draftMarkdown === currentNote.markdown) {
+    if (
+      draftMarkdown === currentNote.markdown &&
+      !hasPendingWikilinkResolutionChanges
+    ) {
       return;
     }
 
@@ -440,6 +486,7 @@ export function useShellController() {
     saveNoteMutation.mutate({
       id: currentNote.id,
       markdown: draftMarkdown,
+      wikilinkResolutions: draftWikilinkResolutions,
     });
   };
 
@@ -452,7 +499,10 @@ export function useShellController() {
       return undefined;
     }
 
-    if (draftMarkdown === currentNote.markdown) {
+    if (
+      draftMarkdown === currentNote.markdown &&
+      !hasPendingWikilinkResolutionChanges
+    ) {
       return undefined;
     }
 
@@ -464,6 +514,7 @@ export function useShellController() {
     return await saveNoteMutation.mutateAsync({
       id: currentNote.id,
       markdown: draftMarkdown,
+      wikilinkResolutions: draftWikilinkResolutions,
     });
   };
 
@@ -541,6 +592,24 @@ export function useShellController() {
     window.addEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
     return () => {
       window.removeEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
+    };
+  }, [setFocusedPane]);
+
+  useEffect(() => {
+    const handleFocusNote = (event: Event) => {
+      const customEvent = event as CustomEvent<FocusNoteDetail>;
+      const noteId = customEvent.detail?.noteId?.trim();
+      if (!noteId) {
+        return;
+      }
+
+      setFocusedPane("editor");
+      latestRef.current.handleSelectNote(noteId);
+    };
+
+    window.addEventListener(FOCUS_NOTE_EVENT, handleFocusNote);
+    return () => {
+      window.removeEventListener(FOCUS_NOTE_EVENT, handleFocusNote);
     };
   }, [setFocusedPane]);
 
@@ -666,7 +735,9 @@ export function useShellController() {
 
     const refreshedNote = await loadNote(selectedNoteId);
     queryClient.setQueryData(["note", refreshedNote.id], refreshedNote);
-    setDraft(refreshedNote.id, refreshedNote.markdown);
+    setDraft(refreshedNote.id, refreshedNote.markdown, {
+      wikilinkResolutions: refreshedNote.wikilinkResolutions,
+    });
     bumpSyncEditorRevision("tag-rewrite-refresh", {
       noteId: refreshedNote.id,
       refreshedLength: refreshedNote.markdown.length,
@@ -1126,11 +1197,14 @@ export function useShellController() {
       setIsRestoreHistoryPending(true);
       try {
         discardPendingSave();
-        await saveNoteMutation.mutateAsync({
+        const savedNote = await saveNoteMutation.mutateAsync({
           id: currentNoteId,
           markdown: snapshot.markdown,
+          wikilinkResolutions: snapshot.wikilinkResolutions,
         });
-        setDraft(currentNoteId, snapshot.markdown);
+        setDraft(currentNoteId, snapshot.markdown, {
+          wikilinkResolutions: savedNote.wikilinkResolutions,
+        });
         setNoteHistoryDialogOpen(false);
         toast.success("Snapshot restored.", {
           id: "restore-history-success",
@@ -1169,11 +1243,22 @@ export function useShellController() {
           : currentNote?.markdown;
       const resolutionMarkdown =
         action === "keep_deleted" ? undefined : preferredResolutionMarkdown;
+      const resolutionWikilinkResolutions =
+        action === "keep_deleted" ||
+        !currentNote ||
+        draftNoteId !== currentNote.id ||
+        draftWikilinkResolutions.length === 0
+          ? undefined
+          : draftWikilinkResolutions;
       try {
         await resolveNoteConflict(
           resolvedNoteId ?? "",
           action,
           resolutionMarkdown,
+          action === "keep_deleted"
+            ? undefined
+            : (selectedConflictSnapshotId ?? undefined),
+          resolutionWikilinkResolutions,
         );
         setChooseConflictDialogOpen(false);
         setChooseConflictNoteId(null);
@@ -1185,6 +1270,9 @@ export function useShellController() {
           queryClient.invalidateQueries({ queryKey: ["note", resolvedNoteId] }),
           queryClient.invalidateQueries({
             queryKey: ["note-conflict", resolvedNoteId],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["note-backlinks", resolvedNoteId],
           }),
           queryClient.invalidateQueries({ queryKey: ["notes"] }),
           queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
@@ -1204,7 +1292,12 @@ export function useShellController() {
       }
       setSelectedConflictSnapshotId(snapshotId);
       if (markdown !== null) {
-        setDraft(currentNote.id, markdown);
+        const snapshot = currentNoteConflict?.snapshots.find(
+          (entry) => entry.snapshotId === snapshotId,
+        );
+        setDraft(currentNote.id, markdown, {
+          wikilinkResolutions: snapshot?.wikilinkResolutions ?? [],
+        });
         bumpSyncEditorRevision("load-conflict-snapshot", {
           noteId: currentNote.id,
           snapshotId,
@@ -1222,6 +1315,7 @@ export function useShellController() {
       availableTagPaths,
       archivedAt: currentNote?.archivedAt ?? null,
       autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
+      backlinks: noteBacklinksQuery.data ?? [],
       deletedAt: currentNote?.deletedAt ?? null,
       markdown: currentEditorMarkdown,
       modifiedAt: currentNote?.modifiedAt ?? 0,
@@ -1292,11 +1386,16 @@ export function useShellController() {
       },
       onChange(markdown: string) {
         if (currentNote && !currentNote.archivedAt && !currentNote.readonly) {
-          setDraft(currentNote.id, markdown);
+          setDraft(currentNote.id, markdown, {
+            preserveWikilinkResolutions: true,
+          });
         }
       },
       onLoadConflictHead(snapshotId: string, markdown: string | null) {
         latestRef.current.handleLoadConflictHead(snapshotId, markdown);
+      },
+      onSelectLinkedNote(noteId: string) {
+        latestRef.current.handleSelectNote(noteId);
       },
       onResolveConflict() {
         setChooseConflictNoteId(currentNote?.id ?? null);
@@ -1308,6 +1407,7 @@ export function useShellController() {
     }),
     [
       availableTagPaths,
+      noteBacklinksQuery.data,
       currentEditorMarkdown,
       currentNoteConflict,
       currentNote,

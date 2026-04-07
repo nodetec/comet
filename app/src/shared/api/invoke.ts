@@ -11,6 +11,7 @@ import {
   type DeleteTagInput,
   type ExportNotesInput,
   type NoteConflictInfo,
+  type NoteBacklink,
   type NoteHistoryInfo,
   type LoadedNote,
   type NotePagePayload,
@@ -18,9 +19,12 @@ import {
   type PublishNoteInput,
   type PublishShortNoteInput,
   type RenameTagInput,
+  type ResolveWikilinkInput,
   type ResolveNoteConflictAction,
+  type SearchResult,
   type ThemeData,
   type ThemeSummary,
+  type WikiLinkResolutionInput,
   type SetHideSubtagNotesInput,
   type SetTagPinnedInput,
   type SecretStorageStatus,
@@ -92,6 +96,10 @@ export async function getNoteHistory(noteId: string) {
   return invoke<NoteHistoryInfo>("get_note_history", { noteId });
 }
 
+export async function getNoteBacklinks(noteId: string) {
+  return invoke<NoteBacklink[]>("get_note_backlinks", { noteId });
+}
+
 export async function createNote(input: { tags: string[]; markdown?: string }) {
   return invoke<LoadedNote>("create_note", input);
 }
@@ -100,7 +108,19 @@ export async function duplicateNote(noteId: string) {
   return invoke<LoadedNote>("duplicate_note", { noteId });
 }
 
-export async function saveNote(input: { id: string; markdown: string }) {
+export async function searchNotes(query: string) {
+  return invoke<SearchResult[]>("search_notes", { query });
+}
+
+export async function resolveWikilink(input: ResolveWikilinkInput) {
+  return invoke<string | null>("resolve_wikilink", { input });
+}
+
+export async function saveNote(input: {
+  id: string;
+  markdown: string;
+  wikilinkResolutions?: WikiLinkResolutionInput[];
+}) {
   return invoke<LoadedNote>("save_note", { input });
 }
 
@@ -175,8 +195,16 @@ export async function resolveNoteConflict(
   noteId: string,
   action: ResolveNoteConflictAction,
   markdown?: string,
+  snapshotId?: string,
+  wikilinkResolutions?: WikiLinkResolutionInput[],
 ) {
-  return invoke("resolve_note_conflict", { action, markdown, noteId });
+  return invoke("resolve_note_conflict", {
+    action,
+    markdown,
+    noteId,
+    snapshotId,
+    wikilinkResolutions,
+  });
 }
 
 export async function exportNotes(input: ExportNotesInput) {

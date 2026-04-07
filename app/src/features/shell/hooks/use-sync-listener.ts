@@ -128,6 +128,7 @@ export function useSyncListener(deps: SyncListenerDeps) {
       const changedIds = new Set([...deletedIds, ...upsertedIds]);
       void queryClient.invalidateQueries({ queryKey: ["notes"] });
       void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+      void queryClient.invalidateQueries({ queryKey: ["note-backlinks"] });
       void queryClient.invalidateQueries({ queryKey: ["bootstrap"] });
 
       if (!bootstrapApplied) {

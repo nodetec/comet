@@ -33,6 +33,7 @@ mod tests {
             pinned_at: None,
             readonly: false,
             tags: vec![],
+            wikilink_resolutions: vec![],
         }
     }
 

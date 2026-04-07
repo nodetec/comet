@@ -7,6 +7,14 @@ pub struct TagOccurrence {
     pub canonical_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WikiLinkOccurrence {
+    pub start: usize,
+    pub end: usize,
+    pub title: String,
+    pub normalized_title: String,
+}
+
 /// Extract the title from the first H1 heading in markdown.
 pub fn title_from_markdown(markdown: &str) -> String {
     markdown
@@ -134,6 +142,15 @@ pub fn strip_markdown_syntax(line: &str) -> String {
     }
 
     s
+}
+
+pub fn normalize_wikilink_title(raw: &str) -> Option<String> {
+    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return None;
+    }
+
+    Some(normalized.to_lowercase())
 }
 
 /// Canonicalize a tag path without surrounding `#` delimiters.
@@ -340,6 +357,109 @@ pub fn extract_tag_occurrences(markdown: &str) -> Vec<TagOccurrence> {
     occurrences
 }
 
+pub fn extract_wikilink_occurrences(markdown: &str) -> Vec<WikiLinkOccurrence> {
+    let bytes = markdown.as_bytes();
+    let mut occurrences = Vec::new();
+    let mut index = 0;
+    let mut fence_char: u8 = 0;
+    let mut fence_len: usize = 0;
+
+    while index < bytes.len() {
+        let at_line_start = index == 0 || bytes[index - 1] == b'\n';
+
+        if let Some(fence_index) = fence_marker_index_at_line_start(bytes, index, at_line_start) {
+            let ch = bytes[fence_index];
+            let mut run = 0;
+            while fence_index + run < bytes.len() && bytes[fence_index + run] == ch {
+                run += 1;
+            }
+            if run >= 3 {
+                if fence_len == 0 {
+                    fence_char = ch;
+                    fence_len = run;
+                } else if ch == fence_char && run >= fence_len {
+                    fence_char = 0;
+                    fence_len = 0;
+                }
+                index = fence_index + run;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+                continue;
+            }
+        }
+
+        if fence_len > 0 {
+            index += 1;
+            continue;
+        }
+
+        if bytes[index] == b'`' {
+            let mut tick_count = 0;
+            while index + tick_count < bytes.len() && bytes[index + tick_count] == b'`' {
+                tick_count += 1;
+            }
+            index += tick_count;
+            loop {
+                if index >= bytes.len() {
+                    break;
+                }
+                if bytes[index] == b'`' {
+                    let mut close_count = 0;
+                    while index + close_count < bytes.len() && bytes[index + close_count] == b'`' {
+                        close_count += 1;
+                    }
+                    index += close_count;
+                    if close_count == tick_count {
+                        break;
+                    }
+                } else {
+                    index += 1;
+                }
+            }
+            continue;
+        }
+
+        if !is_wikilink_open(bytes, index) {
+            index += 1;
+            continue;
+        }
+
+        if let Some(occurrence) = parse_wikilink(markdown, index) {
+            index = occurrence.end;
+            occurrences.push(occurrence);
+            continue;
+        }
+
+        index += 1;
+    }
+
+    occurrences
+}
+
+fn fence_marker_index_at_line_start(
+    bytes: &[u8],
+    index: usize,
+    at_line_start: bool,
+) -> Option<usize> {
+    if !at_line_start {
+        return None;
+    }
+
+    let mut fence_index = index;
+    let mut spaces = 0;
+    while fence_index < bytes.len() && bytes[fence_index] == b' ' && spaces < 3 {
+        fence_index += 1;
+        spaces += 1;
+    }
+
+    if fence_index + 2 < bytes.len() && (bytes[fence_index] == b'`' || bytes[fence_index] == b'~') {
+        Some(fence_index)
+    } else {
+        None
+    }
+}
+
 fn is_hash_escaped(bytes: &[u8], index: usize) -> bool {
     let mut slash_count = 0;
     let mut current = index;
@@ -350,6 +470,59 @@ fn is_hash_escaped(bytes: &[u8], index: usize) -> bool {
     }
 
     slash_count % 2 == 1
+}
+
+fn is_wikilink_open(bytes: &[u8], index: usize) -> bool {
+    index + 1 < bytes.len()
+        && bytes[index] == b'['
+        && bytes[index + 1] == b'['
+        && !is_square_bracket_escaped(bytes, index)
+}
+
+fn is_square_bracket_escaped(bytes: &[u8], index: usize) -> bool {
+    let mut slash_count = 0;
+    let mut current = index;
+
+    while current > 0 && bytes[current - 1] == b'\\' {
+        slash_count += 1;
+        current -= 1;
+    }
+
+    slash_count % 2 == 1
+}
+
+fn parse_wikilink(markdown: &str, start_index: usize) -> Option<WikiLinkOccurrence> {
+    let mut close_index = None;
+    let bytes = markdown.as_bytes();
+    let mut index = start_index + 2;
+
+    while index + 1 < bytes.len() {
+        if bytes[index] == b'\n' || bytes[index] == b'\r' {
+            return None;
+        }
+
+        if bytes[index] == b']' && bytes[index + 1] == b']' {
+            close_index = Some(index);
+            break;
+        }
+
+        index += 1;
+    }
+
+    let close_index = close_index?;
+    let raw_title = markdown[start_index + 2..close_index].trim();
+    if raw_title.is_empty() || raw_title.contains('[') || raw_title.contains(']') {
+        return None;
+    }
+
+    let normalized_title = normalize_wikilink_title(raw_title)?;
+
+    Some(WikiLinkOccurrence {
+        start: start_index,
+        end: close_index + 2,
+        title: raw_title.to_string(),
+        normalized_title,
+    })
 }
 
 fn has_valid_tag_boundary(markdown: &str, hash_index: usize) -> bool {
@@ -670,6 +843,15 @@ mod tests {
     }
 
     #[test]
+    fn normalize_wikilink_title_trims_collapses_and_lowercases() {
+        assert_eq!(
+            normalize_wikilink_title("  Project   Alpha  "),
+            Some("project alpha".to_string())
+        );
+        assert_eq!(normalize_wikilink_title("   "), None);
+    }
+
+    #[test]
     fn title_from_markdown_no_h1_returns_empty() {
         assert_eq!(title_from_markdown("## Not H1\nSome body text"), "");
     }
@@ -837,6 +1019,74 @@ mod tests {
                     canonical_path: "project-alpha".to_string(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn extract_wikilinks_tracks_occurrences_and_titles() {
+        let markdown = "hello [[Roadmap Q2]] and [[Project Alpha]]";
+        assert_eq!(
+            extract_wikilink_occurrences(markdown),
+            vec![
+                WikiLinkOccurrence {
+                    start: 6,
+                    end: 20,
+                    title: "Roadmap Q2".to_string(),
+                    normalized_title: "roadmap q2".to_string(),
+                },
+                WikiLinkOccurrence {
+                    start: 25,
+                    end: 42,
+                    title: "Project Alpha".to_string(),
+                    normalized_title: "project alpha".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_wikilinks_ignores_code_contexts() {
+        let markdown = [
+            "Use `[[not this]]` inline.",
+            "",
+            "```md",
+            "[[also not this]]",
+            "```",
+            "",
+            "[[real link]]",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_wikilink_occurrences(&markdown),
+            vec![WikiLinkOccurrence {
+                start: 57,
+                end: 70,
+                title: "real link".to_string(),
+                normalized_title: "real link".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn extract_wikilinks_ignores_indented_fenced_code_blocks() {
+        let markdown = [
+            "   ```md",
+            "   [[also not this]]",
+            "   ```",
+            "",
+            "[[real link]]",
+        ]
+        .join("\n");
+
+        assert_eq!(
+            extract_wikilink_occurrences(&markdown),
+            vec![WikiLinkOccurrence {
+                start: 38,
+                end: 51,
+                title: "real link".to_string(),
+                normalized_title: "real link".to_string(),
+            }]
         );
     }
 

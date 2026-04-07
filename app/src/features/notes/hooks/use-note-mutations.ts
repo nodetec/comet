@@ -17,7 +17,11 @@ import {
   trashNote,
   unpinNote,
 } from "@/shared/api/invoke";
-import { type NoteFilter, type NoteSummary } from "@/shared/api/types";
+import {
+  type NoteFilter,
+  type NoteSummary,
+  type WikiLinkResolutionInput,
+} from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
 
@@ -30,12 +34,38 @@ export interface NoteMutationDeps {
   noteFilter: NoteFilter;
   activeNpub: string | null;
   isSavingRef: RefObject<boolean>;
+  clearDraftWikilinkResolutions: (noteId?: string) => void;
   setSelectedNoteId: (id: string | null) => void;
-  setDraft: (id: string, markdown: string) => void;
+  setDraft: (
+    id: string,
+    markdown: string,
+    options?: {
+      preserveWikilinkResolutions?: boolean;
+      wikilinkResolutions?: WikiLinkResolutionInput[];
+    },
+  ) => void;
   setCreatingSelectedNoteId: (id: string | null) => void;
   setPendingAutoFocusEditorNoteId: (id: string | null) => void;
   setIsCreatingNoteTransition: (v: boolean) => void;
   setNoteFilter: (filter: NoteFilter) => void;
+}
+
+function haveSameWikilinkResolutions(
+  left: WikiLinkResolutionInput[],
+  right: WikiLinkResolutionInput[],
+) {
+  return (
+    left.length === right.length &&
+    left.every((resolution, index) => {
+      const candidate = right[index];
+      return (
+        candidate?.occurrenceId === resolution.occurrenceId &&
+        candidate?.location === resolution.location &&
+        candidate?.targetNoteId === resolution.targetNoteId &&
+        candidate?.title === resolution.title
+      );
+    })
+  );
 }
 
 export function useNoteMutations(deps: NoteMutationDeps) {
@@ -47,6 +77,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     noteFilter,
     activeNpub,
     isSavingRef,
+    clearDraftWikilinkResolutions,
     setSelectedNoteId,
     setDraft,
     setCreatingSelectedNoteId,
@@ -63,11 +94,16 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     await queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
   };
 
+  const invalidateNoteBacklinks = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["note-backlinks"] });
+  };
+
   const invalidateShellData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
       invalidateNotes(),
       invalidateContextualTags(),
+      invalidateNoteBacklinks(),
     ]);
   };
 
@@ -78,7 +114,9 @@ export function useNoteMutations(deps: NoteMutationDeps) {
       setCreatingSelectedNoteId(note.id);
       setPendingAutoFocusEditorNoteId(note.id);
       setSelectedNoteId(note.id);
-      setDraft(note.id, note.markdown);
+      setDraft(note.id, note.markdown, {
+        wikilinkResolutions: note.wikilinkResolutions,
+      });
       setIsCreatingNoteTransition(false);
       void Promise.all([invalidateNotes(), invalidateContextualTags()]);
     },
@@ -91,11 +129,16 @@ export function useNoteMutations(deps: NoteMutationDeps) {
 
   const saveNoteMutation = useMutation({
     mutationFn: saveNote,
-    onMutate: (input: { id: string; markdown: string }) => {
+    onMutate: (input: {
+      id: string;
+      markdown: string;
+      wikilinkResolutions?: WikiLinkResolutionInput[];
+    }) => {
       isSavingRef.current = true;
       return {
         noteId: input.id,
         submittedMarkdown: input.markdown,
+        submittedWikilinkResolutions: input.wikilinkResolutions ?? [],
       };
     },
     onSuccess: (savedNote, _variables, context) => {
@@ -105,19 +148,27 @@ export function useNoteMutations(deps: NoteMutationDeps) {
         const {
           draftMarkdown: liveDraftMarkdown,
           draftNoteId: liveDraftNoteId,
+          draftWikilinkResolutions: liveDraftWikilinkResolutions,
         } = useShellStore.getState();
         const shouldReconcileDraft =
           liveDraftNoteId === savedNote.id &&
-          liveDraftMarkdown === context.submittedMarkdown;
+          liveDraftMarkdown === context.submittedMarkdown &&
+          haveSameWikilinkResolutions(
+            liveDraftWikilinkResolutions,
+            context.submittedWikilinkResolutions,
+          );
 
         if (shouldReconcileDraft) {
-          setDraft(savedNote.id, savedNote.markdown);
+          setDraft(savedNote.id, savedNote.markdown, {
+            wikilinkResolutions: savedNote.wikilinkResolutions,
+          });
         }
       }
 
       void Promise.all([
         invalidateNotes(),
         invalidateContextualTags(),
+        invalidateNoteBacklinks(),
         queryClient.invalidateQueries({ queryKey: ["todo-count"] }),
       ]);
       try {
@@ -144,7 +195,9 @@ export function useNoteMutations(deps: NoteMutationDeps) {
       queryClient.setQueryData(["note", duplicatedNote.id], duplicatedNote);
       setCreatingSelectedNoteId(null);
       setSelectedNoteId(duplicatedNote.id);
-      setDraft(duplicatedNote.id, duplicatedNote.markdown);
+      setDraft(duplicatedNote.id, duplicatedNote.markdown, {
+        wikilinkResolutions: duplicatedNote.wikilinkResolutions,
+      });
 
       if (noteFilter === "archive" || noteFilter === "trash") {
         setNoteFilter("all");
@@ -232,6 +285,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
 
       if (draftNoteId === noteId) {
         setDraft("", "");
+        clearDraftWikilinkResolutions(noteId);
       }
 
       if (selectedNoteId === noteId) {
@@ -248,6 +302,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     onSuccess: () => {
       setSelectedNoteId(null);
       setDraft("", "");
+      clearDraftWikilinkResolutions();
       void invalidateShellData();
     },
     onError: toastErrorHandler("Couldn't empty trash", "empty-trash-error"),
@@ -275,7 +330,9 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     mutationFn: setNoteReadonly,
     onSuccess: (updatedNote) => {
       queryClient.setQueryData(["note", updatedNote.id], updatedNote);
-      setDraft(updatedNote.id, updatedNote.markdown);
+      setDraft(updatedNote.id, updatedNote.markdown, {
+        wikilinkResolutions: updatedNote.wikilinkResolutions,
+      });
       void invalidateNotes();
     },
     onError: toastErrorHandler(

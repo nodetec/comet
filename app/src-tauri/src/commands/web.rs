@@ -78,5 +78,9 @@ fn extract_title(html: &str) -> Option<String> {
     let raw = &html[content_start..content_start + content_end];
     let decoded = html_escape::decode_html_entities(raw.trim()).into_owned();
     let title = trim_title_suffix(&decoded);
-    if title.is_empty() { None } else { Some(title.to_owned()) }
+    if title.is_empty() {
+        None
+    } else {
+        Some(title.to_owned())
+    }
 }

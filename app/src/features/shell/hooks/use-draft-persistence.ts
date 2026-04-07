@@ -6,7 +6,16 @@ import {
   pendingDraftStorageKey,
   saveNote,
 } from "@/shared/api/invoke";
-import { type LoadedNote } from "@/shared/api/types";
+import {
+  type LoadedNote,
+  type WikiLinkResolutionInput,
+} from "@/shared/api/types";
+
+type PendingDraftPayload = {
+  noteId: string;
+  markdown: string;
+  wikilinkResolutions?: WikiLinkResolutionInput[];
+};
 
 export interface DraftPersistenceDeps {
   activeNpub: string | null;
@@ -15,11 +24,34 @@ export interface DraftPersistenceDeps {
   currentNote: LoadedNote | undefined;
   draftNoteId: string | null;
   draftMarkdown: string;
+  draftWikilinkResolutions: WikiLinkResolutionInput[];
   isCurrentNoteConflicted: boolean;
   saveNotePending: boolean;
-  mutateSaveNote: (input: { id: string; markdown: string }) => void;
+  mutateSaveNote: (input: {
+    id: string;
+    markdown: string;
+    wikilinkResolutions?: WikiLinkResolutionInput[];
+  }) => void;
   pendingSaveTimeoutRef: RefObject<number | null>;
   queryClient: QueryClient;
+}
+
+function haveSameWikilinkResolutions(
+  left: WikiLinkResolutionInput[],
+  right: WikiLinkResolutionInput[],
+) {
+  return (
+    left.length === right.length &&
+    left.every((resolution, index) => {
+      const candidate = right[index];
+      return (
+        candidate?.occurrenceId === resolution.occurrenceId &&
+        candidate?.location === resolution.location &&
+        candidate?.targetNoteId === resolution.targetNoteId &&
+        candidate?.title === resolution.title
+      );
+    })
+  );
 }
 
 export function useDraftPersistence(deps: DraftPersistenceDeps) {
@@ -30,12 +62,19 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     currentNote,
     draftNoteId,
     draftMarkdown,
+    draftWikilinkResolutions,
     isCurrentNoteConflicted,
     saveNotePending,
     mutateSaveNote,
     pendingSaveTimeoutRef,
     queryClient,
   } = deps;
+  const hasPendingWikilinkResolutionChanges = currentNote
+    ? !haveSameWikilinkResolutions(
+        draftWikilinkResolutions,
+        currentNote.wikilinkResolutions,
+      )
+    : draftWikilinkResolutions.length > 0;
 
   // Recover any draft that was pending when the app quit
   useEffect(() => {
@@ -45,10 +84,11 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return;
-      const { noteId, markdown } = JSON.parse(raw) as {
-        noteId: string;
-        markdown: string;
-      };
+      const {
+        noteId,
+        markdown,
+        wikilinkResolutions = [],
+      } = JSON.parse(raw) as PendingDraftPayload;
       if (noteId && markdown) {
         void getNoteConflict(noteId)
           .then((conflict) => {
@@ -57,7 +97,11 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
               return;
             }
 
-            return saveNote({ id: noteId, markdown }).then(() => {
+            return saveNote({
+              id: noteId,
+              markdown,
+              wikilinkResolutions,
+            }).then(() => {
               localStorage.removeItem(draftKey);
               void queryClient.invalidateQueries({
                 queryKey: ["note", noteId],
@@ -86,7 +130,11 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
       return;
     }
 
-    if (saveNotePending || draftMarkdown === currentNote.markdown) {
+    if (
+      saveNotePending ||
+      (!hasPendingWikilinkResolutionChanges &&
+        draftMarkdown === currentNote.markdown)
+    ) {
       return;
     }
 
@@ -97,7 +145,11 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
       }
       localStorage.setItem(
         pendingDraftStorageKey(activeNpub),
-        JSON.stringify({ noteId: currentNote.id, markdown: draftMarkdown }),
+        JSON.stringify({
+          noteId: currentNote.id,
+          markdown: draftMarkdown,
+          wikilinkResolutions: draftWikilinkResolutions,
+        } satisfies PendingDraftPayload),
       );
     } catch {
       // Ignore storage errors
@@ -107,6 +159,7 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
       mutateSaveNote({
         id: currentNote.id,
         markdown: draftMarkdown,
+        wikilinkResolutions: draftWikilinkResolutions,
       });
     }, 3000);
 
@@ -120,7 +173,9 @@ export function useDraftPersistence(deps: DraftPersistenceDeps) {
     activeNpub,
     currentNote,
     draftMarkdown,
+    draftWikilinkResolutions,
     draftNoteId,
+    hasPendingWikilinkResolutionChanges,
     isCurrentNoteConflicted,
     mutateSaveNote,
     pendingSaveTimeoutRef,

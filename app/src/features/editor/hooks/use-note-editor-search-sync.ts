@@ -26,6 +26,7 @@ import { collectSearchMatches } from "@/shared/lib/search";
 export interface UseNoteEditorSearchSyncParams {
   loadKey: string;
   markdown: string;
+  noteId: string | null;
   onSearchMatchCountChangeRef: {
     current: ((count: number) => void) | undefined;
   };
@@ -40,6 +41,7 @@ export interface UseNoteEditorSearchSyncParams {
 export function useNoteEditorSearchSync({
   loadKey,
   markdown,
+  noteId,
   onSearchMatchCountChangeRef,
   presentationCompartmentRef,
   searchActiveMatchIndex,
@@ -61,10 +63,10 @@ export function useNoteEditorSearchSync({
 
     view.dispatch({
       effects: presentationCompartmentRef.current.reconfigure(
-        buildSearchAwarePresentationExtensions(searchQuery),
+        buildSearchAwarePresentationExtensions(searchQuery, noteId),
       ),
     });
-  }, [presentationCompartmentRef, searchQuery, viewRef]);
+  }, [noteId, presentationCompartmentRef, searchQuery, viewRef]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -22,10 +22,7 @@ pub fn save_access_key(conn: &Connection, key: &str) -> Result<(), AppError> {
 }
 
 pub fn clear_access_key(conn: &Connection) {
-    let _ = conn.execute(
-        "DELETE FROM app_settings WHERE key = 'access_key'",
-        [],
-    );
+    let _ = conn.execute("DELETE FROM app_settings WHERE key = 'access_key'", []);
 }
 
 pub fn get_blossom_url(conn: &Connection) -> Option<String> {

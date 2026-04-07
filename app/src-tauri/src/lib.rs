@@ -184,6 +184,8 @@ pub fn run() {
             commands::notes::unpin_note,
             commands::notes::search_notes,
             commands::notes::search_tags,
+            commands::notes::get_note_backlinks,
+            commands::notes::resolve_wikilink,
             commands::notes::export_notes,
             // Accounts
             commands::accounts::list_accounts,

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::domain::notes::model::WikiLinkResolutionInput;
 use crate::domain::sync::vector_clock::VectorClock;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -48,6 +49,7 @@ pub struct SyncedNote {
     pub pinned_at: Option<i64>,
     pub readonly: bool,
     pub tags: Vec<String>,
+    pub wikilink_resolutions: Vec<WikiLinkResolutionInput>,
 }
 
 pub struct SyncedTombstone {

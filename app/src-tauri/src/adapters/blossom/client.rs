@@ -89,17 +89,13 @@ pub async fn upload_blob(
     if let Some(key) = access_key {
         request = request.header("X-Access-Key", key);
     }
-    let resp = request
-        .body(ciphertext)
-        .send()
-        .await
-        .map_err(|e| {
-            blossom_log(&format!(
-                "encrypted upload request failed ciphertext_hash={} error={e}",
-                short_hash(&ciphertext_hash)
-            ));
-            AppError::custom(format!("Blossom upload failed: {e}"))
-        })?;
+    let resp = request.body(ciphertext).send().await.map_err(|e| {
+        blossom_log(&format!(
+            "encrypted upload request failed ciphertext_hash={} error={e}",
+            short_hash(&ciphertext_hash)
+        ));
+        AppError::custom(format!("Blossom upload failed: {e}"))
+    })?;
 
     blossom_log(&format!(
         "encrypted upload response ciphertext_hash={} status={}",
@@ -201,14 +197,10 @@ pub async fn upload_blobs_batch(
     if let Some(key) = access_key {
         request = request.header("X-Access-Key", key);
     }
-    let resp = request
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| {
-            blossom_log(&format!("encrypted batch upload request failed error={e}"));
-            AppError::custom(format!("Blossom batch upload failed: {e}"))
-        })?;
+    let resp = request.body(body).send().await.map_err(|e| {
+        blossom_log(&format!("encrypted batch upload request failed error={e}"));
+        AppError::custom(format!("Blossom batch upload failed: {e}"))
+    })?;
 
     blossom_log(&format!(
         "encrypted batch upload response status={}",

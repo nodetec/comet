@@ -174,10 +174,10 @@ mod tests {
     use super::*;
     use crate::adapters::nostr::comet_note_snapshot::{
         build_note_snapshot_event, NoteSnapshotAttachment, NoteSnapshotEventMeta,
-        NoteSnapshotPayload, COMET_NOTE_COLLECTION,
+        NoteSnapshotPayload, NoteSnapshotWikiLink, COMET_NOTE_COLLECTION,
     };
     use crate::adapters::sqlite::migrations::account_migrations;
-    use rusqlite::Connection;
+    use rusqlite::{Connection, OptionalExtension};
 
     fn setup_db() -> Connection {
         let mut conn = Connection::open_in_memory().unwrap();
@@ -215,6 +215,7 @@ mod tests {
             readonly,
             tags,
             attachments,
+            wikilinks: vec![],
         };
         build_note_snapshot_event(
             keys,
@@ -246,6 +247,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         build_note_snapshot_event(
             keys,
@@ -403,6 +405,137 @@ mod tests {
         assert_eq!(
             change.map(|payload| (payload.note_id, payload.action)),
             Some(("note-blob".to_string(), "upsert".to_string()))
+        );
+    }
+
+    #[test]
+    fn applies_remote_note_snapshot_persists_resolved_wikilinks() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let note_id = "note-link";
+
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at)
+             VALUES ('target-1', 'asdf', '# asdf', 10, 20, 20)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO notes_fts (note_id, title, markdown)
+             VALUES ('target-1', 'asdf', '# asdf')",
+            [],
+        )
+        .unwrap();
+
+        let payload = NoteSnapshotPayload {
+            version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([("DEVICE-A".to_string(), 200)]),
+            markdown: "# Title\n\n[[asdf]]".to_string(),
+            note_created_at: 100,
+            edited_at: 200,
+            deleted_at: None,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+            wikilinks: vec![NoteSnapshotWikiLink {
+                location: 10,
+                title: "asdf".to_string(),
+                occurrence_id: Some("WIKILINK1".to_string()),
+                is_explicit: true,
+                target_note_id: Some("target-1".to_string()),
+            }],
+        };
+        let event = build_note_snapshot_event(
+            &keys,
+            &NoteSnapshotEventMeta {
+                document_id: note_id.to_string(),
+                operation: "put".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(200),
+            },
+            Some(&payload),
+        )
+        .unwrap();
+
+        apply_remote_snapshot_event(&conn, "wss://relay.example", &keys, &event, Some(8), |_| {})
+            .unwrap();
+
+        let stored: Option<(i64, String, Option<String>)> = conn
+            .query_row(
+                "SELECT location, title, target_note_id
+                 FROM note_wikilinks
+                 WHERE source_note_id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .unwrap();
+
+        assert_eq!(
+            stored,
+            Some((9, "asdf".to_string(), Some("target-1".to_string())))
+        );
+    }
+
+    #[test]
+    fn applies_remote_note_snapshot_with_resolved_wikilinks_before_target_note_exists() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let note_id = "note-link";
+
+        let payload = NoteSnapshotPayload {
+            version: 1,
+            device_id: "DEVICE-A".to_string(),
+            vector_clock: std::collections::BTreeMap::from([("DEVICE-A".to_string(), 200)]),
+            markdown: "# Title\n\n[[asdf]]".to_string(),
+            note_created_at: 100,
+            edited_at: 200,
+            deleted_at: None,
+            archived_at: None,
+            pinned_at: None,
+            readonly: false,
+            tags: vec![],
+            attachments: vec![],
+            wikilinks: vec![NoteSnapshotWikiLink {
+                location: 10,
+                title: "asdf".to_string(),
+                occurrence_id: Some("WIKILINK1".to_string()),
+                is_explicit: true,
+                target_note_id: Some("target-1".to_string()),
+            }],
+        };
+        let event = build_note_snapshot_event(
+            &keys,
+            &NoteSnapshotEventMeta {
+                document_id: note_id.to_string(),
+                operation: "put".to_string(),
+                collection: Some(COMET_NOTE_COLLECTION.to_string()),
+                created_at_ms: Some(200),
+            },
+            Some(&payload),
+        )
+        .unwrap();
+
+        apply_remote_snapshot_event(&conn, "wss://relay.example", &keys, &event, Some(8), |_| {})
+            .unwrap();
+
+        let stored: Option<(i64, String, Option<String>)> = conn
+            .query_row(
+                "SELECT location, title, target_note_id
+                 FROM note_wikilinks
+                 WHERE source_note_id = ?1",
+                params![note_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .unwrap();
+
+        assert_eq!(
+            stored,
+            Some((9, "asdf".to_string(), Some("target-1".to_string())))
         );
     }
 

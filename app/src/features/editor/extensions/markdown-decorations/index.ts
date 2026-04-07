@@ -236,6 +236,7 @@ const markdownDecorationsTheme = EditorView.baseTheme({
 });
 
 type MarkdownDecorationsOptions = {
+  noteId?: string | null;
   searchQuery?: string;
 };
 
@@ -251,7 +252,7 @@ export function markdownDecorations(
   return [
     markdownDecorationsPlugin(options.searchQuery),
     markdownDecorationsTheme,
-    linkInteractions(),
+    linkInteractions(options.noteId ?? null),
     ...listExtensions,
     tables(),
   ];

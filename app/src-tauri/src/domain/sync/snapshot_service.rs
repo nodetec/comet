@@ -1,6 +1,6 @@
 use crate::adapters::nostr::comet_note_snapshot::{
     build_note_snapshot_event, NoteSnapshotAttachment, NoteSnapshotEventMeta, NoteSnapshotPayload,
-    COMET_NOTE_COLLECTION,
+    NoteSnapshotWikiLink, COMET_NOTE_COLLECTION,
 };
 use crate::adapters::sqlite::snapshot_repository::{
     upsert_note_snapshot_history, upsert_sync_snapshot, LocalNoteSnapshotHistoryEntry,
@@ -263,6 +263,28 @@ fn load_blob_attachments(
     Ok(blob_attachments)
 }
 
+fn load_note_wikilinks(
+    conn: &Connection,
+    note_id: &str,
+) -> Result<Vec<NoteSnapshotWikiLink>, AppError> {
+    let mut statement = conn.prepare(
+        "SELECT location, title, occurrence_id, target_note_id, is_explicit
+         FROM note_wikilinks
+         WHERE source_note_id = ?1
+         ORDER BY location ASC, title ASC, occurrence_id ASC",
+    )?;
+    let rows = statement.query_map(params![note_id], |row| {
+        Ok(NoteSnapshotWikiLink {
+            location: row.get::<_, i64>(0)? as usize,
+            title: row.get(1)?,
+            occurrence_id: row.get(2)?,
+            target_note_id: row.get(3)?,
+            is_explicit: row.get::<_, i64>(4)? != 0,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 pub fn build_pending_note_snapshot(
     conn: &Connection,
     keys: &Keys,
@@ -276,6 +298,7 @@ pub fn build_pending_note_snapshot(
     let document_coord = note_id.to_string();
     let direct_tag_paths = load_direct_tag_paths(conn, note_id)?;
     let attachments = load_blob_attachments(conn, &fields.markdown, &author_pubkey)?;
+    let wikilinks = load_note_wikilinks(conn, note_id)?;
     let payload = NoteSnapshotPayload {
         version: 1,
         device_id,
@@ -289,6 +312,7 @@ pub fn build_pending_note_snapshot(
         readonly: fields.readonly,
         tags: direct_tag_paths,
         attachments,
+        wikilinks,
     };
     let event = build_note_snapshot_event(
         keys,
@@ -325,6 +349,24 @@ pub fn build_pending_note_snapshot(
                 pinned_at: payload.pinned_at,
                 readonly: payload.readonly,
                 tags: payload.tags.clone(),
+                wikilink_resolutions: payload
+                    .wikilinks
+                    .iter()
+                    .filter_map(|wikilink| {
+                        (wikilink.is_explicit)
+                            .then_some(wikilink.target_note_id.as_ref())
+                            .flatten()
+                            .map(|target_note_id| {
+                                crate::domain::notes::model::WikiLinkResolutionInput {
+                                    occurrence_id: wikilink.occurrence_id.clone(),
+                                    is_explicit: wikilink.is_explicit,
+                                    location: wikilink.location,
+                                    title: wikilink.title.clone(),
+                                    target_note_id: target_note_id.clone(),
+                                }
+                            })
+                    })
+                    .collect(),
             },
             fields.modified_at,
         )?,
@@ -427,6 +469,7 @@ pub fn build_pending_note_deletion_snapshot(
         readonly: false,
         tags: vec![],
         attachments: vec![],
+        wikilinks: vec![],
     };
     let event = build_note_snapshot_event(
         keys,
@@ -582,6 +625,50 @@ mod tests {
 
         assert_eq!(parsed.operation, "put");
         assert_eq!(payload.deleted_at, Some(300));
+    }
+
+    #[test]
+    fn builds_note_snapshot_with_wikilinks_from_index() {
+        let conn = setup_db();
+        let keys = Keys::generate();
+        let author_pubkey = keys.public_key();
+
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
+             VALUES ('target-1', 'asdf', '# asdf', 50, 150, 150, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE notes SET markdown = ?1 WHERE id = 'note-1'",
+            params!["# Title\n\n[[asdf]]"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_wikilinks (source_note_id, target_note_id, location, title, normalized_title, occurrence_id, is_explicit)
+             VALUES ('note-1', 'target-1', 10, 'asdf', 'asdf', 'WIKILINK1', 1)",
+            [],
+        )
+        .unwrap();
+
+        let snapshot = build_pending_note_snapshot(&conn, &keys, &author_pubkey, "note-1").unwrap();
+        let parsed = crate::adapters::nostr::comet_note_snapshot::parse_note_snapshot_event(
+            &keys,
+            &snapshot.event,
+        )
+        .unwrap();
+        let payload = parsed.payload.expect("payload should be present");
+
+        assert_eq!(
+            payload.wikilinks,
+            vec![NoteSnapshotWikiLink {
+                location: 10,
+                title: "asdf".to_string(),
+                occurrence_id: Some("WIKILINK1".to_string()),
+                is_explicit: true,
+                target_note_id: Some("target-1".to_string()),
+            }]
+        );
     }
 
     #[test]

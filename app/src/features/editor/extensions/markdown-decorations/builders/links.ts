@@ -4,15 +4,32 @@ import {
   type EditorState,
   type Extension,
 } from "@codemirror/state";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Decoration, EditorView } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { utf8ByteOffsetForText } from "@/features/editor/lib/wikilinks";
 import type {
   BuilderContext,
   DecorationEntry,
 } from "@/features/editor/extensions/markdown-decorations/types";
+import { dispatchFocusNote } from "@/shared/lib/note-navigation";
+
+type ExternalLinkTarget = {
+  type: "external";
+  url: string;
+};
+
+type WikiLinkTarget = {
+  location: number;
+  title: string;
+  type: "wikilink";
+};
+
+type LinkTarget = ExternalLinkTarget | WikiLinkTarget;
 
 const linkMark = Decoration.mark({ class: "cm-md-link" });
 const LINK_NODE_NAMES = new Set(["Autolink", "Link"]);
@@ -32,6 +49,28 @@ const BRACKET_PAIRS: Record<string, string> = {
   "]": "[",
   "}": "{",
 };
+
+export function resolveDraftWikiLinkTarget(
+  noteId: string | null,
+  target: WikiLinkTarget,
+): string | null {
+  if (!noteId) {
+    return null;
+  }
+
+  const { draftNoteId, draftWikilinkResolutions } = useShellStore.getState();
+  if (draftNoteId !== noteId) {
+    return null;
+  }
+
+  return (
+    draftWikilinkResolutions.find(
+      (resolution) =>
+        resolution.location === target.location &&
+        resolution.title === target.title,
+    )?.targetNoteId ?? null
+  );
+}
 
 export function handleLink(
   node: SyntaxNodeRef,
@@ -294,14 +333,58 @@ export function findExternalLinkTargetAtPosition(
   );
 }
 
+function findWikiLinkTargetAtPosition(
+  state: EditorState,
+  position: number,
+  allowPreviousCharacterFallback: boolean,
+): WikiLinkTarget | null {
+  const candidates = new Set([position]);
+  if (allowPreviousCharacterFallback) {
+    candidates.add(Math.max(0, position - 1));
+  }
+
+  for (const candidate of candidates) {
+    const resolved = syntaxTree(state).resolveInner(candidate, 0);
+
+    for (let node: SyntaxNode | null = resolved; node; node = node.parent) {
+      if (node.name !== "WikiLink") {
+        continue;
+      }
+
+      const labelFrom = node.from + 2;
+      const labelTo = node.to - 2;
+      if (candidate < labelFrom || candidate >= labelTo) {
+        continue;
+      }
+
+      const title = state.sliceDoc(labelFrom, labelTo).trim();
+      if (!title) {
+        return null;
+      }
+
+      return {
+        location: utf8ByteOffsetForText(state.doc.toString(), node.from),
+        title,
+        type: "wikilink",
+      };
+    }
+  }
+
+  return null;
+}
+
 function shouldOpenLink(event: MouseEvent) {
   return event.button === 0;
 }
 
-function getExternalLinkTargetFromEvent(
+function asExternalLinkTarget(url: string | null): ExternalLinkTarget | null {
+  return url ? { type: "external", url } : null;
+}
+
+function getLinkTargetFromEvent(
   view: EditorView,
   event: MouseEvent,
-): string | null {
+): LinkTarget | null {
   const { target } = event;
   if (!(target instanceof Node) || !view.contentDOM.contains(target)) {
     return null;
@@ -319,16 +402,24 @@ function getExternalLinkTargetFromEvent(
       false,
     );
     if (position != null) {
-      return findExternalLinkTargetAtPosition(view.state, position, {
-        allowPreviousCharacterFallback: false,
-      });
+      return (
+        findWikiLinkTargetAtPosition(view.state, position, false) ??
+        asExternalLinkTarget(
+          findExternalLinkTargetAtPosition(view.state, position, {
+            allowPreviousCharacterFallback: false,
+          }),
+        )
+      );
     }
   }
 
   try {
-    return findExternalLinkTargetAtPosition(
-      view.state,
-      view.posAtDOM(target, 0),
+    const position = view.posAtDOM(target, 0);
+    return (
+      findWikiLinkTargetAtPosition(view.state, position, true) ??
+      asExternalLinkTarget(
+        findExternalLinkTargetAtPosition(view.state, position),
+      )
     );
   } catch {
     return null;
@@ -340,6 +431,14 @@ function getLinkEndAtCursor(state: EditorState, pos: number): number | null {
   const node = tree.resolveInner(pos, 1);
 
   for (let n: SyntaxNode | null = node; n; n = n.parent) {
+    if (n.name === "WikiLink") {
+      const wikilinkCloseBracket = n.to - 2;
+      if (pos === wikilinkCloseBracket && n.to > pos) {
+        return n.to;
+      }
+      continue;
+    }
+
     if (!LINK_NODE_NAMES.has(n.name)) {
       continue;
     }
@@ -358,11 +457,72 @@ function getLinkEndAtCursor(state: EditorState, pos: number): number | null {
   return null;
 }
 
-export function linkInteractions(): Extension {
+async function openWikiLink(
+  noteId: string | null,
+  target: WikiLinkTarget,
+): Promise<void> {
+  if (!noteId) {
+    console.warn("[wikilinks] clicked wikilink without active note id", target);
+    return;
+  }
+
+  console.debug("[wikilinks] resolving wikilink", {
+    location: target.location,
+    sourceNoteId: noteId,
+    title: target.title,
+  });
+
+  const draftResolvedNoteId = resolveDraftWikiLinkTarget(noteId, target);
+  if (draftResolvedNoteId) {
+    console.debug("[wikilinks] resolved wikilink from draft resolution", {
+      location: target.location,
+      resolvedNoteId: draftResolvedNoteId,
+      sourceNoteId: noteId,
+      title: target.title,
+    });
+    dispatchFocusNote(draftResolvedNoteId);
+    return;
+  }
+
+  const resolvedNoteId = await invoke<string | null>("resolve_wikilink", {
+    input: {
+      location: target.location,
+      sourceNoteId: noteId,
+      title: target.title,
+    },
+  }).catch((error) => {
+    console.error("[wikilinks] resolve_wikilink invoke failed", {
+      error,
+      location: target.location,
+      sourceNoteId: noteId,
+      title: target.title,
+    });
+    return null;
+  });
+
+  if (resolvedNoteId) {
+    console.debug("[wikilinks] resolved wikilink", {
+      location: target.location,
+      resolvedNoteId,
+      sourceNoteId: noteId,
+      title: target.title,
+    });
+    dispatchFocusNote(resolvedNoteId);
+  } else {
+    console.warn("[wikilinks] unresolved wikilink", {
+      location: target.location,
+      sourceNoteId: noteId,
+      title: target.title,
+    });
+  }
+}
+
+export function linkInteractions(noteId: string | null): Extension {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
       // When clicking to the right of a collapsed link, CM would place
-      // the cursor at the `]` position. Intercept and place it after `)`.
+      // the cursor before the hidden closing syntax. Intercept and place it
+      // after the full link token instead.
       if (event.button === 0 && !event.shiftKey) {
         const contentRect = view.contentDOM.getBoundingClientRect();
         if (
@@ -392,8 +552,8 @@ export function linkInteractions(): Extension {
         return false;
       }
 
-      const targetUrl = getExternalLinkTargetFromEvent(view, event);
-      if (!targetUrl) {
+      const targetLink = getLinkTargetFromEvent(view, event);
+      if (!targetLink) {
         return false;
       }
 
@@ -406,14 +566,19 @@ export function linkInteractions(): Extension {
         return false;
       }
 
-      const targetUrl = getExternalLinkTargetFromEvent(view, event);
-      if (!targetUrl) {
+      const targetLink = getLinkTargetFromEvent(view, event);
+      if (!targetLink) {
         return false;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      void openUrl(targetUrl).catch(() => {});
+      if (targetLink.type === "external") {
+        void openUrl(targetLink.url).catch(() => {});
+      } else {
+        console.debug("[wikilinks] clicked wikilink target", targetLink);
+        void openWikiLink(noteId, targetLink);
+      }
       return true;
     },
   });

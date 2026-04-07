@@ -8,6 +8,7 @@ pub(crate) const DEVICE_ID_KEY: &str = "sync_device_id";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ExistingSyncedNote {
     pub id: String,
+    pub title: String,
     pub is_locally_modified: bool,
     pub markdown: String,
     pub device_id: String,
@@ -67,6 +68,7 @@ pub(crate) fn load_existing_note(
 ) -> Result<Option<ExistingSyncedNote>, AppError> {
     conn.query_row(
         "SELECT id,
+                title,
                 locally_modified != 0,
                 markdown,
                 COALESCE(last_edit_device_id, ''),
@@ -82,15 +84,16 @@ pub(crate) fn load_existing_note(
         |row| {
             Ok(ExistingSyncedNote {
                 id: row.get(0)?,
-                is_locally_modified: row.get(1)?,
-                markdown: row.get(2)?,
-                device_id: row.get(3)?,
-                created_at: row.get(4)?,
-                edited_at: row.get(5)?,
-                archived_at: row.get(6)?,
-                pinned_at: row.get(7)?,
-                readonly: row.get(8)?,
-                vector_clock_json: row.get(9)?,
+                title: row.get(1)?,
+                is_locally_modified: row.get(2)?,
+                markdown: row.get(3)?,
+                device_id: row.get(4)?,
+                created_at: row.get(5)?,
+                edited_at: row.get(6)?,
+                archived_at: row.get(7)?,
+                pinned_at: row.get(8)?,
+                readonly: row.get(9)?,
+                vector_clock_json: row.get(10)?,
             })
         },
     )

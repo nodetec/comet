@@ -43,6 +43,25 @@ pub fn store_note_conflict(
             note.created_at,
         ],
     )?;
+
+    conn.execute(
+        "DELETE FROM note_conflict_wikilinks WHERE snapshot_event_id = ?1",
+        params![snapshot_event_id],
+    )?;
+    for wikilink in &note.wikilink_resolutions {
+        conn.execute(
+            "INSERT INTO note_conflict_wikilinks
+               (snapshot_event_id, occurrence_id, location, title, target_note_id)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                snapshot_event_id,
+                wikilink.occurrence_id,
+                wikilink.location as i64,
+                wikilink.title,
+                wikilink.target_note_id,
+            ],
+        )?;
+    }
     Ok(())
 }
 
@@ -77,6 +96,10 @@ pub fn store_tombstone_conflict(
             tombstone.deleted_at,
             tombstone.deleted_at,
         ],
+    )?;
+    conn.execute(
+        "DELETE FROM note_conflict_wikilinks WHERE snapshot_event_id = ?1",
+        params![snapshot_id],
     )?;
     Ok(())
 }

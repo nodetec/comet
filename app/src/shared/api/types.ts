@@ -33,6 +33,22 @@ export type LoadedNote = {
   readonly: boolean;
   tags: string[];
   title: string;
+  wikilinkResolutions: WikiLinkResolutionInput[];
+};
+
+export type SearchResult = {
+  archivedAt: number | null;
+  id: string;
+  preview: string;
+  title: string;
+};
+
+export type NoteBacklink = {
+  location: number;
+  sourceNoteId: string;
+  sourcePreview: string;
+  sourceTitle: string;
+  title: string;
 };
 
 export type NoteConflictSnapshot = {
@@ -45,6 +61,7 @@ export type NoteConflictSnapshot = {
   preview: string | null;
   snapshotId: string;
   title: string | null;
+  wikilinkResolutions: WikiLinkResolutionInput[];
 };
 
 export type NoteConflictInfo = {
@@ -66,6 +83,7 @@ export type NoteHistorySnapshot = {
   preview: string | null;
   snapshotId: string;
   title: string | null;
+  wikilinkResolutions: WikiLinkResolutionInput[];
 };
 
 export type NoteHistoryInfo = {
@@ -207,4 +225,17 @@ export type ExportNotesInput = {
   tagPath?: string;
   preserveTags?: boolean;
   exportDir: string;
+};
+
+export type ResolveWikilinkInput = {
+  location: number;
+  sourceNoteId: string;
+  title: string;
+};
+
+export type WikiLinkResolutionInput = {
+  occurrenceId?: string;
+  location: number;
+  targetNoteId: string;
+  title: string;
 };

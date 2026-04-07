@@ -129,6 +129,19 @@ export const AUTOCOMPLETE_MENU_THEME = EditorView.theme({
       height: "0.875rem",
       display: "block",
     },
+    "& .cm-note-completion-icon-wrap": {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "0.875rem",
+      flexShrink: 0,
+      color: "var(--muted-foreground)",
+    },
+    "& .cm-note-completion-icon": {
+      width: "0.875rem",
+      height: "0.875rem",
+      display: "block",
+    },
     "& .cm-completionLabel": {
       display: "block",
       minWidth: 0,
@@ -156,9 +169,10 @@ export const AUTOCOMPLETE_MENU_THEME = EditorView.theme({
       backgroundColor: "var(--accent)",
       color: "var(--accent-foreground)",
     },
-    "& > ul > li[aria-selected] .cm-tag-completion-icon-wrap": {
-      color: "var(--primary)",
-    },
+    "& > ul > li[aria-selected] .cm-tag-completion-icon-wrap, & > ul > li[aria-selected] .cm-note-completion-icon-wrap":
+      {
+        color: "var(--primary)",
+      },
   },
 });
 
@@ -173,6 +187,12 @@ export const DISABLE_SETEXT_HEADING: MarkdownConfig = {
   ],
 };
 
-export function buildSearchAwarePresentationExtensions(searchQuery: string) {
-  return [inlineImages({ searchQuery }), markdownDecorations({ searchQuery })];
+export function buildSearchAwarePresentationExtensions(
+  searchQuery: string,
+  noteId: string | null,
+) {
+  return [
+    inlineImages({ searchQuery }),
+    markdownDecorations({ noteId, searchQuery }),
+  ];
 }

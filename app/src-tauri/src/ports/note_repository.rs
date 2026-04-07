@@ -1,7 +1,7 @@
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
-    ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NotePagePayload, NoteQueryInput,
-    SearchResult,
+    ContextualTagsInput, ContextualTagsPayload, ExportNotesInput, NoteBacklink, NotePagePayload,
+    NoteQueryInput, ResolveWikilinkInput, SearchResult, WikiLinkResolutionInput,
 };
 
 /// Raw database row for a note, without HTML rendering.
@@ -32,6 +32,10 @@ pub trait NoteRepository {
     fn next_active_note_id(&self, excluding: Option<&str>) -> Result<Option<String>, NoteError>;
     fn note_markdown(&self, note_id: &str) -> Result<String, NoteError>;
     fn note_markdown_and_readonly(&self, note_id: &str) -> Result<(String, bool), NoteError>;
+    fn wikilink_resolutions_for_note(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<WikiLinkResolutionInput>, NoteError>;
     fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError>;
     fn note_ids_with_direct_tag_subtree(&self, path: &str) -> Result<Vec<String>, NoteError>;
     fn archived_and_trashed_counts(&self) -> Result<(i64, i64), NoteError>;
@@ -82,6 +86,13 @@ pub trait NoteRepository {
         markdown: &str,
     ) -> Result<(), NoteError>;
     fn replace_tags(&self, note_id: &str, markdown: &str) -> Result<(), NoteError>;
+    fn replace_wikilinks(
+        &self,
+        note_id: &str,
+        markdown: &str,
+        resolutions: &[WikiLinkResolutionInput],
+    ) -> Result<(), NoteError>;
+    fn refresh_wikilink_targets(&self, titles: &[String]) -> Result<(), NoteError>;
     fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError>;
     fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError>;
     fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError>;
@@ -91,6 +102,8 @@ pub trait NoteRepository {
     fn query_note_page(&self, input: &NoteQueryInput) -> Result<NotePagePayload, NoteError>;
     fn search_notes(&self, query: &str) -> Result<Vec<SearchResult>, NoteError>;
     fn search_tags(&self, query: &str) -> Result<Vec<String>, NoteError>;
+    fn backlinks_for_note(&self, note_id: &str) -> Result<Vec<NoteBacklink>, NoteError>;
+    fn resolve_wikilink(&self, input: &ResolveWikilinkInput) -> Result<Option<String>, NoteError>;
     fn query_contextual_tags(
         &self,
         input: &ContextualTagsInput,

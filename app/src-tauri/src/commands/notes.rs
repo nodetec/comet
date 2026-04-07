@@ -30,6 +30,7 @@ fn record_to_loaded_note(
     repo: &SqliteNoteRepository,
 ) -> Result<LoadedNote, AppError> {
     let tags = repo.tags_for_note(&record.id)?;
+    let wikilink_resolutions = repo.active_wikilink_resolutions_for_note(&record.id)?;
     Ok(LoadedNote {
         id: record.id,
         title: record.title,
@@ -40,6 +41,7 @@ fn record_to_loaded_note(
         pinned_at: record.pinned_at,
         readonly: record.readonly,
         tags,
+        wikilink_resolutions,
         nostr_d_tag: record.nostr_d_tag,
         published_at: record.published_at,
         published_kind: record.published_kind,
@@ -53,6 +55,50 @@ fn preferred_conflict_relay_url(conn: &rusqlite::Connection) -> Option<String> {
     active
         .filter(|relay_url| available.contains(relay_url))
         .or_else(|| available.into_iter().next())
+}
+
+fn load_conflict_snapshot_wikilink_resolutions(
+    conn: &rusqlite::Connection,
+    repo: &SqliteNoteRepository,
+    note_id: &str,
+    snapshot_id: Option<&str>,
+) -> Result<Vec<WikiLinkResolutionInput>, AppError> {
+    let Some(snapshot_id) = snapshot_id else {
+        return Ok(repo.wikilink_resolutions_for_note(note_id)?);
+    };
+
+    let is_conflict_snapshot: bool = conn.query_row(
+        "SELECT EXISTS(
+           SELECT 1
+           FROM note_conflicts
+           WHERE snapshot_event_id = ?1
+             AND note_id = ?2
+         )",
+        params![snapshot_id, note_id],
+        |row| Ok(row.get::<_, i64>(0)? != 0),
+    )?;
+
+    if !is_conflict_snapshot {
+        return Ok(repo.wikilink_resolutions_for_note(note_id)?);
+    }
+
+    let mut statement = conn.prepare(
+        "SELECT occurrence_id, location, title, target_note_id
+         FROM note_conflict_wikilinks
+         WHERE snapshot_event_id = ?1
+         ORDER BY location ASC, occurrence_id ASC",
+    )?;
+    let rows = statement.query_map(params![snapshot_id], |row| {
+        Ok(WikiLinkResolutionInput {
+            occurrence_id: row.get(0)?,
+            is_explicit: true,
+            location: row.get::<_, i64>(1)? as usize,
+            title: row.get(2)?,
+            target_note_id: row.get(3)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
 /// Spawn async Blossom blob deletions for orphaned blobs.
@@ -155,6 +201,8 @@ pub async fn resolve_note_conflict(
     note_id: String,
     action: ResolveNoteConflictAction,
     markdown: Option<String>,
+    snapshot_id: Option<String>,
+    wikilink_resolutions: Option<Vec<WikiLinkResolutionInput>>,
 ) -> Result<(), AppError> {
     let conn = database_connection(&app)?;
     let conflict_count: i64 = conn.query_row(
@@ -176,6 +224,13 @@ pub async fn resolve_note_conflict(
             markdown.ok_or_else(|| AppError::custom("Conflict resolution requires markdown"))?;
         let title = title_from_markdown(&conflict_markdown);
         let (existing_markdown, is_readonly) = repo.note_markdown_and_readonly(&note_id)?;
+        let wikilink_resolutions =
+            wikilink_resolutions.unwrap_or(load_conflict_snapshot_wikilink_resolutions(
+                &conn,
+                &repo,
+                &note_id,
+                snapshot_id.as_deref(),
+            )?);
         if is_readonly {
             return Err(AppError::custom("Note is read-only."));
         }
@@ -186,6 +241,7 @@ pub async fn resolve_note_conflict(
                 SaveNoteInput {
                     id: note_id.clone(),
                     markdown: conflict_markdown,
+                    wikilink_resolutions: Some(wikilink_resolutions.clone()),
                 },
             )?;
         } else {
@@ -213,6 +269,8 @@ pub async fn resolve_note_conflict(
             )?;
             repo.upsert_search_document(&note_id, &title, &conflict_markdown)?;
             repo.replace_tags(&note_id, &conflict_markdown)?;
+            repo.replace_wikilinks(&note_id, &conflict_markdown, &wikilink_resolutions)?;
+            repo.refresh_wikilink_targets(std::slice::from_ref(&title))?;
         }
     }
 
@@ -501,8 +559,108 @@ pub fn search_tags(app: AppHandle, query: String) -> Result<Vec<String>, AppErro
 }
 
 #[tauri::command]
+pub fn get_note_backlinks(app: AppHandle, note_id: String) -> Result<Vec<NoteBacklink>, AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    Ok(NoteService::backlinks_for_note(&repo, &note_id)?)
+}
+
+#[tauri::command]
+pub fn resolve_wikilink(
+    app: AppHandle,
+    input: ResolveWikilinkInput,
+) -> Result<Option<String>, AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    Ok(NoteService::resolve_wikilink(&repo, input)?)
+}
+
+#[tauri::command]
 pub fn export_notes(app: AppHandle, input: ExportNotesInput) -> Result<usize, AppError> {
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     Ok(NoteService::export_notes(&repo, input)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapters::sqlite::migrations::account_migrations;
+    use crate::domain::sync::conflict_store::store_note_conflict;
+    use crate::domain::sync::model::SyncedNote;
+    use crate::domain::sync::vector_clock::VectorClock;
+    use rusqlite::Connection;
+
+    fn setup_db() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn load_conflict_snapshot_wikilink_resolutions_prefers_selected_conflict_snapshot() {
+        let conn = setup_db();
+        conn.execute(
+            "INSERT INTO notes (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
+             VALUES ('note-1', 'Title', '# Title\n\n[[Alpha]]', 1, 1, 1, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_wikilinks (source_note_id, occurrence_id, location, title, normalized_title, target_note_id, is_explicit)
+             VALUES ('note-1', 'CURRENT1', 10, 'Alpha', 'alpha', 'current-target', 1)",
+            [],
+        )
+        .unwrap();
+
+        store_note_conflict(
+            &conn,
+            &SyncedNote {
+                id: "note-1".to_string(),
+                device_id: "DEVICE-B".to_string(),
+                vector_clock: VectorClock::from([("DEVICE-B".to_string(), 1)]),
+                title: "Title".to_string(),
+                markdown: "# Title\n\n[[Alpha]]".to_string(),
+                created_at: 1,
+                modified_at: 2,
+                edited_at: 2,
+                archived_at: None,
+                deleted_at: None,
+                pinned_at: None,
+                readonly: false,
+                tags: vec![],
+                wikilink_resolutions: vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("CONFLICT1".to_string()),
+                    is_explicit: true,
+                    location: 10,
+                    title: "Alpha".to_string(),
+                    target_note_id: "conflict-target".to_string(),
+                }],
+            },
+            "evt-conflict",
+        )
+        .unwrap();
+
+        let repo = SqliteNoteRepository::new(&conn);
+
+        let conflict_resolutions = load_conflict_snapshot_wikilink_resolutions(
+            &conn,
+            &repo,
+            "note-1",
+            Some("evt-conflict"),
+        )
+        .unwrap();
+        assert_eq!(conflict_resolutions.len(), 1);
+        assert_eq!(conflict_resolutions[0].target_note_id, "conflict-target");
+
+        let current_resolutions = load_conflict_snapshot_wikilink_resolutions(
+            &conn,
+            &repo,
+            "note-1",
+            Some("local:note-1"),
+        )
+        .unwrap();
+        assert_eq!(current_resolutions.len(), 1);
+        assert_eq!(current_resolutions[0].target_note_id, "current-target");
+    }
 }

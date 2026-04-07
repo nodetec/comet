@@ -41,7 +41,7 @@ import { Button } from "@/shared/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
-import { type NoteConflictInfo } from "@/shared/api/types";
+import { type NoteBacklink, type NoteConflictInfo } from "@/shared/api/types";
 
 const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
 const TOOLBAR_ENTER_ANIMATION = {
@@ -59,6 +59,7 @@ type EditorPaneProps = {
   availableTagPaths: string[];
   archivedAt: number | null;
   autoFocusEditor: boolean;
+  backlinks: NoteBacklink[];
   deletedAt: number | null;
   editorKey: string | null;
   isDeletePublishedNotePending: boolean;
@@ -83,6 +84,7 @@ type EditorPaneProps = {
   onSetPinned(pinned: boolean): void;
   onSetReadonly(readonly: boolean): void;
   onLoadConflictHead(snapshotId: string, markdown: string | null): void;
+  onSelectLinkedNote(noteId: string): void;
   onChange(markdown: string): void;
 };
 
@@ -435,6 +437,7 @@ export function EditorPane({
   availableTagPaths,
   archivedAt,
   autoFocusEditor,
+  backlinks,
   deletedAt,
   editorKey,
   isDeletePublishedNotePending,
@@ -459,6 +462,7 @@ export function EditorPane({
   onSetPinned,
   onSetReadonly,
   onLoadConflictHead,
+  onSelectLinkedNote,
   onChange,
 }: EditorPaneProps) {
   const isArchived = archivedAt !== null;
@@ -564,6 +568,7 @@ export function EditorPane({
         autoFocus={autoFocusEditor}
         loadKey={editorLoadKey ?? noteId}
         markdown={markdown}
+        noteId={noteId}
         onChange={onChange}
         onAutoFocusHandled={onAutoFocusEditorHandled}
         onEditorFocusChange={(focused) => {
@@ -945,6 +950,33 @@ export function EditorPane({
           )}
         </div>
       </div>
+
+      {noteId && backlinks.length > 0 ? (
+        <div className="border-separator bg-background shrink-0 border-t px-4 py-3">
+          <p className="text-muted-foreground mb-2 text-xs font-medium tracking-[0.08em] uppercase">
+            Linked Mentions
+          </p>
+          <div className="space-y-1.5">
+            {backlinks.map((backlink) => (
+              <button
+                key={`${backlink.sourceNoteId}:${backlink.location}`}
+                className="hover:bg-accent block w-full rounded-lg px-3 py-2 text-left transition-colors"
+                onClick={() => onSelectLinkedNote(backlink.sourceNoteId)}
+                type="button"
+              >
+                <p className="truncate text-sm font-medium">
+                  {backlink.sourceTitle || "Untitled"}
+                </p>
+                {backlink.sourcePreview ? (
+                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                    {backlink.sourcePreview}
+                  </p>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <AnimatePresence initial={false}>
         {noteId && !isReadOnly && showToolbar ? (

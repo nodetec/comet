@@ -1,6 +1,7 @@
 use crate::domain::common::text::preview_from_markdown;
 use crate::domain::notes::model::{
     NoteConflictInfo, NoteConflictSnapshot, NoteHistoryInfo, NoteHistorySnapshot,
+    WikiLinkResolutionInput,
 };
 use crate::error::AppError;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -46,6 +47,8 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
         let mut snapshots = Vec::new();
         for row in rows {
             let row = row?;
+            let wikilink_resolutions =
+                self.load_note_history_snapshot_wikilink_resolutions(&row.snapshot_id)?;
             snapshots.push(NoteHistorySnapshot {
                 is_current: current.current_snapshot_id.as_ref() == Some(&row.snapshot_id),
                 is_conflict: conflict_ids.contains(&row.snapshot_id),
@@ -59,6 +62,7 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
                     .as_ref()
                     .map(|value| preview_from_markdown(value)),
                 markdown: row.markdown,
+                wikilink_resolutions,
             });
         }
 
@@ -74,7 +78,7 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
         let mut snapshots = Vec::new();
 
         if let Some(current_row) = current.materialized_snapshot {
-            snapshots.push(self.conflict_snapshot_from_row(current_row, true));
+            snapshots.push(self.conflict_snapshot_from_row(note_id, current_row, true)?);
         }
 
         let mut stmt = self.conn.prepare(
@@ -85,7 +89,7 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
         )?;
         let rows = stmt.query_map(params![note_id], Self::read_snapshot_view_row)?;
         for row in rows {
-            snapshots.push(self.conflict_snapshot_from_row(row?, false));
+            snapshots.push(self.conflict_snapshot_from_row(note_id, row?, false)?);
         }
 
         if snapshots.len() <= 1 {
@@ -189,6 +193,28 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
         Ok(conflict_ids)
     }
 
+    fn load_note_history_snapshot_wikilink_resolutions(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<Vec<WikiLinkResolutionInput>, AppError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT occurrence_id, location, title, target_note_id
+             FROM note_snapshot_history_wikilinks
+             WHERE snapshot_event_id = ?1
+             ORDER BY location ASC, occurrence_id ASC",
+        )?;
+        let rows = stmt.query_map(params![snapshot_id], |row| {
+            Ok(WikiLinkResolutionInput {
+                occurrence_id: row.get(0)?,
+                is_explicit: true,
+                location: row.get::<_, i64>(1)? as usize,
+                title: row.get(2)?,
+                target_note_id: row.get(3)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
     fn read_snapshot_view_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SnapshotViewRow> {
         Ok(SnapshotViewRow {
             snapshot_id: row.get(0)?,
@@ -202,10 +228,16 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
 
     fn conflict_snapshot_from_row(
         &self,
+        note_id: &str,
         row: SnapshotViewRow,
         is_current: bool,
-    ) -> NoteConflictSnapshot {
-        NoteConflictSnapshot {
+    ) -> Result<NoteConflictSnapshot, AppError> {
+        let wikilink_resolutions = self.load_conflict_snapshot_wikilink_resolutions(
+            note_id,
+            &row.snapshot_id,
+            is_current,
+        )?;
+        Ok(NoteConflictSnapshot {
             snapshot_id: row.snapshot_id,
             op: row.op,
             mtime: row.mtime,
@@ -218,6 +250,143 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
             markdown: row.markdown,
             is_current,
             is_available: true,
-        }
+            wikilink_resolutions,
+        })
+    }
+
+    fn load_conflict_snapshot_wikilink_resolutions(
+        &self,
+        note_id: &str,
+        snapshot_id: &str,
+        is_current: bool,
+    ) -> Result<Vec<WikiLinkResolutionInput>, AppError> {
+        let sql = if is_current {
+            "SELECT occurrence_id, location, title, target_note_id
+             FROM note_wikilinks
+             WHERE source_note_id = ?1
+               AND target_note_id IS NOT NULL
+               AND is_explicit = 1
+             ORDER BY location ASC, occurrence_id ASC"
+        } else {
+            "SELECT occurrence_id, location, title, target_note_id
+             FROM note_conflict_wikilinks
+             WHERE snapshot_event_id = ?1
+             ORDER BY location ASC, occurrence_id ASC"
+        };
+        let lookup_id = if is_current { note_id } else { snapshot_id };
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map(params![lookup_id], |row| {
+            Ok(WikiLinkResolutionInput {
+                occurrence_id: row.get(0)?,
+                is_explicit: true,
+                location: row.get::<_, i64>(1)? as usize,
+                title: row.get(2)?,
+                target_note_id: row.get(3)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adapters::sqlite::migrations::account_migrations;
+
+    #[test]
+    fn get_note_history_includes_snapshot_wikilink_resolutions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO note_snapshot_history
+               (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES
+               ('snapshot-1', 'note-1', 'put', 'DEVICE-A', '{\"DEVICE-A\":1}', 'Title', '# Title\n\n[[Alpha]]', 1, 1, NULL, NULL, NULL, 0, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_snapshot_history_wikilinks
+               (snapshot_event_id, occurrence_id, location, title, target_note_id)
+             VALUES
+               ('snapshot-1', 'HIST1', 10, 'Alpha', 'history-target')",
+            [],
+        )
+        .unwrap();
+
+        let repo = SqliteSnapshotViewRepository::new(&conn);
+        let history = repo.get_note_history("note-1").unwrap();
+
+        assert_eq!(history.snapshots.len(), 1);
+        assert_eq!(history.snapshots[0].wikilink_resolutions.len(), 1);
+        assert_eq!(
+            history.snapshots[0].wikilink_resolutions[0].target_note_id,
+            "history-target"
+        );
+    }
+
+    #[test]
+    fn get_note_conflict_includes_snapshot_wikilink_resolutions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO notes
+               (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
+             VALUES
+               ('note-1', 'Title', '# Title\n\n[[Alpha]]', 1, 1, 1, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_wikilinks
+               (source_note_id, occurrence_id, location, title, normalized_title, target_note_id, is_explicit)
+             VALUES
+               ('note-1', 'CURRENT1', 10, 'Alpha', 'alpha', 'current-target', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflicts
+               (snapshot_event_id, note_id, op, device_id, vector_clock, title, markdown, modified_at, edited_at, deleted_at, archived_at, pinned_at, readonly, created_at)
+             VALUES
+               ('evt-conflict', 'note-1', 'put', 'DEVICE-B', '{\"DEVICE-B\":1}', 'Title', '# Title\n\n[[Alpha]]', 2, 2, NULL, NULL, NULL, 0, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_conflict_wikilinks
+               (snapshot_event_id, occurrence_id, location, title, target_note_id)
+             VALUES
+               ('evt-conflict', 'CONFLICT1', 10, 'Alpha', 'conflict-target')",
+            [],
+        )
+        .unwrap();
+
+        let repo = SqliteSnapshotViewRepository::new(&conn);
+        let conflict = repo.get_note_conflict("note-1").unwrap().unwrap();
+
+        let current_snapshot = conflict
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.is_current)
+            .unwrap();
+        assert_eq!(current_snapshot.wikilink_resolutions.len(), 1);
+        assert_eq!(
+            current_snapshot.wikilink_resolutions[0].target_note_id,
+            "current-target"
+        );
+
+        let remote_snapshot = conflict
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.snapshot_id == "evt-conflict")
+            .unwrap();
+        assert_eq!(remote_snapshot.wikilink_resolutions.len(), 1);
+        assert_eq!(
+            remote_snapshot.wikilink_resolutions[0].target_note_id,
+            "conflict-target"
+        );
     }
 }

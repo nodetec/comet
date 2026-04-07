@@ -7,3 +7,4 @@ pub mod snapshot_repository;
 pub mod snapshot_view_repository;
 pub mod sync_settings_repository;
 pub mod tag_index;
+pub mod wikilink_index;

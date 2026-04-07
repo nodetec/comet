@@ -29,6 +29,18 @@ pub struct NoteSnapshotAttachment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteSnapshotWikiLink {
+    pub location: usize,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub occurrence_id: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_explicit: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_note_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteSnapshotPayload {
     pub version: u32,
     pub device_id: String,
@@ -47,6 +59,8 @@ pub struct NoteSnapshotPayload {
     pub readonly: bool,
     pub tags: Vec<String>,
     pub attachments: Vec<NoteSnapshotAttachment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wikilinks: Vec<NoteSnapshotWikiLink>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,6 +138,70 @@ impl NoteSnapshotPayload {
 
         let attachments = attachments_by_plaintext.into_values().collect();
 
+        let mut wikilinks_by_occurrence = BTreeMap::new();
+        for wikilink in &self.wikilinks {
+            let title = wikilink.title.trim();
+            if title.is_empty() {
+                return Err(AppError::custom(
+                    "Wikilink title must be non-empty in note snapshot payload",
+                ));
+            }
+            if wikilink
+                .occurrence_id
+                .as_ref()
+                .is_some_and(|occurrence_id| occurrence_id.trim().is_empty())
+            {
+                return Err(AppError::custom(
+                    "Wikilink occurrence_id must be non-empty when present",
+                ));
+            }
+            if wikilink
+                .target_note_id
+                .as_ref()
+                .is_some_and(|target_note_id| target_note_id.trim().is_empty())
+            {
+                return Err(AppError::custom(
+                    "Wikilink target_note_id must be non-empty when present",
+                ));
+            }
+
+            let canonical = NoteSnapshotWikiLink {
+                location: wikilink.location,
+                title: title.to_string(),
+                occurrence_id: wikilink.occurrence_id.clone(),
+                is_explicit: wikilink.is_explicit,
+                target_note_id: wikilink.target_note_id.clone(),
+            };
+
+            let dedupe_key = canonical
+                .occurrence_id
+                .clone()
+                .map(|occurrence_id| format!("id:{occurrence_id}"))
+                .unwrap_or_else(|| format!("loc:{}:title:{}", canonical.location, canonical.title));
+
+            match wikilinks_by_occurrence.insert(dedupe_key, canonical.clone()) {
+                Some(existing) if existing != canonical => {
+                    return Err(AppError::custom(format!(
+                        "Conflicting wikilink metadata for occurrence: {}",
+                        canonical
+                            .occurrence_id
+                            .as_deref()
+                            .unwrap_or("<missing-occurrence-id>")
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        let mut wikilinks = wikilinks_by_occurrence.into_values().collect::<Vec<_>>();
+        wikilinks.sort_by(|left, right| {
+            left.location
+                .cmp(&right.location)
+                .then_with(|| left.title.cmp(&right.title))
+                .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+                .then_with(|| left.is_explicit.cmp(&right.is_explicit))
+        });
+
         Ok(Self {
             version: self.version,
             device_id: self.device_id.clone(),
@@ -137,6 +215,7 @@ impl NoteSnapshotPayload {
             readonly: self.readonly,
             tags,
             attachments,
+            wikilinks,
         })
     }
 
@@ -421,6 +500,24 @@ pub fn payload_to_synced_note(
         pinned_at: payload.pinned_at,
         readonly: payload.readonly,
         tags: payload.tags.clone(),
+        wikilink_resolutions: payload
+            .wikilinks
+            .iter()
+            .filter_map(|wikilink| {
+                (wikilink.is_explicit)
+                    .then_some(wikilink.target_note_id.as_ref())
+                    .flatten()
+                    .map(
+                        |target_note_id| crate::domain::notes::model::WikiLinkResolutionInput {
+                            occurrence_id: wikilink.occurrence_id.clone(),
+                            is_explicit: wikilink.is_explicit,
+                            location: wikilink.location,
+                            title: wikilink.title.clone(),
+                            target_note_id: target_note_id.clone(),
+                        },
+                    )
+            })
+            .collect(),
     }
 }
 
@@ -473,6 +570,22 @@ mod tests {
                     key: "key-a".into(),
                 },
             ],
+            wikilinks: vec![
+                NoteSnapshotWikiLink {
+                    location: 24,
+                    title: "Second".into(),
+                    occurrence_id: Some("WIKILINKSECOND".into()),
+                    is_explicit: false,
+                    target_note_id: None,
+                },
+                NoteSnapshotWikiLink {
+                    location: 10,
+                    title: "First".into(),
+                    occurrence_id: Some("WIKILINKFIRST".into()),
+                    is_explicit: true,
+                    target_note_id: Some("note-1".into()),
+                },
+            ],
         }
     }
 
@@ -482,7 +595,7 @@ mod tests {
 
         assert_eq!(
             json,
-            "{\"version\":1,\"device_id\":\"DEVICE-A\",\"markdown\":\"# Title\\n\\nBody\",\"note_created_at\":100,\"edited_at\":200,\"tags\":[\"roadmap\",\"work/project-alpha\"],\"attachments\":[{\"plaintext_hash\":\"a\",\"ciphertext_hash\":\"cipher-a\",\"key\":\"key-a\"},{\"plaintext_hash\":\"b\",\"ciphertext_hash\":\"cipher-b\",\"key\":\"key-b\"}]}"
+            "{\"version\":1,\"device_id\":\"DEVICE-A\",\"markdown\":\"# Title\\n\\nBody\",\"note_created_at\":100,\"edited_at\":200,\"tags\":[\"roadmap\",\"work/project-alpha\"],\"attachments\":[{\"plaintext_hash\":\"a\",\"ciphertext_hash\":\"cipher-a\",\"key\":\"key-a\"},{\"plaintext_hash\":\"b\",\"ciphertext_hash\":\"cipher-b\",\"key\":\"key-b\"}],\"wikilinks\":[{\"location\":10,\"title\":\"First\",\"occurrence_id\":\"WIKILINKFIRST\",\"is_explicit\":true,\"target_note_id\":\"note-1\"},{\"location\":24,\"title\":\"Second\",\"occurrence_id\":\"WIKILINKSECOND\"}]}"
         );
     }
 
@@ -572,6 +685,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         let meta = NoteSnapshotEventMeta {
             document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
@@ -604,6 +718,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         let meta = NoteSnapshotEventMeta {
             document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),
@@ -634,6 +749,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         let meta = NoteSnapshotEventMeta {
             document_id: "B181093E-A1A3-492F-BF55-6E661BFEA397".to_string(),

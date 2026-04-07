@@ -64,7 +64,11 @@ import {
   TagGrammar,
   tagHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/tag-syntax";
-import { tagAutocomplete } from "@/features/editor/extensions/tag-autocomplete";
+import {
+  WikiLinkGrammar,
+  wikilinkHighlightStyle,
+} from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
+import { noteAutocomplete } from "@/features/editor/extensions/note-autocomplete";
 import { pasteLink } from "@/features/editor/extensions/paste-link";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
 import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
@@ -93,6 +97,7 @@ type NoteEditorProps = {
   autoFocus?: boolean;
   loadKey: string;
   markdown: string;
+  noteId: string | null;
   onAutoFocusHandled?(): void;
   onEditorFocusChange?(focused: boolean): void;
   onSearchMatchCountChange?(count: number): void;
@@ -182,6 +187,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       autoFocus = false,
       loadKey,
       markdown,
+      noteId,
       onChange,
       onAutoFocusHandled,
       onEditorFocusChange,
@@ -217,6 +223,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const initialAutoFocusRef = useRef(autoFocus);
     const initialOnAutoFocusHandledRef = useRef(onAutoFocusHandled);
     const initialMarkdownRef = useRef(markdown);
+    const initialNoteIdRef = useRef(noteId);
     const initialReadOnlyRef = useRef(readOnly);
     const initialSearchQueryRef = useRef(searchQuery);
     const initialSpellCheckRef = useRef(spellCheck);
@@ -241,6 +248,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     useNoteEditorSearchSync({
       loadKey,
       markdown,
+      noteId,
       onSearchMatchCountChangeRef,
       presentationCompartmentRef,
       searchActiveMatchIndex,
@@ -260,14 +268,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         EditorView.editable.of(!initialReadOnlyRef.current),
       ]);
       const autocompleteExtension = autocompleteCompartmentRef.current.of(
-        tagAutocomplete(initialAvailableTagPathsRef.current),
+        noteAutocomplete(
+          initialNoteIdRef.current,
+          initialAvailableTagPathsRef.current,
+        ),
       );
       const contentAttributesExtension =
         contentAttributesCompartmentRef.current.of(
           createEditorContentAttributes(initialSpellCheckRef.current),
         );
       const presentationExtension = presentationCompartmentRef.current.of(
-        buildSearchAwarePresentationExtensions(initialSearchQueryRef.current),
+        buildSearchAwarePresentationExtensions(
+          initialSearchQueryRef.current,
+          initialNoteIdRef.current,
+        ),
       );
 
       const view = new EditorView({
@@ -288,6 +302,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               TaskList,
               HighlightSyntax,
               TagGrammar,
+              WikiLinkGrammar,
               DISABLE_SETEXT_HEADING,
             ],
             codeLanguages: languages,
@@ -296,6 +311,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           AUTOCOMPLETE_MENU_THEME,
           presentationExtension,
           tagHighlightStyle,
+          wikilinkHighlightStyle,
           pasteLink(),
           search(),
           EditorView.domEventHandlers({
@@ -604,10 +620,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
       view.dispatch({
         effects: autocompleteCompartmentRef.current.reconfigure(
-          tagAutocomplete(availableTagPaths),
+          noteAutocomplete(noteId, availableTagPaths),
         ),
       });
-    }, [availableTagPaths]);
+    }, [availableTagPaths, noteId]);
 
     useEffect(() => {
       const view = viewRef.current;

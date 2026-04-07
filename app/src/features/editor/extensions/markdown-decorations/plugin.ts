@@ -23,6 +23,7 @@ import {
   handleLink,
 } from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { handleStrikethrough } from "@/features/editor/extensions/markdown-decorations/builders/strikethrough";
+import { handleWikiLink } from "@/features/editor/extensions/markdown-decorations/builders/wikilinks";
 import {
   getCursorLineRanges,
   getCursorRanges,
@@ -58,6 +59,7 @@ const NODE_HANDLERS: Record<string, NodeHandler> = {
   FencedCode: handleCodeBlock,
   CodeBlock: handleCodeBlock,
   Link: handleLink,
+  WikiLink: handleWikiLink,
   Highlight: handleHighlight,
   Blockquote: handleBlockquote,
   QuoteMark: handleQuoteMark,
@@ -70,6 +72,7 @@ const SEARCH_REVEAL_NODE_NAMES = new Set([
   "StrongEmphasis",
   "InlineCode",
   "Link",
+  "WikiLink",
   "Highlight",
   "Blockquote",
   "QuoteMark",

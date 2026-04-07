@@ -7,6 +7,7 @@ import {
 } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 const { openUrlMock } = vi.hoisted(() => ({
   openUrlMock: vi.fn(() => Promise.resolve()),
@@ -17,7 +18,10 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 }));
 
 import { markdownDecorations } from "@/features/editor/extensions/markdown-decorations";
-import { findExternalLinkTargetAtPosition } from "@/features/editor/extensions/markdown-decorations/builders/links";
+import {
+  findExternalLinkTargetAtPosition,
+  resolveDraftWikiLinkTarget,
+} from "@/features/editor/extensions/markdown-decorations/builders/links";
 
 function createView(doc: string, readOnly = false) {
   const parent = document.createElement("div");
@@ -49,6 +53,11 @@ async function flush() {
 
 afterEach(() => {
   openUrlMock.mockClear();
+  useShellStore.setState({
+    draftMarkdown: "",
+    draftNoteId: null,
+    draftWikilinkResolutions: [],
+  });
   document.body.replaceChildren();
 });
 
@@ -327,5 +336,28 @@ describe("Editor link interactions", () => {
     expect(openUrlMock).not.toHaveBeenCalled();
 
     view.destroy();
+  });
+
+  it("prefers unsaved draft wikilink resolutions before backend lookup", () => {
+    useShellStore.setState({
+      draftMarkdown: "[[Target]]",
+      draftNoteId: "note-1",
+      draftWikilinkResolutions: [
+        {
+          occurrenceId: "A1",
+          location: 0,
+          targetNoteId: "resolved-note",
+          title: "Target",
+        },
+      ],
+    });
+
+    expect(
+      resolveDraftWikiLinkTarget("note-1", {
+        location: 0,
+        title: "Target",
+        type: "wikilink",
+      }),
+    ).toBe("resolved-note");
   });
 });

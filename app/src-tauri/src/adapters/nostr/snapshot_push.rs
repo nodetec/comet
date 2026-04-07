@@ -774,7 +774,14 @@ pub async fn push_deletion_snapshot(
     };
 
     let access_key = load_access_key(app);
-    let fanout = send_event_to_relays(active_relay_url, backup_relay_urls, keys, access_key.as_deref(), &event).await?;
+    let fanout = send_event_to_relays(
+        active_relay_url,
+        backup_relay_urls,
+        keys,
+        access_key.as_deref(),
+        &event,
+    )
+    .await?;
 
     let conn = database_connection(app)?;
     let _ = conn.execute(
@@ -1239,6 +1246,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         build_note_snapshot_event(
             keys,

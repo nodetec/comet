@@ -98,7 +98,8 @@ async fn bootstrap_with_keys_and_changes(
         min_retained_created_at,
     )?;
 
-    let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, access_key).await?;
+    let mut connection =
+        SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, access_key).await?;
     connection
         .send_changes_bootstrap("bootstrap", &author_pubkey)
         .await?;
@@ -1396,9 +1397,10 @@ mod tests {
         }
 
         async fn publish_event_with_keys(&self, keys: &Keys, event: &Event) {
-            let mut connection = SnapshotRelayConnection::connect_authenticated(&self.ws_url, keys, None)
-                .await
-                .unwrap();
+            let mut connection =
+                SnapshotRelayConnection::connect_authenticated(&self.ws_url, keys, None)
+                    .await
+                    .unwrap();
             connection.send_event(event).await.unwrap();
             let response = connection.recv_message().await.unwrap();
             match response {
@@ -1450,6 +1452,7 @@ mod tests {
             readonly: false,
             tags: vec![],
             attachments: vec![],
+            wikilinks: vec![],
         };
         build_note_snapshot_event(
             keys,
@@ -1480,9 +1483,10 @@ mod tests {
             (event, pending.event_id)
         };
 
-        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
-            .await
-            .unwrap();
+        let mut connection =
+            SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
+                .await
+                .unwrap();
         connection.send_event(&event).await.unwrap();
         let response = connection.recv_message().await.unwrap();
         match response {
@@ -1522,9 +1526,10 @@ mod tests {
     }
 
     async fn publish_local_event(relay_ws_url: &str, keys: &Keys, event: &Event) {
-        let mut connection = SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
-            .await
-            .unwrap();
+        let mut connection =
+            SnapshotRelayConnection::connect_authenticated(relay_ws_url, keys, None)
+                .await
+                .unwrap();
         connection.send_event(event).await.unwrap();
         let response = connection.recv_message().await.unwrap();
         match response {

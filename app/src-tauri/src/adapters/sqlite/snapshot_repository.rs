@@ -1,4 +1,5 @@
 use crate::domain::common::time::now_millis;
+use crate::domain::notes::model::WikiLinkResolutionInput;
 use crate::error::AppError;
 use nostr_sdk::prelude::{Event, JsonUtil};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -53,12 +54,14 @@ pub struct LocalNoteSnapshotHistoryEntry {
     pub pinned_at: Option<i64>,
     pub readonly: bool,
     pub created_at: i64,
+    pub wikilink_resolutions: Vec<WikiLinkResolutionInput>,
 }
 
 pub fn clear_local_snapshot_state(conn: &Connection) -> Result<(), AppError> {
     crate::adapters::sqlite::tag_index::clear_tag_index(conn)?;
     conn.execute_batch(
-        "DELETE FROM notes_fts;
+        "DELETE FROM note_wikilinks;
+         DELETE FROM notes_fts;
          DELETE FROM bootstrap_snapshot_stage;
          DELETE FROM note_conflicts;
          DELETE FROM note_tombstones;
@@ -76,10 +79,7 @@ pub fn clear_local_snapshot_state(conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn clear_bootstrap_snapshot_stage(
-    conn: &Connection,
-    relay_url: &str,
-) -> Result<(), AppError> {
+pub fn clear_bootstrap_snapshot_stage(conn: &Connection, relay_url: &str) -> Result<(), AppError> {
     conn.execute(
         "DELETE FROM bootstrap_snapshot_stage WHERE relay_url = ?1",
         params![relay_url],
@@ -285,6 +285,25 @@ pub fn upsert_note_snapshot_history(
             snapshot.created_at
         ],
     )?;
+    conn.execute(
+        "DELETE FROM note_snapshot_history_wikilinks
+         WHERE snapshot_event_id = ?1",
+        params![snapshot.snapshot_event_id],
+    )?;
+    for wikilink in &snapshot.wikilink_resolutions {
+        conn.execute(
+            "INSERT INTO note_snapshot_history_wikilinks
+               (snapshot_event_id, occurrence_id, location, title, target_note_id)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                snapshot.snapshot_event_id,
+                wikilink.occurrence_id,
+                wikilink.location as i64,
+                wikilink.title,
+                wikilink.target_note_id,
+            ],
+        )?;
+    }
     Ok(())
 }
 
@@ -446,10 +465,14 @@ mod tests {
         stage_bootstrap_snapshot_event(&conn, "wss://relay.example", &event).unwrap();
 
         let mut seen = Vec::new();
-        for_each_staged_bootstrap_snapshot_event(&conn, "wss://relay.example", |snapshot_id, row| {
-            seen.push((snapshot_id.to_string(), row.id.to_hex()));
-            Ok(())
-        })
+        for_each_staged_bootstrap_snapshot_event(
+            &conn,
+            "wss://relay.example",
+            |snapshot_id, row| {
+                seen.push((snapshot_id.to_string(), row.id.to_hex()));
+                Ok(())
+            },
+        )
         .unwrap();
 
         assert_eq!(seen, vec![(event.id.to_hex(), event.id.to_hex())]);
@@ -619,6 +642,7 @@ mod tests {
                     pinned_at: None,
                     readonly: false,
                     created_at: index as i64,
+                    wikilink_resolutions: vec![],
                 },
             )
             .unwrap();
@@ -658,6 +682,7 @@ mod tests {
                 pinned_at: None,
                 readonly: false,
                 created_at: 100,
+                wikilink_resolutions: vec![],
             },
         )
         .unwrap();

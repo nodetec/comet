@@ -4,13 +4,16 @@ use std::path::{Path, PathBuf};
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use uuid::Uuid;
 
-use crate::domain::common::text::{extract_tags, preview_from_markdown, strip_tags_from_markdown};
+use crate::domain::common::text::{
+    extract_tags, normalize_wikilink_title, preview_from_markdown, strip_tags_from_markdown,
+};
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::{
     ContextualTagNode, ContextualTagsInput, ContextualTagsPayload, ExportModeInput,
-    ExportNotesInput, NoteFilterInput, NotePagePayload, NoteQueryInput, NoteSortDirection,
-    NoteSortField, NoteSummary, SearchResult,
+    ExportNotesInput, NoteBacklink, NoteFilterInput, NotePagePayload, NoteQueryInput,
+    NoteSortDirection, NoteSortField, NoteSummary, ResolveWikilinkInput, SearchResult,
+    WikiLinkResolutionInput,
 };
 use crate::domain::sync::conflict_store::merge_note_conflict_clocks;
 use crate::domain::sync::vector_clock::{
@@ -123,6 +126,132 @@ fn direct_tags_for_note(conn: &Connection, note_id: &str) -> Result<Vec<String>,
 
     Ok(tags)
 }
+
+fn wikilink_resolutions_for_note(
+    conn: &Connection,
+    note_id: &str,
+) -> Result<Vec<WikiLinkResolutionInput>, NoteError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT occurrence_id, location, title, target_note_id, is_explicit
+             FROM note_wikilinks
+             WHERE source_note_id = ?1
+               AND target_note_id IS NOT NULL
+               AND is_explicit = 1
+             ORDER BY location ASC, occurrence_id ASC",
+        )
+        .map_err(map_err)?;
+
+    let rows = statement
+        .query_map(params![note_id], |row| {
+            Ok(WikiLinkResolutionInput {
+                occurrence_id: row.get(0)?,
+                is_explicit: row.get::<_, i64>(4)? != 0,
+                location: row.get::<_, i64>(1)? as usize,
+                title: row.get(2)?,
+                target_note_id: row.get(3)?,
+            })
+        })
+        .map_err(map_err)?;
+
+    let mut resolutions = Vec::new();
+    for row in rows {
+        resolutions.push(row.map_err(map_err)?);
+    }
+
+    Ok(resolutions)
+}
+
+fn active_wikilink_resolutions_for_note(
+    conn: &Connection,
+    note_id: &str,
+) -> Result<Vec<WikiLinkResolutionInput>, NoteError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT l.occurrence_id, l.location, l.title, l.target_note_id, l.is_explicit
+             FROM note_wikilinks l
+             JOIN notes n ON n.id = l.target_note_id
+             WHERE l.source_note_id = ?1
+               AND l.target_note_id IS NOT NULL
+               AND l.is_explicit = 1
+               AND n.deleted_at IS NULL
+             ORDER BY l.location ASC, l.occurrence_id ASC",
+        )
+        .map_err(map_err)?;
+
+    let rows = statement
+        .query_map(params![note_id], |row| {
+            Ok(WikiLinkResolutionInput {
+                occurrence_id: row.get(0)?,
+                is_explicit: row.get::<_, i64>(4)? != 0,
+                location: row.get::<_, i64>(1)? as usize,
+                title: row.get(2)?,
+                target_note_id: row.get(3)?,
+            })
+        })
+        .map_err(map_err)?;
+
+    let mut resolutions = Vec::new();
+    for row in rows {
+        resolutions.push(row.map_err(map_err)?);
+    }
+
+    Ok(resolutions)
+}
+
+fn preferred_active_note_id_for_normalized_title(
+    conn: &Connection,
+    normalized_title: &str,
+) -> Result<Option<String>, NoteError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT id, title
+             FROM notes
+             WHERE deleted_at IS NULL
+             ORDER BY COALESCE(edited_at, modified_at, created_at) DESC,
+                      created_at DESC,
+                      id DESC",
+        )
+        .map_err(map_err)?;
+
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(map_err)?;
+
+    let mut matched_note_id: Option<String> = None;
+    let mut match_count = 0usize;
+    for row in rows {
+        let (note_id, title) = row.map_err(map_err)?;
+        if normalize_wikilink_title(&title).as_deref() != Some(normalized_title) {
+            continue;
+        }
+
+        match_count += 1;
+        if matched_note_id.is_none() {
+            matched_note_id = Some(note_id);
+        }
+    }
+
+    if match_count > 1 {
+        log::warn!(
+            "[wikilinks] fallback title resolution is ambiguous; choosing latest normalized_title={} match_count={}",
+            normalized_title,
+            match_count
+        );
+    }
+
+    if matched_note_id.is_none() {
+        log::warn!(
+            "[wikilinks] fallback title resolution found no active note normalized_title={}",
+            normalized_title
+        );
+    }
+
+    Ok(matched_note_id)
+}
+
 fn sanitize_filename(title: &str) -> String {
     let sanitized: String = title
         .chars()
@@ -533,6 +662,13 @@ impl SqliteNoteRepository<'_> {
         let next_clock_json = serialize_vector_clock(&next_clock).map_err(map_clock_err)?;
         Ok((device_id, next_clock_json))
     }
+
+    pub(crate) fn active_wikilink_resolutions_for_note(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<WikiLinkResolutionInput>, NoteError> {
+        active_wikilink_resolutions_for_note(self.conn, note_id)
+    }
 }
 
 impl<'a> SqliteNoteRepository<'a> {
@@ -609,6 +745,13 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .optional()
             .map_err(map_err)?
             .ok_or(NoteError::NotFound)
+    }
+
+    fn wikilink_resolutions_for_note(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<WikiLinkResolutionInput>, NoteError> {
+        wikilink_resolutions_for_note(self.conn, note_id)
     }
 
     fn tags_for_note(&self, note_id: &str) -> Result<Vec<String>, NoteError> {
@@ -920,6 +1063,26 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
+    fn replace_wikilinks(
+        &self,
+        note_id: &str,
+        markdown: &str,
+        resolutions: &[WikiLinkResolutionInput],
+    ) -> Result<(), NoteError> {
+        crate::adapters::sqlite::wikilink_index::rebuild_note_wikilink_index(
+            self.conn,
+            note_id,
+            markdown,
+            resolutions,
+        )
+        .map_err(map_err)
+    }
+
+    fn refresh_wikilink_targets(&self, titles: &[String]) -> Result<(), NoteError> {
+        crate::adapters::sqlite::wikilink_index::refresh_wikilink_targets(self.conn, titles)
+            .map_err(map_err)
+    }
+
     fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError> {
         self.conn
             .query_row(
@@ -1193,6 +1356,183 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         }
 
         Ok(tags)
+    }
+
+    fn backlinks_for_note(&self, note_id: &str) -> Result<Vec<NoteBacklink>, NoteError> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT l.source_note_id, n.title, n.markdown, l.title, l.location
+                 FROM note_wikilinks l
+                 JOIN notes n ON n.id = l.source_note_id
+                 WHERE l.target_note_id = ?1
+                   AND n.deleted_at IS NULL
+                 ORDER BY n.pinned_at IS NULL ASC, n.pinned_at DESC, n.edited_at DESC, l.location ASC",
+            )
+            .map_err(map_err)?;
+
+        let rows = statement
+            .query_map(params![note_id], |row| {
+                let markdown: String = row.get(2)?;
+                Ok(NoteBacklink {
+                    source_note_id: row.get(0)?,
+                    source_title: row.get(1)?,
+                    source_preview: preview_from_markdown(&markdown),
+                    title: row.get(3)?,
+                    location: row.get::<_, i64>(4)? as usize,
+                })
+            })
+            .map_err(map_err)?;
+
+        let mut backlinks = Vec::new();
+        for row in rows {
+            backlinks.push(row.map_err(map_err)?);
+        }
+
+        Ok(backlinks)
+    }
+
+    fn resolve_wikilink(&self, input: &ResolveWikilinkInput) -> Result<Option<String>, NoteError> {
+        log::info!(
+            "[wikilinks] resolving source_note_id={} location={} title={}",
+            input.source_note_id,
+            input.location,
+            input.title
+        );
+
+        let indexed_target: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT l.target_note_id
+                 FROM note_wikilinks l
+                 JOIN notes n ON n.id = l.target_note_id
+                 WHERE l.source_note_id = ?1
+                   AND l.location = ?2
+                   AND l.title = ?3
+                   AND n.deleted_at IS NULL
+                 LIMIT 1",
+                params![input.source_note_id, input.location as i64, input.title],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(map_err)?;
+        if let Some(target_note_id) = indexed_target {
+            log::info!(
+                "[wikilinks] resolved via indexed occurrence source_note_id={} location={} title={} target_note_id={}",
+                input.source_note_id,
+                input.location,
+                input.title,
+                target_note_id
+            );
+            return Ok(Some(target_note_id));
+        }
+
+        log::info!(
+            "[wikilinks] indexed occurrence did not resolve source_note_id={} location={} title={}",
+            input.source_note_id,
+            input.location,
+            input.title
+        );
+
+        let exact_row: Option<(Option<String>, bool)> = self
+            .conn
+            .query_row(
+                "SELECT target_note_id, is_explicit
+                 FROM note_wikilinks
+                 WHERE source_note_id = ?1
+                   AND location = ?2
+                   AND title = ?3
+                 LIMIT 1",
+                params![input.source_note_id, input.location as i64, input.title],
+                |row| Ok((row.get(0)?, row.get::<_, i64>(1)? != 0)),
+            )
+            .optional()
+            .map_err(map_err)?;
+
+        if let Some((target_note_id, is_explicit)) = exact_row {
+            if is_explicit {
+                log::warn!(
+                    "[wikilinks] explicit wikilink is unresolved source_note_id={} location={} title={} stored_target_note_id={:?}",
+                    input.source_note_id,
+                    input.location,
+                    input.title,
+                    target_note_id
+                );
+                return Ok(None);
+            }
+        }
+
+        if let Ok(mut statement) = self.conn.prepare(
+            "SELECT occurrence_id, location, title, target_note_id, is_explicit
+             FROM note_wikilinks
+             WHERE source_note_id = ?1
+             ORDER BY location ASC",
+        ) {
+            match statement.query_map(params![input.source_note_id.clone()], |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, i64>(4)? != 0,
+                ))
+            }) {
+                Ok(rows) => {
+                    let candidates = rows
+                        .filter_map(Result::ok)
+                        .map(|(occurrence_id, location, title, target_note_id, is_explicit)| {
+                            format!(
+                                "{{occurrence_id={occurrence_id:?}, location={location}, title={title:?}, target_note_id={target_note_id:?}, is_explicit={is_explicit}}}"
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    log::warn!(
+                        "[wikilinks] stored rows for source_note_id={} rows={}",
+                        input.source_note_id,
+                        candidates.join(", ")
+                    );
+                }
+                Err(error) => {
+                    log::warn!(
+                        "[wikilinks] failed to inspect stored rows source_note_id={} error={}",
+                        input.source_note_id,
+                        error
+                    );
+                }
+            }
+        }
+
+        let Some(normalized_title) = normalize_wikilink_title(&input.title) else {
+            log::warn!(
+                "[wikilinks] title could not be normalized source_note_id={} location={} title={}",
+                input.source_note_id,
+                input.location,
+                input.title
+            );
+            return Ok(None);
+        };
+
+        let fallback_target =
+            preferred_active_note_id_for_normalized_title(self.conn, &normalized_title)?;
+
+        if let Some(target_note_id) = &fallback_target {
+            log::info!(
+                "[wikilinks] resolved via fallback title source_note_id={} location={} normalized_title={} target_note_id={}",
+                input.source_note_id,
+                input.location,
+                normalized_title,
+                target_note_id
+            );
+        } else {
+            log::warn!(
+                "[wikilinks] failed to resolve source_note_id={} location={} normalized_title={}",
+                input.source_note_id,
+                input.location,
+                normalized_title
+            );
+        }
+
+        Ok(fallback_target)
     }
 
     fn query_contextual_tags(
@@ -1633,5 +1973,73 @@ mod tests {
             next_clock,
             BTreeMap::from([("DEVICE-A".to_string(), 2), ("DEVICE-B".to_string(), 3),])
         );
+    }
+
+    #[test]
+    fn resolve_wikilink_does_not_fallback_for_broken_explicit_target() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO notes
+               (id, title, markdown, created_at, modified_at, edited_at, deleted_at, locally_modified)
+             VALUES
+               ('source', 'Source', '# Source\n\n[[Alpha]]', 1, 1, 1, NULL, 1),
+               ('target-explicit', 'Alpha', '# Alpha', 1, 1, 1, 10, 1),
+               ('target-fallback', 'Alpha', '# Alpha', 2, 2, 2, NULL, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_wikilinks
+               (source_note_id, occurrence_id, location, title, normalized_title, target_note_id, is_explicit)
+             VALUES
+               ('source', 'EXPLICIT1', 10, 'Alpha', 'alpha', 'target-explicit', 1)",
+            [],
+        )
+        .unwrap();
+
+        let repo = SqliteNoteRepository::new(&conn);
+        let resolved = repo
+            .resolve_wikilink(&ResolveWikilinkInput {
+                source_note_id: "source".to_string(),
+                location: 10,
+                title: "Alpha".to_string(),
+            })
+            .unwrap();
+
+        assert_eq!(resolved, None);
+    }
+
+    #[test]
+    fn active_wikilink_resolutions_for_note_excludes_deleted_targets() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        account_migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO notes
+               (id, title, markdown, created_at, modified_at, edited_at, deleted_at, locally_modified)
+             VALUES
+               ('source', 'Source', '# Source\n\n[[Alpha]] [[Beta]]', 1, 1, 1, NULL, 1),
+               ('target-active', 'Alpha', '# Alpha', 1, 1, 1, NULL, 1),
+               ('target-deleted', 'Beta', '# Beta', 1, 1, 1, 10, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_wikilinks
+               (source_note_id, occurrence_id, location, title, normalized_title, target_note_id, is_explicit)
+             VALUES
+               ('source', 'A1', 10, 'Alpha', 'alpha', 'target-active', 1),
+               ('source', 'B1', 20, 'Beta', 'beta', 'target-deleted', 1)",
+            [],
+        )
+        .unwrap();
+
+        let resolutions = active_wikilink_resolutions_for_note(&conn, "source").unwrap();
+
+        assert_eq!(resolutions.len(), 1);
+        assert_eq!(resolutions[0].target_note_id, "target-active");
+        assert_eq!(resolutions[0].title, "Alpha");
     }
 }
