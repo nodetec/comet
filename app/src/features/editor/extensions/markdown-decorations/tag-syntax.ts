@@ -2,6 +2,8 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { Tag } from "@lezer/highlight";
 import type { MarkdownConfig } from "@lezer/markdown";
 
+import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+
 const tags = {
   hashtag: Tag.define(),
 };
@@ -74,6 +76,11 @@ const TagGrammar: MarkdownConfig = {
 
         // Must have at least one char after #
         if (end <= pos + 1) {
+          return -1;
+        }
+
+        const body = cx.slice(pos + 1, end);
+        if (!canonicalizeTagPath(body)) {
           return -1;
         }
 

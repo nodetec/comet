@@ -66,6 +66,7 @@ describe("editor tag helpers", () => {
     expect(matchTagCompletionAtEnd("hello #")).toBeNull();
     expect(matchTagCompletionAtEnd(String.raw`hello \#roadmap`)).toBeNull();
     expect(matchTagCompletionAtEnd("hello #!/bin")).toBeNull();
+    expect(matchTagCompletionAtEnd("hello #2026roadmap")).toBeNull();
     expect(matchTagCompletionAtEnd("hello #work//proj")).toBeNull();
     expect(matchTagCompletionAtEnd("hello #project al")).toBeNull();
     expect(matchTagCompletionAtEnd("hello #work/ project al")).toBeNull();
@@ -86,6 +87,8 @@ describe("editor tag helpers", () => {
   it("normalizes tag partials for backend search", () => {
     expect(canonicalizeTagPartial("Work/ project  al")).toBeNull();
     expect(canonicalizeTagPartial("work/")).toBe("work/");
+    expect(canonicalizeTagPartial("2026roadmap")).toBeNull();
+    expect(canonicalizeTagPartial("work/2026roadmap")).toBeNull();
   });
 
   it("ranks tag completion options by path prefix before segment prefix", () => {

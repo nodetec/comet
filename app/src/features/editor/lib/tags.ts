@@ -31,6 +31,29 @@ function isTagSegmentChar(character: string) {
   return /[\p{L}\p{N}_-]/u.test(character);
 }
 
+function isTagSegmentLeadingChar(character: string) {
+  return !/\p{N}/u.test(character) && isTagSegmentChar(character);
+}
+
+function canonicalizeTagSegment(raw: string): string | null {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (!isTagSegmentLeadingChar(normalized[0]!)) {
+    return null;
+  }
+
+  for (const character of normalized.slice(1)) {
+    if (!isTagSegmentChar(character)) {
+      return null;
+    }
+  }
+
+  return normalized.toLocaleLowerCase();
+}
+
 function isEscapedHash(text: string, index: number) {
   let slashCount = 0;
   let current = index;
@@ -93,27 +116,11 @@ export function canonicalizeTagPath(raw: string): string | null {
   const canonicalSegments: string[] = [];
 
   for (const segment of segments) {
-    const normalized = segment.trim();
-    if (!normalized) {
+    const canonicalSegment = canonicalizeTagSegment(segment);
+    if (!canonicalSegment) {
       return null;
     }
-
-    let hasLetter = false;
-    for (const character of normalized) {
-      if (/\p{L}/u.test(character)) {
-        hasLetter = true;
-      }
-
-      if (!isTagSegmentChar(character)) {
-        return null;
-      }
-    }
-
-    if (!hasLetter) {
-      return null;
-    }
-
-    canonicalSegments.push(normalized.toLocaleLowerCase());
+    canonicalSegments.push(canonicalSegment);
   }
 
   if (canonicalSegments.length === 0) {
@@ -206,10 +213,10 @@ export function canonicalizeTagPartial(raw: string): string | null {
   const canonicalSegments: string[] = [];
 
   for (const [index, segment] of segments.entries()) {
-    const normalized = segment.trim();
     const isLast = index === segments.length - 1;
+    const canonicalSegment = canonicalizeTagSegment(segment);
 
-    if (!normalized) {
+    if (!canonicalSegment) {
       if (isLast && endsWithSlash) {
         canonicalSegments.push("");
         continue;
@@ -217,13 +224,7 @@ export function canonicalizeTagPartial(raw: string): string | null {
       return null;
     }
 
-    for (const character of normalized) {
-      if (!isTagSegmentChar(character)) {
-        return null;
-      }
-    }
-
-    canonicalSegments.push(normalized.toLocaleLowerCase());
+    canonicalSegments.push(canonicalSegment);
   }
 
   let canonical = canonicalSegments.join("/");

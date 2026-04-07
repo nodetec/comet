@@ -21,12 +21,22 @@
       "rendered": null
     },
     {
+      "raw": "2026roadmap",
+      "canonical": null,
+      "rendered": null
+    },
+    {
       "raw": "work//project",
       "canonical": null,
       "rendered": null
     },
     {
       "raw": "journal/2026",
+      "canonical": null,
+      "rendered": null
+    },
+    {
+      "raw": "journal/2026roadmap",
       "canonical": null,
       "rendered": null
     }
@@ -71,6 +81,14 @@
     {
       "text": "#!/bin/bash",
       "match": null
+    },
+    {
+      "text": "hello #2026roadmap there",
+      "match": null
+    },
+    {
+      "text": "hello #journal/2026roadmap there",
+      "match": null
     }
   ],
   "publishCases": [
@@ -88,6 +106,10 @@
     },
     {
       "raw": "123",
+      "canonical": null
+    },
+    {
+      "raw": "2026Roadmap",
       "canonical": null
     },
     {

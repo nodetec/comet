@@ -154,19 +154,16 @@ pub fn canonicalize_tag_path(raw: &str) -> Option<String> {
             return None;
         }
 
-        let mut has_letter = false;
-        for character in trimmed.chars() {
-            if character.is_alphabetic() {
-                has_letter = true;
-            }
+        let mut characters = trimmed.chars();
+        let first = characters.next()?;
+        if first.is_numeric() || !(first.is_alphanumeric() || matches!(first, '_' | '-')) {
+            return None;
+        }
 
+        for character in characters {
             if !(character.is_alphanumeric() || matches!(character, '_' | '-')) {
                 return None;
             }
-        }
-
-        if !has_letter {
-            return None;
         }
 
         canonical_segments.push(trimmed.to_lowercase());
@@ -696,10 +693,12 @@ mod tests {
     }
 
     #[test]
-    fn canonicalize_tag_path_rejects_empty_or_number_only_segments() {
+    fn canonicalize_tag_path_rejects_empty_or_numeric_leading_segments() {
         assert_eq!(canonicalize_tag_path("work//project"), None);
         assert_eq!(canonicalize_tag_path("123"), None);
+        assert_eq!(canonicalize_tag_path("2026roadmap"), None);
         assert_eq!(canonicalize_tag_path("journal/2026"), None);
+        assert_eq!(canonicalize_tag_path("journal/2026roadmap"), None);
     }
 
     #[test]
@@ -776,6 +775,7 @@ mod tests {
     fn extract_tags_rejects_invalid_and_ambiguous_forms() {
         let markdown = [
             "#123",
+            "#2026roadmap",
             "#project alpha",
             "#work//project",
             "#!/bin/bash",
