@@ -106,6 +106,26 @@ export async function createRelayAccessKey(input: {
   }>;
 }
 
+export async function updateRelayAccessKey(
+  key: string,
+  fields: {
+    label?: string | null;
+    pubkey?: string | null;
+    revoked?: boolean;
+    storage_limit_bytes?: number | null;
+  },
+) {
+  const res = await relayAdminFetch(`/admin/keys/${encodeURIComponent(key)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    throw new Error(`Relay key update failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function revokeRelayAccessKey(key: string) {
   const res = await relayAdminFetch(`/admin/keys/${encodeURIComponent(key)}`, {
     method: "PATCH",

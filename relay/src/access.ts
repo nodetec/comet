@@ -18,6 +18,15 @@ export type AccessControl = {
     storageLimitBytes: number | null,
   ) => Promise<void>;
   revokeKey: (key: string) => Promise<boolean>;
+  updateKey: (
+    key: string,
+    fields: {
+      label?: string | null;
+      pubkey?: string | null;
+      storageLimitBytes?: number | null;
+      revoked?: boolean;
+    },
+  ) => Promise<boolean>;
   deleteKey: (key: string) => Promise<boolean>;
   listKeys: () => Promise<AccessKey[]>;
 };
@@ -91,6 +100,34 @@ export function createAccessControl(
       const rows = await db
         .update(accessKeys)
         .set({ revoked: true })
+        .where(eq(accessKeys.key, key))
+        .returning({ key: accessKeys.key });
+
+      return rows.length > 0;
+    },
+
+    async updateKey(key, fields) {
+      const set: Record<string, unknown> = {};
+      if (fields.label !== undefined) {
+        set.label = fields.label;
+      }
+      if (fields.pubkey !== undefined) {
+        set.pubkey = fields.pubkey;
+      }
+      if (fields.storageLimitBytes !== undefined) {
+        set.storageLimitBytes = fields.storageLimitBytes;
+      }
+      if (fields.revoked !== undefined) {
+        set.revoked = fields.revoked;
+      }
+
+      if (Object.keys(set).length === 0) {
+        return false;
+      }
+
+      const rows = await db
+        .update(accessKeys)
+        .set(set)
         .where(eq(accessKeys.key, key))
         .returning({ key: accessKeys.key });
 

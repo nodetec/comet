@@ -452,12 +452,39 @@ async function handleKeyApiRequest(
     }
 
     const body = await parseJsonBody(request);
-    if (body?.revoked === true) {
-      const revoked = await options.access.revokeKey(options.key);
-      return jsonResponse({ revoked, key: options.key });
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return jsonResponse({ error: "invalid JSON body" }, { status: 400 });
     }
 
-    return jsonResponse({ error: "invalid patch body" }, { status: 400 });
+    const fields: Record<string, unknown> = {};
+    if (typeof body.label === "string" || body.label === null) {
+      fields.label = body.label;
+    }
+    if (
+      (typeof body.pubkey === "string" && /^[a-f0-9]{64}$/.test(body.pubkey)) ||
+      body.pubkey === null
+    ) {
+      fields.pubkey = body.pubkey;
+    }
+    if (typeof body.revoked === "boolean") {
+      fields.revoked = body.revoked;
+    }
+    if (
+      typeof body.storage_limit_bytes === "number" ||
+      body.storage_limit_bytes === null
+    ) {
+      fields.storageLimitBytes = body.storage_limit_bytes;
+    }
+
+    if (Object.keys(fields).length === 0) {
+      return jsonResponse(
+        { error: "no valid fields to update" },
+        { status: 400 },
+      );
+    }
+
+    const updated = await options.access.updateKey(options.key, fields);
+    return jsonResponse({ updated, key: options.key });
   }
 
   if (request.method === "DELETE") {
