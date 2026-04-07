@@ -38,7 +38,8 @@ function groupWikiLinkOccurrencesByTitle(markdown: string) {
 function sortWikilinkResolutions(
   resolutions: WikiLinkResolutionInput[],
 ): WikiLinkResolutionInput[] {
-  return resolutions.toSorted((left, right) => left.location - right.location);
+  // eslint-disable-next-line unicorn/no-array-sort -- app tsconfig target doesn't include toSorted()
+  return [...resolutions].sort((left, right) => left.location - right.location);
 }
 
 function matchesResolutionIdentity(

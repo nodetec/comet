@@ -169,6 +169,10 @@ const markdownDecorationsTheme = EditorView.baseTheme({
     color: "var(--primary)",
     cursor: "pointer",
   },
+  ".cm-md-wikilink-bracket": {
+    color: "var(--muted-foreground)",
+    cursor: "pointer",
+  },
   ".cm-line.cm-md-bq": {
     "--cm-md-bq-bar-color": "var(--primary)",
     backgroundRepeat: "no-repeat",

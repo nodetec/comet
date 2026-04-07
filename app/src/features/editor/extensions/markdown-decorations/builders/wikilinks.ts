@@ -8,6 +8,9 @@ import type {
 } from "@/features/editor/extensions/markdown-decorations/types";
 
 const wikilinkMark = Decoration.mark({ class: "cm-md-link cm-md-wikilink" });
+const wikilinkBracketMark = Decoration.mark({
+  class: "cm-md-wikilink-bracket",
+});
 
 export function handleWikiLink(
   node: SyntaxNodeRef,
@@ -22,7 +25,20 @@ export function handleWikiLink(
     out.push({ from: textFrom, to: textTo, decoration: wikilinkMark });
   }
 
-  if (!onCursor) {
+  if (onCursor) {
+    out.push(
+      {
+        from: node.from,
+        to: textFrom,
+        decoration: wikilinkBracketMark,
+      },
+      {
+        from: textTo,
+        to: node.to,
+        decoration: wikilinkBracketMark,
+      },
+    );
+  } else {
     out.push(
       {
         atomic: true,

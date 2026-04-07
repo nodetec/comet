@@ -72,7 +72,7 @@ const wikilinkHighlightStyle = syntaxHighlighting(
   HighlightStyle.define([
     {
       tag: tags.wikilink,
-      color: "var(--primary)",
+      color: "inherit",
     },
   ]),
 );
