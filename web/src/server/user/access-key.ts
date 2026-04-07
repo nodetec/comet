@@ -8,6 +8,19 @@ export const getUserAccessKey = createServerFn({ method: "GET" }).handler(
   async () => {
     const pubkey = assertUser();
 
+    // Look up the key via the auto-tracked link table first,
+    // fall back to the admin-assigned pubkey column.
+    const linkRow = await db
+      .select({ accessKey: accessKeyPubkeys.accessKey })
+      .from(accessKeyPubkeys)
+      .where(eq(accessKeyPubkeys.pubkey, pubkey))
+      .limit(1);
+
+    const keyFilter =
+      linkRow.length > 0
+        ? eq(accessKeys.key, linkRow[0].accessKey)
+        : eq(accessKeys.pubkey, pubkey);
+
     const rows = await db
       .select({
         key: accessKeys.key,
@@ -17,7 +30,7 @@ export const getUserAccessKey = createServerFn({ method: "GET" }).handler(
         revoked: accessKeys.revoked,
       })
       .from(accessKeys)
-      .where(eq(accessKeys.pubkey, pubkey))
+      .where(keyFilter)
       .limit(1);
 
     if (rows.length === 0) {
