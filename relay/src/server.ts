@@ -437,14 +437,29 @@ async function handleKeyApiRequest(
     key: string;
   },
 ) {
+  if (request.method === "PATCH") {
+    const authError = requireAdminAuthorization(request, options.adminToken);
+    if (authError) {
+      return authError;
+    }
+
+    const body = await parseJsonBody(request);
+    if (body?.revoked === true) {
+      const revoked = await options.access.revokeKey(options.key);
+      return jsonResponse({ revoked, key: options.key });
+    }
+
+    return jsonResponse({ error: "invalid patch body" }, { status: 400 });
+  }
+
   if (request.method === "DELETE") {
     const authError = requireAdminAuthorization(request, options.adminToken);
     if (authError) {
       return authError;
     }
 
-    const revoked = await options.access.revokeKey(options.key);
-    return jsonResponse({ revoked, key: options.key });
+    const deleted = await options.access.deleteKey(options.key);
+    return jsonResponse({ deleted, key: options.key });
   }
 
   return jsonResponse({ error: "method not allowed" }, { status: 405 });

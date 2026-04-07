@@ -6,6 +6,7 @@ import { blobOwners, blobs } from "@comet/data";
 import { DEFAULT_STORAGE_LIMIT_BYTES } from "~/lib/utils";
 import {
   createRelayAccessKey,
+  deleteRelayAccessKey,
   listRelayAccessKeys,
   revokeRelayAccessKey,
 } from "~/server/relay-client";
@@ -75,4 +76,15 @@ export const revokeAccessKey = createServerFn({ method: "POST" })
     }
 
     return revokeRelayAccessKey(data.key);
+  });
+
+export const deleteAccessKey = createServerFn({ method: "POST" })
+  .inputValidator((data: { key: string }) => data)
+  .handler(async ({ data }) => {
+    assertAdmin();
+    if (!data.key) {
+      throw new Error("invalid key");
+    }
+
+    return deleteRelayAccessKey(data.key);
   });

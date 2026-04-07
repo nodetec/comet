@@ -106,10 +106,22 @@ export async function createRelayAccessKey(input: {
 
 export async function revokeRelayAccessKey(key: string) {
   const res = await relayAdminFetch(`/admin/keys/${encodeURIComponent(key)}`, {
-    method: "DELETE",
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revoked: true }),
   });
   if (!res.ok) {
     throw new Error(`Relay key revoke failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteRelayAccessKey(key: string) {
+  const res = await relayAdminFetch(`/admin/keys/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Relay key delete failed: ${res.status}`);
   }
   return res.json();
 }

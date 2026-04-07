@@ -2,7 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Plus, Trash2, KeyRound, Copy, Check } from "lucide-react";
+import {
+  ArrowUpDown,
+  Plus,
+  Trash2,
+  Ban,
+  KeyRound,
+  Copy,
+  Check,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -31,6 +39,7 @@ import {
   listAccessKeys,
   createAccessKey,
   revokeAccessKey,
+  deleteAccessKey,
 } from "~/server/admin/access-keys";
 import { formatBytes, usagePercent, usageColor } from "~/lib/utils";
 
@@ -48,7 +57,7 @@ type AccessKeyRow = {
   storageUsedBytes: number;
 };
 
-function MaskedKey({ value }: { value: string }) {
+function CopyableKey({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -57,16 +66,13 @@ function MaskedKey({ value }: { value: string }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const masked =
-    value.length > 10 ? `${value.slice(0, 7)}...${value.slice(-4)}` : value;
-
   return (
     <div className="flex items-center gap-1.5">
-      <code className="text-xs">{masked}</code>
+      <code className="text-xs break-all">{value}</code>
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6"
+        className="h-6 w-6 shrink-0"
         onClick={handleCopy}
       >
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -105,6 +111,13 @@ function AccessKeysPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (key: string) => deleteAccessKey({ data: { key } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "access-keys"] });
+    },
+  });
+
   function handleCreate(e: FormEvent) {
     e.preventDefault();
     createMutation.mutate(label);
@@ -123,7 +136,7 @@ function AccessKeysPage() {
       {
         accessorKey: "key",
         header: "Key",
-        cell: ({ row }) => <MaskedKey value={row.original.key} />,
+        cell: ({ row }) => <CopyableKey value={row.original.key} />,
       },
       {
         accessorKey: "label",
@@ -194,37 +207,65 @@ function AccessKeysPage() {
       {
         id: "actions",
         header: "",
-        cell: ({ row }) =>
-          row.original.revoked ? null : (
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1">
+            {!row.original.revoked && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" title="Revoke">
+                    <Ban className="text-muted-foreground h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Revoke access key?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      All connections using this key will lose relay and storage
+                      access. The key can be deleted later.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => revokeMutation.mutate(row.original.key)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Revoke
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" title="Delete">
                   <Trash2 className="text-destructive h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Revoke access key?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete access key?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    All connections using this key will lose relay and storage
-                    access.
+                    This will permanently remove the key. This action cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => revokeMutation.mutate(row.original.key)}
+                    onClick={() => deleteMutation.mutate(row.original.key)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Revoke
+                    Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          ),
+          </div>
+        ),
       },
     ],
-    [defaultLimit, revokeMutation],
+    [defaultLimit, revokeMutation, deleteMutation],
   );
 
   return (
@@ -277,7 +318,7 @@ function AccessKeysPage() {
           <DialogHeader>
             <DialogTitle>Access key created</DialogTitle>
             <DialogDescription>
-              Copy this key now. It will not be shown again in full.
+              Copy this key and share it with the user.
             </DialogDescription>
           </DialogHeader>
           <div className="bg-muted rounded-md p-3">

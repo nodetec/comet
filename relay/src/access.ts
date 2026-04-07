@@ -17,6 +17,7 @@ export type AccessControl = {
     storageLimitBytes: number | null,
   ) => Promise<void>;
   revokeKey: (key: string) => Promise<boolean>;
+  deleteKey: (key: string) => Promise<boolean>;
   listKeys: () => Promise<AccessKey[]>;
 };
 
@@ -87,6 +88,15 @@ export function createAccessControl(
       const rows = await db
         .update(accessKeys)
         .set({ revoked: true })
+        .where(eq(accessKeys.key, key))
+        .returning({ key: accessKeys.key });
+
+      return rows.length > 0;
+    },
+
+    async deleteKey(key) {
+      const rows = await db
+        .delete(accessKeys)
         .where(eq(accessKeys.key, key))
         .returning({ key: accessKeys.key });
 
