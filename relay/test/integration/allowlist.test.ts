@@ -76,8 +76,12 @@ describe("relay integration > access keys admin", () => {
     const revoke = await fetch(
       `${ctx.httpUrl}/admin/keys/${encodeURIComponent(created.key)}`,
       {
-        method: "DELETE",
-        headers: { Authorization: "Bearer secret-token" },
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer secret-token",
+        },
+        body: JSON.stringify({ revoked: true }),
       },
     );
     expect(revoke.status).toBe(200);
@@ -90,5 +94,23 @@ describe("relay integration > access keys admin", () => {
       keys: Array<{ revoked: boolean }>;
     };
     expect(afterRevoke.keys[0].revoked).toBe(true);
+
+    const del = await fetch(
+      `${ctx.httpUrl}/admin/keys/${encodeURIComponent(created.key)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: "Bearer secret-token" },
+      },
+    );
+    expect(del.status).toBe(200);
+    expect(await del.json()).toEqual({ deleted: true, key: created.key });
+
+    const listAfterDelete = await fetch(`${ctx.httpUrl}/admin/keys`, {
+      headers: { Authorization: "Bearer secret-token" },
+    });
+    const afterDelete = (await listAfterDelete.json()) as {
+      keys: Array<{ key: string }>;
+    };
+    expect(afterDelete.keys).toHaveLength(0);
   });
 });
