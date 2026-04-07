@@ -275,3 +275,19 @@ export const accessKeys = pgTable(
     index("idx_access_keys_pubkey").on(table.pubkey),
   ],
 );
+
+export const accessKeyPubkeys = pgTable(
+  "access_key_pubkeys",
+  {
+    accessKey: text("access_key")
+      .notNull()
+      .references(() => accessKeys.key, { onDelete: "cascade" }),
+    pubkey: text("pubkey").notNull(),
+    firstSeen: bigint("first_seen", { mode: "number" }).notNull(),
+    lastSeen: bigint("last_seen", { mode: "number" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.accessKey, table.pubkey] }),
+    index("idx_access_key_pubkeys_pubkey").on(table.pubkey),
+  ],
+);

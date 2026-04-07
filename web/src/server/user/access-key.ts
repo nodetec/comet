@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { assertUser } from "~/server/middleware";
-import { accessKeys } from "@comet/data";
+import { accessKeys, accessKeyPubkeys } from "@comet/data";
 
 export const getUserAccessKey = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -21,10 +21,21 @@ export const getUserAccessKey = createServerFn({ method: "GET" }).handler(
       .limit(1);
 
     if (rows.length === 0) {
-      return { accessKey: null };
+      return { accessKey: null, linkedPubkeys: [] };
     }
 
     const row = rows[0];
+
+    const linked = await db
+      .select({
+        pubkey: accessKeyPubkeys.pubkey,
+        firstSeen: accessKeyPubkeys.firstSeen,
+        lastSeen: accessKeyPubkeys.lastSeen,
+      })
+      .from(accessKeyPubkeys)
+      .where(eq(accessKeyPubkeys.accessKey, row.key))
+      .orderBy(accessKeyPubkeys.lastSeen);
+
     return {
       accessKey: {
         key: row.key,
@@ -33,6 +44,11 @@ export const getUserAccessKey = createServerFn({ method: "GET" }).handler(
         expiresAt: row.expiresAt,
         revoked: row.revoked,
       },
+      linkedPubkeys: linked.map((l) => ({
+        pubkey: l.pubkey,
+        firstSeen: l.firstSeen,
+        lastSeen: l.lastSeen,
+      })),
     };
   },
 );

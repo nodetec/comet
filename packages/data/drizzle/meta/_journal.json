@@ -120,6 +120,13 @@
       "when": 1775664000000,
       "tag": "0016_access_key_pubkey",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1775750400000,
+      "tag": "0017_access_key_pubkeys",
+      "breakpoints": true
     }
   ]
 }

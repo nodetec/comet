@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { SnapshotRelayDb } from "./db";
 import type { AccessKey } from "./types";
 
-import { accessKeys } from "./storage/schema";
+import { accessKeys, accessKeyPubkeys } from "./storage/schema";
 
 export type AccessControl = {
   privateMode: boolean;
@@ -27,6 +27,7 @@ export type AccessControl = {
       revoked?: boolean;
     },
   ) => Promise<boolean>;
+  linkPubkey: (key: string, pubkey: string) => Promise<void>;
   deleteKey: (key: string) => Promise<boolean>;
   listKeys: () => Promise<AccessKey[]>;
 };
@@ -132,6 +133,17 @@ export function createAccessControl(
         .returning({ key: accessKeys.key });
 
       return rows.length > 0;
+    },
+
+    async linkPubkey(key, pubkey) {
+      const now = Math.floor(Date.now() / 1000);
+      await db
+        .insert(accessKeyPubkeys)
+        .values({ accessKey: key, pubkey, firstSeen: now, lastSeen: now })
+        .onConflictDoUpdate({
+          target: [accessKeyPubkeys.accessKey, accessKeyPubkeys.pubkey],
+          set: { lastSeen: now },
+        });
     },
 
     async deleteKey(key) {

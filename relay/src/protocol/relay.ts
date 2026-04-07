@@ -295,6 +295,14 @@ export function createClientMessageHandler(options: {
           context.connectionId,
           result.pubkey,
         );
+
+        const accessKey = options.connections.getAccessKey(
+          context.connectionId,
+        );
+        if (accessKey) {
+          void options.access.linkPubkey(accessKey, result.pubkey);
+        }
+
         return [["OK", event.id, true, ""]];
       }
 

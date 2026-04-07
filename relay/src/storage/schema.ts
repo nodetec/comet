@@ -1,5 +1,6 @@
 export {
   accessKeys,
+  accessKeyPubkeys,
   relayEvents,
   relayEventTags,
   relaySettings,

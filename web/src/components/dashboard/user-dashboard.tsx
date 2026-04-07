@@ -8,6 +8,7 @@ import {
   Copy,
   Check,
   KeyRound,
+  Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -124,23 +125,49 @@ function AccessKeyCard() {
       </CardHeader>
       <CardContent>
         {data?.accessKey ? (
-          <div className="flex items-center gap-2">
-            <code className="bg-muted rounded px-2 py-1 text-sm break-all">
-              {data.accessKey.key}
-            </code>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={() => handleCopy(data.accessKey!.key)}
-            >
-              {copied ? (
-                <Check className="h-3.5 w-3.5" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
+          <>
+            <div className="flex items-center gap-2">
+              <code className="bg-muted rounded px-2 py-1 text-sm break-all">
+                {data.accessKey.key}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => handleCopy(data.accessKey!.key)}
+              >
+                {copied ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+
+            {data.linkedPubkeys.length > 0 && (
+              <div className="mt-4">
+                <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
+                  <Users className="h-3 w-3" />
+                  Linked Accounts ({data.linkedPubkeys.length})
+                </div>
+                <ul className="space-y-1">
+                  {data.linkedPubkeys.map((lp) => (
+                    <li
+                      key={lp.pubkey}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <code className="text-muted-foreground text-xs">
+                        {lp.pubkey.slice(0, 12)}...{lp.pubkey.slice(-8)}
+                      </code>
+                      <span className="text-muted-foreground text-xs">
+                        {new Date(lp.lastSeen * 1000).toLocaleDateString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-muted-foreground text-sm">
             No access key assigned. Contact an administrator.
