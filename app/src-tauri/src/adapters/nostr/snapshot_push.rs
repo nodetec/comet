@@ -39,7 +39,7 @@ pub async fn push_note_snapshot(
 }
 
 fn load_access_key(app: &AppHandle) -> Option<String> {
-    let conn = crate::db::database_connection(app).ok()?;
+    let conn = crate::db::app_database_connection(app).ok()?;
     crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn)
 }
 

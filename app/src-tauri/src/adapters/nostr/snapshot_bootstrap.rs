@@ -39,8 +39,11 @@ pub async fn bootstrap_relay_connection(
     let conn = database_connection(app)?;
     let (keys, _) = crate::adapters::tauri::key_store::keys_for_current_identity(app, &conn)?;
     let db_path = active_account(app)?.db_path;
-    let access_key = crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn);
     drop(conn);
+
+    let access_key = crate::db::app_database_connection(app)
+        .ok()
+        .and_then(|c| crate::adapters::sqlite::sync_settings_repository::get_access_key(&c));
 
     bootstrap_with_keys_and_changes(
         &db_path,

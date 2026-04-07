@@ -1,7 +1,8 @@
 use rusqlite_migration::{Migrations, M};
 
 pub fn app_migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(
+    Migrations::new(vec![
+        M::up(
         "CREATE TABLE IF NOT EXISTS accounts (
            public_key TEXT PRIMARY KEY,
            npub       TEXT NOT NULL UNIQUE,
@@ -26,7 +27,14 @@ pub fn app_migrations() -> Migrations<'static> {
            updated_at         INTEGER NOT NULL,
            PRIMARY KEY (principal, account_public_key)
          );",
-    )])
+        ),
+        M::up(
+            "CREATE TABLE IF NOT EXISTS app_settings (
+               key TEXT PRIMARY KEY,
+               value TEXT NOT NULL
+             );",
+        ),
+    ])
 }
 
 pub fn account_migrations() -> Migrations<'static> {

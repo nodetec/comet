@@ -1,4 +1,4 @@
-use crate::db::database_connection;
+use crate::db::{app_database_connection, database_connection};
 use crate::domain::relay::service::normalize_relay_url;
 use crate::error::AppError;
 use rusqlite::OptionalExtension;
@@ -385,13 +385,13 @@ pub async fn unlock_sync(app: AppHandle) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn get_access_key(app: AppHandle) -> Result<Option<String>, AppError> {
-    let conn = database_connection(&app)?;
+    let conn = app_database_connection(&app)?;
     Ok(crate::adapters::sqlite::sync_settings_repository::get_access_key(&conn))
 }
 
 #[tauri::command]
 pub fn set_access_key(app: AppHandle, key: String) -> Result<(), AppError> {
-    let conn = database_connection(&app)?;
+    let conn = app_database_connection(&app)?;
     crate::adapters::sqlite::sync_settings_repository::save_access_key(&conn, &key)?;
     restart_sync_async(&app);
     Ok(())
@@ -399,7 +399,7 @@ pub fn set_access_key(app: AppHandle, key: String) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn clear_access_key(app: AppHandle) -> Result<(), AppError> {
-    let conn = database_connection(&app)?;
+    let conn = app_database_connection(&app)?;
     crate::adapters::sqlite::sync_settings_repository::clear_access_key(&conn);
     restart_sync_async(&app);
     Ok(())
