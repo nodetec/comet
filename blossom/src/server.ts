@@ -264,7 +264,7 @@ async function storeBlobForPubkey(
 
 async function truncateAll(db: DB): Promise<void> {
   await db.execute(
-    rawSql`TRUNCATE blob_owners, blobs, relay_allowed_users, invite_codes CASCADE`,
+    rawSql`TRUNCATE blob_owners, blobs, access_keys, invite_codes CASCADE`,
   );
 }
 
