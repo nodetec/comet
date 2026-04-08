@@ -1,4 +1,4 @@
-import { EditorSelection, RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   type DecorationSet,
@@ -211,10 +211,54 @@ function buildDecorations(
 
 export function markdownDecorationsPlugin(searchQuery = "") {
   const plugin = ViewPlugin.fromClass(
+    // ------------------------------------------------------------------
+    // Decoration rebuild scheduling
+    // ------------------------------------------------------------------
+    //
+    // Markdown decorations hide syntax characters (heading `# ` prefixes,
+    // wikilink `[[`/`]]` brackets, etc.) when the cursor is not on their
+    // line, and reveal them when the cursor moves there. This reveal/hide
+    // toggle is driven by decoration rebuilds in the plugin's update()
+    // method.
+    //
+    // Two problems arise from naive rebuilds:
+    //
+    // 1. **Accidental selection on click (mouseDown deferral)**
+    //    When the user clicks on a line with hidden syntax, CM places the
+    //    cursor based on the current (hidden) layout. A decoration rebuild
+    //    then reveals the syntax, shifting the text. CM's mouse tracking
+    //    sees the shifted layout on mouseup and creates a small selection
+    //    instead of a cursor. Fix: freeze all decoration rebuilds while
+    //    the mouse button is down. The deferred rebuild runs on mouseup
+    //    via queueMicrotask → dispatch, which triggers update() where CM
+    //    properly picks up the new decorations.
+    //
+    // 2. **Jarring un-reveal on note switch (focus-loss deferral)**
+    //    When the user clicks a note in the sidebar, the editor blurs
+    //    before the new note content loads. An immediate focus-loss
+    //    rebuild would hide all reveals (the cursor-line reveals become
+    //    empty when unfocused), causing a visible flash before the note
+    //    content swaps. Fix: defer the focus-loss rebuild by 100ms. If a
+    //    docChanged update arrives first (the new note loaded), the
+    //    pending rebuild is cancelled. If no content change comes (the
+    //    user just clicked away), the deferred rebuild fires and hides
+    //    the reveals normally.
+    //
+    // State flags:
+    //   mouseDown              — true between mousedown and mouseup
+    //   pendingSelectionRebuild — a selection or focus-gain rebuild was
+    //                             deferred during a mouse gesture
+    //   pendingFocusLossRebuild — a focus-loss rebuild is waiting for
+    //                             either a docChanged (cancel) or the
+    //                             100ms timeout (execute)
+    // ------------------------------------------------------------------
     class {
       atomicRanges: DecorationSet;
       decorations: DecorationSet;
       searchMatches: SearchMatch[];
+      mouseDown = false;
+      pendingSelectionRebuild = false;
+      pendingFocusLossRebuild = false;
 
       constructor(view: EditorView) {
         this.searchMatches = collectSearchMatches(
@@ -229,42 +273,95 @@ export function markdownDecorationsPlugin(searchQuery = "") {
         this.decorations = decorations;
       }
 
-      update(update: ViewUpdate) {
-        const reasons = [];
-        if (update.docChanged) reasons.push("docChanged");
+      handleMouseDownUpdate(update: ViewUpdate) {
+        if (update.docChanged) {
+          this.rebuildFromUpdate(update);
+        }
+        if (
+          (update.selectionSet &&
+            selectionAffectsDecorations(update.startState, update.state)) ||
+          (update.focusChanged && update.view.hasFocus)
+        ) {
+          this.pendingSelectionRebuild = true;
+        }
+      }
+
+      collectRebuildReasons(update: ViewUpdate): string[] {
+        const reasons: string[] = [];
+
+        if (this.pendingSelectionRebuild) {
+          this.pendingSelectionRebuild = false;
+          reasons.push("deferredSelectionSet");
+        }
+
+        if (this.pendingFocusLossRebuild && !update.focusChanged) {
+          this.pendingFocusLossRebuild = false;
+          if (!update.docChanged) {
+            reasons.push("deferredFocusLoss");
+          }
+        }
+
+        if (update.docChanged) {
+          this.pendingFocusLossRebuild = false;
+          reasons.push("docChanged");
+        }
         if (
           update.selectionSet &&
           selectionAffectsDecorations(update.startState, update.state)
         ) {
           reasons.push("selectionSet");
         }
-        if (update.focusChanged) reasons.push("focusChanged");
+        if (update.focusChanged) {
+          if (update.view.hasFocus) {
+            reasons.push("focusChanged");
+          } else {
+            this.pendingFocusLossRebuild = true;
+            setTimeout(() => {
+              if (this.pendingFocusLossRebuild) {
+                update.view.dispatch({});
+              }
+            }, 100);
+          }
+        }
         if (update.viewportChanged) reasons.push("viewportChanged");
         if (syntaxTree(update.state) !== syntaxTree(update.startState)) {
           reasons.push("syntaxTreeChanged");
         }
 
-        if (reasons.length > 0) {
-          if (update.docChanged) {
-            this.searchMatches = collectSearchMatches(
-              update.state.doc.toString(),
-              searchQuery,
-            );
-          }
+        return reasons;
+      }
 
-          if (isEditorDebugEnabled()) {
-            logEditorDebug("markdown-decorations", "plugin update", {
-              reasons,
-              visibleRanges: summarizeRanges(update.view.visibleRanges),
-              viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
-            });
-          }
-          const { atomicRanges, decorations } = buildDecorations(
-            update.view,
-            this.searchMatches,
+      rebuildFromUpdate(update: ViewUpdate) {
+        if (update.docChanged) {
+          this.searchMatches = collectSearchMatches(
+            update.state.doc.toString(),
+            searchQuery,
           );
-          this.atomicRanges = atomicRanges;
-          this.decorations = decorations;
+        }
+
+        if (isEditorDebugEnabled()) {
+          logEditorDebug("markdown-decorations", "plugin update", {
+            visibleRanges: summarizeRanges(update.view.visibleRanges),
+            viewport: `${update.view.viewport.from}-${update.view.viewport.to}`,
+          });
+        }
+        const { atomicRanges, decorations } = buildDecorations(
+          update.view,
+          this.searchMatches,
+        );
+        this.atomicRanges = atomicRanges;
+        this.decorations = decorations;
+      }
+
+      update(update: ViewUpdate) {
+        if (this.mouseDown) {
+          this.handleMouseDownUpdate(update);
+          return;
+        }
+
+        const reasons = this.collectRebuildReasons(update);
+        if (reasons.length > 0) {
+          this.rebuildFromUpdate(update);
         }
       }
     },
@@ -274,35 +371,21 @@ export function markdownDecorationsPlugin(searchQuery = "") {
         EditorView.atomicRanges.of(
           (view) => view.plugin(p)?.atomicRanges ?? Decoration.none,
         ),
+      eventHandlers: {
+        mousedown(_, view) {
+          this.mouseDown = true;
+          const onMouseUp = () => {
+            document.removeEventListener("mouseup", onMouseUp);
+            this.mouseDown = false;
+            if (this.pendingSelectionRebuild) {
+              queueMicrotask(() => view.dispatch({}));
+            }
+          };
+          document.addEventListener("mouseup", onMouseUp);
+        },
+      },
     },
   );
 
-  // Collapse accidental small selections caused by decoration layout
-  // shifts. When the cursor moves to a line with hidden syntax (e.g.
-  // heading `# ` prefix), the decorations rebuild to reveal it, shifting
-  // text. If this happens between mousedown and mouseup, CM creates a
-  // small selection instead of a cursor. Detect and collapse these.
-  const collapseAccidentalSelection = EditorView.updateListener.of((update) => {
-    if (!update.selectionSet || update.docChanged) return;
-
-    const { state } = update;
-    const selection = state.selection.main;
-    if (selection.empty) return;
-
-    // Only fix very small selections (up to heading level 6 = "######")
-    const span = Math.abs(selection.head - selection.anchor);
-    if (span > 6) return;
-
-    // Only fix when the cursor just moved to a new line
-    const line = state.doc.lineAt(selection.head);
-    const prevCursorLines = getCursorLineRanges(update.startState);
-    if (overlapsAny(line.from, line.to, prevCursorLines)) return;
-
-    update.view.dispatch({
-      selection: EditorSelection.cursor(selection.head),
-      scrollIntoView: false,
-    });
-  });
-
-  return [plugin, collapseAccidentalSelection];
+  return plugin;
 }
