@@ -254,6 +254,9 @@ export function dropImage() {
         }
 
         this.lastDropPos = pos;
+        if (!this.view.hasFocus) {
+          this.view.focus();
+        }
         this.view.dom.classList.add(DRAG_OVER_CLASS);
         this.view.dispatch({
           scrollIntoView: false,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { EditorSelection } from "@codemirror/state";
-import type { EditorView } from "@codemirror/view";
+import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -33,7 +33,10 @@ vi.mock("@/shared/lib/attachments", () => ({
   unresolveImageSrc: unresolveImageSrcMock,
 }));
 
-import { getDropPositionFromWebviewPoint } from "@/features/editor/extensions/drop-image";
+import {
+  dropImage,
+  getDropPositionFromWebviewPoint,
+} from "@/features/editor/extensions/drop-image";
 
 function setRect(element: HTMLElement, rect: DOMRectInit) {
   Object.defineProperty(element, "getBoundingClientRect", {
@@ -172,5 +175,71 @@ describe("drop image positioning", () => {
 
     expect(pos).toBeNull();
     expect(getContentSelectionHeadFromPointMock).not.toHaveBeenCalled();
+  });
+
+  it("focuses the editor on the first native image drag so the drop cursor can render", async () => {
+    let dragDropHandler:
+      | ((event: {
+          payload: {
+            paths: string[];
+            position: { x: number; y: number };
+            type: string;
+          };
+        }) => void)
+      | null = null;
+
+    getCurrentWebviewMock.mockReturnValue({
+      onDragDropEvent: vi.fn((handler) => {
+        dragDropHandler = handler;
+        return Promise.resolve(() => {});
+      }),
+    });
+
+    const parent = document.createElement("div");
+    document.body.append(parent);
+
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: "hello",
+        extensions: [dropImage()],
+      }),
+    });
+
+    const contentLine = view.contentDOM.querySelector(".cm-line");
+    const textNode = contentLine?.firstChild;
+    if (!textNode) {
+      throw new Error("Expected CodeMirror to render a text node");
+    }
+
+    setRect(view.dom, { x: 0, y: 0, width: 320, height: 200 });
+    Object.defineProperty(document, "caretRangeFromPoint", {
+      configurable: true,
+      value: vi.fn(() => ({
+        startContainer: textNode,
+        startOffset: 2,
+      })),
+    });
+
+    const focusSpy = vi.spyOn(view, "focus");
+
+    if (!dragDropHandler) {
+      throw new Error("Expected dropImage to register a drag handler");
+    }
+
+    dragDropHandler({
+      payload: {
+        type: "enter",
+        paths: ["/images/example.png"],
+        position: { x: 120, y: 80 },
+      },
+    });
+
+    await Promise.resolve();
+
+    expect(focusSpy).toHaveBeenCalledOnce();
+    expect(view.state.selection.main.head).toBe(2);
+
+    view.destroy();
   });
 });
