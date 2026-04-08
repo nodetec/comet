@@ -642,7 +642,6 @@ export function EditorPane({
     );
   };
 
-
   const handleEditorSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (isReadOnly) {
       return;
