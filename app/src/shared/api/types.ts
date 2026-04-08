@@ -119,6 +119,8 @@ export type SecretStorageStatus = {
   storage: "database" | "keychain";
 };
 
+export type BlobFetchStatus = "downloaded" | "missing" | "needsUnlock";
+
 export type AppStatus = {
   version: string;
   appDatabasePath: string;

@@ -924,10 +924,7 @@ mod tests {
             strip_markdown_syntax("See [[Project Alpha]] for details"),
             "See Project Alpha for details"
         );
-        assert_eq!(
-            strip_markdown_syntax("[[A]] and [[B]]"),
-            "A and B"
-        );
+        assert_eq!(strip_markdown_syntax("[[A]] and [[B]]"), "A and B");
     }
 
     #[test]
@@ -1229,12 +1226,7 @@ mod tests {
 
     #[test]
     fn rewrite_wikilink_titles_in_markdown_ignores_code_contexts() {
-        let markdown = [
-            "Use `[[Roadmap Q2]]` inline.",
-            "",
-            "[[Roadmap Q2]]",
-        ]
-        .join("\n");
+        let markdown = ["Use `[[Roadmap Q2]]` inline.", "", "[[Roadmap Q2]]"].join("\n");
         let rewritten = rewrite_wikilink_titles_with_locations(
             &markdown,
             &[WikiLinkTitleRewrite {

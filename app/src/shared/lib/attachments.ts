@@ -4,6 +4,7 @@ export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 type ImportedAttachment = { uri: string; hash: string };
 
 const ATTACHMENT_PREFIX = "attachment://";
+const ATTACHMENT_HASH_RE = /^attachment:\/\/([a-f0-9]{64})\.[^/?#]+$/;
 
 export function isAttachmentUri(src: string): boolean {
   return src.startsWith(ATTACHMENT_PREFIX);
@@ -11,6 +12,10 @@ export function isAttachmentUri(src: string): boolean {
 
 export function hasAttachmentReferences(markdown: string): boolean {
   return markdown.includes(ATTACHMENT_PREFIX);
+}
+
+export function extractAttachmentHash(src: string): string | null {
+  return ATTACHMENT_HASH_RE.exec(src)?.[1] ?? null;
 }
 
 let cachedBasePath: string | null = null;

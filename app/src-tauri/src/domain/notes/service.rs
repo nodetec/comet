@@ -87,33 +87,32 @@ fn project_wikilink_rewrites_onto_markdown(
     let previous_occurrences = extract_wikilink_occurrences(previous_markdown);
     let next_occurrences = extract_wikilink_occurrences(next_markdown);
 
-    let previous_by_title =
-        previous_occurrences
-            .iter()
-            .fold(BTreeMap::<String, Vec<_>>::new(), |mut groups, occurrence| {
-                groups
-                    .entry(occurrence.normalized_title.clone())
-                    .or_default()
-                    .push(occurrence);
-                groups
-            });
-    let next_by_title =
-        next_occurrences
-            .iter()
-            .fold(BTreeMap::<String, Vec<_>>::new(), |mut groups, occurrence| {
-                groups
-                    .entry(occurrence.normalized_title.clone())
-                    .or_default()
-                    .push(occurrence);
-                groups
-            });
+    let previous_by_title = previous_occurrences.iter().fold(
+        BTreeMap::<String, Vec<_>>::new(),
+        |mut groups, occurrence| {
+            groups
+                .entry(occurrence.normalized_title.clone())
+                .or_default()
+                .push(occurrence);
+            groups
+        },
+    );
+    let next_by_title = next_occurrences.iter().fold(
+        BTreeMap::<String, Vec<_>>::new(),
+        |mut groups, occurrence| {
+            groups
+                .entry(occurrence.normalized_title.clone())
+                .or_default()
+                .push(occurrence);
+            groups
+        },
+    );
 
     rewrites
         .iter()
         .filter_map(|rewrite| {
-            let normalized_title = crate::domain::common::text::normalize_wikilink_title(
-                &rewrite.current_title,
-            )?;
+            let normalized_title =
+                crate::domain::common::text::normalize_wikilink_title(&rewrite.current_title)?;
             let previous_group = previous_by_title.get(&normalized_title)?;
             let next_group = next_by_title.get(&normalized_title)?;
             let previous_index = previous_group.iter().position(|occurrence| {
@@ -440,11 +439,7 @@ impl NoteService {
                     &projected_self_rewrites
                         .iter()
                         .map(|(old_location, rewrite)| {
-                            (
-                                *old_location,
-                                rewrite.location,
-                                rewrite.new_title.clone(),
-                            )
+                            (*old_location, rewrite.location, rewrite.new_title.clone())
                         })
                         .collect::<Vec<_>>(),
                 );
@@ -1606,16 +1601,18 @@ mod tests {
             published_at: None,
             published_kind: None,
         };
-        let repo = MockNoteRepository::new().with_note(note).with_wikilink_resolutions(
-            "self",
-            vec![WikiLinkResolutionInput {
-                occurrence_id: Some("SELF1".to_string()),
-                is_explicit: true,
-                location: 13,
-                target_note_id: "self".to_string(),
-                title: "Alpha".to_string(),
-            }],
-        );
+        let repo = MockNoteRepository::new()
+            .with_note(note)
+            .with_wikilink_resolutions(
+                "self",
+                vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("SELF1".to_string()),
+                    is_explicit: true,
+                    location: 13,
+                    target_note_id: "self".to_string(),
+                    title: "Alpha".to_string(),
+                }],
+            );
 
         let (saved, changed, affected_note_ids) = NoteService::save_note(
             &repo,

@@ -364,13 +364,14 @@ async fn maybe_upload_note_attachments_batch(
         };
 
         if let Some((ciphertext_hash, _)) = existing {
-            let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
-            let exists = http_client
-                .head(&head_url)
-                .send()
-                .await
-                .map(|response| response.status().is_success())
-                .unwrap_or(false);
+            let exists = crate::adapters::blossom::client::blob_exists(
+                &http_client,
+                &blossom_url,
+                &ciphertext_hash,
+                keys,
+            )
+            .await
+            .unwrap_or(false);
 
             if exists {
                 reused += 1;
@@ -386,9 +387,14 @@ async fn maybe_upload_note_attachments_batch(
 
         let Some((blob_data, _)) = crate::adapters::filesystem::attachments::read_blob(app, hash)?
         else {
+            let attachments_dir =
+                crate::adapters::filesystem::attachments::get_attachments_dir(app)
+                    .unwrap_or_else(|_| "<unavailable>".to_string());
             failed_hash_errors.insert(
                 hash.clone(),
-                format!("Local attachment missing for snapshot sync: {hash}"),
+                format!(
+                    "Local attachment missing for snapshot sync: {hash} (attachments_dir={attachments_dir})"
+                ),
             );
             continue;
         };

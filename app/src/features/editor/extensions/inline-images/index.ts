@@ -16,10 +16,15 @@ import {
 } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 
+import { fetchBlob } from "@/shared/api/invoke";
+import type { BlobFetchStatus } from "@/shared/api/types";
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
 import type { SearchMatch } from "@/shared/lib/search";
 import { collectSearchMatches } from "@/shared/lib/search";
-import { resolveImageSrc } from "@/shared/lib/attachments";
+import {
+  extractAttachmentHash,
+  resolveImageSrc,
+} from "@/shared/lib/attachments";
 
 const VISIBLE_RANGE_MARGIN = 1000;
 
@@ -34,6 +39,21 @@ const INLINE_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
 const YOUTUBE_URL_RE =
   /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+
+const inflightBlobFetches = new Map<string, Promise<BlobFetchStatus>>();
+
+function fetchBlobOnce(hash: string) {
+  const existing = inflightBlobFetches.get(hash);
+  if (existing) {
+    return existing;
+  }
+
+  const request = fetchBlob(hash).finally(() => {
+    inflightBlobFetches.delete(hash);
+  });
+  inflightBlobFetches.set(hash, request);
+  return request;
+}
 
 function isInsideCodeBlock(
   tree: ReturnType<typeof syntaxTree>,
@@ -84,9 +104,45 @@ class InlineImageWidget extends WidgetType {
     image.className = "cm-inline-image-element";
     image.alt = this.altText;
     image.draggable = false;
-    image.src = resolveImageSrc(this.src);
+    const attachmentHash = extractAttachmentHash(this.src);
+    let blobReady = !attachmentHash;
+    let imageLoaded = false;
+    const setImageSrc = () => {
+      image.src = resolveImageSrc(this.src);
+    };
+
+    const loadImage = async () => {
+      if (!attachmentHash) {
+        setImageSrc();
+        return;
+      }
+
+      try {
+        const status = await fetchBlobOnce(attachmentHash);
+        if (status !== "downloaded") {
+          wrapper.style.display = "none";
+          return;
+        }
+
+        blobReady = true;
+        if (!imageLoaded) {
+          setImageSrc();
+        }
+      } catch {
+        wrapper.style.display = "none";
+      }
+    };
+
     image.addEventListener("error", () => {
+      if (!blobReady) {
+        return;
+      }
+
       wrapper.style.display = "none";
+    });
+    image.addEventListener("load", () => {
+      imageLoaded = true;
+      wrapper.style.removeProperty("display");
     });
     image.addEventListener("mousedown", (event) => {
       if (event.button !== 0) {
@@ -107,6 +163,7 @@ class InlineImageWidget extends WidgetType {
     });
 
     wrapper.append(image);
+    void loadImage();
     return wrapper;
   }
 }

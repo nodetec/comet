@@ -350,8 +350,7 @@ pub fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<SaveNoteRespons
     let note_id = input.id.clone();
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
-    let (record, content_changed, affected_linked_note_ids) =
-        NoteService::save_note(&repo, input)?;
+    let (record, content_changed, affected_linked_note_ids) = NoteService::save_note(&repo, input)?;
     let note = record_to_loaded_note(record, &repo)?;
     if content_changed {
         sync_push(&app, SyncCommand::PushNote(note_id));
