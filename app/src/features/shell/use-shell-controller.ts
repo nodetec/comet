@@ -599,7 +599,7 @@ export function useShellController() {
         return;
       }
 
-      setFocusedPane("editor");
+      setFocusedPane("notes");
       latestRef.current.handleSelectNote(noteId);
     };
 
