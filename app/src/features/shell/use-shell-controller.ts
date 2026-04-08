@@ -45,27 +45,10 @@ import {
   FOCUS_NOTE_EVENT,
   type FocusNoteDetail,
 } from "@/shared/lib/note-navigation";
+import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
-}
-
-function haveSameWikilinkResolutions(
-  left: LoadedNote["wikilinkResolutions"],
-  right: LoadedNote["wikilinkResolutions"],
-) {
-  return (
-    left.length === right.length &&
-    left.every((resolution, index) => {
-      const candidate = right[index];
-      return (
-        candidate?.occurrenceId === resolution.occurrenceId &&
-        candidate?.location === resolution.location &&
-        candidate?.targetNoteId === resolution.targetNoteId &&
-        candidate?.title === resolution.title
-      );
-    })
-  );
 }
 
 export function useShellController() {

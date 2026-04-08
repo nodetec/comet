@@ -10,6 +10,7 @@ import {
   type LoadedNote,
   type WikiLinkResolutionInput,
 } from "@/shared/api/types";
+import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 type PendingDraftPayload = {
   noteId: string;
@@ -34,24 +35,6 @@ export interface DraftPersistenceDeps {
   }) => void;
   pendingSaveTimeoutRef: RefObject<number | null>;
   queryClient: QueryClient;
-}
-
-function haveSameWikilinkResolutions(
-  left: WikiLinkResolutionInput[],
-  right: WikiLinkResolutionInput[],
-) {
-  return (
-    left.length === right.length &&
-    left.every((resolution, index) => {
-      const candidate = right[index];
-      return (
-        candidate?.occurrenceId === resolution.occurrenceId &&
-        candidate?.location === resolution.location &&
-        candidate?.targetNoteId === resolution.targetNoteId &&
-        candidate?.title === resolution.title
-      );
-    })
-  );
 }
 
 export function useDraftPersistence(deps: DraftPersistenceDeps) {

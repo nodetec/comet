@@ -25,6 +25,7 @@ import {
 } from "@/shared/api/types";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
+import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export interface NoteMutationDeps {
   queryClient: QueryClient;
@@ -56,30 +57,6 @@ type CreateNoteMutationInput = {
   markdown?: string;
   autoFocusEditor?: boolean;
 };
-
-function haveSameWikilinkResolutions(
-  left: WikiLinkResolutionInput[],
-  right: WikiLinkResolutionInput[],
-) {
-  if (left.length !== right.length) return false;
-  const sortByLocation = (
-    a: WikiLinkResolutionInput,
-    b: WikiLinkResolutionInput,
-  ) => a.location - b.location;
-  // eslint-disable-next-line unicorn/no-array-sort -- app runtime compatibility still excludes toSorted here
-  const sortedLeft = [...left].sort(sortByLocation);
-  // eslint-disable-next-line unicorn/no-array-sort -- app runtime compatibility still excludes toSorted here
-  const sortedRight = [...right].sort(sortByLocation);
-  return sortedLeft.every((resolution, index) => {
-    const candidate = sortedRight[index];
-    return (
-      candidate?.occurrenceId === resolution.occurrenceId &&
-      candidate?.location === resolution.location &&
-      candidate?.targetNoteId === resolution.targetNoteId &&
-      candidate?.title === resolution.title
-    );
-  });
-}
 
 export function useNoteMutations(deps: NoteMutationDeps) {
   const {
