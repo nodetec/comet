@@ -45,6 +45,16 @@ const NOTE_COMPLETION_ICON_SVG = renderToStaticMarkup(
     strokeWidth: 1.75,
   }),
 );
+const MAX_WIKILINK_COMPLETION_TITLE_LENGTH = 20;
+
+function truncateWikiLinkCompletionTitle(title: string): string {
+  const characters = [...title];
+  if (characters.length <= MAX_WIKILINK_COMPLETION_TITLE_LENGTH) {
+    return title;
+  }
+
+  return `${characters.slice(0, MAX_WIKILINK_COMPLETION_TITLE_LENGTH - 1).join("")}\u2026`;
+}
 
 function getAutocompleteList(view: EditorView): HTMLUListElement | null {
   return view.dom.ownerDocument.querySelector<HTMLUListElement>(
@@ -198,6 +208,7 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
       .map(
         (result) =>
           ({
+            displayLabel: truncateWikiLinkCompletionTitle(result.title),
             label: result.title,
             type: "wikilink",
             apply(view, _completion, from, to) {
