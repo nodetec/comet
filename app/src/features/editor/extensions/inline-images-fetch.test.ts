@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe("inline image blob fetching", () => {
-  it("downloads a missing attachment image on first load failure", async () => {
+  it("downloads a missing attachment image before assigning a local src", async () => {
     const hash = "a".repeat(64);
     fetchBlobMock.mockResolvedValue("downloaded");
 
@@ -61,12 +61,9 @@ describe("inline image blob fetching", () => {
     expect(image).toBeInstanceOf(HTMLImageElement);
     expect(wrapper).toBeInstanceOf(HTMLSpanElement);
 
-    image?.dispatchEvent(new Event("error"));
-    await flush();
-
     expect(fetchBlobMock).toHaveBeenCalledWith(hash);
     expect(image?.getAttribute("src")).toContain("asset://");
-    expect(image?.getAttribute("src")).toContain("?blob=");
+    image?.dispatchEvent(new Event("load"));
     expect((wrapper as HTMLElement | null)?.style.display ?? "").toBe("");
 
     view.destroy();
@@ -79,10 +76,8 @@ describe("inline image blob fetching", () => {
     const { view } = createView(`![Cover](attachment://${hash}.png)`);
     await flush();
 
-    const image = view.dom.querySelector(".cm-inline-image-element");
     const wrapper = view.dom.querySelector(".cm-inline-image");
 
-    image?.dispatchEvent(new Event("error"));
     await flush();
 
     expect(fetchBlobMock).toHaveBeenCalledWith(hash);
