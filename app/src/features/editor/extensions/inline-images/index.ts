@@ -147,7 +147,7 @@ class InlineYouTubeWidget extends WidgetType {
 
     const iframe = document.createElement("iframe");
     iframe.className = "cm-inline-youtube-element";
-    iframe.src = `https://www.youtube.com/embed/${this.videoId}`;
+    iframe.src = `https://www.youtube-nocookie.com/embed/${this.videoId}`;
     iframe.allow =
       "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
     iframe.allowFullscreen = true;
