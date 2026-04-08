@@ -259,6 +259,75 @@ pub async fn upload_blobs_batch(
     Ok(results)
 }
 
+pub async fn blob_exists(
+    client: &reqwest::Client,
+    blossom_url: &str,
+    ciphertext_hash: &str,
+    keys: &Keys,
+) -> Result<bool, AppError> {
+    blossom_log(&format!(
+        "exists check start ciphertext_hash={} url={}",
+        short_hash(ciphertext_hash),
+        blossom_url
+    ));
+
+    let auth_header = sign_blossom_auth(keys, "get", ciphertext_hash, blossom_url)?;
+    let url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
+    let request_client = reqwest::Client::builder()
+        .redirect(Policy::none())
+        .build()
+        .map_err(|e| AppError::custom(format!("Failed to prepare Blossom client: {e}")))?;
+
+    let resp = request_client
+        .get(&url)
+        .header("Authorization", auth_header)
+        .send()
+        .await
+        .map_err(|e| AppError::custom(format!("Blossom exists check failed: {e}")))?;
+
+    if resp.status().is_success() {
+        blossom_log(&format!(
+            "exists check direct ok ciphertext_hash={} status={}",
+            short_hash(ciphertext_hash),
+            resp.status()
+        ));
+        return Ok(true);
+    }
+
+    if !resp.status().is_redirection() {
+        blossom_log(&format!(
+            "exists check direct miss ciphertext_hash={} status={}",
+            short_hash(ciphertext_hash),
+            resp.status()
+        ));
+        return Ok(false);
+    }
+
+    let location = resp
+        .headers()
+        .get(LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| AppError::custom("Blossom exists redirect missing location."))?;
+    let redirect_url = Url::parse(location)
+        .or_else(|_| Url::parse(&url).and_then(|base| base.join(location)))
+        .map_err(|e| AppError::custom(format!("Invalid Blossom redirect URL: {e}")))?;
+
+    let redirect_resp = client
+        .head(redirect_url.clone())
+        .send()
+        .await
+        .map_err(|e| AppError::custom(format!("Blossom exists redirect check failed: {e}")))?;
+
+    blossom_log(&format!(
+        "exists check redirect ciphertext_hash={} location={} status={}",
+        short_hash(ciphertext_hash),
+        redirect_url,
+        redirect_resp.status()
+    ));
+
+    Ok(redirect_resp.status().is_success())
+}
+
 /// Delete a stored Blossom object by its server object hash.
 ///
 /// For Comet's current encrypted attachment flow, this is the ciphertext hash.

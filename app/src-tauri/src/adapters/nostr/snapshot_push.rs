@@ -364,13 +364,14 @@ async fn maybe_upload_note_attachments_batch(
         };
 
         if let Some((ciphertext_hash, _)) = existing {
-            let head_url = format!("{}/{}", blossom_url.trim_end_matches('/'), ciphertext_hash);
-            let exists = http_client
-                .head(&head_url)
-                .send()
-                .await
-                .map(|response| response.status().is_success())
-                .unwrap_or(false);
+            let exists = crate::adapters::blossom::client::blob_exists(
+                &http_client,
+                &blossom_url,
+                &ciphertext_hash,
+                keys,
+            )
+            .await
+            .unwrap_or(false);
 
             if exists {
                 reused += 1;
