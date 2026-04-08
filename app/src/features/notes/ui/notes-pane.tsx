@@ -819,7 +819,10 @@ export function NotesPane({
                       key={note.id}
                       note={note}
                       onContextMenu={handleNoteContextMenu}
-                      onSelectNote={onSelectNote}
+                      onSelectNote={(noteId) => {
+                        setIsSearchFocused(false);
+                        onSelectNote(noteId);
+                      }}
                       searchWords={searchWords}
                       selectedNoteId={selectedNoteId}
                       setSlideInNoteId={setSlideInNoteId}
