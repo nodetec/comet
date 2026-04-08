@@ -1,4 +1,4 @@
-import { RangeSetBuilder } from "@codemirror/state";
+import { EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   type DecorationSet,
@@ -210,7 +210,7 @@ function buildDecorations(
 }
 
 export function markdownDecorationsPlugin(searchQuery = "") {
-  return ViewPlugin.fromClass(
+  const plugin = ViewPlugin.fromClass(
     class {
       atomicRanges: DecorationSet;
       decorations: DecorationSet;
@@ -270,10 +270,39 @@ export function markdownDecorationsPlugin(searchQuery = "") {
     },
     {
       decorations: (v) => v.decorations,
-      provide: (plugin) =>
+      provide: (p) =>
         EditorView.atomicRanges.of(
-          (view) => view.plugin(plugin)?.atomicRanges ?? Decoration.none,
+          (view) => view.plugin(p)?.atomicRanges ?? Decoration.none,
         ),
     },
   );
+
+  // Collapse accidental small selections caused by decoration layout
+  // shifts. When the cursor moves to a line with hidden syntax (e.g.
+  // heading `# ` prefix), the decorations rebuild to reveal it, shifting
+  // text. If this happens between mousedown and mouseup, CM creates a
+  // small selection instead of a cursor. Detect and collapse these.
+  const collapseAccidentalSelection = EditorView.updateListener.of((update) => {
+    if (!update.selectionSet || update.docChanged) return;
+
+    const { state } = update;
+    const selection = state.selection.main;
+    if (selection.empty) return;
+
+    // Only fix very small selections (up to heading level 6 = "######")
+    const span = Math.abs(selection.head - selection.anchor);
+    if (span > 6) return;
+
+    // Only fix when the cursor just moved to a new line
+    const line = state.doc.lineAt(selection.head);
+    const prevCursorLines = getCursorLineRanges(update.startState);
+    if (overlapsAny(line.from, line.to, prevCursorLines)) return;
+
+    update.view.dispatch({
+      selection: EditorSelection.cursor(selection.head),
+      scrollIntoView: false,
+    });
+  });
+
+  return [plugin, collapseAccidentalSelection];
 }

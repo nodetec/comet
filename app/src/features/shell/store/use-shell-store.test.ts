@@ -183,7 +183,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
     ]);
   });
 
-  it("drops duplicate-title wikilink resolutions when the occurrence count changes", () => {
+  it("preserves duplicate-title wikilink resolutions at stable locations when occurrence count changes", () => {
     useShellStore.setState({
       draftMarkdown: "[[Alpha]] [[Alpha]]",
       draftNoteId: "note-1",
@@ -203,7 +203,14 @@ describe("useShellStore wikilink resolution reconciliation", () => {
         preserveWikilinkResolutions: true,
       });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([]);
+    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+      {
+        occurrenceId: "B2",
+        location: 10,
+        targetNoteId: "target-b",
+        title: "Alpha",
+      },
+    ]);
   });
 
   it("preserves resolved wikilinks when only title casing changes", () => {
