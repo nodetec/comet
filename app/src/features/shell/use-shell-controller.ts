@@ -1702,7 +1702,6 @@ export function useShellController() {
       notesQuery.hasNextPage,
       notesQuery.isFetchingNextPage,
       searchQuery,
-      setFocusedPane,
       setNoteSortPrefs,
       setSearchQuery,
       sortViewKey,
