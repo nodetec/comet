@@ -295,9 +295,13 @@ export function getLineBoundaryCursor(
 
   const line = view.state.doc.lineAt(anchor.pos);
   if (side === "left") {
-    return EditorSelection.cursor(
-      line.from + getListMarkerStartOffset(line.text),
-      1,
+    const contentFrom = line.from + getListMarkerStartOffset(line.text);
+    return findVisualFragmentBoundary(
+      view,
+      contentFrom,
+      line.to,
+      targetY,
+      side,
     );
   }
 
