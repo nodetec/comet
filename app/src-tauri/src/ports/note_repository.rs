@@ -107,6 +107,7 @@ pub trait NoteRepository {
     // ── Queries ─────────────────────────────────────────────────────────
 
     fn query_note_page(&self, input: &NoteQueryInput) -> Result<NotePagePayload, NoteError>;
+    fn search_note_titles(&self, query: &str) -> Result<Vec<SearchResult>, NoteError>;
     fn search_notes(&self, query: &str) -> Result<Vec<SearchResult>, NoteError>;
     fn search_tags(&self, query: &str) -> Result<Vec<String>, NoteError>;
     fn backlinks_for_note(&self, note_id: &str) -> Result<Vec<NoteBacklink>, NoteError>;

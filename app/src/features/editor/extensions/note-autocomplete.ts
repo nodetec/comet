@@ -1,12 +1,17 @@
 import {
+  completionKeymap,
   completionStatus,
+  currentCompletions,
+  moveCompletionSelection,
+  selectedCompletionIndex,
   startCompletion,
   autocompletion,
   type Completion,
   type CompletionContext,
 } from "@codemirror/autocomplete";
 import { EditorState, type Extension } from "@codemirror/state";
-import { ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import { keymap } from "@codemirror/view";
+import { ViewPlugin, type EditorView, type ViewUpdate } from "@codemirror/view";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FileText, Hash } from "lucide-react";
@@ -21,7 +26,7 @@ import {
   utf8ByteOffsetForText,
 } from "@/features/editor/lib/wikilinks";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
-import { searchNotes } from "@/shared/api/invoke";
+import { searchNoteTitles } from "@/shared/api/invoke";
 
 const TAG_COMPLETION_TEXT_RE = /^[-/\p{L}\p{N}_]*$/u;
 
@@ -40,6 +45,41 @@ const NOTE_COMPLETION_ICON_SVG = renderToStaticMarkup(
     strokeWidth: 1.75,
   }),
 );
+
+function getAutocompleteList(view: EditorView): HTMLUListElement | null {
+  return view.dom.ownerDocument.querySelector<HTMLUListElement>(
+    ".cm-tooltip.cm-tooltip-autocomplete > ul",
+  );
+}
+
+function revealAutocompleteEdgePadding(
+  view: EditorView,
+  edge: "top" | "bottom",
+) {
+  requestAnimationFrame(() => {
+    const list = getAutocompleteList(view);
+    if (!list) {
+      return;
+    }
+
+    if (edge === "top") {
+      list.scrollTop = 0;
+      return;
+    }
+
+    const selectedItem = list.querySelector<HTMLElement>("li[aria-selected]");
+    const styles = view.dom.ownerDocument.defaultView?.getComputedStyle(list);
+    const paddingBottom = Number.parseFloat(styles?.paddingBottom ?? "0") || 0;
+    if (!selectedItem) {
+      list.scrollTop = list.scrollHeight;
+      return;
+    }
+
+    const targetBottom =
+      selectedItem.offsetTop + selectedItem.offsetHeight + paddingBottom;
+    list.scrollTop = Math.max(0, targetBottom - list.clientHeight);
+  });
+}
 
 function renderCompletionIcon(type: string | null | undefined) {
   const iconWrapper = document.createElement("span");
@@ -127,7 +167,7 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
 
     context.addEventListener("abort", () => {}, { onDocChange: true });
 
-    const results = await searchNotes(query).catch(() => []);
+    const results = await searchNoteTitles(query).catch(() => []);
     if (context.aborted) {
       return null;
     }
@@ -159,7 +199,6 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
         (result) =>
           ({
             label: result.title,
-            detail: result.preview || undefined,
             type: "wikilink",
             apply(view, _completion, from, to) {
               const location = utf8ByteOffsetForText(
@@ -299,13 +338,77 @@ export function noteAutocomplete(
           render: (completion) => renderCompletionIcon(completion.type),
         },
       ],
+      defaultKeymap: false,
       icons: false,
       override: [
         buildTagCompletionSource(normalizedTagPaths),
         buildWikiLinkCompletionSource(noteId),
       ],
-      selectOnOpen: false,
+      selectOnOpen: true,
     }),
+    keymap.of([
+      {
+        key: "ArrowUp",
+        run(view) {
+          if (completionStatus(view.state) !== "active") {
+            return false;
+          }
+
+          const options = currentCompletions(view.state);
+          const selectedIndex = selectedCompletionIndex(view.state);
+          if (options.length === 0) {
+            return false;
+          }
+
+          if (selectedIndex === null) {
+            return moveCompletionSelection(false)(view);
+          }
+
+          if (selectedIndex <= 0) {
+            revealAutocompleteEdgePadding(view, "top");
+            return true;
+          }
+
+          const moved = moveCompletionSelection(false)(view);
+          if (selectedIndex === 1) {
+            revealAutocompleteEdgePadding(view, "top");
+          }
+          return moved;
+        },
+      },
+      {
+        key: "ArrowDown",
+        run(view) {
+          if (completionStatus(view.state) !== "active") {
+            return false;
+          }
+
+          const options = currentCompletions(view.state);
+          const selectedIndex = selectedCompletionIndex(view.state);
+          if (options.length === 0) {
+            return false;
+          }
+
+          if (selectedIndex === null) {
+            return moveCompletionSelection(true)(view);
+          }
+
+          if (selectedIndex >= options.length - 1) {
+            revealAutocompleteEdgePadding(view, "bottom");
+            return true;
+          }
+
+          const moved = moveCompletionSelection(true)(view);
+          if (selectedIndex === options.length - 2) {
+            revealAutocompleteEdgePadding(view, "bottom");
+          }
+          return moved;
+        },
+      },
+      ...completionKeymap.filter(
+        (binding) => binding.key !== "ArrowDown" && binding.key !== "ArrowUp",
+      ),
+    ]),
     reopenNoteAutocompleteOnBackspace,
   ];
 }

@@ -167,6 +167,7 @@ export const AUTOCOMPLETE_MENU_THEME = EditorView.theme({
       fontFamily: '"Geist Variable", sans-serif',
       fontSize: "0.8125rem",
       lineHeight: "1.35",
+      scrollPaddingBlock: "0.5rem",
     },
     "& > ul > li": {
       display: "flex",
@@ -174,6 +175,7 @@ export const AUTOCOMPLETE_MENU_THEME = EditorView.theme({
       gap: "0.45rem",
       borderRadius: "calc(var(--radius) + 2px)",
       padding: "0.375rem 0.5rem",
+      scrollMarginBlock: "0.5rem",
     },
     "& > ul > li[aria-selected]": {
       backgroundColor: "var(--accent)",

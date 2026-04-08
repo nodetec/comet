@@ -183,6 +183,7 @@ pub fn run() {
             commands::notes::pin_note,
             commands::notes::unpin_note,
             commands::notes::search_notes,
+            commands::notes::search_note_titles,
             commands::notes::search_tags,
             commands::notes::get_note_backlinks,
             commands::notes::resolve_wikilink,

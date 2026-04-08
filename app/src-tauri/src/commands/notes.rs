@@ -559,6 +559,13 @@ pub fn search_notes(app: AppHandle, query: String) -> Result<Vec<SearchResult>, 
 }
 
 #[tauri::command]
+pub fn search_note_titles(app: AppHandle, query: String) -> Result<Vec<SearchResult>, AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    Ok(NoteService::search_note_titles(&repo, &query)?)
+}
+
+#[tauri::command]
 pub fn search_tags(app: AppHandle, query: String) -> Result<Vec<String>, AppError> {
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);

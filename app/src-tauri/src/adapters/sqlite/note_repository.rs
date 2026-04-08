@@ -1353,6 +1353,54 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         Ok(results)
     }
 
+    fn search_note_titles(&self, query: &str) -> Result<Vec<SearchResult>, NoteError> {
+        let search_tokens = search_tokens_from_query(query);
+        if search_tokens.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut sql = String::from(
+            "SELECT n.id, n.title, n.markdown, n.archived_at
+             FROM notes n
+             WHERE n.deleted_at IS NULL AND ",
+        );
+        let mut values = Vec::new();
+        let mut clauses = Vec::new();
+
+        for token in &search_tokens {
+            clauses.push("n.title LIKE ? ESCAPE '\\'".to_string());
+            values.push(Value::from(format!("%{}%", escape_like_pattern(token))));
+        }
+
+        sql.push_str(&clauses.join(" AND "));
+        sql.push_str(" ORDER BY n.pinned_at IS NULL ASC, n.edited_at DESC LIMIT ?");
+        values.push(Value::from((SEARCH_RESULTS_LIMIT + 1) as i64));
+
+        let mut statement = self.conn.prepare(&sql).map_err(map_err)?;
+        let rows = statement
+            .query_map(params_from_iter(values.iter()), |row| {
+                let markdown: String = row.get(2)?;
+
+                Ok(SearchResult {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    preview: preview_from_markdown(&markdown),
+                    archived_at: row.get(3)?,
+                })
+            })
+            .map_err(map_err)?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(map_err)?);
+            if results.len() >= SEARCH_RESULTS_LIMIT {
+                break;
+            }
+        }
+
+        Ok(results)
+    }
+
     fn search_tags(&self, query: &str) -> Result<Vec<String>, NoteError> {
         let escaped = escape_like_pattern(&query.to_ascii_lowercase());
         let contains_pattern = format!("%{escaped}%");

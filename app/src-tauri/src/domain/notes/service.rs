@@ -723,6 +723,13 @@ impl NoteService {
         repo.search_notes(query)
     }
 
+    pub fn search_note_titles(
+        repo: &dyn NoteRepository,
+        query: &str,
+    ) -> Result<Vec<SearchResult>, NoteError> {
+        repo.search_note_titles(query)
+    }
+
     pub fn search_tags(repo: &dyn NoteRepository, query: &str) -> Result<Vec<String>, NoteError> {
         repo.search_tags(query)
     }
@@ -1206,6 +1213,9 @@ mod tests {
             unimplemented!()
         }
         fn search_notes(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> {
+            unimplemented!()
+        }
+        fn search_note_titles(&self, _: &str) -> Result<Vec<SearchResult>, NoteError> {
             unimplemented!()
         }
         fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> {

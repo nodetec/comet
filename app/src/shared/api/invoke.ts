@@ -113,6 +113,10 @@ export async function searchNotes(query: string) {
   return invoke<SearchResult[]>("search_notes", { query });
 }
 
+export async function searchNoteTitles(query: string) {
+  return invoke<SearchResult[]>("search_note_titles", { query });
+}
+
 export async function resolveWikilink(input: ResolveWikilinkInput) {
   return invoke<string | null>("resolve_wikilink", { input });
 }
