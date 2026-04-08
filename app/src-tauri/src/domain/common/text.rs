@@ -131,8 +131,15 @@ pub fn strip_markdown_syntax(line: &str) -> String {
     s = s.replace("***", "").replace("**", "").replace("~~", "");
     // Strip inline code backticks
     s = s.replace('`', "");
-    // Strip markdown links [text](url) → text
+    // Strip wikilinks [[title]] → title, then markdown links [text](url) → text
     while let Some(start) = s.find('[') {
+        if s[start..].starts_with("[[") {
+            if let Some(close) = s[start + 2..].find("]]") {
+                let title = s[start + 2..start + 2 + close].trim().to_string();
+                s = format!("{}{}{}", &s[..start], title, &s[start + 2 + close + 2..]);
+                continue;
+            }
+        }
         if let Some(mid) = s[start..].find("](") {
             if let Some(end) = s[start + mid..].find(')') {
                 let text = &s[start + 1..start + mid].to_string();
@@ -413,24 +420,30 @@ pub fn extract_wikilink_occurrences(markdown: &str) -> Vec<WikiLinkOccurrence> {
             while index + tick_count < bytes.len() && bytes[index + tick_count] == b'`' {
                 tick_count += 1;
             }
-            index += tick_count;
+            let scan_start = index + tick_count;
+            let mut scan = scan_start;
+            let mut matched = false;
             loop {
-                if index >= bytes.len() {
+                if scan >= bytes.len() {
                     break;
                 }
-                if bytes[index] == b'`' {
+                if bytes[scan] == b'`' {
                     let mut close_count = 0;
-                    while index + close_count < bytes.len() && bytes[index + close_count] == b'`' {
+                    while scan + close_count < bytes.len() && bytes[scan + close_count] == b'`' {
                         close_count += 1;
                     }
-                    index += close_count;
+                    scan += close_count;
                     if close_count == tick_count {
+                        matched = true;
                         break;
                     }
                 } else {
-                    index += 1;
+                    scan += 1;
                 }
             }
+            // If closed, skip past the inline code span. If unclosed, skip
+            // only the opening backticks so subsequent wikilinks are found.
+            index = if matched { scan } else { scan_start };
             continue;
         }
 
@@ -906,6 +919,27 @@ mod tests {
     }
 
     #[test]
+    fn strip_markdown_syntax_strips_wikilink_brackets() {
+        assert_eq!(
+            strip_markdown_syntax("See [[Project Alpha]] for details"),
+            "See Project Alpha for details"
+        );
+        assert_eq!(
+            strip_markdown_syntax("[[A]] and [[B]]"),
+            "A and B"
+        );
+    }
+
+    #[test]
+    fn preview_from_markdown_strips_wikilinks() {
+        let markdown = "# Title\n\nCheck [[Meeting Notes]] for context";
+        assert_eq!(
+            preview_from_markdown(markdown),
+            "Check Meeting Notes for context"
+        );
+    }
+
+    #[test]
     fn normalize_wikilink_title_trims_collapses_and_lowercases() {
         assert_eq!(
             normalize_wikilink_title("  Project   Alpha  "),
@@ -1154,6 +1188,14 @@ mod tests {
     }
 
     #[test]
+    fn extract_wikilinks_survives_unclosed_backticks() {
+        let markdown = "stray ` backtick [[Real Link]] here";
+        let occurrences = extract_wikilink_occurrences(markdown);
+        assert_eq!(occurrences.len(), 1);
+        assert_eq!(occurrences[0].title, "Real Link");
+    }
+
+    #[test]
     fn rewrite_tag_path_in_markdown_renames_exact_direct_occurrences() {
         let markdown = "hello #roadmap and #work/project-alpha";
         assert_eq!(
@@ -1196,7 +1238,7 @@ mod tests {
         let rewritten = rewrite_wikilink_titles_with_locations(
             &markdown,
             &[WikiLinkTitleRewrite {
-                location: 34,
+                location: 30,
                 current_title: "Roadmap Q2".to_string(),
                 new_title: "Roadmap Q3".to_string(),
             }],

@@ -61,18 +61,22 @@ function haveSameWikilinkResolutions(
   left: WikiLinkResolutionInput[],
   right: WikiLinkResolutionInput[],
 ) {
-  return (
-    left.length === right.length &&
-    left.every((resolution, index) => {
-      const candidate = right[index];
-      return (
-        candidate?.occurrenceId === resolution.occurrenceId &&
-        candidate?.location === resolution.location &&
-        candidate?.targetNoteId === resolution.targetNoteId &&
-        candidate?.title === resolution.title
-      );
-    })
-  );
+  if (left.length !== right.length) return false;
+  const sortByLocation = (
+    a: WikiLinkResolutionInput,
+    b: WikiLinkResolutionInput,
+  ) => a.location - b.location;
+  const sortedLeft = left.toSorted(sortByLocation);
+  const sortedRight = right.toSorted(sortByLocation);
+  return sortedLeft.every((resolution, index) => {
+    const candidate = sortedRight[index];
+    return (
+      candidate?.occurrenceId === resolution.occurrenceId &&
+      candidate?.location === resolution.location &&
+      candidate?.targetNoteId === resolution.targetNoteId &&
+      candidate?.title === resolution.title
+    );
+  });
 }
 
 export function useNoteMutations(deps: NoteMutationDeps) {

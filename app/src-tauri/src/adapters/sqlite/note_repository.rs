@@ -208,6 +208,7 @@ fn preferred_active_note_id_for_normalized_title(
             "SELECT id, title
              FROM notes
              WHERE deleted_at IS NULL
+               AND LOWER(title) = ?1
              ORDER BY COALESCE(edited_at, modified_at, created_at) DESC,
                       created_at DESC,
                       id DESC",
@@ -215,7 +216,7 @@ fn preferred_active_note_id_for_normalized_title(
         .map_err(map_err)?;
 
     let rows = statement
-        .query_map([], |row| {
+        .query_map(params![normalized_title], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })
         .map_err(map_err)?;

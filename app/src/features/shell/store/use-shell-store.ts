@@ -111,30 +111,40 @@ function remapResolutionForUpdatedMarkdown(
     previousOccurrencesByTitle.get(normalizedTitle) ?? [];
   const nextOccurrences = nextOccurrencesByTitle.get(normalizedTitle) ?? [];
 
-  if (
-    previousOccurrences.length === 0 ||
-    previousOccurrences.length !== nextOccurrences.length
-  ) {
-    return null;
-  }
-
-  const occurrenceIndex = previousOccurrences.findIndex(
+  // Try direct location match first — preserves resolutions even when
+  // occurrences are added or removed elsewhere in the document.
+  const locationMatch = nextOccurrences.find(
     (occurrence) => occurrence.location === resolution.location,
   );
-  if (occurrenceIndex === -1) {
-    return null;
+  if (locationMatch) {
+    return {
+      ...resolution,
+      location: locationMatch.location,
+      title: locationMatch.title,
+    };
   }
 
-  const nextOccurrence = nextOccurrences[occurrenceIndex];
-  if (!nextOccurrence) {
-    return null;
+  // Fall back to index-based positional mapping when the occurrence shifted
+  // but the total count is unchanged (e.g. text was inserted before it).
+  if (
+    previousOccurrences.length > 0 &&
+    previousOccurrences.length === nextOccurrences.length
+  ) {
+    const occurrenceIndex = previousOccurrences.findIndex(
+      (occurrence) => occurrence.location === resolution.location,
+    );
+    const nextOccurrence =
+      occurrenceIndex === -1 ? undefined : nextOccurrences[occurrenceIndex];
+    if (nextOccurrence) {
+      return {
+        ...resolution,
+        location: nextOccurrence.location,
+        title: nextOccurrence.title,
+      };
+    }
   }
 
-  return {
-    ...resolution,
-    location: nextOccurrence.location,
-    title: nextOccurrence.title,
-  };
+  return null;
 }
 
 function preserveWikilinkResolutionsForDraft(

@@ -4,7 +4,9 @@ use std::time::Instant;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
 
-use crate::domain::common::text::{extract_wikilink_occurrences, normalize_wikilink_title};
+use crate::domain::common::text::{
+    extract_wikilink_occurrences, normalize_wikilink_title, WikiLinkOccurrence,
+};
 use crate::domain::notes::model::WikiLinkResolutionInput;
 use crate::error::AppError;
 
@@ -37,9 +39,24 @@ struct PendingExplicitResolution {
     target_note_id: String,
 }
 
+/// The resolved assignment for a single wikilink occurrence in the markdown.
+#[derive(Clone, Debug)]
+struct OccurrenceAssignment {
+    occurrence_id: String,
+    /// Target preserved from a previous index row (may be stale).
+    preserved_target: Option<String>,
+    /// Target explicitly set by the client in this save.
+    explicit_target: Option<String>,
+    is_explicit: bool,
+}
+
 fn generate_wikilink_occurrence_id() -> String {
     Uuid::new_v4().simple().to_string().to_uppercase()
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 pub fn ensure_wikilink_index_ready(conn: &mut Connection) -> Result<(), AppError> {
     let version = app_setting(conn, WIKILINK_INDEX_VERSION_KEY)?;
@@ -186,10 +203,9 @@ pub fn refresh_wikilink_targets(
     Ok(())
 }
 
-fn clear_wikilink_index(conn: &Connection) -> Result<(), rusqlite::Error> {
-    conn.execute("DELETE FROM note_wikilinks", [])?;
-    Ok(())
-}
+// ---------------------------------------------------------------------------
+// Index rebuild
+// ---------------------------------------------------------------------------
 
 fn rebuild_note_wikilink_index_with_resolution_map(
     conn: &Connection,
@@ -206,57 +222,104 @@ fn rebuild_note_wikilink_index_with_resolution_map(
         resolutions.len()
     );
 
-    let existing_rows = {
-        let mut statement = conn.prepare(
-            "SELECT occurrence_id, location, title, normalized_title, target_note_id, is_explicit
-             FROM note_wikilinks
-             WHERE source_note_id = ?1",
-        )?;
-        let rows = statement.query_map(params![note_id], |row| {
-            Ok(ExistingOccurrence {
-                occurrence_id: row
-                    .get::<_, Option<String>>(0)?
-                    .unwrap_or_else(generate_wikilink_occurrence_id),
-                location: row.get::<_, i64>(1)? as usize,
-                title: row.get(2)?,
-                normalized_title: row.get(3)?,
-                target_note_id: row.get(4)?,
-                is_explicit: row.get::<_, i64>(5)? != 0,
-            })
-        })?;
-        rows.collect::<Result<Vec<_>, _>>()?
-    };
-
+    let existing_rows = load_existing_occurrences(conn, note_id)?;
     conn.execute(
         "DELETE FROM note_wikilinks WHERE source_note_id = ?1",
         params![note_id],
     )?;
 
-    let mut occurrence_indices_by_title = HashMap::<String, Vec<usize>>::new();
+    let occurrence_indices_by_title = group_occurrence_indices_by_title(&occurrences);
+    let mut existing_by_title = group_existing_by_title(existing_rows);
+    let mut explicit_by_title = group_explicit_by_title(note_id, resolutions);
+
+    // Assign each occurrence an ID and optional target by matching against
+    // existing index rows and explicit resolutions from the client.
+    let mut assignments: Vec<Option<OccurrenceAssignment>> = vec![None; occurrences.len()];
+    for (normalized_title, occurrence_indices) in &occurrence_indices_by_title {
+        let existing_for_title = existing_by_title
+            .remove(normalized_title)
+            .unwrap_or_default();
+        let explicit_for_title = explicit_by_title
+            .remove(normalized_title)
+            .unwrap_or_default();
+        assign_occurrences_for_title(
+            &occurrences,
+            occurrence_indices,
+            existing_for_title,
+            explicit_for_title,
+            &mut assignments,
+        );
+    }
+
+    // Resolve final targets and insert rows.
+    insert_index_rows(conn, note_id, &occurrences, assignments, resolution_map)
+}
+
+// ---------------------------------------------------------------------------
+// Setup: load and group inputs
+// ---------------------------------------------------------------------------
+
+fn load_existing_occurrences(
+    conn: &Connection,
+    note_id: &str,
+) -> Result<Vec<ExistingOccurrence>, rusqlite::Error> {
+    let mut statement = conn.prepare(
+        "SELECT occurrence_id, location, title, normalized_title, target_note_id, is_explicit
+         FROM note_wikilinks
+         WHERE source_note_id = ?1",
+    )?;
+    let rows = statement.query_map(params![note_id], |row| {
+        Ok(ExistingOccurrence {
+            occurrence_id: row
+                .get::<_, Option<String>>(0)?
+                .unwrap_or_else(generate_wikilink_occurrence_id),
+            location: row.get::<_, i64>(1)? as usize,
+            title: row.get(2)?,
+            normalized_title: row.get(3)?,
+            target_note_id: row.get(4)?,
+            is_explicit: row.get::<_, i64>(5)? != 0,
+        })
+    })?;
+    rows.collect()
+}
+
+fn group_occurrence_indices_by_title(
+    occurrences: &[WikiLinkOccurrence],
+) -> HashMap<String, Vec<usize>> {
+    let mut map = HashMap::<String, Vec<usize>>::new();
     for (index, occurrence) in occurrences.iter().enumerate() {
-        occurrence_indices_by_title
-            .entry(occurrence.normalized_title.clone())
+        map.entry(occurrence.normalized_title.clone())
             .or_default()
             .push(index);
     }
+    map
+}
 
-    let mut existing_by_title = HashMap::<String, Vec<ExistingOccurrence>>::new();
-    for existing in existing_rows {
-        existing_by_title
-            .entry(existing.normalized_title.clone())
+fn group_existing_by_title(
+    rows: Vec<ExistingOccurrence>,
+) -> HashMap<String, Vec<ExistingOccurrence>> {
+    let mut map = HashMap::<String, Vec<ExistingOccurrence>>::new();
+    for existing in rows {
+        map.entry(existing.normalized_title.clone())
             .or_default()
             .push(existing);
     }
-    for existing_group in existing_by_title.values_mut() {
-        existing_group.sort_by(|left, right| {
+    for group in map.values_mut() {
+        group.sort_by(|left, right| {
             left.location
                 .cmp(&right.location)
                 .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
                 .then_with(|| left.title.cmp(&right.title))
         });
     }
+    map
+}
 
-    let mut explicit_by_title = HashMap::<String, Vec<PendingExplicitResolution>>::new();
+fn group_explicit_by_title(
+    note_id: &str,
+    resolutions: &[WikiLinkResolutionInput],
+) -> HashMap<String, Vec<PendingExplicitResolution>> {
+    let mut map = HashMap::<String, Vec<PendingExplicitResolution>>::new();
     for resolution in resolutions {
         if !resolution.is_explicit {
             continue;
@@ -281,8 +344,7 @@ fn rebuild_note_wikilink_index_with_resolution_map(
             normalized_title,
             resolution.target_note_id
         );
-        explicit_by_title
-            .entry(normalized_title.clone())
+        map.entry(normalized_title)
             .or_default()
             .push(PendingExplicitResolution {
                 occurrence_id: resolution.occurrence_id.clone(),
@@ -291,206 +353,277 @@ fn rebuild_note_wikilink_index_with_resolution_map(
                 target_note_id: resolution.target_note_id.clone(),
             });
     }
-    for explicit_group in explicit_by_title.values_mut() {
-        explicit_group.sort_by(|left, right| {
+    for group in map.values_mut() {
+        group.sort_by(|left, right| {
             left.location
                 .cmp(&right.location)
                 .then_with(|| left.title.cmp(&right.title))
                 .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
         });
     }
+    map
+}
 
-    let mut inserted_rows = Vec::with_capacity(occurrences.len());
-    let mut assignments =
-        vec![None::<(String, Option<String>, Option<String>, bool)>; occurrences.len()];
+// ---------------------------------------------------------------------------
+// Core matching: assign occurrence IDs and targets for one title group
+// ---------------------------------------------------------------------------
 
-    for (normalized_title, occurrence_indices) in &occurrence_indices_by_title {
-        let occurrence_locations = occurrence_indices
-            .iter()
-            .map(|index| occurrences[*index].start)
-            .collect::<HashSet<_>>();
+/// For all occurrences of a given normalized title, assign each one an
+/// `OccurrenceAssignment` by matching against existing DB rows and explicit
+/// client resolutions.
+///
+/// The algorithm runs in four passes:
+///   1. Match by exact location (explicit resolutions first, then existing rows)
+///   2. Apply explicit resolutions by occurrence_id to already-matched entries
+///   3. Collect unmatched entries into ordered queues
+///   4. Assign remaining occurrences by document order (explicit first, existing second)
+fn assign_occurrences_for_title(
+    occurrences: &[WikiLinkOccurrence],
+    occurrence_indices: &[usize],
+    existing_for_title: Vec<ExistingOccurrence>,
+    explicit_for_title: Vec<PendingExplicitResolution>,
+    assignments: &mut [Option<OccurrenceAssignment>],
+) {
+    let occurrence_locations: HashSet<usize> = occurrence_indices
+        .iter()
+        .map(|index| occurrences[*index].start)
+        .collect();
 
-        let existing_for_title = existing_by_title
-            .remove(normalized_title)
-            .unwrap_or_default();
-        let existing_count = existing_for_title.len();
-        let current_count = occurrence_indices.len();
-        let allow_exact_existing_location_match = existing_count == 1 && current_count == 1;
-        let allow_existing_reuse_by_order = existing_count == current_count;
-        let existing_occurrence_ids = existing_for_title
-            .iter()
-            .map(|existing| existing.occurrence_id.clone())
-            .collect::<HashSet<_>>();
+    let existing_count = existing_for_title.len();
+    let current_count = occurrence_indices.len();
+    let allow_exact_existing_location_match = existing_count == 1 && current_count == 1;
+    let allow_existing_reuse_by_order = existing_count == current_count;
 
-        let mut exact_existing_by_location = HashMap::<usize, ExistingOccurrence>::new();
-        let mut non_exact_existing = Vec::new();
-        for existing in existing_for_title {
-            if occurrence_locations.contains(&existing.location) {
-                if allow_exact_existing_location_match {
-                    exact_existing_by_location.insert(existing.location, existing);
-                } else {
-                    non_exact_existing.push(existing);
-                }
-            } else {
-                non_exact_existing.push(existing);
-            }
-        }
+    let existing_occurrence_ids: HashSet<String> = existing_for_title
+        .iter()
+        .map(|e| e.occurrence_id.clone())
+        .collect();
 
-        let mut explicit_by_occurrence_id = HashMap::<String, PendingExplicitResolution>::new();
-        let mut exact_explicit_by_location = HashMap::<usize, PendingExplicitResolution>::new();
-        let mut non_exact_explicit = Vec::new();
-        for explicit in explicit_by_title
-            .remove(normalized_title)
-            .unwrap_or_default()
-        {
-            if let Some(occurrence_id) = explicit.occurrence_id.clone() {
-                if existing_occurrence_ids.contains(&occurrence_id) {
-                    explicit_by_occurrence_id.insert(occurrence_id, explicit);
-                } else if occurrence_locations.contains(&explicit.location)
-                    && !exact_explicit_by_location.contains_key(&explicit.location)
-                {
-                    exact_explicit_by_location.insert(explicit.location, explicit);
-                } else {
-                    non_exact_explicit.push(explicit);
-                }
-            } else if occurrence_locations.contains(&explicit.location)
-                && !exact_explicit_by_location.contains_key(&explicit.location)
-            {
-                exact_explicit_by_location.insert(explicit.location, explicit);
-            } else {
-                non_exact_explicit.push(explicit);
-            }
-        }
+    // Partition existing rows into location-matched vs. remaining.
+    let (exact_existing_by_location, non_exact_existing) = partition_existing_by_location(
+        existing_for_title,
+        &occurrence_locations,
+        allow_exact_existing_location_match,
+    );
 
-        for occurrence_index in occurrence_indices {
-            let occurrence = &occurrences[*occurrence_index];
+    // Partition explicit resolutions into location-matched, id-matched, and remaining.
+    let (explicit_by_occurrence_id, exact_explicit_by_location, non_exact_explicit) =
+        partition_explicit(
+            explicit_for_title,
+            &existing_occurrence_ids,
+            &occurrence_locations,
+        );
 
-            if let Some(explicit) = exact_explicit_by_location.remove(&occurrence.start) {
-                let occurrence_id = explicit.occurrence_id.clone().unwrap_or_else(|| {
-                    exact_existing_by_location
-                        .remove(&occurrence.start)
-                        .map(|existing| existing.occurrence_id)
-                        .unwrap_or_else(generate_wikilink_occurrence_id)
-                });
-                assignments[*occurrence_index] = Some((
-                    occurrence_id,
-                    Some(explicit.target_note_id.clone()),
-                    Some(explicit.target_note_id),
-                    true,
-                ));
-                continue;
-            }
+    // Mutable copies for consumption during matching.
+    let mut exact_existing_by_location = exact_existing_by_location;
+    let mut exact_explicit_by_location = exact_explicit_by_location;
+    let mut explicit_by_occurrence_id = explicit_by_occurrence_id;
 
-            if let Some(existing) = exact_existing_by_location.remove(&occurrence.start) {
-                assignments[*occurrence_index] = Some((
-                    existing.occurrence_id,
-                    existing.target_note_id.clone(),
-                    None,
-                    existing.is_explicit,
-                ));
-            }
-        }
+    // --- Pass 1: Match by exact location ---
+    for occurrence_index in occurrence_indices {
+        let occurrence = &occurrences[*occurrence_index];
 
-        for occurrence_index in occurrence_indices {
-            let Some((occurrence_id, _preserved_target, explicit_target, is_explicit)) =
-                assignments[*occurrence_index].as_mut()
-            else {
-                continue;
-            };
-
-            if let Some(explicit) = explicit_by_occurrence_id.remove(occurrence_id) {
-                *explicit_target = Some(explicit.target_note_id);
-                *is_explicit = true;
-            }
-        }
-
-        let mut remaining_existing = if allow_existing_reuse_by_order {
-            non_exact_existing.extend(exact_existing_by_location.into_values());
-            non_exact_existing.sort_by(|left, right| {
-                left.location
-                    .cmp(&right.location)
-                    .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+        // Prefer an explicit resolution at this location.
+        if let Some(explicit) = exact_explicit_by_location.remove(&occurrence.start) {
+            let occurrence_id = explicit.occurrence_id.clone().unwrap_or_else(|| {
+                exact_existing_by_location
+                    .remove(&occurrence.start)
+                    .map(|e| e.occurrence_id)
+                    .unwrap_or_else(generate_wikilink_occurrence_id)
             });
-            VecDeque::from(non_exact_existing)
-        } else {
-            VecDeque::new()
-        };
-        let mut remaining_explicit = {
-            non_exact_explicit.extend(exact_explicit_by_location.into_values());
-            non_exact_explicit.sort_by(|left, right| {
-                left.location
-                    .cmp(&right.location)
-                    .then_with(|| left.title.cmp(&right.title))
-                    .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+            assignments[*occurrence_index] = Some(OccurrenceAssignment {
+                occurrence_id,
+                preserved_target: Some(explicit.target_note_id.clone()),
+                explicit_target: Some(explicit.target_note_id),
+                is_explicit: true,
             });
-            VecDeque::from(non_exact_explicit)
-        };
+            continue;
+        }
 
-        for occurrence_index in occurrence_indices {
-            if assignments[*occurrence_index].is_some() {
-                continue;
-            }
-
-            if let Some(explicit) = remaining_explicit.pop_front() {
-                let occurrence_id = explicit
-                    .occurrence_id
-                    .unwrap_or_else(generate_wikilink_occurrence_id);
-                assignments[*occurrence_index] = Some((
-                    occurrence_id,
-                    Some(explicit.target_note_id.clone()),
-                    Some(explicit.target_note_id),
-                    true,
-                ));
-                continue;
-            }
-
-            if let Some(existing) = remaining_existing.pop_front() {
-                assignments[*occurrence_index] = Some((
-                    existing.occurrence_id,
-                    existing.target_note_id.clone(),
-                    None,
-                    existing.is_explicit,
-                ));
-            }
+        // Fall back to an existing row at this location.
+        if let Some(existing) = exact_existing_by_location.remove(&occurrence.start) {
+            assignments[*occurrence_index] = Some(OccurrenceAssignment {
+                occurrence_id: existing.occurrence_id,
+                preserved_target: existing.target_note_id,
+                explicit_target: None,
+                is_explicit: existing.is_explicit,
+            });
         }
     }
 
+    // --- Pass 2: Apply explicit resolutions by occurrence_id ---
+    for occurrence_index in occurrence_indices {
+        let Some(assignment) = assignments[*occurrence_index].as_mut() else {
+            continue;
+        };
+
+        if let Some(explicit) = explicit_by_occurrence_id.remove(&assignment.occurrence_id) {
+            assignment.explicit_target = Some(explicit.target_note_id);
+            assignment.is_explicit = true;
+        }
+    }
+
+    // --- Pass 3: Build ordered queues from unmatched entries ---
+    let mut remaining_existing = if allow_existing_reuse_by_order {
+        let mut queue: Vec<ExistingOccurrence> = non_exact_existing;
+        queue.extend(exact_existing_by_location.into_values());
+        queue.sort_by(|left, right| {
+            left.location
+                .cmp(&right.location)
+                .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+        });
+        VecDeque::from(queue)
+    } else {
+        VecDeque::new()
+    };
+
+    let mut remaining_explicit = {
+        let mut queue: Vec<PendingExplicitResolution> = non_exact_explicit;
+        queue.extend(exact_explicit_by_location.into_values());
+        queue.sort_by(|left, right| {
+            left.location
+                .cmp(&right.location)
+                .then_with(|| left.title.cmp(&right.title))
+                .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
+        });
+        VecDeque::from(queue)
+    };
+
+    // --- Pass 4: Assign remaining by document order ---
+    for occurrence_index in occurrence_indices {
+        if assignments[*occurrence_index].is_some() {
+            continue;
+        }
+
+        if let Some(explicit) = remaining_explicit.pop_front() {
+            let occurrence_id = explicit
+                .occurrence_id
+                .unwrap_or_else(generate_wikilink_occurrence_id);
+            assignments[*occurrence_index] = Some(OccurrenceAssignment {
+                occurrence_id,
+                preserved_target: Some(explicit.target_note_id.clone()),
+                explicit_target: Some(explicit.target_note_id),
+                is_explicit: true,
+            });
+            continue;
+        }
+
+        if let Some(existing) = remaining_existing.pop_front() {
+            assignments[*occurrence_index] = Some(OccurrenceAssignment {
+                occurrence_id: existing.occurrence_id,
+                preserved_target: existing.target_note_id,
+                explicit_target: None,
+                is_explicit: existing.is_explicit,
+            });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Partition helpers
+// ---------------------------------------------------------------------------
+
+/// Split existing DB rows into those at a current occurrence location vs. the rest.
+fn partition_existing_by_location(
+    rows: Vec<ExistingOccurrence>,
+    occurrence_locations: &HashSet<usize>,
+    allow_location_match: bool,
+) -> (HashMap<usize, ExistingOccurrence>, Vec<ExistingOccurrence>) {
+    let mut by_location = HashMap::new();
+    let mut remaining = Vec::new();
+    for existing in rows {
+        if allow_location_match && occurrence_locations.contains(&existing.location) {
+            by_location.insert(existing.location, existing);
+        } else {
+            remaining.push(existing);
+        }
+    }
+    (by_location, remaining)
+}
+
+/// Split explicit resolutions into three buckets:
+///   1. Matched by occurrence_id to an existing row
+///   2. Matched by exact location to a current occurrence
+///   3. Remaining (unmatched)
+fn partition_explicit(
+    resolutions: Vec<PendingExplicitResolution>,
+    existing_occurrence_ids: &HashSet<String>,
+    occurrence_locations: &HashSet<usize>,
+) -> (
+    HashMap<String, PendingExplicitResolution>,
+    HashMap<usize, PendingExplicitResolution>,
+    Vec<PendingExplicitResolution>,
+) {
+    let mut by_occurrence_id = HashMap::new();
+    let mut by_location = HashMap::new();
+    let mut remaining = Vec::new();
+    for explicit in resolutions {
+        if let Some(occurrence_id) = explicit.occurrence_id.clone() {
+            if existing_occurrence_ids.contains(&occurrence_id) {
+                by_occurrence_id.insert(occurrence_id, explicit);
+            } else if occurrence_locations.contains(&explicit.location)
+                && !by_location.contains_key(&explicit.location)
+            {
+                by_location.insert(explicit.location, explicit);
+            } else {
+                remaining.push(explicit);
+            }
+        } else if occurrence_locations.contains(&explicit.location)
+            && !by_location.contains_key(&explicit.location)
+        {
+            by_location.insert(explicit.location, explicit);
+        } else {
+            remaining.push(explicit);
+        }
+    }
+    (by_occurrence_id, by_location, remaining)
+}
+
+// ---------------------------------------------------------------------------
+// Final resolution and DB insert
+// ---------------------------------------------------------------------------
+
+fn insert_index_rows(
+    conn: &Connection,
+    note_id: &str,
+    occurrences: &[WikiLinkOccurrence],
+    assignments: Vec<Option<OccurrenceAssignment>>,
+    resolution_map: &HashMap<String, TitleResolution>,
+) -> Result<(), rusqlite::Error> {
     for (index, occurrence) in occurrences.iter().enumerate() {
-        let (occurrence_id, preserved_target, explicit_target, is_explicit) = assignments[index]
+        let assignment = assignments[index]
             .clone()
-            .unwrap_or_else(|| (generate_wikilink_occurrence_id(), None, None, false));
-        let target_note_id = if is_explicit {
-            explicit_target.clone().or(preserved_target.clone())
+            .unwrap_or_else(|| OccurrenceAssignment {
+                occurrence_id: generate_wikilink_occurrence_id(),
+                preserved_target: None,
+                explicit_target: None,
+                is_explicit: false,
+            });
+
+        let target_note_id = if assignment.is_explicit {
+            assignment
+                .explicit_target
+                .clone()
+                .or(assignment.preserved_target.clone())
         } else {
             resolution_map
                 .get(&occurrence.normalized_title)
-                .map(|resolution| resolution.preferred_note_id.clone())
+                .map(|r| r.preferred_note_id.clone())
         };
+
         log::info!(
             "[wikilinks] indexed occurrence note_id={} occurrence_id={} location={} title={} normalized_title={} explicit_target={:?} preserved_target={:?} is_explicit={} resolved_target={:?}",
             note_id,
-            occurrence_id,
+            assignment.occurrence_id,
             occurrence.start,
             occurrence.title,
             occurrence.normalized_title,
-            explicit_target,
-            preserved_target,
-            is_explicit,
+            assignment.explicit_target,
+            assignment.preserved_target,
+            assignment.is_explicit,
             target_note_id
         );
-        inserted_rows.push((
-            occurrence_id,
-            occurrence.start as i64,
-            occurrence.title.clone(),
-            occurrence.normalized_title.clone(),
-            target_note_id,
-            is_explicit,
-        ));
-    }
 
-    for (occurrence_id, location, title, normalized_title, target_note_id, is_explicit) in
-        inserted_rows
-    {
         conn.execute(
             "INSERT INTO note_wikilinks (
                source_note_id,
@@ -504,16 +637,25 @@ fn rebuild_note_wikilink_index_with_resolution_map(
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 note_id,
-                occurrence_id,
-                location,
-                title,
-                normalized_title,
+                assignment.occurrence_id,
+                occurrence.start as i64,
+                occurrence.title,
+                occurrence.normalized_title,
                 target_note_id,
-                if is_explicit { 1 } else { 0 },
+                if assignment.is_explicit { 1 } else { 0 },
             ],
         )?;
     }
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+fn clear_wikilink_index(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.execute("DELETE FROM note_wikilinks", [])?;
     Ok(())
 }
 

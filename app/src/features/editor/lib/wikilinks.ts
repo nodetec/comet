@@ -140,7 +140,9 @@ function consumeInlineCode(markdown: string, index: number): number | null {
     }
   }
 
-  return nextIndex;
+  // Unclosed inline code — skip only the opening backticks so wikilinks
+  // after them are still extracted.
+  return index + tickCount;
 }
 
 function parseWikiLinkOccurrence(
