@@ -24,7 +24,6 @@ import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { searchNotes } from "@/shared/api/invoke";
 
 const TAG_COMPLETION_TEXT_RE = /^[-/\p{L}\p{N}_]*$/u;
-const WIKILINK_COMPLETION_TEXT_RE = /^[^[\]\n\r]*$/;
 
 const TAG_COMPLETION_ICON_SVG = renderToStaticMarkup(
   createElement(Hash, {
@@ -126,7 +125,30 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
       return null;
     }
 
+    context.addEventListener("abort", () => {}, { onDocChange: true });
+
     const results = await searchNotes(query).catch(() => []);
+    if (context.aborted) {
+      return null;
+    }
+
+    const currentState = context.view?.state;
+    if (currentState) {
+      const { main: currentSelection } = currentState.selection;
+      if (!currentSelection.empty) {
+        return null;
+      }
+
+      const currentLine = currentState.doc.lineAt(currentSelection.from);
+      const currentMatch = matchWikiLinkCompletionAtCursor(
+        currentLine.text,
+        currentSelection.from - currentLine.from,
+      );
+      if (!currentMatch || currentMatch.matchingString.trim() !== query) {
+        return null;
+      }
+    }
+
     if (results.length === 0) {
       return null;
     }
@@ -191,7 +213,6 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
       from: line.from + match.from,
       options,
       to: line.from + match.to,
-      validFor: WIKILINK_COMPLETION_TEXT_RE,
     };
   };
 }
