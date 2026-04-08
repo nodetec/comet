@@ -36,6 +36,11 @@ export type LoadedNote = {
   wikilinkResolutions: WikiLinkResolutionInput[];
 };
 
+export type SaveNoteResponse = {
+  note: LoadedNote;
+  affectedLinkedNoteIds: string[];
+};
+
 export type SearchResult = {
   archivedAt: number | null;
   id: string;

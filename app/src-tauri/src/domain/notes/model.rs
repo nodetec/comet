@@ -35,6 +35,13 @@ pub struct LoadedNote {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SaveNoteResponse {
+    pub note: LoadedNote,
+    pub affected_linked_note_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NoteConflictSnapshot {
     pub snapshot_id: String,
     pub mtime: i64,

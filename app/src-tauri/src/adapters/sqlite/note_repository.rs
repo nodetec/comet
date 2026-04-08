@@ -906,6 +906,36 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         Ok(())
     }
 
+    fn update_note_markdown_preserving_edited_at(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+        now: i64,
+    ) -> Result<(), NoteError> {
+        let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
+        let updated = self
+            .conn
+            .execute(
+                "UPDATE notes
+                 SET title = ?1,
+                     markdown = ?2,
+                     modified_at = ?3,
+                     last_edit_device_id = ?4,
+                     vector_clock = ?5,
+                     locally_modified = 1
+                 WHERE id = ?6",
+                params![title, markdown, now, device_id, vector_clock, note_id],
+            )
+            .map_err(map_err)?;
+
+        if updated == 0 {
+            return Err(NoteError::NotFound);
+        }
+
+        Ok(())
+    }
+
     fn set_readonly(&self, note_id: &str, readonly: bool, now: i64) -> Result<usize, NoteError> {
         let (device_id, vector_clock) = self.next_vector_clock_json(note_id)?;
         self.conn

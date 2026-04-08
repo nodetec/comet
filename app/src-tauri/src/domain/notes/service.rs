@@ -1,11 +1,13 @@
 use crate::domain::common::text::{
-    canonicalize_tag_path, extract_tags, render_tag_token, rewrite_tag_path_in_markdown,
-    title_from_markdown,
+    canonicalize_tag_path, extract_tags, extract_wikilink_occurrences, render_tag_token,
+    rewrite_tag_path_in_markdown, rewrite_wikilink_titles_with_locations, title_from_markdown,
+    WikiLinkTitleRewrite,
 };
 use crate::domain::common::time::now_millis;
 use crate::domain::notes::error::NoteError;
 use crate::domain::notes::model::*;
 use crate::ports::note_repository::{NoteRecord, NoteRepository};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 const INITIAL_NOTES_PAGE_SIZE: usize = 40;
@@ -62,6 +64,196 @@ fn sort_wikilink_resolutions(resolutions: &mut [WikiLinkResolutionInput]) {
             .then_with(|| left.target_note_id.cmp(&right.target_note_id))
             .then_with(|| left.occurrence_id.cmp(&right.occurrence_id))
     });
+}
+
+fn dedupe_wikilink_resolutions(resolutions: &mut Vec<WikiLinkResolutionInput>) {
+    sort_wikilink_resolutions(resolutions);
+    resolutions.dedup_by(|left, right| {
+        left.location == right.location
+            && left.title == right.title
+            && left.target_note_id == right.target_note_id
+    });
+}
+
+fn project_wikilink_rewrites_onto_markdown(
+    previous_markdown: &str,
+    next_markdown: &str,
+    rewrites: &[WikiLinkTitleRewrite],
+) -> Vec<(usize, WikiLinkTitleRewrite)> {
+    if rewrites.is_empty() {
+        return Vec::new();
+    }
+
+    let previous_occurrences = extract_wikilink_occurrences(previous_markdown);
+    let next_occurrences = extract_wikilink_occurrences(next_markdown);
+
+    let previous_by_title =
+        previous_occurrences
+            .iter()
+            .fold(BTreeMap::<String, Vec<_>>::new(), |mut groups, occurrence| {
+                groups
+                    .entry(occurrence.normalized_title.clone())
+                    .or_default()
+                    .push(occurrence);
+                groups
+            });
+    let next_by_title =
+        next_occurrences
+            .iter()
+            .fold(BTreeMap::<String, Vec<_>>::new(), |mut groups, occurrence| {
+                groups
+                    .entry(occurrence.normalized_title.clone())
+                    .or_default()
+                    .push(occurrence);
+                groups
+            });
+
+    rewrites
+        .iter()
+        .filter_map(|rewrite| {
+            let normalized_title = crate::domain::common::text::normalize_wikilink_title(
+                &rewrite.current_title,
+            )?;
+            let previous_group = previous_by_title.get(&normalized_title)?;
+            let next_group = next_by_title.get(&normalized_title)?;
+            let previous_index = previous_group.iter().position(|occurrence| {
+                occurrence.start == rewrite.location && occurrence.title == rewrite.current_title
+            })?;
+            let next_occurrence = if previous_group.len() == next_group.len() {
+                next_group.get(previous_index).copied()
+            } else {
+                next_group.iter().copied().find(|occurrence| {
+                    occurrence.start == rewrite.location
+                        && occurrence.title == rewrite.current_title
+                })
+            }?;
+
+            Some((
+                rewrite.location,
+                WikiLinkTitleRewrite {
+                    location: next_occurrence.start,
+                    current_title: next_occurrence.title.clone(),
+                    new_title: rewrite.new_title.clone(),
+                },
+            ))
+        })
+        .collect()
+}
+
+fn pin_rewritten_wikilink_resolutions(
+    resolutions: &mut Vec<WikiLinkResolutionInput>,
+    target_note_id: &str,
+    rewritten_locations: &[(usize, usize, String)],
+) {
+    for resolution in resolutions.iter_mut() {
+        if resolution.target_note_id != target_note_id {
+            continue;
+        }
+
+        if let Some((_, new_location, new_title)) = rewritten_locations
+            .iter()
+            .find(|(old_location, _, _)| *old_location == resolution.location)
+        {
+            resolution.location = *new_location;
+            resolution.title = new_title.clone();
+            resolution.is_explicit = true;
+        }
+    }
+
+    for (_old_location, new_location, new_title) in rewritten_locations {
+        let already_matched = resolutions.iter().any(|resolution| {
+            resolution.target_note_id == target_note_id
+                && resolution.location == *new_location
+                && resolution.title == *new_title
+        });
+        if already_matched {
+            continue;
+        }
+
+        resolutions.push(WikiLinkResolutionInput {
+            occurrence_id: None,
+            is_explicit: true,
+            location: *new_location,
+            target_note_id: target_note_id.to_string(),
+            title: new_title.clone(),
+        });
+    }
+
+    dedupe_wikilink_resolutions(resolutions);
+}
+
+fn rewrite_inbound_wikilink_titles(
+    repo: &dyn NoteRepository,
+    target_note_id: &str,
+    new_title: &str,
+) -> Result<Vec<String>, NoteError> {
+    let backlinks = repo.backlinks_for_note(target_note_id)?;
+    if backlinks.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let rewrite_groups = backlinks.into_iter().fold(
+        BTreeMap::<String, Vec<WikiLinkTitleRewrite>>::new(),
+        |mut groups, backlink| {
+            if backlink.source_note_id != target_note_id {
+                groups
+                    .entry(backlink.source_note_id)
+                    .or_default()
+                    .push(WikiLinkTitleRewrite {
+                        location: backlink.location,
+                        current_title: backlink.title,
+                        new_title: new_title.to_string(),
+                    });
+            }
+            groups
+        },
+    );
+
+    if rewrite_groups.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let rewrite_now = now_millis();
+    let mut affected_note_ids = Vec::new();
+
+    for (source_note_id, rewrites) in rewrite_groups {
+        let markdown = repo.note_markdown(&source_note_id)?;
+        let (rewritten, applied_rewrites) =
+            rewrite_wikilink_titles_with_locations(&markdown, &rewrites);
+        if rewritten == markdown {
+            continue;
+        }
+
+        let title = title_from_markdown(&rewritten);
+        let mut wikilink_resolutions = repo.wikilink_resolutions_for_note(&source_note_id)?;
+        pin_rewritten_wikilink_resolutions(
+            &mut wikilink_resolutions,
+            target_note_id,
+            &applied_rewrites
+                .iter()
+                .map(|rewrite| {
+                    (
+                        rewrite.old_location,
+                        rewrite.new_location,
+                        rewrite.new_title.clone(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+
+        repo.update_note_markdown_preserving_edited_at(
+            &source_note_id,
+            &title,
+            &rewritten,
+            rewrite_now,
+        )?;
+        repo.upsert_search_document(&source_note_id, &title, &rewritten)?;
+        repo.replace_tags(&source_note_id, &rewritten)?;
+        repo.replace_wikilinks(&source_note_id, &rewritten, &wikilink_resolutions)?;
+        affected_note_ids.push(source_note_id);
+    }
+
+    Ok(affected_note_ids)
 }
 
 // ---------------------------------------------------------------------------
@@ -181,11 +373,11 @@ impl NoteService {
         Self::create_note_with_wikilinks(repo, &[], Some(&markdown), &wikilink_resolutions)
     }
 
-    /// Returns `(record, note_changed)`.
+    /// Returns `(record, note_changed, affected_linked_note_ids)`.
     pub fn save_note(
         repo: &dyn NoteRepository,
         input: SaveNoteInput,
-    ) -> Result<(NoteRecord, bool), NoteError> {
+    ) -> Result<(NoteRecord, bool, Vec<String>), NoteError> {
         log::info!(
             "[wikilinks] save_note id={} wikilink_resolution_count={}",
             input.id,
@@ -203,7 +395,6 @@ impl NoteService {
         }
 
         validate_note_id(&input.id)?;
-        let title = title_from_markdown(&input.markdown);
         let existing = repo.note_by_id(&input.id)?.ok_or(NoteError::NotFound)?;
         let existing_markdown = existing.markdown.clone();
         let previous_title = existing.title;
@@ -213,11 +404,54 @@ impl NoteService {
             return Err(NoteError::ReadOnly);
         }
 
-        let markdown_changed = existing_markdown != input.markdown;
+        let requested_title = title_from_markdown(&input.markdown);
         let mut next_wikilink_resolutions = input
             .wikilink_resolutions
             .clone()
             .unwrap_or_else(|| existing_wikilink_resolutions.clone());
+        let mut next_markdown = input.markdown.clone();
+        if previous_title != requested_title {
+            let self_rewrites = repo
+                .backlinks_for_note(&input.id)?
+                .into_iter()
+                .filter(|backlink| backlink.source_note_id == input.id)
+                .map(|backlink| WikiLinkTitleRewrite {
+                    location: backlink.location,
+                    current_title: backlink.title,
+                    new_title: requested_title.clone(),
+                })
+                .collect::<Vec<_>>();
+            let projected_self_rewrites = project_wikilink_rewrites_onto_markdown(
+                &existing_markdown,
+                &next_markdown,
+                &self_rewrites,
+            );
+            let projected_rewrite_inputs = projected_self_rewrites
+                .iter()
+                .map(|(_, rewrite)| rewrite.clone())
+                .collect::<Vec<_>>();
+            let (rewritten_markdown, _) =
+                rewrite_wikilink_titles_with_locations(&next_markdown, &projected_rewrite_inputs);
+            if rewritten_markdown != next_markdown {
+                next_markdown = rewritten_markdown;
+                pin_rewritten_wikilink_resolutions(
+                    &mut next_wikilink_resolutions,
+                    &input.id,
+                    &projected_self_rewrites
+                        .iter()
+                        .map(|(old_location, rewrite)| {
+                            (
+                                *old_location,
+                                rewrite.location,
+                                rewrite.new_title.clone(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
+        let title = title_from_markdown(&next_markdown);
+        let markdown_changed = existing_markdown != next_markdown;
         sort_wikilink_resolutions(&mut existing_wikilink_resolutions);
         sort_wikilink_resolutions(&mut next_wikilink_resolutions);
         let wikilink_metadata_changed = existing_wikilink_resolutions != next_wikilink_resolutions;
@@ -225,19 +459,24 @@ impl NoteService {
 
         if note_changed {
             let now = now_millis();
-            repo.update_note_content(&input.id, &title, &input.markdown, now)?;
+            repo.update_note_content(&input.id, &title, &next_markdown, now)?;
         } else {
-            repo.update_note_title_only(&input.id, &title, &input.markdown)?;
+            repo.update_note_title_only(&input.id, &title, &next_markdown)?;
         }
 
-        repo.upsert_search_document(&input.id, &title, &input.markdown)?;
-        repo.replace_tags(&input.id, &input.markdown)?;
-        repo.replace_wikilinks(&input.id, &input.markdown, &next_wikilink_resolutions)?;
+        repo.upsert_search_document(&input.id, &title, &next_markdown)?;
+        repo.replace_tags(&input.id, &next_markdown)?;
+        repo.replace_wikilinks(&input.id, &next_markdown, &next_wikilink_resolutions)?;
+        let affected_linked_note_ids = if previous_title != title {
+            rewrite_inbound_wikilink_titles(repo, &input.id, &title)?
+        } else {
+            Vec::new()
+        };
         repo.refresh_wikilink_targets(&[previous_title, title.clone()])?;
         repo.set_last_open_note_id(Some(&input.id))?;
 
         let record = repo.note_by_id(&input.id)?.ok_or(NoteError::NotFound)?;
-        Ok((record, note_changed))
+        Ok((record, note_changed, affected_linked_note_ids))
     }
 
     pub fn set_readonly(
@@ -804,6 +1043,22 @@ mod tests {
             Ok(())
         }
 
+        fn update_note_markdown_preserving_edited_at(
+            &self,
+            note_id: &str,
+            title: &str,
+            markdown: &str,
+            now: i64,
+        ) -> Result<(), NoteError> {
+            let mut notes = self.notes.borrow_mut();
+            if let Some(record) = notes.get_mut(note_id) {
+                record.title = title.to_string();
+                record.markdown = markdown.to_string();
+                record.modified_at = now;
+            }
+            Ok(())
+        }
+
         fn set_readonly(
             &self,
             note_id: &str,
@@ -956,8 +1211,33 @@ mod tests {
         fn search_tags(&self, _: &str) -> Result<Vec<String>, NoteError> {
             unimplemented!()
         }
-        fn backlinks_for_note(&self, _: &str) -> Result<Vec<NoteBacklink>, NoteError> {
-            Ok(Vec::new())
+        fn backlinks_for_note(&self, note_id: &str) -> Result<Vec<NoteBacklink>, NoteError> {
+            let notes = self.notes.borrow();
+            let wikilinks = self.wikilinks.borrow();
+            let mut backlinks = wikilinks
+                .iter()
+                .flat_map(|(source_note_id, resolutions)| {
+                    resolutions.iter().filter_map(|resolution| {
+                        (resolution.target_note_id == note_id).then(|| {
+                            let source_note = notes.get(source_note_id)?;
+                            Some(NoteBacklink {
+                                source_note_id: source_note_id.clone(),
+                                source_title: source_note.title.clone(),
+                                source_preview: String::new(),
+                                title: resolution.title.clone(),
+                                location: resolution.location,
+                            })
+                        })?
+                    })
+                })
+                .collect::<Vec<_>>();
+            backlinks.sort_by(|left, right| {
+                left.source_note_id
+                    .cmp(&right.source_note_id)
+                    .then_with(|| left.location.cmp(&right.location))
+                    .then_with(|| left.title.cmp(&right.title))
+            });
+            Ok(backlinks)
         }
         fn resolve_wikilink(
             &self,
@@ -1096,7 +1376,7 @@ mod tests {
         };
         let repo = MockNoteRepository::new().with_note(record);
 
-        let (_, changed) = NoteService::save_note(
+        let (_, changed, _) = NoteService::save_note(
             &repo,
             SaveNoteInput {
                 id: "note-1".to_string(),
@@ -1127,7 +1407,7 @@ mod tests {
         };
         let repo = MockNoteRepository::new().with_note(record);
 
-        let (_, changed) = NoteService::save_note(
+        let (_, changed, _) = NoteService::save_note(
             &repo,
             SaveNoteInput {
                 id: "note-2".to_string(),
@@ -1169,7 +1449,7 @@ mod tests {
                 }],
             );
 
-        let (saved, changed) = NoteService::save_note(
+        let (saved, changed, _) = NoteService::save_note(
             &repo,
             SaveNoteInput {
                 id: "note-3".to_string(),
@@ -1221,7 +1501,7 @@ mod tests {
                 }],
             );
 
-        let (_, changed) = NoteService::save_note(
+        let (_, changed, _) = NoteService::save_note(
             &repo,
             SaveNoteInput {
                 id: "note-4".to_string(),
@@ -1235,6 +1515,116 @@ mod tests {
         let resolutions = repo.wikilink_resolutions_for_note("note-4").unwrap();
         assert_eq!(resolutions.len(), 1);
         assert_eq!(resolutions[0].target_note_id, "target-a");
+    }
+
+    #[test]
+    fn save_note_renames_inbound_wikilinks_and_returns_affected_note_ids() {
+        let target = NoteRecord {
+            id: "target".to_string(),
+            title: "Alpha".to_string(),
+            markdown: "# Alpha\n\nBody".to_string(),
+            modified_at: 1000,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let source = NoteRecord {
+            id: "source".to_string(),
+            title: "Source".to_string(),
+            markdown: "# Source\n\nSee [[Alpha]]".to_string(),
+            modified_at: 1000,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new()
+            .with_note(target)
+            .with_note(source)
+            .with_wikilink_resolutions(
+                "source",
+                vec![WikiLinkResolutionInput {
+                    occurrence_id: Some("S1".to_string()),
+                    is_explicit: true,
+                    location: 14,
+                    target_note_id: "target".to_string(),
+                    title: "Alpha".to_string(),
+                }],
+            );
+        let original_source_modified_at = repo.notes.borrow()["source"].modified_at;
+
+        let (_, changed, affected_note_ids) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "target".to_string(),
+                markdown: "# Beta\n\nBody".to_string(),
+                wikilink_resolutions: Some(Vec::new()),
+            },
+        )
+        .expect("save should succeed");
+
+        let source_note = repo.notes.borrow()["source"].clone();
+        let source_resolutions = repo.wikilink_resolutions_for_note("source").unwrap();
+
+        assert!(changed);
+        assert_eq!(affected_note_ids, vec!["source".to_string()]);
+        assert_eq!(source_note.markdown, "# Source\n\nSee [[Beta]]");
+        assert!(source_note.modified_at > original_source_modified_at);
+        assert_eq!(source_resolutions[0].title, "Beta");
+        assert_eq!(source_resolutions[0].target_note_id, "target");
+    }
+
+    #[test]
+    fn save_note_rewrites_self_wikilinks_before_reindexing() {
+        let note = NoteRecord {
+            id: "self".to_string(),
+            title: "Alpha".to_string(),
+            markdown: "# Alpha\n\nSee [[Alpha]]".to_string(),
+            modified_at: 1000,
+            archived_at: None,
+            deleted_at: None,
+            pinned_at: None,
+            readonly: false,
+            nostr_d_tag: None,
+            published_at: None,
+            published_kind: None,
+        };
+        let repo = MockNoteRepository::new().with_note(note).with_wikilink_resolutions(
+            "self",
+            vec![WikiLinkResolutionInput {
+                occurrence_id: Some("SELF1".to_string()),
+                is_explicit: true,
+                location: 13,
+                target_note_id: "self".to_string(),
+                title: "Alpha".to_string(),
+            }],
+        );
+
+        let (saved, changed, affected_note_ids) = NoteService::save_note(
+            &repo,
+            SaveNoteInput {
+                id: "self".to_string(),
+                markdown: "# Beta\n\nSee [[Alpha]]".to_string(),
+                wikilink_resolutions: None,
+            },
+        )
+        .expect("save should succeed");
+
+        let resolutions = repo.wikilink_resolutions_for_note("self").unwrap();
+
+        assert!(changed);
+        assert!(affected_note_ids.is_empty());
+        assert_eq!(saved.markdown, "# Beta\n\nSee [[Beta]]");
+        assert_eq!(resolutions.len(), 1);
+        assert_eq!(resolutions[0].title, "Beta");
+        assert_eq!(resolutions[0].target_note_id, "self");
     }
 
     #[test]

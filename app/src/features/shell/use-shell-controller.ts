@@ -249,12 +249,22 @@ export function useShellController() {
       return;
     }
 
+    if (noteQuery.isPlaceholderData) {
+      return;
+    }
+
     if (noteQuery.data && noteQuery.data.id !== draftNoteId) {
       setDraft(noteQuery.data.id, noteQuery.data.markdown, {
         wikilinkResolutions: noteQuery.data.wikilinkResolutions,
       });
     }
-  }, [draftNoteId, noteQuery.data, selectedNoteId, setDraft]);
+  }, [
+    draftNoteId,
+    noteQuery.data,
+    noteQuery.isPlaceholderData,
+    selectedNoteId,
+    setDraft,
+  ]);
 
   // --- Hydrate initial selection ---
   useEffect(() => {
@@ -513,11 +523,12 @@ export function useShellController() {
       pendingSaveTimeoutRef.current = null;
     }
 
-    return await saveNoteMutation.mutateAsync({
+    const response = await saveNoteMutation.mutateAsync({
       id: currentNote.id,
       markdown: draftMarkdown,
       wikilinkResolutions: draftWikilinkResolutions,
     });
+    return response.note;
   };
 
   const withFlushedCurrentDraft = (
@@ -1252,7 +1263,7 @@ export function useShellController() {
       setIsRestoreHistoryPending(true);
       try {
         discardPendingSave();
-        const savedNote = await saveNoteMutation.mutateAsync({
+        const { note: savedNote } = await saveNoteMutation.mutateAsync({
           id: currentNoteId,
           markdown: snapshot.markdown,
           wikilinkResolutions: snapshot.wikilinkResolutions,

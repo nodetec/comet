@@ -346,16 +346,23 @@ pub fn duplicate_note(app: AppHandle, note_id: String) -> Result<LoadedNote, App
 }
 
 #[tauri::command]
-pub fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<LoadedNote, AppError> {
+pub fn save_note(app: AppHandle, input: SaveNoteInput) -> Result<SaveNoteResponse, AppError> {
     let note_id = input.id.clone();
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
-    let (record, content_changed) = NoteService::save_note(&repo, input)?;
+    let (record, content_changed, affected_linked_note_ids) =
+        NoteService::save_note(&repo, input)?;
     let note = record_to_loaded_note(record, &repo)?;
     if content_changed {
         sync_push(&app, SyncCommand::PushNote(note_id));
     }
-    Ok(note)
+    for linked_note_id in &affected_linked_note_ids {
+        sync_push(&app, SyncCommand::PushNote(linked_note_id.clone()));
+    }
+    Ok(SaveNoteResponse {
+        note,
+        affected_linked_note_ids,
+    })
 }
 
 #[tauri::command]

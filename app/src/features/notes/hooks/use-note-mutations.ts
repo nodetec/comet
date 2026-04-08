@@ -8,6 +8,7 @@ import {
   deleteNotePermanently,
   duplicateNote,
   emptyTrash,
+  loadNote,
   pendingDraftStorageKey,
   pinNote,
   restoreFromTrash,
@@ -96,6 +97,10 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
   };
 
+  const invalidateLoadedNotes = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["note"] });
+  };
+
   const invalidateContextualTags = async () => {
     await queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
   };
@@ -152,7 +157,8 @@ export function useNoteMutations(deps: NoteMutationDeps) {
         submittedWikilinkResolutions: input.wikilinkResolutions ?? [],
       };
     },
-    onSuccess: (savedNote, _variables, context) => {
+    onSuccess: async (response, _variables, context) => {
+      const { note: savedNote, affectedLinkedNoteIds } = response;
       queryClient.setQueryData(["note", savedNote.id], savedNote);
 
       if (context?.noteId === savedNote.id) {
@@ -176,7 +182,26 @@ export function useNoteMutations(deps: NoteMutationDeps) {
         }
       }
 
+      // Eagerly refresh affected notes so their cache has the rewritten wikilinks
+      if (affectedLinkedNoteIds.length > 0) {
+        const { draftNoteId: liveDraftNoteId } = useShellStore.getState();
+        const refreshResults = await Promise.allSettled(
+          affectedLinkedNoteIds.map((id) => loadNote(id)),
+        );
+        for (const result of refreshResults) {
+          if (result.status !== "fulfilled") continue;
+          const refreshed = result.value;
+          queryClient.setQueryData(["note", refreshed.id], refreshed);
+          if (refreshed.id === liveDraftNoteId) {
+            setDraft(refreshed.id, refreshed.markdown, {
+              wikilinkResolutions: refreshed.wikilinkResolutions,
+            });
+          }
+        }
+      }
+
       void Promise.all([
+        invalidateLoadedNotes(),
         invalidateNotes(),
         invalidateContextualTags(),
         invalidateNoteBacklinks(),

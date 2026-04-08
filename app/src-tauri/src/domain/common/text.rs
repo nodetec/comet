@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TagOccurrence {
@@ -13,6 +13,20 @@ pub struct WikiLinkOccurrence {
     pub end: usize,
     pub title: String,
     pub normalized_title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WikiLinkTitleRewrite {
+    pub location: usize,
+    pub current_title: String,
+    pub new_title: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RewrittenWikiLinkTitle {
+    pub old_location: usize,
+    pub new_location: usize,
+    pub new_title: String,
 }
 
 /// Extract the title from the first H1 heading in markdown.
@@ -651,6 +665,55 @@ pub fn rewrite_tag_path_in_markdown(
     Some(output)
 }
 
+pub fn rewrite_wikilink_titles_with_locations(
+    markdown: &str,
+    rewrites: &[WikiLinkTitleRewrite],
+) -> (String, Vec<RewrittenWikiLinkTitle>) {
+    if rewrites.is_empty() {
+        return (markdown.to_string(), Vec::new());
+    }
+
+    let rewrites_by_location = rewrites
+        .iter()
+        .map(|rewrite| (rewrite.location, rewrite))
+        .collect::<HashMap<_, _>>();
+    let occurrences = extract_wikilink_occurrences(markdown);
+    if occurrences.is_empty() {
+        return (markdown.to_string(), Vec::new());
+    }
+
+    let mut output = String::with_capacity(markdown.len());
+    let mut cursor = 0;
+    let mut applied_rewrites = Vec::new();
+
+    for occurrence in occurrences {
+        output.push_str(&markdown[cursor..occurrence.start]);
+
+        if let Some(rewrite) = rewrites_by_location.get(&occurrence.start) {
+            if occurrence.title == rewrite.current_title {
+                let new_location = output.len();
+                output.push_str("[[");
+                output.push_str(&rewrite.new_title);
+                output.push_str("]]");
+                applied_rewrites.push(RewrittenWikiLinkTitle {
+                    old_location: occurrence.start,
+                    new_location,
+                    new_title: rewrite.new_title.clone(),
+                });
+            } else {
+                output.push_str(&markdown[occurrence.start..occurrence.end]);
+            }
+        } else {
+            output.push_str(&markdown[occurrence.start..occurrence.end]);
+        }
+
+        cursor = occurrence.end;
+    }
+
+    output.push_str(&markdown[cursor..]);
+    (output, applied_rewrites)
+}
+
 fn tag_path_matches_subtree(path: &str, root: &str) -> bool {
     path == root
         || path
@@ -1097,6 +1160,50 @@ mod tests {
             rewrite_tag_path_in_markdown(markdown, "work/project-alpha", Some("work/mobile")),
             Some("hello #roadmap and #work/mobile".to_string())
         );
+    }
+
+    #[test]
+    fn rewrite_wikilink_titles_in_markdown_rewrites_matching_occurrences() {
+        let markdown = "hello [[Roadmap Q2]] and [[Project Alpha]]";
+        let rewritten = rewrite_wikilink_titles_with_locations(
+            markdown,
+            &[
+                WikiLinkTitleRewrite {
+                    location: 6,
+                    current_title: "Roadmap Q2".to_string(),
+                    new_title: "Roadmap Q3".to_string(),
+                },
+                WikiLinkTitleRewrite {
+                    location: 25,
+                    current_title: "Project Alpha".to_string(),
+                    new_title: "Project Beta".to_string(),
+                },
+            ],
+        )
+        .0;
+
+        assert_eq!(rewritten, "hello [[Roadmap Q3]] and [[Project Beta]]");
+    }
+
+    #[test]
+    fn rewrite_wikilink_titles_in_markdown_ignores_code_contexts() {
+        let markdown = [
+            "Use `[[Roadmap Q2]]` inline.",
+            "",
+            "[[Roadmap Q2]]",
+        ]
+        .join("\n");
+        let rewritten = rewrite_wikilink_titles_with_locations(
+            &markdown,
+            &[WikiLinkTitleRewrite {
+                location: 34,
+                current_title: "Roadmap Q2".to_string(),
+                new_title: "Roadmap Q3".to_string(),
+            }],
+        )
+        .0;
+
+        assert_eq!(rewritten, "Use `[[Roadmap Q2]]` inline.\n\n[[Roadmap Q3]]");
     }
 
     #[test]

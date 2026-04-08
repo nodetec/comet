@@ -21,6 +21,7 @@ import {
   type RenameTagInput,
   type ResolveWikilinkInput,
   type ResolveNoteConflictAction,
+  type SaveNoteResponse,
   type SearchResult,
   type ThemeData,
   type ThemeSummary,
@@ -121,7 +122,7 @@ export async function saveNote(input: {
   markdown: string;
   wikilinkResolutions?: WikiLinkResolutionInput[];
 }) {
-  return invoke<LoadedNote>("save_note", { input });
+  return invoke<SaveNoteResponse>("save_note", { input });
 }
 
 export async function setNoteReadonly(input: {

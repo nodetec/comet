@@ -68,6 +68,13 @@ pub trait NoteRepository {
         title: &str,
         markdown: &str,
     ) -> Result<(), NoteError>;
+    fn update_note_markdown_preserving_edited_at(
+        &self,
+        note_id: &str,
+        title: &str,
+        markdown: &str,
+        now: i64,
+    ) -> Result<(), NoteError>;
     fn set_readonly(&self, note_id: &str, readonly: bool, now: i64) -> Result<usize, NoteError>;
     fn archive_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;
     fn restore_note(&self, note_id: &str, now: i64) -> Result<usize, NoteError>;

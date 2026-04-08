@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ChevronUp,
   Ellipsis,
+  Link2,
   Lock,
   PencilOff,
   PanelBottomClose,
@@ -38,6 +39,7 @@ import {
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
 import { Button } from "@/shared/ui/button";
+import { PopoverPopup, PopoverRoot, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
@@ -700,6 +702,49 @@ export function EditorPane({
       window.removeEventListener("keydown", handleGlobalHistoryKeyDown);
   }, []);
 
+  const backlinksButton =
+    backlinks.length > 0 ? (
+      <PopoverRoot>
+        <PopoverTrigger
+          render={
+            <Button
+              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+              size="icon-sm"
+              variant="ghost"
+            />
+          }
+        >
+          <Link2 className="size-[1.2rem]" />
+        </PopoverTrigger>
+        <PopoverPopup>
+          <div className="p-3">
+            <p className="text-muted-foreground mb-2 text-xs font-medium tracking-[0.08em] uppercase">
+              Linked Mentions
+            </p>
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              {backlinks.map((backlink) => (
+                <button
+                  key={`${backlink.sourceNoteId}:${backlink.location}`}
+                  className="hover:bg-accent block w-full rounded-md px-2.5 py-1.5 text-left transition-colors"
+                  onClick={() => onSelectLinkedNote(backlink.sourceNoteId)}
+                  type="button"
+                >
+                  <p className="truncate text-sm font-medium">
+                    {backlink.sourceTitle || "Untitled"}
+                  </p>
+                  {backlink.sourcePreview ? (
+                    <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                      {backlink.sourcePreview}
+                    </p>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        </PopoverPopup>
+      </PopoverRoot>
+    ) : null;
+
   const menuButton = (
     <Button
       className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
@@ -806,6 +851,7 @@ export function EditorPane({
           <div className="pointer-events-none relative z-40 flex items-center gap-1">
             {statusContent}
             {toolbarSlot}
+            {backlinksButton}
             {menuButton}
           </div>
         ) : null}
@@ -950,33 +996,6 @@ export function EditorPane({
           )}
         </div>
       </div>
-
-      {noteId && backlinks.length > 0 ? (
-        <div className="border-separator bg-background shrink-0 border-t px-4 py-3">
-          <p className="text-muted-foreground mb-2 text-xs font-medium tracking-[0.08em] uppercase">
-            Linked Mentions
-          </p>
-          <div className="space-y-1.5">
-            {backlinks.map((backlink) => (
-              <button
-                key={`${backlink.sourceNoteId}:${backlink.location}`}
-                className="hover:bg-accent block w-full rounded-lg px-3 py-2 text-left transition-colors"
-                onClick={() => onSelectLinkedNote(backlink.sourceNoteId)}
-                type="button"
-              >
-                <p className="truncate text-sm font-medium">
-                  {backlink.sourceTitle || "Untitled"}
-                </p>
-                {backlink.sourcePreview ? (
-                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
-                    {backlink.sourcePreview}
-                  </p>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       <AnimatePresence initial={false}>
         {noteId && !isReadOnly && showToolbar ? (
