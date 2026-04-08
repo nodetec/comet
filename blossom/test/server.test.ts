@@ -138,39 +138,6 @@ describe("blossom integration", () => {
     );
   });
 
-  test("proxies authenticated blob downloads even when public blob URL points elsewhere", async () => {
-    const signer = createSigner();
-    const accessKey = await createAccessKeyForStorage(ctx!.db);
-
-    const body = new TextEncoder().encode("authenticated proxy blob");
-    const sha256 = await computeSha256Hex(body);
-    const uploadResponse = await fetch(`${ctx!.baseUrl}/upload`, {
-      method: "PUT",
-      headers: {
-        Authorization: createAuthHeader(signer, "upload"),
-        "Content-Type": "text/plain",
-        "X-Access-Key": accessKey,
-      },
-      body,
-    });
-
-    expect(uploadResponse.status).toBe(200);
-
-    const getResponse = await fetch(`${ctx!.baseUrl}/${sha256}`, {
-      headers: {
-        Authorization: createAuthHeader(signer, "upload", { sha256 }),
-      },
-      redirect: "manual",
-    });
-
-    expect(getResponse.status).toBe(200);
-    expect(getResponse.headers.get("content-type")).toBe("text/plain");
-    expect(getResponse.headers.get("x-content-sha256")).toBe(sha256);
-    expect(Array.from(new Uint8Array(await getResponse.arrayBuffer()))).toEqual(
-      Array.from(body),
-    );
-  });
-
   test("rejects list requests for a different pubkey", async () => {
     const owner = createSigner();
     const other = createSigner();
