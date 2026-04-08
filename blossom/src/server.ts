@@ -130,6 +130,10 @@ function shouldProxyBlobResponse(requestUrl: URL, publicUrl: string): boolean {
   );
 }
 
+function shouldProxyAuthenticatedBlobResponse(request: Request): boolean {
+  return Boolean(request.headers.get("authorization"));
+}
+
 function shortHash(hash: string): string {
   return hash.slice(0, 8);
 }
@@ -313,7 +317,10 @@ export async function createBlossomServer(
         }
 
         const publicUrl = objectStorage.getPublicUrl(blob.sha256);
-        if (shouldProxyBlobResponse(url, publicUrl)) {
+        if (
+          shouldProxyAuthenticatedBlobResponse(request) ||
+          shouldProxyBlobResponse(url, publicUrl)
+        ) {
           console.log(
             `[blossom] get proxy hash=${shortHash(blob.sha256)} public_url=${publicUrl}`,
           );
