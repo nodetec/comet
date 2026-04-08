@@ -5,6 +5,7 @@ import { initAttachmentsBasePath } from "@/shared/lib/attachments";
 import {
   type AccountSummary,
   type AppStatus,
+  type BlobFetchStatus,
   type BootstrapPayload,
   type ContextualTagsInput,
   type ContextualTagsPayload,
@@ -237,6 +238,10 @@ export async function getAccountNsec(publicKey: string) {
 
 export async function getSecretStorageStatus() {
   return invoke<SecretStorageStatus>("get_secret_storage_status");
+}
+
+export async function fetchBlob(hash: string) {
+  return invoke<BlobFetchStatus>("fetch_blob", { hash });
 }
 
 export async function moveSecretToKeychain() {

@@ -16,10 +16,14 @@ import {
 } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 
+import { fetchBlob } from "@/shared/api/invoke";
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
 import type { SearchMatch } from "@/shared/lib/search";
 import { collectSearchMatches } from "@/shared/lib/search";
-import { resolveImageSrc } from "@/shared/lib/attachments";
+import {
+  extractAttachmentHash,
+  resolveImageSrc,
+} from "@/shared/lib/attachments";
 
 const VISIBLE_RANGE_MARGIN = 1000;
 
@@ -84,8 +88,33 @@ class InlineImageWidget extends WidgetType {
     image.className = "cm-inline-image-element";
     image.alt = this.altText;
     image.draggable = false;
-    image.src = resolveImageSrc(this.src);
+    const attachmentHash = extractAttachmentHash(this.src);
+    let fetchAttempted = false;
+    const setImageSrc = (cacheBust?: string) => {
+      const resolvedSrc = resolveImageSrc(this.src);
+      image.src = cacheBust ? `${resolvedSrc}?blob=${cacheBust}` : resolvedSrc;
+    };
+
+    setImageSrc();
     image.addEventListener("error", () => {
+      if (attachmentHash && !fetchAttempted) {
+        fetchAttempted = true;
+        void fetchBlob(attachmentHash)
+          .then((status) => {
+            if (status !== "downloaded") {
+              wrapper.style.display = "none";
+              return;
+            }
+
+            wrapper.style.removeProperty("display");
+            setImageSrc(`${Date.now()}`);
+          })
+          .catch(() => {
+            wrapper.style.display = "none";
+          });
+        return;
+      }
+
       wrapper.style.display = "none";
     });
     image.addEventListener("mousedown", (event) => {
