@@ -41,6 +41,14 @@ impl FsBlobStorage {
             fs::write(&dest_path, file_bytes)?;
         }
 
+        log::info!(
+            "[blob] imported local attachment plaintext_hash={} ext={} bytes={} path={}",
+            hash,
+            ext,
+            file_bytes.len(),
+            dest_path.display()
+        );
+
         Ok(ImportedImage {
             uri: format!("attachment://{dest_filename}"),
             hash,
@@ -63,9 +71,23 @@ impl BlobStorage for FsBlobStorage {
             let path = self.dir.join(format!("{hash}.{ext}"));
             if path.exists() {
                 let data = fs::read(&path)?;
+                log::info!(
+                    "[blob] local attachment hit plaintext_hash={} ext={} bytes={} path={}",
+                    hash,
+                    ext,
+                    data.len(),
+                    path.display()
+                );
                 return Ok(Some((data, ext.to_string())));
             }
         }
+
+        log::warn!(
+            "[blob] local attachment miss plaintext_hash={} attachments_dir={} checked_exts={}",
+            hash,
+            self.dir.display(),
+            KNOWN_EXTENSIONS.join(",")
+        );
         Ok(None)
     }
 
