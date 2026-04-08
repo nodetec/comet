@@ -66,8 +66,10 @@ function haveSameWikilinkResolutions(
     a: WikiLinkResolutionInput,
     b: WikiLinkResolutionInput,
   ) => a.location - b.location;
-  const sortedLeft = left.toSorted(sortByLocation);
-  const sortedRight = right.toSorted(sortByLocation);
+  // eslint-disable-next-line unicorn/no-array-sort -- app runtime compatibility still excludes toSorted here
+  const sortedLeft = [...left].sort(sortByLocation);
+  // eslint-disable-next-line unicorn/no-array-sort -- app runtime compatibility still excludes toSorted here
+  const sortedRight = [...right].sort(sortByLocation);
   return sortedLeft.every((resolution, index) => {
     const candidate = sortedRight[index];
     return (

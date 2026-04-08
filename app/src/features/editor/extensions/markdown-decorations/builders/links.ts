@@ -487,21 +487,24 @@ async function openWikiLink(
     return;
   }
 
-  const resolvedNoteId = await invoke<string | null>("resolve_wikilink", {
-    input: {
-      location: target.location,
-      sourceNoteId: noteId,
-      title: target.title,
-    },
-  }).catch((error) => {
+  let resolvedNoteId: string | null;
+  try {
+    resolvedNoteId = await invoke<string | null>("resolve_wikilink", {
+      input: {
+        location: target.location,
+        sourceNoteId: noteId,
+        title: target.title,
+      },
+    });
+  } catch (error) {
     console.error("[wikilinks] resolve_wikilink invoke failed", {
       error,
       location: target.location,
       sourceNoteId: noteId,
       title: target.title,
     });
-    return null;
-  });
+    return;
+  }
 
   if (resolvedNoteId) {
     console.debug("[wikilinks] resolved wikilink", {

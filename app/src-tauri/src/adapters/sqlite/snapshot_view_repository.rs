@@ -261,12 +261,14 @@ impl<'a> SqliteSnapshotViewRepository<'a> {
         is_current: bool,
     ) -> Result<Vec<WikiLinkResolutionInput>, AppError> {
         let sql = if is_current {
-            "SELECT occurrence_id, location, title, target_note_id
-             FROM note_wikilinks
-             WHERE source_note_id = ?1
-               AND target_note_id IS NOT NULL
-               AND is_explicit = 1
-             ORDER BY location ASC, occurrence_id ASC"
+            "SELECT l.occurrence_id, l.location, l.title, l.target_note_id
+             FROM note_wikilinks l
+             JOIN notes n ON n.id = l.target_note_id
+             WHERE l.source_note_id = ?1
+               AND l.target_note_id IS NOT NULL
+               AND l.is_explicit = 1
+               AND n.deleted_at IS NULL
+             ORDER BY l.location ASC, l.occurrence_id ASC"
         } else {
             "SELECT occurrence_id, location, title, target_note_id
              FROM note_conflict_wikilinks
@@ -335,7 +337,8 @@ mod tests {
             "INSERT INTO notes
                (id, title, markdown, created_at, modified_at, edited_at, locally_modified)
              VALUES
-               ('note-1', 'Title', '# Title\n\n[[Alpha]]', 1, 1, 1, 1)",
+               ('note-1', 'Title', '# Title\n\n[[Alpha]]', 1, 1, 1, 1),
+               ('current-target', 'Alpha', '# Alpha', 1, 1, 1, 1)",
             [],
         )
         .unwrap();
