@@ -326,7 +326,7 @@ const inlineImageTheme = EditorView.baseTheme({
   ".cm-inline-image-element": {
     display: "block",
     maxHeight: "min(24rem, 50vh)",
-    maxWidth: "min(100%, 32rem)",
+    maxWidth: "100%",
     objectFit: "contain",
     userSelect: "none",
   },
