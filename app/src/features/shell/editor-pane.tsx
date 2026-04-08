@@ -642,14 +642,6 @@ export function EditorPane({
     );
   };
 
-  const handleEditorContextMenu = (event: MouseEvent<HTMLDivElement>) => {
-    if (!noteId) {
-      return;
-    }
-
-    event.preventDefault();
-    void openEditorMenu(new LogicalPosition(event.clientX, event.clientY));
-  };
 
   const handleEditorSurfaceMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (isReadOnly) {
@@ -953,7 +945,6 @@ export function EditorPane({
             findOpen && "pt-2",
           )}
           data-editor-scroll-container
-          onContextMenu={handleEditorContextMenu}
           onMouseDown={handleEditorSurfaceMouseDown}
           onMouseUp={(event) => {
             // Force WebKit to re-evaluate the cursor after drag-select.
