@@ -414,9 +414,7 @@ function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
     return;
   }
 
-  useShellStore.getState().setFocusedPane("notes");
   event.preventDefault();
-
   window.getSelection()?.removeAllRanges();
 }
 

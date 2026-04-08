@@ -938,13 +938,16 @@ export function useShellController() {
 
   const handleSelectNote = (noteId: string) => {
     if (noteId === selectedNoteId) {
+      setFocusedPane("notes");
       return;
     }
 
     flushCurrentDraft();
     setCreatingSelectedNoteId(null);
     setPendingAutoFocusEditorNoteId(null);
-    setSelectedNoteId(noteId);
+    // Batch selectedNoteId + focusedPane into a single store update so
+    // there's no intermediate render where the old note has the indicator.
+    useShellStore.setState({ selectedNoteId: noteId, focusedPane: "notes" });
   };
 
   const handleArchiveNote = (noteId: string) => {
@@ -1676,7 +1679,6 @@ export function useShellController() {
       onTrashNote: (noteId: string) =>
         latestRef.current.handleTrashNote(noteId),
       onSelectNote: (noteId: string) => {
-        setFocusedPane("notes");
         latestRef.current.handleSelectNote(noteId);
       },
       onSetNotePinned: (noteId: string, pinned: boolean) =>
