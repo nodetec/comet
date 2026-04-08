@@ -69,6 +69,7 @@ import {
   wikilinkHighlightStyle,
 } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
 import { noteAutocomplete } from "@/features/editor/extensions/note-autocomplete";
+import { dropImage } from "@/features/editor/extensions/drop-image";
 import { pasteImage } from "@/features/editor/extensions/paste-image";
 import { pasteLink } from "@/features/editor/extensions/paste-link";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
@@ -318,6 +319,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           tagHighlightStyle,
           wikilinkHighlightStyle,
           pasteImage(),
+          dropImage(),
           pasteLink(),
           search(),
           EditorView.domEventHandlers({
