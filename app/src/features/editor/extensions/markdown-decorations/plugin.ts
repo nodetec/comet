@@ -129,12 +129,16 @@ function expandedVisibleRanges(
   return ranges;
 }
 
+function hasActiveEditorFocus(view: EditorView) {
+  return view.hasFocus && !view.dom.classList.contains("comet-editor-inactive");
+}
+
 function buildDecorations(
   view: EditorView,
   searchMatches: SearchMatch[],
 ): { atomicRanges: DecorationSet; decorations: DecorationSet } {
   const { state } = view;
-  const hasFocus = view.hasFocus;
+  const hasFocus = hasActiveEditorFocus(view);
   const debugEnabled = isEditorDebugEnabled();
   const ranges = expandedVisibleRanges(view);
   const ctx: BuilderContext = {

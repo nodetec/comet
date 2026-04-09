@@ -40,6 +40,11 @@ function createDecoratedView(doc: string, selection: EditorSelection) {
   });
 }
 
+async function flush() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise(requestAnimationFrame);
+}
+
 afterEach(() => {
   document.body.replaceChildren();
 });
@@ -187,6 +192,32 @@ describe("markdownDecorations pointer selection normalization", () => {
     });
 
     expect(view.state.selection.main.head).toBe(2);
+    view.destroy();
+  });
+
+  it("keeps heading syntax hidden when a new note loads into an inactive editor", async () => {
+    const view = createDecoratedView(
+      "# Old heading\nBody",
+      EditorSelection.create([EditorSelection.cursor(2)]),
+    );
+
+    view.contentDOM.focus();
+    await flush();
+
+    view.dom.classList.add("comet-editor-inactive");
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: "# New heading\nBody",
+      },
+    });
+
+    await flush();
+
+    const firstLine = view.dom.querySelector(".cm-line");
+    expect(firstLine?.textContent).toBe("New heading");
+
     view.destroy();
   });
 });
