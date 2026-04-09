@@ -178,19 +178,21 @@ describe("drop image positioning", () => {
   });
 
   it("focuses the editor on the first native image drag so the drop cursor can render", async () => {
-    let dragDropHandler:
-      | ((event: {
-          payload: {
-            paths: string[];
-            position: { x: number; y: number };
-            type: string;
-          };
-        }) => void)
-      | null = null;
+    type DragDropHandler = (event: {
+      payload: {
+        paths: string[];
+        position: { x: number; y: number };
+        type: string;
+      };
+    }) => void;
+
+    let dragDropHandler!: DragDropHandler;
+    let hasDragDropHandler = false;
 
     getCurrentWebviewMock.mockReturnValue({
-      onDragDropEvent: vi.fn((handler) => {
+      onDragDropEvent: vi.fn((handler: DragDropHandler) => {
         dragDropHandler = handler;
+        hasDragDropHandler = true;
         return Promise.resolve(() => {});
       }),
     });
@@ -223,7 +225,7 @@ describe("drop image positioning", () => {
 
     const focusSpy = vi.spyOn(view, "focus");
 
-    if (!dragDropHandler) {
+    if (!hasDragDropHandler) {
       throw new Error("Expected dropImage to register a drag handler");
     }
 
