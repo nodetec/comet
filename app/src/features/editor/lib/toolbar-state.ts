@@ -276,31 +276,57 @@ function getCodeFenceRangeAt(
   return null;
 }
 
+function isInsideCodeFence(markdown: string, position: number): boolean {
+  const text = createText(markdown);
+  const currentLine = text.lineAt(clamp(position, 0, markdown.length));
+
+  // Scan backward from the cursor line to find an unclosed fence.
+  // Only need to track the most recent open fence, not all of them.
+  let openFence: string | null = null;
+
+  for (let lineNumber = 1; lineNumber <= currentLine.number; lineNumber++) {
+    const line = text.line(lineNumber);
+    const match = CODE_FENCE_RE.exec(line.text);
+    if (!match) continue;
+
+    const fence = match[1] ?? "";
+    if (openFence === null) {
+      openFence = fence;
+    } else if (openFence === fence) {
+      openFence = null;
+    }
+  }
+
+  return openFence !== null;
+}
+
 function getBlockType(markdown: string, position: number): BlockType {
-  if (getCodeFenceRangeAt(markdown, position)) {
+  const text = createText(markdown);
+  const line = text.lineAt(clamp(position, 0, markdown.length));
+
+  // Quick line-local check for heading — avoids scanning the document
+  const headingMatch = HEADING_PREFIX_RE.exec(line.text);
+  if (headingMatch) {
+    switch (headingMatch[1]?.length) {
+      case 1: {
+        return "h1";
+      }
+      case 2: {
+        return "h2";
+      }
+      case 3: {
+        return "h3";
+      }
+    }
+  }
+
+  // Only scan for code fences if the line could plausibly be inside one
+  // (not a heading, and fences exist somewhere above the cursor).
+  if (isInsideCodeFence(markdown, position)) {
     return "code";
   }
 
-  const line = createText(markdown).lineAt(clamp(position, 0, markdown.length));
-  const match = HEADING_PREFIX_RE.exec(line.text);
-  if (!match) {
-    return "paragraph";
-  }
-
-  switch (match[1]?.length) {
-    case 1: {
-      return "h1";
-    }
-    case 2: {
-      return "h2";
-    }
-    case 3: {
-      return "h3";
-    }
-    default: {
-      return "paragraph";
-    }
-  }
+  return "paragraph";
 }
 
 function unwrapCodeFenceBlock(

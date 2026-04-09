@@ -1070,6 +1070,48 @@ function transactionTouchesOnlyActiveCell(
   return touchesOnlyCell;
 }
 
+/**
+ * Check whether any changed range in a transaction intersects with a
+ * Table node in either the old or new syntax tree.
+ */
+function changesAffectTables(transaction: Transaction): boolean {
+  let found = false;
+
+  transaction.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+    if (found) return;
+
+    const oldTree = syntaxTree(transaction.startState);
+    const oldDoc = transaction.startState.doc;
+    oldTree.iterate({
+      from: oldDoc.lineAt(fromA).from,
+      to: oldDoc.lineAt(Math.min(toA, oldDoc.length)).to,
+      enter(node) {
+        if (node.name === "Table") {
+          found = true;
+          return false;
+        }
+      },
+    });
+
+    if (found) return;
+
+    const newTree = syntaxTree(transaction.state);
+    const newDoc = transaction.state.doc;
+    newTree.iterate({
+      from: newDoc.lineAt(fromB).from,
+      to: newDoc.lineAt(Math.min(toB, newDoc.length)).to,
+      enter(node) {
+        if (node.name === "Table") {
+          found = true;
+          return false;
+        }
+      },
+    });
+  });
+
+  return found;
+}
+
 const tableDecorationField = StateField.define<DecorationSet>({
   create(state) {
     return buildTableDecorations(state);
@@ -1084,6 +1126,11 @@ const tableDecorationField = StateField.define<DecorationSet>({
     }
 
     if (!transaction.docChanged) {
+      if (
+        syntaxTree(transaction.state) !== syntaxTree(transaction.startState)
+      ) {
+        return buildTableDecorations(transaction.state);
+      }
       return decorations;
     }
 
@@ -1092,6 +1139,13 @@ const tableDecorationField = StateField.define<DecorationSet>({
       transaction.annotation(syncTableEditAnnotation) &&
       transactionTouchesOnlyActiveCell(transaction, resolved)
     ) {
+      return decorations.map(transaction.changes);
+    }
+
+    // When the change doesn't touch any Table node, map existing
+    // decorations through position changes. This avoids rebuilding
+    // all table widgets on every keystroke outside of tables.
+    if (!changesAffectTables(transaction)) {
       return decorations.map(transaction.changes);
     }
 

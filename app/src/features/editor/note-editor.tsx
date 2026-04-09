@@ -529,8 +529,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           editableExtension,
           contentAttributesExtension,
           EditorView.updateListener.of((update) => {
+            let markdown: string | null = null;
+            const getMarkdown = () =>
+              (markdown ??= update.state.doc.toString());
+
             if (update.docChanged && !applyingExternalChangeRef.current) {
-              onChangeRef.current(update.state.doc.toString());
+              // Defer the onChange callback so the Zustand store update
+              // (and the React re-render it triggers) doesn't block the
+              // current keystroke from painting.
+              const md = getMarkdown();
+              setTimeout(() => onChangeRef.current(md), 0);
             }
 
             if (
@@ -543,14 +551,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
             if (update.docChanged) {
               const query = getSearchQuery(update.state);
-              onSearchMatchCountChangeRef.current?.(
-                countSearchMatches(update.state, query),
-              );
+              if (query.valid) {
+                onSearchMatchCountChangeRef.current?.(
+                  countSearchMatches(update.state, query),
+                );
+              } else {
+                onSearchMatchCountChangeRef.current?.(0);
+              }
             }
 
             if (update.docChanged || update.selectionSet) {
               setToolbarState(
-                getToolbarState(update.state.doc.toString(), {
+                getToolbarState(getMarkdown(), {
                   anchor: update.state.selection.main.anchor,
                   head: update.state.selection.main.head,
                 }),

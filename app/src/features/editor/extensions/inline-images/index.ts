@@ -285,10 +285,26 @@ export function findInlineImageBeforeCursor(
   state: EditorState,
   cursor: number,
 ): InlineImageMatch | null {
-  for (const match of findInlineImages(state)) {
-    if (match.to === cursor) {
-      return match;
-    }
+  // Only check the current line instead of scanning the entire document.
+  // Image syntax is always single-line so a line-scoped search is correct.
+  const line = state.doc.lineAt(cursor);
+  const tree = syntaxTree(state);
+  const regex = new RegExp(INLINE_IMAGE_REGEX.source, "g");
+  const slice = state.doc.sliceString(line.from, line.to);
+
+  let m;
+  while ((m = regex.exec(slice)) !== null) {
+    const from = line.from + m.index;
+    const to = from + m[0].length;
+
+    if (to !== cursor) continue;
+    if (isInsideCodeBlock(tree, from)) continue;
+
+    const altText = m[1] ?? "";
+    const src = m[2] ?? "";
+    if (!src) continue;
+
+    return { altText, from, src, to };
   }
 
   return null;
@@ -364,10 +380,9 @@ function inlineImagePlugin(searchQuery = "") {
       searchMatches: SearchMatch[];
 
       constructor(view: EditorView) {
-        this.searchMatches = collectSearchMatches(
-          view.state.doc.toString(),
-          searchQuery,
-        );
+        this.searchMatches = searchQuery
+          ? collectSearchMatches(view.state.doc.toString(), searchQuery)
+          : [];
         this.decorations = buildInlineImageDecorations(
           view,
           this.searchMatches,
@@ -381,10 +396,9 @@ function inlineImagePlugin(searchQuery = "") {
           syntaxTree(update.state) !== syntaxTree(update.startState)
         ) {
           if (update.docChanged) {
-            this.searchMatches = collectSearchMatches(
-              update.state.doc.toString(),
-              searchQuery,
-            );
+            this.searchMatches = searchQuery
+              ? collectSearchMatches(update.state.doc.toString(), searchQuery)
+              : [];
           }
           this.decorations = buildInlineImageDecorations(
             update.view,
