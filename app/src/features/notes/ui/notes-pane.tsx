@@ -390,6 +390,7 @@ type NoteRowProps = {
   note: NoteSummary;
   onContextMenu(event: MouseEvent<HTMLButtonElement>, note: NoteSummary): void;
   onMoveSelection(direction: NoteListNavigationDirection): void;
+  onRowRef(noteId: string, element: HTMLButtonElement | null): void;
   onSelectNote(noteId: string): void;
   searchWords: string[];
   selectedNoteId: string | null;
@@ -487,6 +488,7 @@ const NoteRow = memo(function NoteRow({
   note,
   onContextMenu,
   onMoveSelection,
+  onRowRef,
   onSelectNote,
   searchWords,
   selectedNoteId,
@@ -520,6 +522,9 @@ const NoteRow = memo(function NoteRow({
           isSearchFocused,
         })}
         data-comet-selected-note={isActive ? "true" : undefined}
+        ref={(element) => {
+          onRowRef(note.id, element);
+        }}
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
         onFocus={() => {
@@ -679,6 +684,7 @@ export function NotesPane({
   const pendingNotesPaneSelectionRef = useRef<
     FocusNotesPaneDetail["selection"] | null
   >(null);
+  const noteRowRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const shouldRestoreSelectedRowFocusRef = useRef(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -747,6 +753,7 @@ export function NotesPane({
         return;
       }
 
+      noteRowRefs.current.get(nextNoteId)?.scrollIntoView({ block: "nearest" });
       setIsSearchFocused(false);
       onSelectNote(nextNoteId);
     },
@@ -1028,6 +1035,13 @@ export function NotesPane({
                       onContextMenu={handleNoteContextMenu}
                       onMoveSelection={(direction) => {
                         handleMoveSelection(note.id, direction);
+                      }}
+                      onRowRef={(noteId, element) => {
+                        if (element) {
+                          noteRowRefs.current.set(noteId, element);
+                        } else {
+                          noteRowRefs.current.delete(noteId);
+                        }
                       }}
                       onSelectNote={(noteId) => {
                         setIsSearchFocused(false);

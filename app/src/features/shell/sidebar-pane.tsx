@@ -1257,6 +1257,9 @@ export function SidebarPane({
     }
 
     event.preventDefault();
+    sidebarRowRefs.current
+      .get(nextItem.id)
+      ?.scrollIntoView({ block: "nearest" });
     selectSidebarNavigationItem({
       item: nextItem,
       onSelectAll,
