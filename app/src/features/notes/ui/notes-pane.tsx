@@ -32,6 +32,10 @@ import { useInView } from "react-intersection-observer";
 
 import { Button } from "@/shared/ui/button";
 import { searchWordsFromQuery } from "@/shared/lib/search";
+import {
+  type NoteListNavigationDirection,
+  getAdjacentNoteId,
+} from "@/features/notes/lib/note-list-navigation";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 import {
@@ -378,6 +382,7 @@ type NoteRowProps = {
   isSearchFocused: boolean;
   note: NoteSummary;
   onContextMenu(event: MouseEvent<HTMLButtonElement>, note: NoteSummary): void;
+  onMoveSelection(direction: NoteListNavigationDirection): void;
   onSelectNote(noteId: string): void;
   searchWords: string[];
   selectedNoteId: string | null;
@@ -437,6 +442,7 @@ const NoteRow = memo(function NoteRow({
   isSearchFocused,
   note,
   onContextMenu,
+  onMoveSelection,
   onSelectNote,
   searchWords,
   selectedNoteId,
@@ -473,6 +479,18 @@ const NoteRow = memo(function NoteRow({
         onContextMenu={(event) => onContextMenu(event, note)}
         onFocus={() => {
           useShellStore.getState().setFocusedPane("notes");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            onMoveSelection("next");
+            return;
+          }
+
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            onMoveSelection("previous");
+          }
         }}
         onPointerDown={(event) => {
           handleNoteRowPointerDown(event);
@@ -617,6 +635,27 @@ export function NotesPane({
       onChangeSearch(nextQuery);
     },
     [onChangeSearch],
+  );
+
+  const handleMoveSelection = useCallback(
+    (currentNoteId: string, direction: NoteListNavigationDirection) => {
+      if (isMutatingNote) {
+        return;
+      }
+
+      const nextNoteId = getAdjacentNoteId(
+        filteredNotes,
+        currentNoteId,
+        direction,
+      );
+      if (!nextNoteId) {
+        return;
+      }
+
+      setIsSearchFocused(false);
+      onSelectNote(nextNoteId);
+    },
+    [filteredNotes, isMutatingNote, onSelectNote],
   );
 
   useEffect(() => {
@@ -817,6 +856,9 @@ export function NotesPane({
                       key={note.id}
                       note={note}
                       onContextMenu={handleNoteContextMenu}
+                      onMoveSelection={(direction) => {
+                        handleMoveSelection(note.id, direction);
+                      }}
                       onSelectNote={(noteId) => {
                         setIsSearchFocused(false);
                         onSelectNote(noteId);

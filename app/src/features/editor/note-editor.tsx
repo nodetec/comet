@@ -522,6 +522,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               },
             },
             {
+              key: "Escape",
+              run(view) {
+                useShellStore.getState().setFocusedPane("notes");
+                blurEditorView(view);
+                return true;
+              },
+            },
+            {
               key: "Mod-a",
               run(view) {
                 selectAllCursorRef.current = view.state.selection.main.head;
