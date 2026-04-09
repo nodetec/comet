@@ -16,6 +16,7 @@ import {
 } from "@/features/editor/extensions/tables/cell-selection-state";
 import {
   activeTableCellField,
+  clearActiveTableCellEffect,
   setActiveTableCellEffect,
 } from "@/features/editor/extensions/tables/state";
 
@@ -151,6 +152,30 @@ describe("table runtime", () => {
     expect(
       currentCell?.querySelector(".cm-md-table-cell-editor"),
     ).not.toBeNull();
+
+    view.destroy();
+  });
+
+  it("does not reopen a stale cell editor after the active cell is cleared", async () => {
+    const { view } = createView(
+      ["| H1 | H2 |", "| --- | --- |", "| A1 | A2 |"].join("\n"),
+    );
+
+    view.dispatch({
+      effects: setActiveTableCellEffect.of({
+        col: 0,
+        row: 0,
+        section: "header",
+        tableFrom: 0,
+      }),
+    });
+    view.dispatch({
+      effects: clearActiveTableCellEffect.of(),
+    });
+
+    await flush();
+
+    expect(view.dom.querySelector(".cm-md-table-cell-editor")).toBeNull();
 
     view.destroy();
   });

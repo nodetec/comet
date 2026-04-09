@@ -1794,12 +1794,6 @@ class NestedTableEditorController {
         break;
       }
     }
-    scheduleMainSelectionToLocalSelection(
-      initialSelection,
-      localText,
-      mainView,
-      resolved,
-    );
     const state = EditorState.create({
       doc: localText,
       selection: EditorSelection.single(
@@ -2123,17 +2117,26 @@ class NestedTableEditorController {
       parent: host,
       state,
     });
-    this.editor.contentDOM.focus({ preventScroll: true });
+    let openedSelection = initialSelection;
 
     if (pendingOpen?.clickCoords) {
       const pos = this.editor.posAtCoords(pendingOpen.clickCoords);
       if (pos != null) {
+        openedSelection = { anchor: pos, head: pos };
         this.editor.dispatch({
           selection: EditorSelection.cursor(pos),
           scrollIntoView: false,
         });
       }
     }
+
+    scheduleMainSelectionToLocalSelection(
+      openedSelection,
+      localText,
+      mainView,
+      resolved,
+    );
+    this.editor.contentDOM.focus({ preventScroll: true });
   }
 
   handleMainEditorUpdate(mainView: EditorView) {
@@ -2539,7 +2542,11 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
           ),
         )
       ) {
-        this.sync();
+        this.sync({
+          deferOpen: !update.transactions.some((transaction) =>
+            transaction.annotation(normalizeBeforeEditAnnotation),
+          ),
+        });
       }
     }
 
@@ -2549,7 +2556,7 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
       destroyTableCellMenu(this.view);
     }
 
-    private sync() {
+    private sync({ deferOpen = true }: { deferOpen?: boolean } = {}) {
       const activeCell = getActiveTableCell(this.view.state);
       if (!activeCell) {
         this.controller.close();
@@ -2608,12 +2615,45 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
         this.view,
         resolved.activeCell,
       );
-      requestAnimationFrame(() => {
+      const openIfStillActive = () => {
         if (!this.view.dom.isConnected) {
           return;
         }
-        this.controller.open(this.view, resolved, cellElement, pendingOpen);
-      });
+        const latestActiveCell = getActiveTableCell(this.view.state);
+        if (
+          !latestActiveCell ||
+          !isSameActiveTableCell(latestActiveCell, resolved.activeCell)
+        ) {
+          return;
+        }
+        const latestResolved = getResolvedActiveTableCell(this.view.state);
+        if (
+          !latestResolved ||
+          !isSameActiveTableCell(latestResolved.activeCell, resolved.activeCell)
+        ) {
+          return;
+        }
+        const latestCellElement = findActiveCellElement(
+          this.view,
+          latestResolved.activeCell,
+        );
+        if (!latestCellElement) {
+          return;
+        }
+        this.controller.open(
+          this.view,
+          latestResolved,
+          latestCellElement,
+          pendingOpen,
+        );
+      };
+
+      if (!deferOpen) {
+        openIfStillActive();
+        return;
+      }
+
+      requestAnimationFrame(openIfStillActive);
     }
   },
 );
