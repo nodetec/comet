@@ -139,6 +139,58 @@ export function getListMarkerData(
   };
 }
 
+const LIST_NODE_NAMES = new Set(["BulletList", "OrderedList", "ListItem"]);
+
+/**
+ * Check whether any of the changed ranges in a transaction intersect
+ * with list-related syntax nodes. When they don't, the existing
+ * decorations can be cheaply mapped through position changes instead
+ * of doing a full tree iteration.
+ */
+function changesAffectLists(transaction: Transaction): boolean {
+  let found = false;
+
+  transaction.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+    if (found) return;
+
+    // Check the old tree (handles deletions of list markers)
+    const oldTree = syntaxTree(transaction.startState);
+    const oldDoc = transaction.startState.doc;
+    const oldFrom = oldDoc.lineAt(fromA).from;
+    const oldTo = oldDoc.lineAt(Math.min(toA, oldDoc.length)).to;
+    oldTree.iterate({
+      from: oldFrom,
+      to: oldTo,
+      enter(node) {
+        if (LIST_NODE_NAMES.has(node.name)) {
+          found = true;
+          return false;
+        }
+      },
+    });
+
+    if (found) return;
+
+    // Check the new tree (handles insertions of list markers)
+    const newTree = syntaxTree(transaction.state);
+    const newDoc = transaction.state.doc;
+    const newFrom = newDoc.lineAt(fromB).from;
+    const newTo = newDoc.lineAt(Math.min(toB, newDoc.length)).to;
+    newTree.iterate({
+      from: newFrom,
+      to: newTo,
+      enter(node) {
+        if (LIST_NODE_NAMES.has(node.name)) {
+          found = true;
+          return false;
+        }
+      },
+    });
+  });
+
+  return found;
+}
+
 function createListStateField(
   decorate: (state: EditorState) => [DecorationSet, DecorationSet],
 ) {
@@ -148,8 +200,28 @@ function createListStateField(
     },
     update(value, transaction) {
       if (!transaction.docChanged) {
+        // Rebuild when the syntax tree finishes parsing (new nodes
+        // may have appeared that weren't visible during the initial
+        // docChanged update).
+        if (
+          syntaxTree(transaction.state) !== syntaxTree(transaction.startState)
+        ) {
+          return decorate(transaction.state);
+        }
         return value;
       }
+
+      // When the change doesn't touch any list nodes, map existing
+      // decorations through position changes instead of doing a full
+      // tree iteration. This avoids 5 × O(n) tree walks per keystroke
+      // when typing in headings, paragraphs, code blocks, etc.
+      if (!changesAffectLists(transaction)) {
+        return [
+          value[0].map(transaction.changes),
+          value[1].map(transaction.changes),
+        ];
+      }
+
       return decorate(transaction.state);
     },
     provide(field) {

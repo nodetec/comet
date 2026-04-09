@@ -274,10 +274,9 @@ export function markdownDecorationsPlugin(searchQuery = "") {
       pendingFocusLossRebuild = false;
 
       constructor(view: EditorView) {
-        this.searchMatches = collectSearchMatches(
-          view.state.doc.toString(),
-          searchQuery,
-        );
+        this.searchMatches = searchQuery
+          ? collectSearchMatches(view.state.doc.toString(), searchQuery)
+          : [];
         const { atomicRanges, decorations } = buildDecorations(
           view,
           this.searchMatches,
@@ -346,10 +345,9 @@ export function markdownDecorationsPlugin(searchQuery = "") {
 
       rebuildFromUpdate(update: ViewUpdate) {
         if (update.docChanged) {
-          this.searchMatches = collectSearchMatches(
-            update.state.doc.toString(),
-            searchQuery,
-          );
+          this.searchMatches = searchQuery
+            ? collectSearchMatches(update.state.doc.toString(), searchQuery)
+            : [];
         }
 
         if (isEditorDebugEnabled()) {
