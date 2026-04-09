@@ -24,8 +24,14 @@ import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
 import { SidebarPane } from "@/features/shell/sidebar-pane";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import {
+  dispatchFocusEditor,
+  dispatchFocusNotesPane,
+} from "@/shared/lib/pane-navigation";
+import {
+  getPaneFocusShortcut,
   isCommandPaletteShortcut,
   isEditorFindShortcut,
   isNotesSearchShortcut,
@@ -77,6 +83,7 @@ function App() {
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
 
   const openCommandPalette = useEffectEvent(() => {
     setCommandPaletteOpen(true);
@@ -88,6 +95,20 @@ function App() {
 
   const openEditorFind = useEffectEvent(() => {
     window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
+  });
+
+  const focusPane = useEffectEvent((pane: "sidebar" | "notes" | "editor") => {
+    if (pane === "editor") {
+      dispatchFocusEditor();
+      return;
+    }
+
+    if (pane === "notes") {
+      dispatchFocusNotesPane();
+      return;
+    }
+
+    setFocusedPane(pane);
   });
 
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -112,6 +133,15 @@ function App() {
       event.stopPropagation();
       event.stopImmediatePropagation();
       openEditorFind();
+      return;
+    }
+
+    const paneShortcut = getPaneFocusShortcut(event);
+    if (paneShortcut) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      focusPane(paneShortcut);
       return;
     }
 

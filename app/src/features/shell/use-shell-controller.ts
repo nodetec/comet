@@ -1650,6 +1650,7 @@ export function useShellController() {
       isLoadingMoreNotes: notesQuery.isFetchingNextPage,
       sortField: noteSortField,
       sortDirection: noteSortDirection,
+      isNotesPlaceholderData: notesQuery.isPlaceholderData,
       onChangeSortField: (field: NoteSortField) =>
         setNoteSortPrefs(sortViewKey, { field }),
       onChangeSortDirection: (direction: NoteSortDirection) =>
@@ -1701,6 +1702,7 @@ export function useShellController() {
       noteSortField,
       notesQuery.hasNextPage,
       notesQuery.isFetchingNextPage,
+      notesQuery.isPlaceholderData,
       searchQuery,
       setNoteSortPrefs,
       setSearchQuery,

@@ -109,6 +109,7 @@ type NoteEditorProps = {
 export type NoteEditorHandle = {
   blur(): void;
   focus(): void;
+  focusAtStart(): void;
   focusAtEnd(): void;
   redo(): boolean;
   undo(): boolean;
@@ -268,6 +269,20 @@ function focusEditorAtEndPreservingScroll(view: EditorView) {
 
   if (scrollContainer) {
     lockEditorScrollPosition(scrollContainer, scrollTop);
+  }
+}
+
+function focusEditorAtStart(view: EditorView) {
+  useShellStore.getState().setFocusedPane("editor");
+  view.dispatch({
+    selection: EditorSelection.cursor(0),
+    scrollIntoView: false,
+  });
+  view.focus();
+
+  const scrollContainer = findEditorScrollContainer(view);
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0;
   }
 }
 
@@ -765,6 +780,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             return;
           }
           viewRef.current?.focus();
+        },
+        focusAtStart() {
+          if (readOnly || !viewRef.current) {
+            return;
+          }
+
+          focusEditorAtStart(viewRef.current);
         },
         focusAtEnd() {
           if (readOnly || !viewRef.current) {

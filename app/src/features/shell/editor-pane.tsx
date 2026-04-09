@@ -35,6 +35,10 @@ import {
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
 import {
+  type FocusEditorDetail,
+  FOCUS_EDITOR_EVENT,
+} from "@/shared/lib/pane-navigation";
+import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
@@ -691,6 +695,30 @@ export function EditorPane({
     window.addEventListener("keydown", handleGlobalHistoryKeyDown);
     return () =>
       window.removeEventListener("keydown", handleGlobalHistoryKeyDown);
+  }, []);
+
+  const handleFocusEditor = useEffectEvent((event: Event) => {
+    if (!noteId) {
+      return;
+    }
+
+    const customEvent = event as CustomEvent<FocusEditorDetail>;
+    const scrollTo = customEvent.detail?.scrollTo ?? "preserve";
+
+    setFocusedPane("editor");
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+      if (scrollTo === "top") {
+        scrollContainerRef.current?.scrollTo({ top: 0 });
+      }
+    });
+  });
+
+  useEffect(() => {
+    window.addEventListener(FOCUS_EDITOR_EVENT, handleFocusEditor);
+    return () => {
+      window.removeEventListener(FOCUS_EDITOR_EVENT, handleFocusEditor);
+    };
   }, []);
 
   const backlinksButton =

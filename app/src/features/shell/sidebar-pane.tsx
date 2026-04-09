@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useMemo,
   useRef,
@@ -32,7 +33,16 @@ import {
 } from "lucide-react";
 
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { getNoteListNavigationDirectionForKey } from "@/features/notes/lib/note-list-navigation";
+import {
+  flattenVisibleSidebarNavigationItems,
+  getActiveSidebarNavigationItemId,
+  getAdjacentSidebarNavigationItem,
+  getSidebarCollapseAction,
+  getSidebarExpandAction,
+} from "@/features/shell/lib/sidebar-navigation";
 import { Button } from "@/shared/ui/button";
+import { dispatchFocusNotesPane } from "@/shared/lib/pane-navigation";
 import { cn } from "@/shared/lib/utils";
 import {
   DialogBackdrop,
@@ -71,7 +81,7 @@ function sidebarItemClasses(isActive: boolean, isFocused?: boolean) {
   } else {
     stateClass = "";
   }
-  return `text-sidebar-foreground flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm transition-colors ${stateClass}`;
+  return `text-sidebar-foreground flex w-full cursor-default items-center gap-3 rounded-md px-2.5 py-1 text-left text-sm outline-none ring-0 transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${stateClass}`;
 }
 
 function SidebarIndentedContent({
@@ -118,6 +128,21 @@ function SidebarRowContent({
       </span>
     </div>
   );
+}
+
+function focusSidebarRow(element: HTMLElement | null) {
+  if (!element) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      element.scrollIntoView({
+        block: "nearest",
+      });
+      element.focus({ preventScroll: true });
+    });
+  });
 }
 
 function ancestorSidebarTagPaths(path: string) {
@@ -425,6 +450,7 @@ function TagTree({
   onSetTagPinned,
   onToggleExpanded,
   onSelectTagPath,
+  onSidebarRowFocus,
   onTagRowRef,
 }: {
   activeTagPath: string | null;
@@ -437,7 +463,8 @@ function TagTree({
   onSetTagPinned(path: string, pinned: boolean): void;
   onToggleExpanded(path: string): void;
   onSelectTagPath(path: string): void;
-  onTagRowRef(path: string, element: HTMLDivElement | null): void;
+  onSidebarRowFocus(): void;
+  onTagRowRef(path: string, element: HTMLElement | null): void;
 }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -451,6 +478,7 @@ function TagTree({
           <div key={node.path}>
             <div
               className={cn(sidebarItemClasses(isActive, isFocused), "group")}
+              data-comet-sidebar-active={isActive ? "true" : undefined}
               data-comet-sidebar-tag-path={node.path}
               onClick={() => onSelectTagPath(node.path)}
               onContextMenu={(event) =>
@@ -461,7 +489,9 @@ function TagTree({
                   onSetTagPinned,
                 })
               }
+              onFocus={onSidebarRowFocus}
               ref={(element) => onTagRowRef(node.path, element)}
+              tabIndex={-1}
             >
               <SidebarIndentedContent indentLevel={indentLevel}>
                 <SidebarRowContent
@@ -515,6 +545,7 @@ function TagTree({
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={onToggleExpanded}
                 onSelectTagPath={onSelectTagPath}
+                onSidebarRowFocus={onSidebarRowFocus}
                 onTagRowRef={onTagRowRef}
               />
             </SidebarCollapse>
@@ -592,6 +623,126 @@ function RenameTagDialog({
   );
 }
 
+function isSidebarFilterActive(
+  filter: NoteFilter,
+  noteFilter: NoteFilter,
+  noteSectionHasActiveTag: boolean,
+) {
+  return noteFilter === filter && !noteSectionHasActiveTag;
+}
+
+function selectSidebarNavigationItem(params: {
+  item: ReturnType<typeof getAdjacentSidebarNavigationItem>;
+  onSelectAll: () => void;
+  onSelectArchive: () => void;
+  onSelectSidebarTagPath: (tagPath: string) => void;
+  onSelectPinned: () => void;
+  onSelectToday: () => void;
+  onSelectTodo: () => void;
+  onSelectTrash: () => void;
+  onSelectUntagged: () => void;
+}) {
+  const {
+    item,
+    onSelectAll,
+    onSelectArchive,
+    onSelectSidebarTagPath,
+    onSelectPinned,
+    onSelectToday,
+    onSelectTodo,
+    onSelectTrash,
+    onSelectUntagged,
+  } = params;
+
+  if (!item) {
+    return;
+  }
+
+  if (item.kind === "tag") {
+    onSelectSidebarTagPath(item.tagPath);
+    return;
+  }
+
+  switch (item.filter) {
+    case "all": {
+      onSelectAll();
+      break;
+    }
+    case "today": {
+      onSelectToday();
+      break;
+    }
+    case "todo": {
+      onSelectTodo();
+      break;
+    }
+    case "pinned": {
+      onSelectPinned();
+      break;
+    }
+    case "untagged": {
+      onSelectUntagged();
+      break;
+    }
+    case "archive": {
+      onSelectArchive();
+      break;
+    }
+    case "trash": {
+      onSelectTrash();
+      break;
+    }
+  }
+}
+
+function applySidebarCollapseAction(params: {
+  action: ReturnType<typeof getSidebarCollapseAction>;
+  onSelectAll: () => void;
+  onSelectSidebarTagPath: (tagPath: string) => void;
+  setNotesChildrenOpen: (open: boolean) => void;
+  toggleExpandedTagPath: (path: string) => void;
+}) {
+  const {
+    action,
+    onSelectAll,
+    onSelectSidebarTagPath,
+    setNotesChildrenOpen,
+    toggleExpandedTagPath,
+  } = params;
+  if (!action) {
+    return;
+  }
+
+  if (action.kind === "collapse-notes") {
+    setNotesChildrenOpen(false);
+    onSelectAll();
+    return;
+  }
+
+  toggleExpandedTagPath(action.tagPath);
+  if (action.nextTagPath) {
+    onSelectSidebarTagPath(action.nextTagPath);
+  }
+}
+
+function applySidebarExpandAction(params: {
+  action: ReturnType<typeof getSidebarExpandAction>;
+  setNotesChildrenOpen: (open: boolean) => void;
+  toggleExpandedTagPath: (path: string) => void;
+}) {
+  const { action, setNotesChildrenOpen, toggleExpandedTagPath } = params;
+  if (!action) {
+    return;
+  }
+
+  if (action.kind === "expand-notes") {
+    setNotesChildrenOpen(true);
+    return;
+  }
+
+  toggleExpandedTagPath(action.tagPath);
+}
+
 function NotesSection({
   archivedCount,
   isFocused,
@@ -599,6 +750,8 @@ function NotesSection({
   noteSectionHasActiveTag,
   notesChildrenOpen,
   onEmptyTrash,
+  onRowRef,
+  onSidebarRowFocus,
   onSelectAll,
   onSelectArchive,
   onSelectToday,
@@ -616,6 +769,8 @@ function NotesSection({
   noteSectionHasActiveTag: boolean;
   notesChildrenOpen: boolean;
   onEmptyTrash: () => void;
+  onRowRef: (itemId: string, element: HTMLElement | null) => void;
+  onSidebarRowFocus: () => void;
   onSelectAll: () => void;
   onSelectArchive: () => void;
   onSelectToday: () => void;
@@ -627,6 +782,43 @@ function NotesSection({
   todoCount: number;
   trashedCount: number;
 }) {
+  const isAllActive = isSidebarFilterActive(
+    "all",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isTodayActive = isSidebarFilterActive(
+    "today",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isTodoActive = isSidebarFilterActive(
+    "todo",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isPinnedActive = isSidebarFilterActive(
+    "pinned",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isUntaggedActive = isSidebarFilterActive(
+    "untagged",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isArchiveActive = isSidebarFilterActive(
+    "archive",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const isTrashActive = isSidebarFilterActive(
+    "trash",
+    noteFilter,
+    noteSectionHasActiveTag,
+  );
+  const showArchive = archivedCount > 0 || noteFilter === "archive";
+  const showTrash = trashedCount > 0 || noteFilter === "trash";
   const handleTrashContextMenu = (event: MouseEvent<HTMLButtonElement>) => {
     showTrashContextMenu(event, onEmptyTrash).catch(() => {});
   };
@@ -635,11 +827,12 @@ function NotesSection({
     <section className="flex flex-col gap-0.5">
       <div className="flex flex-col gap-0.5">
         <div
-          className={sidebarItemClasses(
-            noteFilter === "all" && !noteSectionHasActiveTag,
-            isFocused,
-          )}
+          className={sidebarItemClasses(isAllActive, isFocused)}
+          data-comet-sidebar-active={isAllActive ? "true" : undefined}
           onClick={onSelectAll}
+          onFocus={onSidebarRowFocus}
+          ref={(element) => onRowRef("filter:all", element)}
+          tabIndex={-1}
         >
           <SidebarRowContent
             chevron={
@@ -666,11 +859,11 @@ function NotesSection({
         <SidebarCollapse open={notesChildrenOpen}>
           <div className="flex flex-col gap-0.5">
             <button
-              className={sidebarItemClasses(
-                noteFilter === "today" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
+              className={sidebarItemClasses(isTodayActive, isFocused)}
               onClick={onSelectToday}
+              onFocus={onSidebarRowFocus}
+              ref={(element) => onRowRef("filter:today", element)}
+              data-comet-sidebar-active={isTodayActive ? "true" : undefined}
               type="button"
             >
               <SidebarIndentedContent indentLevel={1}>
@@ -683,11 +876,11 @@ function NotesSection({
               </SidebarIndentedContent>
             </button>
             <button
-              className={sidebarItemClasses(
-                noteFilter === "todo" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
+              className={sidebarItemClasses(isTodoActive, isFocused)}
               onClick={onSelectTodo}
+              onFocus={onSidebarRowFocus}
+              ref={(element) => onRowRef("filter:todo", element)}
+              data-comet-sidebar-active={isTodoActive ? "true" : undefined}
               type="button"
             >
               <SidebarIndentedContent indentLevel={1}>
@@ -704,11 +897,11 @@ function NotesSection({
               </SidebarIndentedContent>
             </button>
             <button
-              className={sidebarItemClasses(
-                noteFilter === "pinned" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
+              className={sidebarItemClasses(isPinnedActive, isFocused)}
               onClick={onSelectPinned}
+              onFocus={onSidebarRowFocus}
+              ref={(element) => onRowRef("filter:pinned", element)}
+              data-comet-sidebar-active={isPinnedActive ? "true" : undefined}
               type="button"
             >
               <SidebarIndentedContent indentLevel={1}>
@@ -719,11 +912,11 @@ function NotesSection({
               </SidebarIndentedContent>
             </button>
             <button
-              className={sidebarItemClasses(
-                noteFilter === "untagged" && !noteSectionHasActiveTag,
-                isFocused,
-              )}
+              className={sidebarItemClasses(isUntaggedActive, isFocused)}
               onClick={onSelectUntagged}
+              onFocus={onSidebarRowFocus}
+              ref={(element) => onRowRef("filter:untagged", element)}
+              data-comet-sidebar-active={isUntaggedActive ? "true" : undefined}
               type="button"
             >
               <SidebarIndentedContent indentLevel={1}>
@@ -736,13 +929,13 @@ function NotesSection({
           </div>
         </SidebarCollapse>
       </div>
-      {(archivedCount > 0 || noteFilter === "archive") && (
+      {showArchive && (
         <button
-          className={sidebarItemClasses(
-            noteFilter === "archive" && !noteSectionHasActiveTag,
-            isFocused,
-          )}
+          className={sidebarItemClasses(isArchiveActive, isFocused)}
           onClick={onSelectArchive}
+          onFocus={onSidebarRowFocus}
+          ref={(element) => onRowRef("filter:archive", element)}
+          data-comet-sidebar-active={isArchiveActive ? "true" : undefined}
           type="button"
         >
           <SidebarRowContent
@@ -751,14 +944,14 @@ function NotesSection({
           />
         </button>
       )}
-      {(trashedCount > 0 || noteFilter === "trash") && (
+      {showTrash && (
         <button
-          className={sidebarItemClasses(
-            noteFilter === "trash" && !noteSectionHasActiveTag,
-            isFocused,
-          )}
+          className={sidebarItemClasses(isTrashActive, isFocused)}
           onClick={onSelectTrash}
           onContextMenu={(event) => handleTrashContextMenu(event)}
+          onFocus={onSidebarRowFocus}
+          ref={(element) => onRowRef("filter:trash", element)}
+          data-comet-sidebar-active={isTrashActive ? "true" : undefined}
           type="button"
         >
           <SidebarRowContent
@@ -835,6 +1028,7 @@ export function SidebarPane({
   onSelectTagPath,
 }: SidebarPaneProps) {
   const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const openSettings = useUIStore((s) => s.setSettingsOpen);
   const notesChildrenOpen = useUIStore((s) => s.sidebarNotesChildrenOpen);
   const setNotesChildrenOpen = useUIStore((s) => s.setSidebarNotesChildrenOpen);
@@ -850,7 +1044,7 @@ export function SidebarPane({
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const footerSentinelRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const tagRowRefs = useRef(new Map<string, HTMLDivElement | null>());
+  const sidebarRowRefs = useRef(new Map<string, HTMLElement | null>());
   const { showHeaderBorder, setShowHeaderBorder, showFooterBorder } =
     useSidebarBorders({
       availableTagTreeLength: availableTagTree.length,
@@ -875,6 +1069,33 @@ export function SidebarPane({
   );
   useRenameInputFocus(renameDialogOpen, renameInputRef);
   const noteSectionHasActiveTag = activeTagPath !== null;
+  const sidebarNavigationItems = useMemo(
+    () =>
+      flattenVisibleSidebarNavigationItems({
+        archivedCount,
+        availableTagTree,
+        expandedTagPaths,
+        noteFilter,
+        notesChildrenOpen,
+        trashedCount,
+      }),
+    [
+      archivedCount,
+      availableTagTree,
+      expandedTagPaths,
+      noteFilter,
+      notesChildrenOpen,
+      trashedCount,
+    ],
+  );
+  const activeSidebarItemId = useMemo(
+    () =>
+      getActiveSidebarNavigationItemId({
+        activeTagPath,
+        noteFilter,
+      }),
+    [activeTagPath, noteFilter],
+  );
 
   useEffect(() => {
     const handleFocusTagPath = (event: Event) => {
@@ -903,7 +1124,7 @@ export function SidebarPane({
       return;
     }
 
-    const element = tagRowRefs.current.get(pendingScrollTagPath);
+    const element = sidebarRowRefs.current.get(`tag:${pendingScrollTagPath}`);
     const scrollContainer = scrollContainerRef.current;
     if (!element || !scrollContainer) {
       return;
@@ -921,6 +1142,21 @@ export function SidebarPane({
 
     setPendingScrollTagPath(null);
   }, [expandedTagPaths, pendingScrollTagPath]);
+
+  useEffect(() => {
+    if (!isFocused || renameDialogOpen) {
+      return;
+    }
+
+    focusSidebarRow(sidebarRowRefs.current.get(activeSidebarItemId) ?? null);
+  }, [
+    activeSidebarItemId,
+    expandedTagPaths,
+    isFocused,
+    notesChildrenOpen,
+    renameDialogOpen,
+    sidebarNavigationItems,
+  ]);
 
   const closeRenameDialog = () => {
     resetRenameDialog({
@@ -944,6 +1180,94 @@ export function SidebarPane({
   const handleSelectSidebarTagPath = (tagPath: string) => {
     setPendingScrollTagPath(tagPath);
     onSelectTagPath(tagPath);
+  };
+
+  const handleSidebarRowFocus = () => {
+    setFocusedPane("sidebar");
+  };
+
+  const handleSidebarKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+
+    const lowerKey = event.key.toLowerCase();
+    if (event.key === "Enter" || lowerKey === "o") {
+      event.preventDefault();
+      dispatchFocusNotesPane({ selection: "first" });
+      return;
+    }
+
+    if (lowerKey === "h" || event.key === "ArrowLeft") {
+      const collapseAction = getSidebarCollapseAction({
+        activeTagPath,
+        availableTagTree,
+        expandedTagPaths,
+        noteFilter,
+        notesChildrenOpen,
+      });
+      if (!collapseAction) {
+        return;
+      }
+
+      event.preventDefault();
+      applySidebarCollapseAction({
+        action: collapseAction,
+        onSelectAll,
+        onSelectSidebarTagPath: handleSelectSidebarTagPath,
+        setNotesChildrenOpen,
+        toggleExpandedTagPath,
+      });
+      return;
+    }
+
+    if (lowerKey === "l" || event.key === "ArrowRight") {
+      const expandAction = getSidebarExpandAction({
+        activeTagPath,
+        availableTagTree,
+        expandedTagPaths,
+        noteFilter,
+        notesChildrenOpen,
+      });
+      if (!expandAction) {
+        return;
+      }
+
+      event.preventDefault();
+      applySidebarExpandAction({
+        action: expandAction,
+        setNotesChildrenOpen,
+        toggleExpandedTagPath,
+      });
+      return;
+    }
+
+    const direction = getNoteListNavigationDirectionForKey(event.key);
+    if (!direction) {
+      return;
+    }
+
+    const nextItem = getAdjacentSidebarNavigationItem(
+      sidebarNavigationItems,
+      activeSidebarItemId,
+      direction,
+    );
+    if (!nextItem) {
+      return;
+    }
+
+    event.preventDefault();
+    selectSidebarNavigationItem({
+      item: nextItem,
+      onSelectAll,
+      onSelectArchive,
+      onSelectPinned,
+      onSelectSidebarTagPath: handleSelectSidebarTagPath,
+      onSelectToday,
+      onSelectTodo,
+      onSelectTrash,
+      onSelectUntagged,
+    });
   };
 
   return (
@@ -998,6 +1322,8 @@ export function SidebarPane({
         </header>
         <nav
           className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-2 pt-3"
+          onFocusCapture={handleSidebarRowFocus}
+          onKeyDown={handleSidebarKeyDown}
           onScroll={(event) => {
             setShowHeaderBorder(event.currentTarget.scrollTop > 0);
           }}
@@ -1010,6 +1336,14 @@ export function SidebarPane({
             noteSectionHasActiveTag={noteSectionHasActiveTag}
             notesChildrenOpen={notesChildrenOpen}
             onEmptyTrash={onEmptyTrash}
+            onRowRef={(itemId, element) => {
+              if (element) {
+                sidebarRowRefs.current.set(itemId, element);
+              } else {
+                sidebarRowRefs.current.delete(itemId);
+              }
+            }}
+            onSidebarRowFocus={handleSidebarRowFocus}
             onSelectAll={onSelectAll}
             onSelectArchive={onSelectArchive}
             onSelectToday={onSelectToday}
@@ -1041,11 +1375,12 @@ export function SidebarPane({
                 onSetTagPinned={onSetTagPinned}
                 onToggleExpanded={toggleExpandedTagPath}
                 onSelectTagPath={handleSelectSidebarTagPath}
+                onSidebarRowFocus={handleSidebarRowFocus}
                 onTagRowRef={(path, element) => {
                   if (element) {
-                    tagRowRefs.current.set(path, element);
+                    sidebarRowRefs.current.set(`tag:${path}`, element);
                   } else {
-                    tagRowRefs.current.delete(path);
+                    sidebarRowRefs.current.delete(`tag:${path}`);
                   }
                 }}
               />

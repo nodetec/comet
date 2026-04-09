@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getPaneFocusShortcut,
   isCommandPaletteShortcut,
   isEditorFindShortcut,
   isNotesSearchShortcut,
@@ -99,5 +100,46 @@ describe("isNotesSearchShortcut", () => {
 
   it("does not match Cmd+F", () => {
     expect(isNotesSearchShortcut(createKeyboardEvent())).toBe(false);
+  });
+});
+
+describe("getPaneFocusShortcut", () => {
+  it("maps Cmd+1/2/3 to sidebar, notes, and editor", () => {
+    expect(
+      getPaneFocusShortcut(
+        createKeyboardEvent({
+          code: "Digit1",
+          key: "1",
+        }),
+      ),
+    ).toBe("sidebar");
+    expect(
+      getPaneFocusShortcut(
+        createKeyboardEvent({
+          code: "Digit2",
+          key: "2",
+        }),
+      ),
+    ).toBe("notes");
+    expect(
+      getPaneFocusShortcut(
+        createKeyboardEvent({
+          code: "Digit3",
+          key: "3",
+        }),
+      ),
+    ).toBe("editor");
+  });
+
+  it("does not match when Shift is also pressed", () => {
+    expect(
+      getPaneFocusShortcut(
+        createKeyboardEvent({
+          code: "Digit1",
+          key: "!",
+          shiftKey: true,
+        }),
+      ),
+    ).toBeNull();
   });
 });

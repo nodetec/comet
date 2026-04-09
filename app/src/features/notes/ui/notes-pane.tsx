@@ -38,6 +38,11 @@ import {
   getNoteListNavigationDirectionForKey,
 } from "@/features/notes/lib/note-list-navigation";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  dispatchFocusEditor,
+  type FocusNotesPaneDetail,
+  FOCUS_NOTES_PANE_EVENT,
+} from "@/shared/lib/pane-navigation";
 
 import {
   type NoteFilter,
@@ -85,6 +90,7 @@ type NotesPaneProps = {
   isCreatingNote: boolean;
   isLoadingMoreNotes: boolean;
   isMutatingNote: boolean;
+  isNotesPlaceholderData: boolean;
   noteFilter: NoteFilter;
   searchQuery: string;
   selectedNoteId: string | null;
@@ -434,6 +440,36 @@ function focusSelectedNoteRow(root?: ParentNode | null) {
   });
 }
 
+function focusNotesPaneTarget(scrollContainer: HTMLDivElement | null) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const selectedRow = scrollContainer?.querySelector<HTMLButtonElement>(
+        '[data-comet-selected-note="true"]',
+      );
+      if (selectedRow) {
+        selectedRow.focus({ preventScroll: true });
+        return;
+      }
+
+      scrollContainer?.focus({ preventScroll: true });
+    });
+  });
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName;
+  return (
+    target.isContentEditable ||
+    tagName === "INPUT" ||
+    tagName === "SELECT" ||
+    tagName === "TEXTAREA"
+  );
+}
+
 const NoteRow = memo(function NoteRow({
   focusedPane,
   highlightWords,
@@ -453,6 +489,7 @@ const NoteRow = memo(function NoteRow({
 }: NoteRowProps) {
   const isActive = note.id === selectedNoteId;
   const cardPreview = noteCardPreview(note, searchWords);
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
 
   return (
     <motion.div
@@ -482,10 +519,33 @@ const NoteRow = memo(function NoteRow({
           useShellStore.getState().setFocusedPane("notes");
         }}
         onKeyDown={(event) => {
+          if (event.metaKey || event.ctrlKey || event.altKey) {
+            return;
+          }
+
+          const lowerKey = event.key.toLowerCase();
           const direction = getNoteListNavigationDirectionForKey(event.key);
           if (direction) {
             event.preventDefault();
             onMoveSelection(direction);
+            return;
+          }
+
+          if (event.key === "Enter" || lowerKey === "o") {
+            event.preventDefault();
+            dispatchFocusEditor({ scrollTo: "top" });
+            return;
+          }
+
+          if (lowerKey === "l") {
+            event.preventDefault();
+            dispatchFocusEditor();
+            return;
+          }
+
+          if (event.key === "Escape" || lowerKey === "h") {
+            event.preventDefault();
+            setFocusedPane("sidebar");
           }
         }}
         onPointerDown={(event) => {
@@ -555,6 +615,7 @@ export function NotesPane({
   isCreatingNote,
   isLoadingMoreNotes,
   isMutatingNote,
+  isNotesPlaceholderData,
   noteFilter,
   searchQuery,
   selectedNoteId,
@@ -579,6 +640,7 @@ export function NotesPane({
   totalNoteCount,
 }: NotesPaneProps) {
   const focusedPane = useShellStore((s) => s.focusedPane);
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";
   const [isSearchOpen, setIsSearchOpen] = useState(
@@ -607,6 +669,9 @@ export function NotesPane({
 
   const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingNotesPaneSelectionRef = useRef<
+    FocusNotesPaneDetail["selection"] | null
+  >(null);
   const shouldRestoreSelectedRowFocusRef = useRef(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -633,6 +698,33 @@ export function NotesPane({
     [onChangeSearch],
   );
 
+  const focusSearchInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }, []);
+
+  const closeSearchAndRestoreFocus = useCallback(
+    (options?: { clearQuery?: boolean }) => {
+      if (options?.clearQuery && searchQuery) {
+        applySearchQuery("");
+      }
+
+      setIsSearchOpen(false);
+      setIsSearchFocused(false);
+
+      if (selectedNoteId) {
+        setFocusedPane("notes");
+        focusSelectedNoteRow(scrollContainerRef.current);
+        return;
+      }
+
+      setFocusedPane("sidebar");
+    },
+    [applySearchQuery, searchQuery, selectedNoteId, setFocusedPane],
+  );
+
   const handleMoveSelection = useCallback(
     (currentNoteId: string, direction: NoteListNavigationDirection) => {
       if (isMutatingNote) {
@@ -654,6 +746,16 @@ export function NotesPane({
     [filteredNotes, isMutatingNote, onSelectNote],
   );
 
+  const selectFirstVisibleNote = useCallback(() => {
+    const firstNoteId = filteredNotes[0]?.id;
+    if (!firstNoteId) {
+      return false;
+    }
+
+    onSelectNote(firstNoteId);
+    return true;
+  }, [filteredNotes, onSelectNote]);
+
   useEffect(() => {
     if (searchQuery) {
       setIsSearchOpen(true);
@@ -671,29 +773,78 @@ export function NotesPane({
 
   useEffect(() => {
     const handleFocusSearch = () => {
+      setFocusedPane("notes");
       setIsSearchOpen(true);
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
+      focusSearchInput();
     };
     window.addEventListener("comet:focus-search", handleFocusSearch);
     return () =>
       window.removeEventListener("comet:focus-search", handleFocusSearch);
-  }, []);
+  }, [focusSearchInput, setFocusedPane]);
+
+  useEffect(() => {
+    const handleFocusNotesPane = (event: Event) => {
+      const customEvent = event as CustomEvent<FocusNotesPaneDetail>;
+      const selection = customEvent.detail?.selection ?? "selected";
+
+      if (selection === "first") {
+        if (isNotesPlaceholderData) {
+          pendingNotesPaneSelectionRef.current = "first";
+          return;
+        }
+
+        setIsSearchFocused(false);
+        selectFirstVisibleNote();
+        return;
+      }
+
+      pendingNotesPaneSelectionRef.current = "selected";
+      setFocusedPane("notes");
+      setIsSearchFocused(false);
+      focusNotesPaneTarget(scrollContainerRef.current);
+    };
+
+    window.addEventListener(FOCUS_NOTES_PANE_EVENT, handleFocusNotesPane);
+    return () => {
+      window.removeEventListener(FOCUS_NOTES_PANE_EVENT, handleFocusNotesPane);
+    };
+  }, [isNotesPlaceholderData, selectFirstVisibleNote, setFocusedPane]);
 
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
   }, [activeTagPath, filteredNotes.length, noteFilter, searchQuery]);
 
   useEffect(() => {
-    if (isSearchFocused || !selectedNoteId) {
+    if (isSearchFocused || focusedPane !== "notes") {
       return;
     }
 
-    if (focusedPane === "notes" || shouldRestoreSelectedRowFocusRef.current) {
+    if (pendingNotesPaneSelectionRef.current && isNotesPlaceholderData) {
+      return;
+    }
+
+    if (selectedNoteId || shouldRestoreSelectedRowFocusRef.current) {
+      pendingNotesPaneSelectionRef.current = null;
       shouldRestoreSelectedRowFocusRef.current = false;
       focusSelectedNoteRow(scrollContainerRef.current);
+      return;
     }
-  }, [filteredNotes.length, focusedPane, isSearchFocused, selectedNoteId]);
+
+    if (pendingNotesPaneSelectionRef.current && selectFirstVisibleNote()) {
+      pendingNotesPaneSelectionRef.current = null;
+      return;
+    }
+
+    pendingNotesPaneSelectionRef.current = null;
+    focusNotesPaneTarget(scrollContainerRef.current);
+  }, [
+    filteredNotes.length,
+    focusedPane,
+    isNotesPlaceholderData,
+    isSearchFocused,
+    selectFirstVisibleNote,
+    selectedNoteId,
+  ]);
 
   useEffect(() => {
     if (!inView || !hasMoreNotes) {
@@ -723,7 +874,27 @@ export function NotesPane({
   };
 
   return (
-    <section className="bg-background flex h-full min-h-0 flex-col">
+    <section
+      className="bg-background flex h-full min-h-0 flex-col"
+      onKeyDown={(event) => {
+        if (
+          event.defaultPrevented ||
+          focusedPane !== "notes" ||
+          isEditableKeyboardTarget(event.target) ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.altKey ||
+          event.shiftKey ||
+          event.key !== "/"
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        setIsSearchOpen(true);
+        focusSearchInput();
+      }}
+    >
       <header
         className={[
           "h-13 w-full shrink-0 px-3",
@@ -742,11 +913,7 @@ export function NotesPane({
                 onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
-                    if (searchQuery) {
-                      applySearchQuery("");
-                    }
-
-                    setIsSearchOpen(false);
+                    closeSearchAndRestoreFocus({ clearQuery: true });
                   }
                 }}
                 placeholder="Search…"
@@ -756,8 +923,7 @@ export function NotesPane({
               <Button
                 className="text-muted-foreground hover:bg-accent hover:text-accent-foreground absolute top-1/2 right-1 z-10 -translate-y-1/2"
                 onClick={() => {
-                  applySearchQuery("");
-                  setIsSearchOpen(false);
+                  closeSearchAndRestoreFocus({ clearQuery: true });
                 }}
                 onMouseDown={(event) => event.preventDefault()}
                 size="icon-xs"
@@ -827,6 +993,7 @@ export function NotesPane({
           setShowHeaderBorder(event.currentTarget.scrollTop > 0);
         }}
         ref={scrollContainerRef}
+        tabIndex={-1}
       >
         {filteredNotes.length === 0 ? (
           <div className="flex h-full items-center justify-center">

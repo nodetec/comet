@@ -3,6 +3,8 @@ type ShortcutEvent = Pick<
   "altKey" | "code" | "ctrlKey" | "key" | "metaKey" | "shiftKey"
 >;
 
+export type PaneShortcutTarget = "sidebar" | "notes" | "editor";
+
 function matchesShortcut(
   event: ShortcutEvent,
   {
@@ -40,4 +42,27 @@ export function isNotesSearchShortcut(event: ShortcutEvent) {
     key: "f",
     shift: true,
   });
+}
+
+export function getPaneFocusShortcut(
+  event: ShortcutEvent,
+): PaneShortcutTarget | null {
+  if ((!event.metaKey && !event.ctrlKey) || event.altKey || event.shiftKey) {
+    return null;
+  }
+
+  switch (event.code) {
+    case "Digit1": {
+      return "sidebar";
+    }
+    case "Digit2": {
+      return "notes";
+    }
+    case "Digit3": {
+      return "editor";
+    }
+    default: {
+      return null;
+    }
+  }
 }
