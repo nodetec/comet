@@ -33,6 +33,11 @@ type WikiLinkTarget = {
 };
 
 type LinkTarget = ExternalLinkTarget | WikiLinkTarget;
+type LinkHit = {
+  from: number;
+  target: LinkTarget;
+  to: number;
+};
 
 const linkMark = Decoration.mark({ class: "cm-md-link" });
 const LINK_NODE_NAMES = new Set(["Autolink", "Link"]);
@@ -233,6 +238,50 @@ function getExternalLinkTargetFromNode(
   return EXTERNAL_LINK_SCHEME_RE.test(url) ? url : null;
 }
 
+function getExternalLinkHitFromNode(
+  state: EditorState,
+  node: SyntaxNode,
+): LinkHit | null {
+  const url = getExternalLinkTargetFromNode(state, node);
+  if (!url) {
+    return null;
+  }
+
+  if (node.name === "Link") {
+    const marks = node.getChildren("LinkMark");
+    if (marks.length < 2) {
+      return null;
+    }
+
+    const from = marks[0]!.to;
+    const to = marks[1]!.from;
+    if (from >= to) {
+      return null;
+    }
+
+    return {
+      from,
+      target: { type: "external", url },
+      to,
+    };
+  }
+
+  if (node.name === "Autolink") {
+    const urlNode = node.getChild("URL");
+    if (!urlNode || urlNode.from >= urlNode.to) {
+      return null;
+    }
+
+    return {
+      from: urlNode.from,
+      target: { type: "external", url },
+      to: urlNode.to,
+    };
+  }
+
+  return null;
+}
+
 function isVisibleLinkPosition(node: SyntaxNode, position: number): boolean {
   if (node.name === "Link") {
     const marks = node.getChildren("LinkMark");
@@ -251,11 +300,11 @@ function isVisibleLinkPosition(node: SyntaxNode, position: number): boolean {
   return false;
 }
 
-function findSyntaxTreeLinkTargetAtPosition(
+function findSyntaxTreeLinkHitAtPosition(
   state: EditorState,
   position: number,
   allowPreviousCharacterFallback: boolean,
-): string | null {
+): LinkHit | null {
   const candidates = new Set([position]);
   if (allowPreviousCharacterFallback) {
     candidates.add(Math.max(0, position - 1));
@@ -273,17 +322,17 @@ function findSyntaxTreeLinkTargetAtPosition(
         continue;
       }
 
-      return getExternalLinkTargetFromNode(state, node);
+      return getExternalLinkHitFromNode(state, node);
     }
   }
 
   return null;
 }
 
-function findPlainExternalLinkTargetAtPosition(
+function findPlainExternalLinkHitAtPosition(
   state: EditorState,
   position: number,
-): string | null {
+): LinkHit | null {
   const line = state.doc.lineAt(position);
   const offset = position - line.from;
   const tree = syntaxTree(state);
@@ -314,10 +363,30 @@ function findPlainExternalLinkTargetAtPosition(
       continue;
     }
 
-    return target;
+    return {
+      from: absoluteFrom,
+      target: { type: "external", url: target },
+      to: absoluteTo,
+    };
   }
 
   return null;
+}
+
+function findExternalLinkHitAtPosition(
+  state: EditorState,
+  position: number,
+  options: {
+    allowPreviousCharacterFallback?: boolean;
+  } = {},
+): LinkHit | null {
+  return (
+    findSyntaxTreeLinkHitAtPosition(
+      state,
+      position,
+      options.allowPreviousCharacterFallback ?? true,
+    ) ?? findPlainExternalLinkHitAtPosition(state, position)
+  );
 }
 
 export function findExternalLinkTargetAtPosition(
@@ -327,20 +396,15 @@ export function findExternalLinkTargetAtPosition(
     allowPreviousCharacterFallback?: boolean;
   } = {},
 ): string | null {
-  return (
-    findSyntaxTreeLinkTargetAtPosition(
-      state,
-      position,
-      options.allowPreviousCharacterFallback ?? true,
-    ) ?? findPlainExternalLinkTargetAtPosition(state, position)
-  );
+  const hit = findExternalLinkHitAtPosition(state, position, options);
+  return hit?.target.type === "external" ? hit.target.url : null;
 }
 
-function findWikiLinkTargetAtPosition(
+function findWikiLinkHitAtPosition(
   state: EditorState,
   position: number,
   allowPreviousCharacterFallback: boolean,
-): WikiLinkTarget | null {
+): LinkHit | null {
   const candidates = new Set([position]);
   if (allowPreviousCharacterFallback) {
     candidates.add(Math.max(0, position - 1));
@@ -366,9 +430,13 @@ function findWikiLinkTargetAtPosition(
       }
 
       return {
-        location: utf8ByteOffsetForText(state.doc.toString(), node.from),
-        title,
-        type: "wikilink",
+        from: labelFrom,
+        target: {
+          location: utf8ByteOffsetForText(state.doc.toString(), node.from),
+          title,
+          type: "wikilink",
+        },
+        to: labelTo,
       };
     }
   }
@@ -380,14 +448,67 @@ function shouldOpenLink(event: MouseEvent) {
   return event.button === 0;
 }
 
-function asExternalLinkTarget(url: string | null): ExternalLinkTarget | null {
-  return url ? { type: "external", url } : null;
+function getVisibleRangeClientRects(
+  view: EditorView,
+  from: number,
+  to: number,
+): DOMRect[] {
+  try {
+    const start = view.domAtPos(from, 1);
+    const end = view.domAtPos(to, -1);
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    return [...range.getClientRects()];
+  } catch {
+    return [];
+  }
 }
 
-function getLinkTargetFromEvent(
+function isPointInRect(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, "bottom" | "left" | "right" | "top">,
+): boolean {
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
+}
+
+function isPointerInsideLinkHit(
   view: EditorView,
   event: MouseEvent,
-): LinkTarget | null {
+  hit: LinkHit,
+): boolean {
+  const rangeRects = getVisibleRangeClientRects(view, hit.from, hit.to);
+  if (rangeRects.length > 0) {
+    return rangeRects.some((rect) =>
+      isPointInRect(event.clientX, event.clientY, rect),
+    );
+  }
+
+  const startRect =
+    view.coordsAtPos(hit.from, 1) ?? view.coordsAtPos(hit.from, -1);
+  const endRect = view.coordsAtPos(hit.to, -1) ?? view.coordsAtPos(hit.to, 1);
+  if (!startRect || !endRect) {
+    return true;
+  }
+
+  return isPointInRect(event.clientX, event.clientY, {
+    bottom: Math.max(startRect.bottom, endRect.bottom),
+    left: Math.min(startRect.left, startRect.right),
+    right: Math.max(endRect.left, endRect.right),
+    top: Math.min(startRect.top, endRect.top),
+  });
+}
+
+function getLinkHitFromEvent(
+  view: EditorView,
+  event: MouseEvent,
+): LinkHit | null {
   const { target } = event;
   if (!(target instanceof Node) || !view.contentDOM.contains(target)) {
     return null;
@@ -400,29 +521,31 @@ function getLinkTargetFromEvent(
       return null;
     }
 
-    const position = view.posAtCoords(
-      { x: event.clientX, y: event.clientY },
-      false,
-    );
+    const position = view.posAtCoords({
+      x: event.clientX,
+      y: event.clientY,
+    });
     if (position != null) {
-      return (
-        findWikiLinkTargetAtPosition(view.state, position, false) ??
-        asExternalLinkTarget(
-          findExternalLinkTargetAtPosition(view.state, position, {
-            allowPreviousCharacterFallback: false,
-          }),
-        )
-      );
+      const hit =
+        findWikiLinkHitAtPosition(view.state, position, false) ??
+        findExternalLinkHitAtPosition(view.state, position, {
+          allowPreviousCharacterFallback: false,
+        });
+      if (!hit || !isPointerInsideLinkHit(view, event, hit)) {
+        return null;
+      }
+
+      return hit;
     }
+
+    return null;
   }
 
   try {
     const position = view.posAtDOM(target, 0);
     return (
-      findWikiLinkTargetAtPosition(view.state, position, true) ??
-      asExternalLinkTarget(
-        findExternalLinkTargetAtPosition(view.state, position),
-      )
+      findWikiLinkHitAtPosition(view.state, position, true) ??
+      findExternalLinkHitAtPosition(view.state, position)
     );
   } catch {
     return null;
@@ -563,8 +686,8 @@ export function linkInteractions(noteId: string | null): Extension {
         return false;
       }
 
-      const targetLink = getLinkTargetFromEvent(view, event);
-      if (!targetLink) {
+      const hit = getLinkHitFromEvent(view, event);
+      if (!hit) {
         return false;
       }
 
@@ -577,18 +700,18 @@ export function linkInteractions(noteId: string | null): Extension {
         return false;
       }
 
-      const targetLink = getLinkTargetFromEvent(view, event);
-      if (!targetLink) {
+      const hit = getLinkHitFromEvent(view, event);
+      if (!hit) {
         return false;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      if (targetLink.type === "external") {
-        void openUrl(targetLink.url).catch(() => {});
+      if (hit.target.type === "external") {
+        void openUrl(hit.target.url).catch(() => {});
       } else {
-        console.debug("[wikilinks] clicked wikilink target", targetLink);
-        void openWikiLink(noteId, targetLink);
+        console.debug("[wikilinks] clicked wikilink target", hit.target);
+        void openWikiLink(noteId, hit.target);
       }
       return true;
     },

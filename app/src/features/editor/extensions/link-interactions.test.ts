@@ -228,6 +228,80 @@ describe("Editor link interactions", () => {
     view.destroy();
   });
 
+  it("does not open markdown links when the pointer lands in link padding", async () => {
+    const doc = "[Example](https://example.com)";
+    const { view } = createView(doc);
+
+    await flush();
+
+    const link = view.dom.querySelector(".cm-md-link");
+    expect(link).not.toBeNull();
+
+    const originalPosAtCoords = view.posAtCoords.bind(view);
+    const originalPosAtDOM = view.posAtDOM.bind(view);
+    const originalCoordsAtPos = view.coordsAtPos.bind(view);
+    const createRangeSpy = vi.spyOn(document, "createRange").mockImplementation(
+      () =>
+        ({
+          getClientRects: () => [],
+          setEnd: () => {},
+          setStart: () => {},
+        }) as unknown as Range,
+    );
+    Object.assign(view, {
+      coordsAtPos: (pos: number, side?: -1 | 1) => {
+        if (pos === doc.indexOf("Example") && side === 1) {
+          return DOMRect.fromRect({
+            height: 20,
+            width: 0,
+            x: 10,
+            y: 10,
+          });
+        }
+
+        if (pos === doc.indexOf("Example") + "Example".length && side === -1) {
+          return DOMRect.fromRect({
+            height: 20,
+            width: 0,
+            x: 70,
+            y: 10,
+          });
+        }
+
+        return originalCoordsAtPos(pos, side);
+      },
+      posAtCoords: () => doc.indexOf("Example"),
+      posAtDOM: () => doc.indexOf("Example"),
+    });
+
+    link?.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+    link?.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        button: 0,
+        clientX: 100,
+        clientY: 20,
+      }),
+    );
+
+    expect(openUrlMock).not.toHaveBeenCalled();
+
+    Object.assign(view, {
+      coordsAtPos: originalCoordsAtPos,
+      posAtCoords: originalPosAtCoords,
+      posAtDOM: originalPosAtDOM,
+    });
+    createRangeSpy.mockRestore();
+    view.destroy();
+  });
+
   it("opens plain external URLs on plain click", async () => {
     const { view } = createView("See https://github.com/nodeca/pica now");
 
