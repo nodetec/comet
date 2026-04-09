@@ -433,9 +433,15 @@ function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
 function focusSelectedNoteRow(root?: ParentNode | null) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      (root ?? document)
-        .querySelector<HTMLButtonElement>('[data-comet-selected-note="true"]')
-        ?.focus({ preventScroll: true });
+      const selectedRow = (root ?? document).querySelector<HTMLButtonElement>(
+        '[data-comet-selected-note="true"]',
+      );
+      if (!selectedRow) {
+        return;
+      }
+
+      selectedRow.scrollIntoView({ block: "nearest" });
+      selectedRow.focus({ preventScroll: true });
     });
   });
 }
@@ -447,6 +453,7 @@ function focusNotesPaneTarget(scrollContainer: HTMLDivElement | null) {
         '[data-comet-selected-note="true"]',
       );
       if (selectedRow) {
+        selectedRow.scrollIntoView({ block: "nearest" });
         selectedRow.focus({ preventScroll: true });
         return;
       }
