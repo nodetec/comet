@@ -192,4 +192,20 @@ describe("Advanced list rendering", () => {
 
     view.destroy();
   });
+
+  it("does not leave a source spacer after the decorated task marker", async () => {
+    const { view } = createView(
+      "- [ ] Task item that should wrap onto another line",
+    );
+
+    await flush();
+
+    const taskLine = view.dom.querySelector(".cm-line.cm-md-task-list");
+    expect(taskLine).not.toBeNull();
+    expect(taskLine?.textContent).toBe(
+      "Task item that should wrap onto another line",
+    );
+
+    view.destroy();
+  });
 });

@@ -30,8 +30,7 @@ import {
 const BULLET_INDENT = 2;
 const ORDERED_INDENT = 3;
 const LIST_INDENT_STEP = "1.5rem";
-const LIST_MARKER_WIDTH = "2rem";
-const LIST_WRAP_INDENT_OFFSET = "0.2rem";
+const LIST_MARKER_WIDTH = "2.2rem";
 const LIST_CHILD_BLOCK_OFFSET = LIST_MARKER_WIDTH;
 const LIST_SOURCE_INDENT_CHAR_WIDTH = "0.25rem";
 const BLOCKQUOTE_PREFIX_RE = /^(?:[ \t]{0,3}> ?)+/;
@@ -1396,9 +1395,9 @@ function addMarkerDecorations(
           },
         }).range(data.lineStart),
         Decoration.replace({}).range(data.markerStart, data.markerEnd + 1),
-        taskMarkerDecoration.range(taskStart, taskEnd),
+        taskMarkerDecoration.range(taskStart, taskEnd + 1),
       );
-      atomicRanges.push(taskMarkerDecoration.range(taskStart, taskEnd));
+      atomicRanges.push(taskMarkerDecoration.range(taskStart, taskEnd + 1));
 
       if (checked && taskEnd + 1 < line.to) {
         decorationRanges.push(
@@ -1826,11 +1825,9 @@ const listTheme = EditorView.theme({
   ".cm-md-list": {
     "--cm-md-list-indent-step": LIST_INDENT_STEP,
     "--cm-md-list-marker-width": LIST_MARKER_WIDTH,
-    "--cm-md-list-wrap-indent-offset": LIST_WRAP_INDENT_OFFSET,
     paddingLeft:
-      "calc(var(--indent-level) * var(--cm-md-list-indent-step) + var(--cm-md-list-marker-width) + var(--cm-md-list-wrap-indent-offset)) !important",
-    textIndent:
-      "calc(-1 * (var(--cm-md-list-marker-width) + var(--cm-md-list-wrap-indent-offset)))",
+      "calc(var(--indent-level) * var(--cm-md-list-indent-step) + var(--cm-md-list-marker-width)) !important",
+    textIndent: "calc(var(--cm-md-list-marker-width) * -1)",
   },
   ".cm-md-list *": {
     textIndent: "0",
@@ -1907,7 +1904,7 @@ const listTheme = EditorView.theme({
     height: "1.15em",
     lineHeight: "1",
     position: "relative",
-    transform: "translateY(0.20em)",
+    transform: "translateY(0.24em)",
     width: "1.15em",
   },
   ".cm-md-task-marker-checked .cm-md-task-marker-box": {
