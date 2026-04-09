@@ -36,6 +36,10 @@ export function isEditorFindShortcut(event: ShortcutEvent) {
   return matchesShortcut(event, { code: "KeyF", key: "f" });
 }
 
+export function isSidebarToggleShortcut(event: ShortcutEvent) {
+  return matchesShortcut(event, { code: "KeyE", key: "e" });
+}
+
 export function isNotesSearchShortcut(event: ShortcutEvent) {
   return matchesShortcut(event, {
     code: "KeyF",

@@ -35,6 +35,7 @@ import {
   isCommandPaletteShortcut,
   isEditorFindShortcut,
   isNotesSearchShortcut,
+  isSidebarToggleShortcut,
 } from "@/shared/lib/keyboard";
 
 const TAURI_EVENT_COMMAND_PALETTE = "menu-command-palette";
@@ -83,6 +84,8 @@ function App() {
   useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
 
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
+  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
 
   const openCommandPalette = useEffectEvent(() => {
@@ -117,6 +120,14 @@ function App() {
       event.stopPropagation();
       event.stopImmediatePropagation();
       openCommandPalette();
+      return;
+    }
+
+    if (isSidebarToggleShortcut(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      toggleSidebar();
       return;
     }
 
@@ -280,20 +291,28 @@ function App() {
             data-tauri-drag-region
           />
         ) : null}
-        <Container className="h-full w-full" id="comet-shell">
-          <Section
-            defaultSize={200}
-            disableResponsive
-            minSize={180}
-            className="select-none"
-          >
-            <SidebarPane {...sidebarPaneProps} />
-          </Section>
-          <Bar
-            className="bg-separator z-30 cursor-col-resize"
-            expandInteractiveArea={{ left: 5, right: 5 }}
-            size={1}
-          />
+        <Container
+          className="h-full w-full"
+          id="comet-shell"
+          key={sidebarVisible ? "s" : "h"}
+        >
+          {sidebarVisible ? (
+            <>
+              <Section
+                defaultSize={200}
+                disableResponsive
+                minSize={180}
+                className="select-none"
+              >
+                <SidebarPane {...sidebarPaneProps} />
+              </Section>
+              <Bar
+                className="bg-separator z-30 cursor-col-resize"
+                expandInteractiveArea={{ left: 5, right: 5 }}
+                size={1}
+              />
+            </>
+          ) : null}
 
           <Section
             defaultSize={280}

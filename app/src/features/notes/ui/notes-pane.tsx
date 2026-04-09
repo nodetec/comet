@@ -37,6 +37,7 @@ import {
   getAdjacentNoteId,
   getNoteListNavigationDirectionForKey,
 } from "@/features/notes/lib/note-list-navigation";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
   dispatchFocusEditor,
@@ -498,6 +499,7 @@ const NoteRow = memo(function NoteRow({
 }: NoteRowProps) {
   const isActive = note.id === selectedNoteId;
   const cardPreview = noteCardPreview(note, searchWords);
+  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
 
   return (
@@ -557,6 +559,9 @@ const NoteRow = memo(function NoteRow({
 
           if (event.key === "Escape" || lowerKey === "h") {
             event.preventDefault();
+            if (!sidebarVisible) {
+              useUIStore.getState().toggleSidebar();
+            }
             setFocusedPane("sidebar");
           }
         }}
@@ -653,6 +658,7 @@ export function NotesPane({
 }: NotesPaneProps) {
   const focusedPane = useShellStore((s) => s.focusedPane);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
+  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";
   const [isSearchOpen, setIsSearchOpen] = useState(
@@ -912,6 +918,7 @@ export function NotesPane({
       <header
         className={[
           "h-13 w-full shrink-0 px-3",
+          sidebarVisible ? "" : "pl-20",
           showHeaderBorder ? "border-separator border-b" : "",
         ].join(" ")}
       >

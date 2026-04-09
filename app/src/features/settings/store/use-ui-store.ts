@@ -46,6 +46,9 @@ type UIStore = {
   expandedSidebarTagPaths: string[];
   setExpandedSidebarTagPaths(paths: string[]): void;
 
+  sidebarVisible: boolean;
+  toggleSidebar(): void;
+
   sidebarNotesChildrenOpen: boolean;
   setSidebarNotesChildrenOpen(open: boolean): void;
 
@@ -113,6 +116,11 @@ export const useUIStore = create<UIStore>()(
         set({ expandedSidebarTagPaths });
       },
 
+      sidebarVisible: true,
+      toggleSidebar: () => {
+        set((state) => ({ sidebarVisible: !state.sidebarVisible }));
+      },
+
       sidebarNotesChildrenOpen: true,
       setSidebarNotesChildrenOpen: (sidebarNotesChildrenOpen) => {
         set({ sidebarNotesChildrenOpen });
@@ -126,6 +134,7 @@ export const useUIStore = create<UIStore>()(
         editorSpellCheck: state.editorSpellCheck,
         editorVimMode: state.editorVimMode,
         themeName: state.themeName,
+        sidebarVisible: state.sidebarVisible,
         noteSortPrefs: state.noteSortPrefs,
         expandedSidebarTagPaths: state.expandedSidebarTagPaths,
         sidebarNotesChildrenOpen: state.sidebarNotesChildrenOpen,

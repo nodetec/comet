@@ -1194,7 +1194,10 @@ export function SidebarPane({
     const lowerKey = event.key.toLowerCase();
     if (event.key === "Enter" || lowerKey === "o") {
       event.preventDefault();
-      dispatchFocusNotesPane({ selection: "first" });
+      const hasSelection = !!useShellStore.getState().selectedNoteId;
+      dispatchFocusNotesPane({
+        selection: hasSelection ? "selected" : "first",
+      });
       return;
     }
 
