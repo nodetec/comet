@@ -132,6 +132,7 @@ pub fn upsert_tombstone_from_sync(
         ],
     )?;
     clear_resolved_note_conflicts(conn, &tombstone.id, &tombstone.vector_clock)?;
+    crate::adapters::sqlite::snapshot_repository::prune_oldest_tombstones(conn)?;
     invalidate_cache(&tombstone.id);
     Ok(Some(tombstone.id.clone()))
 }

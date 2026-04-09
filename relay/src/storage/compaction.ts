@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, lt, min } from "drizzle-orm";
 
 import type { SnapshotRelayDb } from "../db";
-import { syncPayloads, syncSnapshots } from "./schema";
+import { syncChanges, syncPayloads, syncSnapshots } from "./schema";
 import {
+  MAX_DEL_SNAPSHOTS_PER_AUTHOR,
   RETAINED_SNAPSHOT_WINDOW_PER_DOCUMENT,
   SNAPSHOT_RETENTION_MODE,
 } from "../domain/snapshots/retention";
@@ -10,6 +11,7 @@ import { selectNondominatedSnapshotIds } from "../domain/snapshots/vector-clock"
 
 export type CompactionStore = {
   compactPayloadsBefore: (mtime: number) => Promise<number>;
+  pruneTombstones: () => Promise<number>;
   minRetainedCreatedAt: () => Promise<number | null>;
   retentionInfo: () => Promise<{
     snapshotRetention: {
@@ -151,6 +153,138 @@ export function createCompactionStore(db: SnapshotRelayDb): CompactionStore {
       });
 
       return candidates.length;
+    },
+    async pruneTombstones() {
+      // Use vector clocks (not mtime) to determine each document's current
+      // state — matching the same logic used by compactPayloadsBefore and
+      // bootstrap queries.  A document is "currently deleted" only when
+      // every nondominated snapshot is op='del'.  Documents with any
+      // nondominated 'put' (live or conflicted) are never pruned.
+      const allSnapshots = await db
+        .select({
+          authorPubkey: syncSnapshots.authorPubkey,
+          dTag: syncSnapshots.dTag,
+          snapshotId: syncSnapshots.snapshotId,
+          op: syncSnapshots.op,
+          mtime: syncSnapshots.mtime,
+          vectorClock: syncSnapshots.vectorClock,
+          eventId: syncSnapshots.eventId,
+        })
+        .from(syncSnapshots);
+
+      if (allSnapshots.length === 0) {
+        return 0;
+      }
+
+      // Group by document
+      type SnapshotRow = (typeof allSnapshots)[number];
+      const rowsByDocument = new Map<string, SnapshotRow[]>();
+      for (const row of allSnapshots) {
+        const key = `${row.authorPubkey}:${row.dTag}`;
+        const group = rowsByDocument.get(key);
+        if (group) {
+          group.push(row);
+        } else {
+          rowsByDocument.set(key, [row]);
+        }
+      }
+
+      // Find documents whose nondominated snapshots are all 'del'
+      const currentlyDeleted = new Map<
+        string,
+        { dTag: string; maxNondominatedMtime: number }[]
+      >();
+
+      for (const [, group] of rowsByDocument) {
+        const nondominatedIds = selectNondominatedSnapshotIds(
+          group.map((row) => ({
+            snapshotId: row.snapshotId,
+            vectorClock: row.vectorClock,
+          })),
+        );
+
+        const nondominatedRows = group.filter((row) =>
+          nondominatedIds.has(row.snapshotId),
+        );
+
+        // If any nondominated snapshot is a 'put', the doc is live/conflicted
+        if (nondominatedRows.some((row) => row.op === "put")) {
+          continue;
+        }
+
+        const authorPubkey = group[0].authorPubkey;
+        const dTag = group[0].dTag;
+        const maxNondominatedMtime = Math.max(
+          ...nondominatedRows.map((row) => row.mtime),
+        );
+
+        const docs = currentlyDeleted.get(authorPubkey);
+        if (docs) {
+          docs.push({ dTag, maxNondominatedMtime });
+        } else {
+          currentlyDeleted.set(authorPubkey, [{ dTag, maxNondominatedMtime }]);
+        }
+      }
+
+      let totalPruned = 0;
+
+      for (const [authorPubkey, docs] of currentlyDeleted) {
+        if (docs.length <= MAX_DEL_SNAPSHOTS_PER_AUTHOR) {
+          continue;
+        }
+
+        // Sort newest first by the nondominated mtime, keep the newest,
+        // prune the rest.
+        docs.sort((a, b) => b.maxNondominatedMtime - a.maxNondominatedMtime);
+        const excess = docs.slice(MAX_DEL_SNAPSHOTS_PER_AUTHOR);
+        const dTags = excess.map((doc) => doc.dTag);
+
+        await db.transaction(async (tx) => {
+          const eventIds = await tx
+            .select({ eventId: syncSnapshots.eventId })
+            .from(syncSnapshots)
+            .where(
+              and(
+                eq(syncSnapshots.authorPubkey, authorPubkey),
+                inArray(syncSnapshots.dTag, dTags),
+              ),
+            );
+
+          const payloadEventIds = eventIds
+            .map((row) => row.eventId)
+            .filter(
+              (eventId): eventId is string => typeof eventId === "string",
+            );
+
+          if (payloadEventIds.length > 0) {
+            await tx
+              .delete(syncPayloads)
+              .where(inArray(syncPayloads.eventId, payloadEventIds));
+          }
+
+          await tx
+            .delete(syncChanges)
+            .where(
+              and(
+                eq(syncChanges.authorPubkey, authorPubkey),
+                inArray(syncChanges.dTag, dTags),
+              ),
+            );
+
+          await tx
+            .delete(syncSnapshots)
+            .where(
+              and(
+                eq(syncSnapshots.authorPubkey, authorPubkey),
+                inArray(syncSnapshots.dTag, dTags),
+              ),
+            );
+        });
+
+        totalPruned += dTags.length;
+      }
+
+      return totalPruned;
     },
     minRetainedCreatedAt,
     async retentionInfo() {

@@ -28,6 +28,13 @@ export function createRetentionPolicyRuntime(options: {
   };
 
   const runCompaction = async (policy: RelayRetentionPolicy) => {
+    const prunedTombstones = await options.compaction.pruneTombstones();
+    if (prunedTombstones > 0) {
+      options.log?.(
+        `retention policy pruned ${prunedTombstones} tombstone documents`,
+      );
+    }
+
     if (policy.payloadRetentionDays === null) {
       return 0;
     }

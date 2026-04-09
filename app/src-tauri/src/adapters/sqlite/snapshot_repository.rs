@@ -6,6 +6,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 
 const LOCAL_RECENT_SNAPSHOT_WINDOW: usize = 10;
+const MAX_TOMBSTONES: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncRelayState {
@@ -400,6 +401,54 @@ fn prune_sync_snapshots_for_document(
     }
 
     Ok(delete_ids.len())
+}
+
+/// Prune sync artifacts for the oldest tombstoned documents beyond the cap.
+///
+/// The tombstone rows themselves are preserved — their vector clocks are
+/// needed to reject stale puts from other relays or delayed bootstraps.
+/// Only the associated `sync_snapshots` and `note_snapshot_history` rows
+/// are deleted, since those are the heavyweight data.
+pub fn prune_oldest_tombstones(conn: &Connection) -> Result<usize, AppError> {
+    let total: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM note_tombstones",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if total <= MAX_TOMBSTONES as i64 {
+        return Ok(0);
+    }
+
+    let excess = total - MAX_TOMBSTONES as i64;
+    let mut stmt = conn.prepare(
+        "SELECT id FROM note_tombstones
+         WHERE locally_modified = 0
+         ORDER BY deleted_at ASC
+         LIMIT ?1",
+    )?;
+    let prunable_ids: Vec<String> = stmt
+        .query_map(params![excess], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+
+    for note_id in &prunable_ids {
+        conn.execute(
+            "UPDATE note_tombstones
+             SET snapshot_event_id = NULL
+             WHERE id = ?1",
+            params![note_id],
+        )?;
+        conn.execute(
+            "DELETE FROM sync_snapshots WHERE d_tag = ?1",
+            params![note_id],
+        )?;
+        conn.execute(
+            "DELETE FROM note_snapshot_history WHERE note_id = ?1",
+            params![note_id],
+        )?;
+    }
+
+    Ok(prunable_ids.len())
 }
 
 #[cfg(test)]
@@ -813,5 +862,205 @@ mod tests {
         assert_eq!(note_tag_links, 0);
         assert_eq!(active_sync_relay_url, None);
         assert_eq!(relays, 1);
+    }
+
+    fn insert_tombstone(conn: &Connection, note_id: &str, deleted_at: i64, locally_modified: bool) {
+        conn.execute(
+            "INSERT INTO note_tombstones (id, deleted_at, last_edit_device_id, vector_clock, locally_modified)
+             VALUES (?1, ?2, 'DEVICE-A', '{}', ?3)",
+            params![note_id, deleted_at, i32::from(locally_modified)],
+        )
+        .unwrap();
+    }
+
+    fn tombstone_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM note_tombstones", [], |row| row.get(0)).unwrap()
+    }
+
+    fn tombstone_exists(conn: &Connection, note_id: &str) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM note_tombstones WHERE id = ?1",
+            params![note_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap()
+            > 0
+    }
+
+    fn tombstone_snapshot_event_id(conn: &Connection, note_id: &str) -> Option<String> {
+        conn.query_row(
+            "SELECT snapshot_event_id FROM note_tombstones WHERE id = ?1",
+            params![note_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .unwrap()
+        .flatten()
+    }
+
+    #[test]
+    fn prunes_oldest_tombstone_sync_artifacts_when_over_cap() {
+        let conn = setup_db();
+
+        for i in 0..105 {
+            let note_id = format!("note-{i:03}");
+            insert_tombstone(&conn, &note_id, i, false);
+            conn.execute(
+                "UPDATE note_tombstones SET snapshot_event_id = ?1 WHERE id = ?2",
+                params![format!("event-{i:03}"), note_id],
+            )
+            .unwrap();
+        }
+        assert_eq!(tombstone_count(&conn), 105);
+
+        let pruned = prune_oldest_tombstones(&conn).unwrap();
+        assert_eq!(pruned, 5);
+
+        // All 105 tombstone rows are preserved (vector clocks still guard
+        // against stale restores)
+        assert_eq!(tombstone_count(&conn), 105);
+
+        // Pruned tombstones had their snapshot_event_id cleared
+        for i in 0..5 {
+            assert!(tombstone_exists(&conn, &format!("note-{i:03}")));
+            assert_eq!(tombstone_snapshot_event_id(&conn, &format!("note-{i:03}")), None);
+        }
+        // Newest 100 still reference their snapshot events
+        for i in 5..105 {
+            assert_eq!(
+                tombstone_snapshot_event_id(&conn, &format!("note-{i:03}")),
+                Some(format!("event-{i:03}")),
+            );
+        }
+    }
+
+    #[test]
+    fn skips_locally_modified_tombstones_during_pruning() {
+        let conn = setup_db();
+
+        // 10 oldest are locally_modified
+        for i in 0..10 {
+            insert_tombstone(&conn, &format!("note-{i:03}"), i, true);
+        }
+        // 95 synced
+        for i in 10..105 {
+            insert_tombstone(&conn, &format!("note-{i:03}"), i, false);
+        }
+        assert_eq!(tombstone_count(&conn), 105);
+
+        let pruned = prune_oldest_tombstones(&conn).unwrap();
+        // Only synced ones can be pruned: need to remove 5, oldest synced start at i=10
+        assert_eq!(pruned, 5);
+
+        // All tombstone rows preserved
+        assert_eq!(tombstone_count(&conn), 105);
+        for i in 0..105 {
+            assert!(tombstone_exists(&conn, &format!("note-{i:03}")));
+        }
+    }
+
+    #[test]
+    fn cleans_up_sync_snapshots_and_history_for_pruned_tombstones() {
+        let conn = setup_db();
+
+        for i in 0..105 {
+            let note_id = format!("note-{i:03}");
+            insert_tombstone(&conn, &note_id, i, false);
+
+            upsert_sync_snapshot(
+                &conn,
+                &LocalSyncSnapshot {
+                    author_pubkey: "author-1".to_string(),
+                    d_tag: note_id.clone(),
+                    snapshot_id: format!("snapshot-{i:03}"),
+                    op: "del".to_string(),
+                    mtime: i,
+                    entity_type: Some("note".to_string()),
+                    event_id: Some(format!("snapshot-{i:03}")),
+                    payload_retained: true,
+                    relay_url: None,
+                    stored_seq: None,
+                    created_at: i,
+                },
+            )
+            .unwrap();
+
+            upsert_note_snapshot_history(
+                &conn,
+                &LocalNoteSnapshotHistoryEntry {
+                    snapshot_event_id: format!("snapshot-{i:03}"),
+                    note_id: note_id.clone(),
+                    op: "del".to_string(),
+                    device_id: "DEVICE-A".to_string(),
+                    vector_clock: "{}".to_string(),
+                    title: None,
+                    markdown: None,
+                    modified_at: i,
+                    edited_at: None,
+                    deleted_at: Some(i),
+                    archived_at: None,
+                    pinned_at: None,
+                    readonly: false,
+                    created_at: i,
+                    wikilink_resolutions: vec![],
+                },
+            )
+            .unwrap();
+        }
+
+        prune_oldest_tombstones(&conn).unwrap();
+
+        // Tombstone row preserved, but snapshot_event_id cleared
+        assert!(tombstone_exists(&conn, "note-000"));
+        assert_eq!(tombstone_snapshot_event_id(&conn, "note-000"), None);
+
+        // Pruned tombstone's sync snapshots and history should be gone
+        let snapshot_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE d_tag = 'note-000'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let history_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE note_id = 'note-000'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(snapshot_count, 0);
+        assert_eq!(history_count, 0);
+
+        // Surviving tombstone's data should remain
+        let snapshot_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sync_snapshots WHERE d_tag = 'note-104'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let history_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM note_snapshot_history WHERE note_id = 'note-104'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(snapshot_count, 1);
+        assert_eq!(history_count, 1);
+    }
+
+    #[test]
+    fn does_not_prune_tombstones_when_under_cap() {
+        let conn = setup_db();
+
+        for i in 0..50 {
+            insert_tombstone(&conn, &format!("note-{i:03}"), i, false);
+        }
+
+        let pruned = prune_oldest_tombstones(&conn).unwrap();
+        assert_eq!(pruned, 0);
+        assert_eq!(tombstone_count(&conn), 50);
     }
 }
