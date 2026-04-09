@@ -59,6 +59,7 @@ import { ensureNoteEditorVimNavigation } from "@/features/editor/lib/note-editor
 import { EditorToolbar } from "@/features/editor/ui/editor-toolbar";
 import { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations";
 import { getInlineSyntaxRightBoundaryAtCursor } from "@/features/editor/extensions/markdown-decorations/builders/inline-boundaries";
+import { getSnappedCursorPosition } from "@/features/editor/extensions/markdown-decorations/snap-cursor";
 import {
   TagGrammar,
   tagHighlightStyle,
@@ -176,6 +177,137 @@ function trySnapInlineSyntaxRightBoundaryClick(
   });
   view.focus();
   return true;
+}
+
+function isExcludedLeadingClickTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        [
+          ".cm-md-task-marker-box",
+          ".cm-md-task-marker-source",
+          ".cm-md-table-wrapper",
+          ".cm-md-table-cell",
+          ".cm-md-table-cell-editor",
+          ".cm-md-link",
+          ".cm-md-hr",
+        ].join(", "),
+      ),
+    )
+  );
+}
+
+function getLeadingPaddingClickLineStart(
+  view: EditorView,
+  event: Pick<MouseEvent, "clientX" | "clientY" | "target">,
+) {
+  if (isExcludedLeadingClickTarget(event.target)) {
+    return null;
+  }
+
+  const pos = view.posAtCoords(
+    {
+      x: event.clientX,
+      y: event.clientY,
+    },
+    false,
+  );
+  if (pos == null) {
+    return null;
+  }
+
+  const line = view.state.doc.lineAt(pos);
+  const clickedBlock = view.lineBlockAtHeight(event.clientY - view.documentTop);
+  if (clickedBlock.from !== line.from) {
+    return null;
+  }
+
+  const startRect =
+    view.coordsAtPos(line.from, 1) ?? view.coordsAtPos(line.from, -1);
+  if (!startRect) {
+    return null;
+  }
+
+  return event.clientX < Math.min(startRect.left, startRect.right)
+    ? line.from
+    : null;
+}
+
+function focusEditorPreservingScroll(view: EditorView) {
+  const scrollContainer = findEditorScrollContainer(view);
+  const scrollTop = scrollContainer?.scrollTop ?? 0;
+
+  useShellStore.getState().setFocusedPane("editor");
+  view.focus();
+
+  if (scrollContainer) {
+    lockEditorScrollPosition(scrollContainer, scrollTop);
+  }
+}
+
+function dispatchPointerCursorSelection(view: EditorView, pos: number) {
+  view.dispatch({
+    annotations: Transaction.userEvent.of("select.pointer"),
+    selection: EditorSelection.cursor(pos),
+    scrollIntoView: false,
+  });
+}
+
+function handleSpecialMouseDownSelection(
+  view: EditorView,
+  event: MouseEvent,
+  leadingPaddingLineStart: number | null,
+) {
+  if (trySnapInlineSyntaxRightBoundaryClick(view, event)) {
+    return true;
+  }
+
+  const horizontalRuleSelection = getHorizontalRuleSelection(
+    view,
+    event.target,
+    event.clientX,
+    event.clientY,
+  );
+  if (horizontalRuleSelection) {
+    event.preventDefault();
+    event.stopPropagation();
+    useShellStore.getState().setFocusedPane("editor");
+    view.focus();
+    view.dispatch({ selection: horizontalRuleSelection });
+    return true;
+  }
+
+  const tableBoundarySelection = getTableBoundarySelection(
+    view,
+    event.target,
+    event.clientX,
+    event.clientY,
+  );
+  if (tableBoundarySelection) {
+    event.preventDefault();
+    event.stopPropagation();
+    useShellStore.getState().setFocusedPane("editor");
+    view.focus();
+    view.dispatch({
+      scrollIntoView: false,
+      selection: tableBoundarySelection,
+    });
+    return true;
+  }
+
+  if (leadingPaddingLineStart != null) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!view.hasFocus) {
+      focusEditorPreservingScroll(view);
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
@@ -313,43 +445,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {
-              if (trySnapInlineSyntaxRightBoundaryClick(view, event)) {
-                return true;
-              }
-
-              if (!view.hasFocus) {
-                useShellStore.getState().setFocusedPane("editor");
-                view.contentDOM.focus({ preventScroll: true });
-              }
-
-              const horizontalRuleSelection = getHorizontalRuleSelection(
+              const leadingPaddingLineStart = getLeadingPaddingClickLineStart(
                 view,
-                event.target,
-                event.clientX,
-                event.clientY,
+                event,
               );
-              if (horizontalRuleSelection) {
-                event.preventDefault();
-                event.stopPropagation();
-                view.focus();
-                view.dispatch({ selection: horizontalRuleSelection });
-                return true;
-              }
 
-              const tableBoundarySelection = getTableBoundarySelection(
-                view,
-                event.target,
-                event.clientX,
-                event.clientY,
-              );
-              if (tableBoundarySelection) {
-                event.preventDefault();
-                event.stopPropagation();
-                view.focus();
-                view.dispatch({
-                  scrollIntoView: false,
-                  selection: tableBoundarySelection,
-                });
+              if (
+                handleSpecialMouseDownSelection(
+                  view,
+                  event,
+                  leadingPaddingLineStart,
+                )
+              ) {
                 return true;
               }
 
@@ -365,33 +472,41 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               if (!view.hasFocus) {
                 event.preventDefault();
 
-                const scrollContainer = findEditorScrollContainer(view);
-                const scrollTop = scrollContainer?.scrollTop ?? 0;
                 const clickedInsideTable =
                   event.target instanceof HTMLElement &&
                   event.target.closest(".cm-md-table-wrapper");
 
-                view.focus();
-
-                if (scrollContainer) {
-                  lockEditorScrollPosition(scrollContainer, scrollTop);
-                }
+                focusEditorPreservingScroll(view);
 
                 if (clickedInsideTable) {
                   return false;
                 }
 
                 if (directPos != null) {
-                  view.dispatch({
-                    selection: EditorSelection.cursor(directPos),
-                    scrollIntoView: false,
-                  });
+                  const snappedPos =
+                    getSnappedCursorPosition(view.state, directPos) ??
+                    directPos;
+
+                  dispatchPointerCursorSelection(view, snappedPos);
                 }
 
                 return true;
               }
 
               return false;
+            },
+            click(event, view) {
+              const lineStart = getLeadingPaddingClickLineStart(view, event);
+              if (lineStart == null) {
+                return false;
+              }
+
+              event.preventDefault();
+              event.stopPropagation();
+
+              focusEditorPreservingScroll(view);
+              dispatchPointerCursorSelection(view, lineStart);
+              return true;
             },
           }),
           EditorView.domEventHandlers({

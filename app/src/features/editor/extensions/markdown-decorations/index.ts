@@ -1,4 +1,8 @@
-import { type Extension } from "@codemirror/state";
+import {
+  EditorState,
+  type Extension,
+  type TransactionSpec,
+} from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
@@ -6,6 +10,7 @@ import { linkInteractions } from "@/features/editor/extensions/markdown-decorati
 import { tables } from "@/features/editor/extensions/markdown-decorations/builders/tables";
 import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
+import { getSnappedPointerSelection } from "@/features/editor/extensions/markdown-decorations/snap-cursor";
 import {
   isListExtensionsDisabled,
   logEditorDebug,
@@ -245,6 +250,27 @@ type MarkdownDecorationsOptions = {
   searchQuery?: string;
 };
 
+const pointerSelectionSnapExtension = EditorState.transactionFilter.of(
+  (transaction): readonly TransactionSpec[] => {
+    if (
+      transaction.docChanged ||
+      !transaction.selection ||
+      !transaction.isUserEvent("select.pointer")
+    ) {
+      return [transaction];
+    }
+
+    const selection = getSnappedPointerSelection(
+      transaction.startState,
+      transaction.newSelection,
+    );
+
+    return selection
+      ? [transaction, { selection, sequential: true }]
+      : [transaction];
+  },
+);
+
 export function markdownDecorations(
   options: MarkdownDecorationsOptions = {},
 ): Extension {
@@ -255,6 +281,7 @@ export function markdownDecorations(
   const listExtensions = listsDisabled ? [] : [lists()];
 
   return [
+    pointerSelectionSnapExtension,
     markdownDecorationsPlugin(options.searchQuery),
     markdownDecorationsTheme,
     linkInteractions(options.noteId ?? null),

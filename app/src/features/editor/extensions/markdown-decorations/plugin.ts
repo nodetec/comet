@@ -209,6 +209,19 @@ function buildDecorations(
   };
 }
 
+function queueDeferredSelectionRebuild(
+  view: EditorView,
+  pluginState: { pendingSelectionRebuild: boolean },
+) {
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      if (pluginState.pendingSelectionRebuild) {
+        view.dispatch({});
+      }
+    });
+  }, 0);
+}
+
 export function markdownDecorationsPlugin(searchQuery = "") {
   const plugin = ViewPlugin.fromClass(
     // ------------------------------------------------------------------
@@ -229,9 +242,9 @@ export function markdownDecorationsPlugin(searchQuery = "") {
     //    then reveals the syntax, shifting the text. CM's mouse tracking
     //    sees the shifted layout on mouseup and creates a small selection
     //    instead of a cursor. Fix: freeze all decoration rebuilds while
-    //    the mouse button is down. The deferred rebuild runs on mouseup
-    //    via queueMicrotask → dispatch, which triggers update() where CM
-    //    properly picks up the new decorations.
+    //    the mouse button is down. The deferred rebuild runs after mouseup
+    //    on a later task / frame so the full click sequence settles before
+    //    hidden prefixes are re-laid out.
     //
     // 2. **Jarring un-reveal on note switch (focus-loss deferral)**
     //    When the user clicks a note in the sidebar, the editor blurs
@@ -378,7 +391,7 @@ export function markdownDecorationsPlugin(searchQuery = "") {
             document.removeEventListener("mouseup", onMouseUp);
             this.mouseDown = false;
             if (this.pendingSelectionRebuild) {
-              queueMicrotask(() => view.dispatch({}));
+              queueDeferredSelectionRebuild(view, this);
             }
           };
           document.addEventListener("mouseup", onMouseUp);
