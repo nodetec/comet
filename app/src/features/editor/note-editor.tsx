@@ -228,6 +228,15 @@ function getLeadingPaddingClickLineStart(
     return null;
   }
 
+  const firstVisualLineTop = Math.min(startRect.top, startRect.bottom);
+  const firstVisualLineBottom = Math.max(startRect.top, startRect.bottom);
+  if (
+    event.clientY < firstVisualLineTop ||
+    event.clientY > firstVisualLineBottom
+  ) {
+    return null;
+  }
+
   return event.clientX < Math.min(startRect.left, startRect.right)
     ? line.from
     : null;
