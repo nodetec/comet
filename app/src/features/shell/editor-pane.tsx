@@ -707,10 +707,13 @@ export function EditorPane({
 
     setFocusedPane("editor");
     requestAnimationFrame(() => {
-      editorRef.current?.focus();
       if (scrollTo === "top") {
+        editorRef.current?.focusAtStart();
         scrollContainerRef.current?.scrollTo({ top: 0 });
+        return;
       }
+
+      editorRef.current?.focus();
     });
   });
 

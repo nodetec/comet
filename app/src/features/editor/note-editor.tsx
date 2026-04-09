@@ -274,16 +274,11 @@ function focusEditorAtEndPreservingScroll(view: EditorView) {
 
 function focusEditorAtStart(view: EditorView) {
   useShellStore.getState().setFocusedPane("editor");
+  view.focus();
   view.dispatch({
     selection: EditorSelection.cursor(0),
-    scrollIntoView: false,
+    scrollIntoView: true,
   });
-  view.focus();
-
-  const scrollContainer = findEditorScrollContainer(view);
-  if (scrollContainer) {
-    scrollContainer.scrollTop = 0;
-  }
 }
 
 function dispatchPointerCursorSelection(view: EditorView, pos: number) {
