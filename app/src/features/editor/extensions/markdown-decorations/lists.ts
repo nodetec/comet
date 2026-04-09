@@ -97,6 +97,24 @@ class TaskMarkerWidget extends WidgetType {
   }
 }
 
+class EmptyTaskPlaceholderWidget extends WidgetType {
+  override eq(other: WidgetType): boolean {
+    return other instanceof EmptyTaskPlaceholderWidget;
+  }
+
+  override ignoreEvent(): boolean {
+    return true;
+  }
+
+  override toDOM(): HTMLElement {
+    const placeholder = document.createElement("span");
+    placeholder.className = "cm-md-task-empty-placeholder";
+    placeholder.setAttribute("aria-hidden", "true");
+    placeholder.textContent = "\u200B";
+    return placeholder;
+  }
+}
+
 type ListMarkerNodeRef = Pick<SyntaxNodeRef, "from" | "to" | "type" | "node">;
 type DocLine = ReturnType<EditorState["doc"]["lineAt"]>;
 
@@ -1399,6 +1417,15 @@ function addMarkerDecorations(
       );
       atomicRanges.push(taskMarkerDecoration.range(taskStart, taskEnd + 1));
 
+      if (taskEnd + 1 >= line.to) {
+        decorationRanges.push(
+          Decoration.widget({
+            side: -1,
+            widget: new EmptyTaskPlaceholderWidget(),
+          }).range(line.to),
+        );
+      }
+
       if (checked && taskEnd + 1 < line.to) {
         decorationRanges.push(
           Decoration.mark({
@@ -1893,6 +1920,15 @@ const listTheme = EditorView.theme({
     display: "inline-flex",
     justifyContent: "center",
     width: "var(--cm-md-list-marker-width)",
+  },
+  ".cm-md-task-empty-placeholder": {
+    display: "inline",
+    font: "inherit",
+    lineHeight: "inherit",
+    opacity: "0",
+    pointerEvents: "none",
+    userSelect: "none",
+    verticalAlign: "baseline",
   },
   ".cm-md-task-marker-box": {
     backgroundColor: "var(--background)",

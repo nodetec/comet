@@ -208,4 +208,24 @@ describe("Advanced list rendering", () => {
 
     view.destroy();
   });
+
+  it("adds an invisible baseline placeholder for empty task lines only", async () => {
+    const { view } = createView(["- [ ] ", "- [ ] Task item"].join("\n"));
+
+    await flush();
+
+    const taskLines = [
+      ...view.dom.querySelectorAll<HTMLElement>(".cm-line.cm-md-task-list"),
+    ];
+    expect(taskLines).toHaveLength(2);
+    expect(
+      taskLines[0]?.querySelector(".cm-md-task-empty-placeholder"),
+    ).not.toBeNull();
+    expect(
+      taskLines[1]?.querySelector(".cm-md-task-empty-placeholder"),
+    ).toBeNull();
+    expect(taskLines[1]?.textContent).toBe("Task item");
+
+    view.destroy();
+  });
 });
