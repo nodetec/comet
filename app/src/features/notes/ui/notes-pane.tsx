@@ -685,6 +685,13 @@ export function NotesPane({
     skipAnimationUntilRef.current = Date.now() + 500;
   }
 
+  // Suppress layout animations when panel visibility changes.
+  const prevSidebarVisibleRef = useRef(sidebarVisible);
+  if (prevSidebarVisibleRef.current !== sidebarVisible) {
+    prevSidebarVisibleRef.current = sidebarVisible;
+    skipAnimationUntilRef.current = Date.now() + 500;
+  }
+
   const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const pendingNotesPaneSelectionRef = useRef<

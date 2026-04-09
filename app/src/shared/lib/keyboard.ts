@@ -40,6 +40,10 @@ export function isSidebarToggleShortcut(event: ShortcutEvent) {
   return matchesShortcut(event, { code: "KeyE", key: "e" });
 }
 
+export function isFocusModeShortcut(event: ShortcutEvent) {
+  return matchesShortcut(event, { code: "KeyE", key: "e", shift: true });
+}
+
 export function isNotesSearchShortcut(event: ShortcutEvent) {
   return matchesShortcut(event, {
     code: "KeyF",

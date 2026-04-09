@@ -34,6 +34,7 @@ import {
   getPaneFocusShortcut,
   isCommandPaletteShortcut,
   isEditorFindShortcut,
+  isFocusModeShortcut,
   isNotesSearchShortcut,
   isSidebarToggleShortcut,
 } from "@/shared/lib/keyboard";
@@ -85,7 +86,9 @@ function App() {
 
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
+  const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const toggleFocusMode = useUIStore((s) => s.toggleFocusMode);
   const setFocusedPane = useShellStore((s) => s.setFocusedPane);
 
   const openCommandPalette = useEffectEvent(() => {
@@ -123,11 +126,23 @@ function App() {
       return;
     }
 
+    if (isFocusModeShortcut(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      toggleFocusMode();
+      return;
+    }
+
     if (isSidebarToggleShortcut(event)) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      toggleSidebar();
+      if (useUIStore.getState().notesPanelVisible) {
+        toggleSidebar();
+      } else {
+        toggleFocusMode();
+      }
       return;
     }
 
@@ -291,11 +306,7 @@ function App() {
             data-tauri-drag-region
           />
         ) : null}
-        <Container
-          className="h-full w-full"
-          id="comet-shell"
-          key={sidebarVisible ? "s" : "h"}
-        >
+        <Container className="h-full w-full" id="comet-shell">
           {sidebarVisible ? (
             <>
               <Section
@@ -314,21 +325,25 @@ function App() {
             </>
           ) : null}
 
-          <Section
-            defaultSize={280}
-            disableResponsive
-            maxSize={340}
-            minSize={220}
-            className="select-none"
-          >
-            <NotesPane {...notesPaneProps} />
-          </Section>
+          {notesPanelVisible ? (
+            <>
+              <Section
+                defaultSize={280}
+                disableResponsive
+                maxSize={340}
+                minSize={220}
+                className="select-none"
+              >
+                <NotesPane {...notesPaneProps} />
+              </Section>
 
-          <Bar
-            className="bg-accent/35 z-30 cursor-col-resize"
-            expandInteractiveArea={{ left: 5, right: 5 }}
-            size={1}
-          />
+              <Bar
+                className="bg-accent/35 z-30 cursor-col-resize"
+                expandInteractiveArea={{ left: 5, right: 5 }}
+                size={1}
+              />
+            </>
+          ) : null}
 
           <Section minSize={300}>
             <EditorPane {...editorPaneProps} />

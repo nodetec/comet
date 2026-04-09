@@ -49,6 +49,9 @@ type UIStore = {
   sidebarVisible: boolean;
   toggleSidebar(): void;
 
+  notesPanelVisible: boolean;
+  toggleFocusMode(): void;
+
   sidebarNotesChildrenOpen: boolean;
   setSidebarNotesChildrenOpen(open: boolean): void;
 
@@ -121,6 +124,16 @@ export const useUIStore = create<UIStore>()(
         set((state) => ({ sidebarVisible: !state.sidebarVisible }));
       },
 
+      notesPanelVisible: true,
+      toggleFocusMode: () => {
+        set((state) => {
+          const entering = state.sidebarVisible || state.notesPanelVisible;
+          return entering
+            ? { sidebarVisible: false, notesPanelVisible: false }
+            : { sidebarVisible: true, notesPanelVisible: true };
+        });
+      },
+
       sidebarNotesChildrenOpen: true,
       setSidebarNotesChildrenOpen: (sidebarNotesChildrenOpen) => {
         set({ sidebarNotesChildrenOpen });
@@ -135,6 +148,7 @@ export const useUIStore = create<UIStore>()(
         editorVimMode: state.editorVimMode,
         themeName: state.themeName,
         sidebarVisible: state.sidebarVisible,
+        notesPanelVisible: state.notesPanelVisible,
         noteSortPrefs: state.noteSortPrefs,
         expandedSidebarTagPaths: state.expandedSidebarTagPaths,
         sidebarNotesChildrenOpen: state.sidebarNotesChildrenOpen,

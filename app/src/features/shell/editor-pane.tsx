@@ -480,6 +480,7 @@ export function EditorPane({
     null,
   );
   const editorFontSize = useUIStore((s) => s.editorFontSize);
+  const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
   const showToolbar = useUIStore((s) => s.showEditorToolbar);
   const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
   const editorVimMode = useUIStore((s) => s.editorVimMode);
@@ -856,6 +857,7 @@ export function EditorPane({
       <header
         className={cn(
           "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
+          !notesPanelVisible && "pl-24",
           showHeaderBorder && !findOpen && "border-separator border-b",
         )}
       >

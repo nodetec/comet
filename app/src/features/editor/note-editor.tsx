@@ -79,6 +79,7 @@ import {
 } from "@/features/editor/lib/note-editor-selection";
 import { useNoteEditorSearchSync } from "@/features/editor/hooks/use-note-editor-search-sync";
 import { useNoteEditorToolbarActions } from "@/features/editor/hooks/use-note-editor-toolbar-actions";
+import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
   isEditorFindShortcut,
@@ -551,6 +552,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             {
               key: "Escape",
               run(view) {
+                const uiState = useUIStore.getState();
+                if (!uiState.notesPanelVisible) {
+                  uiState.toggleFocusMode();
+                }
                 useShellStore.getState().setFocusedPane("notes");
                 blurEditorView(view);
                 return true;
