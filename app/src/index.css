@@ -126,6 +126,7 @@ body {
   min-width: 0;
   position: relative;
   box-sizing: border-box;
+  padding-bottom: var(--editor-bottom-padding);
 }
 
 .comet-editor-column::before {
@@ -152,7 +153,6 @@ body {
   min-height: 100%;
   width: 100%;
   box-sizing: border-box;
-  padding-bottom: var(--editor-bottom-padding);
   padding-top: 0.25rem;
 }
 

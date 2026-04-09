@@ -657,7 +657,7 @@ export function EditorPane({
       return;
     }
 
-    editorRef.current?.focus();
+    editorRef.current?.focusAtEnd();
   };
 
   const handleGlobalHistoryKeyDown = useEffectEvent((event: KeyboardEvent) => {
