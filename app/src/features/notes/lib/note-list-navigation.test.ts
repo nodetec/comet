@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getAdjacentNoteId } from "@/features/notes/lib/note-list-navigation";
+import {
+  getAdjacentNoteId,
+  getNoteListNavigationDirectionForKey,
+} from "@/features/notes/lib/note-list-navigation";
 
 const notes = [{ id: "note-1" }, { id: "note-2" }, { id: "note-3" }];
 
@@ -23,5 +26,23 @@ describe("getAdjacentNoteId", () => {
 
   it("returns null when the current note is not in the list", () => {
     expect(getAdjacentNoteId(notes, "missing-note", "next")).toBeNull();
+  });
+});
+
+describe("getNoteListNavigationDirectionForKey", () => {
+  it("maps ArrowDown and j to next", () => {
+    expect(getNoteListNavigationDirectionForKey("ArrowDown")).toBe("next");
+    expect(getNoteListNavigationDirectionForKey("j")).toBe("next");
+    expect(getNoteListNavigationDirectionForKey("J")).toBe("next");
+  });
+
+  it("maps ArrowUp and k to previous", () => {
+    expect(getNoteListNavigationDirectionForKey("ArrowUp")).toBe("previous");
+    expect(getNoteListNavigationDirectionForKey("k")).toBe("previous");
+    expect(getNoteListNavigationDirectionForKey("K")).toBe("previous");
+  });
+
+  it("returns null for unrelated keys", () => {
+    expect(getNoteListNavigationDirectionForKey("Enter")).toBeNull();
   });
 });

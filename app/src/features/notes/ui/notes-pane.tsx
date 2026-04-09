@@ -35,6 +35,7 @@ import { searchWordsFromQuery } from "@/shared/lib/search";
 import {
   type NoteListNavigationDirection,
   getAdjacentNoteId,
+  getNoteListNavigationDirectionForKey,
 } from "@/features/notes/lib/note-list-navigation";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 
@@ -481,15 +482,10 @@ const NoteRow = memo(function NoteRow({
           useShellStore.getState().setFocusedPane("notes");
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
+          const direction = getNoteListNavigationDirectionForKey(event.key);
+          if (direction) {
             event.preventDefault();
-            onMoveSelection("next");
-            return;
-          }
-
-          if (event.key === "ArrowUp") {
-            event.preventDefault();
-            onMoveSelection("previous");
+            onMoveSelection(direction);
           }
         }}
         onPointerDown={(event) => {
