@@ -46,6 +46,15 @@ const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-h6": {
     paddingBottom: "0rem",
   },
+  ".cm-md-heading-inline": {
+    display: "inline",
+    verticalAlign: "baseline",
+    width: "auto",
+  },
+  ".cm-md-heading-inline.cm-md-h1, .cm-md-heading-inline.cm-md-h2, .cm-md-heading-inline.cm-md-h3, .cm-md-heading-inline.cm-md-h4, .cm-md-heading-inline.cm-md-h5, .cm-md-heading-inline.cm-md-h6":
+    {
+      paddingBottom: "0",
+    },
   ".cm-md-strong": {
     fontWeight: "700",
   },

@@ -125,7 +125,20 @@ describe("CodeMirror search rendering", () => {
 
     expect(view.dom.querySelector(".cm-md-heading")).not.toBeNull();
     expect(view.dom.querySelector(".cm-md-h1")).not.toBeNull();
-    expect(view.dom.querySelector(".cm-searchMatch")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-searchMatch")?.textContent).toBe("l");
+    expect(view.dom.textContent).toContain("# lorem ipsum");
+
+    view.destroy();
+  });
+
+  it("keeps heading prefix matches inline instead of wrapping the heading fragment", async () => {
+    const { view } = createView("# lorem ipsum", "#");
+
+    await flush();
+
+    expect(view.dom.querySelector(".cm-md-heading")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-md-heading-inline")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-searchMatch")?.textContent).toBe("#");
     expect(view.dom.textContent).toContain("# lorem ipsum");
 
     view.destroy();

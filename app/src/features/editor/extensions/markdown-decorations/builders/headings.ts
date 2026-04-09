@@ -19,11 +19,13 @@ const HEADING_LEVEL: Record<string, number> = {
 
 const headingMarkCache = new Map<string, Decoration>();
 
-function getHeadingMark(level: number): Decoration {
-  const key = `h${level}`;
+function getHeadingMark(level: number, inline = false): Decoration {
+  const key = `${inline ? "inline-" : ""}h${level}`;
   let deco = headingMarkCache.get(key);
   if (!deco) {
-    deco = Decoration.mark({ class: `cm-md-heading cm-md-h${level}` });
+    deco = Decoration.mark({
+      class: `cm-md-heading cm-md-h${level}${inline ? " cm-md-heading-inline" : ""}`,
+    });
     headingMarkCache.set(key, deco);
   }
   return deco;
@@ -47,6 +49,7 @@ function handleATXHeading(
   resolved: SyntaxNode,
   level: number,
   onCursor: boolean,
+  inlineHeading: boolean,
   out: DecorationEntry[],
 ): void {
   const marks = resolved.getChildren("HeaderMark");
@@ -76,7 +79,7 @@ function handleATXHeading(
   out.push({
     from: node.from,
     to: node.to,
-    decoration: getHeadingMark(level),
+    decoration: getHeadingMark(level, inlineHeading),
   });
 }
 
@@ -92,8 +95,8 @@ export function handleHeading(
 
   const resolved = node.node;
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorLines);
-  const revealSyntax =
-    onCursor || overlapsAny(node.from, node.to, ctx.searchMatches);
+  const revealedBySearch = overlapsAny(node.from, node.to, ctx.searchMatches);
+  const revealSyntax = onCursor || revealedBySearch;
 
   if (!node.name.startsWith("ATX")) {
     return;
@@ -107,5 +110,5 @@ export function handleHeading(
     return;
   }
 
-  handleATXHeading(node, resolved, level, revealSyntax, out);
+  handleATXHeading(node, resolved, level, revealSyntax, revealedBySearch, out);
 }
