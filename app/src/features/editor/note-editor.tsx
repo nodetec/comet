@@ -59,7 +59,6 @@ import { ensureNoteEditorVimNavigation } from "@/features/editor/lib/note-editor
 import { EditorToolbar } from "@/features/editor/ui/editor-toolbar";
 import { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations";
 import { getInlineSyntaxRightBoundaryAtCursor } from "@/features/editor/extensions/markdown-decorations/builders/inline-boundaries";
-import { getSnappedCursorPosition } from "@/features/editor/extensions/markdown-decorations/snap-cursor";
 import {
   TagGrammar,
   tagHighlightStyle,
@@ -254,11 +253,7 @@ function dispatchPointerCursorSelection(view: EditorView, pos: number) {
   });
 }
 
-function handleSpecialMouseDownSelection(
-  view: EditorView,
-  event: MouseEvent,
-  leadingPaddingLineStart: number | null,
-) {
+function handleSpecialMouseDownSelection(view: EditorView, event: MouseEvent) {
   if (trySnapInlineSyntaxRightBoundaryClick(view, event)) {
     return true;
   }
@@ -293,17 +288,6 @@ function handleSpecialMouseDownSelection(
       scrollIntoView: false,
       selection: tableBoundarySelection,
     });
-    return true;
-  }
-
-  if (leadingPaddingLineStart != null) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (!view.hasFocus) {
-      focusEditorPreservingScroll(view);
-    }
-
     return true;
   }
 
@@ -445,52 +429,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           search(),
           EditorView.domEventHandlers({
             mousedown(event, view) {
-              const leadingPaddingLineStart = getLeadingPaddingClickLineStart(
-                view,
-                event,
-              );
-
-              if (
-                handleSpecialMouseDownSelection(
-                  view,
-                  event,
-                  leadingPaddingLineStart,
-                )
-              ) {
+              if (handleSpecialMouseDownSelection(view, event)) {
                 return true;
               }
 
               event.stopPropagation();
-              const directPos = view.posAtCoords(
-                {
-                  x: event.clientX,
-                  y: event.clientY,
-                },
-                false,
-              );
 
               if (!view.hasFocus) {
-                event.preventDefault();
-
-                const clickedInsideTable =
-                  event.target instanceof HTMLElement &&
-                  event.target.closest(".cm-md-table-wrapper");
-
                 focusEditorPreservingScroll(view);
-
-                if (clickedInsideTable) {
-                  return false;
-                }
-
-                if (directPos != null) {
-                  const snappedPos =
-                    getSnappedCursorPosition(view.state, directPos) ??
-                    directPos;
-
-                  dispatchPointerCursorSelection(view, snappedPos);
-                }
-
-                return true;
               }
 
               return false;

@@ -95,6 +95,14 @@ export const MARKDOWN_EDITOR_THEME = EditorView.theme({
   ".cm-selectionLayer": {
     zIndex: "1 !important",
     pointerEvents: "none",
+    // Override baseTheme's `contain: size style` so the layer can be
+    // stretched by the bottom/right offsets, giving clip-path a real
+    // reference box to clip selection backgrounds out of the padding.
+    contain: "style",
+    bottom: "0",
+    right: "0",
+    clipPath:
+      "inset(0 max(clamp(1rem, 5vw, 3.5rem), calc((100% - 42rem) / 2)))",
   },
   ".cm-cursorLayer": {
     zIndex: "2 !important",
