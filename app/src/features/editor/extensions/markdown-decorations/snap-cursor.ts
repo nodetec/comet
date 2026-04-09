@@ -31,11 +31,15 @@ const ATX_HEADING_NAMES = new Set([
 export function getSnappedCursorPosition(
   state: EditorState,
   pos: number,
+  /** Skip the "is syntax already revealed?" check. Used for drag-
+   *  selection anchors where the anchor was placed while syntax was
+   *  still hidden but the cursor has since moved onto the line. */
+  ignoreReveal = false,
 ): number | null {
   const tree = syntaxTree(state);
   const node = tree.resolveInner(pos, 1);
-  const cursorLines = getCursorLineRanges(state);
-  const cursorRanges = getCursorRanges(state);
+  const cursorLines = ignoreReveal ? [] : getCursorLineRanges(state);
+  const cursorRanges = ignoreReveal ? [] : getCursorRanges(state);
 
   for (let n: SyntaxNode | null = node; n; n = n.parent) {
     const snap = snapNodeSyntax(state, n, pos, cursorLines, cursorRanges);
@@ -54,8 +58,9 @@ export function getSnappedPointerSelection(
   let changed = false;
   const ranges = ("ranges" in selection ? selection.ranges : [selection]).map(
     (range) => {
+      const isDrag = range.anchor !== range.head;
       const anchor =
-        getSnappedCursorPosition(state, range.anchor) ?? range.anchor;
+        getSnappedCursorPosition(state, range.anchor, isDrag) ?? range.anchor;
       const head = getSnappedCursorPosition(state, range.head) ?? range.head;
 
       if (anchor !== range.anchor || head !== range.head) {
