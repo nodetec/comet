@@ -124,8 +124,23 @@ describe("CodeMirror search rendering", () => {
     await flush();
 
     expect(view.dom.querySelector(".cm-md-heading")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-md-heading-line")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-md-h1-line")).not.toBeNull();
+    expect(view.dom.querySelector(".cm-md-heading-not-first-line")).toBeNull();
     expect(view.dom.querySelector(".cm-searchMatch")).not.toBeNull();
     expect(view.dom.textContent).toContain("# lorem ipsum");
+
+    view.destroy();
+  });
+
+  it("adds top padding class to headings that are not on the first document line", async () => {
+    const { view } = createView("before\n# lorem ipsum");
+
+    await flush();
+
+    expect(
+      view.dom.querySelector(".cm-md-heading-not-first-line"),
+    ).not.toBeNull();
 
     view.destroy();
   });

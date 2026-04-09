@@ -18,6 +18,7 @@ const HEADING_LEVEL: Record<string, number> = {
 };
 
 const headingMarkCache = new Map<string, Decoration>();
+const headingLineCache = new Map<string, Decoration>();
 
 function getHeadingMark(level: number): Decoration {
   const key = `h${level}`;
@@ -25,6 +26,20 @@ function getHeadingMark(level: number): Decoration {
   if (!deco) {
     deco = Decoration.mark({ class: `cm-md-heading cm-md-h${level}` });
     headingMarkCache.set(key, deco);
+  }
+  return deco;
+}
+
+function getHeadingLine(level: number, withTopPadding: boolean): Decoration {
+  const key = `h${level}-line-${withTopPadding ? "top" : "base"}`;
+  let deco = headingLineCache.get(key);
+  if (!deco) {
+    deco = Decoration.line({
+      attributes: {
+        class: `cm-md-heading-line cm-md-h${level}-line${withTopPadding ? " cm-md-heading-not-first-line" : ""}`,
+      },
+    });
+    headingLineCache.set(key, deco);
   }
   return deco;
 }
@@ -47,9 +62,17 @@ function handleATXHeading(
   resolved: SyntaxNode,
   level: number,
   onCursor: boolean,
+  ctx: BuilderContext,
   out: DecorationEntry[],
 ): void {
   const marks = resolved.getChildren("HeaderMark");
+  const line = ctx.state.doc.lineAt(node.from);
+
+  out.push({
+    from: line.from,
+    to: line.from,
+    decoration: getHeadingLine(level, line.number > 1),
+  });
 
   if (!onCursor && marks.length > 0) {
     const firstMark = marks[0]!;
@@ -107,5 +130,5 @@ export function handleHeading(
     return;
   }
 
-  handleATXHeading(node, resolved, level, revealSyntax, out);
+  handleATXHeading(node, resolved, level, revealSyntax, ctx, out);
 }
