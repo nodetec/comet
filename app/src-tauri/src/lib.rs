@@ -11,12 +11,16 @@ pub mod tools;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
+#[cfg(not(debug_assertions))]
+use url::Url;
 
 const MENU_EDITOR_FIND_ID: &str = "editor-find";
 const MENU_NEW_NOTE_ID: &str = "new-note";
 const MENU_COMMAND_PALETTE_ID: &str = "command-palette";
 const MENU_NOTES_SEARCH_ID: &str = "notes-search";
 const MENU_SETTINGS_ID: &str = "settings";
+#[cfg(not(debug_assertions))]
+const LOCALHOST_ASSET_PORT: u16 = 3210;
 const TAURI_EVENT_COMMAND_PALETTE: &str = "menu-command-palette";
 const TAURI_EVENT_EDITOR_FIND: &str = "menu-editor-find";
 const TAURI_EVENT_NEW_NOTE: &str = "menu-new-note";
@@ -47,7 +51,7 @@ pub fn run() {
         log_plugin = log_plugin.target(Target::new(TargetKind::Webview));
     }
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .menu(|app| {
             let file_menu = SubmenuBuilder::new(app, "File")
                 .item(
@@ -131,7 +135,18 @@ pub fn run() {
             }
             _ => {}
         })
-        .plugin(log_plugin.build())
+        .plugin(log_plugin.build());
+
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(
+        tauri_plugin_localhost::Builder::new(LOCALHOST_ASSET_PORT)
+            .on_request(|_, response| {
+                response.add_header("Referrer-Policy", "strict-origin-when-cross-origin");
+            })
+            .build(),
+    );
+
+    builder
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -144,6 +159,14 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 crate::adapters::nostr::sync_manager::auto_start(&handle).await;
             });
+
+            #[cfg(not(debug_assertions))]
+            if let Some(window) = app.get_webview_window("main") {
+                let localhost_url =
+                    Url::parse(&format!("http://localhost:{LOCALHOST_ASSET_PORT}"))?;
+                window.navigate(localhost_url)?;
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

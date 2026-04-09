@@ -54,6 +54,7 @@ uuid = { version = "1", features = ["v4"] }
 tauri-plugin-log = "2.8.0"
 tauri-plugin-opener = "2"
 tauri-plugin-secure-storage = "1.4.0"
+tauri-plugin-localhost = "2.3.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }

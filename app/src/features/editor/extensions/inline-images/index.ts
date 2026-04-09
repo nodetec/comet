@@ -27,6 +27,7 @@ import {
 } from "@/shared/lib/attachments";
 
 const VISIBLE_RANGE_MARGIN = 1000;
+const YOUTUBE_EMBED_BASE_URL = "https://www.youtube-nocookie.com/embed";
 
 type InlineImageMatch = {
   altText: string;
@@ -173,6 +174,26 @@ function extractYouTubeVideoId(src: string): string | null {
   return match ? (match[1] ?? null) : null;
 }
 
+function resolveYouTubeEmbedOrigin(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const { origin, protocol } = window.location;
+  return protocol === "http:" || protocol === "https:" ? origin : null;
+}
+
+function buildYouTubeEmbedSrc(videoId: string): string {
+  const url = new URL(`${YOUTUBE_EMBED_BASE_URL}/${videoId}`);
+  const origin = resolveYouTubeEmbedOrigin();
+  if (origin) {
+    url.searchParams.set("origin", origin);
+  }
+  url.searchParams.set("playsinline", "1");
+  url.searchParams.set("rel", "0");
+  return url.toString();
+}
+
 class InlineYouTubeWidget extends WidgetType {
   private readonly videoId: string;
 
@@ -204,7 +225,9 @@ class InlineYouTubeWidget extends WidgetType {
 
     const iframe = document.createElement("iframe");
     iframe.className = "cm-inline-youtube-element";
-    iframe.src = `https://www.youtube-nocookie.com/embed/${this.videoId}`;
+    iframe.loading = "lazy";
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    iframe.src = buildYouTubeEmbedSrc(this.videoId);
     iframe.allow =
       "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
     iframe.allowFullscreen = true;
