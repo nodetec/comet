@@ -4,7 +4,6 @@ import {
   useImperativeHandle,
   useRef,
   useState,
-  type MouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -75,16 +74,9 @@ import { pasteLink } from "@/features/editor/extensions/paste-link";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
 import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import {
-  getContentSelectionHeadFromPoint,
   getHorizontalRuleSelection,
-  getLineBoundaryCursor,
-  getSelectionHeadFromPoint,
   getTableBoundarySelection,
-  startSelectionEdgeAutoScroll,
-  TABLE_CELL_SELECTOR,
-  TABLE_EDITOR_HOST_SELECTOR,
 } from "@/features/editor/lib/note-editor-selection";
-import type { GutterSide } from "@/features/editor/lib/note-editor-selection";
 import { useNoteEditorSearchSync } from "@/features/editor/hooks/use-note-editor-search-sync";
 import { useNoteEditorToolbarActions } from "@/features/editor/hooks/use-note-editor-toolbar-actions";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
@@ -223,9 +215,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
     const prevPaneRef = useRef(useShellStore.getState().focusedPane);
-    const gutterDragCleanupRef = useRef<(() => void) | null>(null);
-    const gutterPointerIdRef = useRef<number | null>(null);
-    const selectionAutoScrollCleanupRef = useRef<(() => void) | null>(null);
     const initialAutoFocusRef = useRef(autoFocus);
     const initialOnAutoFocusHandledRef = useRef(onAutoFocusHandled);
     const initialMarkdownRef = useRef(markdown);
@@ -323,40 +312,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           pasteLink(),
           search(),
           EditorView.domEventHandlers({
-            pointerdown(event, view) {
-              selectionAutoScrollCleanupRef.current?.();
-              selectionAutoScrollCleanupRef.current = null;
-
-              if (
-                event.button !== 0 ||
-                !event.isPrimary ||
-                (event.target instanceof HTMLElement &&
-                  event.target.closest(
-                    `${TABLE_CELL_SELECTOR}, ${TABLE_EDITOR_HOST_SELECTOR}, .cm-md-task-marker-source`,
-                  ))
-              ) {
-                return;
-              }
-
-              let anchor: number | null = null;
-              selectionAutoScrollCleanupRef.current =
-                startSelectionEdgeAutoScroll(view, event.pointerId, {
-                  captureOnStart: false,
-                  getAnchor: () => anchor ?? view.state.selection.main.anchor,
-                  getHead: (pointer) =>
-                    getContentSelectionHeadFromPoint(
-                      view,
-                      pointer.target,
-                      pointer.clientX,
-                      pointer.clientY,
-                    ),
-                  requireChangedNonEmptySelectionBeforeActivation: true,
-                });
-
-              requestAnimationFrame(() => {
-                anchor = view.state.selection.main.anchor;
-              });
-            },
             mousedown(event, view) {
               if (trySnapInlineSyntaxRightBoundaryClick(view, event)) {
                 return true;
@@ -374,8 +329,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 event.clientY,
               );
               if (horizontalRuleSelection) {
-                selectionAutoScrollCleanupRef.current?.();
-                selectionAutoScrollCleanupRef.current = null;
                 event.preventDefault();
                 event.stopPropagation();
                 view.focus();
@@ -390,8 +343,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 event.clientY,
               );
               if (tableBoundarySelection) {
-                selectionAutoScrollCleanupRef.current?.();
-                selectionAutoScrollCleanupRef.current = null;
                 event.preventDefault();
                 event.stopPropagation();
                 view.focus();
@@ -403,6 +354,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               }
 
               event.stopPropagation();
+              const directPos = view.posAtCoords(
+                {
+                  x: event.clientX,
+                  y: event.clientY,
+                },
+                false,
+              );
 
               if (!view.hasFocus) {
                 event.preventDefault();
@@ -423,16 +381,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                   return false;
                 }
 
-                const pos = view.posAtCoords(
-                  {
-                    x: event.clientX,
-                    y: event.clientY,
-                  },
-                  false,
-                );
-                if (pos != null) {
+                if (directPos != null) {
                   view.dispatch({
-                    selection: EditorSelection.cursor(pos),
+                    selection: EditorSelection.cursor(directPos),
                     scrollIntoView: false,
                   });
                 }
@@ -590,10 +541,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
 
       return () => {
         unsubscribeShell();
-        gutterDragCleanupRef.current?.();
-        gutterDragCleanupRef.current = null;
-        selectionAutoScrollCleanupRef.current?.();
-        selectionAutoScrollCleanupRef.current = null;
         view.destroy();
         viewRef.current = null;
       };
@@ -722,73 +669,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       [readOnly],
     );
 
-    const startGutterSelectionDrag = (
-      event: MouseEvent<HTMLDivElement>,
-      side: GutterSide,
-    ) => {
-      if (readOnly) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      useShellStore.getState().setFocusedPane("editor");
-
-      const view = viewRef.current;
-      if (!view) {
-        return;
-      }
-
-      const anchor = getLineBoundaryCursor(view, event.clientY, side);
-      if (!anchor) {
-        return;
-      }
-
-      const scrollContainer = findEditorScrollContainer(view);
-      const scrollTop = scrollContainer?.scrollTop ?? 0;
-
-      view.focus();
-      if (scrollContainer) {
-        lockEditorScrollPosition(scrollContainer, scrollTop);
-      }
-
-      view.dispatch({
-        selection: EditorSelection.create([anchor]),
-      });
-
-      gutterDragCleanupRef.current?.();
-      selectionAutoScrollCleanupRef.current?.();
-      const pointerId = gutterPointerIdRef.current;
-      selectionAutoScrollCleanupRef.current = startSelectionEdgeAutoScroll(
-        view,
-        pointerId ?? 1,
-        {
-          captureOnStart: true,
-          getAnchor: () => anchor.anchor,
-          getHead: (pointer) =>
-            getSelectionHeadFromPoint(
-              view,
-              pointer.target,
-              pointer.clientX,
-              pointer.clientY,
-              side,
-            ),
-          updateSelectionOnPointerMove: true,
-        },
-      );
-
-      const cleanup = () => {
-        selectionAutoScrollCleanupRef.current?.();
-        selectionAutoScrollCleanupRef.current = null;
-        gutterPointerIdRef.current = null;
-        if (gutterDragCleanupRef.current === cleanup) {
-          gutterDragCleanupRef.current = null;
-        }
-      };
-
-      gutterDragCleanupRef.current = cleanup;
-    };
-
     return (
       <>
         <div
@@ -801,50 +681,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               "comet-codemirror-active-search",
           )}
         >
-          <div
-            className="comet-editor-gutter"
-            data-editor-gutter="left"
-            onPointerDown={(event) => {
-              gutterPointerIdRef.current = event.pointerId;
-            }}
-            onClick={(event: MouseEvent<HTMLDivElement>) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
-              event.preventDefault();
-              event.stopPropagation();
-              viewRef.current?.focus();
-            }}
-            onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-              startGutterSelectionDrag(event, "left");
-            }}
-          />
           <div className="comet-editor-column">
             <div
               className="comet-codemirror-host min-h-full flex-1"
               ref={containerRef}
             />
           </div>
-          <div
-            className="comet-editor-gutter"
-            data-editor-gutter="right"
-            onPointerDown={(event) => {
-              gutterPointerIdRef.current = event.pointerId;
-            }}
-            onClick={(event: MouseEvent<HTMLDivElement>) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onMouseUp={(event: MouseEvent<HTMLDivElement>) => {
-              event.preventDefault();
-              event.stopPropagation();
-              viewRef.current?.focus();
-            }}
-            onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
-              startGutterSelectionDrag(event, "right");
-            }}
-          />
         </div>
         {toolbarContainer && !readOnly
           ? createPortal(

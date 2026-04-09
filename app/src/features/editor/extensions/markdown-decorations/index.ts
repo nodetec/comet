@@ -13,53 +13,33 @@ import {
 
 const markdownDecorationsTheme = EditorView.baseTheme({
   ".cm-md-heading": {
+    boxSizing: "border-box",
     color: "var(--heading-color)",
+    display: "inline-block",
     fontWeight: "700",
-  },
-  ".cm-line.cm-md-h1-line.cm-md-heading-not-first-line": {
-    paddingTop: "1.2rem",
-  },
-  ".cm-line.cm-md-h1-line": {
-    paddingBottom: "0.6rem",
-  },
-  ".cm-line.cm-md-h2-line.cm-md-heading-not-first-line": {
-    paddingTop: "0.8rem",
-  },
-  ".cm-line.cm-md-h2-line": {
-    paddingBottom: "0.4rem",
-  },
-  ".cm-line.cm-md-h3-line.cm-md-heading-not-first-line": {
-    paddingTop: "0.6rem",
-  },
-  ".cm-line.cm-md-h3-line": {
-    paddingBottom: "0.3rem",
-  },
-  ".cm-line.cm-md-h4-line.cm-md-heading-not-first-line": {
-    paddingTop: "0.5rem",
-  },
-  ".cm-line.cm-md-h4-line": {
-    paddingBottom: "0rem",
-  },
-  ".cm-line.cm-md-h5-line.cm-md-heading-not-first-line": {
-    paddingTop: "0.5rem",
-  },
-  ".cm-line.cm-md-h5-line": {
-    paddingBottom: "0rem",
-  },
-  ".cm-line.cm-md-h6-line.cm-md-heading-not-first-line": {
-    paddingTop: "0.5rem",
-  },
-  ".cm-line.cm-md-h6-line": {
-    paddingBottom: "0rem",
+    verticalAlign: "top",
+    width: "100%",
   },
   ".cm-md-h1": {
+    paddingBottom: "0.6rem",
     fontSize: "2em",
   },
   ".cm-md-h2": {
+    paddingBottom: "0.4rem",
     fontSize: "1.6em",
   },
   ".cm-md-h3": {
+    paddingBottom: "0.3rem",
     fontSize: "1.3em",
+  },
+  ".cm-md-h4": {
+    paddingBottom: "0rem",
+  },
+  ".cm-md-h5": {
+    paddingBottom: "0rem",
+  },
+  ".cm-md-h6": {
+    paddingBottom: "0rem",
   },
   ".cm-md-strong": {
     fontWeight: "700",

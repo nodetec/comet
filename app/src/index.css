@@ -116,31 +116,16 @@ body {
   background: transparent;
   cursor: text;
   width: 100%;
-  display: grid;
-  grid-template-columns:
-    minmax(clamp(1rem, 4vw, 3rem), 1fr)
-    minmax(0, 42rem)
-    minmax(clamp(1rem, 4vw, 3rem), 1fr);
-}
-
-.comet-editor-content-wrap {
   min-height: 100%;
 }
 
-.comet-editor-gutter {
-  min-width: 0;
-  position: relative;
-  cursor: text;
-}
-
 .comet-editor-column {
-  grid-column: 2;
-  width: min(100%, 42rem);
-  max-width: 42rem;
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   position: relative;
   box-sizing: border-box;
-  padding-bottom: var(--editor-bottom-padding);
 }
 
 .comet-editor-column::before {
@@ -167,9 +152,7 @@ body {
   min-height: 100%;
   width: 100%;
   box-sizing: border-box;
-
-  padding-left: clamp(1rem, 5vw, 3.5rem);
-  padding-right: clamp(1rem, 5vw, 3.5rem);
+  padding-bottom: var(--editor-bottom-padding);
   padding-top: 0.25rem;
 }
 
@@ -196,6 +179,12 @@ body {
 .comet-codemirror-host .cm-scroller {
   min-height: 100%;
   width: 100%;
+  box-sizing: border-box;
+}
+
+.comet-codemirror-host .cm-content {
+  padding-left: max(clamp(1rem, 5vw, 3.5rem), calc((100% - 42rem) / 2));
+  padding-right: max(clamp(1rem, 5vw, 3.5rem), calc((100% - 42rem) / 2));
 }
 
 .comet-codemirror-host .cm-gutters {

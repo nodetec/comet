@@ -30,23 +30,6 @@ export function lockEditorScrollPosition(
   });
 }
 
-export function holdEditorScrollPosition(
-  scrollContainer: HTMLElement,
-): () => void {
-  let held = true;
-  const scrollTop = scrollContainer.scrollTop;
-  const lock = () => {
-    if (held) {
-      scrollContainer.scrollTop = scrollTop;
-    }
-  };
-  scrollContainer.addEventListener("scroll", lock);
-  return () => {
-    held = false;
-    scrollContainer.removeEventListener("scroll", lock);
-  };
-}
-
 export function createEditorContentAttributes(spellCheck: boolean) {
   return EditorView.contentAttributes.of({
     autocapitalize: "off",
