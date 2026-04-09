@@ -107,10 +107,12 @@ export const MARKDOWN_EDITOR_THEME = EditorView.theme({
   ".cm-cursorLayer": {
     zIndex: "2 !important",
   },
-  "&.comet-editor-inactive .cm-content": {
+  // Keep inactive styling scoped to the root editor so nested table editors
+  // can still render their own caret while the main editor host is inactive.
+  "&.comet-editor-inactive > .cm-scroller > .cm-content": {
     caretColor: "transparent",
   },
-  "&.comet-editor-inactive .cm-cursorLayer": {
+  "&.comet-editor-inactive > .cm-scroller > .cm-cursorLayer": {
     opacity: "0",
   },
   "&.comet-editor-inactive > .cm-scroller > .cm-selectionLayer .cm-selectionBackground":

@@ -187,6 +187,18 @@ body {
   padding-right: max(clamp(1rem, 5vw, 3.5rem), calc((100% - 42rem) / 2));
 }
 
+.cm-md-table-cell-editor .cm-content {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.cm-md-table-cell-editor .cm-selectionLayer {
+  clip-path: none !important;
+  contain: size style !important;
+  bottom: auto !important;
+  right: auto !important;
+}
+
 .comet-codemirror-host .cm-gutters {
   display: none;
 }

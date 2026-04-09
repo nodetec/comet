@@ -2600,12 +2600,20 @@ const nestedTableEditorPlugin = ViewPlugin.fromClass(
         return;
       }
 
-      this.controller.open(
+      // Defer open to rAF so the cell widget is laid out before
+      // drawSelection()'s initial measure runs. Without this, WebKit's
+      // coordsAtPos returns null on the first frame, producing an empty
+      // cursor layer that gets display:none.
+      const pendingOpen = consumePendingTableCellOpen(
         this.view,
-        resolved,
-        cellElement,
-        consumePendingTableCellOpen(this.view, resolved.activeCell),
+        resolved.activeCell,
       );
+      requestAnimationFrame(() => {
+        if (!this.view.dom.isConnected) {
+          return;
+        }
+        this.controller.open(this.view, resolved, cellElement, pendingOpen);
+      });
     }
   },
 );
