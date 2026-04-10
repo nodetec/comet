@@ -3,20 +3,13 @@ import { type CSSProperties, useState } from "react";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
 
-import { Button } from "@/shared/ui/button";
-import {
-  DialogBackdrop,
-  DialogClose,
-  DialogPopup,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from "@/shared/ui/dialog";
 import { Toaster } from "@/shared/ui/sonner";
 import { AccountSwitcherDialog } from "@/features/settings/account-switcher-dialog";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
 import { BootstrapError } from "@/features/shell/ui/bootstrap-error";
+import { ConflictResolutionDialog } from "@/features/shell/ui/conflict-resolution-dialog";
+import { DeletePublishDialog } from "@/features/shell/ui/delete-publish-dialog";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NoteHistoryDialog } from "@/features/shell/note-history-dialog";
 import { NotesPane } from "@/features/notes/ui/notes-pane";
@@ -26,7 +19,6 @@ import { useAppShortcuts } from "@/features/shell/use-app-shortcuts";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { conflictDialogCopy } from "@/shared/lib/conflict-dialog-copy";
 
 function App() {
   useTheme();
@@ -62,17 +54,6 @@ function App() {
   if (bootstrapError) {
     return <BootstrapError error={bootstrapError} onRetry={retryBootstrap} />;
   }
-
-  const chooseConflictDialog = conflictDialogCopy(
-    chooseConflictDialogProps.hasDeleteCandidate,
-  );
-  const defaultRestoreConflictLabel =
-    chooseConflictDialogProps.hasDeleteCandidate
-      ? "Restore note"
-      : "Choose shown version";
-  const restoreConflictLabel = chooseConflictDialogProps.pending
-    ? "Restoring…"
-    : defaultRestoreConflictLabel;
 
   return (
     <div
@@ -137,85 +118,8 @@ function App() {
       <PublishDialog {...publishDialogProps} />
       <PublishShortNoteDialog {...publishShortNoteDialogProps} />
       <NoteHistoryDialog {...noteHistoryDialogProps} />
-      <DialogRoot
-        open={chooseConflictDialogProps.open}
-        onOpenChange={chooseConflictDialogProps.onOpenChange}
-      >
-        <DialogPortal>
-          <DialogBackdrop />
-          <DialogPopup className="w-full max-w-sm p-6">
-            <DialogTitle className="text-base font-semibold">
-              {chooseConflictDialog.title}
-            </DialogTitle>
-            <p className="text-muted-foreground mt-2 text-sm">
-              {chooseConflictDialog.description}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
-                Cancel
-              </DialogClose>
-              {chooseConflictDialogProps.hasDeleteCandidate ? (
-                <Button
-                  disabled={chooseConflictDialogProps.pending}
-                  onClick={chooseConflictDialogProps.onKeepDeleted}
-                  size="sm"
-                  variant="destructive"
-                >
-                  {chooseConflictDialogProps.pending
-                    ? "Deleting…"
-                    : "Keep deleted"}
-                </Button>
-              ) : null}
-              <Button
-                disabled={chooseConflictDialogProps.pending}
-                onClick={chooseConflictDialogProps.onRestore}
-                size="sm"
-                variant="secondary"
-              >
-                {restoreConflictLabel}
-              </Button>
-              <Button
-                disabled={chooseConflictDialogProps.pending}
-                onClick={chooseConflictDialogProps.onMerge}
-                size="sm"
-                variant="default"
-              >
-                {chooseConflictDialogProps.pending ? "Merging…" : "Merge draft"}
-              </Button>
-            </div>
-          </DialogPopup>
-        </DialogPortal>
-      </DialogRoot>
-      <DialogRoot
-        open={deletePublishDialogProps.open}
-        onOpenChange={deletePublishDialogProps.onOpenChange}
-      >
-        <DialogPortal>
-          <DialogBackdrop />
-          <DialogPopup className="w-full max-w-sm p-6">
-            <DialogTitle className="text-base font-semibold">
-              Delete from Nostr?
-            </DialogTitle>
-            <p className="text-muted-foreground mt-2 text-sm">
-              This will request relays to delete the published note. Relays may
-              not honor the request, and copies may still exist elsewhere.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <DialogClose className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm transition-colors">
-                Cancel
-              </DialogClose>
-              <Button
-                disabled={deletePublishDialogProps.pending}
-                onClick={deletePublishDialogProps.onConfirm}
-                size="sm"
-                variant="destructive"
-              >
-                {deletePublishDialogProps.pending ? "Deleting…" : "Delete"}
-              </Button>
-            </div>
-          </DialogPopup>
-        </DialogPortal>
-      </DialogRoot>
+      <ConflictResolutionDialog {...chooseConflictDialogProps} />
+      <DeletePublishDialog {...deletePublishDialogProps} />
       <CommandPalette
         availableTagPaths={sidebarPaneProps.availableTagPaths}
         open={commandPaletteOpen}
