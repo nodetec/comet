@@ -76,16 +76,19 @@ class ScrollPastEndPlugin implements PluginValue {
       height = Math.min(steps * (maxHeight / 20), maxHeight);
     }
 
+    // Always keep at least 1px so the scroll container has overflow
+    // and macOS rubber-band bounce works even with short content.
+    height = Math.max(height, 1);
+
     if (height !== this.currentHeight) {
       this.currentHeight = height;
-      if (height > 0) {
-        const spacer = this.ensureSpacer();
-        if (spacer) {
-          spacer.style.height = `${height}px`;
-        }
-      } else if (this.spacer) {
-        this.spacer.style.height = "0";
+      const spacer = this.ensureSpacer();
+      if (spacer) {
+        spacer.style.height = `${height}px`;
       }
+
+      // Hide scrollbar when overflow is just the 1px bounce pixel.
+      scrollContainer.classList.toggle("hide-scrollbar", height <= 1);
     }
   }
 
@@ -99,6 +102,8 @@ class ScrollPastEndPlugin implements PluginValue {
   };
 
   destroy(): void {
+    const scrollContainer = findEditorScrollContainer(this.view);
+    scrollContainer?.classList.remove("hide-scrollbar");
     this.spacer?.removeEventListener("mousedown", this.handleSpacerClick);
     this.spacer?.remove();
     this.spacer = null;

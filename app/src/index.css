@@ -129,6 +129,14 @@ body {
   box-sizing: border-box;
 }
 
+.hide-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .comet-editor-column::before {
   content: "";
   position: absolute;
