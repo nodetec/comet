@@ -1,10 +1,13 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { open } from "@tauri-apps/plugin-dialog";
 import { type QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
-import { loadNote } from "@/shared/api/invoke";
-import type { LoadedNote } from "@/shared/api/types";
+import { exportNotes, loadNote } from "@/shared/api/invoke";
+import type { LoadedNote, NoteFilter } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
+import { matchesTagScope } from "@/features/shell/hooks/use-view-navigation";
 
 type Mutation<TArg = string> = {
   isPending: boolean;
@@ -22,6 +25,10 @@ export interface NoteOperationsDeps {
   draftNoteId: string | null;
   draftMarkdown: string;
   queryClient: QueryClient;
+  activeTagPath: string | null;
+  tagViewActive: boolean;
+  noteFilter: NoteFilter;
+  currentNote: LoadedNote | undefined;
   archiveNoteMutation: Mutation;
   restoreNoteMutation: Mutation;
   trashNoteMutation: Mutation;
@@ -187,6 +194,77 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     })();
   };
 
+  const handleExportNotes = () => {
+    void (async () => {
+      try {
+        const selected = await open({
+          directory: true,
+          title:
+            deps.tagViewActive && deps.activeTagPath
+              ? `Export ${deps.activeTagPath}`
+              : "Export notes",
+        });
+        if (!selected) return;
+        await deps.draftControl.flushCurrentDraftAsync();
+
+        const count = await exportNotes(
+          deps.tagViewActive && deps.activeTagPath
+            ? {
+                exportMode: "tag",
+                tagPath: deps.activeTagPath,
+                preserveTags: true,
+                exportDir: selected as string,
+              }
+            : {
+                exportMode: "note_filter",
+                noteFilter: deps.noteFilter,
+                preserveTags: true,
+                exportDir: selected as string,
+              },
+        );
+
+        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
+          id: "export-notes-success",
+        });
+      } catch (error) {
+        toastErrorHandler("Couldn't export notes", "export-notes-error")(error);
+      }
+    })();
+  };
+
+  const handleExportTag = (tagPath: string) => {
+    void (async () => {
+      try {
+        const selected = await open({
+          directory: true,
+          title: `Export ${tagPath}`,
+        });
+        if (!selected) return;
+
+        if (
+          deps.currentNote &&
+          deps.draftNoteId === deps.currentNote.id &&
+          matchesTagScope(deps.currentNote.tags, tagPath)
+        ) {
+          await deps.draftControl.flushCurrentDraftAsync();
+        }
+
+        const count = await exportNotes({
+          exportMode: "tag",
+          tagPath,
+          preserveTags: true,
+          exportDir: selected as string,
+        });
+
+        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
+          id: "export-tag-success",
+        });
+      } catch (error) {
+        toastErrorHandler("Couldn't export tag", "export-tag-error")(error);
+      }
+    })();
+  };
+
   return {
     isMutatingNote,
     handleArchiveNote,
@@ -199,5 +277,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     handleSetNoteReadonly,
     handleDuplicateNote,
     handleCopyNoteContent,
+    handleExportNotes,
+    handleExportTag,
   };
 }

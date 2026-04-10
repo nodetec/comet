@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { errorMessage } from "@/shared/lib/utils";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
@@ -10,7 +7,6 @@ import {
   useUIStore,
 } from "@/features/settings/store/use-ui-store";
 
-import { exportNotes } from "@/shared/api/invoke";
 import {
   type NoteSortDirection,
   type NoteSortField,
@@ -21,7 +17,6 @@ import { usePublishState } from "@/features/publishing";
 
 import { useNoteQueries } from "@/features/notes-pane/hooks/use-note-queries";
 import { useNoteMutations } from "@/features/notes-pane/hooks/use-note-mutations";
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
 import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
@@ -29,21 +24,9 @@ import { useConflictResolution } from "@/features/shell/hooks/use-conflict-resol
 import { useNoteHistoryDialog } from "@/features/shell/hooks/use-note-history-dialog";
 import { useNoteOperations } from "@/features/shell/hooks/use-note-operations";
 import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
-import {
-  FOCUS_TAG_PATH_EVENT,
-  type FocusTagPathDetail,
-} from "@/shared/lib/tag-navigation";
-import {
-  CREATE_NOTE_FROM_WIKILINK_EVENT,
-  type CreateNoteFromWikilinkDetail,
-  FOCUS_NOTE_EVENT,
-  type FocusNoteDetail,
-} from "@/shared/lib/note-navigation";
+import { useViewNavigation } from "@/features/shell/hooks/use-view-navigation";
+import { useShellEventListeners } from "@/features/shell/hooks/use-shell-event-listeners";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
-
-function matchesTagScope(tags: string[], tagPath: string) {
-  return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
-}
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
@@ -295,8 +278,7 @@ export function useShellController() {
     pendingSaveTimeoutRef,
     saveNoteMutation,
   });
-  const { flushCurrentDraft, flushCurrentDraftAsync, withFlushedCurrentDraft } =
-    draftControl;
+  const { flushCurrentDraft, flushCurrentDraftAsync } = draftControl;
 
   // --- Draft persistence ---
   useDraftPersistence({
@@ -362,6 +344,10 @@ export function useShellController() {
     draftNoteId,
     draftMarkdown,
     queryClient,
+    activeTagPath,
+    tagViewActive,
+    noteFilter: effectiveNoteFilter,
+    currentNote,
     archiveNoteMutation,
     restoreNoteMutation,
     trashNoteMutation,
@@ -391,327 +377,28 @@ export function useShellController() {
     bumpSyncEditorRevision,
   });
 
-  // --- Account change listener ---
-  useEffect(() => {
-    const handlePrepareAccountChange = () => {
-      void (async () => {
-        try {
-          await latestRef.current.flushCurrentDraftAsync();
-          window.dispatchEvent(
-            new CustomEvent("comet:account-change-prepared", {
-              detail: { ok: true },
-            }),
-          );
-        } catch (error) {
-          window.dispatchEvent(
-            new CustomEvent("comet:account-change-prepared", {
-              detail: {
-                ok: false,
-                message: errorMessage(
-                  error,
-                  "Couldn't save the current draft.",
-                ),
-              },
-            }),
-          );
-        }
-      })();
-    };
-
-    window.addEventListener(
-      "comet:prepare-account-change",
-      handlePrepareAccountChange,
-    );
-    return () => {
-      window.removeEventListener(
-        "comet:prepare-account-change",
-        handlePrepareAccountChange,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleFocusTagPath = (event: Event) => {
-      const customEvent = event as CustomEvent<FocusTagPathDetail>;
-      const tagPath = canonicalizeTagPath(customEvent.detail?.tagPath ?? "");
-      if (!tagPath) {
-        return;
-      }
-
-      setFocusedPane("notes");
-      latestRef.current.handleSelectTagPath(tagPath);
-    };
-
-    window.addEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
-    return () => {
-      window.removeEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
-    };
-  }, [setFocusedPane]);
-
-  useEffect(() => {
-    const handleFocusNote = (event: Event) => {
-      const customEvent = event as CustomEvent<FocusNoteDetail>;
-      const noteId = customEvent.detail?.noteId?.trim();
-      if (!noteId) {
-        return;
-      }
-
-      setFocusedPane("notes");
-      latestRef.current.handleSelectNote(noteId);
-    };
-
-    window.addEventListener(FOCUS_NOTE_EVENT, handleFocusNote);
-    return () => {
-      window.removeEventListener(FOCUS_NOTE_EVENT, handleFocusNote);
-    };
-  }, [setFocusedPane]);
-
-  useEffect(() => {
-    const handleCreateNoteFromWikilink = (event: Event) => {
-      const customEvent = event as CustomEvent<CreateNoteFromWikilinkDetail>;
-      const title = customEvent.detail?.title?.trim();
-      if (!title || isCreatingNote) {
-        return;
-      }
-
-      latestRef.current.flushCurrentDraft();
-      const tagsForNewNote =
-        tagViewActive && activeTagPath ? [activeTagPath] : [];
-      if (
-        !tagViewActive &&
-        noteFilter !== "today" &&
-        noteFilter !== "todo" &&
-        noteFilter !== "pinned" &&
-        noteFilter !== "untagged"
-      ) {
-        setNoteFilter("all");
-      }
-      setSearchQuery("");
-      setCreatingSelectedNoteId(null);
-      setFocusedPane("notes");
-      setIsCreatingNoteTransition(true);
-      createNoteMutation.mutate({
-        autoFocusEditor: false,
-        tags: tagsForNewNote,
-        markdown: `# ${title}`,
-      });
-    };
-
-    window.addEventListener(
-      CREATE_NOTE_FROM_WIKILINK_EVENT,
-      handleCreateNoteFromWikilink,
-    );
-    return () => {
-      window.removeEventListener(
-        CREATE_NOTE_FROM_WIKILINK_EVENT,
-        handleCreateNoteFromWikilink,
-      );
-    };
-  }, [
+  // --- View navigation ---
+  const viewNav = useViewNavigation({
     activeTagPath,
-    createNoteMutation,
-    isCreatingNote,
-    noteFilter,
-    setFocusedPane,
-    setNoteFilter,
-    setSearchQuery,
     tagViewActive,
-  ]);
-
-  // --- Handlers ---
-  const handleCreateNote = () => {
-    if (isCreatingNote) {
-      return;
-    }
-
-    flushCurrentDraft();
-    const tagsForNewNote =
-      tagViewActive && activeTagPath ? [activeTagPath] : [];
-    if (
-      !tagViewActive &&
-      noteFilter !== "today" &&
-      noteFilter !== "todo" &&
-      noteFilter !== "pinned" &&
-      noteFilter !== "untagged"
-    ) {
-      setNoteFilter("all");
-    }
-    setSearchQuery("");
-    setCreatingSelectedNoteId(null);
-    setIsCreatingNoteTransition(true);
-    createNoteMutation.mutate({
-      tags: tagsForNewNote,
-      markdown: effectiveNoteFilter === "todo" ? "- [ ] " : "# ",
-    });
-  };
-
-  const clearSelectionIfNotActive = () => {
-    if (currentNote && (currentNote.archivedAt || currentNote.deletedAt)) {
-      setSelectedNoteId(null);
-      setDraft("", "");
-    }
-  };
-
-  const handleSelectAll = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("all");
-    });
-  };
-
-  const handleSelectToday = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("today");
-    });
-  };
-
-  const handleSelectTodo = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("todo");
-    });
-  };
-
-  const handleSelectPinned = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("pinned");
-    });
-  };
-
-  const handleSelectUntagged = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("untagged");
-    });
-  };
-
-  const handleSelectArchive = () => {
-    withFlushedCurrentDraft(() => {
-      setSelectedNoteId(null);
-      setDraft("", "");
-      setTagViewActive(false);
-      setNoteFilter("archive");
-    });
-  };
-
-  const handleSelectTrash = () => {
-    withFlushedCurrentDraft(() => {
-      setSelectedNoteId(null);
-      setDraft("", "");
-      setTagViewActive(false);
-      setNoteFilter("trash");
-    });
-  };
-
-  const handleSelectTagPath = (tagPath: string) => {
-    if (tagViewActive && activeTagPath === tagPath) {
-      return;
-    }
-
-    withFlushedCurrentDraft((savedNote) => {
-      const noteForScope = savedNote ?? currentNote;
-
-      if (noteForScope && !matchesTagScope(noteForScope.tags, tagPath)) {
-        setSelectedNoteId(null);
-        setDraft("", "");
-      }
-
-      setTagViewActive(true);
-      setActiveTagPath(tagPath);
-    });
-  };
-
-  const handleSelectNote = (noteId: string) => {
-    if (noteId === selectedNoteId) {
-      setFocusedPane("notes");
-      return;
-    }
-
-    flushCurrentDraft();
-    setCreatingSelectedNoteId(null);
-    setPendingAutoFocusEditorNoteId(null);
-    // Batch selectedNoteId + focusedPane into a single store update so
-    // there's no intermediate render where the old note has the indicator.
-    useShellStore.setState({ selectedNoteId: noteId, focusedPane: "notes" });
-  };
-
-  const handleExportNotes = () => {
-    void (async () => {
-      try {
-        const selected = await open({
-          directory: true,
-          title:
-            tagViewActive && activeTagPath
-              ? `Export ${activeTagPath}`
-              : "Export notes",
-        });
-        if (!selected) return;
-        await flushCurrentDraftAsync();
-
-        const count = await exportNotes(
-          tagViewActive && activeTagPath
-            ? {
-                exportMode: "tag",
-                tagPath: activeTagPath,
-                preserveTags: true,
-                exportDir: selected as string,
-              }
-            : {
-                exportMode: "note_filter",
-                noteFilter,
-                preserveTags: true,
-                exportDir: selected as string,
-              },
-        );
-
-        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
-          id: "export-notes-success",
-        });
-      } catch (error) {
-        toastErrorHandler("Couldn't export notes", "export-notes-error")(error);
-      }
-    })();
-  };
-
-  const handleExportTag = (tagPath: string) => {
-    void (async () => {
-      try {
-        const selected = await open({
-          directory: true,
-          title: `Export ${tagPath}`,
-        });
-        if (!selected) return;
-
-        if (
-          currentNote &&
-          draftNoteId === currentNote.id &&
-          matchesTagScope(currentNote.tags, tagPath)
-        ) {
-          await flushCurrentDraftAsync();
-        }
-
-        const count = await exportNotes({
-          exportMode: "tag",
-          tagPath,
-          preserveTags: true,
-          exportDir: selected as string,
-        });
-
-        toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {
-          id: "export-tag-success",
-        });
-      } catch (error) {
-        toastErrorHandler("Couldn't export tag", "export-tag-error")(error);
-      }
-    })();
-  };
+    noteFilter,
+    effectiveNoteFilter,
+    selectedNoteId,
+    currentNote,
+    isCreatingNote,
+    draftControl,
+    createNoteMutation,
+    setActiveTagPath,
+    setCreatingSelectedNoteId,
+    setDraft,
+    setFocusedPane,
+    setIsCreatingNoteTransition,
+    setNoteFilter,
+    setPendingAutoFocusEditorNoteId,
+    setSearchQuery,
+    setSelectedNoteId,
+    setTagViewActive,
+  });
 
   // Keep latest handler references for stable memoized callbacks
   const currentHandlers = {
@@ -720,30 +407,30 @@ export function useShellController() {
     flushCurrentDraftAsync,
     handleArchiveNote: noteOps.handleArchiveNote,
     handleCopyNoteContent: noteOps.handleCopyNoteContent,
-    handleCreateNote,
+    handleCreateNote: viewNav.handleCreateNote,
     handleDuplicateNote: noteOps.handleDuplicateNote,
     handleDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
     handleEmptyTrash: noteOps.handleEmptyTrash,
-    handleExportNotes,
-    handleExportTag,
+    handleExportNotes: noteOps.handleExportNotes,
+    handleExportTag: noteOps.handleExportTag,
     handleRestoreFromTrash: noteOps.handleRestoreFromTrash,
     handleRestoreNote: noteOps.handleRestoreNote,
     handleDeleteTag: tagOps.handleDeleteTag,
-    handleSelectAll,
-    handleSelectArchive,
-    handleSelectTrash,
+    handleSelectAll: viewNav.handleSelectAll,
+    handleSelectArchive: viewNav.handleSelectArchive,
+    handleSelectTrash: viewNav.handleSelectTrash,
     handleTrashNote: noteOps.handleTrashNote,
     handleRenameTag: tagOps.handleRenameTag,
-    handleSelectNote,
+    handleSelectNote: viewNav.handleSelectNote,
     handleSetHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
     handleSetTagPinned: tagOps.handleSetTagPinned,
-    handleSelectToday,
-    handleSelectTodo,
-    handleSelectPinned,
-    handleSelectUntagged,
+    handleSelectToday: viewNav.handleSelectToday,
+    handleSelectTodo: viewNav.handleSelectTodo,
+    handleSelectPinned: viewNav.handleSelectPinned,
+    handleSelectUntagged: viewNav.handleSelectUntagged,
     handleSetNotePinned: noteOps.handleSetNotePinned,
     handleSetNoteReadonly: noteOps.handleSetNoteReadonly,
-    handleSelectTagPath,
+    handleSelectTagPath: viewNav.handleSelectTagPath,
     handleOpenNoteHistory: noteHistory.handleOpenNoteHistory,
     handleSelectNoteHistorySnapshot:
       noteHistory.handleSelectNoteHistorySnapshot,
@@ -755,6 +442,21 @@ export function useShellController() {
   };
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
+
+  // --- Event listeners ---
+  useShellEventListeners({
+    latestRef,
+    activeTagPath,
+    tagViewActive,
+    noteFilter,
+    isCreatingNote,
+    createNoteMutation,
+    setNoteFilter,
+    setSearchQuery,
+    setCreatingSelectedNoteId,
+    setIsCreatingNoteTransition,
+    setFocusedPane,
+  });
 
   // --- Props assembly ---
   const nextEditorPaneProps = useMemo(
