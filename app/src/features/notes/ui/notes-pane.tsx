@@ -260,7 +260,18 @@ export function NotesPane({
   useEffect(() => {
     const handleFocusNotesPane = (event: Event) => {
       const customEvent = event as CustomEvent<FocusNotesPaneDetail>;
-      const selection = customEvent.detail?.selection ?? "selected";
+      let selection = customEvent.detail?.selection ?? "selected";
+
+      // If the selected note isn't in the current filtered list, fall back
+      // to selecting the first visible note instead of focusing an empty
+      // scroll container.
+      if (
+        selection === "selected" &&
+        selectedNoteId &&
+        !filteredNotes.some((n) => n.id === selectedNoteId)
+      ) {
+        selection = "first";
+      }
 
       if (selection === "first") {
         if (isNotesPlaceholderData) {
@@ -269,7 +280,9 @@ export function NotesPane({
         }
 
         setIsSearchFocused(false);
+        setFocusedPane("notes");
         selectFirstVisibleNote();
+        focusNotesPaneTarget(scrollContainerRef.current);
         return;
       }
 
@@ -283,7 +296,13 @@ export function NotesPane({
     return () => {
       window.removeEventListener(FOCUS_NOTES_PANE_EVENT, handleFocusNotesPane);
     };
-  }, [isNotesPlaceholderData, selectFirstVisibleNote, setFocusedPane]);
+  }, [
+    filteredNotes,
+    isNotesPlaceholderData,
+    selectFirstVisibleNote,
+    selectedNoteId,
+    setFocusedPane,
+  ]);
 
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);

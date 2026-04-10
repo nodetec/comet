@@ -1,4 +1,4 @@
-import { type MouseEvent } from "react";
+import { type KeyboardEvent, type MouseEvent } from "react";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu } from "@tauri-apps/api/menu";
 import {
@@ -47,6 +47,19 @@ async function showTrashContextMenu(
     await menu.popup(new LogicalPosition(event.clientX, event.clientY));
   } finally {
     await menu.close();
+  }
+}
+
+/**
+ * Prevent the native button Enter/Space → click behavior so that the
+ * parent `<nav>` keyboard handler controls focus transitions exclusively.
+ * Without this, pressing Enter on a filter button fires both the nav
+ * handler (which focuses the notes pane) and the button's synthetic
+ * click (which re-selects the filter and sets focus back to sidebar).
+ */
+function preventButtonKeyboardClick(event: KeyboardEvent<HTMLButtonElement>) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
   }
 }
 
@@ -169,6 +182,7 @@ export function NotesSection({
               className={sidebarItemClasses(isTodayActive, isFocused)}
               onClick={onSelectToday}
               onFocus={onSidebarRowFocus}
+              onKeyDown={preventButtonKeyboardClick}
               ref={(element) => onRowRef("filter:today", element)}
               data-comet-sidebar-active={isTodayActive ? "true" : undefined}
               type="button"
@@ -186,6 +200,7 @@ export function NotesSection({
               className={sidebarItemClasses(isTodoActive, isFocused)}
               onClick={onSelectTodo}
               onFocus={onSidebarRowFocus}
+              onKeyDown={preventButtonKeyboardClick}
               ref={(element) => onRowRef("filter:todo", element)}
               data-comet-sidebar-active={isTodoActive ? "true" : undefined}
               type="button"
@@ -207,6 +222,7 @@ export function NotesSection({
               className={sidebarItemClasses(isPinnedActive, isFocused)}
               onClick={onSelectPinned}
               onFocus={onSidebarRowFocus}
+              onKeyDown={preventButtonKeyboardClick}
               ref={(element) => onRowRef("filter:pinned", element)}
               data-comet-sidebar-active={isPinnedActive ? "true" : undefined}
               type="button"
@@ -222,6 +238,7 @@ export function NotesSection({
               className={sidebarItemClasses(isUntaggedActive, isFocused)}
               onClick={onSelectUntagged}
               onFocus={onSidebarRowFocus}
+              onKeyDown={preventButtonKeyboardClick}
               ref={(element) => onRowRef("filter:untagged", element)}
               data-comet-sidebar-active={isUntaggedActive ? "true" : undefined}
               type="button"
@@ -241,6 +258,7 @@ export function NotesSection({
           className={sidebarItemClasses(isArchiveActive, isFocused)}
           onClick={onSelectArchive}
           onFocus={onSidebarRowFocus}
+          onKeyDown={preventButtonKeyboardClick}
           ref={(element) => onRowRef("filter:archive", element)}
           data-comet-sidebar-active={isArchiveActive ? "true" : undefined}
           type="button"
@@ -257,6 +275,7 @@ export function NotesSection({
           onClick={onSelectTrash}
           onContextMenu={(event) => handleTrashContextMenu(event)}
           onFocus={onSidebarRowFocus}
+          onKeyDown={preventButtonKeyboardClick}
           ref={(element) => onRowRef("filter:trash", element)}
           data-comet-sidebar-active={isTrashActive ? "true" : undefined}
           type="button"

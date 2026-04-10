@@ -152,10 +152,7 @@ export function focusNotesPaneTarget(scrollContainer: HTMLDivElement | null) {
       if (selectedRow) {
         selectedRow.scrollIntoView({ block: "nearest" });
         selectedRow.focus({ preventScroll: true });
-        return;
       }
-
-      scrollContainer?.focus({ preventScroll: true });
     });
   });
 }
