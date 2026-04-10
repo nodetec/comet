@@ -1,18 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
-export function useRevealMainWindow(bootstrapLoading: boolean) {
-  const hasRevealedWindowRef = useRef(false);
+export function useRevealMainWindow(ready: boolean) {
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
-    // The Tauri main window starts hidden to avoid startup flash. Reveal it only
-    // once the initial shell state is ready, and never re-run that reveal during
-    // later note/query transitions.
-    if (bootstrapLoading || hasRevealedWindowRef.current) {
-      return;
-    }
+    if (!ready || revealed) return;
 
-    hasRevealedWindowRef.current = true;
+    setRevealed(true);
     void invoke("reveal_main_window");
-  }, [bootstrapLoading]);
+  }, [ready, revealed]);
+
+  return revealed;
 }

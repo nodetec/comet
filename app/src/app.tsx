@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useState } from "react";
 
 import { useTheme } from "@/shared/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
@@ -16,6 +16,7 @@ import { Toaster } from "@/shared/ui/sonner";
 import { AccountSwitcherDialog } from "@/features/settings/account-switcher-dialog";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
+import { BootstrapError } from "@/features/shell/ui/bootstrap-error";
 import { EditorPane } from "@/features/shell/editor-pane";
 import { NoteHistoryDialog } from "@/features/shell/note-history-dialog";
 import { NotesPane } from "@/features/notes/ui/notes-pane";
@@ -30,7 +31,6 @@ import { conflictDialogCopy } from "@/shared/lib/conflict-dialog-copy";
 function App() {
   useTheme();
   const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
-  const [revealed, setRevealed] = useState(false);
   const {
     bootstrapError,
     chooseConflictDialogProps,
@@ -52,11 +52,7 @@ function App() {
     setCommandPaletteOpen,
   } = useAppShortcuts({ onCreateNote: notesPaneProps.onCreateNote });
 
-  useEffect(() => {
-    if (readyToRevealWindow) setRevealed(true);
-  }, [readyToRevealWindow]);
-
-  useRevealMainWindow(!revealed);
+  const revealed = useRevealMainWindow(readyToRevealWindow);
 
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
@@ -64,19 +60,7 @@ function App() {
   if (!revealed) return null;
 
   if (bootstrapError) {
-    return (
-      <div className="text-foreground flex min-h-screen items-center justify-center">
-        <div className="border-border bg-card flex max-w-lg min-w-96 flex-col gap-4 rounded-xl border px-5 py-5 shadow-sm">
-          <div className="space-y-1">
-            <p className="font-semibold">Couldn&apos;t load your notes</p>
-            <p className="text-muted-foreground text-sm">{bootstrapError}</p>
-          </div>
-          <div>
-            <Button onClick={retryBootstrap}>Try again</Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <BootstrapError error={bootstrapError} onRetry={retryBootstrap} />;
   }
 
   const chooseConflictDialog = conflictDialogCopy(
