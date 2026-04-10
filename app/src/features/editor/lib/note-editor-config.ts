@@ -57,7 +57,10 @@ export const MARKDOWN_HIGHLIGHT_STYLE = HighlightStyle.define([
 
 export const MARKDOWN_EDITOR_THEME = EditorView.theme({
   "&": {
-    minHeight: "100%",
+    flex: "1",
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "0",
     background: "transparent",
     cursor: "text",
   },
@@ -65,13 +68,17 @@ export const MARKDOWN_EDITOR_THEME = EditorView.theme({
     outline: "none",
   },
   ".cm-scroller": {
-    minHeight: "100%",
+    flex: "1",
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "0",
     overflow: "visible",
     fontFamily: '"Figtree Variable", sans-serif',
     cursor: "text",
   },
   ".cm-content": {
-    minHeight: "100%",
+    flex: "1",
+    minHeight: "0",
     color: "var(--editor-text)",
     caretColor: "var(--editor-caret)",
     cursor: "text",

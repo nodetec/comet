@@ -30,7 +30,6 @@ body {
 
 :root {
   --radius: 0.5rem;
-  --editor-bottom-padding: 70dvh;
 }
 
 @theme inline {
@@ -121,12 +120,13 @@ body {
 
 .comet-editor-column {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   position: relative;
   box-sizing: border-box;
-  padding-bottom: var(--editor-bottom-padding);
 }
 
 .comet-editor-column::before {

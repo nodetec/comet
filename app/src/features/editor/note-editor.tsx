@@ -72,6 +72,7 @@ import { dropImage } from "@/features/editor/extensions/drop-image";
 import { pasteImage } from "@/features/editor/extensions/paste-image";
 import { pasteLink } from "@/features/editor/extensions/paste-link";
 import { scrollCenterOnEnter } from "@/features/editor/extensions/scroll-center-on-enter";
+import { scrollPastEnd } from "@/features/editor/extensions/scroll-past-end";
 import { deleteTableBackward } from "@/features/editor/extensions/tables/delete-table-boundary";
 import {
   getHorizontalRuleSelection,
@@ -442,6 +443,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
           drawSelection(),
           EditorView.lineWrapping,
           scrollCenterOnEnter({ viewportPercentage: 5 }),
+          scrollPastEnd(),
           markdownLanguage({
             base: markdownLang,
             extensions: [
@@ -809,7 +811,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       <>
         <div
           className={cn(
-            "comet-editor-shell relative flex min-h-full w-full flex-1",
+            "comet-editor-shell relative flex min-h-full w-full flex-1 flex-col",
             searchHighlightAllMatchesYellow &&
               "comet-codemirror-passive-search",
             searchQuery &&
@@ -819,7 +821,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         >
           <div className="comet-editor-column">
             <div
-              className="comet-codemirror-host min-h-full flex-1"
+              className="comet-codemirror-host flex min-h-0 flex-1 flex-col"
               ref={containerRef}
             />
           </div>
