@@ -736,13 +736,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             to: view.state.doc.length,
             insert: nextMarkdown,
           },
+          ...(autoFocus && {
+            selection: EditorSelection.cursor(nextMarkdown.length),
+          }),
           annotations: Transaction.addToHistory.of(false),
         });
 
         if (autoFocus) {
-          view.dispatch({
-            selection: EditorSelection.cursor(view.state.doc.length),
-          });
+          useShellStore.getState().setFocusedPane("editor");
           view.focus();
           onAutoFocusHandled?.();
         } else {

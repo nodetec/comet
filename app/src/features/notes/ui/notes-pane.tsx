@@ -435,6 +435,10 @@ function handleNoteRowPointerDown(event: PointerEvent<HTMLButtonElement>) {
 function focusSelectedNoteRow(root?: ParentNode | null) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (useShellStore.getState().focusedPane !== "notes") {
+        return;
+      }
+
       const selectedRow = (root ?? document).querySelector<HTMLButtonElement>(
         '[data-comet-selected-note="true"]',
       );
@@ -451,6 +455,10 @@ function focusSelectedNoteRow(root?: ParentNode | null) {
 function focusNotesPaneTarget(scrollContainer: HTMLDivElement | null) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (useShellStore.getState().focusedPane !== "notes") {
+        return;
+      }
+
       const selectedRow = scrollContainer?.querySelector<HTMLButtonElement>(
         '[data-comet-selected-note="true"]',
       );

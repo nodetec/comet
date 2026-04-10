@@ -972,7 +972,7 @@ export function EditorPane({
       <div className="relative min-h-0 flex-1">
         <div
           className={cn(
-            "h-full min-h-0 overflow-y-scroll overscroll-y-contain",
+            "h-full min-h-0 overflow-y-scroll overscroll-y-contain outline-none",
             !isReadOnly && "cursor-text",
             findOpen && "pt-2",
           )}
