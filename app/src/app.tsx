@@ -30,8 +30,7 @@ import { conflictDialogCopy } from "@/shared/lib/conflict-dialog-copy";
 function App() {
   useTheme();
   const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
-  const [hasCompletedStartupReveal, setHasCompletedStartupReveal] =
-    useState(false);
+  const [revealed, setRevealed] = useState(false);
   const {
     bootstrapError,
     chooseConflictDialogProps,
@@ -53,21 +52,16 @@ function App() {
     setCommandPaletteOpen,
   } = useAppShortcuts({ onCreateNote: notesPaneProps.onCreateNote });
 
-  useRevealMainWindow(!hasCompletedStartupReveal && !readyToRevealWindow);
+  useEffect(() => {
+    if (readyToRevealWindow) setRevealed(true);
+  }, [readyToRevealWindow]);
+
+  useRevealMainWindow(!revealed);
 
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
 
-  useEffect(() => {
-    if (readyToRevealWindow && !hasCompletedStartupReveal) {
-      setHasCompletedStartupReveal(true);
-    }
-  }, [hasCompletedStartupReveal, readyToRevealWindow]);
-
-  if (!hasCompletedStartupReveal && !readyToRevealWindow) {
-    // Keep React mounted but the window hidden until startup data is ready.
-    return null;
-  }
+  if (!revealed) return null;
 
   if (bootstrapError) {
     return (
