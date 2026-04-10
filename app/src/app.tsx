@@ -215,11 +215,8 @@ function App() {
   });
 
   useEffect(() => {
-    let unlistenCommandPalette: (() => void) | null = null;
-    let unlistenEditorFind: (() => void) | null = null;
-    let unlistenNewNote: (() => void) | null = null;
-    let unlistenNotesSearch: (() => void) | null = null;
-    let unlistenSettings: (() => void) | null = null;
+    let cancelled = false;
+    const disposers: (() => void)[] = [];
 
     void Promise.all([
       listen(TAURI_EVENT_COMMAND_PALETTE, handleCommandPaletteMenuEvent),
@@ -227,28 +224,17 @@ function App() {
       listen(TAURI_EVENT_NEW_NOTE, handleNewNoteMenuEvent),
       listen(TAURI_EVENT_NOTES_SEARCH, handleNotesSearchMenuEvent),
       listen(TAURI_EVENT_SETTINGS, handleSettingsMenuEvent),
-    ]).then(
-      ([
-        disposeCommandPalette,
-        disposeEditorFind,
-        disposeNewNote,
-        disposeNotesSearch,
-        disposeSettings,
-      ]) => {
-        unlistenCommandPalette = disposeCommandPalette;
-        unlistenEditorFind = disposeEditorFind;
-        unlistenNewNote = disposeNewNote;
-        unlistenNotesSearch = disposeNotesSearch;
-        unlistenSettings = disposeSettings;
-      },
-    );
+    ]).then((unlistenFns) => {
+      if (cancelled) {
+        for (const fn of unlistenFns) fn();
+      } else {
+        disposers.push(...unlistenFns);
+      }
+    });
 
     return () => {
-      unlistenCommandPalette?.();
-      unlistenEditorFind?.();
-      unlistenNewNote?.();
-      unlistenNotesSearch?.();
-      unlistenSettings?.();
+      cancelled = true;
+      for (const fn of disposers) fn();
     };
   }, []);
 
