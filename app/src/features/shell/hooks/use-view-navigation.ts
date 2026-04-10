@@ -25,11 +25,6 @@ export interface ViewNavigationDeps {
   isCreatingNote: boolean;
   draftControl: DraftControl;
   createNoteMutation: CreateNoteMutation;
-  setCreatingSelectedNoteId: (id: string | null) => void;
-  setIsCreatingNoteTransition: (v: boolean) => void;
-  setPendingAutoFocusEditorNoteId: (id: string | null) => void;
-  setSearchQuery: (query: string) => void;
-  setNoteFilter: (filter: NoteFilter) => void;
 }
 
 export function useViewNavigation(deps: ViewNavigationDeps) {
@@ -43,20 +38,17 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     isCreatingNote,
     draftControl,
     createNoteMutation,
-    setCreatingSelectedNoteId,
-    setIsCreatingNoteTransition,
-    setPendingAutoFocusEditorNoteId,
-    setSearchQuery,
-    setNoteFilter,
   } = deps;
 
   const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
+  const setNoteFilter = useShellStore((s) => s.setNoteFilter);
   const navigateToFilter = useShellStore((s) => s.navigateToFilter);
   const navigateToDisposedFilter = useShellStore(
     (s) => s.navigateToDisposedFilter,
   );
   const navigateToTagPath = useShellStore((s) => s.navigateToTagPath);
   const navigateToNote = useShellStore((s) => s.navigateToNote);
+  const prepareNoteCreation = useShellStore((s) => s.prepareNoteCreation);
 
   const handleCreateNote = () => {
     if (isCreatingNote) {
@@ -75,9 +67,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     ) {
       setNoteFilter("all");
     }
-    setSearchQuery("");
-    setCreatingSelectedNoteId(null);
-    setIsCreatingNoteTransition(true);
+    prepareNoteCreation();
     createNoteMutation.mutate({
       tags: tagsForNewNote,
       markdown: effectiveNoteFilter === "todo" ? "- [ ] " : "# ",
@@ -129,8 +119,6 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     }
 
     flushCurrentDraft();
-    setCreatingSelectedNoteId(null);
-    setPendingAutoFocusEditorNoteId(null);
     navigateToNote(noteId);
   };
 

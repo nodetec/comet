@@ -14,6 +14,7 @@ import {
   type FocusNoteDetail,
 } from "@/shared/lib/note-navigation";
 import type { NoteFilter } from "@/shared/api/types";
+import { useShellStore } from "@/features/shell/store/use-shell-store";
 
 interface ShellEventHandlers {
   flushCurrentDraft: () => void;
@@ -35,11 +36,6 @@ export interface ShellEventListenerDeps {
       autoFocusEditor?: boolean;
     }) => void;
   };
-  setNoteFilter: (filter: NoteFilter) => void;
-  setSearchQuery: (query: string) => void;
-  setCreatingSelectedNoteId: (id: string | null) => void;
-  setIsCreatingNoteTransition: (v: boolean) => void;
-  setFocusedPane: (pane: "sidebar" | "notes" | "editor") => void;
 }
 
 export function useShellEventListeners(deps: ShellEventListenerDeps) {
@@ -50,12 +46,11 @@ export function useShellEventListeners(deps: ShellEventListenerDeps) {
     noteFilter,
     isCreatingNote,
     createNoteMutation,
-    setNoteFilter,
-    setSearchQuery,
-    setCreatingSelectedNoteId,
-    setIsCreatingNoteTransition,
-    setFocusedPane,
   } = deps;
+
+  const setNoteFilter = useShellStore((s) => s.setNoteFilter);
+  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
+  const prepareNoteCreation = useShellStore((s) => s.prepareNoteCreation);
 
   // --- Account change listener ---
   useEffect(() => {
@@ -155,10 +150,8 @@ export function useShellEventListeners(deps: ShellEventListenerDeps) {
       ) {
         setNoteFilter("all");
       }
-      setSearchQuery("");
-      setCreatingSelectedNoteId(null);
       setFocusedPane("notes");
-      setIsCreatingNoteTransition(true);
+      prepareNoteCreation();
       createNoteMutation.mutate({
         autoFocusEditor: false,
         tags: tagsForNewNote,
@@ -182,11 +175,9 @@ export function useShellEventListeners(deps: ShellEventListenerDeps) {
     isCreatingNote,
     latestRef,
     noteFilter,
-    setCreatingSelectedNoteId,
+    prepareNoteCreation,
     setFocusedPane,
-    setIsCreatingNoteTransition,
     setNoteFilter,
-    setSearchQuery,
     tagViewActive,
   ]);
 }

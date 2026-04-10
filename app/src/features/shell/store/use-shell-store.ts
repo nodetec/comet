@@ -185,20 +185,28 @@ type NavigationActions = {
     tagPath: string,
     currentNote: { tags: string[] } | undefined,
   ): void;
-  /** Select a note by ID. Batches selectedNoteId + focusedPane into one update. */
+  /** Select a note by ID. Clears creation state and batches into one update. */
   navigateToNote(noteId: string): void;
+  /** Prepare app state for a new note creation. */
+  prepareNoteCreation(): void;
 };
 
 type ShellStore = {
   activeTagPath: string | null;
+  creatingSelectedNoteId: string | null;
   draftMarkdown: string;
   draftNoteId: string | null;
   draftWikilinkResolutions: WikiLinkResolutionInput[];
   focusedPane: FocusedPane;
+  isCreatingNoteTransition: boolean;
   noteFilter: NoteFilter;
+  pendingAutoFocusEditorNoteId: string | null;
   searchQuery: string;
   selectedNoteId: string | null;
   tagViewActive: boolean;
+  setCreatingSelectedNoteId(id: string | null): void;
+  setIsCreatingNoteTransition(value: boolean): void;
+  setPendingAutoFocusEditorNoteId(id: string | null): void;
   clearActiveTagPath(): void;
   clearDraftWikilinkResolutions(noteId?: string): void;
   removeDraftWikilinkResolutions(
@@ -227,14 +235,26 @@ type ShellStore = {
 
 export const useShellStore = create<ShellStore>((set) => ({
   activeTagPath: null,
+  creatingSelectedNoteId: null,
   draftMarkdown: "",
   draftNoteId: null,
   draftWikilinkResolutions: [],
   focusedPane: "notes",
+  isCreatingNoteTransition: false,
   noteFilter: "all",
+  pendingAutoFocusEditorNoteId: null,
   searchQuery: "",
   selectedNoteId: null,
   tagViewActive: false,
+  setCreatingSelectedNoteId: (creatingSelectedNoteId) => {
+    set({ creatingSelectedNoteId });
+  },
+  setIsCreatingNoteTransition: (isCreatingNoteTransition) => {
+    set({ isCreatingNoteTransition });
+  },
+  setPendingAutoFocusEditorNoteId: (pendingAutoFocusEditorNoteId) => {
+    set({ pendingAutoFocusEditorNoteId });
+  },
   clearActiveTagPath: () => {
     set({ activeTagPath: null, tagViewActive: false });
   },
@@ -357,7 +377,19 @@ export const useShellStore = create<ShellStore>((set) => ({
     });
   },
   navigateToNote: (noteId) => {
-    set({ selectedNoteId: noteId, focusedPane: "notes" });
+    set({
+      selectedNoteId: noteId,
+      focusedPane: "notes",
+      creatingSelectedNoteId: null,
+      pendingAutoFocusEditorNoteId: null,
+    });
+  },
+  prepareNoteCreation: () => {
+    set({
+      searchQuery: "",
+      creatingSelectedNoteId: null,
+      isCreatingNoteTransition: true,
+    });
   },
   upsertDraftWikilinkResolution: (noteId, resolution) => {
     set((state) => {

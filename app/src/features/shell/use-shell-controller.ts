@@ -31,13 +31,6 @@ import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
     useState(false);
-  const [isCreatingNoteTransition, setIsCreatingNoteTransition] =
-    useState(false);
-  const [creatingSelectedNoteId, setCreatingSelectedNoteId] = useState<
-    string | null
-  >(null);
-  const [pendingAutoFocusEditorNoteId, setPendingAutoFocusEditorNoteId] =
-    useState<string | null>(null);
   const [syncEditorRevision, setSyncEditorRevision] = useState(0);
 
   const publish = usePublishState();
@@ -67,16 +60,28 @@ export function useShellController() {
 
   const queryClient = useQueryClient();
   const activeTagPath = useShellStore((state) => state.activeTagPath);
+  const creatingSelectedNoteId = useShellStore(
+    (state) => state.creatingSelectedNoteId,
+  );
   const draftMarkdown = useShellStore((state) => state.draftMarkdown);
   const draftNoteId = useShellStore((state) => state.draftNoteId);
   const draftWikilinkResolutions = useShellStore(
     (state) => state.draftWikilinkResolutions,
   );
+  const isCreatingNoteTransition = useShellStore(
+    (state) => state.isCreatingNoteTransition,
+  );
   const noteFilter = useShellStore((state) => state.noteFilter);
   const searchQuery = useShellStore((state) => state.searchQuery);
+  const pendingAutoFocusEditorNoteId = useShellStore(
+    (state) => state.pendingAutoFocusEditorNoteId,
+  );
   const selectedNoteId = useShellStore((state) => state.selectedNoteId);
   const tagViewActive = useShellStore((state) => state.tagViewActive);
   const setDraft = useShellStore((state) => state.setDraft);
+  const setPendingAutoFocusEditorNoteId = useShellStore(
+    (state) => state.setPendingAutoFocusEditorNoteId,
+  );
   const clearDraftWikilinkResolutions = useShellStore(
     (state) => state.clearDraftWikilinkResolutions,
   );
@@ -157,9 +162,6 @@ export function useShellController() {
     clearDraftWikilinkResolutions,
     setSelectedNoteId,
     setDraft,
-    setCreatingSelectedNoteId,
-    setPendingAutoFocusEditorNoteId,
-    setIsCreatingNoteTransition,
     setNoteFilter,
   });
 
@@ -388,11 +390,6 @@ export function useShellController() {
     isCreatingNote,
     draftControl,
     createNoteMutation,
-    setCreatingSelectedNoteId,
-    setIsCreatingNoteTransition,
-    setPendingAutoFocusEditorNoteId,
-    setSearchQuery,
-    setNoteFilter,
   });
 
   // Keep latest handler references for stable memoized callbacks
@@ -446,11 +443,6 @@ export function useShellController() {
     noteFilter,
     isCreatingNote,
     createNoteMutation,
-    setNoteFilter,
-    setSearchQuery,
-    setCreatingSelectedNoteId,
-    setIsCreatingNoteTransition,
-    setFocusedPane,
   });
 
   // --- Props assembly ---

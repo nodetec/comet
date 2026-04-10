@@ -46,9 +46,6 @@ export interface NoteMutationDeps {
       wikilinkResolutions?: WikiLinkResolutionInput[];
     },
   ) => void;
-  setCreatingSelectedNoteId: (id: string | null) => void;
-  setPendingAutoFocusEditorNoteId: (id: string | null) => void;
-  setIsCreatingNoteTransition: (v: boolean) => void;
   setNoteFilter: (filter: NoteFilter) => void;
 }
 
@@ -70,11 +67,18 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     clearDraftWikilinkResolutions,
     setSelectedNoteId,
     setDraft,
-    setCreatingSelectedNoteId,
-    setPendingAutoFocusEditorNoteId,
-    setIsCreatingNoteTransition,
     setNoteFilter,
   } = deps;
+
+  const setCreatingSelectedNoteId = useShellStore(
+    (s) => s.setCreatingSelectedNoteId,
+  );
+  const setPendingAutoFocusEditorNoteId = useShellStore(
+    (s) => s.setPendingAutoFocusEditorNoteId,
+  );
+  const setIsCreatingNoteTransition = useShellStore(
+    (s) => s.setIsCreatingNoteTransition,
+  );
 
   const invalidateNotes = async () => {
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
