@@ -85,7 +85,7 @@ describe("relay integration > access keys admin", () => {
       },
     );
     expect(revoke.status).toBe(200);
-    expect(await revoke.json()).toEqual({ revoked: true, key: created.key });
+    expect(await revoke.json()).toEqual({ updated: true, key: created.key });
 
     const listAfterRevoke = await fetch(`${ctx.httpUrl}/admin/keys`, {
       headers: { Authorization: "Bearer secret-token" },
