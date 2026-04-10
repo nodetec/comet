@@ -1,4 +1,4 @@
-import { type CSSProperties, useState } from "react";
+import type { CSSProperties } from "react";
 
 import { useTheme } from "@/shared/hooks/use-theme";
 import { Bar, Container, Section } from "@column-resizer/react";
@@ -20,9 +20,10 @@ import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 
+const IS_MACOS = navigator.userAgent.includes("Mac");
+
 function App() {
   useTheme();
-  const [isMacos] = useState(() => navigator.userAgent.includes("Mac"));
   const {
     bootstrapError,
     chooseConflictDialogProps,
@@ -60,12 +61,12 @@ function App() {
       className="text-foreground relative h-full min-h-0 overflow-hidden"
       style={
         {
-          "--titlebar-height": isMacos ? "3.25rem" : "0px",
+          "--titlebar-height": IS_MACOS ? "3.25rem" : "0px",
         } as CSSProperties
       }
     >
       <div className="relative h-full min-h-0">
-        {isMacos ? (
+        {IS_MACOS ? (
           <div
             className="absolute inset-x-0 top-0 z-30 h-(--titlebar-height)"
             data-tauri-drag-region
