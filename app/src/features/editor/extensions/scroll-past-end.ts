@@ -49,7 +49,7 @@ class ScrollPastEndPlugin implements PluginValue {
     this.spacer = document.createElement("div");
     this.spacer.setAttribute("aria-hidden", "true");
     this.spacer.style.cursor = "text";
-    this.spacer.addEventListener("mousedown", this.handleSpacerClick);
+    this.spacer.addEventListener("mousedown", this.handleSpacerMouseDown);
     scrollContainer.append(this.spacer);
     return this.spacer;
   }
@@ -92,19 +92,74 @@ class ScrollPastEndPlugin implements PluginValue {
     }
   }
 
-  private handleSpacerClick = (event: MouseEvent): void => {
+  private handleSpacerMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 0) {
+      return;
+    }
+
     event.preventDefault();
+    const anchor = this.view.state.doc.length;
     this.view.dispatch({
-      selection: EditorSelection.cursor(this.view.state.doc.length),
+      selection: EditorSelection.cursor(anchor),
       scrollIntoView: false,
     });
     this.view.focus();
+
+    const scrollContainer = findEditorScrollContainer(this.view);
+    const scrollEdge = 30; // px from top/bottom edge to trigger scrolling
+    const scrollSpeed = 8; // px per frame
+    let scrollRAF = 0;
+
+    const autoScroll = (clientY: number) => {
+      cancelAnimationFrame(scrollRAF);
+      if (!scrollContainer) {
+        return;
+      }
+
+      const rect = scrollContainer.getBoundingClientRect();
+      let delta = 0;
+      if (clientY < rect.top + scrollEdge) {
+        delta = -scrollSpeed;
+      } else if (clientY > rect.bottom - scrollEdge) {
+        delta = scrollSpeed;
+      }
+
+      if (delta === 0) {
+        return;
+      }
+
+      const step = () => {
+        scrollContainer.scrollTop += delta;
+        scrollRAF = requestAnimationFrame(step);
+      };
+      scrollRAF = requestAnimationFrame(step);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const pos = this.view.posAtCoords({ x: e.clientX, y: e.clientY });
+      if (pos != null) {
+        this.view.dispatch({
+          selection: EditorSelection.range(anchor, pos),
+          scrollIntoView: false,
+        });
+      }
+      autoScroll(e.clientY);
+    };
+
+    const handleMouseUp = () => {
+      cancelAnimationFrame(scrollRAF);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
   };
 
   destroy(): void {
     const scrollContainer = findEditorScrollContainer(this.view);
     scrollContainer?.classList.remove("hide-scrollbar");
-    this.spacer?.removeEventListener("mousedown", this.handleSpacerClick);
+    this.spacer?.removeEventListener("mousedown", this.handleSpacerMouseDown);
     this.spacer?.remove();
     this.spacer = null;
   }
