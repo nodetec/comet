@@ -12,14 +12,14 @@ Desktop notes app.
 ## Editor Invariants
 
 - The editor is **markdown-first**. Stored note markdown is the canonical representation for note content.
-- Lexical AST, rendered HTML, clipboard payloads, and sync payloads are derived representations and must not introduce content drift.
+- CodeMirror AST, rendered HTML, clipboard payloads, and sync payloads are derived representations and must not introduce content drift.
 - Supported content should round-trip stably across save/load, sync, copy/paste, and import/export flows.
 - Preserve authored structure where possible. Do not silently reformat or normalize content unless the normalization is intentional, documented, and stable after one pass.
 - Any bug caused by representation drift should get a regression test at the seam where it occurred.
 
 ## Stack
 
-- **Frontend**: React 19, Vite, Tailwind 4, shadcn/ui, Lexical editor
+- **Frontend**: React 19, Vite, Tailwind 4, shadcn/ui, CodeMirror 6
 - **Backend**: Tauri 2 (Rust), SQLite via rusqlite
 - **State**: TanStack Query, Zustand
 - **Sync**: Nostr protocol via nostr-sdk
@@ -36,7 +36,7 @@ Desktop notes app.
 
 ### React/TypeScript
 
-- Components: `PascalCase` (file and export)
+- Components: `PascalCase` export in `kebab-case.tsx` file
 - Hooks: `useCamelCase`
 - Utils/functions: `camelCase`
 - Types: `PascalCase`
