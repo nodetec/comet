@@ -18,12 +18,9 @@ import {
 import {
   defaultNoteSortPrefs,
   useNoteSortPrefs,
-  useUIActions,
 } from "@/features/settings/store/use-ui-store";
 
 import {
-  type NoteSortDirection,
-  type NoteSortField,
   type PublishNoteInput,
   type PublishShortNoteInput,
 } from "@/shared/api/types";
@@ -90,17 +87,13 @@ export function useShellController() {
     setDraft,
     setNoteFilter,
     setPendingAutoFocusEditorNoteId,
-    setSearchQuery,
     setSelectedNoteId,
     setTagViewActive,
   } = useShellActions();
 
   const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
-  const visibleActiveTagPath = tagViewActive ? activeTagPath : null;
-  const sortViewKey = effectiveNoteFilter;
   const allSortPrefs = useNoteSortPrefs();
-  const { setNoteSortPrefs } = useUIActions();
-  const sortPrefs = allSortPrefs[sortViewKey] ?? defaultNoteSortPrefs;
+  const sortPrefs = allSortPrefs[effectiveNoteFilter] ?? defaultNoteSortPrefs;
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
@@ -723,24 +716,16 @@ export function useShellController() {
 
   const notesPaneProps = useMemo(
     () => ({
-      activeTagPath: visibleActiveTagPath,
-      creatingNoteId: creatingSelectedNoteId,
       filteredNotes: currentNotes,
       hasMoreNotes: notesQuery.hasNextPage,
       isCreatingNote,
       isLoadingMoreNotes: notesQuery.isFetchingNextPage,
-      sortField: noteSortField,
-      sortDirection: noteSortDirection,
       isNotesPlaceholderData: notesQuery.isPlaceholderData,
-      onChangeSortField: (field: NoteSortField) =>
-        setNoteSortPrefs(sortViewKey, { field }),
-      onChangeSortDirection: (direction: NoteSortDirection) =>
-        setNoteSortPrefs(sortViewKey, { direction }),
       isMutatingNote,
-      noteFilter: effectiveNoteFilter,
+      selectedNoteId: displayedSelectedNoteId,
+      totalNoteCount,
       onArchiveNote: (noteId: string) =>
         latestRef.current.handleArchiveNote(noteId),
-      onChangeSearch: setSearchQuery,
       onCopyNoteContent: (noteId: string) =>
         latestRef.current.handleCopyNoteContent(noteId),
       onCreateNote: () => latestRef.current.handleCreateNote(),
@@ -758,36 +743,23 @@ export function useShellController() {
         latestRef.current.handleRestoreFromTrash(noteId),
       onRestoreNote: (noteId: string) =>
         latestRef.current.handleRestoreNote(noteId),
-      onTrashNote: (noteId: string) =>
-        latestRef.current.handleTrashNote(noteId),
-      onSelectNote: (noteId: string) => {
-        latestRef.current.handleSelectNote(noteId);
-      },
+      onSelectNote: (noteId: string) =>
+        latestRef.current.handleSelectNote(noteId),
       onSetNotePinned: (noteId: string, pinned: boolean) =>
         latestRef.current.handleSetNotePinned(noteId, pinned),
       onSetNoteReadonly: (noteId: string, readonly: boolean) =>
         latestRef.current.handleSetNoteReadonly(noteId, readonly),
-      searchQuery,
-      selectedNoteId: displayedSelectedNoteId,
-      totalNoteCount,
+      onTrashNote: (noteId: string) =>
+        latestRef.current.handleTrashNote(noteId),
     }),
     [
-      visibleActiveTagPath,
-      creatingSelectedNoteId,
       currentNotes,
       displayedSelectedNoteId,
-      effectiveNoteFilter,
       isCreatingNote,
       isMutatingNote,
-      noteSortDirection,
-      noteSortField,
       notesQuery.hasNextPage,
       notesQuery.isFetchingNextPage,
       notesQuery.isPlaceholderData,
-      searchQuery,
-      setNoteSortPrefs,
-      setSearchQuery,
-      sortViewKey,
       totalNoteCount,
     ],
   );

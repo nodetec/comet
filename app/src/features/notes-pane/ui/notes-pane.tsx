@@ -16,17 +16,26 @@ import {
   type NoteListNavigationDirection,
   getAdjacentNoteId,
 } from "@/features/notes-pane/lib/note-list-navigation";
-import { useSidebarVisible } from "@/features/settings/store/use-ui-store";
 import {
+  defaultNoteSortPrefs,
+  useNoteSortPrefs,
+  useSidebarVisible,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
+import {
+  useActiveTagPath,
+  useCreatingSelectedNoteId,
   useFocusedPane,
+  useNoteFilter,
+  useSearchQuery,
   useShellActions,
+  useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
 import {
   type FocusNotesPaneDetail,
   FOCUS_NOTES_PANE_EVENT,
 } from "@/shared/lib/pane-navigation";
 import {
-  type NoteFilter,
   type NoteSortDirection,
   type NoteSortField,
   type NoteSummary,
@@ -44,56 +53,38 @@ import {
 import { NoteRow } from "@/features/notes-pane/ui/note-row";
 
 type NotesPaneProps = {
-  activeTagPath: string | null;
-  creatingNoteId: string | null;
   filteredNotes: NoteSummary[];
   hasMoreNotes: boolean | undefined;
   isCreatingNote: boolean;
   isLoadingMoreNotes: boolean;
   isMutatingNote: boolean;
   isNotesPlaceholderData: boolean;
-  noteFilter: NoteFilter;
-  searchQuery: string;
   selectedNoteId: string | null;
-  sortField: NoteSortField;
-  sortDirection: NoteSortDirection;
   totalNoteCount: number;
   onArchiveNote(noteId: string): void;
-  onChangeSearch(query: string): void;
-  onChangeSortField(field: NoteSortField): void;
-  onChangeSortDirection(direction: NoteSortDirection): void;
   onCopyNoteContent(noteId: string): void;
   onCreateNote(): void;
   onDeleteNotePermanently(noteId: string): void;
   onDuplicateNote(noteId: string): void;
+  onExportNotes(): void;
   onLoadMore(): void;
   onRestoreFromTrash(noteId: string): void;
+  onRestoreNote(noteId: string): void;
+  onSelectNote(noteId: string): void;
   onSetNotePinned(noteId: string, pinned: boolean): void;
   onSetNoteReadonly(noteId: string, readonly: boolean): void;
-  onExportNotes(): void;
-  onRestoreNote(noteId: string): void;
   onTrashNote(noteId: string): void;
-  onSelectNote(noteId: string): void;
 };
 
 export function NotesPane({
-  activeTagPath,
-  creatingNoteId,
   filteredNotes,
   hasMoreNotes,
   isCreatingNote,
   isLoadingMoreNotes,
   isMutatingNote,
   isNotesPlaceholderData,
-  noteFilter,
-  searchQuery,
   selectedNoteId,
-  sortField,
-  sortDirection,
   onArchiveNote,
-  onChangeSearch,
-  onChangeSortField,
-  onChangeSortDirection,
   onCopyNoteContent,
   onCreateNote,
   onDeleteNotePermanently,
@@ -101,13 +92,33 @@ export function NotesPane({
   onExportNotes,
   onLoadMore,
   onRestoreFromTrash,
-  onSetNotePinned,
-  onSetNoteReadonly,
   onRestoreNote,
   onSelectNote,
+  onSetNotePinned,
+  onSetNoteReadonly,
   onTrashNote,
   totalNoteCount,
 }: NotesPaneProps) {
+  const storeActiveTagPath = useActiveTagPath();
+  const tagViewActive = useTagViewActive();
+  const activeTagPath = tagViewActive ? storeActiveTagPath : null;
+  const storeNoteFilter = useNoteFilter();
+  const noteFilter = tagViewActive ? "all" : storeNoteFilter;
+  const searchQuery = useSearchQuery();
+  const creatingNoteId = useCreatingSelectedNoteId();
+  const { setSearchQuery: onChangeSearch } = useShellActions();
+  const { setNoteSortPrefs } = useUIActions();
+
+  const sortViewKey = noteFilter;
+  const allSortPrefs = useNoteSortPrefs();
+  const sortPrefs = allSortPrefs[sortViewKey] ?? defaultNoteSortPrefs;
+  const sortField = sortPrefs.field;
+  const sortDirection = sortPrefs.direction;
+  const onChangeSortField = (field: NoteSortField) =>
+    setNoteSortPrefs(sortViewKey, { field });
+  const onChangeSortDirection = (direction: NoteSortDirection) =>
+    setNoteSortPrefs(sortViewKey, { direction });
+
   const focusedPane = useFocusedPane();
   const { setFocusedPane } = useShellActions();
   const sidebarVisible = useSidebarVisible();
