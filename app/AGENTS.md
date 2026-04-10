@@ -17,8 +17,6 @@ Desktop notes app.
 - Preserve authored structure where possible. Do not silently reformat or normalize content unless the normalization is intentional, documented, and stable after one pass.
 - Any bug caused by representation drift should get a regression test at the seam where it occurred.
 
-Reference: `app/docs/editor-invariants.md`
-
 ## Stack
 
 - **Frontend**: React 19, Vite, Tailwind 4, shadcn/ui, Lexical editor
