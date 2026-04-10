@@ -22,8 +22,11 @@ import {
 } from "@/features/settings/store/use-ui-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import {
+  useActiveTagPath,
   useFocusedPane,
+  useNoteFilter,
   useShellActions,
+  useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
 import {
   FOCUS_TAG_PATH_EVENT,
@@ -135,13 +138,11 @@ function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
 // --- Main component ---
 
 type SidebarPaneProps = {
-  activeTagPath: string | null;
   availableTagPaths: string[];
+  availableTagTree: ContextualTagNode[];
   archivedCount: number;
   todoCount: number;
   trashedCount: number;
-  availableTagTree: ContextualTagNode[];
-  noteFilter: NoteFilter;
   onSelectAll(): void;
   onSelectToday(): void;
   onSelectTodo(): void;
@@ -149,23 +150,21 @@ type SidebarPaneProps = {
   onSelectUntagged(): void;
   onSelectArchive(): void;
   onSelectTrash(): void;
+  onSelectTagPath(tagPath: string): void;
   onEmptyTrash(): void;
   onDeleteTag(path: string): void;
   onExportTag(path: string): void;
   onRenameTag(fromPath: string, toPath: string): void;
   onSetTagPinned(path: string, pinned: boolean): void;
   onSetTagHideSubtagNotes(path: string, hideSubtagNotes: boolean): void;
-  onSelectTagPath(tagPath: string): void;
 };
 
 export function SidebarPane({
-  activeTagPath,
   availableTagPaths,
+  availableTagTree,
   archivedCount,
   todoCount,
   trashedCount,
-  availableTagTree,
-  noteFilter,
   onSelectAll,
   onSelectToday,
   onSelectTodo,
@@ -173,16 +172,26 @@ export function SidebarPane({
   onSelectUntagged,
   onSelectArchive,
   onSelectTrash,
+  onSelectTagPath,
   onEmptyTrash,
   onDeleteTag,
   onExportTag,
   onRenameTag,
   onSetTagPinned,
-  onSelectTagPath,
+  onSetTagHideSubtagNotes: _onSetTagHideSubtagNotes,
 }: SidebarPaneProps) {
+  const storeActiveTagPath = useActiveTagPath();
+  const tagViewActive = useTagViewActive();
+  const activeTagPath = tagViewActive ? storeActiveTagPath : null;
+  const noteFilter = useNoteFilter();
   const focusedPane = useFocusedPane();
   const isFocused = focusedPane === "sidebar";
   const { setFocusedPane } = useShellActions();
+
+  const withSidebarFocus = (fn: () => void) => () => {
+    setFocusedPane("sidebar");
+    fn();
+  };
   const {
     setSettingsOpen: openSettings,
     setSidebarNotesChildrenOpen: setNotesChildrenOpen,
@@ -334,7 +343,16 @@ export function SidebarPane({
     });
   };
 
+  const focusedSelectAll = withSidebarFocus(onSelectAll);
+  const focusedSelectToday = withSidebarFocus(onSelectToday);
+  const focusedSelectTodo = withSidebarFocus(onSelectTodo);
+  const focusedSelectPinned = withSidebarFocus(onSelectPinned);
+  const focusedSelectUntagged = withSidebarFocus(onSelectUntagged);
+  const focusedSelectArchive = withSidebarFocus(onSelectArchive);
+  const focusedSelectTrash = withSidebarFocus(onSelectTrash);
+
   const handleSelectSidebarTagPath = (tagPath: string) => {
+    setFocusedPane("sidebar");
     setPendingScrollTagPath(tagPath);
     onSelectTagPath(tagPath);
   };
@@ -352,13 +370,13 @@ export function SidebarPane({
     sidebarNavigationItems,
     activeSidebarItemId,
     sidebarRowRefs,
-    onSelectAll,
-    onSelectArchive,
-    onSelectPinned,
-    onSelectToday,
-    onSelectTodo,
-    onSelectTrash,
-    onSelectUntagged,
+    onSelectAll: focusedSelectAll,
+    onSelectArchive: focusedSelectArchive,
+    onSelectPinned: focusedSelectPinned,
+    onSelectToday: focusedSelectToday,
+    onSelectTodo: focusedSelectTodo,
+    onSelectTrash: focusedSelectTrash,
+    onSelectUntagged: focusedSelectUntagged,
     onSelectSidebarTagPath: handleSelectSidebarTagPath,
     setNotesChildrenOpen,
     toggleExpandedTagPath,
@@ -438,13 +456,13 @@ export function SidebarPane({
               }
             }}
             onSidebarRowFocus={handleSidebarRowFocus}
-            onSelectAll={onSelectAll}
-            onSelectArchive={onSelectArchive}
-            onSelectToday={onSelectToday}
-            onSelectTodo={onSelectTodo}
-            onSelectPinned={onSelectPinned}
-            onSelectUntagged={onSelectUntagged}
-            onSelectTrash={onSelectTrash}
+            onSelectAll={focusedSelectAll}
+            onSelectArchive={focusedSelectArchive}
+            onSelectToday={focusedSelectToday}
+            onSelectTodo={focusedSelectTodo}
+            onSelectPinned={focusedSelectPinned}
+            onSelectUntagged={focusedSelectUntagged}
+            onSelectTrash={focusedSelectTrash}
             onToggleNotesChildren={() => {
               setNotesChildrenOpen(!notesChildrenOpen);
             }}

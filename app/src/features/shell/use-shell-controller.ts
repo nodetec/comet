@@ -88,7 +88,6 @@ export function useShellController() {
     clearDraftWikilinkResolutions,
     setActiveTagPath,
     setDraft,
-    setFocusedPane,
     setNoteFilter,
     setPendingAutoFocusEditorNoteId,
     setSearchQuery,
@@ -795,64 +794,36 @@ export function useShellController() {
 
   const sidebarPaneProps = useMemo(
     () => ({
-      activeTagPath: visibleActiveTagPath,
       availableTagPaths,
       availableTagTree,
       archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
       todoCount: todoCountQuery.data ?? 0,
       trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
-      noteFilter,
-      onSelectAll: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectAll();
-      },
-      onSelectToday: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectToday();
-      },
-      onSelectTodo: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectTodo();
-      },
-      onSelectPinned: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectPinned();
-      },
-      onSelectUntagged: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectUntagged();
-      },
-      onSelectArchive: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectArchive();
-      },
-      onSelectTrash: () => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectTrash();
-      },
+      onSelectAll: () => latestRef.current.handleSelectAll(),
+      onSelectToday: () => latestRef.current.handleSelectToday(),
+      onSelectTodo: () => latestRef.current.handleSelectTodo(),
+      onSelectPinned: () => latestRef.current.handleSelectPinned(),
+      onSelectUntagged: () => latestRef.current.handleSelectUntagged(),
+      onSelectArchive: () => latestRef.current.handleSelectArchive(),
+      onSelectTrash: () => latestRef.current.handleSelectTrash(),
+      onSelectTagPath: (tagPath: string) =>
+        latestRef.current.handleSelectTagPath(tagPath),
       onDeleteTag: (path: string) => latestRef.current.handleDeleteTag(path),
       onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
       onExportTag: (path: string) => latestRef.current.handleExportTag(path),
       onRenameTag: (fromPath: string, toPath: string) =>
         latestRef.current.handleRenameTag(fromPath, toPath),
-      onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
-        latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
       onSetTagPinned: (path: string, pinned: boolean) =>
         latestRef.current.handleSetTagPinned(path, pinned),
-      onSelectTagPath: (tagPath: string) => {
-        setFocusedPane("sidebar");
-        latestRef.current.handleSelectTagPath(tagPath);
-      },
+      onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
+        latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
     }),
     [
       availableTagPaths,
       availableTagTree,
       bootstrapQuery.data?.archivedCount,
       bootstrapQuery.data?.trashedCount,
-      noteFilter,
-      setFocusedPane,
       todoCountQuery.data,
-      visibleActiveTagPath,
     ],
   );
 
