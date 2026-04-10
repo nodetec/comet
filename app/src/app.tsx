@@ -18,7 +18,10 @@ import { SidebarPane } from "@/features/sidebar-pane";
 import { useAppShortcuts } from "@/features/shell/use-app-shortcuts";
 import { useRevealMainWindow } from "@/features/shell/use-reveal-main-window";
 import { useShellController } from "@/features/shell/use-shell-controller";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import {
+  useNotesPanelVisible,
+  useSidebarVisible,
+} from "@/features/settings/store/use-ui-store";
 
 const IS_MACOS = navigator.userAgent.includes("Mac");
 
@@ -47,8 +50,8 @@ function App() {
 
   const revealed = useRevealMainWindow(readyToRevealWindow);
 
-  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
-  const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
+  const sidebarVisible = useSidebarVisible();
+  const notesPanelVisible = useNotesPanelVisible();
 
   if (!revealed) return null;
 

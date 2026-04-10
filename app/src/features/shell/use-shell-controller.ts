@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { errorMessage } from "@/shared/lib/utils";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  useActiveTagPath,
+  useCreatingSelectedNoteId,
+  useDraftMarkdown,
+  useDraftNoteId,
+  useDraftWikilinkResolutions,
+  useIsCreatingNoteTransition,
+  useNoteFilter,
+  usePendingAutoFocusEditorNoteId,
+  useSearchQuery,
+  useSelectedNoteId,
+  useShellActions,
+  useTagViewActive,
+} from "@/features/shell/store/use-shell-store";
 import {
   defaultNoteSortPrefs,
-  useUIStore,
+  useNoteSortPrefs,
+  useUIActions,
 } from "@/features/settings/store/use-ui-store";
 
 import {
@@ -59,46 +73,35 @@ export function useShellController() {
   const isSavingRef = useRef(false);
 
   const queryClient = useQueryClient();
-  const activeTagPath = useShellStore((state) => state.activeTagPath);
-  const creatingSelectedNoteId = useShellStore(
-    (state) => state.creatingSelectedNoteId,
-  );
-  const draftMarkdown = useShellStore((state) => state.draftMarkdown);
-  const draftNoteId = useShellStore((state) => state.draftNoteId);
-  const draftWikilinkResolutions = useShellStore(
-    (state) => state.draftWikilinkResolutions,
-  );
-  const isCreatingNoteTransition = useShellStore(
-    (state) => state.isCreatingNoteTransition,
-  );
-  const noteFilter = useShellStore((state) => state.noteFilter);
-  const searchQuery = useShellStore((state) => state.searchQuery);
-  const pendingAutoFocusEditorNoteId = useShellStore(
-    (state) => state.pendingAutoFocusEditorNoteId,
-  );
-  const selectedNoteId = useShellStore((state) => state.selectedNoteId);
-  const tagViewActive = useShellStore((state) => state.tagViewActive);
-  const setDraft = useShellStore((state) => state.setDraft);
-  const setPendingAutoFocusEditorNoteId = useShellStore(
-    (state) => state.setPendingAutoFocusEditorNoteId,
-  );
-  const clearDraftWikilinkResolutions = useShellStore(
-    (state) => state.clearDraftWikilinkResolutions,
-  );
-  const setActiveTagPath = useShellStore((state) => state.setActiveTagPath);
-  const setNoteFilter = useShellStore((state) => state.setNoteFilter);
-  const setSearchQuery = useShellStore((state) => state.setSearchQuery);
-  const setSelectedNoteId = useShellStore((state) => state.setSelectedNoteId);
-  const setTagViewActive = useShellStore((state) => state.setTagViewActive);
-  const setFocusedPane = useShellStore((state) => state.setFocusedPane);
+  const activeTagPath = useActiveTagPath();
+  const creatingSelectedNoteId = useCreatingSelectedNoteId();
+  const draftMarkdown = useDraftMarkdown();
+  const draftNoteId = useDraftNoteId();
+  const draftWikilinkResolutions = useDraftWikilinkResolutions();
+  const isCreatingNoteTransition = useIsCreatingNoteTransition();
+  const noteFilter = useNoteFilter();
+  const searchQuery = useSearchQuery();
+  const pendingAutoFocusEditorNoteId = usePendingAutoFocusEditorNoteId();
+  const selectedNoteId = useSelectedNoteId();
+  const tagViewActive = useTagViewActive();
+  const {
+    clearDraftWikilinkResolutions,
+    setActiveTagPath,
+    setDraft,
+    setFocusedPane,
+    setNoteFilter,
+    setPendingAutoFocusEditorNoteId,
+    setSearchQuery,
+    setSelectedNoteId,
+    setTagViewActive,
+  } = useShellActions();
 
   const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
   const visibleActiveTagPath = tagViewActive ? activeTagPath : null;
   const sortViewKey = effectiveNoteFilter;
-  const sortPrefs =
-    useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
-    defaultNoteSortPrefs;
-  const setNoteSortPrefs = useUIStore((state) => state.setNoteSortPrefs);
+  const allSortPrefs = useNoteSortPrefs();
+  const { setNoteSortPrefs } = useUIActions();
+  const sortPrefs = allSortPrefs[sortViewKey] ?? defaultNoteSortPrefs;
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 

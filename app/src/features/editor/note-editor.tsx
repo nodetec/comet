@@ -80,8 +80,8 @@ import {
 } from "@/features/editor/lib/note-editor-selection";
 import { useNoteEditorSearchSync } from "@/features/editor/hooks/use-note-editor-search-sync";
 import { useNoteEditorToolbarActions } from "@/features/editor/hooks/use-note-editor-toolbar-actions";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { uiStore } from "@/features/settings/store/use-ui-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
@@ -250,7 +250,7 @@ function focusEditorPreservingScroll(view: EditorView) {
   const scrollContainer = findEditorScrollContainer(view);
   const scrollTop = scrollContainer?.scrollTop ?? 0;
 
-  useShellStore.getState().setFocusedPane("editor");
+  shellStore.getState().actions.setFocusedPane("editor");
   view.focus();
 
   if (scrollContainer) {
@@ -262,7 +262,7 @@ function focusEditorAtEndPreservingScroll(view: EditorView) {
   const scrollContainer = findEditorScrollContainer(view);
   const scrollTop = scrollContainer?.scrollTop ?? 0;
 
-  useShellStore.getState().setFocusedPane("editor");
+  shellStore.getState().actions.setFocusedPane("editor");
   view.dispatch({
     selection: EditorSelection.cursor(view.state.doc.length),
     scrollIntoView: false,
@@ -275,7 +275,7 @@ function focusEditorAtEndPreservingScroll(view: EditorView) {
 }
 
 function focusEditorAtStart(view: EditorView) {
-  useShellStore.getState().setFocusedPane("editor");
+  shellStore.getState().actions.setFocusedPane("editor");
   view.focus();
   view.dispatch({
     selection: EditorSelection.cursor(0),
@@ -305,7 +305,7 @@ function handleSpecialMouseDownSelection(view: EditorView, event: MouseEvent) {
   if (horizontalRuleSelection) {
     event.preventDefault();
     event.stopPropagation();
-    useShellStore.getState().setFocusedPane("editor");
+    shellStore.getState().actions.setFocusedPane("editor");
     view.focus();
     view.dispatch({ selection: horizontalRuleSelection });
     return true;
@@ -320,7 +320,7 @@ function handleSpecialMouseDownSelection(view: EditorView, event: MouseEvent) {
   if (tableBoundarySelection) {
     event.preventDefault();
     event.stopPropagation();
-    useShellStore.getState().setFocusedPane("editor");
+    shellStore.getState().actions.setFocusedPane("editor");
     view.focus();
     view.dispatch({
       scrollIntoView: false,
@@ -368,7 +368,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const vimCompartmentRef = useRef(new Compartment());
     const applyingExternalChangeRef = useRef(false);
     const lastLoadKeyRef = useRef(loadKey);
-    const prevPaneRef = useRef(useShellStore.getState().focusedPane);
+    const prevPaneRef = useRef(shellStore.getState().focusedPane);
     const initialAutoFocusRef = useRef(autoFocus);
     const initialOnAutoFocusHandledRef = useRef(onAutoFocusHandled);
     const initialMarkdownRef = useRef(markdown);
@@ -554,11 +554,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             {
               key: "Escape",
               run(view) {
-                const uiState = useUIStore.getState();
+                const uiState = uiStore.getState();
                 if (!uiState.notesPanelVisible) {
-                  uiState.toggleFocusMode();
+                  uiState.actions.toggleFocusMode();
                 }
-                useShellStore.getState().setFocusedPane("notes");
+                shellStore.getState().actions.setFocusedPane("notes");
                 blurEditorView(view);
                 return true;
               },
@@ -650,7 +650,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       );
 
       syncEditorPaneFocusState(view, prevPaneRef.current);
-      const unsubscribeShell = useShellStore.subscribe((state) => {
+      const unsubscribeShell = shellStore.subscribe((state) => {
         prevPaneRef.current = state.focusedPane;
         syncEditorPaneFocusState(view, state.focusedPane);
       });
@@ -743,13 +743,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
         });
 
         if (autoFocus) {
-          useShellStore.getState().setFocusedPane("editor");
+          shellStore.getState().actions.setFocusedPane("editor");
           view.focus();
           onAutoFocusHandled?.();
         } else {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              if (useShellStore.getState().focusedPane !== "editor") {
+              if (shellStore.getState().focusedPane !== "editor") {
                 blurEditorView(view);
               }
             });

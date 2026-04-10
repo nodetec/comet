@@ -3,8 +3,14 @@ import { formatDistanceToNow } from "date-fns";
 import { GitMergeConflict, Pin } from "lucide-react";
 import { motion } from "framer-motion";
 
-import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  uiStore,
+  useSidebarVisible,
+} from "@/features/settings/store/use-ui-store";
+import {
+  shellStore,
+  useShellActions,
+} from "@/features/shell/store/use-shell-store";
 import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,
@@ -58,8 +64,8 @@ export const NoteRow = memo(function NoteRow({
 }: NoteRowProps) {
   const isActive = note.id === selectedNoteId;
   const cardPreview = noteCardPreview(note, searchWords);
-  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
+  const sidebarVisible = useSidebarVisible();
+  const { setFocusedPane } = useShellActions();
 
   return (
     <motion.div
@@ -89,7 +95,7 @@ export const NoteRow = memo(function NoteRow({
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
         onFocus={() => {
-          useShellStore.getState().setFocusedPane("notes");
+          shellStore.getState().actions.setFocusedPane("notes");
         }}
         onKeyDown={(event) => {
           if (event.metaKey || event.ctrlKey || event.altKey) {
@@ -119,7 +125,7 @@ export const NoteRow = memo(function NoteRow({
           if (event.key === "Escape" || lowerKey === "h") {
             event.preventDefault();
             if (!sidebarVisible) {
-              useUIStore.getState().toggleSidebar();
+              uiStore.getState().actions.toggleSidebar();
             }
             setFocusedPane("sidebar");
           }

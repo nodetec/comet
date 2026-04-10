@@ -23,7 +23,10 @@ import {
   type NoteSummary,
   type WikiLinkResolutionInput,
 } from "@/shared/api/types";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  shellStore,
+  useShellActions,
+} from "@/features/shell/store/use-shell-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
@@ -70,15 +73,11 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     setNoteFilter,
   } = deps;
 
-  const setCreatingSelectedNoteId = useShellStore(
-    (s) => s.setCreatingSelectedNoteId,
-  );
-  const setPendingAutoFocusEditorNoteId = useShellStore(
-    (s) => s.setPendingAutoFocusEditorNoteId,
-  );
-  const setIsCreatingNoteTransition = useShellStore(
-    (s) => s.setIsCreatingNoteTransition,
-  );
+  const {
+    setCreatingSelectedNoteId,
+    setPendingAutoFocusEditorNoteId,
+    setIsCreatingNoteTransition,
+  } = useShellActions();
 
   const invalidateNotes = async () => {
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -153,7 +152,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
           draftMarkdown: liveDraftMarkdown,
           draftNoteId: liveDraftNoteId,
           draftWikilinkResolutions: liveDraftWikilinkResolutions,
-        } = useShellStore.getState();
+        } = shellStore.getState();
         const shouldReconcileDraft =
           liveDraftNoteId === savedNote.id &&
           liveDraftMarkdown === context.submittedMarkdown &&
@@ -171,7 +170,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
 
       // Eagerly refresh affected notes so their cache has the rewritten wikilinks
       if (affectedLinkedNoteIds.length > 0) {
-        const { draftNoteId: liveDraftNoteId } = useShellStore.getState();
+        const { draftNoteId: liveDraftNoteId } = shellStore.getState();
         const refreshResults = await Promise.allSettled(
           affectedLinkedNoteIds.map((id) => loadNote(id)),
         );

@@ -1,6 +1,9 @@
 import type { LoadedNote, NoteFilter } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  shellStore,
+  useShellActions,
+} from "@/features/shell/store/use-shell-store";
 
 export function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
@@ -41,14 +44,14 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
   } = deps;
 
   const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
-  const setNoteFilter = useShellStore((s) => s.setNoteFilter);
-  const navigateToFilter = useShellStore((s) => s.navigateToFilter);
-  const navigateToDisposedFilter = useShellStore(
-    (s) => s.navigateToDisposedFilter,
-  );
-  const navigateToTagPath = useShellStore((s) => s.navigateToTagPath);
-  const navigateToNote = useShellStore((s) => s.navigateToNote);
-  const prepareNoteCreation = useShellStore((s) => s.prepareNoteCreation);
+  const {
+    navigateToFilter,
+    navigateToDisposedFilter,
+    navigateToTagPath,
+    navigateToNote,
+    prepareNoteCreation,
+    setNoteFilter,
+  } = useShellActions();
 
   const handleCreateNote = () => {
     if (isCreatingNote) {
@@ -114,7 +117,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
 
   const handleSelectNote = (noteId: string) => {
     if (noteId === selectedNoteId) {
-      useShellStore.setState({ focusedPane: "notes" });
+      shellStore.setState({ focusedPane: "notes" });
       return;
     }
 

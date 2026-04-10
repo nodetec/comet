@@ -21,122 +21,107 @@ export const defaultNoteSortPrefs: NoteSortPrefs = {
   direction: "newest",
 };
 
-type UIStore = {
-  showEditorToolbar: boolean;
+type UIActions = {
   setShowEditorToolbar(show: boolean): void;
-
-  settingsOpen: boolean;
   setSettingsOpen(open: boolean): void;
-
-  settingsTab: SettingsTab;
   setSettingsTab(tab: SettingsTab): void;
-
-  editorFontSize: number;
   setEditorFontSize(size: number): void;
-
-  editorSpellCheck: boolean;
   setEditorSpellCheck(enabled: boolean): void;
-
-  editorVimMode: boolean;
   setEditorVimMode(enabled: boolean): void;
-
-  noteSortPrefs: Record<string, NoteSortPrefs>;
   setNoteSortPrefs(viewKey: string, prefs: Partial<NoteSortPrefs>): void;
-
-  expandedSidebarTagPaths: string[];
   setExpandedSidebarTagPaths(paths: string[]): void;
-
-  sidebarVisible: boolean;
   toggleSidebar(): void;
-
-  notesPanelVisible: boolean;
   toggleFocusMode(): void;
-
-  sidebarNotesChildrenOpen: boolean;
   setSidebarNotesChildrenOpen(open: boolean): void;
-
-  themeName: string | null;
   setThemeName(name: string | null): void;
 };
 
-export const useUIStore = create<UIStore>()(
+type UIState = {
+  showEditorToolbar: boolean;
+  settingsOpen: boolean;
+  settingsTab: SettingsTab;
+  editorFontSize: number;
+  editorSpellCheck: boolean;
+  editorVimMode: boolean;
+  noteSortPrefs: Record<string, NoteSortPrefs>;
+  expandedSidebarTagPaths: string[];
+  sidebarVisible: boolean;
+  notesPanelVisible: boolean;
+  sidebarNotesChildrenOpen: boolean;
+  themeName: string | null;
+  actions: UIActions;
+};
+
+const useUIStore = create<UIState>()(
   persist(
     (set) => ({
       showEditorToolbar: false,
-      setShowEditorToolbar: (showEditorToolbar) => {
-        set({ showEditorToolbar });
-      },
-
       settingsOpen: false,
-      setSettingsOpen: (settingsOpen) => {
-        set({ settingsOpen });
-      },
-
       settingsTab: "general",
-      setSettingsTab: (settingsTab) => {
-        set({ settingsTab });
-      },
-
       editorFontSize: 15,
-      setEditorFontSize: (editorFontSize) => {
-        set({ editorFontSize: Math.min(20, Math.max(12, editorFontSize)) });
-      },
-
       editorSpellCheck: false,
-      setEditorSpellCheck: (editorSpellCheck) => {
-        set({ editorSpellCheck });
-      },
-
       editorVimMode: false,
-      setEditorVimMode: (editorVimMode) => {
-        set({ editorVimMode });
-      },
-
       themeName: null,
-      setThemeName: (themeName) => {
-        set({ themeName });
-      },
-
       noteSortPrefs: {},
-      setNoteSortPrefs: (viewKey, prefs) => {
-        set((state) => {
-          const current = state.noteSortPrefs[viewKey] ?? defaultNoteSortPrefs;
-          const next = { ...current, ...prefs };
-          if (
-            next.field === current.field &&
-            next.direction === current.direction
-          ) {
-            return state;
-          }
-          return {
-            noteSortPrefs: { ...state.noteSortPrefs, [viewKey]: next },
-          };
-        });
-      },
-
       expandedSidebarTagPaths: [],
-      setExpandedSidebarTagPaths: (expandedSidebarTagPaths) => {
-        set({ expandedSidebarTagPaths });
-      },
-
       sidebarVisible: true,
-      toggleSidebar: () => {
-        set((state) => ({ sidebarVisible: !state.sidebarVisible }));
-      },
-
       notesPanelVisible: true,
-      toggleFocusMode: () => {
-        set((state) => {
-          const entering = state.sidebarVisible || state.notesPanelVisible;
-          return entering
-            ? { sidebarVisible: false, notesPanelVisible: false }
-            : { sidebarVisible: true, notesPanelVisible: true };
-        });
-      },
-
       sidebarNotesChildrenOpen: true,
-      setSidebarNotesChildrenOpen: (sidebarNotesChildrenOpen) => {
-        set({ sidebarNotesChildrenOpen });
+      actions: {
+        setShowEditorToolbar: (showEditorToolbar) => {
+          set({ showEditorToolbar });
+        },
+        setSettingsOpen: (settingsOpen) => {
+          set({ settingsOpen });
+        },
+        setSettingsTab: (settingsTab) => {
+          set({ settingsTab });
+        },
+        setEditorFontSize: (editorFontSize) => {
+          set({ editorFontSize: Math.min(20, Math.max(12, editorFontSize)) });
+        },
+        setEditorSpellCheck: (editorSpellCheck) => {
+          set({ editorSpellCheck });
+        },
+        setEditorVimMode: (editorVimMode) => {
+          set({ editorVimMode });
+        },
+        setThemeName: (themeName) => {
+          set({ themeName });
+        },
+        setNoteSortPrefs: (viewKey, prefs) => {
+          set((state) => {
+            const current =
+              state.noteSortPrefs[viewKey] ?? defaultNoteSortPrefs;
+            const next = { ...current, ...prefs };
+            if (
+              next.field === current.field &&
+              next.direction === current.direction
+            ) {
+              return state;
+            }
+            return {
+              noteSortPrefs: { ...state.noteSortPrefs, [viewKey]: next },
+            };
+          });
+        },
+        setExpandedSidebarTagPaths: (expandedSidebarTagPaths) => {
+          set({ expandedSidebarTagPaths });
+        },
+        toggleSidebar: () => {
+          set((state) => ({ sidebarVisible: !state.sidebarVisible }));
+        },
+        toggleFocusMode: () => {
+          set((state) => {
+            const entering = state.sidebarVisible || state.notesPanelVisible;
+            return entering
+              ? { sidebarVisible: false, notesPanelVisible: false }
+              : { sidebarVisible: true, notesPanelVisible: true };
+          });
+        },
+        setSidebarNotesChildrenOpen: (sidebarNotesChildrenOpen) => {
+          set({ sidebarNotesChildrenOpen });
+        },
       },
     }),
     {
@@ -156,3 +141,30 @@ export const useUIStore = create<UIStore>()(
     },
   ),
 );
+
+// --- Public API ---
+
+/** Raw store for imperative `getState()` / `setState()` / `subscribe()` access. */
+export const uiStore = useUIStore;
+
+/** Returns all actions (stable reference, never causes re-render). */
+export const useUIActions = () => useUIStore((s) => s.actions);
+
+// --- Atomic state hooks ---
+
+export const useShowEditorToolbar = () =>
+  useUIStore((s) => s.showEditorToolbar);
+export const useSettingsOpen = () => useUIStore((s) => s.settingsOpen);
+export const useSettingsTab = () => useUIStore((s) => s.settingsTab);
+export const useEditorFontSize = () => useUIStore((s) => s.editorFontSize);
+export const useEditorSpellCheck = () => useUIStore((s) => s.editorSpellCheck);
+export const useEditorVimMode = () => useUIStore((s) => s.editorVimMode);
+export const useNoteSortPrefs = () => useUIStore((s) => s.noteSortPrefs);
+export const useExpandedSidebarTagPaths = () =>
+  useUIStore((s) => s.expandedSidebarTagPaths);
+export const useSidebarVisible = () => useUIStore((s) => s.sidebarVisible);
+export const useNotesPanelVisible = () =>
+  useUIStore((s) => s.notesPanelVisible);
+export const useSidebarNotesChildrenOpen = () =>
+  useUIStore((s) => s.sidebarNotesChildrenOpen);
+export const useThemeName = () => useUIStore((s) => s.themeName);

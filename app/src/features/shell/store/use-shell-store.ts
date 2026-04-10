@@ -191,19 +191,7 @@ type NavigationActions = {
   prepareNoteCreation(): void;
 };
 
-type ShellStore = {
-  activeTagPath: string | null;
-  creatingSelectedNoteId: string | null;
-  draftMarkdown: string;
-  draftNoteId: string | null;
-  draftWikilinkResolutions: WikiLinkResolutionInput[];
-  focusedPane: FocusedPane;
-  isCreatingNoteTransition: boolean;
-  noteFilter: NoteFilter;
-  pendingAutoFocusEditorNoteId: string | null;
-  searchQuery: string;
-  selectedNoteId: string | null;
-  tagViewActive: boolean;
+type ShellActions = {
   setCreatingSelectedNoteId(id: string | null): void;
   setIsCreatingNoteTransition(value: boolean): void;
   setPendingAutoFocusEditorNoteId(id: string | null): void;
@@ -233,7 +221,23 @@ type ShellStore = {
   ): void;
 } & NavigationActions;
 
-export const useShellStore = create<ShellStore>((set) => ({
+type ShellState = {
+  activeTagPath: string | null;
+  creatingSelectedNoteId: string | null;
+  draftMarkdown: string;
+  draftNoteId: string | null;
+  draftWikilinkResolutions: WikiLinkResolutionInput[];
+  focusedPane: FocusedPane;
+  isCreatingNoteTransition: boolean;
+  noteFilter: NoteFilter;
+  pendingAutoFocusEditorNoteId: string | null;
+  searchQuery: string;
+  selectedNoteId: string | null;
+  tagViewActive: boolean;
+  actions: ShellActions;
+};
+
+const useShellStore = create<ShellState>((set) => ({
   activeTagPath: null,
   creatingSelectedNoteId: null,
   draftMarkdown: "",
@@ -246,124 +250,90 @@ export const useShellStore = create<ShellStore>((set) => ({
   searchQuery: "",
   selectedNoteId: null,
   tagViewActive: false,
-  setCreatingSelectedNoteId: (creatingSelectedNoteId) => {
-    set({ creatingSelectedNoteId });
-  },
-  setIsCreatingNoteTransition: (isCreatingNoteTransition) => {
-    set({ isCreatingNoteTransition });
-  },
-  setPendingAutoFocusEditorNoteId: (pendingAutoFocusEditorNoteId) => {
-    set({ pendingAutoFocusEditorNoteId });
-  },
-  clearActiveTagPath: () => {
-    set({ activeTagPath: null, tagViewActive: false });
-  },
-  clearDraftWikilinkResolutions: (noteId) => {
-    set((state) => {
-      if (noteId && state.draftNoteId !== noteId) {
-        return state;
-      }
-      return { draftWikilinkResolutions: [] };
-    });
-  },
-  removeDraftWikilinkResolutions: (noteId, resolutions) => {
-    set((state) => {
-      if (state.draftNoteId !== noteId || resolutions.length === 0) {
-        return state;
-      }
+  actions: {
+    setCreatingSelectedNoteId: (creatingSelectedNoteId) => {
+      set({ creatingSelectedNoteId });
+    },
+    setIsCreatingNoteTransition: (isCreatingNoteTransition) => {
+      set({ isCreatingNoteTransition });
+    },
+    setPendingAutoFocusEditorNoteId: (pendingAutoFocusEditorNoteId) => {
+      set({ pendingAutoFocusEditorNoteId });
+    },
+    clearActiveTagPath: () => {
+      set({ activeTagPath: null, tagViewActive: false });
+    },
+    clearDraftWikilinkResolutions: (noteId) => {
+      set((state) => {
+        if (noteId && state.draftNoteId !== noteId) {
+          return state;
+        }
+        return { draftWikilinkResolutions: [] };
+      });
+    },
+    removeDraftWikilinkResolutions: (noteId, resolutions) => {
+      set((state) => {
+        if (state.draftNoteId !== noteId || resolutions.length === 0) {
+          return state;
+        }
 
-      const nextResolutions = removeMatchingWikilinkResolutions(
-        state.draftWikilinkResolutions,
-        resolutions,
-      );
-
-      return {
-        draftWikilinkResolutions: nextResolutions,
-      };
-    });
-  },
-  setDraft: (noteId, markdown, options) => {
-    set((state) => {
-      let nextResolutions: WikiLinkResolutionInput[] = [];
-
-      if (options?.wikilinkResolutions !== undefined) {
-        nextResolutions = [...options.wikilinkResolutions];
-      } else if (
-        options?.preserveWikilinkResolutions &&
-        state.draftNoteId === noteId
-      ) {
-        nextResolutions = preserveWikilinkResolutionsForDraft(
-          state.draftMarkdown,
-          markdown,
+        const nextResolutions = removeMatchingWikilinkResolutions(
           state.draftWikilinkResolutions,
-        );
-      }
-
-      return {
-        draftMarkdown: markdown,
-        draftNoteId: noteId,
-        draftWikilinkResolutions: nextResolutions,
-      };
-    });
-  },
-  setActiveTagPath: (activeTagPath) => {
-    set({ activeTagPath });
-  },
-  setFocusedPane: (focusedPane) => {
-    set({ focusedPane });
-  },
-  setNoteFilter: (noteFilter) => {
-    set({ noteFilter });
-  },
-  setSearchQuery: (searchQuery) => {
-    set({ searchQuery });
-  },
-  setSelectedNoteId: (selectedNoteId) => {
-    set({ selectedNoteId });
-  },
-  setTagViewActive: (tagViewActive) => {
-    set({ tagViewActive });
-  },
-  navigateToFilter: (filter, currentNote) => {
-    const clearSelection =
-      currentNote && (currentNote.archivedAt || currentNote.deletedAt);
-    set({
-      ...(clearSelection
-        ? {
-            selectedNoteId: null,
-            draftMarkdown: "",
-            draftNoteId: null,
-            draftWikilinkResolutions: [],
-          }
-        : {}),
-      tagViewActive: false,
-      noteFilter: filter,
-    });
-  },
-  navigateToDisposedFilter: (filter) => {
-    set({
-      selectedNoteId: null,
-      draftMarkdown: "",
-      draftNoteId: null,
-      draftWikilinkResolutions: [],
-      tagViewActive: false,
-      noteFilter: filter,
-    });
-  },
-  navigateToTagPath: (tagPath, currentNote) => {
-    set((state) => {
-      if (state.tagViewActive && state.activeTagPath === tagPath) {
-        return state;
-      }
-
-      const outOfScope =
-        currentNote &&
-        !currentNote.tags.some(
-          (tag) => tag === tagPath || tag.startsWith(`${tagPath}/`),
+          resolutions,
         );
 
-      return {
-        ...(outOfScope
+        return {
+          draftWikilinkResolutions: nextResolutions,
+        };
+      });
+    },
+    setDraft: (noteId, markdown, options) => {
+      set((state) => {
+        let nextResolutions: WikiLinkResolutionInput[] = [];
+
+        if (options?.wikilinkResolutions !== undefined) {
+          nextResolutions = [...options.wikilinkResolutions];
+        } else if (
+          options?.preserveWikilinkResolutions &&
+          state.draftNoteId === noteId
+        ) {
+          nextResolutions = preserveWikilinkResolutionsForDraft(
+            state.draftMarkdown,
+            markdown,
+            state.draftWikilinkResolutions,
+          );
+        }
+
+        return {
+          draftMarkdown: markdown,
+          draftNoteId: noteId,
+          draftWikilinkResolutions: nextResolutions,
+        };
+      });
+    },
+    setActiveTagPath: (activeTagPath) => {
+      set({ activeTagPath });
+    },
+    setFocusedPane: (focusedPane) => {
+      set({ focusedPane });
+    },
+    setNoteFilter: (noteFilter) => {
+      set({ noteFilter });
+    },
+    setSearchQuery: (searchQuery) => {
+      set({ searchQuery });
+    },
+    setSelectedNoteId: (selectedNoteId) => {
+      set({ selectedNoteId });
+    },
+    setTagViewActive: (tagViewActive) => {
+      set({ tagViewActive });
+    },
+    navigateToFilter: (filter, currentNote) => {
+      const clearSelection =
+        currentNote && (currentNote.archivedAt || currentNote.deletedAt);
+      set({
+        ...(clearSelection
           ? {
               selectedNoteId: null,
               draftMarkdown: "",
@@ -371,51 +341,114 @@ export const useShellStore = create<ShellStore>((set) => ({
               draftWikilinkResolutions: [],
             }
           : {}),
-        tagViewActive: true,
-        activeTagPath: tagPath,
-      };
-    });
-  },
-  navigateToNote: (noteId) => {
-    set({
-      selectedNoteId: noteId,
-      focusedPane: "notes",
-      creatingSelectedNoteId: null,
-      pendingAutoFocusEditorNoteId: null,
-    });
-  },
-  prepareNoteCreation: () => {
-    set({
-      searchQuery: "",
-      creatingSelectedNoteId: null,
-      isCreatingNoteTransition: true,
-    });
-  },
-  upsertDraftWikilinkResolution: (noteId, resolution) => {
-    set((state) => {
-      if (state.draftNoteId !== noteId) {
-        console.warn("[wikilinks] skipped draft wikilink resolution upsert", {
-          draftNoteId: state.draftNoteId,
-          noteId,
-          resolution,
-        });
-        return state;
-      }
-
-      const nextResolutions = state.draftWikilinkResolutions.filter(
-        (entry) => !replaceableResolutionSlotMatches(entry, resolution),
-      );
-      nextResolutions.push(resolution);
-
-      console.debug("[wikilinks] stored draft wikilink resolution", {
-        draftNoteId: state.draftNoteId,
-        resolution,
-        resolutionCount: nextResolutions.length,
+        tagViewActive: false,
+        noteFilter: filter,
       });
+    },
+    navigateToDisposedFilter: (filter) => {
+      set({
+        selectedNoteId: null,
+        draftMarkdown: "",
+        draftNoteId: null,
+        draftWikilinkResolutions: [],
+        tagViewActive: false,
+        noteFilter: filter,
+      });
+    },
+    navigateToTagPath: (tagPath, currentNote) => {
+      set((state) => {
+        if (state.tagViewActive && state.activeTagPath === tagPath) {
+          return state;
+        }
 
-      return {
-        draftWikilinkResolutions: sortWikilinkResolutions(nextResolutions),
-      };
-    });
+        const outOfScope =
+          currentNote &&
+          !currentNote.tags.some(
+            (tag) => tag === tagPath || tag.startsWith(`${tagPath}/`),
+          );
+
+        return {
+          ...(outOfScope
+            ? {
+                selectedNoteId: null,
+                draftMarkdown: "",
+                draftNoteId: null,
+                draftWikilinkResolutions: [],
+              }
+            : {}),
+          tagViewActive: true,
+          activeTagPath: tagPath,
+        };
+      });
+    },
+    navigateToNote: (noteId) => {
+      set({
+        selectedNoteId: noteId,
+        focusedPane: "notes",
+        creatingSelectedNoteId: null,
+        pendingAutoFocusEditorNoteId: null,
+      });
+    },
+    prepareNoteCreation: () => {
+      set({
+        searchQuery: "",
+        creatingSelectedNoteId: null,
+        isCreatingNoteTransition: true,
+      });
+    },
+    upsertDraftWikilinkResolution: (noteId, resolution) => {
+      set((state) => {
+        if (state.draftNoteId !== noteId) {
+          console.warn("[wikilinks] skipped draft wikilink resolution upsert", {
+            draftNoteId: state.draftNoteId,
+            noteId,
+            resolution,
+          });
+          return state;
+        }
+
+        const nextResolutions = state.draftWikilinkResolutions.filter(
+          (entry) => !replaceableResolutionSlotMatches(entry, resolution),
+        );
+        nextResolutions.push(resolution);
+
+        console.debug("[wikilinks] stored draft wikilink resolution", {
+          draftNoteId: state.draftNoteId,
+          resolution,
+          resolutionCount: nextResolutions.length,
+        });
+
+        return {
+          draftWikilinkResolutions: sortWikilinkResolutions(nextResolutions),
+        };
+      });
+    },
   },
 }));
+
+// --- Public API ---
+
+/** Raw store for imperative `getState()` / `setState()` / `subscribe()` access. */
+export const shellStore = useShellStore;
+
+/** Returns all actions (stable reference, never causes re-render). */
+export const useShellActions = () => useShellStore((s) => s.actions);
+
+// --- Atomic state hooks ---
+
+export const useActiveTagPath = () => useShellStore((s) => s.activeTagPath);
+export const useCreatingSelectedNoteId = () =>
+  useShellStore((s) => s.creatingSelectedNoteId);
+export const useDraftMarkdown = () => useShellStore((s) => s.draftMarkdown);
+export const useDraftNoteId = () => useShellStore((s) => s.draftNoteId);
+export const useDraftWikilinkResolutions = () =>
+  useShellStore((s) => s.draftWikilinkResolutions);
+export const useFocusedPane = () => useShellStore((s) => s.focusedPane);
+export const useIsCreatingNoteTransition = () =>
+  useShellStore((s) => s.isCreatingNoteTransition);
+export const useNoteFilter = () => useShellStore((s) => s.noteFilter);
+export const usePendingAutoFocusEditorNoteId = () =>
+  useShellStore((s) => s.pendingAutoFocusEditorNoteId);
+export const useSearchQuery = () => useShellStore((s) => s.searchQuery);
+export const useSelectedNoteId = () => useShellStore((s) => s.selectedNoteId);
+export const useTagViewActive = () => useShellStore((s) => s.tagViewActive);

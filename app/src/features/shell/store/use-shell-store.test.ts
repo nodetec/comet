@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 
-describe("useShellStore wikilink resolution reconciliation", () => {
+describe("shellStore wikilink resolution reconciliation", () => {
   afterEach(() => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "",
       draftNoteId: null,
       draftWikilinkResolutions: [],
@@ -12,7 +12,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("removes only submitted wikilink resolutions for the active draft", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]] [[Beta]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -31,7 +31,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().removeDraftWikilinkResolutions("note-1", [
+    shellStore.getState().actions.removeDraftWikilinkResolutions("note-1", [
       {
         occurrenceId: "A1",
         location: 0,
@@ -40,7 +40,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       },
     ]);
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "B2",
         location: 10,
@@ -51,7 +51,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("does not drop a newer replacement without occurrence ids", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -63,7 +63,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().removeDraftWikilinkResolutions("note-1", [
+    shellStore.getState().actions.removeDraftWikilinkResolutions("note-1", [
       {
         location: 0,
         targetNoteId: "target-old",
@@ -71,7 +71,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       },
     ]);
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         location: 0,
         targetNoteId: "target-new",
@@ -81,7 +81,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("clears same-note wikilink resolutions on authoritative draft replacement", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -94,19 +94,19 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().setDraft("note-1", "# Refreshed markdown");
+    shellStore.getState().actions.setDraft("note-1", "# Refreshed markdown");
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([]);
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([]);
   });
 
   it("hydrates authoritative wikilink resolutions on draft replacement", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "# Old",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [],
     });
 
-    useShellStore.getState().setDraft("note-1", "# Loaded\n\n[[Alpha]]", {
+    shellStore.getState().actions.setDraft("note-1", "# Loaded\n\n[[Alpha]]", {
       wikilinkResolutions: [
         {
           occurrenceId: "A1",
@@ -117,7 +117,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "A1",
         location: 10,
@@ -128,7 +128,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("preserves same-note wikilink resolutions for live draft edits when requested", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -141,11 +141,11 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().setDraft("note-1", "x [[Alpha]] more", {
+    shellStore.getState().actions.setDraft("note-1", "x [[Alpha]] more", {
       preserveWikilinkResolutions: true,
     });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "A1",
         location: 2,
@@ -156,7 +156,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("preserves duplicate-title wikilink resolutions by occurrence id when positions shift", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]] [[Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -169,11 +169,11 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().setDraft("note-1", "x [[Alpha]] [[Alpha]]", {
+    shellStore.getState().actions.setDraft("note-1", "x [[Alpha]] [[Alpha]]", {
       preserveWikilinkResolutions: true,
     });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "B2",
         location: 12,
@@ -184,7 +184,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("preserves duplicate-title wikilink resolutions at stable locations when occurrence count changes", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Alpha]] [[Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -197,13 +197,13 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore
+    shellStore
       .getState()
-      .setDraft("note-1", "[[Alpha]] [[Alpha]] [[Alpha]]", {
+      .actions.setDraft("note-1", "[[Alpha]] [[Alpha]] [[Alpha]]", {
         preserveWikilinkResolutions: true,
       });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "B2",
         location: 10,
@@ -214,7 +214,7 @@ describe("useShellStore wikilink resolution reconciliation", () => {
   });
 
   it("preserves resolved wikilinks when only title casing changes", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Project Alpha]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -227,11 +227,11 @@ describe("useShellStore wikilink resolution reconciliation", () => {
       ],
     });
 
-    useShellStore.getState().setDraft("note-1", "[[project   alpha]]", {
+    shellStore.getState().actions.setDraft("note-1", "[[project   alpha]]", {
       preserveWikilinkResolutions: true,
     });
 
-    expect(useShellStore.getState().draftWikilinkResolutions).toEqual([
+    expect(shellStore.getState().draftWikilinkResolutions).toEqual([
       {
         occurrenceId: "A1",
         location: 0,

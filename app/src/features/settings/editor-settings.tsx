@@ -2,19 +2,27 @@ import { Minus, Plus } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import { Switch } from "@/shared/ui/switch";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import {
+  useEditorFontSize,
+  useEditorSpellCheck,
+  useEditorVimMode,
+  useShowEditorToolbar,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
 
 import { SettingRow } from "./setting-row";
 
 export function EditorSettings() {
-  const showToolbar = useUIStore((s) => s.showEditorToolbar);
-  const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
-  const fontSize = useUIStore((s) => s.editorFontSize);
-  const setFontSize = useUIStore((s) => s.setEditorFontSize);
-  const spellCheck = useUIStore((s) => s.editorSpellCheck);
-  const setSpellCheck = useUIStore((s) => s.setEditorSpellCheck);
-  const vimMode = useUIStore((s) => s.editorVimMode);
-  const setVimMode = useUIStore((s) => s.setEditorVimMode);
+  const showToolbar = useShowEditorToolbar();
+  const fontSize = useEditorFontSize();
+  const spellCheck = useEditorSpellCheck();
+  const vimMode = useEditorVimMode();
+  const {
+    setShowEditorToolbar: setShowToolbar,
+    setEditorFontSize: setFontSize,
+    setEditorSpellCheck: setSpellCheck,
+    setEditorVimMode: setVimMode,
+  } = useUIActions();
 
   return (
     <div>

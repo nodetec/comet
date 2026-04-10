@@ -17,7 +17,11 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import {
+  useSettingsOpen,
+  useSettingsTab,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";
@@ -38,10 +42,9 @@ const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
   "comet:reopen-settings-after-account-change";
 
 export function SettingsDialog() {
-  const open = useUIStore((s) => s.settingsOpen);
-  const setOpen = useUIStore((s) => s.setSettingsOpen);
-  const activeTab = useUIStore((s) => s.settingsTab);
-  const setTab = useUIStore((s) => s.setSettingsTab);
+  const open = useSettingsOpen();
+  const activeTab = useSettingsTab();
+  const { setSettingsOpen: setOpen, setSettingsTab: setTab } = useUIActions();
 
   useEffect(() => {
     try {

@@ -7,8 +7,15 @@ import {
   type MouseEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  useEditorFontSize,
+  useEditorSpellCheck,
+  useEditorVimMode,
+  useNotesPanelVisible,
+  useShowEditorToolbar,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
+import { useShellActions } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import {
@@ -120,13 +127,13 @@ export function EditorPane({
   const [toolbarContainer, setToolbarContainer] = useState<HTMLElement | null>(
     null,
   );
-  const editorFontSize = useUIStore((s) => s.editorFontSize);
-  const notesPanelVisible = useUIStore((s) => s.notesPanelVisible);
-  const showToolbar = useUIStore((s) => s.showEditorToolbar);
-  const editorSpellCheck = useUIStore((s) => s.editorSpellCheck);
-  const editorVimMode = useUIStore((s) => s.editorVimMode);
-  const setShowToolbar = useUIStore((s) => s.setShowEditorToolbar);
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
+  const editorFontSize = useEditorFontSize();
+  const notesPanelVisible = useNotesPanelVisible();
+  const showToolbar = useShowEditorToolbar();
+  const editorSpellCheck = useEditorSpellCheck();
+  const editorVimMode = useEditorVimMode();
+  const { setShowEditorToolbar: setShowToolbar } = useUIActions();
+  const { setFocusedPane } = useShellActions();
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.snapshotCount ?? 0) > 1;
   const viewableConflictSnapshots =

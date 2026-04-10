@@ -1,8 +1,8 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
-import { useShellStore } from "@/features/shell/store/use-shell-store";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import { useShellActions } from "@/features/shell/store/use-shell-store";
+import { uiStore, useUIActions } from "@/features/settings/store/use-ui-store";
 import {
   dispatchFocusEditor,
   dispatchFocusNotesPane,
@@ -31,10 +31,8 @@ export function useAppShortcuts({ onCreateNote }: UseAppShortcutsOptions) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
 
-  const setSettingsOpen = useUIStore((s) => s.setSettingsOpen);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const toggleFocusMode = useUIStore((s) => s.toggleFocusMode);
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
+  const { setSettingsOpen, toggleSidebar, toggleFocusMode } = useUIActions();
+  const { setFocusedPane } = useShellActions();
 
   const openCommandPalette = useEffectEvent(() => {
     setCommandPaletteOpen(true);
@@ -83,7 +81,7 @@ export function useAppShortcuts({ onCreateNote }: UseAppShortcutsOptions) {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      if (useUIStore.getState().notesPanelVisible) {
+      if (uiStore.getState().notesPanelVisible) {
         toggleSidebar();
       } else {
         toggleFocusMode();

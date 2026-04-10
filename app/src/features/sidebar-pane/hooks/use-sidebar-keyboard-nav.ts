@@ -8,7 +8,7 @@ import {
   type SidebarNavigationItem,
 } from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { dispatchFocusNotesPane } from "@/shared/lib/pane-navigation";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 
 function selectSidebarNavigationItem(params: {
@@ -174,7 +174,7 @@ export function useSidebarKeyboardNav(deps: SidebarKeyboardNavDeps) {
     const lowerKey = event.key.toLowerCase();
     if (event.key === "Enter" || lowerKey === "o") {
       event.preventDefault();
-      const hasSelection = !!useShellStore.getState().selectedNoteId;
+      const hasSelection = !!shellStore.getState().selectedNoteId;
       dispatchFocusNotesPane({
         selection: hasSelection ? "selected" : "first",
       });

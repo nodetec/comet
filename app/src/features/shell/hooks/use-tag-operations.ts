@@ -3,7 +3,7 @@ import { type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 import {
   deleteTag,
   loadNote,
@@ -149,7 +149,7 @@ export function useTagOperations(deps: TagOperationsDeps) {
 
         const affectedNoteIds = await deleteTag({ path });
         if (deps.activeTagPath === path) {
-          useShellStore.getState().clearActiveTagPath();
+          shellStore.getState().actions.clearActiveTagPath();
         }
 
         await Promise.all([

@@ -7,7 +7,7 @@ import {
 } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 import { WikiLinkGrammar } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
 import { CREATE_NOTE_FROM_WIKILINK_EVENT } from "@/shared/lib/note-navigation";
 
@@ -66,7 +66,7 @@ async function flush() {
 afterEach(() => {
   invokeMock.mockReset();
   openUrlMock.mockClear();
-  useShellStore.setState({
+  shellStore.setState({
     draftMarkdown: "",
     draftNoteId: null,
     draftWikilinkResolutions: [],
@@ -426,7 +426,7 @@ describe("Editor link interactions", () => {
   });
 
   it("prefers unsaved draft wikilink resolutions before backend lookup", () => {
-    useShellStore.setState({
+    shellStore.setState({
       draftMarkdown: "[[Target]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [

@@ -16,8 +16,11 @@ import {
   type NoteListNavigationDirection,
   getAdjacentNoteId,
 } from "@/features/notes-pane/lib/note-list-navigation";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { useSidebarVisible } from "@/features/settings/store/use-ui-store";
+import {
+  useFocusedPane,
+  useShellActions,
+} from "@/features/shell/store/use-shell-store";
 import {
   type FocusNotesPaneDetail,
   FOCUS_NOTES_PANE_EVENT,
@@ -105,9 +108,9 @@ export function NotesPane({
   onTrashNote,
   totalNoteCount,
 }: NotesPaneProps) {
-  const focusedPane = useShellStore((s) => s.focusedPane);
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
-  const sidebarVisible = useUIStore((s) => s.sidebarVisible);
+  const focusedPane = useFocusedPane();
+  const { setFocusedPane } = useShellActions();
+  const sidebarVisible = useSidebarVisible();
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";
   const [isSearchOpen, setIsSearchOpen] = useState(

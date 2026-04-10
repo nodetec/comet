@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getAppStatus, listThemes } from "@/shared/api/invoke";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import {
+  useThemeName,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
 import { SYSTEM_THEME_ID } from "@/shared/theme/schema";
 
 import { SettingRow } from "./setting-row";
 
 export function ThemeSettings() {
-  const themeName = useUIStore((s) => s.themeName);
-  const setThemeName = useUIStore((s) => s.setThemeName);
+  const themeName = useThemeName();
+  const { setThemeName } = useUIActions();
 
   const { data: themes = [] } = useQuery({
     queryKey: ["themes"],

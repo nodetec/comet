@@ -14,7 +14,7 @@ import {
   type FocusNoteDetail,
 } from "@/shared/lib/note-navigation";
 import type { NoteFilter } from "@/shared/api/types";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { useShellActions } from "@/features/shell/store/use-shell-store";
 
 interface ShellEventHandlers {
   flushCurrentDraft: () => void;
@@ -48,9 +48,8 @@ export function useShellEventListeners(deps: ShellEventListenerDeps) {
     createNoteMutation,
   } = deps;
 
-  const setNoteFilter = useShellStore((s) => s.setNoteFilter);
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
-  const prepareNoteCreation = useShellStore((s) => s.prepareNoteCreation);
+  const { setNoteFilter, setFocusedPane, prepareNoteCreation } =
+    useShellActions();
 
   // --- Account change listener ---
   useEffect(() => {

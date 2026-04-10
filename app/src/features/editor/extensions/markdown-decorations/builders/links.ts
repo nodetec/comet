@@ -10,7 +10,7 @@ import { Decoration, EditorView } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/features/shell/store/use-shell-store";
 import { utf8ByteOffsetForText } from "@/features/editor/lib/wikilinks";
 import type {
   BuilderContext,
@@ -66,7 +66,7 @@ export function resolveDraftWikiLinkTarget(
     return null;
   }
 
-  const { draftNoteId, draftWikilinkResolutions } = useShellStore.getState();
+  const { draftNoteId, draftWikilinkResolutions } = shellStore.getState();
   if (draftNoteId !== noteId) {
     return null;
   }

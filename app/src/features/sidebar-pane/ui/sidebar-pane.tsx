@@ -15,9 +15,16 @@ import {
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { SyncDialog } from "@/features/sync";
-import { useUIStore } from "@/features/settings/store/use-ui-store";
+import {
+  useExpandedSidebarTagPaths,
+  useSidebarNotesChildrenOpen,
+  useUIActions,
+} from "@/features/settings/store/use-ui-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
-import { useShellStore } from "@/features/shell/store/use-shell-store";
+import {
+  useFocusedPane,
+  useShellActions,
+} from "@/features/shell/store/use-shell-store";
 import {
   FOCUS_TAG_PATH_EVENT,
   type FocusTagPathDetail,
@@ -94,10 +101,8 @@ function useSidebarBorders(params: {
 }
 
 function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
-  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
-  const setExpandedSidebarTagPaths = useUIStore(
-    (s) => s.setExpandedSidebarTagPaths,
-  );
+  const expandedSidebarTagPaths = useExpandedSidebarTagPaths();
+  const { setExpandedSidebarTagPaths } = useUIActions();
 
   const expandedTagPaths = useMemo(
     () => new Set(expandedSidebarTagPaths),
@@ -175,11 +180,14 @@ export function SidebarPane({
   onSetTagPinned,
   onSelectTagPath,
 }: SidebarPaneProps) {
-  const isFocused = useShellStore((s) => s.focusedPane === "sidebar");
-  const setFocusedPane = useShellStore((s) => s.setFocusedPane);
-  const openSettings = useUIStore((s) => s.setSettingsOpen);
-  const notesChildrenOpen = useUIStore((s) => s.sidebarNotesChildrenOpen);
-  const setNotesChildrenOpen = useUIStore((s) => s.setSidebarNotesChildrenOpen);
+  const focusedPane = useFocusedPane();
+  const isFocused = focusedPane === "sidebar";
+  const { setFocusedPane } = useShellActions();
+  const {
+    setSettingsOpen: openSettings,
+    setSidebarNotesChildrenOpen: setNotesChildrenOpen,
+  } = useUIActions();
+  const notesChildrenOpen = useSidebarNotesChildrenOpen();
   const syncState = useSyncState();
 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -211,10 +219,8 @@ export function SidebarPane({
   );
   const { expandedTagPaths, toggleExpandedTagPath } =
     usePersistedExpandedTagPaths(availableTagPaths);
-  const expandedSidebarTagPaths = useUIStore((s) => s.expandedSidebarTagPaths);
-  const setExpandedSidebarTagPaths = useUIStore(
-    (s) => s.setExpandedSidebarTagPaths,
-  );
+  const expandedSidebarTagPaths = useExpandedSidebarTagPaths();
+  const { setExpandedSidebarTagPaths } = useUIActions();
   useRenameInputFocus(renameDialogOpen, renameInputRef);
   const noteSectionHasActiveTag = activeTagPath !== null;
   const sidebarNavigationItems = useMemo(
