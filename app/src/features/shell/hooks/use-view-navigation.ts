@@ -25,16 +25,11 @@ export interface ViewNavigationDeps {
   isCreatingNote: boolean;
   draftControl: DraftControl;
   createNoteMutation: CreateNoteMutation;
-  setActiveTagPath: (path: string | null) => void;
   setCreatingSelectedNoteId: (id: string | null) => void;
-  setDraft: (noteId: string, markdown: string) => void;
-  setFocusedPane: (pane: "sidebar" | "notes" | "editor") => void;
   setIsCreatingNoteTransition: (v: boolean) => void;
-  setNoteFilter: (filter: NoteFilter) => void;
   setPendingAutoFocusEditorNoteId: (id: string | null) => void;
   setSearchQuery: (query: string) => void;
-  setSelectedNoteId: (id: string | null) => void;
-  setTagViewActive: (active: boolean) => void;
+  setNoteFilter: (filter: NoteFilter) => void;
 }
 
 export function useViewNavigation(deps: ViewNavigationDeps) {
@@ -48,19 +43,20 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     isCreatingNote,
     draftControl,
     createNoteMutation,
-    setActiveTagPath,
     setCreatingSelectedNoteId,
-    setDraft,
-    setFocusedPane,
     setIsCreatingNoteTransition,
-    setNoteFilter,
     setPendingAutoFocusEditorNoteId,
     setSearchQuery,
-    setSelectedNoteId,
-    setTagViewActive,
+    setNoteFilter,
   } = deps;
 
   const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
+  const navigateToFilter = useShellStore((s) => s.navigateToFilter);
+  const navigateToDisposedFilter = useShellStore(
+    (s) => s.navigateToDisposedFilter,
+  );
+  const navigateToTagPath = useShellStore((s) => s.navigateToTagPath);
+  const navigateToNote = useShellStore((s) => s.navigateToNote);
 
   const handleCreateNote = () => {
     if (isCreatingNote) {
@@ -88,69 +84,32 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     });
   };
 
-  const clearSelectionIfNotActive = () => {
-    if (currentNote && (currentNote.archivedAt || currentNote.deletedAt)) {
-      setSelectedNoteId(null);
-      setDraft("", "");
-    }
-  };
-
   const handleSelectAll = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("all");
-    });
+    withFlushedCurrentDraft(() => navigateToFilter("all", currentNote));
   };
 
   const handleSelectToday = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("today");
-    });
+    withFlushedCurrentDraft(() => navigateToFilter("today", currentNote));
   };
 
   const handleSelectTodo = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("todo");
-    });
+    withFlushedCurrentDraft(() => navigateToFilter("todo", currentNote));
   };
 
   const handleSelectPinned = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("pinned");
-    });
+    withFlushedCurrentDraft(() => navigateToFilter("pinned", currentNote));
   };
 
   const handleSelectUntagged = () => {
-    withFlushedCurrentDraft(() => {
-      clearSelectionIfNotActive();
-      setTagViewActive(false);
-      setNoteFilter("untagged");
-    });
+    withFlushedCurrentDraft(() => navigateToFilter("untagged", currentNote));
   };
 
   const handleSelectArchive = () => {
-    withFlushedCurrentDraft(() => {
-      setSelectedNoteId(null);
-      setDraft("", "");
-      setTagViewActive(false);
-      setNoteFilter("archive");
-    });
+    withFlushedCurrentDraft(() => navigateToDisposedFilter("archive"));
   };
 
   const handleSelectTrash = () => {
-    withFlushedCurrentDraft(() => {
-      setSelectedNoteId(null);
-      setDraft("", "");
-      setTagViewActive(false);
-      setNoteFilter("trash");
-    });
+    withFlushedCurrentDraft(() => navigateToDisposedFilter("trash"));
   };
 
   const handleSelectTagPath = (tagPath: string) => {
@@ -159,30 +118,20 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     }
 
     withFlushedCurrentDraft((savedNote) => {
-      const noteForScope = savedNote ?? currentNote;
-
-      if (noteForScope && !matchesTagScope(noteForScope.tags, tagPath)) {
-        setSelectedNoteId(null);
-        setDraft("", "");
-      }
-
-      setTagViewActive(true);
-      setActiveTagPath(tagPath);
+      navigateToTagPath(tagPath, savedNote ?? currentNote);
     });
   };
 
   const handleSelectNote = (noteId: string) => {
     if (noteId === selectedNoteId) {
-      setFocusedPane("notes");
+      useShellStore.setState({ focusedPane: "notes" });
       return;
     }
 
     flushCurrentDraft();
     setCreatingSelectedNoteId(null);
     setPendingAutoFocusEditorNoteId(null);
-    // Batch selectedNoteId + focusedPane into a single store update so
-    // there's no intermediate render where the old note has the indicator.
-    useShellStore.setState({ selectedNoteId: noteId, focusedPane: "notes" });
+    navigateToNote(noteId);
   };
 
   return {

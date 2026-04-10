@@ -388,16 +388,11 @@ export function useShellController() {
     isCreatingNote,
     draftControl,
     createNoteMutation,
-    setActiveTagPath,
     setCreatingSelectedNoteId,
-    setDraft,
-    setFocusedPane,
     setIsCreatingNoteTransition,
-    setNoteFilter,
     setPendingAutoFocusEditorNoteId,
     setSearchQuery,
-    setSelectedNoteId,
-    setTagViewActive,
+    setNoteFilter,
   });
 
   // Keep latest handler references for stable memoized callbacks

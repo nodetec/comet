@@ -168,6 +168,27 @@ function preserveWikilinkResolutionsForDraft(
   );
 }
 
+// --- Event-style navigation actions ---
+
+type NavigationActions = {
+  /** Navigate to a filter view (all, today, checklist, pinned, untagged). Clears tag view. */
+  navigateToFilter(
+    filter: NoteFilter,
+    currentNote:
+      | { archivedAt: number | null; deletedAt: number | null }
+      | undefined,
+  ): void;
+  /** Navigate to archive or trash. Clears selection and tag view. */
+  navigateToDisposedFilter(filter: "archive" | "trash"): void;
+  /** Navigate to a tag path. Clears selection if the current note is out of scope. */
+  navigateToTagPath(
+    tagPath: string,
+    currentNote: { tags: string[] } | undefined,
+  ): void;
+  /** Select a note by ID. Batches selectedNoteId + focusedPane into one update. */
+  navigateToNote(noteId: string): void;
+};
+
 type ShellStore = {
   activeTagPath: string | null;
   draftMarkdown: string;
@@ -202,7 +223,7 @@ type ShellStore = {
     noteId: string,
     resolution: WikiLinkResolutionInput,
   ): void;
-};
+} & NavigationActions;
 
 export const useShellStore = create<ShellStore>((set) => ({
   activeTagPath: null,
@@ -282,6 +303,61 @@ export const useShellStore = create<ShellStore>((set) => ({
   },
   setTagViewActive: (tagViewActive) => {
     set({ tagViewActive });
+  },
+  navigateToFilter: (filter, currentNote) => {
+    const clearSelection =
+      currentNote && (currentNote.archivedAt || currentNote.deletedAt);
+    set({
+      ...(clearSelection
+        ? {
+            selectedNoteId: null,
+            draftMarkdown: "",
+            draftNoteId: null,
+            draftWikilinkResolutions: [],
+          }
+        : {}),
+      tagViewActive: false,
+      noteFilter: filter,
+    });
+  },
+  navigateToDisposedFilter: (filter) => {
+    set({
+      selectedNoteId: null,
+      draftMarkdown: "",
+      draftNoteId: null,
+      draftWikilinkResolutions: [],
+      tagViewActive: false,
+      noteFilter: filter,
+    });
+  },
+  navigateToTagPath: (tagPath, currentNote) => {
+    set((state) => {
+      if (state.tagViewActive && state.activeTagPath === tagPath) {
+        return state;
+      }
+
+      const outOfScope =
+        currentNote &&
+        !currentNote.tags.some(
+          (tag) => tag === tagPath || tag.startsWith(`${tagPath}/`),
+        );
+
+      return {
+        ...(outOfScope
+          ? {
+              selectedNoteId: null,
+              draftMarkdown: "",
+              draftNoteId: null,
+              draftWikilinkResolutions: [],
+            }
+          : {}),
+        tagViewActive: true,
+        activeTagPath: tagPath,
+      };
+    });
+  },
+  navigateToNote: (noteId) => {
+    set({ selectedNoteId: noteId, focusedPane: "notes" });
   },
   upsertDraftWikilinkResolution: (noteId, resolution) => {
     set((state) => {
