@@ -12,7 +12,7 @@ import { ConflictResolutionDialog } from "@/features/shell/ui/conflict-resolutio
 import { DeletePublishDialog } from "@/features/shell/ui/delete-publish-dialog";
 import { EditorPane } from "@/features/editor-pane";
 import { NoteHistoryDialog } from "@/features/shell/note-history-dialog";
-import { NotesPane } from "@/features/notes-pane/ui/notes-pane";
+import { NotesPane } from "@/features/notes-pane";
 import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
 import { SidebarPane } from "@/features/sidebar-pane";
 import { useAppShortcuts } from "@/features/shell/use-app-shortcuts";
