@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
@@ -11,22 +10,12 @@ import {
   useUIStore,
 } from "@/features/settings/store/use-ui-store";
 
+import { exportNotes } from "@/shared/api/invoke";
 import {
-  deleteTag,
-  exportNotes,
-  loadNote,
-  renameTag,
-  resolveNoteConflict,
-  setHideSubtagNotes,
-  setTagPinned,
-} from "@/shared/api/invoke";
-import {
-  type LoadedNote,
   type NoteSortDirection,
   type NoteSortField,
   type PublishNoteInput,
   type PublishShortNoteInput,
-  type ResolveNoteConflictAction,
 } from "@/shared/api/types";
 import { usePublishState } from "@/features/publishing";
 
@@ -35,6 +24,11 @@ import { useNoteMutations } from "@/features/notes/hooks/use-note-mutations";
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
+import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
+import { useConflictResolution } from "@/features/shell/hooks/use-conflict-resolution";
+import { useNoteHistoryDialog } from "@/features/shell/hooks/use-note-history-dialog";
+import { useNoteOperations } from "@/features/shell/hooks/use-note-operations";
+import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
 import {
   FOCUS_TAG_PATH_EVENT,
   type FocusTagPathDetail,
@@ -62,22 +56,6 @@ export function useShellController() {
   const [pendingAutoFocusEditorNoteId, setPendingAutoFocusEditorNoteId] =
     useState<string | null>(null);
   const [syncEditorRevision, setSyncEditorRevision] = useState(0);
-  const [chooseConflictDialogOpen, setChooseConflictDialogOpen] =
-    useState(false);
-  const [chooseConflictNoteId, setChooseConflictNoteId] = useState<
-    string | null
-  >(null);
-  const [selectedConflictSnapshotId, setSelectedConflictSnapshotId] = useState<
-    string | null
-  >(null);
-  const [isResolveConflictPending, setIsResolveConflictPending] =
-    useState(false);
-  const [noteHistoryDialogOpen, setNoteHistoryDialogOpen] = useState(false);
-  const [selectedHistorySnapshotId, setSelectedHistorySnapshotId] = useState<
-    string | null
-  >(null);
-  const [isRestoreHistoryPending, setIsRestoreHistoryPending] = useState(false);
-  const [isTagMutationPending, setIsTagMutationPending] = useState(false);
 
   const publish = usePublishState();
   const {
@@ -133,7 +111,6 @@ export function useShellController() {
     useUIStore((state) => state.noteSortPrefs[sortViewKey]) ??
     defaultNoteSortPrefs;
   const setNoteSortPrefs = useUIStore((state) => state.setNoteSortPrefs);
-  const previousConflictNoteIdRef = useRef<string | null>(null);
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
@@ -307,6 +284,20 @@ export function useShellController() {
       draftNoteId === currentNote.id ? draftMarkdown : currentNote.markdown;
   }
 
+  // --- Draft control ---
+  const draftControl = useDraftControl({
+    currentNote,
+    draftNoteId,
+    draftMarkdown,
+    draftWikilinkResolutions,
+    isCurrentNoteConflicted,
+    hasPendingWikilinkResolutionChanges,
+    pendingSaveTimeoutRef,
+    saveNoteMutation,
+  });
+  const { flushCurrentDraft, flushCurrentDraftAsync, withFlushedCurrentDraft } =
+    draftControl;
+
   // --- Draft persistence ---
   useDraftPersistence({
     activeNpub,
@@ -323,216 +314,82 @@ export function useShellController() {
     queryClient,
   });
 
-  useEffect(() => {
-    if (!currentNote) {
-      previousConflictNoteIdRef.current = null;
-      setSelectedConflictSnapshotId(null);
-      return;
-    }
-
-    const conflictNoteId = isCurrentNoteConflicted ? currentNote.id : null;
-    const justBecameConflicted =
-      conflictNoteId !== null &&
-      previousConflictNoteIdRef.current !== conflictNoteId;
-    previousConflictNoteIdRef.current = conflictNoteId;
-
-    if (!justBecameConflicted) {
-      return;
-    }
-
-    if (pendingSaveTimeoutRef.current !== null) {
-      window.clearTimeout(pendingSaveTimeoutRef.current);
-      pendingSaveTimeoutRef.current = null;
-    }
-
-    if (
-      draftNoteId === currentNote.id &&
-      (draftMarkdown !== currentNote.markdown ||
-        hasPendingWikilinkResolutionChanges)
-    ) {
-      setDraft(currentNote.id, currentNote.markdown, {
-        wikilinkResolutions: currentNote.wikilinkResolutions,
-      });
-      bumpSyncEditorRevision("conflict-reset-to-current-note", {
-        draftLength: draftMarkdown.length,
-        noteId: currentNote.id,
-        noteLength: currentNote.markdown.length,
-      });
-    }
-  }, [
-    bumpSyncEditorRevision,
-    currentNote,
-    draftMarkdown,
-    draftNoteId,
-    hasPendingWikilinkResolutionChanges,
-    isCurrentNoteConflicted,
-    pendingSaveTimeoutRef,
-    setDraft,
-  ]);
-
-  useEffect(() => {
-    if (!currentNote || !currentNoteConflict || !isCurrentNoteConflicted) {
-      setSelectedConflictSnapshotId(null);
-      return;
-    }
-
-    if (
-      selectedConflictSnapshotId &&
-      currentNoteConflict.snapshots.some(
-        (snapshot) => snapshot.snapshotId === selectedConflictSnapshotId,
-      )
-    ) {
-      return;
-    }
-
-    setSelectedConflictSnapshotId(
-      currentNoteConflict.currentSnapshotId ??
-        currentNoteConflict.snapshots[0]?.snapshotId ??
-        null,
-    );
-  }, [
+  // --- Conflict resolution ---
+  const conflictResolution = useConflictResolution({
     currentNote,
     currentNoteConflict,
     isCurrentNoteConflicted,
+    draftNoteId,
+    draftMarkdown,
+    draftWikilinkResolutions,
+    hasPendingWikilinkResolutionChanges,
+    selectedNoteId,
+    pendingSaveTimeoutRef,
+    queryClient,
+    setDraft,
+    bumpSyncEditorRevision,
+  });
+  const {
+    chooseConflictDialogOpen,
     selectedConflictSnapshotId,
-  ]);
+    isResolveConflictPending,
+    setChooseConflictDialogOpen,
+    setChooseConflictNoteId,
+  } = conflictResolution;
 
-  useEffect(() => {
-    if (!noteHistoryDialogOpen) {
-      setSelectedHistorySnapshotId(null);
-      return;
-    }
-
-    if (!currentNoteId) {
-      setNoteHistoryDialogOpen(false);
-      setSelectedHistorySnapshotId(null);
-      return;
-    }
-
-    if (!currentNoteHistory || currentNoteHistory.snapshotCount === 0) {
-      setSelectedHistorySnapshotId(null);
-      return;
-    }
-
-    if (
-      selectedHistorySnapshotId &&
-      currentNoteHistory.snapshots.some(
-        (snapshot) => snapshot.snapshotId === selectedHistorySnapshotId,
-      )
-    ) {
-      return;
-    }
-
-    setSelectedHistorySnapshotId(
-      currentNoteHistory.snapshots.find((snapshot) => snapshot.isCurrent)
-        ?.snapshotId ??
-        currentNoteHistory.snapshots[0]?.snapshotId ??
-        null,
-    );
-  }, [
-    currentNoteHistory,
+  // --- Note history dialog ---
+  const noteHistory = useNoteHistoryDialog({
+    draftControl,
     currentNoteId,
+    currentNoteHistory,
+    isCurrentNoteConflicted,
+    queryClient,
+    saveNoteMutation,
+    setDraft,
+  });
+  const {
     noteHistoryDialogOpen,
     selectedHistorySnapshotId,
-  ]);
+    isRestoreHistoryPending,
+    setNoteHistoryDialogOpen,
+    setSelectedHistorySnapshotId,
+  } = noteHistory;
 
-  useEffect(() => {
-    if (!chooseConflictDialogOpen) {
-      return;
-    }
+  // --- Note operations ---
+  const noteOps = useNoteOperations({
+    draftControl,
+    selectedNoteId,
+    draftNoteId,
+    draftMarkdown,
+    queryClient,
+    archiveNoteMutation,
+    restoreNoteMutation,
+    trashNoteMutation,
+    restoreFromTrashMutation,
+    deleteNotePermanentlyMutation,
+    emptyTrashMutation,
+    pinNoteMutation,
+    unpinNoteMutation,
+    duplicateNoteMutation,
+    setNoteReadonlyMutation,
+  });
 
-    if (
-      !currentNote ||
-      !isCurrentNoteConflicted ||
-      chooseConflictNoteId !== currentNote.id
-    ) {
-      setChooseConflictDialogOpen(false);
-      setChooseConflictNoteId(null);
-    }
-  }, [
-    chooseConflictDialogOpen,
-    chooseConflictNoteId,
+  // --- Tag operations ---
+  const tagOps = useTagOperations({
+    draftControl,
     currentNote,
     isCurrentNoteConflicted,
-  ]);
-
-  // --- Flush / discard helpers ---
-  const flushCurrentDraft = () => {
-    if (!currentNote || draftNoteId !== currentNote.id) {
-      return;
-    }
-
-    if (isCurrentNoteConflicted) {
-      return;
-    }
-
-    if (
-      draftMarkdown === currentNote.markdown &&
-      !hasPendingWikilinkResolutionChanges
-    ) {
-      return;
-    }
-
-    if (pendingSaveTimeoutRef.current !== null) {
-      window.clearTimeout(pendingSaveTimeoutRef.current);
-      pendingSaveTimeoutRef.current = null;
-    }
-
-    saveNoteMutation.mutate({
-      id: currentNote.id,
-      markdown: draftMarkdown,
-      wikilinkResolutions: draftWikilinkResolutions,
-    });
-  };
-
-  const flushCurrentDraftAsync = async (): Promise<LoadedNote | undefined> => {
-    if (!currentNote || draftNoteId !== currentNote.id) {
-      return undefined;
-    }
-
-    if (isCurrentNoteConflicted) {
-      return undefined;
-    }
-
-    if (
-      draftMarkdown === currentNote.markdown &&
-      !hasPendingWikilinkResolutionChanges
-    ) {
-      return undefined;
-    }
-
-    if (pendingSaveTimeoutRef.current !== null) {
-      window.clearTimeout(pendingSaveTimeoutRef.current);
-      pendingSaveTimeoutRef.current = null;
-    }
-
-    const response = await saveNoteMutation.mutateAsync({
-      id: currentNote.id,
-      markdown: draftMarkdown,
-      wikilinkResolutions: draftWikilinkResolutions,
-    });
-    return response.note;
-  };
-
-  const withFlushedCurrentDraft = (
-    action: (savedNote?: LoadedNote) => void | Promise<void>,
-  ) => {
-    void (async () => {
-      try {
-        const savedNote = await flushCurrentDraftAsync();
-        await action(savedNote);
-      } catch {
-        // Save failures already surface through the mutation error handler.
-      }
-    })();
-  };
-
-  const discardPendingSave = () => {
-    if (pendingSaveTimeoutRef.current !== null) {
-      window.clearTimeout(pendingSaveTimeoutRef.current);
-      pendingSaveTimeoutRef.current = null;
-    }
-  };
+    draftNoteId,
+    selectedNoteId,
+    activeTagPath,
+    queryClient,
+    invalidateNotes,
+    invalidateContextualTags,
+    setDraft,
+    setActiveTagPath,
+    setTagViewActive,
+    bumpSyncEditorRevision,
+  });
 
   // --- Account change listener ---
   useEffect(() => {
@@ -753,10 +610,6 @@ export function useShellController() {
     });
   };
 
-  const handleEmptyTrash = () => {
-    emptyTrashMutation.mutate();
-  };
-
   const handleSelectTagPath = (tagPath: string) => {
     if (tagViewActive && activeTagPath === tagPath) {
       return;
@@ -775,167 +628,6 @@ export function useShellController() {
     });
   };
 
-  const syncSelectedNoteAfterTagRewrite = async (affectedNoteIds: string[]) => {
-    if (!selectedNoteId || !affectedNoteIds.includes(selectedNoteId)) {
-      await queryClient.invalidateQueries({ queryKey: ["note"] });
-      return;
-    }
-
-    const refreshedNote = await loadNote(selectedNoteId);
-    queryClient.setQueryData(["note", refreshedNote.id], refreshedNote);
-    setDraft(refreshedNote.id, refreshedNote.markdown, {
-      wikilinkResolutions: refreshedNote.wikilinkResolutions,
-    });
-    bumpSyncEditorRevision("tag-rewrite-refresh", {
-      noteId: refreshedNote.id,
-      refreshedLength: refreshedNote.markdown.length,
-    });
-  };
-
-  const handleRenameTag = (fromPath: string, toPath: string) => {
-    if (isTagMutationPending) {
-      return;
-    }
-
-    void (async () => {
-      setIsTagMutationPending(true);
-
-      try {
-        if (
-          currentNote &&
-          isCurrentNoteConflicted &&
-          currentNote.tags.includes(fromPath)
-        ) {
-          toast.error(
-            "Resolve the current note conflict before renaming this tag.",
-            {
-              id: "rename-tag-conflict-error",
-            },
-          );
-          return;
-        }
-
-        if (
-          currentNote &&
-          draftNoteId === currentNote.id &&
-          currentNote.tags.includes(fromPath)
-        ) {
-          await flushCurrentDraftAsync();
-        }
-
-        const affectedNoteIds = await renameTag({ fromPath, toPath });
-        const nextPath = canonicalizeTagPath(toPath) ?? toPath;
-        setActiveTagPath(activeTagPath === fromPath ? nextPath : activeTagPath);
-
-        await Promise.all([
-          invalidateNotes(),
-          invalidateContextualTags(),
-          syncSelectedNoteAfterTagRewrite(affectedNoteIds),
-        ]);
-
-        toast.success("Tag renamed.", { id: "rename-tag-success" });
-      } catch (error) {
-        toastErrorHandler("Couldn't rename tag", "rename-tag-error")(error);
-      } finally {
-        setIsTagMutationPending(false);
-      }
-    })();
-  };
-
-  const handleDeleteTag = (path: string) => {
-    if (isTagMutationPending) {
-      return;
-    }
-
-    void (async () => {
-      setIsTagMutationPending(true);
-
-      try {
-        if (
-          currentNote &&
-          isCurrentNoteConflicted &&
-          currentNote.tags.includes(path)
-        ) {
-          toast.error(
-            "Resolve the current note conflict before deleting this tag.",
-            {
-              id: "delete-tag-conflict-error",
-            },
-          );
-          return;
-        }
-
-        if (
-          currentNote &&
-          draftNoteId === currentNote.id &&
-          currentNote.tags.includes(path)
-        ) {
-          await flushCurrentDraftAsync();
-        }
-
-        const affectedNoteIds = await deleteTag({ path });
-        if (activeTagPath === path) {
-          setActiveTagPath(null);
-          setTagViewActive(false);
-        }
-
-        await Promise.all([
-          invalidateNotes(),
-          invalidateContextualTags(),
-          syncSelectedNoteAfterTagRewrite(affectedNoteIds),
-        ]);
-
-        toast.success("Tag deleted.", { id: "delete-tag-success" });
-      } catch (error) {
-        toastErrorHandler("Couldn't delete tag", "delete-tag-error")(error);
-      } finally {
-        setIsTagMutationPending(false);
-      }
-    })();
-  };
-
-  const handleSetTagPinned = (path: string, pinned: boolean) => {
-    if (isTagMutationPending) {
-      return;
-    }
-
-    void (async () => {
-      setIsTagMutationPending(true);
-      try {
-        await setTagPinned({ path, pinned });
-        await invalidateContextualTags();
-      } catch (error) {
-        toastErrorHandler(
-          "Couldn't update tag pin",
-          "set-tag-pinned-error",
-        )(error);
-      } finally {
-        setIsTagMutationPending(false);
-      }
-    })();
-  };
-
-  const handleSetHideSubtagNotes = (path: string, hideSubtagNotes: boolean) => {
-    if (isTagMutationPending) {
-      return;
-    }
-
-    void (async () => {
-      setIsTagMutationPending(true);
-      try {
-        await setHideSubtagNotes({ path, hideSubtagNotes });
-        await Promise.all([invalidateNotes(), invalidateContextualTags()]);
-      } catch (error) {
-        toastErrorHandler(
-          "Couldn't update tag visibility",
-          "set-hide-subtag-notes-error",
-        )(error);
-      } finally {
-        setIsTagMutationPending(false);
-      }
-    })();
-  };
-
   const handleSelectNote = (noteId: string) => {
     if (noteId === selectedNoteId) {
       setFocusedPane("notes");
@@ -948,169 +640,6 @@ export function useShellController() {
     // Batch selectedNoteId + focusedPane into a single store update so
     // there's no intermediate render where the old note has the indicator.
     useShellStore.setState({ selectedNoteId: noteId, focusedPane: "notes" });
-  };
-
-  const handleArchiveNote = (noteId: string) => {
-    void (async () => {
-      if (
-        archiveNoteMutation.isPending ||
-        restoreNoteMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending
-      ) {
-        return;
-      }
-
-      if (noteId === selectedNoteId) {
-        await flushCurrentDraftAsync();
-      }
-
-      await archiveNoteMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleRestoreNote = (noteId: string) => {
-    void (async () => {
-      if (
-        archiveNoteMutation.isPending ||
-        restoreNoteMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending
-      ) {
-        return;
-      }
-
-      await restoreNoteMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleTrashNote = (noteId: string) => {
-    void (async () => {
-      if (
-        trashNoteMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending
-      ) {
-        return;
-      }
-
-      if (noteId === selectedNoteId) {
-        discardPendingSave();
-      }
-
-      await trashNoteMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleRestoreFromTrash = (noteId: string) => {
-    void (async () => {
-      if (
-        restoreFromTrashMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending
-      ) {
-        return;
-      }
-
-      await restoreFromTrashMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleDeleteNotePermanently = (noteId: string) => {
-    void (async () => {
-      if (
-        trashNoteMutation.isPending ||
-        restoreFromTrashMutation.isPending ||
-        deleteNotePermanentlyMutation.isPending
-      ) {
-        return;
-      }
-
-      if (noteId === selectedNoteId) {
-        discardPendingSave();
-      }
-
-      await deleteNotePermanentlyMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleSetNotePinned = (noteId: string, pinned: boolean) => {
-    if (
-      archiveNoteMutation.isPending ||
-      restoreNoteMutation.isPending ||
-      deleteNotePermanentlyMutation.isPending ||
-      pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending ||
-      duplicateNoteMutation.isPending ||
-      setNoteReadonlyMutation.isPending
-    ) {
-      return;
-    }
-
-    const mutation = pinned ? pinNoteMutation : unpinNoteMutation;
-    void mutation.mutateAsync(noteId).catch(() => {});
-  };
-
-  const handleSetNoteReadonly = (noteId: string, readonly: boolean) => {
-    if (
-      archiveNoteMutation.isPending ||
-      restoreNoteMutation.isPending ||
-      deleteNotePermanentlyMutation.isPending ||
-      pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending ||
-      duplicateNoteMutation.isPending ||
-      setNoteReadonlyMutation.isPending
-    ) {
-      return;
-    }
-
-    void (async () => {
-      if (noteId === selectedNoteId) {
-        await flushCurrentDraftAsync();
-      }
-
-      await setNoteReadonlyMutation.mutateAsync({
-        noteId,
-        readonly,
-      });
-    })().catch(() => {});
-  };
-
-  const handleDuplicateNote = (noteId: string) => {
-    if (
-      archiveNoteMutation.isPending ||
-      restoreNoteMutation.isPending ||
-      deleteNotePermanentlyMutation.isPending ||
-      pinNoteMutation.isPending ||
-      unpinNoteMutation.isPending ||
-      duplicateNoteMutation.isPending ||
-      setNoteReadonlyMutation.isPending
-    ) {
-      return;
-    }
-
-    void (async () => {
-      if (noteId === selectedNoteId) {
-        await flushCurrentDraftAsync();
-      }
-
-      await duplicateNoteMutation.mutateAsync(noteId);
-    })().catch(() => {});
-  };
-
-  const handleCopyNoteContent = (noteId: string) => {
-    void (async () => {
-      try {
-        if (noteId === selectedNoteId && draftNoteId === noteId) {
-          await writeText(draftMarkdown);
-          return;
-        }
-
-        const note =
-          queryClient.getQueryData<LoadedNote>(["note", noteId]) ??
-          (await loadNote(noteId));
-
-        await writeText(note.markdown);
-      } catch (error) {
-        toastErrorHandler("Couldn't copy note", "copy-note-error")(error);
-      }
-    })();
   };
 
   const handleExportNotes = () => {
@@ -1189,174 +718,40 @@ export function useShellController() {
     fetchNextPage: notesQuery.fetchNextPage,
     flushCurrentDraft,
     flushCurrentDraftAsync,
-    handleArchiveNote,
-    handleCopyNoteContent,
+    handleArchiveNote: noteOps.handleArchiveNote,
+    handleCopyNoteContent: noteOps.handleCopyNoteContent,
     handleCreateNote,
-    handleDuplicateNote,
-    handleDeleteNotePermanently,
-    handleEmptyTrash,
+    handleDuplicateNote: noteOps.handleDuplicateNote,
+    handleDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
+    handleEmptyTrash: noteOps.handleEmptyTrash,
     handleExportNotes,
     handleExportTag,
-    handleRestoreFromTrash,
-    handleRestoreNote,
-    handleDeleteTag,
+    handleRestoreFromTrash: noteOps.handleRestoreFromTrash,
+    handleRestoreNote: noteOps.handleRestoreNote,
+    handleDeleteTag: tagOps.handleDeleteTag,
     handleSelectAll,
     handleSelectArchive,
     handleSelectTrash,
-    handleTrashNote,
-    handleRenameTag,
+    handleTrashNote: noteOps.handleTrashNote,
+    handleRenameTag: tagOps.handleRenameTag,
     handleSelectNote,
-    handleSetHideSubtagNotes,
-    handleSetTagPinned,
+    handleSetHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
+    handleSetTagPinned: tagOps.handleSetTagPinned,
     handleSelectToday,
     handleSelectTodo,
     handleSelectPinned,
     handleSelectUntagged,
-    handleSetNotePinned,
-    handleSetNoteReadonly,
+    handleSetNotePinned: noteOps.handleSetNotePinned,
+    handleSetNoteReadonly: noteOps.handleSetNoteReadonly,
     handleSelectTagPath,
-    handleOpenNoteHistory() {
-      if (!currentNoteId) {
-        return;
-      }
-      setNoteHistoryDialogOpen(true);
-    },
-    handleSelectNoteHistorySnapshot(snapshotId: string) {
-      setSelectedHistorySnapshotId(snapshotId);
-    },
-    async handleRestoreSelectedNoteHistorySnapshot() {
-      if (!currentNoteId || !currentNoteHistory || !selectedHistorySnapshotId) {
-        return;
-      }
-
-      if (isCurrentNoteConflicted) {
-        toast.error(
-          "Resolve the current note conflict before restoring history.",
-          {
-            id: "restore-history-conflict-error",
-          },
-        );
-        return;
-      }
-
-      const snapshot = currentNoteHistory.snapshots.find(
-        (entry) => entry.snapshotId === selectedHistorySnapshotId,
-      );
-      if (!snapshot || snapshot.op === "del" || !snapshot.markdown) {
-        return;
-      }
-
-      setIsRestoreHistoryPending(true);
-      try {
-        discardPendingSave();
-        const { note: savedNote } = await saveNoteMutation.mutateAsync({
-          id: currentNoteId,
-          markdown: snapshot.markdown,
-          wikilinkResolutions: snapshot.wikilinkResolutions,
-        });
-        setDraft(currentNoteId, snapshot.markdown, {
-          wikilinkResolutions: savedNote.wikilinkResolutions,
-        });
-        setNoteHistoryDialogOpen(false);
-        toast.success("Snapshot restored.", {
-          id: "restore-history-success",
-        });
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["note", currentNoteId] }),
-          queryClient.invalidateQueries({
-            queryKey: ["note-history", currentNoteId],
-          }),
-          queryClient.invalidateQueries({ queryKey: ["notes"] }),
-          queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-        ]);
-      } catch (error) {
-        toastErrorHandler(
-          "Couldn't restore snapshot",
-          "restore-history-error",
-        )(error);
-      } finally {
-        setIsRestoreHistoryPending(false);
-      }
-    },
-    async handleResolveCurrentNoteConflict(action: ResolveNoteConflictAction) {
-      const resolvedNoteId =
-        currentNote?.id ?? chooseConflictNoteId ?? selectedNoteId;
-      if (
-        (!currentNote || !resolvedNoteId) &&
-        (action === "restore" || action === "merge")
-      ) {
-        return;
-      }
-
-      setIsResolveConflictPending(true);
-      const preferredResolutionMarkdown =
-        currentNote && draftNoteId === currentNote.id
-          ? draftMarkdown
-          : currentNote?.markdown;
-      const resolutionMarkdown =
-        action === "keep_deleted" ? undefined : preferredResolutionMarkdown;
-      const resolutionWikilinkResolutions =
-        action === "keep_deleted" ||
-        !currentNote ||
-        draftNoteId !== currentNote.id ||
-        draftWikilinkResolutions.length === 0
-          ? undefined
-          : draftWikilinkResolutions;
-      try {
-        await resolveNoteConflict(
-          resolvedNoteId ?? "",
-          action,
-          resolutionMarkdown,
-          action === "keep_deleted"
-            ? undefined
-            : (selectedConflictSnapshotId ?? undefined),
-          resolutionWikilinkResolutions,
-        );
-        setChooseConflictDialogOpen(false);
-        setChooseConflictNoteId(null);
-        setSelectedConflictSnapshotId(null);
-        toast.success("Conflict resolution published.", {
-          id: "resolve-note-conflict-success",
-        });
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["note", resolvedNoteId] }),
-          queryClient.invalidateQueries({
-            queryKey: ["note-conflict", resolvedNoteId],
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["note-backlinks", resolvedNoteId],
-          }),
-          queryClient.invalidateQueries({ queryKey: ["notes"] }),
-          queryClient.invalidateQueries({ queryKey: ["bootstrap"] }),
-        ]);
-      } catch (error) {
-        toastErrorHandler(
-          "Couldn't resolve note conflict",
-          "resolve-note-conflict-error",
-        )(error);
-      } finally {
-        setIsResolveConflictPending(false);
-      }
-    },
-    handleLoadConflictHead(snapshotId: string, markdown: string | null) {
-      if (!currentNote) {
-        return;
-      }
-      setSelectedConflictSnapshotId(snapshotId);
-      if (markdown !== null) {
-        const snapshot = currentNoteConflict?.snapshots.find(
-          (entry) => entry.snapshotId === snapshotId,
-        );
-        setDraft(currentNote.id, markdown, {
-          wikilinkResolutions: snapshot?.wikilinkResolutions ?? [],
-        });
-        bumpSyncEditorRevision("load-conflict-snapshot", {
-          noteId: currentNote.id,
-          snapshotId,
-          markdownLength: markdown.length,
-        });
-      }
-    },
+    handleOpenNoteHistory: noteHistory.handleOpenNoteHistory,
+    handleSelectNoteHistorySnapshot:
+      noteHistory.handleSelectNoteHistorySnapshot,
+    handleRestoreSelectedNoteHistorySnapshot:
+      noteHistory.handleRestoreSelectedNoteHistorySnapshot,
+    handleResolveCurrentNoteConflict:
+      conflictResolution.handleResolveCurrentNoteConflict,
+    handleLoadConflictHead: conflictResolution.handleLoadConflictHead,
   };
   const latestRef = useRef(currentHandlers);
   latestRef.current = currentHandlers;
@@ -1628,17 +1023,12 @@ export function useShellController() {
       isRestoreHistoryPending,
       noteHistoryDialogOpen,
       selectedHistorySnapshotId,
+      setNoteHistoryDialogOpen,
+      setSelectedHistorySnapshotId,
     ],
   );
 
-  const isMutatingNote =
-    archiveNoteMutation.isPending ||
-    restoreNoteMutation.isPending ||
-    deleteNotePermanentlyMutation.isPending ||
-    pinNoteMutation.isPending ||
-    unpinNoteMutation.isPending ||
-    duplicateNoteMutation.isPending ||
-    setNoteReadonlyMutation.isPending;
+  const { isMutatingNote } = noteOps;
 
   const notesPaneProps = useMemo(
     () => ({
