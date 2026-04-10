@@ -2,32 +2,22 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
-  useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type MouseEvent,
 } from "react";
-import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
   Ellipsis,
   Link2,
   Lock,
   PencilOff,
   PanelBottomClose,
   PanelBottomOpen,
-  Search,
-  X,
 } from "lucide-react";
 
 import {
@@ -38,28 +28,23 @@ import {
   type FocusEditorDetail,
   FOCUS_EDITOR_EVENT,
 } from "@/shared/lib/pane-navigation";
-import {
-  isEditorFindShortcut,
-  isNotesSearchShortcut,
-} from "@/shared/lib/keyboard";
 import { Button } from "@/shared/ui/button";
 import { PopoverPopup, PopoverRoot, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
-import { resolveActiveEditorSearch } from "@/shared/lib/search";
 import { cn } from "@/shared/lib/utils";
 import { type NoteBacklink, type NoteConflictInfo } from "@/shared/api/types";
 
-const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
-const TOOLBAR_ENTER_ANIMATION = {
-  damping: 28,
-  mass: 0.8,
-  stiffness: 360,
-  type: "spring" as const,
-};
-const TOOLBAR_EXIT_ANIMATION = {
-  duration: 0.16,
-  ease: [0.4, 0, 1, 1] as const,
-};
+import {
+  TOOLBAR_ENTER_ANIMATION,
+  TOOLBAR_EXIT_ANIMATION,
+  buildEditorMenu,
+  firstLineH1Title,
+  isEditableElement,
+} from "@/features/shell/ui/editor-pane-utils";
+import { useEditorScrollHeader } from "@/features/shell/hooks/use-editor-scroll-header";
+import { useFindBar } from "@/features/shell/hooks/use-find-bar";
+import { EditorFindBar } from "@/features/shell/ui/editor-find-bar";
+import { ConflictResolutionFooter } from "@/features/shell/ui/conflict-resolution-footer";
 
 type EditorPaneProps = {
   availableTagPaths: string[];
@@ -93,350 +78,6 @@ type EditorPaneProps = {
   onSelectLinkedNote(noteId: string): void;
   onChange(markdown: string): void;
 };
-
-// eslint-disable-next-line sonarjs/slow-regex -- bounded by single-line input
-const H1_TITLE_RE = /^#\s+(.+?)\s*$/;
-
-type EditorMenuContext = {
-  readonly: boolean;
-  isPublishedNote: boolean;
-  isDeletePublishedNotePending: boolean;
-  pinnedAt: number | null;
-  publishedAt: number | null;
-  onSetReadonly(readonly: boolean): void;
-  onDeletePublishedNote(): void;
-  onPublishShortNote(): void;
-  onOpenPublishDialog(): void;
-  onSetPinned(pinned: boolean): void;
-  onDuplicateNote(): void;
-  onOpenHistory(): void;
-};
-
-async function buildEditorMenu(
-  position: LogicalPosition,
-  ctx: EditorMenuContext,
-) {
-  const readonlyMenuItem = await CheckMenuItem.new({
-    id: "editor-menu-readonly",
-    text: "Read-only",
-    checked: ctx.readonly,
-    enabled: !ctx.isPublishedNote,
-    action: () => ctx.onSetReadonly(!ctx.readonly),
-  });
-
-  const deletePublishedItem = {
-    id: "editor-menu-delete-published",
-    text: "Delete from Nostr",
-    enabled: !ctx.isDeletePublishedNotePending,
-    action: ctx.onDeletePublishedNote,
-  };
-
-  let publishItems;
-  if (ctx.isPublishedNote) {
-    publishItems = [deletePublishedItem];
-  } else {
-    const publishAsSubmenu = await Submenu.new({
-      text: ctx.publishedAt ? "Update on Nostr" : "Publish As",
-      items: [
-        {
-          id: "editor-menu-publish-note",
-          text: "Note",
-          action: () => ctx.onPublishShortNote(),
-        },
-        {
-          id: "editor-menu-publish-article",
-          text: "Article",
-          action: () => ctx.onOpenPublishDialog(),
-        },
-      ],
-    });
-    publishItems = ctx.publishedAt
-      ? [publishAsSubmenu, deletePublishedItem]
-      : [publishAsSubmenu];
-  }
-
-  const menu = await Menu.new({
-    items: [
-      {
-        id: ctx.pinnedAt ? "editor-menu-unpin" : "editor-menu-pin",
-        text: ctx.pinnedAt ? "Unpin" : "Pin To Top",
-        action: () => ctx.onSetPinned(!ctx.pinnedAt),
-      },
-      readonlyMenuItem,
-      {
-        id: "editor-menu-duplicate",
-        text: "Duplicate",
-        action: ctx.onDuplicateNote,
-      },
-      {
-        id: "editor-menu-history",
-        text: "View History",
-        action: ctx.onOpenHistory,
-      },
-      ...publishItems,
-    ],
-  });
-
-  try {
-    await menu.popup(position);
-  } finally {
-    await menu.close();
-  }
-}
-
-function firstLineH1Title(markdown: string) {
-  const [firstLine = ""] = markdown.split("\n", 1);
-  const match = H1_TITLE_RE.exec(firstLine);
-  return match?.[1] ?? null;
-}
-
-function formatConflictHeadTimestamp(mtime: number) {
-  return format(mtime, "MMM d, yyyy 'at' h:mm a");
-}
-
-function useEditorScrollHeader(
-  noteId: string | null,
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>,
-) {
-  const [showHeaderBorder, setShowHeaderBorder] = useState(false);
-  const [showHeaderTitle, setShowHeaderTitle] = useState(false);
-  const noteScrollPositionsRef = useRef<Map<string, number>>(new Map());
-
-  const updateHeaderState = useCallback(
-    (scrollContainer: HTMLDivElement | null) => {
-      const scrolled = (scrollContainer?.scrollTop ?? 0) > 0;
-      setShowHeaderBorder(scrolled);
-
-      if (!scrollContainer || !noteId) {
-        setShowHeaderTitle(false);
-        return;
-      }
-
-      const firstLine = scrollContainer.querySelector(
-        ".cm-content > .cm-line:first-child",
-      ) as HTMLElement | null;
-
-      if (!firstLine) {
-        setShowHeaderTitle(scrolled);
-        return;
-      }
-
-      const scrollRect = scrollContainer.getBoundingClientRect();
-      const firstLineRect = firstLine.getBoundingClientRect();
-      setShowHeaderTitle(firstLineRect.bottom <= scrollRect.top);
-    },
-    [noteId],
-  );
-
-  useLayoutEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) {
-      updateHeaderState(null);
-      return;
-    }
-
-    const nextScrollTop = noteId
-      ? (noteScrollPositionsRef.current.get(noteId) ?? 0)
-      : 0;
-    scrollContainer.scrollTop = nextScrollTop;
-    setShowHeaderBorder(nextScrollTop > 0);
-
-    const frame = window.requestAnimationFrame(() => {
-      updateHeaderState(scrollContainer);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [noteId, scrollContainerRef, updateHeaderState]);
-
-  const scrollContainerCallbacks = useMemo(
-    () => ({
-      onScroll: (noteId: string | null, scrollTop: number) => {
-        if (noteId) {
-          noteScrollPositionsRef.current.set(noteId, scrollTop);
-        }
-      },
-      updateHeaderState,
-    }),
-    [updateHeaderState],
-  );
-
-  return { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks };
-}
-
-function useFindBar({
-  noteId,
-  searchQuery,
-  editorRef,
-  setFocusedPane,
-}: {
-  noteId: string | null;
-  searchQuery: string;
-  editorRef: React.RefObject<NoteEditorHandle | null>;
-  setFocusedPane: (pane: "sidebar" | "notes" | "editor") => void;
-}) {
-  const [findOpen, setFindOpen] = useState(false);
-  const [findMatchCount, setFindMatchCount] = useState(0);
-  const [findQuery, setFindQuery] = useState("");
-  const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
-  const [findScrollRevision, setFindScrollRevision] = useState(0);
-  const findInputRef = useRef<HTMLInputElement | null>(null);
-  const lastActiveNoteIdRef = useRef(noteId);
-  const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
-
-  const activeEditorSearch = resolveActiveEditorSearch({
-    editorQuery: hasEditorFindQuery ? findQuery : "",
-    noteQuery: searchQuery,
-  });
-  const editorSearchQuery = activeEditorSearch.query;
-  const isUsingEditorFindSearch = activeEditorSearch.source === "editor";
-  const activeEditorFindMatchCount = isUsingEditorFindSearch
-    ? findMatchCount
-    : 0;
-  const resolvedActiveFindMatchIndex =
-    activeEditorFindMatchCount === 0
-      ? 0
-      : Math.min(activeFindMatchIndex, activeEditorFindMatchCount - 1);
-
-  if (lastActiveNoteIdRef.current !== noteId) {
-    lastActiveNoteIdRef.current = noteId;
-    if (activeFindMatchIndex !== 0) {
-      setActiveFindMatchIndex(0);
-    }
-  }
-
-  const closeFind = useCallback(
-    (focusEditor: boolean) => {
-      setFocusedPane("editor");
-      setFindOpen(false);
-      setFindMatchCount(0);
-      setFindQuery("");
-      setActiveFindMatchIndex(0);
-      if (focusEditor) {
-        requestAnimationFrame(() => {
-          editorRef.current?.focus();
-        });
-      }
-    },
-    [setFocusedPane, editorRef],
-  );
-
-  const focusFindInput = useCallback(() => {
-    requestAnimationFrame(() => {
-      findInputRef.current?.focus();
-      findInputRef.current?.select();
-    });
-  }, []);
-
-  const openFind = useCallback(() => {
-    setFocusedPane("editor");
-    setFindOpen(true);
-
-    if (findOpen) {
-      focusFindInput();
-    }
-  }, [findOpen, focusFindInput, setFocusedPane]);
-
-  const stepActiveFindMatch = useCallback(
-    (direction: 1 | -1) => {
-      if (activeEditorFindMatchCount === 0) return;
-      setActiveFindMatchIndex((prev) => {
-        const current =
-          activeEditorFindMatchCount === 0
-            ? 0
-            : Math.min(prev, activeEditorFindMatchCount - 1);
-        const next = current + direction;
-        if (next < 0) return activeEditorFindMatchCount - 1;
-        if (next >= activeEditorFindMatchCount) return 0;
-        return next;
-      });
-      setFindScrollRevision((r) => r + 1);
-    },
-    [activeEditorFindMatchCount],
-  );
-
-  const ensureActiveFindMatch = useCallback(() => {
-    if (activeEditorFindMatchCount === 0 || findQuery.trim().length === 0) {
-      return;
-    }
-
-    setFindScrollRevision((value) => value + 1);
-  }, [activeEditorFindMatchCount, findQuery]);
-
-  useLayoutEffect(() => {
-    if (!findOpen || !noteId) {
-      return;
-    }
-
-    focusFindInput();
-  }, [findOpen, focusFindInput, noteId]);
-
-  const handleGlobalFindKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (event.defaultPrevented) {
-      return;
-    }
-
-    if (isNotesSearchShortcut(event)) {
-      return;
-    }
-
-    if (isEditorFindShortcut(event)) {
-      event.preventDefault();
-      openFind();
-    }
-    if (event.key === "Escape" && findOpen) {
-      event.preventDefault();
-      closeFind(true);
-    }
-  });
-
-  const handleOpenEditorFind = useEffectEvent((_event: Event) => {
-    openFind();
-  });
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleGlobalFindKeyDown);
-    window.addEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
-    return () => {
-      window.removeEventListener("keydown", handleGlobalFindKeyDown);
-      window.removeEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
-    };
-  }, []);
-
-  return {
-    findOpen,
-    findMatchCount: activeEditorFindMatchCount,
-    findQuery,
-    activeFindMatchIndex: resolvedActiveFindMatchIndex,
-    findScrollRevision,
-    findInputRef,
-    editorSearchQuery,
-    isUsingEditorFindSearch,
-    setFindMatchCount,
-    setFindQuery,
-    setActiveFindMatchIndex,
-    closeFind,
-    ensureActiveFindMatch,
-    stepActiveFindMatch,
-  };
-}
-
-function isEditableElement(element: EventTarget | null) {
-  if (!(element instanceof HTMLElement)) {
-    return false;
-  }
-
-  if (element.closest(".cm-editor")) {
-    return true;
-  }
-
-  const tagName = element.tagName;
-  return (
-    element.isContentEditable ||
-    tagName === "INPUT" ||
-    tagName === "SELECT" ||
-    tagName === "TEXTAREA"
-  );
-}
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function EditorPane({
@@ -892,81 +533,23 @@ export function EditorPane({
       ) : null}
 
       {findOpen && noteId && (
-        <div className="border-separator flex shrink-0 items-center gap-2 border-b px-3 pb-4">
-          <label className="border-input/60 focus-within:border-primary relative flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-1">
-            <Search className="text-muted-foreground size-3.5 shrink-0" />
-            <input
-              autoCapitalize="off"
-              ref={findInputRef}
-              className="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-none"
-              placeholder="Search…"
-              value={findQuery}
-              onChange={(e) => {
-                setFindQuery(e.target.value);
-                setActiveFindMatchIndex(0);
-              }}
-              onFocus={() => {
-                ensureActiveFindMatch();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  stepActiveFindMatch(e.shiftKey ? -1 : 1);
-                  return;
-                }
-
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  closeFind(true);
-                }
-              }}
-            />
-            <span className="text-muted-foreground min-w-12 text-right text-xs tabular-nums">
-              {findQuery &&
-                findMatchCount > 0 &&
-                `${activeFindMatchIndex + 1}/${findMatchCount}`}
-              {findQuery && findMatchCount === 0 && "0"}
-            </span>
-          </label>
-          <Button
-            className="text-muted-foreground"
-            disabled={findMatchCount === 0}
-            onClick={() => stepActiveFindMatch(-1)}
-            onMouseDown={(event) => event.preventDefault()}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <ChevronUp className="size-3.5" />
-          </Button>
-          <Button
-            className="text-muted-foreground"
-            disabled={findMatchCount === 0}
-            onClick={() => stepActiveFindMatch(1)}
-            onMouseDown={(event) => event.preventDefault()}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <ChevronDown className="size-3.5" />
-          </Button>
-          <Button
-            className="text-muted-foreground"
-            onClick={() => {
-              if (findQuery) {
-                setFindMatchCount(0);
-                setFindQuery("");
-                setActiveFindMatchIndex(0);
-                findInputRef.current?.focus();
-              } else {
-                closeFind(false);
-              }
-            }}
-            onMouseDown={(event) => event.preventDefault()}
-            size="icon-xs"
-            variant="ghost"
-          >
-            <X className="size-3.5" />
-          </Button>
-        </div>
+        <EditorFindBar
+          findQuery={findQuery}
+          findMatchCount={findMatchCount}
+          activeFindMatchIndex={activeFindMatchIndex}
+          findInputRef={findInputRef}
+          onQueryChange={setFindQuery}
+          onResetMatchIndex={() => setActiveFindMatchIndex(0)}
+          onFocus={ensureActiveFindMatch}
+          onStepMatch={stepActiveFindMatch}
+          onClose={closeFind}
+          onClear={() => {
+            setFindMatchCount(0);
+            setFindQuery("");
+            setActiveFindMatchIndex(0);
+            findInputRef.current?.focus();
+          }}
+        />
       )}
 
       <div className="relative min-h-0 flex-1">
@@ -1050,87 +633,15 @@ export function EditorPane({
       </AnimatePresence>
 
       {noteId && hasConflict ? (
-        <div className="border-separator bg-background/95 shrink-0 border-t backdrop-blur">
-          <div className="flex h-13 items-center justify-between gap-4 px-4">
-            <div className="min-w-0">
-              <p className="text-foreground truncate text-xs font-medium">
-                {viewedConflictSnapshot?.title ??
-                  (viewedConflictSnapshot?.op === "del"
-                    ? "Deleted snapshot"
-                    : "Conflicting snapshot")}
-              </p>
-              <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
-                <span>
-                  {viewedConflictSnapshot
-                    ? formatConflictHeadTimestamp(viewedConflictSnapshot.mtime)
-                    : "No previewable snapshot available"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                className="shadow-none"
-                disabled={isResolveConflictPending || readonly}
-                onClick={onResolveConflict}
-                size="sm"
-                type="button"
-                variant="default"
-              >
-                {isResolveConflictPending ? "Resolving…" : "Resolve"}
-              </Button>
-              <Button
-                className="text-muted-foreground"
-                disabled={viewedConflictSnapshotIndex <= 0}
-                onClick={() => {
-                  const previousHead =
-                    viewedConflictSnapshotIndex > 0
-                      ? viewableConflictSnapshots[
-                          viewedConflictSnapshotIndex - 1
-                        ]
-                      : null;
-                  if (previousHead) {
-                    onLoadConflictHead(
-                      previousHead.snapshotId,
-                      previousHead.markdown,
-                    );
-                  }
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <ChevronLeft className="size-[1.2rem]" />
-              </Button>
-              <Button
-                className="text-muted-foreground"
-                disabled={
-                  viewedConflictSnapshotIndex < 0 ||
-                  viewedConflictSnapshotIndex >=
-                    viewableConflictSnapshots.length - 1
-                }
-                onClick={() => {
-                  const nextHead =
-                    viewedConflictSnapshotIndex >= 0 &&
-                    viewedConflictSnapshotIndex <
-                      viewableConflictSnapshots.length - 1
-                      ? viewableConflictSnapshots[
-                          viewedConflictSnapshotIndex + 1
-                        ]
-                      : null;
-                  if (nextHead) {
-                    onLoadConflictHead(nextHead.snapshotId, nextHead.markdown);
-                  }
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <ChevronRight className="size-[1.2rem]" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConflictResolutionFooter
+          viewedConflictSnapshot={viewedConflictSnapshot ?? null}
+          viewedConflictSnapshotIndex={viewedConflictSnapshotIndex}
+          viewableConflictSnapshots={viewableConflictSnapshots}
+          isResolveConflictPending={isResolveConflictPending}
+          readonly={readonly}
+          onResolveConflict={onResolveConflict}
+          onLoadConflictHead={onLoadConflictHead}
+        />
       ) : null}
     </section>
   );
