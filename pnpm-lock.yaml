@@ -129,9 +129,6 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.2.4(react@19.2.4)
-      react-highlight-words:
-        specifier: ^0.21.0
-        version: 0.21.0(react@19.2.4)
       react-intersection-observer:
         specifier: ^10.0.3
         version: 10.0.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -8451,12 +8448,6 @@ packages:
         integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==,
       }
 
-  highlight-words-core@1.2.3:
-    resolution:
-      {
-        integrity: sha512-m1O9HW3/GNHxzSIXWw1wCNXXsgLlxrP0OI6+ycGUhiUHkikqW3OrwVHz+lxeNBe5yqLESdIcj8PowHQ2zLvUvQ==,
-      }
-
   hono@4.12.8:
     resolution:
       {
@@ -9609,12 +9600,6 @@ packages:
         integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==,
       }
     engines: { node: ">= 0.8" }
-
-  memoize-one@4.0.3:
-    resolution:
-      {
-        integrity: sha512-QmpUu4KqDmX0plH4u+tf0riMc1KHE1+lw95cMrLlXQAFOx/xnBtwhZ52XJxd9X2O6kwKBqX32kmhbhlobD0cuw==,
-      }
 
   merge-descriptors@2.0.0:
     resolution:
@@ -10792,14 +10777,6 @@ packages:
       }
     peerDependencies:
       react: ^19.2.4
-
-  react-highlight-words@0.21.0:
-    resolution:
-      {
-        integrity: sha512-SdWEeU9fIINArEPO1rO5OxPyuhdEKZQhHzZZP1ie6UeXQf+CjycT1kWaB+9bwGcVbR0NowuHK3RqgqNg6bgBDQ==,
-      }
-    peerDependencies:
-      react: ^0.14.0 || ^15.0.0 || ^16.0.0-0 || ^17.0.0-0 || ^18.0.0-0 || ^19.0.0-0
 
   react-intersection-observer@10.0.3:
     resolution:
@@ -18790,8 +18767,6 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  highlight-words-core@1.2.3: {}
-
   hono@4.12.8: {}
 
   hookable@6.1.0: {}
@@ -19505,8 +19480,6 @@ snapshots:
   mdn-data@2.27.1: {}
 
   media-typer@1.1.0: {}
-
-  memoize-one@4.0.3: {}
 
   merge-descriptors@2.0.0: {}
 
@@ -20437,12 +20410,6 @@ snapshots:
     dependencies:
       react: 19.2.4
       scheduler: 0.27.0
-
-  react-highlight-words@0.21.0(react@19.2.4):
-    dependencies:
-      highlight-words-core: 1.2.3
-      memoize-one: 4.0.3
-      react: 19.2.4
 
   react-intersection-observer@10.0.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
