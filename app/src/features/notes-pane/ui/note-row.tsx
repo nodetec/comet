@@ -9,15 +9,15 @@ import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,
   getNoteListNavigationDirectionForKey,
-} from "@/features/notes/lib/note-list-navigation";
+} from "@/features/notes-pane/lib/note-list-navigation";
 import { type NoteSummary } from "@/shared/api/types";
 
-import { HighlightedText } from "@/features/notes/ui/highlighted-text";
+import { HighlightedText } from "@/features/notes-pane/ui/highlighted-text";
 import {
   handleNoteRowPointerDown,
   noteCardPreview,
   noteRowClassName,
-} from "@/features/notes/ui/notes-pane-utils";
+} from "@/features/notes-pane/ui/notes-pane-utils";
 
 export type NoteRowProps = {
   focusedPane: "sidebar" | "notes" | "editor";

@@ -1,12 +1,12 @@
 import { type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { getNoteListNavigationDirectionForKey } from "@/features/notes/lib/note-list-navigation";
+import { getNoteListNavigationDirectionForKey } from "@/features/notes-pane/lib/note-list-navigation";
 import {
   getAdjacentSidebarNavigationItem,
   getSidebarCollapseAction,
   getSidebarExpandAction,
   type SidebarNavigationItem,
-} from "@/features/shell/lib/sidebar-navigation";
+} from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { dispatchFocusNotesPane } from "@/shared/lib/pane-navigation";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";

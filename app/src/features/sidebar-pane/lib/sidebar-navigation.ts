@@ -1,4 +1,4 @@
-import { type NoteListNavigationDirection } from "@/features/notes/lib/note-list-navigation";
+import { type NoteListNavigationDirection } from "@/features/notes-pane/lib/note-list-navigation";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 
 export type SidebarNavigationItem =

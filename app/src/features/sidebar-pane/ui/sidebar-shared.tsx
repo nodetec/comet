@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   SIDEBAR_CHILD_INDENT_PX,
   SIDEBAR_COLLAPSE_TRANSITION,
-} from "@/features/shell/ui/sidebar-utils";
+} from "@/features/sidebar-pane/ui/sidebar-utils";
 
 export function SidebarIndentedContent({
   indentLevel,

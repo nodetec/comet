@@ -18,12 +18,12 @@ import { type NoteFilter } from "@/shared/api/types";
 import {
   SIDEBAR_ITEM_ICON_CLASS_NAME,
   sidebarItemClasses,
-} from "@/features/shell/ui/sidebar-utils";
+} from "@/features/sidebar-pane/ui/sidebar-utils";
 import {
   SidebarCollapse,
   SidebarIndentedContent,
   SidebarRowContent,
-} from "@/features/shell/ui/sidebar-shared";
+} from "@/features/sidebar-pane/ui/sidebar-shared";
 
 function isSidebarFilterActive(
   filter: NoteFilter,

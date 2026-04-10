@@ -15,7 +15,7 @@ import { searchWordsFromQuery } from "@/shared/lib/search";
 import {
   type NoteListNavigationDirection,
   getAdjacentNoteId,
-} from "@/features/notes/lib/note-list-navigation";
+} from "@/features/notes-pane/lib/note-list-navigation";
 import { useUIStore } from "@/features/settings/store/use-ui-store";
 import { useShellStore } from "@/features/shell/store/use-shell-store";
 import {
@@ -37,8 +37,8 @@ import {
   notesHeading,
   showNoteContextMenu,
   showNoteSortMenu,
-} from "@/features/notes/ui/notes-pane-utils";
-import { NoteRow } from "@/features/notes/ui/note-row";
+} from "@/features/notes-pane/ui/notes-pane-utils";
+import { NoteRow } from "@/features/notes-pane/ui/note-row";
 
 type NotesPaneProps = {
   activeTagPath: string | null;

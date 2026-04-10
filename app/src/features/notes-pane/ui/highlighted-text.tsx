@@ -4,7 +4,7 @@ import {
   HIGHLIGHT_CLASS_NAME,
   MAX_HIGHLIGHT_MATCHES_PER_BLOCK,
   findNextHighlightMatch,
-} from "@/features/notes/ui/notes-pane-utils";
+} from "@/features/notes-pane/ui/notes-pane-utils";
 
 export const HighlightedText = memo(function HighlightedText({
   text,

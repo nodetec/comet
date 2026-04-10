@@ -11,7 +11,7 @@ import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import {
   flattenVisibleSidebarNavigationItems,
   getActiveSidebarNavigationItemId,
-} from "@/features/shell/lib/sidebar-navigation";
+} from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { SyncDialog } from "@/features/sync";
@@ -25,18 +25,18 @@ import {
 import {
   focusSidebarRow,
   ancestorSidebarTagPaths,
-} from "@/features/shell/ui/sidebar-utils";
-import { TagTree } from "@/features/shell/ui/sidebar-tag-tree";
-import { NotesSection } from "@/features/shell/ui/sidebar-notes-section";
-import { RenameTagDialog } from "@/features/shell/ui/sidebar-rename-dialog";
+} from "@/features/sidebar-pane/ui/sidebar-utils";
+import { TagTree } from "@/features/sidebar-pane/ui/sidebar-tag-tree";
+import { NotesSection } from "@/features/sidebar-pane/ui/sidebar-notes-section";
+import { RenameTagDialog } from "@/features/sidebar-pane/ui/sidebar-rename-dialog";
 import {
   renameErrorMessage,
   resetRenameDialog,
   submitRenameDialog,
   useRenameInputFocus,
-} from "@/features/shell/ui/sidebar-rename-utils";
-import { useSyncState } from "@/features/shell/hooks/use-sync-state";
-import { useSidebarKeyboardNav } from "@/features/shell/hooks/use-sidebar-keyboard-nav";
+} from "@/features/sidebar-pane/ui/sidebar-rename-utils";
+import { useSyncState } from "@/features/sidebar-pane/hooks/use-sync-state";
+import { useSidebarKeyboardNav } from "@/features/sidebar-pane/hooks/use-sidebar-keyboard-nav";
 
 // --- Local hooks ---
 

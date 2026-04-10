@@ -10,12 +10,12 @@ import {
   SIDEBAR_ITEM_STATUS_ICON_CLASS_NAME,
   SIDEBAR_TAG_ICON_CLASS_NAME,
   sidebarItemClasses,
-} from "@/features/shell/ui/sidebar-utils";
+} from "@/features/sidebar-pane/ui/sidebar-utils";
 import {
   SidebarCollapse,
   SidebarIndentedContent,
   SidebarRowContent,
-} from "@/features/shell/ui/sidebar-shared";
+} from "@/features/sidebar-pane/ui/sidebar-shared";
 
 async function showTagContextMenu(
   event: MouseEvent<HTMLDivElement | HTMLButtonElement>,

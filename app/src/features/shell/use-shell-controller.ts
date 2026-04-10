@@ -19,8 +19,8 @@ import {
 } from "@/shared/api/types";
 import { usePublishState } from "@/features/publishing";
 
-import { useNoteQueries } from "@/features/notes/hooks/use-note-queries";
-import { useNoteMutations } from "@/features/notes/hooks/use-note-mutations";
+import { useNoteQueries } from "@/features/notes-pane/hooks/use-note-queries";
+import { useNoteMutations } from "@/features/notes-pane/hooks/use-note-mutations";
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";

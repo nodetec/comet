@@ -13,7 +13,7 @@ import {
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
-import { OPEN_EDITOR_FIND_EVENT } from "@/features/shell/ui/editor-pane-utils";
+import { OPEN_EDITOR_FIND_EVENT } from "@/features/editor-pane/lib/editor-pane-utils";
 
 export function useFindBar({
   noteId,

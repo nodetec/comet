@@ -40,11 +40,11 @@ import {
   buildEditorMenu,
   firstLineH1Title,
   isEditableElement,
-} from "@/features/shell/ui/editor-pane-utils";
-import { useEditorScrollHeader } from "@/features/shell/hooks/use-editor-scroll-header";
-import { useFindBar } from "@/features/shell/hooks/use-find-bar";
-import { EditorFindBar } from "@/features/shell/ui/editor-find-bar";
-import { ConflictResolutionFooter } from "@/features/shell/ui/conflict-resolution-footer";
+} from "@/features/editor-pane/lib/editor-pane-utils";
+import { useEditorScrollHeader } from "@/features/editor-pane/hooks/use-editor-scroll-header";
+import { useFindBar } from "@/features/editor-pane/hooks/use-find-bar";
+import { EditorFindBar } from "@/features/editor-pane/ui/editor-find-bar";
+import { ConflictResolutionFooter } from "@/features/editor-pane/ui/conflict-resolution-footer";
 
 type EditorPaneProps = {
   availableTagPaths: string[];

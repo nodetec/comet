@@ -6,7 +6,7 @@ import {
   getAdjacentSidebarNavigationItem,
   getSidebarCollapseAction,
   getSidebarExpandAction,
-} from "@/features/shell/lib/sidebar-navigation";
+} from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { type ContextualTagNode } from "@/shared/api/types";
 
 function createTagNode(
