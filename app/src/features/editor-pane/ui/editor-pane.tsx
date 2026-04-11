@@ -1,9 +1,13 @@
 import {
+  type CSSProperties,
   useEffect,
   useEffectEvent,
   useRef,
   useState,
   type MouseEvent,
+  type ReactNode,
+  type RefObject,
+  type UIEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -196,60 +200,6 @@ export function EditorPane({
   };
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
   const lastHandledFocusEditorRequestIdRef = useRef(0);
-  const editorContent = (() => {
-    if (noteId === null) {
-      return null;
-    }
-
-    if (isViewingDeletedConflictSnapshot) {
-      return (
-        <div className="flex min-h-full items-center justify-center px-6">
-          <div className="max-w-sm text-center">
-            <p className="text-foreground text-sm font-medium">
-              This version deletes the note
-            </p>
-            <p className="text-muted-foreground mt-2 text-sm">
-              Use the conflict actions below to keep the deletion, restore the
-              note, or merge a new version.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <NoteEditor
-        availableTagPaths={availableTagPaths}
-        autoFocus={autoFocusEditor}
-        loadKey={editorLoadKey ?? noteId}
-        markdown={markdown}
-        noteId={noteId}
-        onChange={onChange}
-        onAutoFocusHandled={onAutoFocusEditorHandled}
-        onEditorFocusChange={(focused) => {
-          if (focused) {
-            setFocusedPane("editor");
-          }
-        }}
-        onSearchMatchCountChange={
-          isUsingEditorFindSearch ? setFindMatchCount : undefined
-        }
-        readOnly={isReadOnly}
-        ref={editorRef}
-        searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
-        searchActiveMatchIndex={
-          isUsingEditorFindSearch ? activeFindMatchIndex : null
-        }
-        searchQuery={editorSearchQuery}
-        searchScrollRevision={
-          isUsingEditorFindSearch ? findScrollRevision : undefined
-        }
-        spellCheck={editorSpellCheck}
-        toolbarContainer={toolbarContainer}
-        vimMode={editorVimMode}
-      />
-    );
-  })();
 
   const openEditorMenu = async (position: LogicalPosition) => {
     if (!noteId) return;
@@ -360,192 +310,207 @@ export function EditorPane({
     handleFocusEditor(focusEditorRequest.scrollTo);
   }, [focusEditorRequest, handleFocusEditor]);
 
-  const backlinksButton =
-    backlinks.length > 0 ? (
-      <PopoverRoot>
-        <PopoverTrigger
-          render={
-            <Button
-              className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-              size="icon-sm"
-              variant="ghost"
-            />
-          }
-        >
-          <Link2 className="size-[1.2rem]" />
-        </PopoverTrigger>
-        <PopoverPopup>
-          <div className="p-3">
-            <p className="text-muted-foreground mb-2 text-xs font-medium tracking-[0.08em] uppercase">
-              Linked Mentions
-            </p>
-            <div className="max-h-72 space-y-1 overflow-y-auto">
-              {backlinks.map((backlink) => (
-                <button
-                  key={`${backlink.sourceNoteId}:${backlink.location}`}
-                  className="hover:bg-accent block w-full rounded-md px-2.5 py-1.5 text-left transition-colors"
-                  onClick={() => onSelectLinkedNote(backlink.sourceNoteId)}
-                  type="button"
-                >
-                  <p className="truncate text-sm font-medium">
-                    {backlink.sourceTitle || "Untitled"}
-                  </p>
-                  {backlink.sourcePreview ? (
-                    <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
-                      {backlink.sourcePreview}
-                    </p>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        </PopoverPopup>
-      </PopoverRoot>
+  const headerActions =
+    noteId !== null ? (
+      <EditorPaneHeaderActions
+        backlinks={backlinks}
+        hasConflict={hasConflict}
+        isPublishedNote={isPublishedNote}
+        isReadOnly={isReadOnly}
+        isViewingDeletedConflictSnapshot={isViewingDeletedConflictSnapshot}
+        modifiedAt={modifiedAt}
+        onOpenMenu={handleOpenMenu}
+        onOpenPublishDialog={onOpenPublishDialog}
+        onSelectLinkedNote={onSelectLinkedNote}
+        onToggleToolbar={() => setShowToolbar(!showToolbar)}
+        publishedAt={publishedAt}
+        showToolbar={showToolbar}
+      />
     ) : null;
 
-  const menuButton = (
-    <Button
-      className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-      onClick={(event: MouseEvent<HTMLButtonElement>) =>
-        void handleOpenMenu(event)
-      }
-      size="icon-sm"
-      variant="ghost"
-    >
-      <Ellipsis className="size-[1.2rem]" />
-    </Button>
-  );
+  const banner =
+    noteId !== null && hasConflict ? <EditorPaneConflictBanner /> : null;
 
-  let statusContent: React.ReactNode = null;
-  if (isPublishedNote) {
-    statusContent = (
-      <>
-        <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
-          Published
-        </span>
-        <Tooltip>
-          <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
-            <Lock className="size-[1.2rem]" />
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Short notes are immutable on Nostr and can&apos;t be updated.
-          </TooltipContent>
-        </Tooltip>
-      </>
-    );
-  } else if (publishedAt != null) {
-    statusContent =
-      modifiedAt <= publishedAt ? (
-        <span className="text-muted-foreground pointer-events-auto text-xs">
-          Published
-        </span>
-      ) : (
-        <button
-          className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
-          onClick={onOpenPublishDialog}
-          type="button"
-        >
-          Update
-        </button>
-      );
+  const findBar =
+    findOpen && noteId ? (
+      <EditorFindBar
+        findQuery={findQuery}
+        findMatchCount={findMatchCount}
+        activeFindMatchIndex={activeFindMatchIndex}
+        findInputRef={findInputRef}
+        onQueryChange={setFindQuery}
+        onResetMatchIndex={() => setActiveFindMatchIndex(0)}
+        onFocus={ensureActiveFindMatch}
+        onStepMatch={stepActiveFindMatch}
+        onClose={closeFind}
+        onClear={() => {
+          setFindMatchCount(0);
+          setFindQuery("");
+          setActiveFindMatchIndex(0);
+          findInputRef.current?.focus();
+        }}
+      />
+    ) : null;
+
+  const footer =
+    noteId !== null && hasConflict ? (
+      <ConflictResolutionFooter
+        viewedConflictSnapshot={viewedConflictSnapshot ?? null}
+        viewedConflictSnapshotIndex={viewedConflictSnapshotIndex}
+        viewableConflictSnapshots={viewableConflictSnapshots}
+        isResolveConflictPending={isResolveConflictPending}
+        readonly={readonly}
+        onResolveConflict={onResolveConflict}
+        onLoadConflictHead={onLoadConflictHead}
+      />
+    ) : null;
+
+  const frameProps = {
+    banner,
+    editorFontSize,
+    editorSpellCheck,
+    findBar,
+    findOpen,
+    headerActions,
+    isReadOnly,
+    noteTitle,
+    notesPanelVisible,
+    onEditorSurfaceMouseDown: handleEditorSurfaceMouseDown,
+    onScrollContainerScroll: (event: UIEvent<HTMLDivElement>) => {
+      scrollContainerCallbacks.onScroll(noteId, event.currentTarget.scrollTop);
+      scrollContainerCallbacks.updateHeaderState(event.currentTarget);
+    },
+    scrollContainerRef,
+    showHeaderBorder,
+    showHeaderTitle,
+    showToolbar,
+    toolbarContainerRef,
+  } satisfies Omit<EditorPaneFrameProps, "body" | "footer">;
+
+  if (noteId === null) {
+    return <EditorPaneFrame {...frameProps} body={<EditorPaneEmptyState />} />;
   }
 
-  let toolbarSlot: React.ReactNode = null;
-  if (isReadOnly) {
-    let readOnlyTooltip = "Read-only";
-    if (isViewingDeletedConflictSnapshot) {
-      readOnlyTooltip = "Choose or merge a note version to edit";
-    } else if (hasConflict) {
-      readOnlyTooltip = "Resolve the conflict to edit";
-    }
-
-    toolbarSlot = (
-      <Tooltip>
-        <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
-          <span aria-label={readOnlyTooltip} title={readOnlyTooltip}>
-            <PencilOff className="size-[1.2rem]" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">{readOnlyTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  } else if (!isReadOnly) {
-    toolbarSlot = (
-      <Button
-        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
-        onClick={() => setShowToolbar(!showToolbar)}
-        size="icon-sm"
-        title={showToolbar ? "Hide toolbar" : "Show toolbar"}
-        variant="ghost"
-      >
-        {showToolbar ? (
-          <PanelBottomClose className="size-[1.2rem]" />
-        ) : (
-          <PanelBottomOpen className="size-[1.2rem]" />
-        )}
-      </Button>
+  if (isViewingDeletedConflictSnapshot) {
+    return (
+      <EditorPaneFrame
+        {...frameProps}
+        body={<EditorPaneDeletedConflictState />}
+        footer={footer}
+      />
     );
   }
 
   return (
+    <EditorPaneFrame
+      {...frameProps}
+      body={
+        <div className="relative flex min-h-full w-full flex-col">
+          <NoteEditor
+            availableTagPaths={availableTagPaths}
+            autoFocus={autoFocusEditor}
+            loadKey={editorLoadKey ?? noteId}
+            markdown={markdown}
+            noteId={noteId}
+            onChange={onChange}
+            onAutoFocusHandled={onAutoFocusEditorHandled}
+            onEditorFocusChange={(focused) => {
+              if (focused) {
+                setFocusedPane("editor");
+              }
+            }}
+            onSearchMatchCountChange={
+              isUsingEditorFindSearch ? setFindMatchCount : undefined
+            }
+            readOnly={isReadOnly}
+            ref={editorRef}
+            searchHighlightAllMatchesYellow={!isUsingEditorFindSearch}
+            searchActiveMatchIndex={
+              isUsingEditorFindSearch ? activeFindMatchIndex : null
+            }
+            searchQuery={editorSearchQuery}
+            searchScrollRevision={
+              isUsingEditorFindSearch ? findScrollRevision : undefined
+            }
+            spellCheck={editorSpellCheck}
+            toolbarContainer={toolbarContainer}
+            vimMode={editorVimMode}
+          />
+        </div>
+      }
+      footer={footer}
+    />
+  );
+}
+
+type EditorPaneFrameProps = {
+  banner?: ReactNode;
+  body: ReactNode;
+  editorFontSize: number;
+  editorSpellCheck: boolean;
+  findBar?: ReactNode;
+  findOpen: boolean;
+  footer?: ReactNode;
+  headerActions?: ReactNode;
+  isReadOnly: boolean;
+  noteTitle: string | null;
+  notesPanelVisible: boolean;
+  onEditorSurfaceMouseDown(event: MouseEvent<HTMLDivElement>): void;
+  onScrollContainerScroll(event: UIEvent<HTMLDivElement>): void;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
+  showHeaderBorder: boolean;
+  showHeaderTitle: boolean;
+  showToolbar: boolean;
+  toolbarContainerRef(node: HTMLDivElement | null): void;
+};
+
+type EditorPaneHeaderActionsProps = {
+  backlinks: NoteBacklink[];
+  hasConflict: boolean;
+  isPublishedNote: boolean;
+  isReadOnly: boolean;
+  isViewingDeletedConflictSnapshot: boolean;
+  modifiedAt: number;
+  onOpenMenu(event: MouseEvent<HTMLButtonElement>): Promise<void>;
+  onOpenPublishDialog(): void;
+  onSelectLinkedNote(noteId: string): void;
+  onToggleToolbar(): void;
+  publishedAt: number | null;
+  showToolbar: boolean;
+};
+
+function EditorPaneFrame({
+  banner,
+  body,
+  editorFontSize,
+  editorSpellCheck,
+  findBar,
+  findOpen,
+  footer,
+  headerActions,
+  isReadOnly,
+  noteTitle,
+  notesPanelVisible,
+  onEditorSurfaceMouseDown,
+  onScrollContainerScroll,
+  scrollContainerRef,
+  showHeaderBorder,
+  showHeaderTitle,
+  showToolbar,
+  toolbarContainerRef,
+}: EditorPaneFrameProps) {
+  return (
     <section className="bg-background relative flex h-full min-h-0 flex-col">
-      <header
-        className={cn(
-          "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
-          !notesPanelVisible && "pl-24",
-          showHeaderBorder && !findOpen && "border-separator border-b",
-        )}
-      >
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              "truncate font-semibold transition-opacity duration-300",
-              showHeaderTitle && noteTitle ? "opacity-100" : "opacity-0",
-            )}
-          >
-            {noteTitle ?? ""}
-          </p>
-        </div>
-        {noteId ? (
-          <div className="pointer-events-none relative z-40 flex items-center gap-1">
-            {statusContent}
-            {toolbarSlot}
-            {backlinksButton}
-            {menuButton}
-          </div>
-        ) : null}
-      </header>
-
-      {noteId && hasConflict ? (
-        <div className="border-primary/20 bg-primary/10 sticky top-0 z-30 border-b px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
-              Conflicting note versions detected
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {findOpen && noteId && (
-        <EditorFindBar
-          findQuery={findQuery}
-          findMatchCount={findMatchCount}
-          activeFindMatchIndex={activeFindMatchIndex}
-          findInputRef={findInputRef}
-          onQueryChange={setFindQuery}
-          onResetMatchIndex={() => setActiveFindMatchIndex(0)}
-          onFocus={ensureActiveFindMatch}
-          onStepMatch={stepActiveFindMatch}
-          onClose={closeFind}
-          onClear={() => {
-            setFindMatchCount(0);
-            setFindQuery("");
-            setActiveFindMatchIndex(0);
-            findInputRef.current?.focus();
-          }}
-        />
-      )}
-
+      <EditorPaneHeader
+        actions={headerActions}
+        findOpen={findOpen}
+        noteTitle={noteTitle}
+        notesPanelVisible={notesPanelVisible}
+        showHeaderBorder={showHeaderBorder}
+        showHeaderTitle={showHeaderTitle}
+      />
+      {banner}
+      {findBar}
       <div className="relative min-h-0 flex-1">
         <div
           className={cn(
@@ -554,7 +519,7 @@ export function EditorPane({
             findOpen && "pt-2",
           )}
           data-editor-scroll-container
-          onMouseDown={handleEditorSurfaceMouseDown}
+          onMouseDown={onEditorSurfaceMouseDown}
           onMouseUp={(event) => {
             // Force WebKit to re-evaluate the cursor after drag-select.
             // In fullscreen, the OS cursor state can get stuck when the
@@ -565,40 +530,21 @@ export function EditorPane({
               el.style.cursor = "";
             });
           }}
-          onScroll={(event) => {
-            scrollContainerCallbacks.onScroll(
-              noteId,
-              event.currentTarget.scrollTop,
-            );
-            scrollContainerCallbacks.updateHeaderState(event.currentTarget);
-          }}
+          onScroll={onScrollContainerScroll}
           ref={scrollContainerRef}
           style={
             {
               "--editor-font-size": `${editorFontSize}px`,
-            } as React.CSSProperties
+            } as CSSProperties
           }
           spellCheck={editorSpellCheck}
         >
-          {noteId ? (
-            <div className="relative flex min-h-full w-full flex-col">
-              {editorContent}
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <img
-                src={cometLogo}
-                alt=""
-                className="size-32 opacity-50"
-                draggable={false}
-              />
-            </div>
-          )}
+          {body}
         </div>
       </div>
 
       <AnimatePresence initial={false}>
-        {noteId && !isReadOnly && showToolbar ? (
+        {headerActions && !isReadOnly && showToolbar ? (
           <motion.div
             animate={{
               opacity: 1,
@@ -626,17 +572,293 @@ export function EditorPane({
         ) : null}
       </AnimatePresence>
 
-      {noteId && hasConflict ? (
-        <ConflictResolutionFooter
-          viewedConflictSnapshot={viewedConflictSnapshot ?? null}
-          viewedConflictSnapshotIndex={viewedConflictSnapshotIndex}
-          viewableConflictSnapshots={viewableConflictSnapshots}
-          isResolveConflictPending={isResolveConflictPending}
-          readonly={readonly}
-          onResolveConflict={onResolveConflict}
-          onLoadConflictHead={onLoadConflictHead}
-        />
-      ) : null}
+      {footer}
     </section>
+  );
+}
+
+function EditorPaneHeader({
+  actions,
+  findOpen,
+  noteTitle,
+  notesPanelVisible,
+  showHeaderBorder,
+  showHeaderTitle,
+}: {
+  actions?: ReactNode;
+  findOpen: boolean;
+  noteTitle: string | null;
+  notesPanelVisible: boolean;
+  showHeaderBorder: boolean;
+  showHeaderTitle: boolean;
+}) {
+  return (
+    <header
+      className={cn(
+        "flex h-13 shrink-0 items-center justify-between gap-3 px-4",
+        !notesPanelVisible && "pl-24",
+        showHeaderBorder && !findOpen && "border-separator border-b",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            "truncate font-semibold transition-opacity duration-300",
+            showHeaderTitle && noteTitle ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {noteTitle ?? ""}
+        </p>
+      </div>
+      {actions ? (
+        <div className="pointer-events-none relative z-40 flex items-center gap-1">
+          {actions}
+        </div>
+      ) : null}
+    </header>
+  );
+}
+
+function EditorPaneHeaderActions({
+  backlinks,
+  hasConflict,
+  isPublishedNote,
+  isReadOnly,
+  isViewingDeletedConflictSnapshot,
+  modifiedAt,
+  onOpenMenu,
+  onOpenPublishDialog,
+  onSelectLinkedNote,
+  onToggleToolbar,
+  publishedAt,
+  showToolbar,
+}: EditorPaneHeaderActionsProps) {
+  return (
+    <>
+      <EditorPaneStatus
+        isPublishedNote={isPublishedNote}
+        modifiedAt={modifiedAt}
+        onOpenPublishDialog={onOpenPublishDialog}
+        publishedAt={publishedAt}
+      />
+      <EditorPaneToolbarAction
+        hasConflict={hasConflict}
+        isReadOnly={isReadOnly}
+        isViewingDeletedConflictSnapshot={isViewingDeletedConflictSnapshot}
+        onToggleToolbar={onToggleToolbar}
+        showToolbar={showToolbar}
+      />
+      <EditorPaneBacklinksButton
+        backlinks={backlinks}
+        onSelectLinkedNote={onSelectLinkedNote}
+      />
+      <Button
+        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+        onClick={(event) => {
+          void onOpenMenu(event);
+        }}
+        size="icon-sm"
+        variant="ghost"
+      >
+        <Ellipsis className="size-[1.2rem]" />
+      </Button>
+    </>
+  );
+}
+
+function EditorPaneStatus({
+  isPublishedNote,
+  modifiedAt,
+  onOpenPublishDialog,
+  publishedAt,
+}: {
+  isPublishedNote: boolean;
+  modifiedAt: number;
+  onOpenPublishDialog(): void;
+  publishedAt: number | null;
+}) {
+  if (isPublishedNote) {
+    return (
+      <>
+        <span className="text-muted-foreground pointer-events-auto mr-1 text-xs">
+          Published
+        </span>
+        <Tooltip>
+          <TooltipTrigger className="text-muted-foreground/60 pointer-events-auto cursor-default">
+            <Lock className="size-[1.2rem]" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            Short notes are immutable on Nostr and can&apos;t be updated.
+          </TooltipContent>
+        </Tooltip>
+      </>
+    );
+  }
+
+  if (publishedAt == null) {
+    return null;
+  }
+
+  if (modifiedAt <= publishedAt) {
+    return (
+      <span className="text-muted-foreground pointer-events-auto text-xs">
+        Published
+      </span>
+    );
+  }
+
+  return (
+    <button
+      className="text-muted-foreground hover:text-foreground pointer-events-auto cursor-default text-xs transition-colors"
+      onClick={onOpenPublishDialog}
+      type="button"
+    >
+      Update
+    </button>
+  );
+}
+
+function EditorPaneToolbarAction({
+  hasConflict,
+  isReadOnly,
+  isViewingDeletedConflictSnapshot,
+  onToggleToolbar,
+  showToolbar,
+}: {
+  hasConflict: boolean;
+  isReadOnly: boolean;
+  isViewingDeletedConflictSnapshot: boolean;
+  onToggleToolbar(): void;
+  showToolbar: boolean;
+}) {
+  if (isReadOnly) {
+    let readOnlyTooltip = "Read-only";
+    if (isViewingDeletedConflictSnapshot) {
+      readOnlyTooltip = "Choose or merge a note version to edit";
+    } else if (hasConflict) {
+      readOnlyTooltip = "Resolve the conflict to edit";
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger className="text-muted-foreground pointer-events-auto flex size-7 items-center justify-center rounded-[min(var(--radius-md),12px)]">
+          <span aria-label={readOnlyTooltip} title={readOnlyTooltip}>
+            <PencilOff className="size-[1.2rem]" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{readOnlyTooltip}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+      onClick={onToggleToolbar}
+      size="icon-sm"
+      title={showToolbar ? "Hide toolbar" : "Show toolbar"}
+      variant="ghost"
+    >
+      {showToolbar ? (
+        <PanelBottomClose className="size-[1.2rem]" />
+      ) : (
+        <PanelBottomOpen className="size-[1.2rem]" />
+      )}
+    </Button>
+  );
+}
+
+function EditorPaneBacklinksButton({
+  backlinks,
+  onSelectLinkedNote,
+}: {
+  backlinks: NoteBacklink[];
+  onSelectLinkedNote(noteId: string): void;
+}) {
+  if (backlinks.length === 0) {
+    return null;
+  }
+
+  return (
+    <PopoverRoot>
+      <PopoverTrigger
+        render={
+          <Button
+            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground pointer-events-auto"
+            size="icon-sm"
+            variant="ghost"
+          />
+        }
+      >
+        <Link2 className="size-[1.2rem]" />
+      </PopoverTrigger>
+      <PopoverPopup>
+        <div className="p-3">
+          <p className="text-muted-foreground mb-2 text-xs font-medium tracking-[0.08em] uppercase">
+            Linked Mentions
+          </p>
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {backlinks.map((backlink) => (
+              <button
+                key={`${backlink.sourceNoteId}:${backlink.location}`}
+                className="hover:bg-accent block w-full rounded-md px-2.5 py-1.5 text-left transition-colors"
+                onClick={() => onSelectLinkedNote(backlink.sourceNoteId)}
+                type="button"
+              >
+                <p className="truncate text-sm font-medium">
+                  {backlink.sourceTitle || "Untitled"}
+                </p>
+                {backlink.sourcePreview ? (
+                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                    {backlink.sourcePreview}
+                  </p>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      </PopoverPopup>
+    </PopoverRoot>
+  );
+}
+
+function EditorPaneConflictBanner() {
+  return (
+    <div className="border-primary/20 bg-primary/10 sticky top-0 z-30 border-b px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          Conflicting note versions detected
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function EditorPaneDeletedConflictState() {
+  return (
+    <div className="flex min-h-full items-center justify-center px-6">
+      <div className="max-w-sm text-center">
+        <p className="text-foreground text-sm font-medium">
+          This version deletes the note
+        </p>
+        <p className="text-muted-foreground mt-2 text-sm">
+          Use the conflict actions below to keep the deletion, restore the note,
+          or merge a new version.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function EditorPaneEmptyState() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <img
+        src={cometLogo}
+        alt=""
+        className="size-32 opacity-50"
+        draggable={false}
+      />
+    </div>
   );
 }
