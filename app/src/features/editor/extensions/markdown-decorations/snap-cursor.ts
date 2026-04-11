@@ -61,7 +61,8 @@ export function getSnappedPointerSelection(
       const isDrag = range.anchor !== range.head;
       const anchor =
         getSnappedCursorPosition(state, range.anchor, isDrag) ?? range.anchor;
-      const head = getSnappedCursorPosition(state, range.head) ?? range.head;
+      const head =
+        getSnappedCursorPosition(state, range.head, isDrag) ?? range.head;
 
       if (anchor !== range.anchor || head !== range.head) {
         changed = true;

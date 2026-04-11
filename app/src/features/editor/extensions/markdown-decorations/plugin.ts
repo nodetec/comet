@@ -44,6 +44,15 @@ import { type SearchMatch, collectSearchMatches } from "@/shared/lib/search";
 
 const VISIBLE_RANGE_MARGIN = 1000;
 
+const ATX_HEADING_NAMES = new Set([
+  "ATXHeading1",
+  "ATXHeading2",
+  "ATXHeading3",
+  "ATXHeading4",
+  "ATXHeading5",
+  "ATXHeading6",
+]);
+
 const NODE_HANDLERS: Record<string, NodeHandler> = {
   ATXHeading1: handleHeading,
   ATXHeading2: handleHeading,
@@ -215,11 +224,11 @@ function buildDecorations(
 
 /**
  * After a mouse-drag with frozen decorations, the selection was mapped
- * using the collapsed layout. Hidden syntax (the `[` of `[text](url)`,
- * `[[`/`]]` of wikilinks) had zero visual width so the selection
- * boundary landed just inside the visible content. Expand each range
- * to include the hidden syntax at its edges before the deferred
- * decoration rebuild reveals them.
+ * using the collapsed layout. Hidden syntax (heading `# ` prefixes,
+ * link `[`/`](url)`, wikilink `[[`/`]]`) had zero visual width so the
+ * selection boundary landed just inside the visible content. Expand
+ * each range to include the hidden syntax at its edges before the
+ * deferred decoration rebuild reveals them.
  */
 function expandSelectionOverHiddenSyntax(
   view: EditorView,
@@ -239,6 +248,17 @@ function expandSelectionOverHiddenSyntax(
       n;
       n = n.parent
     ) {
+      if (ATX_HEADING_NAMES.has(n.name)) {
+        const mark = n.getChild("HeaderMark");
+        if (mark) {
+          const contentStart = Math.min(mark.to + 1, n.to);
+          if (from > n.from && from <= contentStart) {
+            from = n.from;
+            changed = true;
+          }
+        }
+        break;
+      }
       if (n.name === "Link") {
         const marks = n.getChildren("LinkMark");
         if (marks.length >= 2 && from > n.from && from <= marks[0].to) {
