@@ -1106,6 +1106,15 @@ function addMarkerDecorationsFromModel(
 ) {
   const isBullet = BULLET_MARKERS.has(item.marker);
 
+  // Hide leading indent spaces (the raw whitespace before the marker).
+  // CSS paddingLeft handles the visual indent; the source spaces would
+  // double-count it and create a growing gap at deeper nesting levels.
+  if (item.markerFrom > item.lineFrom) {
+    decorationRanges.push(
+      Decoration.replace({}).range(item.lineFrom, item.markerFrom),
+    );
+  }
+
   if (isBullet && item.task) {
     const { checked } = item.task;
     const taskMarkerDecoration = Decoration.replace({

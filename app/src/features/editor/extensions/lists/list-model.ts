@@ -8,7 +8,6 @@ import {
   BULLET_MARKERS,
   LIST_CHILD_BLOCK_OFFSET,
   LIST_INDENT_STEP,
-  LIST_SOURCE_INDENT_CHAR_WIDTH,
   ORDERED_INDENT,
   TASK_MARKERS,
 } from "@/features/editor/extensions/lists/list-types";
@@ -146,8 +145,10 @@ function buildListItems(state: EditorState): ListItemInfo[] {
         : ORDERED_INDENT;
       const continuationPrefix = markerPrefix + " ".repeat(continuationIndent);
 
-      // Indent style for child blocks.
-      const indentStyle = `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET} + ${sourceIndentChars} * ${LIST_SOURCE_INDENT_CHAR_WIDTH})`;
+      // Indent style for child blocks. Must match the marker line's text
+      // start: indentLevel * step + marker width (the textIndent pulls
+      // the marker left, so text starts at paddingLeft).
+      const indentStyle = `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET})`;
 
       items.push({
         node,
