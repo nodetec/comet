@@ -28,6 +28,7 @@ import {
   type ThemeSummary,
   type WikiLinkResolutionInput,
   type SetHideSubtagNotesInput,
+  type SetTagIconInput,
   type SetTagPinnedInput,
   type SecretStorageStatus,
   type TagIndexDiagnostics,
@@ -147,6 +148,10 @@ export async function deleteTag(input: DeleteTagInput) {
 
 export async function setTagPinned(input: SetTagPinnedInput) {
   return invoke("set_tag_pinned", { input });
+}
+
+export async function setTagIcon(input: SetTagIconInput) {
+  return invoke("set_tag_icon", { input });
 }
 
 export async function setHideSubtagNotes(input: SetHideSubtagNotesInput) {

@@ -75,7 +75,7 @@ pub fn clear_local_snapshot_state(conn: &Connection) -> Result<(), AppError> {
          DELETE FROM sync_snapshots;
          DELETE FROM sync_relay_state;
          DELETE FROM sync_relays;
-         DELETE FROM app_settings WHERE key IN ('active_sync_relay_url');",
+         DELETE FROM app_settings WHERE key IN ('active_sync_relay_url', 'tag_metadata_vector_clock', 'tag_metadata_locally_modified', 'tag_metadata_stored_payload');",
     )?;
     Ok(())
 }

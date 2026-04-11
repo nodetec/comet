@@ -114,6 +114,7 @@ pub struct ContextualTagNode {
     pub depth: usize,
     pub pinned: bool,
     pub hide_subtag_notes: bool,
+    pub icon: Option<String>,
     pub direct_note_count: usize,
     pub inclusive_note_count: usize,
     pub children: Vec<ContextualTagNode>,
@@ -222,6 +223,13 @@ pub struct SetTagPinnedInput {
 pub struct SetHideSubtagNotesInput {
     pub path: String,
     pub hide_subtag_notes: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetTagIconInput {
+    pub path: String,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

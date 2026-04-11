@@ -197,11 +197,17 @@ export type SetHideSubtagNotesInput = {
   path: string;
 };
 
+export type SetTagIconInput = {
+  path: string;
+  icon: string | null;
+};
+
 export type ContextualTagNode = {
   children: ContextualTagNode[];
   depth: number;
   directNoteCount: number;
   hideSubtagNotes: boolean;
+  icon: string | null;
   inclusiveNoteCount: number;
   label: string;
   path: string;

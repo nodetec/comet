@@ -6,5 +6,6 @@ pub(crate) mod note_apply;
 pub mod service;
 pub mod snapshot_apply_service;
 pub mod snapshot_service;
+pub(crate) mod tag_metadata_apply;
 pub(crate) mod tombstone_apply;
 pub mod vector_clock;

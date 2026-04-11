@@ -212,12 +212,17 @@ export function useSyncListener(deps: SyncListenerDeps) {
         }
       },
     );
+    const unlistenTagMetadata = listen("sync-tag-metadata-change", () => {
+      void queryClient.invalidateQueries({ queryKey: ["contextual-tags"] });
+    });
+
     return () => {
       if (flushTimerRef.current !== null) {
         window.clearTimeout(flushTimerRef.current);
         flushTimerRef.current = null;
       }
       void unlisten.then((fn) => fn());
+      void unlistenTagMetadata.then((fn) => fn());
     };
   }, [queryClient, pendingSaveTimeoutRef, isSavingRef, bumpSyncEditorRevision]);
 

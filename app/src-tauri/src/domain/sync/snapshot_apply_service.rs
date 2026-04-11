@@ -14,6 +14,26 @@ use crate::error::AppError;
 use nostr_sdk::prelude::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
+/// Result of applying a remote snapshot event.
+pub enum ApplySnapshotResult {
+    /// A note was changed (upsert, delete, or conflict).
+    NoteChange(SyncChangePayload),
+    /// Tag metadata was updated from a remote snapshot.
+    TagMetadataChange,
+    /// No changes were applied (dominated or equal clock).
+    NoChange,
+}
+
+impl ApplySnapshotResult {
+    #[cfg(test)]
+    pub fn note_change(self) -> Option<SyncChangePayload> {
+        match self {
+            Self::NoteChange(payload) => Some(payload),
+            _ => None,
+        }
+    }
+}
+
 pub fn apply_remote_snapshot_event(
     conn: &Connection,
     relay_url: &str,
@@ -21,7 +41,30 @@ pub fn apply_remote_snapshot_event(
     event: &Event,
     stored_seq: Option<i64>,
     mut invalidate_cache: impl FnMut(&str),
-) -> Result<Option<SyncChangePayload>, AppError> {
+) -> Result<ApplySnapshotResult, AppError> {
+    // Check collection tag before decrypting to dispatch to the correct handler
+    let collection = event
+        .tags
+        .find(TagKind::custom("c"))
+        .and_then(|tag| tag.content())
+        .map(std::string::ToString::to_string);
+
+    if collection.as_deref()
+        == Some(
+            crate::adapters::nostr::comet_tag_metadata_snapshot::COMET_TAG_METADATA_COLLECTION,
+        )
+    {
+        let applied =
+            crate::domain::sync::tag_metadata_apply::apply_remote_tag_metadata_snapshot(
+                conn, relay_url, keys, event, stored_seq,
+            )?;
+        return Ok(if applied {
+            ApplySnapshotResult::TagMetadataChange
+        } else {
+            ApplySnapshotResult::NoChange
+        });
+    }
+
     let parsed = parse_note_snapshot_event(keys, event)?;
     let author_pubkey = event.pubkey.to_hex();
     let snapshot_timestamp_ms = event.created_at.as_secs() as i64 * 1000;
@@ -166,7 +209,10 @@ pub fn apply_remote_snapshot_event(
         )?;
     }
 
-    Ok(change_payload)
+    Ok(match change_payload {
+        Some(payload) => ApplySnapshotResult::NoteChange(payload),
+        None => ApplySnapshotResult::NoChange,
+    })
 }
 
 #[cfg(test)]
@@ -282,7 +328,7 @@ mod tests {
             200,
         );
 
-        let change = apply_remote_snapshot_event(
+        let result = apply_remote_snapshot_event(
             &conn,
             "wss://relay.example",
             &keys,
@@ -301,7 +347,9 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
         assert_eq!(
-            change.map(|payload| (payload.note_id, payload.action)),
+            result
+                .note_change()
+                .map(|payload| (payload.note_id, payload.action)),
             Some(("note-1".to_string(), "upsert".to_string()))
         );
     }
@@ -403,7 +451,7 @@ mod tests {
             ))
         );
         assert_eq!(
-            change.map(|payload| (payload.note_id, payload.action)),
+            change.note_change().map(|payload| (payload.note_id, payload.action)),
             Some(("note-blob".to_string(), "upsert".to_string()))
         );
     }
@@ -580,7 +628,7 @@ mod tests {
         assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
         assert_eq!(modified_at, 0);
         assert_eq!(
-            change.map(|payload| (payload.note_id, payload.action)),
+            change.note_change().map(|payload| (payload.note_id, payload.action)),
             Some((note_id.to_string(), "upsert".to_string()))
         );
     }
@@ -683,7 +731,7 @@ mod tests {
         assert_eq!(snapshot_event_id, Some(event.id.to_hex()));
         assert_eq!(deleted_at, Some(300));
         assert_eq!(
-            change.map(|payload| (payload.note_id, payload.action)),
+            change.note_change().map(|payload| (payload.note_id, payload.action)),
             Some((note_id.to_string(), "upsert".to_string()))
         );
     }

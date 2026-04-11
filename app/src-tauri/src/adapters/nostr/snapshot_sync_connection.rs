@@ -8,7 +8,7 @@ use crate::adapters::sqlite::sync_settings_repository::{
 use crate::domain::sync::model::{SyncChangePayload, SyncCommand, SyncState};
 use crate::error::AppError;
 use nostr_sdk::prelude::Keys;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -143,14 +143,39 @@ pub(super) async fn run_snapshot_sync_connection(
             .map(|(id, _)| id.clone())
             .collect();
 
-        for note_id in &ready {
-            pending_pushes.remove(note_id);
+        for id in &ready {
+            pending_pushes.remove(id);
         }
 
-        if let Err(error) =
-            push_note_snapshots_batch(app, &relay_url, &backup_relay_urls, &keys, &ready).await
-        {
-            sync_log(app, &format!("snapshot push batch error: {error}"));
+        let has_tag_metadata = ready.iter().any(|id| id == "__tag_metadata__");
+        let note_ids: Vec<String> = ready
+            .into_iter()
+            .filter(|id| id != "__tag_metadata__")
+            .collect();
+
+        if !note_ids.is_empty() {
+            if let Err(error) =
+                push_note_snapshots_batch(app, &relay_url, &backup_relay_urls, &keys, &note_ids)
+                    .await
+            {
+                sync_log(app, &format!("snapshot push batch error: {error}"));
+            }
+        }
+
+        if has_tag_metadata {
+            if let Err(error) = crate::adapters::nostr::snapshot_push::push_tag_metadata_snapshot(
+                app,
+                &relay_url,
+                &backup_relay_urls,
+                &keys,
+            )
+            .await
+            {
+                sync_log(
+                    app,
+                    &format!("tag metadata snapshot push error: {error}"),
+                );
+            }
         }
     }
 }
@@ -183,6 +208,20 @@ fn list_pending_local_sync_commands(conn: &Connection) -> Result<Vec<SyncCommand
         }
     }
 
+    {
+        let tag_metadata_modified: Option<String> = conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = 'tag_metadata_locally_modified'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        if tag_metadata_modified.as_deref() == Some("true") {
+            commands.push(SyncCommand::PushTagMetadata);
+        }
+    }
+
     Ok(commands)
 }
 
@@ -202,17 +241,19 @@ async fn flush_pending_local_changes(
 
     let mut pending_notes = 0usize;
     let mut pending_deletions = 0usize;
+    let mut pending_tag_metadata = false;
     for command in &pending_commands {
         match command {
             SyncCommand::PushNote(_) => pending_notes += 1,
             SyncCommand::PushDeletion(_) => pending_deletions += 1,
+            SyncCommand::PushTagMetadata => pending_tag_metadata = true,
         }
     }
     sync_log(
         app,
         &format!(
-            "replaying pending local changes notes={} deletions={}",
-            pending_notes, pending_deletions
+            "replaying pending local changes notes={} deletions={} tag_metadata={}",
+            pending_notes, pending_deletions, pending_tag_metadata
         ),
     );
 
@@ -222,6 +263,7 @@ async fn flush_pending_local_changes(
         match command {
             SyncCommand::PushNote(note_id) => pending_note_ids.push(note_id),
             SyncCommand::PushDeletion(entity_id) => pending_deletion_ids.push(entity_id),
+            SyncCommand::PushTagMetadata => {}
         }
     }
 
@@ -248,6 +290,22 @@ async fn flush_pending_local_changes(
         sync_log(app, &format!("snapshot push batch error: {error}"));
     }
 
+    if pending_tag_metadata {
+        if let Err(error) = crate::adapters::nostr::snapshot_push::push_tag_metadata_snapshot(
+            app,
+            active_relay_url,
+            backup_relay_urls,
+            keys,
+        )
+        .await
+        {
+            sync_log(
+                app,
+                &format!("tag metadata snapshot push error: {error}"),
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -272,6 +330,13 @@ async fn handle_snapshot_push_command(
                 sync_log(app, &format!("snapshot delete push error: {id}: {error}"));
             }
         }
+        Some(SyncCommand::PushTagMetadata) => {
+            sync_log(app, "queued tag metadata snapshot push");
+            pending_pushes.insert(
+                "__tag_metadata__".to_string(),
+                tokio::time::Instant::now() + debounce_duration,
+            );
+        }
         None => return Ok(()),
     }
 
@@ -293,17 +358,23 @@ async fn handle_snapshot_incoming_message(
             ..
         } => {
             let conn = crate::db::database_connection(app)?;
-            if let Some(change) =
-                crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event(
-                    &conn,
-                    relay_url,
-                    keys,
-                    &event,
-                    Some(seq),
-                    |_| {},
-                )?
-            {
-                emit_sync_remote_change(app, change);
+            match crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event(
+                &conn,
+                relay_url,
+                keys,
+                &event,
+                Some(seq),
+                |_| {},
+            )? {
+                crate::domain::sync::snapshot_apply_service::ApplySnapshotResult::NoteChange(
+                    change,
+                ) => {
+                    emit_sync_remote_change(app, change);
+                }
+                crate::domain::sync::snapshot_apply_service::ApplySnapshotResult::TagMetadataChange => {
+                    let _ = app.emit("sync-tag-metadata-change", ());
+                }
+                crate::domain::sync::snapshot_apply_service::ApplySnapshotResult::NoChange => {}
             }
         }
         crate::adapters::nostr::relay_client::SnapshotRelayIncomingMessage::ChangesEose {

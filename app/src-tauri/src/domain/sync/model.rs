@@ -19,6 +19,7 @@ pub enum SyncState {
 pub enum SyncCommand {
     PushNote(String),
     PushDeletion(String),
+    PushTagMetadata,
 }
 
 #[derive(Debug, Clone, Serialize)]

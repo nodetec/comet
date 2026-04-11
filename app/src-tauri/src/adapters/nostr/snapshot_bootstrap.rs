@@ -7,7 +7,7 @@ use crate::adapters::sqlite::snapshot_repository::{
 };
 use crate::db::{active_account, database_connection};
 use crate::domain::sync::model::SyncChangePayload;
-use crate::domain::sync::snapshot_apply_service::apply_remote_snapshot_event;
+use crate::domain::sync::snapshot_apply_service::{apply_remote_snapshot_event, ApplySnapshotResult};
 use crate::error::AppError;
 use nostr_sdk::prelude::{Event, Keys};
 use rusqlite::Connection;
@@ -200,10 +200,10 @@ async fn bootstrap_with_keys_and_changes(
                 return Ok(());
             }
 
-            if let Some(change) =
-                apply_remote_snapshot_event(&tx, relay_ws_url, keys, &event, None, |_| {})?
-            {
-                let _ = change;
+            if !matches!(
+                apply_remote_snapshot_event(&tx, relay_ws_url, keys, &event, None, |_| {})?,
+                ApplySnapshotResult::NoChange
+            ) {
                 bootstrap_changed = true;
             }
 
@@ -222,6 +222,9 @@ async fn bootstrap_with_keys_and_changes(
         min_retained_created_at,
     )?;
     clear_bootstrap_snapshot_stage(&tx, relay_ws_url)?;
+    // Tag metadata may have been applied before note snapshots created the
+    // tag rows. Re-apply now that all bootstrap notes (and their tags) exist.
+    crate::domain::sync::tag_metadata_apply::reapply_stored_tag_metadata(&tx)?;
     tx.commit()?;
 
     if bootstrap_changed {

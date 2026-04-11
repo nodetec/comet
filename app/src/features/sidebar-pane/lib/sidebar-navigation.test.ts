@@ -19,6 +19,7 @@ function createTagNode(
     depth: path.split("/").length,
     directNoteCount: 0,
     hideSubtagNotes: false,
+    icon: null,
     inclusiveNoteCount: 0,
     // eslint-disable-next-line unicorn/prefer-at -- app tsconfig target does not include Array.prototype.at()
     label: segments[segments.length - 1] ?? path,

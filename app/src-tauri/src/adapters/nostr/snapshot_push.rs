@@ -1022,6 +1022,156 @@ async fn send_events_on_connection(
     Ok(RelayBatchConnectionResult { rejected_event_ids })
 }
 
+pub async fn push_tag_metadata_snapshot(
+    app: &AppHandle,
+    active_relay_url: &str,
+    backup_relay_urls: &[String],
+    keys: &Keys,
+) -> Result<(), AppError> {
+    use crate::adapters::nostr::comet_note_snapshot::NoteSnapshotEventMeta;
+    use crate::adapters::nostr::comet_tag_metadata_snapshot::{
+        build_tag_metadata_snapshot_event, TagMetadataEntry, TagMetadataSnapshotPayload,
+        COMET_TAG_METADATA_COLLECTION, COMET_TAG_METADATA_D_TAG,
+        COMET_TAG_METADATA_SNAPSHOT_VERSION,
+    };
+    use crate::adapters::sqlite::snapshot_repository::{upsert_sync_snapshot, LocalSyncSnapshot};
+    use crate::domain::sync::vector_clock::{
+        increment_vector_clock, parse_vector_clock, serialize_vector_clock,
+    };
+    use std::collections::BTreeMap;
+
+    let conn = database_connection(app)?;
+
+    // Load tag metadata from DB (only non-default entries)
+    let mut tag_entries = BTreeMap::new();
+    {
+        let mut stmt = conn.prepare(
+            "SELECT path, pinned, icon FROM tags WHERE pinned = 1 OR icon IS NOT NULL",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })?;
+        for row in rows {
+            let (path, pinned, icon) = row?;
+            tag_entries.insert(
+                path,
+                TagMetadataEntry {
+                    pinned: pinned != 0,
+                    icon,
+                },
+            );
+        }
+    }
+
+    // Load the already-advanced vector clock (incremented eagerly in the
+    // command handler via mark_tag_metadata_locally_modified).
+    let clock_json: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'tag_metadata_vector_clock'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
+    let vector_clock = clock_json
+        .as_deref()
+        .and_then(|json| parse_vector_clock(json).ok())
+        .unwrap_or_default();
+
+    // Use the per-device sync ID (not public key) so different installations
+    // for the same account produce distinguishable vector clock entries.
+    let device_id =
+        crate::domain::sync::apply_support::current_device_id(&conn)?;
+
+    // The clock should already be advanced by mark_tag_metadata_locally_modified,
+    // but if it's empty (e.g. migration first-push), ensure a valid clock.
+    let vector_clock = if vector_clock.is_empty() {
+        increment_vector_clock(&vector_clock, &device_id).map_err(AppError::custom)?
+    } else {
+        vector_clock
+    };
+
+    let now = crate::domain::common::time::now_millis();
+
+    let payload = TagMetadataSnapshotPayload {
+        version: COMET_TAG_METADATA_SNAPSHOT_VERSION,
+        device_id,
+        vector_clock,
+        tags: tag_entries,
+    };
+
+    let event = build_tag_metadata_snapshot_event(
+        keys,
+        &NoteSnapshotEventMeta {
+            document_id: COMET_TAG_METADATA_D_TAG.to_string(),
+            operation: "put".to_string(),
+            collection: Some(COMET_TAG_METADATA_COLLECTION.to_string()),
+            created_at_ms: Some(now),
+        },
+        &payload,
+    )?;
+
+    let event_id = event.id.to_hex();
+    let author_pubkey = keys.public_key().to_hex();
+
+    // Persist local sync snapshot
+    upsert_sync_snapshot(
+        &conn,
+        &LocalSyncSnapshot {
+            author_pubkey: author_pubkey.clone(),
+            d_tag: COMET_TAG_METADATA_D_TAG.to_string(),
+            snapshot_id: event_id.clone(),
+            op: "put".to_string(),
+            mtime: now,
+            entity_type: Some(COMET_TAG_METADATA_COLLECTION.to_string()),
+            event_id: Some(event_id.clone()),
+            payload_retained: true,
+            relay_url: None,
+            stored_seq: None,
+            created_at: now.div_euclid(1000),
+        },
+    )?;
+
+    // Store updated vector clock
+    let clock_json =
+        serialize_vector_clock(&payload.vector_clock).map_err(AppError::custom)?;
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES ('tag_metadata_vector_clock', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rusqlite::params![clock_json],
+    )?;
+
+    drop(conn);
+
+    // Publish to relays
+    let access_key = load_access_key(app);
+    send_events_to_relays_batch(
+        active_relay_url,
+        backup_relay_urls,
+        keys,
+        access_key.as_deref(),
+        &[event],
+        |_event_id| {
+            // Clear locally_modified flag on first successful relay ACK
+            if let Ok(conn) = database_connection(app) {
+                let _ = conn.execute(
+                    "INSERT INTO app_settings (key, value) VALUES ('tag_metadata_locally_modified', 'false')
+                     ON CONFLICT(key) DO UPDATE SET value = 'false'",
+                    [],
+                );
+            }
+            sync_log(app, "tag metadata snapshot relay ack");
+        },
+    )
+    .await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

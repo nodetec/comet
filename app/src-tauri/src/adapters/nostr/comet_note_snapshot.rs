@@ -79,11 +79,11 @@ pub struct ParsedNoteSnapshotEvent {
     pub payload: Option<NoteSnapshotPayload>,
 }
 
-fn is_false(value: &bool) -> bool {
+pub(crate) fn is_false(value: &bool) -> bool {
     !value
 }
 
-fn self_conversation_key(keys: &Keys) -> Result<ConversationKey, AppError> {
+pub(crate) fn self_conversation_key(keys: &Keys) -> Result<ConversationKey, AppError> {
     ConversationKey::derive(keys.secret_key(), &keys.public_key())
         .map_err(|e| AppError::custom(format!("Failed to derive self conversation key: {e}")))
 }
@@ -251,9 +251,8 @@ pub fn decrypt_note_snapshot_payload(
     NoteSnapshotPayload::from_canonical_json(&json)
 }
 
-fn build_visible_vector_clock_tags(payload: &NoteSnapshotPayload) -> Result<Vec<Tag>, AppError> {
-    let vector_clock =
-        canonicalize_vector_clock(&payload.vector_clock).map_err(AppError::custom)?;
+pub(crate) fn build_visible_vector_clock_tags(clock: &VectorClock) -> Result<Vec<Tag>, AppError> {
+    let vector_clock = canonicalize_vector_clock(clock).map_err(AppError::custom)?;
     if vector_clock.is_empty() {
         return Err(AppError::custom(
             "Note snapshot payload vector_clock must be non-empty",
@@ -268,7 +267,7 @@ fn build_visible_vector_clock_tags(payload: &NoteSnapshotPayload) -> Result<Vec<
         .collect())
 }
 
-fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppError> {
+pub(crate) fn parse_visible_vector_clock_tags(event: &Event) -> Result<VectorClock, AppError> {
     let mut vector_clock = BTreeMap::new();
     let mut previous_device_id: Option<String> = None;
 
@@ -362,7 +361,7 @@ pub fn build_note_snapshot_tags(
         Tag::identifier(&meta.document_id),
         Tag::custom(TagKind::custom("o"), vec![meta.operation.clone()]),
     ];
-    tags.extend(build_visible_vector_clock_tags(payload)?);
+    tags.extend(build_visible_vector_clock_tags(&payload.vector_clock)?);
 
     if let Some(collection) = &meta.collection {
         if collection.trim().is_empty() {

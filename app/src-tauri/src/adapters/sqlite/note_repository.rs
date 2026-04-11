@@ -508,6 +508,7 @@ struct ContextualTagRow {
     depth: usize,
     pinned: bool,
     hide_subtag_notes: bool,
+    icon: Option<String>,
     direct_note_count: usize,
     inclusive_note_count: usize,
 }
@@ -544,6 +545,7 @@ fn build_contextual_tag_tree(rows: Vec<ContextualTagRow>) -> Vec<ContextualTagNo
                     depth: row.depth,
                     pinned: row.pinned,
                     hide_subtag_notes: row.hide_subtag_notes,
+                    icon: row.icon,
                     direct_note_count: row.direct_note_count,
                     inclusive_note_count: row.inclusive_note_count,
                     children: build_children(Some(path), children_by_parent),
@@ -1135,6 +1137,15 @@ impl NoteRepository for SqliteNoteRepository<'_> {
             .map_err(map_err)
     }
 
+    fn set_tag_icon(&self, path: &str, icon: Option<&str>) -> Result<usize, NoteError> {
+        self.conn
+            .execute(
+                "UPDATE tags SET icon = ?1, updated_at = ?2 WHERE path = ?3",
+                params![icon, now_millis(), path],
+            )
+            .map_err(map_err)
+    }
+
     fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError> {
         self.conn
             .execute(
@@ -1624,7 +1635,8 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                     t.pinned,
                     t.hide_subtag_notes,
                     SUM(CASE WHEN l.is_direct = 1 THEN 1 ELSE 0 END) AS direct_note_count,
-                    COUNT(*) AS inclusive_note_count
+                    COUNT(*) AS inclusive_note_count,
+                    t.icon
              FROM notes n
              JOIN note_tag_links l ON l.note_id = n.id
              JOIN tags t ON t.id = l.tag_id",
@@ -1640,7 +1652,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         }
 
         sql.push_str(
-            " GROUP BY t.id, t.path, t.depth, t.pinned, t.hide_subtag_notes
+            " GROUP BY t.id, t.path, t.depth, t.pinned, t.hide_subtag_notes, t.icon
               ORDER BY t.pinned DESC, t.path ASC",
         );
 
@@ -1654,6 +1666,7 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                     hide_subtag_notes: row.get::<_, i64>(3)? != 0,
                     direct_note_count: row.get::<_, i64>(4)? as usize,
                     inclusive_note_count: row.get::<_, i64>(5)? as usize,
+                    icon: row.get(6)?,
                 })
             })
             .map_err(map_err)?;

@@ -102,6 +102,7 @@ pub trait NoteRepository {
     fn refresh_wikilink_targets(&self, titles: &[String]) -> Result<(), NoteError>;
     fn tag_is_pinned(&self, path: &str) -> Result<bool, NoteError>;
     fn set_tag_pinned(&self, path: &str, pinned: bool) -> Result<usize, NoteError>;
+    fn set_tag_icon(&self, path: &str, icon: Option<&str>) -> Result<usize, NoteError>;
     fn set_tag_hide_subtag_notes(&self, path: &str, hide: bool) -> Result<usize, NoteError>;
 
     // ── Queries ─────────────────────────────────────────────────────────

@@ -347,5 +347,14 @@ pub fn account_migrations() -> Migrations<'static> {
              CREATE INDEX idx_note_snapshot_history_wikilinks_snapshot
                ON note_snapshot_history_wikilinks(snapshot_event_id, location);",
         ),
+        M::up(
+            "INSERT OR IGNORE INTO app_settings (key, value)
+               VALUES ('tag_metadata_vector_clock', '{}');
+             INSERT OR IGNORE INTO app_settings (key, value)
+               VALUES ('tag_metadata_locally_modified', 'false');
+             UPDATE app_settings SET value = 'true'
+               WHERE key = 'tag_metadata_locally_modified'
+               AND EXISTS (SELECT 1 FROM tags WHERE pinned = 1 OR icon IS NOT NULL);",
+        ),
     ])
 }

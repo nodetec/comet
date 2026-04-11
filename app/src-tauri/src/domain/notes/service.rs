@@ -619,6 +619,19 @@ impl NoteService {
         Ok(())
     }
 
+    pub fn set_tag_icon(
+        repo: &dyn NoteRepository,
+        input: SetTagIconInput,
+    ) -> Result<(), NoteError> {
+        let path = validate_tag_path(&input.path)?;
+        log::info!("[tags] set icon path={} icon={:?}", path, input.icon);
+        let updated = repo.set_tag_icon(&path, input.icon.as_deref())?;
+        if updated == 0 {
+            return Err(NoteError::TagNotFound);
+        }
+        Ok(())
+    }
+
     pub fn set_hide_subtag_notes(
         repo: &dyn NoteRepository,
         input: SetHideSubtagNotesInput,
@@ -1164,6 +1177,10 @@ mod tests {
             } else {
                 pinned_tags.remove(path);
             }
+            Ok(1)
+        }
+
+        fn set_tag_icon(&self, _path: &str, _icon: Option<&str>) -> Result<usize, NoteError> {
             Ok(1)
         }
 

@@ -387,6 +387,9 @@ pub fn rename_tag(app: AppHandle, input: RenameTagInput) -> Result<Vec<String>, 
     for note_id in &affected_note_ids {
         sync_push(&app, SyncCommand::PushNote(note_id.clone()));
     }
+    // Rename transfers pinned/icon to the new path — sync the metadata too.
+    mark_tag_metadata_locally_modified(&conn);
+    sync_push(&app, SyncCommand::PushTagMetadata);
 
     Ok(affected_note_ids)
 }
@@ -400,6 +403,9 @@ pub fn delete_tag(app: AppHandle, input: DeleteTagInput) -> Result<Vec<String>, 
     for note_id in &affected_note_ids {
         sync_push(&app, SyncCommand::PushNote(note_id.clone()));
     }
+    // Deleting a tag may remove pinned/icon metadata — sync it.
+    mark_tag_metadata_locally_modified(&conn);
+    sync_push(&app, SyncCommand::PushTagMetadata);
 
     Ok(affected_note_ids)
 }
@@ -409,7 +415,58 @@ pub fn set_tag_pinned(app: AppHandle, input: SetTagPinnedInput) -> Result<(), Ap
     let conn = database_connection(&app)?;
     let repo = SqliteNoteRepository::new(&conn);
     NoteService::set_tag_pinned(&repo, input)?;
+    mark_tag_metadata_locally_modified(&conn);
+    sync_push(&app, SyncCommand::PushTagMetadata);
     Ok(())
+}
+
+#[tauri::command]
+pub fn set_tag_icon(app: AppHandle, input: SetTagIconInput) -> Result<(), AppError> {
+    let conn = database_connection(&app)?;
+    let repo = SqliteNoteRepository::new(&conn);
+    NoteService::set_tag_icon(&repo, input)?;
+    mark_tag_metadata_locally_modified(&conn);
+    sync_push(&app, SyncCommand::PushTagMetadata);
+    Ok(())
+}
+
+fn mark_tag_metadata_locally_modified(conn: &rusqlite::Connection) {
+    use crate::domain::sync::apply_support::current_device_id;
+    use crate::domain::sync::vector_clock::{
+        increment_vector_clock, parse_vector_clock, serialize_vector_clock,
+    };
+
+    // Advance the vector clock eagerly so that any remote snapshot arriving
+    // during the debounce window sees the local intent and doesn't silently
+    // overwrite the pending edit.
+    if let Ok(device_id) = current_device_id(conn) {
+        let clock_json: Option<String> = conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = 'tag_metadata_vector_clock'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(None);
+        let clock = clock_json
+            .as_deref()
+            .and_then(|json| parse_vector_clock(json).ok())
+            .unwrap_or_default();
+        if let Ok(next) = increment_vector_clock(&clock, &device_id) {
+            if let Ok(json) = serialize_vector_clock(&next) {
+                let _ = conn.execute(
+                    "INSERT INTO app_settings (key, value) VALUES ('tag_metadata_vector_clock', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    rusqlite::params![json],
+                );
+            }
+        }
+    }
+
+    let _ = conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES ('tag_metadata_locally_modified', 'true')
+         ON CONFLICT(key) DO UPDATE SET value = 'true'",
+        [],
+    );
 }
 
 #[tauri::command]

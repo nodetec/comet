@@ -196,6 +196,7 @@ pub fn run() {
             commands::notes::rename_tag,
             commands::notes::delete_tag,
             commands::notes::set_tag_pinned,
+            commands::notes::set_tag_icon,
             commands::notes::set_hide_subtag_notes,
             commands::notes::archive_note,
             commands::notes::restore_note,
