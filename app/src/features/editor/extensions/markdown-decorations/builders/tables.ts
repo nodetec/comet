@@ -4,7 +4,7 @@ import {
   EditorSelection,
   EditorState,
   RangeSetBuilder,
-  StateEffect,
+  type StateEffect,
   StateField,
   Transaction,
   type Extension,
@@ -627,7 +627,7 @@ class TableCellMenuController {
   private constructor(
     private readonly deleteColumnItem: MenuItem,
     private readonly deleteRowItem: MenuItem,
-    private readonly items: Array<MenuItem | PredefinedMenuItem>,
+    private readonly items: (MenuItem | PredefinedMenuItem)[],
     private readonly menu: Menu,
   ) {}
 
@@ -727,7 +727,7 @@ class TableCellMenuController {
       },
     });
 
-    const items: Array<MenuItem | PredefinedMenuItem> = [
+    const items: (MenuItem | PredefinedMenuItem)[] = [
       rowAboveItem,
       rowBelowItem,
       separatorOne,

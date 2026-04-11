@@ -17,7 +17,7 @@ function getBlockquoteDeco(depth: number): Decoration {
       class: `cm-md-bq cm-md-bq-${d}`,
     });
   }
-  return blockquoteDecoCache[d]!;
+  return blockquoteDecoCache[d];
 }
 
 export function handleBlockquote(

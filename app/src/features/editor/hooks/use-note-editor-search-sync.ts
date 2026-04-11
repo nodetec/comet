@@ -8,7 +8,7 @@ import {
   setSearchQuery,
 } from "@codemirror/search";
 import {
-  Compartment,
+  type Compartment,
   EditorSelection,
   type SelectionRange,
 } from "@codemirror/state";

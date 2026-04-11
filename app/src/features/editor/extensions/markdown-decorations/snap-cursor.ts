@@ -144,7 +144,7 @@ function snapHeadingSyntax(
   const marks = heading.getChildren("HeaderMark");
   if (marks.length === 0) return null;
 
-  const firstMark = marks[0]!;
+  const firstMark = marks[0];
   if (!isSpaceDelimitedATXHeading(state, firstMark.to, heading.to)) {
     return null;
   }
@@ -160,7 +160,7 @@ function snapHeadingSyntax(
   // Trailing closing mark (## Header ##)
   if (marks.length > 1) {
     // eslint-disable-next-line unicorn/prefer-at
-    const lastMark = marks[marks.length - 1]!;
+    const lastMark = marks[marks.length - 1];
     if (pos >= lastMark.from) {
       return heading.to;
     }
@@ -186,9 +186,9 @@ function snapInlineDelimiters(
 
   if (marks.length < 2) return null;
 
-  const openMark = marks[0]!;
+  const openMark = marks[0];
   // eslint-disable-next-line unicorn/prefer-at
-  const closeMark = marks[marks.length - 1]!;
+  const closeMark = marks[marks.length - 1];
 
   // Inclusive of content-start (openMark.to) for the same reason as
   // headings: posAtCoords maps the visual left edge there.
@@ -215,8 +215,8 @@ function snapLinkSyntax(
   const marks = link.getChildren("LinkMark");
   if (marks.length < 2) return null;
 
-  const openBracket = marks[0]!;
-  const closeBracket = marks[1]!;
+  const openBracket = marks[0];
+  const closeBracket = marks[1];
 
   if (pos <= openBracket.to) {
     return link.from;

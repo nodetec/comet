@@ -14,25 +14,25 @@ function getInlineContentEnd(node: SyntaxNode): number | null {
   if (node.name === "Emphasis" || node.name === "StrongEmphasis") {
     const marks = node.getChildren("EmphasisMark");
     // eslint-disable-next-line unicorn/prefer-at
-    return marks.length > 1 ? marks[marks.length - 1]!.from : null;
+    return marks.length > 1 ? marks[marks.length - 1].from : null;
   }
 
   if (node.name === "InlineCode") {
     const marks = node.getChildren("CodeMark");
     // eslint-disable-next-line unicorn/prefer-at
-    return marks.length > 1 ? marks[marks.length - 1]!.from : null;
+    return marks.length > 1 ? marks[marks.length - 1].from : null;
   }
 
   if (node.name === "Highlight") {
     const marks = node.getChildren("HighlightMark");
     // eslint-disable-next-line unicorn/prefer-at
-    return marks.length > 1 ? marks[marks.length - 1]!.from : null;
+    return marks.length > 1 ? marks[marks.length - 1].from : null;
   }
 
   if (node.name === "Strikethrough") {
     const marks = node.getChildren("StrikethroughMark");
     // eslint-disable-next-line unicorn/prefer-at
-    return marks.length > 1 ? marks[marks.length - 1]!.from : null;
+    return marks.length > 1 ? marks[marks.length - 1].from : null;
   }
 
   return null;

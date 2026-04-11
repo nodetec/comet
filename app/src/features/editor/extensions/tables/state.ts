@@ -1,5 +1,5 @@
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, StateEffect, StateField } from "@codemirror/state";
+import { type EditorState, StateEffect, StateField } from "@codemirror/state";
 import type { SyntaxNodeRef } from "@lezer/common";
 
 import { parseMarkdownTable } from "@/features/editor/extensions/tables/markdown-table";

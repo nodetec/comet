@@ -45,7 +45,7 @@ export function AccountSwitcherDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const {
     data: accounts = [],

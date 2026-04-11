@@ -60,14 +60,13 @@ function getCandidateClientPoints(position: WebviewDropPosition) {
     { x: position.x, y: position.y },
   ];
 
-  return candidates.filter((candidate, index) => {
-    return (
+  return candidates.filter(
+    (candidate, index) =>
       index ===
-      candidates.findIndex((other) => {
-        return other.x === candidate.x && other.y === candidate.y;
-      })
-    );
-  });
+      candidates.findIndex(
+        (other) => other.x === candidate.x && other.y === candidate.y,
+      ),
+  );
 }
 
 function isPointInsideRect(

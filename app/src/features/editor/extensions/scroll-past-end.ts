@@ -1,6 +1,6 @@
 import { EditorSelection } from "@codemirror/state";
 import {
-  EditorView,
+  type EditorView,
   type PluginValue,
   ViewPlugin,
   type ViewUpdate,
@@ -92,7 +92,7 @@ class ScrollPastEndPlugin implements PluginValue {
     }
   }
 
-  private handleSpacerMouseDown = (event: MouseEvent): void => {
+  private readonly handleSpacerMouseDown = (event: MouseEvent): void => {
     if (event.button !== 0) {
       return;
     }

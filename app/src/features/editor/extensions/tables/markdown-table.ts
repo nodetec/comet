@@ -83,14 +83,16 @@ function createParsedMarkdownTable(
       Array.from({ length: columnCount }, (_, index) => row[index] ?? ""),
     ),
     cellRanges: {
-      headers: Array.from({ length: columnCount }, (_, index) => {
-        return cellRanges.headers[index] ?? fallbackRange;
-      }),
+      headers: Array.from(
+        { length: columnCount },
+        (_, index) => cellRanges.headers[index] ?? fallbackRange,
+      ),
       rows: bodyRows.map((_row, rowIndex) => {
         const rowRanges = cellRanges.rows[rowIndex] ?? [];
-        return Array.from({ length: columnCount }, (_, index) => {
-          return rowRanges[index] ?? fallbackRange;
-        });
+        return Array.from(
+          { length: columnCount },
+          (_, index) => rowRanges[index] ?? fallbackRange,
+        );
       }),
     },
     headerCells: Array.from(
@@ -320,7 +322,7 @@ export class MarkdownTable {
             didChange = true;
           }
         } else if (nextRows[row - 1]?.[col] !== "") {
-          nextRows[row - 1]![col] = "";
+          nextRows[row - 1][col] = "";
           didChange = true;
         }
       }
@@ -370,7 +372,7 @@ export class MarkdownTable {
         if (targetUnifiedRow === 0) {
           nextHeader[targetCol] = value;
         } else if (nextRows[targetUnifiedRow - 1]) {
-          nextRows[targetUnifiedRow - 1]![targetCol] = value;
+          nextRows[targetUnifiedRow - 1][targetCol] = value;
         }
       }
     }

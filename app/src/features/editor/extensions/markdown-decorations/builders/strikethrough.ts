@@ -19,9 +19,9 @@ export function handleStrikethrough(
   const onCursor = overlapsAny(node.from, node.to, ctx.cursorRanges);
 
   // Apply line-through only to content between delimiters
-  const contentFrom = marks.length > 0 ? marks[0]!.to : node.from;
+  const contentFrom = marks.length > 0 ? marks[0].to : node.from;
   // eslint-disable-next-line unicorn/prefer-at
-  const contentTo = marks.length > 1 ? marks[marks.length - 1]!.from : node.to;
+  const contentTo = marks.length > 1 ? marks[marks.length - 1].from : node.to;
   if (contentFrom < contentTo) {
     out.push({
       from: contentFrom,

@@ -55,7 +55,7 @@ function handleATXHeading(
   const marks = resolved.getChildren("HeaderMark");
 
   if (!onCursor && marks.length > 0) {
-    const firstMark = marks[0]!;
+    const firstMark = marks[0];
     const contentStart = Math.min(firstMark.to + 1, node.to);
     out.push({
       atomic: true,
@@ -66,7 +66,7 @@ function handleATXHeading(
 
     if (marks.length > 1) {
       // eslint-disable-next-line unicorn/prefer-at
-      const lastMark = marks[marks.length - 1]!;
+      const lastMark = marks[marks.length - 1];
       out.push({
         atomic: true,
         from: lastMark.from,

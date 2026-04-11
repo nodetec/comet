@@ -161,8 +161,8 @@ function addListDecorations(
   data: ListMarkerData,
   lineClass: string,
   markerDecoration: Range<Decoration>,
-  decorationRanges: Array<Range<Decoration>>,
-  _atomicRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
+  _atomicRanges: Range<Decoration>[],
 ) {
   decorationRanges.push(
     Decoration.line({
@@ -188,7 +188,7 @@ function addListChildLineDecorations(
   to: number,
   markerLineStart: number,
   indentStyle: string,
-  decorationRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
 ) {
   let line = state.doc.lineAt(from);
 
@@ -218,7 +218,7 @@ function addParagraphChildLineDecorations(
   markerLineStart: number,
   expectedPrefix: string,
   indentStyle: string,
-  decorationRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
 ) {
   let line = state.doc.lineAt(child.from);
 
@@ -294,7 +294,7 @@ type ExplicitContinuationContext = {
 };
 
 function summarizeTransactionChanges(transaction: Transaction) {
-  const changes: Array<{ fromA: number; toA: number; insert: string }> = [];
+  const changes: { fromA: number; toA: number; insert: string }[] = [];
   transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
     changes.push({
       fromA,
@@ -1284,7 +1284,7 @@ function stripNonTightListContinuation(
     return null;
   }
 
-  const allChanges: Array<{ from: number; to: number; insert: string }> = [];
+  const allChanges: { from: number; to: number; insert: string }[] = [];
   let found = false;
   let charsRemoved = 0;
 
@@ -1388,8 +1388,8 @@ function expandedVisibleRanges(
 function addMarkerDecorations(
   state: EditorState,
   data: ListMarkerData,
-  decorationRanges: Array<Range<Decoration>>,
-  atomicRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
+  atomicRanges: Range<Decoration>[],
 ) {
   const isBullet = BULLET_MARKERS.has(data.marker);
 
@@ -1467,8 +1467,8 @@ function buildAllListDecorations(
 ): [DecorationSet, DecorationSet] {
   const state = view.state;
   const visibleRanges = expandedVisibleRanges(view);
-  const decorationRanges: Array<Range<Decoration>> = [];
-  const atomicRanges: Array<Range<Decoration>> = [];
+  const decorationRanges: Range<Decoration>[] = [];
+  const atomicRanges: Range<Decoration>[] = [];
 
   // ---- Pass 1: single tree iteration for markers + child blocks ----------
   for (const range of visibleRanges) {
@@ -1607,8 +1607,8 @@ function addParagraphPrefixDecorations(
   child: SyntaxNode,
   markerLineStart: number,
   expectedPrefix: string,
-  decorationRanges: Array<Range<Decoration>>,
-  atomicRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
+  atomicRanges: Range<Decoration>[],
 ) {
   if (child.type.name !== "Paragraph") {
     return;
@@ -1642,7 +1642,7 @@ function addListChildGapDecorations(
   childLineStart: number,
   markerLineStart: number,
   indentStyle: string,
-  decorationRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
 ) {
   if (previousChildLineEnd + 1 > childLineStart - 1) {
     return;
@@ -1665,8 +1665,8 @@ function decorateListChildNode(
   expectedPrefix: string,
   indentStyle: string,
   previousChildLineEnd: number,
-  decorationRanges: Array<Range<Decoration>>,
-  atomicRanges: Array<Range<Decoration>>,
+  decorationRanges: Range<Decoration>[],
+  atomicRanges: Range<Decoration>[],
 ) {
   addParagraphPrefixDecorations(
     state,

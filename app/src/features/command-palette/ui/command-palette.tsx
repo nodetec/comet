@@ -159,9 +159,7 @@ export function CommandPalette({
         <DialogBackdrop />
         <DialogPopup
           className="fixed top-[20%] left-1/2 w-full max-w-lg -translate-x-1/2 translate-y-0 overflow-hidden p-0"
-          finalFocus={() =>
-            shouldFocusSelectedNoteOnCloseRef.current ? false : true
-          }
+          finalFocus={() => !shouldFocusSelectedNoteOnCloseRef.current}
         >
           <CommandPrimitive className="flex flex-col" shouldFilter={false} loop>
             <div className="flex items-center px-3">

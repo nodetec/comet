@@ -53,7 +53,7 @@ function editableCellBounds(line: string, from: number, to: number) {
 }
 
 function getNonEmptyLinesWithOffsets(text: string) {
-  const result: Array<{ from: number; line: string }> = [];
+  const result: { from: number; line: string }[] = [];
   const lines = text.split("\n");
   let offset = 0;
 

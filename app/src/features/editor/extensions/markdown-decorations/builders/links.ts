@@ -94,8 +94,8 @@ export function handleLink(
   }
 
   // Apply link styling to visible text (between first [ and first ])
-  const openBracket = marks[0]!;
-  const closeBracket = marks[1]!;
+  const openBracket = marks[0];
+  const closeBracket = marks[1];
   const textFrom = openBracket.to;
   const textTo = closeBracket.from;
 
@@ -253,8 +253,8 @@ function getExternalLinkHitFromNode(
       return null;
     }
 
-    const from = marks[0]!.to;
-    const to = marks[1]!.from;
+    const from = marks[0].to;
+    const to = marks[1].from;
     if (from >= to) {
       return null;
     }
@@ -289,7 +289,7 @@ function isVisibleLinkPosition(node: SyntaxNode, position: number): boolean {
       return false;
     }
 
-    return position >= marks[0]!.to && position < marks[1]!.from;
+    return position >= marks[0].to && position < marks[1].from;
   }
 
   if (node.name === "Autolink") {
@@ -574,7 +574,7 @@ function getLinkEndAtCursor(state: EditorState, pos: number): number | null {
       continue;
     }
 
-    const closeBracket = marks[1]!;
+    const closeBracket = marks[1];
     if (pos === closeBracket.from && n.to > pos) {
       return n.to;
     }

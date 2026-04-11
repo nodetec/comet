@@ -39,8 +39,7 @@ import {
   logEditorDebug,
   summarizeRanges,
 } from "@/shared/lib/editor-debug";
-import type { SearchMatch } from "@/shared/lib/search";
-import { collectSearchMatches } from "@/shared/lib/search";
+import { type SearchMatch, collectSearchMatches } from "@/shared/lib/search";
 
 const VISIBLE_RANGE_MARGIN = 1000;
 

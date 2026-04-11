@@ -15,7 +15,7 @@ export type FocusedPane = "sidebar" | "notes" | "editor";
 function groupWikiLinkOccurrencesByTitle(markdown: string) {
   const occurrencesByTitle = new Map<
     string,
-    Array<{ location: number; title: string }>
+    { location: number; title: string }[]
   >();
 
   for (const occurrence of extractWikiLinkOccurrences(markdown)) {
@@ -85,12 +85,9 @@ function remapResolutionForUpdatedMarkdown(
   resolution: WikiLinkResolutionInput,
   previousOccurrencesByTitle: Map<
     string,
-    Array<{ location: number; title: string }>
+    { location: number; title: string }[]
   >,
-  nextOccurrencesByTitle: Map<
-    string,
-    Array<{ location: number; title: string }>
-  >,
+  nextOccurrencesByTitle: Map<string, { location: number; title: string }[]>,
 ): WikiLinkResolutionInput | null {
   const normalizedTitle = normalizeWikiLinkTitle(resolution.title);
   if (!normalizedTitle) {

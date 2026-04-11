@@ -11,17 +11,6 @@
     "typeAware": true
   },
   "rules": {
-    "no-unused-vars": [
-      "error",
-      {
-        "argsIgnorePattern": "^_",
-        "caughtErrorsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_"
-      }
-    ],
-    "react/only-export-components": ["error", { "allowConstantExport": true }],
-    "react/exhaustive-deps": "error",
-    "react/rules-of-hooks": "error",
     "typescript/no-floating-promises": [
       "error",
       { "ignoreVoid": true, "ignoreIIFE": true }
@@ -31,7 +20,6 @@
       { "checksVoidReturn": { "attributes": false } }
     ],
 
-    "react/no-unsafe": "off",
     "react/react-in-jsx-scope": "off",
     "react/jsx-max-depth": "off",
     "react/jsx-props-no-spreading": "off",
@@ -39,21 +27,6 @@
     "unicorn/no-null": "off",
     "unicorn/no-array-callback-reference": "off",
     "unicorn/prefer-global-this": "off",
-    "unicorn/prefer-import-meta-properties": "off",
-    "unicorn/prefer-string-replace-all": "off",
-    "unicorn/custom-error-definition": "off",
-    "unicorn/require-post-message-target-origin": "off",
-    "typescript/consistent-type-definitions": "off",
-    "typescript/parameter-properties": "off",
-    "typescript/array-type": "off",
-    "typescript/consistent-type-imports": "off",
-    "typescript/prefer-readonly": "off",
-    "typescript/restrict-template-expressions": "off",
-    "import/default": "off",
-    "import/no-named-as-default": "warn",
-    "import/no-named-as-default-member": "warn",
-    "import/no-duplicates": "warn",
-    "import/no-unassigned-import": "off",
     "import/no-named-export": "off",
     "import/group-exports": "off",
     "import/consistent-type-specifier-style": "off",
@@ -62,14 +35,12 @@
     "import/first": "off",
     "import/no-nodejs-modules": "off",
     "import/no-namespace": "off",
+    "import/no-unassigned-import": "off",
+    "typescript/consistent-type-definitions": "off",
+    "typescript/parameter-properties": "off",
     "unbound-method": "off",
-    "no-unsafe-type-assertion": "off",
-    "no-unnecessary-type-assertion": "off",
-    "consistent-return": "off",
-    "no-shadow": "off",
     "no-misused-spread": "off",
-    "no-unnecessary-type-arguments": "off",
-    "no-unneeded-ternary": "off",
+    "no-unsafe-type-assertion": "off",
     "no-magic-numbers": "off",
     "func-style": "off",
     "sort-keys": "off",
@@ -84,8 +55,8 @@
     "prefer-destructuring": "off",
     "init-declarations": "off",
     "no-implicit-coercion": "off",
-    "arrow-body-style": "off",
-    "no-duplicate-imports": "off"
+    "consistent-return": "off",
+    "no-shadow": "off"
   },
   "ignorePatterns": [
     "dist/**",
@@ -94,12 +65,5 @@
     "src-tauri/**",
     "scripts/**"
   ],
-  "overrides": [
-    {
-      "files": ["src/components/editor/nodes/*.tsx", "src/components/ui/*.tsx"],
-      "rules": {
-        "react/only-export-components": "off"
-      }
-    }
-  ]
+  "overrides": []
 }

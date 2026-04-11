@@ -93,7 +93,7 @@ function consumeFenceTransition(
     return null;
   }
 
-  const marker = markdown[fenceIndex]!;
+  const marker = markdown[fenceIndex];
   const run = countRepeatedCharacter(markdown, fenceIndex, marker);
 
   if (fenceLength === 0) {
@@ -211,7 +211,7 @@ function readWikiLinkCompletionTail(
       break;
     }
 
-    const character = text[labelEnd]!;
+    const character = text[labelEnd];
     if ("[]\n\r".includes(character)) {
       return null;
     }

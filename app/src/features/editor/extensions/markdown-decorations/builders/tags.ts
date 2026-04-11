@@ -20,7 +20,7 @@ export function findAllTags(text: string, baseOffset: number): TagRange[] {
   let m;
   SIMPLE_TAG_RE.lastIndex = 0;
   while ((m = SIMPLE_TAG_RE.exec(text)) !== null) {
-    const raw = m[1]!;
+    const raw = m[1];
     const inner = raw.slice(1);
     if (canonicalizeTagPath(inner)) {
       const from = baseOffset + m.index + (m[0].length - raw.length);

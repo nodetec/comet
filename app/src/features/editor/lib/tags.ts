@@ -41,7 +41,7 @@ function canonicalizeTagSegment(raw: string): string | null {
     return null;
   }
 
-  if (!isTagSegmentLeadingChar(normalized[0]!)) {
+  if (!isTagSegmentLeadingChar(normalized[0])) {
     return null;
   }
 
@@ -91,7 +91,7 @@ function hasInvalidSimpleTrailingText(text: string, endIndex: number) {
   }
 
   for (let index = endIndex + 1; index < text.length; index += 1) {
-    const character = text[index]!;
+    const character = text[index];
     if (character === "\n" || character === "\r") {
       return false;
     }
@@ -157,7 +157,7 @@ function parseSimpleTag(
   let end = startIndex + 1;
 
   while (end < text.length) {
-    const character = text[end]!;
+    const character = text[end];
     if (isTagSegmentChar(character) || character === "/") {
       end += 1;
       continue;
@@ -286,7 +286,7 @@ export function matchTagCompletionAtCursor(
 
   let tokenEnd = cursorOffset;
   while (tokenEnd < text.length) {
-    const character = text[tokenEnd]!;
+    const character = text[tokenEnd];
     if (isTagSegmentChar(character) || character === "/") {
       tokenEnd += 1;
       continue;

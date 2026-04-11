@@ -1,5 +1,5 @@
 import {
-  EditorView,
+  type EditorView,
   type PluginValue,
   ViewPlugin,
   type ViewUpdate,

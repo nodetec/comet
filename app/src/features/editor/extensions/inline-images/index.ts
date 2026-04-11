@@ -19,8 +19,7 @@ import {
 import { fetchBlob } from "@/shared/api/invoke";
 import type { BlobFetchStatus } from "@/shared/api/types";
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
-import type { SearchMatch } from "@/shared/lib/search";
-import { collectSearchMatches } from "@/shared/lib/search";
+import { type SearchMatch, collectSearchMatches } from "@/shared/lib/search";
 import {
   extractAttachmentHash,
   resolveImageSrc,

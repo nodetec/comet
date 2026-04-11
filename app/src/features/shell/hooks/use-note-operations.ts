@@ -213,13 +213,13 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
                 exportMode: "tag",
                 tagPath: deps.activeTagPath,
                 preserveTags: true,
-                exportDir: selected as string,
+                exportDir: selected,
               }
             : {
                 exportMode: "note_filter",
                 noteFilter: deps.noteFilter,
                 preserveTags: true,
-                exportDir: selected as string,
+                exportDir: selected,
               },
         );
 
@@ -253,7 +253,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
           exportMode: "tag",
           tagPath,
           preserveTags: true,
-          exportDir: selected as string,
+          exportDir: selected,
         });
 
         toast.success(`Exported ${count} note${count === 1 ? "" : "s"}`, {

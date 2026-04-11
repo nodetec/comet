@@ -30,9 +30,10 @@ async function showTagContextMenu(
   event.preventDefault();
   const isRootTag = !node.path.includes("/");
 
-  const items: Array<
-    { item: "Separator" } | { id: string; text: string; action: () => void }
-  > = [];
+  const items: (
+    | { item: "Separator" }
+    | { id: string; text: string; action: () => void }
+  )[] = [];
 
   if (isRootTag) {
     items.push({

@@ -1,6 +1,6 @@
 import {
   Annotation,
-  EditorState,
+  type EditorState,
   StateEffect,
   StateField,
 } from "@codemirror/state";

@@ -1,5 +1,5 @@
 import { EditorSelection } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
 import { Vim } from "@replit/codemirror-vim";
 
 import { getEditorScrollContainer } from "@/features/editor/lib/view-utils";

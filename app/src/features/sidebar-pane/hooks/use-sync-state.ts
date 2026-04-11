@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 export function useSyncState() {
-  const [syncState, setSyncState] = useState<string>("disconnected");
+  const [syncState, setSyncState] = useState("disconnected");
 
   useEffect(() => {
     invoke<string | { error: { message: string } }>("get_sync_status")

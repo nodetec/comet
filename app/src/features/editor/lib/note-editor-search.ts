@@ -1,6 +1,6 @@
 import { type EditorState } from "@codemirror/state";
 import { type SearchQuery } from "@codemirror/search";
-import { EditorView } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
 
 import { getEditorScrollContainer } from "@/features/editor/lib/view-utils";
 

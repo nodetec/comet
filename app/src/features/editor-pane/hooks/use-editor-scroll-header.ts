@@ -6,7 +6,7 @@ export function useEditorScrollHeader(
 ) {
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showHeaderTitle, setShowHeaderTitle] = useState(false);
-  const noteScrollPositionsRef = useRef<Map<string, number>>(new Map());
+  const noteScrollPositionsRef = useRef(new Map());
 
   const updateHeaderState = useCallback(
     (scrollContainer: HTMLDivElement | null) => {

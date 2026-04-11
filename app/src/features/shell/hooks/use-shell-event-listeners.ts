@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { type RefObject } from "react";
+import { type RefObject, useEffect } from "react";
 
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import { errorMessage } from "@/shared/lib/utils";
