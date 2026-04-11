@@ -331,7 +331,7 @@ export function useShellController() {
     selectedHistorySnapshotId,
     isRestoreHistoryPending,
     setNoteHistoryDialogOpen,
-    setSelectedHistorySnapshotId,
+    setUserHistorySnapshotId,
   } = noteHistory;
 
   // --- Note operations ---
@@ -621,7 +621,7 @@ export function useShellController() {
     onOpenChange(open: boolean) {
       setNoteHistoryDialogOpen(open);
       if (!open) {
-        setSelectedHistorySnapshotId(null);
+        setUserHistorySnapshotId(null);
       }
     },
     onRestore() {

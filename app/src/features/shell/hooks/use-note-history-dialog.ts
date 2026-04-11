@@ -35,53 +35,47 @@ export interface NoteHistoryDialogDeps {
 
 export function useNoteHistoryDialog(deps: NoteHistoryDialogDeps) {
   const [noteHistoryDialogOpen, setNoteHistoryDialogOpen] = useState(false);
-  const [selectedHistorySnapshotId, setSelectedHistorySnapshotId] = useState<
+  const [userHistorySnapshotId, setUserHistorySnapshotId] = useState<
     string | null
   >(null);
   const [isRestoreHistoryPending, setIsRestoreHistoryPending] = useState(false);
 
-  // Auto-select history snapshot
-  useEffect(() => {
-    if (!noteHistoryDialogOpen) {
-      setSelectedHistorySnapshotId(null);
-      return;
-    }
-
-    if (!deps.currentNoteId) {
-      setNoteHistoryDialogOpen(false);
-      setSelectedHistorySnapshotId(null);
-      return;
+  // Derive effective snapshot selection from query data + user pick
+  const selectedHistorySnapshotId = (() => {
+    if (!noteHistoryDialogOpen || !deps.currentNoteId) {
+      return null;
     }
 
     if (
       !deps.currentNoteHistory ||
       deps.currentNoteHistory.snapshotCount === 0
     ) {
-      setSelectedHistorySnapshotId(null);
-      return;
+      return null;
     }
 
     if (
-      selectedHistorySnapshotId &&
+      userHistorySnapshotId &&
       deps.currentNoteHistory.snapshots.some(
-        (snapshot) => snapshot.snapshotId === selectedHistorySnapshotId,
+        (snapshot) => snapshot.snapshotId === userHistorySnapshotId,
       )
     ) {
-      return;
+      return userHistorySnapshotId;
     }
 
-    setSelectedHistorySnapshotId(
+    return (
       deps.currentNoteHistory.snapshots.find((snapshot) => snapshot.isCurrent)
         ?.snapshotId ??
-        deps.currentNoteHistory.snapshots[0]?.snapshotId ??
-        null,
+      deps.currentNoteHistory.snapshots[0]?.snapshotId ??
+      null
     );
-  }, [
-    deps.currentNoteHistory,
-    deps.currentNoteId,
-    noteHistoryDialogOpen,
-    selectedHistorySnapshotId,
-  ]);
+  })();
+
+  // Close dialog if note is removed while open
+  useEffect(() => {
+    if (noteHistoryDialogOpen && !deps.currentNoteId) {
+      setNoteHistoryDialogOpen(false);
+    }
+  }, [deps.currentNoteId, noteHistoryDialogOpen]);
 
   const handleOpenNoteHistory = () => {
     if (!deps.currentNoteId) {
@@ -91,7 +85,7 @@ export function useNoteHistoryDialog(deps: NoteHistoryDialogDeps) {
   };
 
   const handleSelectNoteHistorySnapshot = (snapshotId: string) => {
-    setSelectedHistorySnapshotId(snapshotId);
+    setUserHistorySnapshotId(snapshotId);
   };
 
   const handleRestoreSelectedNoteHistorySnapshot = async () => {
@@ -160,7 +154,7 @@ export function useNoteHistoryDialog(deps: NoteHistoryDialogDeps) {
     selectedHistorySnapshotId,
     isRestoreHistoryPending,
     setNoteHistoryDialogOpen,
-    setSelectedHistorySnapshotId,
+    setUserHistorySnapshotId,
     handleOpenNoteHistory,
     handleSelectNoteHistorySnapshot,
     handleRestoreSelectedNoteHistorySnapshot,

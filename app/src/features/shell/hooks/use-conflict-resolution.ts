@@ -57,18 +57,40 @@ export function useConflictResolution(deps: ConflictResolutionDeps) {
   const [chooseConflictNoteId, setChooseConflictNoteId] = useState<
     string | null
   >(null);
-  const [selectedConflictSnapshotId, setSelectedConflictSnapshotId] = useState<
+  const [userConflictSnapshotId, setUserConflictSnapshotId] = useState<
     string | null
   >(null);
   const [isResolveConflictPending, setIsResolveConflictPending] =
     useState(false);
   const previousConflictNoteIdRef = useRef<string | null>(null);
 
+  // Derive effective snapshot selection from query data + user pick
+  const selectedConflictSnapshotId = (() => {
+    if (!currentNote || !currentNoteConflict || !isCurrentNoteConflicted) {
+      return null;
+    }
+
+    if (
+      userConflictSnapshotId &&
+      currentNoteConflict.snapshots.some(
+        (snapshot) => snapshot.snapshotId === userConflictSnapshotId,
+      )
+    ) {
+      return userConflictSnapshotId;
+    }
+
+    return (
+      currentNoteConflict.currentSnapshotId ??
+      currentNoteConflict.snapshots[0]?.snapshotId ??
+      null
+    );
+  })();
+
   // Reset draft when note becomes conflicted
   useEffect(() => {
     if (!currentNote) {
       previousConflictNoteIdRef.current = null;
-      setSelectedConflictSnapshotId(null);
+      setUserConflictSnapshotId(null);
       return;
     }
 
@@ -110,34 +132,6 @@ export function useConflictResolution(deps: ConflictResolutionDeps) {
     isCurrentNoteConflicted,
     pendingSaveTimeoutRef,
     setDraft,
-  ]);
-
-  // Auto-select conflict snapshot
-  useEffect(() => {
-    if (!currentNote || !currentNoteConflict || !isCurrentNoteConflicted) {
-      setSelectedConflictSnapshotId(null);
-      return;
-    }
-
-    if (
-      selectedConflictSnapshotId &&
-      currentNoteConflict.snapshots.some(
-        (snapshot) => snapshot.snapshotId === selectedConflictSnapshotId,
-      )
-    ) {
-      return;
-    }
-
-    setSelectedConflictSnapshotId(
-      currentNoteConflict.currentSnapshotId ??
-        currentNoteConflict.snapshots[0]?.snapshotId ??
-        null,
-    );
-  }, [
-    currentNote,
-    currentNoteConflict,
-    isCurrentNoteConflicted,
-    selectedConflictSnapshotId,
   ]);
 
   // Close dialog if note is no longer conflicted
@@ -199,7 +193,7 @@ export function useConflictResolution(deps: ConflictResolutionDeps) {
       );
       setChooseConflictDialogOpen(false);
       setChooseConflictNoteId(null);
-      setSelectedConflictSnapshotId(null);
+      setUserConflictSnapshotId(null);
       toast.success("Conflict resolution published.", {
         id: "resolve-note-conflict-success",
       });
@@ -233,7 +227,7 @@ export function useConflictResolution(deps: ConflictResolutionDeps) {
     if (!currentNote) {
       return;
     }
-    setSelectedConflictSnapshotId(snapshotId);
+    setUserConflictSnapshotId(snapshotId);
     if (markdown !== null) {
       const snapshot = currentNoteConflict?.snapshots.find(
         (entry) => entry.snapshotId === snapshotId,
