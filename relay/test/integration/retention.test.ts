@@ -28,7 +28,7 @@ describe("relay integration > retention", () => {
   });
 
   test("advertises payload retention boundaries after payload compaction", async () => {
-    const ctx = await startTestSnapshotRelay(39417);
+    const ctx = await startTestSnapshotRelay(39_417);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -47,7 +47,7 @@ describe("relay integration > retention", () => {
       retainedEventD,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
@@ -81,7 +81,7 @@ describe("relay integration > retention", () => {
   });
 
   test("returns EVENT-STATUS when a known snapshot payload was compacted", async () => {
-    const ctx = await startTestSnapshotRelay(39419);
+    const ctx = await startTestSnapshotRelay(39_419);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -96,7 +96,7 @@ describe("relay integration > retention", () => {
       snapshotEvent("snapshot-5", 1_900_000_000_000),
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
@@ -115,7 +115,7 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       [
         "EVENT-STATUS",
         "fetch-compacted",
@@ -126,7 +126,7 @@ describe("relay integration > retention", () => {
   });
 
   test("returns retained and compacted snapshots together in a mixed REQ fetch", async () => {
-    const ctx = await startTestSnapshotRelay(39434);
+    const ctx = await startTestSnapshotRelay(39_434);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -142,7 +142,7 @@ describe("relay integration > retention", () => {
       newestEvent,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_850_000_000_000)).toBe(1);
@@ -161,7 +161,7 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 3, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 3, 3000, trace)).toEqual([
       ["EVENT", "fetch-mixed", newestEvent],
       [
         "EVENT-STATUS",
@@ -173,7 +173,7 @@ describe("relay integration > retention", () => {
   });
 
   test("retains the newest snapshot payload after compacting older snapshots", async () => {
-    const ctx = await startTestSnapshotRelay(39451);
+    const ctx = await startTestSnapshotRelay(39_451);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -188,7 +188,7 @@ describe("relay integration > retention", () => {
       newestEvent,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
@@ -207,14 +207,14 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENT", "fetch-head", newestEvent],
       ["EOSE", "fetch-head"],
     ]);
   });
 
   test("retains a recent per-document snapshot window during compaction", async () => {
-    const ctx = await startTestSnapshotRelay(39454);
+    const ctx = await startTestSnapshotRelay(39_454);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -233,7 +233,7 @@ describe("relay integration > retention", () => {
       retainedEventD,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
@@ -258,7 +258,7 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 6, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 6, 3000, trace)).toEqual([
       ["EVENT", "fetch-retained-window", retainedEventA],
       ["EVENT", "fetch-retained-window", retainedEventB],
       ["EVENT", "fetch-retained-window", retainedEventC],
@@ -273,7 +273,7 @@ describe("relay integration > retention", () => {
   });
 
   test("retains an older concurrent snapshot during compaction", async () => {
-    const ctx = await startTestSnapshotRelay(39456);
+    const ctx = await startTestSnapshotRelay(39_456);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -342,7 +342,7 @@ describe("relay integration > retention", () => {
       currentEvent,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_800_000_000_000)).toBe(2);
@@ -361,7 +361,7 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 4, 3000, trace)).toEqual([
       ["EVENT", "fetch-concurrent-retention", retainedConcurrent],
       ["EVENT", "fetch-concurrent-retention", currentEvent],
       [
@@ -374,7 +374,7 @@ describe("relay integration > retention", () => {
   });
 
   test("retains the latest tombstone snapshot during compaction", async () => {
-    const ctx = await startTestSnapshotRelay(39455);
+    const ctx = await startTestSnapshotRelay(39_455);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -393,7 +393,7 @@ describe("relay integration > retention", () => {
       tombstoneEvent,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
@@ -412,14 +412,14 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENT", "fetch-tombstone", tombstoneEvent],
       ["EOSE", "fetch-tombstone"],
     ]);
   });
 
   test("compacts payloads independently across multiple documents in one author namespace", async () => {
-    const ctx = await startTestSnapshotRelay(39468);
+    const ctx = await startTestSnapshotRelay(39_468);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -465,7 +465,7 @@ describe("relay integration > retention", () => {
       otherDocHead,
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);
@@ -484,7 +484,7 @@ describe("relay integration > retention", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 4, 3000, trace)).toEqual([
       ["EVENT", "multi-doc-retention", otherDocHead],
       ["EVENT", "multi-doc-retention", oldDocHead],
       [
@@ -497,19 +497,19 @@ describe("relay integration > retention", () => {
   });
 
   test("does not compact configured generic event storage", async () => {
-    const ctx = await startTestSnapshotRelay(39469, {
-      companionKinds: [10002],
+    const ctx = await startTestSnapshotRelay(39_469, {
+      companionKinds: [10_002],
     });
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
-    const generic = genericEvent("generic-retained", 10002, [
+    const generic = genericEvent("generic-retained", 10_002, [
       ["p", "author-1"],
     ]);
 
     sendJson(ws, ["EVENT", generic], trace);
-    await waitForMessage(ws, 3_000, trace);
+    await waitForMessage(ws, 3000, trace);
 
     for (const event of [
       snapshotEvent("snapshot-1", 1_700_000_000_000),
@@ -519,7 +519,7 @@ describe("relay integration > retention", () => {
       snapshotEvent("snapshot-5", 1_900_000_000_000),
     ]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     expect(await ctx.compactPayloadsBefore(1_950_000_000_000)).toBe(1);

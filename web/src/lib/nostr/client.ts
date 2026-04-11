@@ -53,14 +53,14 @@ interface PendingFetch {
 
 export class RelayClient {
   private ws: WebSocket | null = null;
-  private url: string;
+  private readonly url: string;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = 1000;
-  private pendingOk = new Map<
+  private readonly pendingOk = new Map<
     string,
     { resolve: (ok: boolean) => void; reject: (err: Error) => void }
   >();
-  private pendingFetches = new Map<string, PendingFetch>();
+  private readonly pendingFetches = new Map<string, PendingFetch>();
   private closed = false;
 
   onEvent: EventCallback = () => {};
@@ -142,7 +142,7 @@ export class RelayClient {
           this.pendingOk.delete(event.id);
           reject(new Error("publish timeout"));
         }
-      }, 10000);
+      }, 10_000);
     });
   }
 
@@ -150,7 +150,7 @@ export class RelayClient {
    * Fetch events matching filters. Resolves with all events received
    * before EOSE or the timeout (whichever comes first).
    */
-  fetch(filters: NostrFilter[], timeoutMs = 15000): Promise<NostrEvent[]> {
+  fetch(filters: NostrFilter[], timeoutMs = 15_000): Promise<NostrEvent[]> {
     return new Promise((resolve) => {
       const subId = `f:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 6)}`;
       const timeout = setTimeout(() => {
@@ -242,7 +242,7 @@ export class RelayClient {
 
     try {
       const authEvent: UnsignedEvent = {
-        kind: 22242,
+        kind: 22_242,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ["relay", this.url],
@@ -262,14 +262,14 @@ export class RelayClient {
             this.pendingOk.delete(signed.id);
             reject(new Error("AUTH timeout"));
           }
-        }, 10000);
+        }, 10_000);
       });
 
       if (ok) {
         this.onAuth();
       }
-    } catch (err) {
-      console.error("AUTH failed:", err);
+    } catch (error) {
+      console.error("AUTH failed:", error);
     }
   }
 
@@ -277,7 +277,7 @@ export class RelayClient {
     if (this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
       this.connect();
     }, this.reconnectDelay);
   }

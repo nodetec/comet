@@ -151,7 +151,7 @@ async function mapWithConcurrency<T, R>(
     return [];
   }
 
-  const results = new Array<R>(items.length);
+  const results = Array.from<R>({ length: items.length });
   let nextIndex = 0;
 
   async function runWorker(): Promise<void> {
@@ -220,8 +220,8 @@ async function storeBlobForPubkey(
   if (!existingBlob) {
     try {
       await objectStorage.uploadBlob(sha256, data, contentType);
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error(
         `[blossom] storage upload failed hash=${shortHash(sha256)} pubkey=${shortPubkey(pubkey)} error=${err.name}: ${err.message}`,
       );
@@ -643,7 +643,7 @@ export async function createBlossomServer(
         );
 
         const storageStartedAt = Date.now();
-        const storageWriteEntries = Array.from(uniqueNewUploads.entries());
+        const storageWriteEntries = [...uniqueNewUploads.entries()];
         const storageWriteResults = await mapWithConcurrency(
           storageWriteEntries,
           BATCH_UPLOAD_STORAGE_CONCURRENCY,
@@ -678,12 +678,12 @@ export async function createBlossomServer(
           `[blossom] batch storage uploads ready pubkey=${shortPubkey(auth.pubkey)} blobs=${storageWriteEntries.length} failed=${failedStorageWrites.size} elapsed_ms=${Date.now() - storageStartedAt}`,
         );
 
-        const results: Array<{
+        const results: {
           part: string;
           status: number;
           descriptor?: BlobDescriptor;
           error?: string;
-        }> = [];
+        }[] = [];
 
         for (const plan of batchPlans) {
           if (!plan.ok) {
@@ -731,9 +731,9 @@ export async function createBlossomServer(
       }
 
       // Admin blob deletion — ADMIN_TOKEN auth (no Nostr signing required)
-      const adminBlobMatch = url.pathname.match(/^\/admin\/([a-f0-9]{64})$/);
-      const adminUserBlobMatch = url.pathname.match(
-        /^\/admin\/users\/([a-f0-9]{64})\/blobs$/,
+      const adminBlobMatch = /^\/admin\/([a-f0-9]{64})$/.exec(url.pathname);
+      const adminUserBlobMatch = /^\/admin\/users\/([a-f0-9]{64})\/blobs$/.exec(
+        url.pathname,
       );
       if (request.method === "DELETE" && adminBlobMatch) {
         console.log(

@@ -43,7 +43,7 @@ function LoginPage() {
   function createAuthEvent(secretKey: Uint8Array) {
     return finalizeEvent(
       {
-        kind: 27235,
+        kind: 27_235,
         content: "",
         tags: [],
         created_at: Math.floor(Date.now() / 1000),
@@ -62,7 +62,7 @@ function LoginPage() {
       }
 
       const event = {
-        kind: 27235,
+        kind: 27_235,
         content: "",
         tags: [],
         created_at: Math.floor(Date.now() / 1000),

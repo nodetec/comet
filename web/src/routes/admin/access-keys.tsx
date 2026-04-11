@@ -63,7 +63,7 @@ function CopyableKey({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    navigator.clipboard.writeText(value);
+    void navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -106,7 +106,9 @@ function AccessKeysPage() {
         },
       }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "access-keys"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "access-keys"],
+      });
       setLabel("");
       setPubkeyInput("");
       setCreatedKey(result.key);
@@ -116,14 +118,18 @@ function AccessKeysPage() {
   const revokeMutation = useMutation({
     mutationFn: (key: string) => revokeAccessKey({ data: { key } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "access-keys"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "access-keys"],
+      });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (key: string) => deleteAccessKey({ data: { key } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "access-keys"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "access-keys"],
+      });
     },
   });
 
@@ -137,7 +143,7 @@ function AccessKeysPage() {
 
   function handleCopyCreated() {
     if (createdKey) {
-      navigator.clipboard.writeText(createdKey);
+      void navigator.clipboard.writeText(createdKey);
       setCreatedKeyCopied(true);
       setTimeout(() => setCreatedKeyCopied(false), 2000);
     }

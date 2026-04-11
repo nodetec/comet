@@ -1,14 +1,11 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "unicorn", "import"],
+  "$schema": "node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "error",
     "style": "error"
-  },
-  "options": {
-    "typeAware": true
   },
   "rules": {
     "typescript/no-floating-promises": [
@@ -20,10 +17,6 @@
       { "checksVoidReturn": { "attributes": false } }
     ],
 
-    "react/react-in-jsx-scope": "off",
-    "react/jsx-max-depth": "off",
-    "react/jsx-props-no-spreading": "off",
-    "react/jsx-handler-names": "off",
     "unicorn/no-null": "off",
     "unicorn/no-array-callback-reference": "off",
     "unicorn/prefer-global-this": "off",
@@ -65,8 +58,8 @@
     "dist/**",
     "node_modules/**",
     "coverage/**",
-    "src-tauri/**",
-    "scripts/**"
+    "drizzle/**",
+    "vendor/**"
   ],
   "overrides": []
 }

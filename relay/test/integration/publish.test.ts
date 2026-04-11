@@ -23,7 +23,7 @@ describe("relay integration > publish", () => {
   });
 
   test("returns NOTICE for malformed JSON input", async () => {
-    const ctx = await startTestSnapshotRelay(39436);
+    const ctx = await startTestSnapshotRelay(39_436);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -32,14 +32,14 @@ describe("relay integration > publish", () => {
     ctx.log(`${trace.label} -> <raw malformed json>`);
     ws.send("{");
 
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "NOTICE",
       "invalid: expected a JSON array message",
     ]);
   });
 
   test("returns NOTICE for non-array JSON input", async () => {
-    const ctx = await startTestSnapshotRelay(39437);
+    const ctx = await startTestSnapshotRelay(39_437);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -48,14 +48,14 @@ describe("relay integration > publish", () => {
     ctx.log(`${trace.label} -> <raw object json>`);
     ws.send(JSON.stringify({ kind: "not-an-array" }));
 
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "NOTICE",
       "invalid: expected a JSON array message",
     ]);
   });
 
   test("rejects binary websocket messages with NOTICE", async () => {
-    const ctx = await startTestSnapshotRelay(39438);
+    const ctx = await startTestSnapshotRelay(39_438);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -64,14 +64,14 @@ describe("relay integration > publish", () => {
     ctx.log(`${trace.label} -> <binary 3 bytes>`);
     ws.send(new Uint8Array([1, 2, 3]));
 
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "NOTICE",
       "invalid: binary messages unsupported",
     ]);
   });
 
   test("returns duplicate response when the same snapshot is published twice", async () => {
-    const ctx = await startTestSnapshotRelay(39431);
+    const ctx = await startTestSnapshotRelay(39_431);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -79,7 +79,7 @@ describe("relay integration > publish", () => {
     const event = snapshotEvent(REV_A);
 
     sendJson(ws, ["EVENT", event], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       event.id,
       true,
@@ -87,7 +87,7 @@ describe("relay integration > publish", () => {
     ]);
 
     sendJson(ws, ["EVENT", event], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       event.id,
       false,
@@ -96,7 +96,7 @@ describe("relay integration > publish", () => {
   });
 
   test("rejects unsupported non-snapshot event kinds", async () => {
-    const ctx = await startTestSnapshotRelay(39439);
+    const ctx = await startTestSnapshotRelay(39_439);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -112,7 +112,7 @@ describe("relay integration > publish", () => {
     };
 
     sendJson(ws, ["EVENT", event], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       event.id,
       false,
@@ -121,7 +121,7 @@ describe("relay integration > publish", () => {
   });
 
   test("rejects snapshot events with malformed metadata", async () => {
-    const ctx = await startTestSnapshotRelay(39440);
+    const ctx = await startTestSnapshotRelay(39_440);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -137,7 +137,7 @@ describe("relay integration > publish", () => {
     };
 
     sendJson(ws, ["EVENT", invalidEvent], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       invalidEvent.id,
       false,
@@ -146,7 +146,7 @@ describe("relay integration > publish", () => {
   });
 
   test("rejects snapshot events with malformed operation tags", async () => {
-    const ctx = await startTestSnapshotRelay(39441);
+    const ctx = await startTestSnapshotRelay(39_441);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -162,7 +162,7 @@ describe("relay integration > publish", () => {
     };
 
     sendJson(ws, ["EVENT", invalidEvent], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       invalidEvent.id,
       false,

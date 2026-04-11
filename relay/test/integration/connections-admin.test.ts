@@ -24,7 +24,7 @@ describe("relay integration > admin connections", () => {
   });
 
   test("returns 503 when admin token is not configured", async () => {
-    const ctx = await startTestSnapshotRelay(35230);
+    const ctx = await startTestSnapshotRelay(35_230);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/connections`);
@@ -33,7 +33,7 @@ describe("relay integration > admin connections", () => {
   });
 
   test("lists authenticated connections and live subscription ids", async () => {
-    const ctx = await startTestSnapshotRelay(35231, {
+    const ctx = await startTestSnapshotRelay(35_231, {
       privateMode: true,
       adminToken: "secret-token",
     });
@@ -44,17 +44,17 @@ describe("relay integration > admin connections", () => {
     const ws = await connectWs(ctx.port, traceOptions(ctx, "connections"));
     const challengeMessage = await waitForMessage(
       ws,
-      3_000,
+      3000,
       traceOptions(ctx, "connections"),
     );
 
     sendJson(ws, ["TOKEN", accessKey], traceOptions(ctx, "connections"));
-    await waitForMessage(ws, 3_000, traceOptions(ctx, "connections"));
+    await waitForMessage(ws, 3000, traceOptions(ctx, "connections"));
 
     const auth = authEvent(challengeMessage[1] as string, ctx.relayUrl);
     sendJson(ws, ["AUTH", auth], traceOptions(ctx, "connections"));
     expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "connections")),
+      await waitForMessage(ws, 3000, traceOptions(ctx, "connections")),
     ).toEqual(["OK", auth.id, true, ""]);
 
     sendJson(
@@ -71,7 +71,7 @@ describe("relay integration > admin connections", () => {
       ],
       traceOptions(ctx, "connections"),
     );
-    await waitForMessage(ws, 3_000, traceOptions(ctx, "connections"));
+    await waitForMessage(ws, 3000, traceOptions(ctx, "connections"));
 
     const response = await fetch(`${ctx.httpUrl}/admin/connections`, {
       headers: { Authorization: "Bearer secret-token" },

@@ -43,11 +43,11 @@ function resolveAppDataDir(dev: boolean): string {
   if (os === "darwin") {
     configDir = join(home, "Library", "Application Support", identifier);
   } else if (os === "win32") {
-    const appdata = process.env["APPDATA"] ?? join(home, "AppData", "Roaming");
+    const appdata = process.env.APPDATA ?? join(home, "AppData", "Roaming");
     configDir = join(appdata, identifier);
   } else {
     configDir = join(
-      process.env["XDG_CONFIG_HOME"] ?? join(home, ".config"),
+      process.env.XDG_CONFIG_HOME ?? join(home, ".config"),
       identifier,
     );
   }

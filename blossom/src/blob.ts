@@ -10,7 +10,7 @@ export async function computeSha256Hex(
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
 
-  return Array.from(new Uint8Array(hashBuffer))
+  return [...new Uint8Array(hashBuffer)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }

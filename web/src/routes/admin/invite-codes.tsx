@@ -90,7 +90,9 @@ function InviteCodesPage() {
     mutationFn: () =>
       createInviteCode({ data: { maxUses: parseInt(maxUses, 10) || 1 } }),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invite-codes"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "invite-codes"],
+      });
       setNewCode(result.code);
     },
   });
@@ -98,7 +100,9 @@ function InviteCodesPage() {
   const revokeMutation = useMutation({
     mutationFn: (id: number) => revokeInviteCode({ data: { id } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invite-codes"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "invite-codes"],
+      });
     },
   });
 

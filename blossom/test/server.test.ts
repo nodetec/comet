@@ -18,12 +18,12 @@ type UploadResponse = {
 };
 
 type UploadBatchResponse = {
-  results: Array<{
+  results: {
     part: string;
     status: number;
     descriptor?: UploadResponse;
     error?: string;
-  }>;
+  }[];
 };
 
 let ctx: BlossomTestContext | undefined;
@@ -133,9 +133,9 @@ describe("blossom integration", () => {
     expect(getResponse.status).toBe(200);
     expect(getResponse.headers.get("content-type")).toBe("text/plain");
     expect(getResponse.headers.get("x-content-sha256")).toBe(sha256);
-    expect(Array.from(new Uint8Array(await getResponse.arrayBuffer()))).toEqual(
-      Array.from(body),
-    );
+    expect([...new Uint8Array(await getResponse.arrayBuffer())]).toEqual([
+      ...body,
+    ]);
   });
 
   test("rejects list requests for a different pubkey", async () => {

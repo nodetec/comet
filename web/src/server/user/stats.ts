@@ -35,9 +35,9 @@ export const getUserStats = createServerFn({ method: "GET" }).handler(
 
     return {
       events: Number(eventRows[0]?.val ?? 0),
-      blobs: Number(blobStats[0]?.blobCount ?? 0),
-      storage: Number(blobStats[0]?.storageUsed ?? 0),
-      snapshots: Number(snapshotRows[0]?.val ?? 0),
+      blobs: blobStats[0]?.blobCount ?? 0,
+      storage: blobStats[0]?.storageUsed ?? 0,
+      snapshots: snapshotRows[0]?.val ?? 0,
     };
   },
 );
@@ -45,7 +45,7 @@ export const getUserStats = createServerFn({ method: "GET" }).handler(
 export const getUserEventsOverTime = createServerFn({ method: "GET" }).handler(
   async () => {
     const pubkey = assertUser();
-    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
+    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86_400;
     const rows = await db.execute<StoredEventsOverTimeRow>(
       buildStoredEventsOverTimeQuery(thirtyDaysAgo, pubkey),
     );

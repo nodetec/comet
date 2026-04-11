@@ -58,9 +58,9 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
   return {
     users: blobStats.map((r) => ({
       pubkey: r.pubkey,
-      storageUsedBytes: Number(r.storageUsedBytes),
+      storageUsedBytes: r.storageUsedBytes,
       storageLimitBytes: null,
-      blobCount: Number(r.blobCount),
+      blobCount: r.blobCount,
       eventCount: eventCountMap.get(r.pubkey) ?? 0,
     })),
     defaultStorageLimitBytes: DEFAULT_STORAGE_LIMIT_BYTES,
@@ -149,9 +149,9 @@ export const deleteUserData = createServerFn({ method: "POST" })
         );
 
       return {
-        deletedRelayEvents: Number(relayEventRow.val),
-        deletedRevisionEvents: Number(revisionPayloadRow.val),
-        deletedLegacyEvents: Number(legacyEventRow.val),
+        deletedRelayEvents: relayEventRow.val,
+        deletedRevisionEvents: revisionPayloadRow.val,
+        deletedLegacyEvents: legacyEventRow.val,
       };
     });
 

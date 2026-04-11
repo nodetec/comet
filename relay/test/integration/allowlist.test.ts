@@ -14,7 +14,7 @@ describe("relay integration > access keys admin", () => {
   });
 
   test("returns 503 when admin token is not configured", async () => {
-    const ctx = await startTestSnapshotRelay(35210);
+    const ctx = await startTestSnapshotRelay(35_210);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/keys`);
@@ -23,7 +23,7 @@ describe("relay integration > access keys admin", () => {
   });
 
   test("creates, lists, and revokes access keys", async () => {
-    const ctx = await startTestSnapshotRelay(35211, {
+    const ctx = await startTestSnapshotRelay(35_211, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -40,7 +40,7 @@ describe("relay integration > access keys admin", () => {
       body: JSON.stringify({
         label: "test-user",
         expires_at: 1_900_000_000,
-        storage_limit_bytes: 1_024,
+        storage_limit_bytes: 1024,
       }),
     });
 
@@ -54,7 +54,7 @@ describe("relay integration > access keys admin", () => {
     expect(created.key).toMatch(/^sk_/);
     expect(created.label).toBe("test-user");
     expect(created.expires_at).toBe(1_900_000_000);
-    expect(created.storage_limit_bytes).toBe(1_024);
+    expect(created.storage_limit_bytes).toBe(1024);
 
     const list = await fetch(`${ctx.httpUrl}/admin/keys`, {
       headers: { Authorization: "Bearer secret-token" },
@@ -62,11 +62,11 @@ describe("relay integration > access keys admin", () => {
     expect(list.status).toBe(200);
     const listed = (await list.json()) as {
       private_mode: boolean;
-      keys: Array<{
+      keys: {
         key: string;
         label: string;
         revoked: boolean;
-      }>;
+      }[];
     };
     expect(listed.private_mode).toBe(false);
     expect(listed.keys).toHaveLength(1);
@@ -91,7 +91,7 @@ describe("relay integration > access keys admin", () => {
       headers: { Authorization: "Bearer secret-token" },
     });
     const afterRevoke = (await listAfterRevoke.json()) as {
-      keys: Array<{ revoked: boolean }>;
+      keys: { revoked: boolean }[];
     };
     expect(afterRevoke.keys[0].revoked).toBe(true);
 
@@ -109,7 +109,7 @@ describe("relay integration > access keys admin", () => {
       headers: { Authorization: "Bearer secret-token" },
     });
     const afterDelete = (await listAfterDelete.json()) as {
-      keys: Array<{ key: string }>;
+      keys: { key: string }[];
     };
     expect(afterDelete.keys).toHaveLength(0);
   });

@@ -18,7 +18,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("returns the default retention policy", async () => {
-    const ctx = await startTestSnapshotRelay(35200);
+    const ctx = await startTestSnapshotRelay(35_200);
     contexts.push(ctx);
 
     const response = await fetch(`${ctx.httpUrl}/admin/retention`);
@@ -31,7 +31,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("requires bearer auth for retention updates when an admin token is configured", async () => {
-    const ctx = await startTestSnapshotRelay(35201, {
+    const ctx = await startTestSnapshotRelay(35_201, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -47,7 +47,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("updates and persists the retention policy through the admin api", async () => {
-    const ctx = await startTestSnapshotRelay(35202, {
+    const ctx = await startTestSnapshotRelay(35_202, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -86,7 +86,7 @@ describe("relay integration > admin retention api", () => {
   });
 
   test("applies the updated retention policy immediately to older snapshot payloads", async () => {
-    const ctx = await startTestSnapshotRelay(35203, {
+    const ctx = await startTestSnapshotRelay(35_203, {
       adminToken: "secret-token",
     });
     contexts.push(ctx);
@@ -107,7 +107,7 @@ describe("relay integration > admin retention api", () => {
     ]) {
       sendJson(ws, ["EVENT", event], traceOptions(ctx, "admin-apply"));
       expect(
-        await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
+        await waitForMessage(ws, 3000, traceOptions(ctx, "admin-apply")),
       ).toEqual(["OK", event.id, true, `stored: snapshot ${event.id}`]);
     }
 
@@ -144,17 +144,17 @@ describe("relay integration > admin retention api", () => {
     );
 
     expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
+      await waitForMessage(ws, 3000, traceOptions(ctx, "admin-apply")),
     ).toEqual(["EVENT", "retention-fetch", retainedSnapshotD]);
     expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
+      await waitForMessage(ws, 3000, traceOptions(ctx, "admin-apply")),
     ).toEqual([
       "EVENT-STATUS",
       "retention-fetch",
       { id: compactedSnapshot.id, status: "payload_compacted" },
     ]);
     expect(
-      await waitForMessage(ws, 3_000, traceOptions(ctx, "admin-apply")),
+      await waitForMessage(ws, 3000, traceOptions(ctx, "admin-apply")),
     ).toEqual(["EOSE", "retention-fetch"]);
   });
 });

@@ -79,7 +79,7 @@ export function EventsOverTimeChart({ data }: { data?: EventsOverTimeData[] }) {
               axisLine={false}
               tickMargin={8}
               tickFormatter={(v: string) => {
-                const d = new Date(v + "T00:00:00");
+                const d = new Date(`${v}T00:00:00`);
                 return d.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -91,7 +91,7 @@ export function EventsOverTimeChart({ data }: { data?: EventsOverTimeData[] }) {
               content={
                 <ChartTooltipContent
                   labelFormatter={(v: string) => {
-                    const d = new Date(v + "T00:00:00");
+                    const d = new Date(`${v}T00:00:00`);
                     return d.toLocaleDateString("en-US", {
                       month: "long",
                       day: "numeric",
@@ -142,17 +142,20 @@ export function EventsByKindChart({ data }: { data?: EventsByKindData[] }) {
     return config;
   }, [data]);
 
-  const pieData = useMemo(() => {
-    return (data ?? []).map((item) => ({
-      name: kindLabel(item.kind),
-      value: item.count,
-      fill: pieConfig[`kind-${item.kind}`]?.color ?? "var(--chart-1)",
-    }));
-  }, [data, pieConfig]);
+  const pieData = useMemo(
+    () =>
+      (data ?? []).map((item) => ({
+        name: kindLabel(item.kind),
+        value: item.count,
+        fill: pieConfig[`kind-${item.kind}`]?.color ?? "var(--chart-1)",
+      })),
+    [data, pieConfig],
+  );
 
-  const totalEvents = useMemo(() => {
-    return (data ?? []).reduce((sum, item) => sum + item.count, 0);
-  }, [data]);
+  const totalEvents = useMemo(
+    () => (data ?? []).reduce((sum, item) => sum + item.count, 0),
+    [data],
+  );
 
   return (
     <Card className="lg:col-span-3">
@@ -245,13 +248,15 @@ export function StorageByUserChart({ data }: { data?: StorageByUserData[] }) {
     return config;
   }, [data]);
 
-  const barData = useMemo(() => {
-    return (data ?? []).map((item, i) => ({
-      pubkey: shortNpub(item.pubkey),
-      storage: item.storage,
-      fill: PIE_COLORS[i % PIE_COLORS.length],
-    }));
-  }, [data]);
+  const barData = useMemo(
+    () =>
+      (data ?? []).map((item, i) => ({
+        pubkey: shortNpub(item.pubkey),
+        storage: item.storage,
+        fill: PIE_COLORS[i % PIE_COLORS.length],
+      })),
+    [data],
+  );
 
   if (!barData.length) return null;
 
@@ -290,8 +295,8 @@ export function StorageByUserChart({ data }: { data?: StorageByUserData[] }) {
               }
             />
             <Bar dataKey="storage" radius={[4, 4, 0, 0]}>
-              {barData.map((entry, index) => (
-                <Cell key={index} fill={entry.fill} />
+              {barData.map((entry) => (
+                <Cell key={entry.pubkey} fill={entry.fill} />
               ))}
             </Bar>
           </BarChart>

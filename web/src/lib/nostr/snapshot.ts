@@ -1,6 +1,6 @@
 import type { NostrEvent } from "./client";
 
-export const COMET_NOTE_SNAPSHOT_KIND = 42061;
+export const COMET_NOTE_SNAPSHOT_KIND = 42_061;
 export const COMET_NOTE_COLLECTION = "notes";
 const COMET_NOTE_SNAPSHOT_VERSION = 1;
 

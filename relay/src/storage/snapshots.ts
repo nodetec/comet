@@ -151,7 +151,7 @@ export function createSnapshotStore(db: SnapshotRelayDb): SnapshotStore {
         }
       }
 
-      return Array.from(events.values()).sort((left, right) => {
+      return [...events.values()].toSorted((left, right) => {
         if (left.created_at !== right.created_at) {
           return left.created_at - right.created_at;
         }
@@ -192,7 +192,7 @@ export function createSnapshotStore(db: SnapshotRelayDb): SnapshotStore {
         }
       }
 
-      return Array.from(snapshotIds.values()).sort();
+      return [...snapshotIds.values()].toSorted();
     },
   };
 }

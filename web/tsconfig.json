@@ -12,7 +12,6 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
-    "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"]
     }

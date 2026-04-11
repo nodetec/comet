@@ -23,9 +23,9 @@ export const getStats = createServerFn({ method: "GET" }).handler(async () => {
   ]);
   return {
     events: Number(eventRow.val),
-    blobs: Number(blobRow.val),
-    users: Number(userRow.val),
-    blobStorage: Number(blobSizeRow.val),
+    blobs: blobRow.val,
+    users: userRow.val,
+    blobStorage: blobSizeRow.val,
   };
 });
 
@@ -44,7 +44,7 @@ export const getEventsByKind = createServerFn({ method: "GET" }).handler(
 export const getEventsOverTime = createServerFn({ method: "GET" }).handler(
   async () => {
     assertAdmin();
-    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
+    const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86_400;
     const rows = await db.execute<StoredEventsOverTimeRow>(
       buildStoredEventsOverTimeQuery(thirtyDaysAgo),
     );
@@ -70,7 +70,7 @@ export const getStorageByUser = createServerFn({ method: "GET" }).handler(
     return {
       data: rows.map((r) => ({
         pubkey: r.pubkey,
-        storage: Number(r.storage),
+        storage: r.storage,
       })),
     };
   },

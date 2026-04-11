@@ -5,7 +5,7 @@ export type SnapshotRelayInfoDocument = {
   description: string;
   software: string;
   version: string;
-  supported_nips: Array<number | string>;
+  supported_nips: (number | string)[];
   changes_feed: {
     min_seq: number;
   };

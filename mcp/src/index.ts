@@ -9,15 +9,15 @@ const dev = args.includes("--dev");
 let appDbPath: string;
 try {
   appDbPath = resolveAppDatabasePath(dev);
-} catch (e) {
-  console.error(e instanceof Error ? e.message : String(e));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 
 try {
   await openDatabase(appDbPath);
-} catch (e) {
-  console.error(e instanceof Error ? e.message : String(e));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 

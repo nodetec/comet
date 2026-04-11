@@ -29,7 +29,7 @@ export function UserDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["user", "stats"],
     queryFn: () => getUserStats(),
-    refetchInterval: 10000,
+    refetchInterval: 10_000,
   });
 
   const { data: eventsOverTime } = useQuery({
@@ -105,7 +105,7 @@ function AccessKeyCard() {
   });
 
   function handleCopy(key: string) {
-    navigator.clipboard.writeText(key);
+    void navigator.clipboard.writeText(key);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -134,7 +134,7 @@ function AccessKeyCard() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0"
-                onClick={() => handleCopy(data.accessKey!.key)}
+                onClick={() => handleCopy(data.accessKey.key)}
               >
                 {copied ? (
                   <Check className="h-3.5 w-3.5" />

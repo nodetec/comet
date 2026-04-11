@@ -26,7 +26,7 @@ describe("relay integration > concurrency", () => {
   });
 
   test("keeps live subscribers and bootstrap clients consistent while a third client publishes", async () => {
-    const ctx = await startTestSnapshotRelay(39449);
+    const ctx = await startTestSnapshotRelay(39_449);
     contexts.push(ctx);
 
     const publisherTrace = traceOptions(ctx, "publisher");
@@ -40,7 +40,7 @@ describe("relay integration > concurrency", () => {
     const laterEvent = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
 
     sendJson(publisherWs, ["EVENT", initialEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     sendJson(
       liveWs,
@@ -57,7 +57,7 @@ describe("relay integration > concurrency", () => {
       ],
       liveTrace,
     );
-    expect(await waitForMessage(liveWs, 3_000, liveTrace)).toEqual([
+    expect(await waitForMessage(liveWs, 3000, liveTrace)).toEqual([
       "CHANGES",
       "live-mixed",
       "EOSE",
@@ -85,9 +85,9 @@ describe("relay integration > concurrency", () => {
     expect(bootstrap.snapshotSeq).toEqual(1);
     expect(bootstrap.snapshots).toEqual([initialEvent]);
 
-    const liveEventPromise = waitForMessage(liveWs, 3_000, liveTrace);
+    const liveEventPromise = waitForMessage(liveWs, 3000, liveTrace);
     sendJson(publisherWs, ["EVENT", laterEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     expect(await liveEventPromise).toEqual([
       "CHANGES",
@@ -111,11 +111,11 @@ describe("relay integration > concurrency", () => {
       ],
       bootstrapTrace,
     );
-    expect(
-      await waitForMessages(bootstrapWs, 2, 3_000, bootstrapTrace),
-    ).toEqual([
-      ["CHANGES", "mixed-tail", "EVENT", 2, laterEvent],
-      ["CHANGES", "mixed-tail", "EOSE", 2],
-    ]);
+    expect(await waitForMessages(bootstrapWs, 2, 3000, bootstrapTrace)).toEqual(
+      [
+        ["CHANGES", "mixed-tail", "EVENT", 2, laterEvent],
+        ["CHANGES", "mixed-tail", "EOSE", 2],
+      ],
+    );
   });
 });

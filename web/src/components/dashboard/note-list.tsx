@@ -26,7 +26,7 @@ function getSnippet(markdown: string, maxLen = 120): string {
   const lines = markdown.split("\n");
   const contentLines = lines.filter((l) => !l.startsWith("# ") && l.trim());
   const text = contentLines.join(" ").slice(0, maxLen);
-  return text.length >= maxLen ? text + "..." : text;
+  return text.length >= maxLen ? `${text}...` : text;
 }
 
 function NoteListItem({
@@ -88,11 +88,13 @@ function NoteListSeparator({ hidden }: { hidden?: boolean }) {
   );
 }
 
+const SKELETON_KEYS = ["s1", "s2", "s3", "s4", "s5", "s6"];
+
 function NoteListSkeleton() {
   return (
     <div className="space-y-0 px-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i}>
+      {SKELETON_KEYS.map((id) => (
+        <div key={id}>
           <div className="flex h-[6.75rem] flex-col gap-1.5 px-3 py-2.5">
             <Skeleton className="h-4 w-3/5" />
             <Skeleton className="h-3.5 w-full" />
@@ -160,6 +162,7 @@ export function NoteList({
       </div>
 
       <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+        {/* oxlint-disable unicorn/no-nested-ternary -- loading/empty/content pattern */}
         {isLoading && notes.length === 0 ? (
           <NoteListSkeleton />
         ) : notes.length === 0 ? (
@@ -199,6 +202,7 @@ export function NoteList({
             )}
           </div>
         )}
+        {/* oxlint-enable unicorn/no-nested-ternary */}
       </ScrollArea>
     </div>
   );

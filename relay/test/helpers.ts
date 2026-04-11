@@ -140,7 +140,7 @@ export async function connectWs(
 
 export function waitForMessage(
   ws: WebSocket,
-  timeoutMs = 3_000,
+  timeoutMs = 3000,
   options: TraceOptions = {},
 ): Promise<unknown[]> {
   return new Promise((resolve, reject) => {
@@ -171,7 +171,7 @@ export function waitForMessage(
 export function waitForMessages(
   ws: WebSocket,
   count: number,
-  timeoutMs = 3_000,
+  timeoutMs = 3000,
   options: TraceOptions = {},
 ): Promise<unknown[][]> {
   return new Promise((resolve) => {
@@ -241,7 +241,7 @@ export async function waitForBootstrapSnapshots(
   let snapshotSeq: number | null = null;
 
   while (true) {
-    const responsePromise = waitForMessage(ws, 3_000, options);
+    const responsePromise = waitForMessage(ws, 3000, options);
     const response = await responsePromise;
     if (!Array.isArray(response) || response[0] !== "CHANGES") {
       throw new Error(
@@ -284,7 +284,7 @@ export async function waitFor(
     label?: string;
   } = {},
 ): Promise<void> {
-  const timeoutMs = options.timeoutMs ?? 3_000;
+  const timeoutMs = options.timeoutMs ?? 3000;
   const intervalMs = options.intervalMs ?? 25;
   const started = Date.now();
 

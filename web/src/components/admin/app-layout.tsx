@@ -34,7 +34,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   async function handleLogout() {
     await logout();
-    navigate({ to: "/admin/login" });
+    void navigate({ to: "/admin/login" });
   }
 
   return (

@@ -57,7 +57,7 @@ async function main() {
         (relay) =>
           new Promise<void>((resolve) => {
             relay.child.once("exit", () => resolve());
-            setTimeout(resolve, 2_000);
+            setTimeout(resolve, 2000);
           }),
       ),
     );
@@ -153,31 +153,38 @@ function parseArgs(args: string[]): Options {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
-      case "--count":
+      case "--count": {
         count = parseIntegerArg(arg, args[index + 1]);
         index += 1;
         break;
-      case "--start-port":
+      }
+      case "--start-port": {
         startPort = parseIntegerArg(arg, args[index + 1]);
         index += 1;
         break;
-      case "--host":
+      }
+      case "--host": {
         host = args[index + 1] ?? host;
         index += 1;
         break;
-      case "--admin-db":
+      }
+      case "--admin-db": {
         adminDatabaseUrl = args[index + 1] ?? adminDatabaseUrl;
         index += 1;
         break;
-      case "--keep-databases":
+      }
+      case "--keep-databases": {
         keepDatabases = true;
         break;
+      }
       case "--help":
-      case "-h":
+      case "-h": {
         printHelpAndExit();
         break;
-      default:
+      }
+      default: {
         throw new Error(`Unknown argument: ${arg}`);
+      }
     }
   }
 

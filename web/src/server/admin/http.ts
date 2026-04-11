@@ -15,7 +15,8 @@ export async function getAdminErrorMessage(
   }
 
   try {
-    const body = (await response.text()).trim();
+    const rawBody = await response.text();
+    const body = rawBody.trim();
     if (body !== "") {
       return body;
     }

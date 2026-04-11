@@ -27,7 +27,7 @@ describe("relay integration > changes", () => {
   });
 
   test("stores a snapshot event and replays it through CHANGES", async () => {
-    const ctx = await startTestSnapshotRelay(39410);
+    const ctx = await startTestSnapshotRelay(39_410);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -35,7 +35,7 @@ describe("relay integration > changes", () => {
     const event = snapshotEvent(REV_A);
 
     sendJson(ws, ["EVENT", event], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "OK",
       event.id,
       true,
@@ -57,14 +57,14 @@ describe("relay integration > changes", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["CHANGES", "sync-1", "EVENT", 1, event],
       ["CHANGES", "sync-1", "EOSE", 1],
     ]);
   });
 
   test("filters CHANGES replay by document id", async () => {
-    const ctx = await startTestSnapshotRelay(39463);
+    const ctx = await startTestSnapshotRelay(39_463);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -74,7 +74,7 @@ describe("relay integration > changes", () => {
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     sendJson(
@@ -93,14 +93,14 @@ describe("relay integration > changes", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["CHANGES", "doc-filter", "EVENT", 2, secondEvent],
       ["CHANGES", "doc-filter", "EOSE", 2],
     ]);
   });
 
   test("bootstrap returns only nondominated current snapshots for one document", async () => {
-    const ctx = await startTestSnapshotRelay(39464);
+    const ctx = await startTestSnapshotRelay(39_464);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -135,7 +135,7 @@ describe("relay integration > changes", () => {
 
     for (const event of [staleEvent, currentLeft, currentRight]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     sendJson(
@@ -152,7 +152,7 @@ describe("relay integration > changes", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 4, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 4, 3000, trace)).toEqual([
       [
         "CHANGES",
         "bootstrap-current",
@@ -166,7 +166,7 @@ describe("relay integration > changes", () => {
   });
 
   test("streams live CHANGES events after the initial EOSE", async () => {
-    const ctx = await startTestSnapshotRelay(39418);
+    const ctx = await startTestSnapshotRelay(39_418);
     contexts.push(ctx);
 
     const subscriberTrace = traceOptions(ctx, "subscriber");
@@ -189,7 +189,7 @@ describe("relay integration > changes", () => {
       ],
       subscriberTrace,
     );
-    expect(await waitForMessage(subscriber, 3_000, subscriberTrace)).toEqual([
+    expect(await waitForMessage(subscriber, 3000, subscriberTrace)).toEqual([
       "CHANGES",
       "live-1",
       "EOSE",
@@ -197,10 +197,10 @@ describe("relay integration > changes", () => {
     ]);
 
     const event = snapshotEvent(REV_A);
-    const livePromise = waitForMessage(subscriber, 3_000, subscriberTrace);
+    const livePromise = waitForMessage(subscriber, 3000, subscriberTrace);
     sendJson(publisher, ["EVENT", event], publisherTrace);
 
-    expect(await waitForMessage(publisher, 3_000, publisherTrace)).toEqual([
+    expect(await waitForMessage(publisher, 3000, publisherTrace)).toEqual([
       "OK",
       event.id,
       true,
@@ -210,7 +210,7 @@ describe("relay integration > changes", () => {
   });
 
   test("removes a live CHANGES subscription after CLOSE", async () => {
-    const ctx = await startTestSnapshotRelay(39433);
+    const ctx = await startTestSnapshotRelay(39_433);
     contexts.push(ctx);
 
     const subscriberTrace = traceOptions(ctx, "subscriber");
@@ -232,7 +232,7 @@ describe("relay integration > changes", () => {
       ],
       subscriberTrace,
     );
-    expect(await waitForMessage(subscriber, 3_000, subscriberTrace)).toEqual([
+    expect(await waitForMessage(subscriber, 3000, subscriberTrace)).toEqual([
       "CHANGES",
       "live-close",
       "EOSE",
@@ -240,7 +240,7 @@ describe("relay integration > changes", () => {
     ]);
 
     sendJson(subscriber, ["CLOSE", "live-close"], subscriberTrace);
-    expect(await waitForMessage(subscriber, 3_000, subscriberTrace)).toEqual([
+    expect(await waitForMessage(subscriber, 3000, subscriberTrace)).toEqual([
       "CLOSED",
       "live-close",
       "closed",
@@ -248,7 +248,7 @@ describe("relay integration > changes", () => {
 
     const event = snapshotEvent(REV_A);
     sendJson(publisher, ["EVENT", event], publisherTrace);
-    expect(await waitForMessage(publisher, 3_000, publisherTrace)).toEqual([
+    expect(await waitForMessage(publisher, 3000, publisherTrace)).toEqual([
       "OK",
       event.id,
       true,
@@ -259,7 +259,7 @@ describe("relay integration > changes", () => {
   });
 
   test("returns CHANGES ERR when the authors filter is missing", async () => {
-    const ctx = await startTestSnapshotRelay(39442);
+    const ctx = await startTestSnapshotRelay(39_442);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -275,7 +275,7 @@ describe("relay integration > changes", () => {
       trace,
     );
 
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "CHANGES",
       "bad-scope",
       "ERR",
@@ -284,7 +284,7 @@ describe("relay integration > changes", () => {
   });
 
   test("returns CHANGES ERR when multiple authors are requested", async () => {
-    const ctx = await startTestSnapshotRelay(39443);
+    const ctx = await startTestSnapshotRelay(39_443);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -305,7 +305,7 @@ describe("relay integration > changes", () => {
       trace,
     );
 
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "CHANGES",
       "bad-scope-multi",
       "ERR",
@@ -314,14 +314,14 @@ describe("relay integration > changes", () => {
   });
 
   test("returns CLOSED when CLOSE is used on a non-live subscription id", async () => {
-    const ctx = await startTestSnapshotRelay(39447);
+    const ctx = await startTestSnapshotRelay(39_447);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
 
     sendJson(ws, ["CLOSE", "missing-subscription"], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "CLOSED",
       "missing-subscription",
       "closed",
@@ -329,7 +329,7 @@ describe("relay integration > changes", () => {
   });
 
   test("assigns monotonic seq values when two clients publish different documents", async () => {
-    const ctx = await startTestSnapshotRelay(39450);
+    const ctx = await startTestSnapshotRelay(39_450);
     contexts.push(ctx);
 
     const leftTrace = traceOptions(ctx, "left");
@@ -344,8 +344,8 @@ describe("relay integration > changes", () => {
 
     sendJson(leftWs, ["EVENT", leftEvent], leftTrace);
     sendJson(rightWs, ["EVENT", rightEvent], rightTrace);
-    await waitForMessage(leftWs, 3_000, leftTrace);
-    await waitForMessage(rightWs, 3_000, rightTrace);
+    await waitForMessage(leftWs, 3000, leftTrace);
+    await waitForMessage(rightWs, 3000, rightTrace);
 
     sendJson(
       readerWs,
@@ -362,7 +362,7 @@ describe("relay integration > changes", () => {
       readerTrace,
     );
 
-    const messages = await waitForMessages(readerWs, 3, 3_000, readerTrace);
+    const messages = await waitForMessages(readerWs, 3, 3000, readerTrace);
     expect(messages).toHaveLength(3);
     expect(messages[2]).toEqual(["CHANGES", "all-docs", "EOSE", 2]);
     expect(messages[0][3]).toBe(1);
@@ -376,7 +376,7 @@ describe("relay integration > changes", () => {
   });
 
   test("broadcasts the same live change to multiple subscribers", async () => {
-    const ctx = await startTestSnapshotRelay(39452);
+    const ctx = await startTestSnapshotRelay(39_452);
     contexts.push(ctx);
 
     const leftTrace = traceOptions(ctx, "left-subscriber");
@@ -405,7 +405,7 @@ describe("relay integration > changes", () => {
         ],
         trace,
       );
-      expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+      expect(await waitForMessage(ws, 3000, trace)).toEqual([
         "CHANGES",
         subscriptionId,
         "EOSE",
@@ -414,11 +414,11 @@ describe("relay integration > changes", () => {
     }
 
     const event = snapshotEvent(REV_A);
-    const leftEventPromise = waitForMessage(leftWs, 3_000, leftTrace);
-    const rightEventPromise = waitForMessage(rightWs, 3_000, rightTrace);
+    const leftEventPromise = waitForMessage(leftWs, 3000, leftTrace);
+    const rightEventPromise = waitForMessage(rightWs, 3000, rightTrace);
 
     sendJson(publisherWs, ["EVENT", event], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     expect(await leftEventPromise).toEqual([
       "CHANGES",
@@ -437,7 +437,7 @@ describe("relay integration > changes", () => {
   });
 
   test("replaces an existing live subscription when the same subscription id is reused on one socket", async () => {
-    const ctx = await startTestSnapshotRelay(39471);
+    const ctx = await startTestSnapshotRelay(39_471);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -461,7 +461,7 @@ describe("relay integration > changes", () => {
       ],
       trace,
     );
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "CHANGES",
       "dup-live",
       "EOSE",
@@ -484,7 +484,7 @@ describe("relay integration > changes", () => {
       ],
       trace,
     );
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "CHANGES",
       "dup-live",
       "EOSE",
@@ -495,12 +495,12 @@ describe("relay integration > changes", () => {
     const deliveredEvent = snapshotEvent(REV_B, 1_700_000_000_100, [], "doc-2");
 
     sendJson(publisherWs, ["EVENT", ignoredEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
     await expectNoMessage(ws, 300, trace);
 
-    const deliveredPromise = waitForMessage(ws, 3_000, trace);
+    const deliveredPromise = waitForMessage(ws, 3000, trace);
     sendJson(publisherWs, ["EVENT", deliveredEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
     expect(await deliveredPromise).toEqual([
       "CHANGES",
       "dup-live",
@@ -511,7 +511,7 @@ describe("relay integration > changes", () => {
   });
 
   test("replays missed changes after a subscriber disconnects and reconnects", async () => {
-    const ctx = await startTestSnapshotRelay(39453);
+    const ctx = await startTestSnapshotRelay(39_453);
     contexts.push(ctx);
 
     const firstTrace = traceOptions(ctx, "first-client");
@@ -535,7 +535,7 @@ describe("relay integration > changes", () => {
       ],
       firstTrace,
     );
-    expect(await waitForMessage(firstWs, 3_000, firstTrace)).toEqual([
+    expect(await waitForMessage(firstWs, 3000, firstTrace)).toEqual([
       "CHANGES",
       "live-reconnect",
       "EOSE",
@@ -547,7 +547,7 @@ describe("relay integration > changes", () => {
 
     const event = snapshotEvent(REV_A);
     sendJson(publisherWs, ["EVENT", event], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     const reconnectWs = await connectWs(ctx.port, reconnectTrace);
     sendJson(
@@ -565,16 +565,16 @@ describe("relay integration > changes", () => {
       reconnectTrace,
     );
 
-    expect(
-      await waitForMessages(reconnectWs, 2, 3_000, reconnectTrace),
-    ).toEqual([
-      ["CHANGES", "catchup", "EVENT", 1, event],
-      ["CHANGES", "catchup", "EOSE", 1],
-    ]);
+    expect(await waitForMessages(reconnectWs, 2, 3000, reconnectTrace)).toEqual(
+      [
+        ["CHANGES", "catchup", "EVENT", 1, event],
+        ["CHANGES", "catchup", "EOSE", 1],
+      ],
+    );
   });
 
   test("replays only later changes when reconnecting with a nonzero since cursor", async () => {
-    const ctx = await startTestSnapshotRelay(39465);
+    const ctx = await startTestSnapshotRelay(39_465);
     contexts.push(ctx);
 
     const firstTrace = traceOptions(ctx, "first-client");
@@ -598,7 +598,7 @@ describe("relay integration > changes", () => {
       ],
       firstTrace,
     );
-    expect(await waitForMessage(firstWs, 3_000, firstTrace)).toEqual([
+    expect(await waitForMessage(firstWs, 3000, firstTrace)).toEqual([
       "CHANGES",
       "live-since",
       "EOSE",
@@ -606,9 +606,9 @@ describe("relay integration > changes", () => {
     ]);
 
     const firstEvent = snapshotEvent(REV_A);
-    const firstLiveEvent = waitForMessage(firstWs, 3_000, firstTrace);
+    const firstLiveEvent = waitForMessage(firstWs, 3000, firstTrace);
     sendJson(publisherWs, ["EVENT", firstEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
     expect(await firstLiveEvent).toEqual([
       "CHANGES",
       "live-since",
@@ -622,7 +622,7 @@ describe("relay integration > changes", () => {
 
     const secondEvent = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
     sendJson(publisherWs, ["EVENT", secondEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     const reconnectWs = await connectWs(ctx.port, reconnectTrace);
     sendJson(
@@ -640,16 +640,16 @@ describe("relay integration > changes", () => {
       reconnectTrace,
     );
 
-    expect(
-      await waitForMessages(reconnectWs, 2, 3_000, reconnectTrace),
-    ).toEqual([
-      ["CHANGES", "catchup-since-1", "EVENT", 2, secondEvent],
-      ["CHANGES", "catchup-since-1", "EOSE", 2],
-    ]);
+    expect(await waitForMessages(reconnectWs, 2, 3000, reconnectTrace)).toEqual(
+      [
+        ["CHANGES", "catchup-since-1", "EVENT", 2, secondEvent],
+        ["CHANGES", "catchup-since-1", "EOSE", 2],
+      ],
+    );
   });
 
   test("removes live subscriptions when the websocket closes", async () => {
-    const ctx = await startTestSnapshotRelay(39466);
+    const ctx = await startTestSnapshotRelay(39_466);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -670,7 +670,7 @@ describe("relay integration > changes", () => {
       ],
       trace,
     );
-    await waitForMessage(ws, 3_000, trace);
+    await waitForMessage(ws, 3000, trace);
 
     expect(ctx.connectionCount()).toBe(1);
     ws.close();

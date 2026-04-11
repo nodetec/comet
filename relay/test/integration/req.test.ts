@@ -25,7 +25,7 @@ describe("relay integration > req", () => {
   });
 
   test("filters REQ by ids", async () => {
-    const ctx = await startTestSnapshotRelay(39460);
+    const ctx = await startTestSnapshotRelay(39_460);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -35,7 +35,7 @@ describe("relay integration > req", () => {
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     sendJson(
@@ -51,14 +51,14 @@ describe("relay integration > req", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENT", "filter-ids", secondEvent],
       ["EOSE", "filter-ids"],
     ]);
   });
 
   test("filters REQ by authors, kind, document, and event id together", async () => {
-    const ctx = await startTestSnapshotRelay(39461);
+    const ctx = await startTestSnapshotRelay(39_461);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -74,7 +74,7 @@ describe("relay integration > req", () => {
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     sendJson(
@@ -92,28 +92,28 @@ describe("relay integration > req", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENT", "filter-combo", secondEvent],
       ["EOSE", "filter-combo"],
     ]);
   });
 
   test("returns NOTICE for malformed REQ filters", async () => {
-    const ctx = await startTestSnapshotRelay(39462);
+    const ctx = await startTestSnapshotRelay(39_462);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
 
     sendJson(ws, ["REQ", "bad-req", "not-an-object"], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "NOTICE",
       "invalid: REQ requires a string subscription id and object filters",
     ]);
   });
 
   test("returns batched snapshot events for REQ-BATCH", async () => {
-    const ctx = await startTestSnapshotRelay(39463);
+    const ctx = await startTestSnapshotRelay(39_463);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -123,7 +123,7 @@ describe("relay integration > req", () => {
 
     for (const event of [firstEvent, secondEvent]) {
       sendJson(ws, ["EVENT", event], trace);
-      await waitForMessage(ws, 3_000, trace);
+      await waitForMessage(ws, 3000, trace);
     }
 
     sendJson(
@@ -140,21 +140,21 @@ describe("relay integration > req", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENTS", "filter-batch", [firstEvent, secondEvent]],
       ["EOSE", "filter-batch"],
     ]);
   });
 
   test("returns NOTICE for malformed REQ-BATCH filters", async () => {
-    const ctx = await startTestSnapshotRelay(39464);
+    const ctx = await startTestSnapshotRelay(39_464);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
     const ws = await connectWs(ctx.port, trace);
 
     sendJson(ws, ["REQ-BATCH", "bad-req-batch", "not-an-object"], trace);
-    expect(await waitForMessage(ws, 3_000, trace)).toEqual([
+    expect(await waitForMessage(ws, 3000, trace)).toEqual([
       "NOTICE",
       "invalid: REQ-BATCH requires a string subscription id and object filters",
     ]);

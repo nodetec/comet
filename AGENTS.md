@@ -16,6 +16,8 @@
 
 - Treat the project as greenfield. Prefer clean solutions over compatibility layers, migration hacks, or legacy-preserving abstractions.
 - Do not carry forward temporary transition logic once a cleaner baseline can replace it.
+- **Linting**: All packages use oxlint (not ESLint). Root `.oxlintrc.json` provides shared config; app/ and web/ override with React-specific settings. `@tanstack/eslint-plugin-query` rules are not yet available — revisit when oxlint JS plugins stabilize.
+- **Formatting**: All packages use oxfmt (not Prettier). Root `.oxfmtrc.json` provides shared config with Tailwind class sorting enabled.
 
 ## App
 
@@ -64,4 +66,3 @@ Each feature follows this structure:
 - **Testing**: Vitest, unit tests only (`*.test.ts`), colocated with implementation. Tests cover logic (search, markdown, etc.), not components.
 - **No routing**: Single-page desktop app. Navigation is store-driven (`selectedNoteId`, `activeNotebookId`).
 - **CodeMirror editor**: Extensions in `features/editor/extensions/`. Markdown-first with syntax highlighting, autocomplete, and inline images.
-- **Linting**: Oxlint (not ESLint). `@tanstack/eslint-plugin-query` rules are not yet available — revisit when oxlint JS plugins stabilize.

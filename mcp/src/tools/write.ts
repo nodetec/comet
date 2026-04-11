@@ -182,11 +182,16 @@ export function createNotebook(db: DB, name: string): NotebookSummary {
       `INSERT INTO notebooks (id, name, created_at, updated_at, locally_modified)
        VALUES (?, ?, ?, ?, 1)`,
     ).run(notebookId, normalized, now, now);
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("UNIQUE constraint failed")) {
-      throw new Error("A notebook with that name already exists.");
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("UNIQUE constraint failed")
+    ) {
+      throw new Error("A notebook with that name already exists.", {
+        cause: error,
+      });
     }
-    throw e;
+    throw error;
   }
 
   return { id: notebookId, name: normalized, noteCount: 0 };

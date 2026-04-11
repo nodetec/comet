@@ -80,7 +80,7 @@ export function canonicalizeVisibleVectorClock(
   input: VisibleVectorClock,
 ): VisibleVectorClock {
   return Object.fromEntries(
-    Object.entries(input).sort(([left], [right]) =>
+    Object.entries(input).toSorted(([left], [right]) =>
       compareDeviceIds(left, right),
     ),
   );

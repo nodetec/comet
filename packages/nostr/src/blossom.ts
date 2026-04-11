@@ -1,7 +1,7 @@
 import { validateAndVerifyEvent } from "./event";
 import type { NostrEvent } from "./types";
 
-export const KIND_BLOSSOM_AUTH = 24242;
+export const KIND_BLOSSOM_AUTH = 24_242;
 
 export type BlossomAction = "delete" | "list" | "upload";
 

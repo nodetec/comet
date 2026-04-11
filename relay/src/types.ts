@@ -1,8 +1,8 @@
 import type { NostrEvent } from "@comet/nostr";
 import type { VisibleVectorClock } from "./domain/snapshots/vector-clock";
 
-export const SNAPSHOT_SYNC_EVENT_KIND = 42061;
-export const RELAY_AUTH_EVENT_KIND = 22242;
+export const SNAPSHOT_SYNC_EVENT_KIND = 42_061;
+export const RELAY_AUTH_EVENT_KIND = 22_242;
 
 export type SnapshotOp = "put" | "del";
 

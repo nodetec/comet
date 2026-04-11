@@ -11,7 +11,7 @@ export const userLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const event = data.signedEvent;
 
-    if (event.kind !== 27235) {
+    if (event.kind !== 27_235) {
       return { ok: false, error: "invalid event kind" };
     }
 

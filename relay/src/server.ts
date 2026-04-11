@@ -5,8 +5,10 @@ import { createAccessControl } from "./access";
 import { createClientMessageHandler } from "./protocol/relay";
 import { createRetentionPolicyRuntime } from "./application/relay/retention-policy";
 import { createSnapshotRelayDb, type SnapshotRelayDb } from "./db";
-import { createConnectionRegistry } from "./infra/connections";
-import type { ConnectionRegistry } from "./infra/connections";
+import {
+  createConnectionRegistry,
+  type ConnectionRegistry,
+} from "./infra/connections";
 import type { SnapshotRelayConfig } from "./types";
 import { createChangeStore } from "./storage/changes";
 import { createCompactionStore } from "./storage/compaction";
@@ -285,7 +287,7 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
     ...init,
     headers: {
       ...adminJsonHeaders(),
-      ...(init.headers ?? {}),
+      ...init.headers,
     },
   });
 }
@@ -518,10 +520,10 @@ function handleConnectionsApiRequest(
       connections.push({
         id,
         access_key: state.accessKey,
-        authed_pubkeys: Array.from(state.authedPubkeys),
-        live_changes_subscription_ids: Array.from(
-          state.liveChangesSubscriptions.keys(),
-        ),
+        authed_pubkeys: [...state.authedPubkeys],
+        live_changes_subscription_ids: [
+          ...state.liveChangesSubscriptions.keys(),
+        ],
       });
     }
 

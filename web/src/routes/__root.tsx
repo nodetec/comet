@@ -5,8 +5,7 @@ import {
   Scripts,
   createRootRouteWithContext,
 } from "@tanstack/react-router";
-import { QueryClientProvider } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import appCss from "~/styles/app.css?url";
 
@@ -17,7 +16,7 @@ interface RouterContext {
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
-      { charSet: "utf-8" },
+      { charSet: "utf8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Comet" },
     ],

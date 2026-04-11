@@ -20,6 +20,6 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
   return { ok: true };
 });
 
-export const checkAuth = createServerFn({ method: "GET" }).handler(async () => {
-  return { authenticated: isAdminAuthenticated() };
-});
+export const checkAuth = createServerFn({ method: "GET" }).handler(
+  async () => ({ authenticated: isAdminAuthenticated() }),
+);

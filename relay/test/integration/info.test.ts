@@ -14,7 +14,7 @@ describe("relay integration > info", () => {
   });
 
   test("advertises snapshot-sync capabilities at the relay root", async () => {
-    const ctx = await startTestSnapshotRelay(39414);
+    const ctx = await startTestSnapshotRelay(39_414);
     contexts.push(ctx);
 
     const response = await fetch(`http://127.0.0.1:${ctx.port}/`, {
@@ -47,7 +47,7 @@ describe("relay integration > info", () => {
   });
 
   test("accepts websocket upgrades on the relay root", async () => {
-    const ctx = await startTestSnapshotRelay(39415);
+    const ctx = await startTestSnapshotRelay(39_415);
     contexts.push(ctx);
 
     const ws = new WebSocket(`ws://127.0.0.1:${ctx.port}/`);

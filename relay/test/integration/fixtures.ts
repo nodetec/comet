@@ -35,7 +35,7 @@ export function snapshotEvent(
       ["o", op],
       ["c", "notes"],
       ...Object.entries(vectorClock)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .toSorted(([left], [right]) => left.localeCompare(right))
         .map(([deviceId, counter]) => ["vc", deviceId, String(counter)]),
     ],
     content: `ciphertext-${snapshotId}`,
@@ -88,7 +88,7 @@ export function authEvent(
   const createdAt = options.createdAt ?? Math.floor(Date.now() / 1000);
   return finalizeEvent(
     {
-      kind: 22242,
+      kind: 22_242,
       created_at: createdAt,
       tags: [
         ["challenge", challenge],

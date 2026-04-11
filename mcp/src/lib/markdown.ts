@@ -19,7 +19,7 @@ function isTagChar(code: number): boolean {
  * Returns sorted, deduplicated, lowercased tags. Skips purely numeric tags.
  */
 export function extractTags(markdown: string): string[] {
-  const bytes = Buffer.from(markdown, "utf-8");
+  const bytes = Buffer.from(markdown, "utf8");
   const tags = new Set<string>();
   let index = 0;
   let fenceChar = 0;
@@ -152,8 +152,7 @@ export function extractTags(markdown: string): string[] {
     // Skip purely numeric tags
     const tagBytes = bytes.subarray(tagStart, tagEnd);
     let hasAlpha = false;
-    for (let i = 0; i < tagBytes.length; i++) {
-      const b = tagBytes[i];
+    for (const b of tagBytes) {
       if (
         (b >= 0x41 && b <= 0x5a) || // A-Z
         (b >= 0x61 && b <= 0x7a) // a-z
@@ -164,13 +163,13 @@ export function extractTags(markdown: string): string[] {
     }
 
     if (hasAlpha) {
-      const tag = tagBytes.toString("utf-8").toLowerCase();
+      const tag = tagBytes.toString("utf8").toLowerCase();
       tags.add(tag);
     }
     index = tagEnd;
   }
 
-  return [...tags].sort();
+  return [...tags].toSorted();
 }
 
 /**
@@ -248,11 +247,7 @@ function stripMarkdownSyntax(line: string): string {
   }
   // Strip blockquote markers
   while (s.startsWith("> ") || s.startsWith(">")) {
-    if (s.startsWith("> ")) {
-      s = s.slice(2);
-    } else {
-      s = s.slice(1);
-    }
+    s = s.startsWith("> ") ? s.slice(2) : s.slice(1);
   }
   // Strip list markers
   if (s.startsWith("- ")) {
@@ -262,7 +257,7 @@ function stripMarkdownSyntax(line: string): string {
   } else if (s.startsWith("+ ")) {
     s = s.slice(2);
   } else if (s.length > 2) {
-    const m = s.match(/^(\d{1,2})[.)]\s*/);
+    const m = /^(\d{1,2})[.)]\s*/.exec(s);
     if (m) {
       s = s.slice(m[0].length);
     }

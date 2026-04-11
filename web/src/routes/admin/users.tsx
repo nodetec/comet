@@ -48,7 +48,7 @@ function UsersPage() {
   const { data } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () => listUsers(),
-    refetchInterval: 10000,
+    refetchInterval: 10_000,
   });
 
   const deleteMutation = useMutation({

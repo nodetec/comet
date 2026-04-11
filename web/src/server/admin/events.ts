@@ -31,7 +31,7 @@ export const listEvents = createServerFn({ method: "GET" })
       createdAt: Number(row.created_at),
       content:
         row.content.length > 200
-          ? row.content.slice(0, 200) + "\u2026"
+          ? `${row.content.slice(0, 200)}\u2026`
           : row.content,
       source: row.source,
     }));

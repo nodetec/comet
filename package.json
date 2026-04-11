@@ -1,9 +1,8 @@
 {
   "name": "comet",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be",
   "scripts": {
     "dev": "turbo run dev --filter=@comet/app",
     "bundle": "pnpm tauri build --bundles app",
@@ -46,8 +45,8 @@
     "www:dev": "pnpm --filter @comet/www dev",
     "www:build": "pnpm --filter @comet/www build",
     "www:preview": "pnpm --filter @comet/www preview",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "preview": "turbo run preview --filter=@comet/app",
     "seed:db": "pnpm --filter @comet/app seed:db",
     "tauri": "pnpm --filter @comet/app tauri",
@@ -56,8 +55,7 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "oxfmt": "^0.44.0",
     "turbo": "^2.0.0"
   },
   "lint-staged": {
@@ -66,34 +64,35 @@
       "pnpm --filter @comet/app exec oxfmt --write"
     ],
     "relay/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/relay exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/relay exec oxlint --type-aware --fix",
+      "pnpm --filter @comet/relay exec oxfmt --write"
     ],
     "blossom/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/blossom exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/blossom exec oxlint --type-aware --fix",
+      "pnpm --filter @comet/blossom exec oxfmt --write"
     ],
     "mcp/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/mcp exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/mcp exec oxlint --type-aware --fix",
+      "pnpm --filter @comet/mcp exec oxfmt --write"
     ],
     "web/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/web exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/web exec oxlint --fix",
+      "pnpm --filter @comet/web exec oxfmt --write"
     ],
     "packages/data/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/data exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/data exec oxlint --type-aware --fix",
+      "pnpm --filter @comet/data exec oxfmt --write"
     ],
     "packages/nostr/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/nostr exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/nostr exec oxlint --type-aware --fix",
+      "pnpm --filter @comet/nostr exec oxfmt --write"
     ],
     "**/*.{js,mjs,cjs,json,md,yml,yaml}": [
-      "prettier --write"
+      "oxfmt --write"
     ],
     "app/**/*.{css,html}": [
-      "prettier --write"
+      "oxfmt --write"
     ]
-  }
+  },
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
 }

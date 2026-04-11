@@ -62,7 +62,7 @@ export function createRetentionPolicyRuntime(options: {
           }`,
         );
       });
-    }, policy.compactionIntervalSeconds * 1_000);
+    }, policy.compactionIntervalSeconds * 1000);
   };
 
   return {

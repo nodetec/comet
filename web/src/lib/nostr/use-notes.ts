@@ -72,9 +72,9 @@ export function useNotes() {
       }
     }
 
-    return Array.from(noteMap.values())
+    return [...noteMap.values()]
       .filter((note) => !note.deletedAt)
-      .sort((a, b) => b.modifiedAt - a.modifiedAt);
+      .toSorted((a, b) => b.modifiedAt - a.modifiedAt);
   }, [query.data]);
 
   return {

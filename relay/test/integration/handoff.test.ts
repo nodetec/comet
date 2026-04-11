@@ -26,7 +26,7 @@ describe("relay integration > handoff", () => {
   });
 
   test("returns retained snapshots through CHANGES bootstrap", async () => {
-    const ctx = await startTestSnapshotRelay(39415);
+    const ctx = await startTestSnapshotRelay(39_415);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -34,7 +34,7 @@ describe("relay integration > handoff", () => {
     const event = snapshotEvent(REV_B);
 
     sendJson(ws, ["EVENT", event], trace);
-    await waitForMessage(ws, 3_000, trace);
+    await waitForMessage(ws, 3000, trace);
 
     sendJson(
       ws,
@@ -71,14 +71,14 @@ describe("relay integration > handoff", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 2, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 2, 3000, trace)).toEqual([
       ["EVENT", "fetch-1", event],
       ["EOSE", "fetch-1"],
     ]);
   });
 
   test("returns only EOSE when REQ asks for an unknown snapshot id", async () => {
-    const ctx = await startTestSnapshotRelay(39432);
+    const ctx = await startTestSnapshotRelay(39_432);
     contexts.push(ctx);
 
     const trace = traceOptions(ctx, "client");
@@ -98,13 +98,13 @@ describe("relay integration > handoff", () => {
       trace,
     );
 
-    expect(await waitForMessages(ws, 1, 3_000, trace)).toEqual([
+    expect(await waitForMessages(ws, 1, 3000, trace)).toEqual([
       ["EOSE", "fetch-missing"],
     ]);
   });
 
   test("hands off from bootstrap snapshot to CHANGES without missing later snapshots", async () => {
-    const ctx = await startTestSnapshotRelay(39435);
+    const ctx = await startTestSnapshotRelay(39_435);
     contexts.push(ctx);
 
     const bootstrapTrace = traceOptions(ctx, "bootstrap");
@@ -115,7 +115,7 @@ describe("relay integration > handoff", () => {
     const laterEvent = snapshotEvent(REV_B, 1_700_000_000_100, [REV_A]);
 
     sendJson(publisherWs, ["EVENT", initialEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     sendJson(
       bootstrapWs,
@@ -139,7 +139,7 @@ describe("relay integration > handoff", () => {
     expect(bootstrap.snapshots).toEqual([initialEvent]);
 
     sendJson(publisherWs, ["EVENT", laterEvent], publisherTrace);
-    await waitForMessage(publisherWs, 3_000, publisherTrace);
+    await waitForMessage(publisherWs, 3000, publisherTrace);
 
     sendJson(
       bootstrapWs,
@@ -156,11 +156,11 @@ describe("relay integration > handoff", () => {
       bootstrapTrace,
     );
 
-    expect(
-      await waitForMessages(bootstrapWs, 2, 3_000, bootstrapTrace),
-    ).toEqual([
-      ["CHANGES", "handoff-live", "EVENT", 2, laterEvent],
-      ["CHANGES", "handoff-live", "EOSE", 2],
-    ]);
+    expect(await waitForMessages(bootstrapWs, 2, 3000, bootstrapTrace)).toEqual(
+      [
+        ["CHANGES", "handoff-live", "EVENT", 2, laterEvent],
+        ["CHANGES", "handoff-live", "EOSE", 2],
+      ],
+    );
   });
 });

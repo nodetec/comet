@@ -30,7 +30,7 @@ function LoginPage() {
     try {
       const result = await login({ data: { token } });
       if (result.ok) {
-        navigate({ to: "/admin" });
+        void navigate({ to: "/admin" });
       } else {
         setError(result.error ?? "Invalid admin token");
       }

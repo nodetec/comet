@@ -201,7 +201,7 @@ export function createChangeStore(db: SnapshotRelayDb): ChangeStore {
         }
       }
 
-      return events.sort((left, right) => {
+      return events.toSorted((left, right) => {
         if (left.created_at !== right.created_at) {
           return left.created_at - right.created_at;
         }

@@ -7,7 +7,7 @@ export function getRouter() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5_000,
+        staleTime: 5000,
         retry: 1,
       },
     },

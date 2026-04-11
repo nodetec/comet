@@ -64,9 +64,9 @@
   "ignorePatterns": [
     "dist/**",
     "node_modules/**",
-    "coverage/**",
-    "src-tauri/**",
-    "scripts/**"
+    ".output/**",
+    ".vinxi/**",
+    "src/routeTree.gen.ts"
   ],
   "overrides": []
 }

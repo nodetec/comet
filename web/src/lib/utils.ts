@@ -9,7 +9,7 @@ export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+  return `${(bytes / 1024 ** i).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 export function formatTimestamp(epochSeconds: number): string {
@@ -31,10 +31,10 @@ const KIND_LABELS: Record<number, string> = {
   9: "Delete",
   23: "Long-form",
   1059: "Gift Wrap",
-  42061: "Comet Snapshot",
-  10002: "Relay List",
-  24242: "Blossom Auth",
-  30023: "Long-form",
+  42_061: "Comet Snapshot",
+  10_002: "Relay List",
+  24_242: "Blossom Auth",
+  30_023: "Long-form",
 };
 
 export function kindLabel(kind: number): string {
@@ -42,7 +42,7 @@ export function kindLabel(kind: number): string {
 }
 
 export function shortPubkey(pubkey: string): string {
-  return pubkey.slice(0, 8) + "\u2026";
+  return `${pubkey.slice(0, 8)}\u2026`;
 }
 
 export function usageColor(pct: number): string {

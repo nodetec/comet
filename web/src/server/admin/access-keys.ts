@@ -29,7 +29,7 @@ export const listAccessKeys = createServerFn({ method: "GET" }).handler(
     const usageMap = new Map<string, number>();
     for (const row of usageRows) {
       if (row.accessKey) {
-        usageMap.set(row.accessKey, Number(row.totalSize));
+        usageMap.set(row.accessKey, row.totalSize);
       }
     }
 

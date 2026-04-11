@@ -1,9 +1,8 @@
 import type { NostrEvent } from "@comet/nostr";
 
 import type { AccessControl } from "../access";
-import { classifyEvent } from "../domain/events/policy";
+import { classifyEvent, type KindPolicy } from "../domain/events/policy";
 import { parseSnapshotEnvelope } from "../domain/snapshots/validation";
-import type { KindPolicy } from "../domain/events/policy";
 import {
   SNAPSHOT_SYNC_EVENT_KIND,
   type RelayFilter,

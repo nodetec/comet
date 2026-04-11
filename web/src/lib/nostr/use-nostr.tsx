@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   useRef,
   useEffect,
   type ReactNode,
@@ -92,10 +93,11 @@ export function NostrProvider({ children }: { children: ReactNode }) {
       setStoredPubkey(pk);
       setPubkey(pk);
       connectRelay(pk);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to sign in";
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to sign in";
       setError(message);
-      throw err;
+      throw error;
     }
   }, [connectRelay]);
 
@@ -127,12 +129,13 @@ export function NostrProvider({ children }: { children: ReactNode }) {
     };
   }, [connectRelay]);
 
+  const value = useMemo(
+    () => ({ pubkey, isAuthenticated, relay, signIn, signOut, error }),
+    [pubkey, isAuthenticated, relay, signIn, signOut, error],
+  );
+
   return (
-    <NostrContext.Provider
-      value={{ pubkey, isAuthenticated, relay, signIn, signOut, error }}
-    >
-      {children}
-    </NostrContext.Provider>
+    <NostrContext.Provider value={value}>{children}</NostrContext.Provider>
   );
 }
 

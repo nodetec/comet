@@ -153,34 +153,40 @@ function appendNoteViewClauses(
   notebookId: string | undefined,
 ): void {
   switch (filter) {
-    case "all":
+    case "all": {
       clauses.push("n.archived_at IS NULL");
       clauses.push("n.deleted_at IS NULL");
       break;
-    case "today":
+    }
+    case "today": {
       clauses.push("n.archived_at IS NULL");
       clauses.push("n.deleted_at IS NULL");
       clauses.push("n.edited_at >= ?");
       values.push(Date.now() - 24 * 60 * 60 * 1000);
       break;
-    case "todo":
+    }
+    case "todo": {
       clauses.push("n.archived_at IS NULL");
       clauses.push("n.deleted_at IS NULL");
       clauses.push("n.markdown LIKE '%- [ ] %'");
       break;
-    case "archive":
+    }
+    case "archive": {
       clauses.push("n.archived_at IS NOT NULL");
       clauses.push("n.deleted_at IS NULL");
       break;
-    case "trash":
+    }
+    case "trash": {
       clauses.push("n.deleted_at IS NOT NULL");
       break;
-    case "notebook":
+    }
+    case "notebook": {
       clauses.push("n.archived_at IS NULL");
       clauses.push("n.deleted_at IS NULL");
       clauses.push("n.notebook_id = ?");
       values.push(notebookId ?? "");
       break;
+    }
   }
 }
 
@@ -231,7 +237,7 @@ export function listNotes(
            JOIN notes_fts ON notes_fts.note_id = n.id`;
     for (const pattern of searchMode.patterns) {
       clauses.push(
-        "(notes_fts.title LIKE ? ESCAPE '\\' OR notes_fts.markdown LIKE ? ESCAPE '\\')",
+        String.raw`(notes_fts.title LIKE ? ESCAPE '\' OR notes_fts.markdown LIKE ? ESCAPE '\')`,
       );
       values.push(pattern, pattern);
     }
@@ -292,7 +298,7 @@ export function listNotes(
   }
 
   const notes: NoteSummary[] = rows.map((row) => {
-    const markdown = row["markdown"] as string;
+    const markdown = row.markdown as string;
     const notebookId = row["b.id"] as string | null;
     const notebookName = row["b.name"] as string | null;
     return {
@@ -339,21 +345,21 @@ export function readNote(db: DB, noteId: string): LoadedNote | null {
     .prepare("SELECT tag FROM note_tags WHERE note_id = ? ORDER BY tag ASC")
     .all(noteId) as { tag: string }[];
 
-  const notebookId = row["notebook_id"] as string | null;
-  const notebookName = row["notebook_name"] as string | null;
+  const notebookId = row.notebook_id as string | null;
+  const notebookName = row.notebook_name as string | null;
 
   return {
-    id: row["id"] as string,
-    title: row["title"] as string,
-    markdown: row["markdown"] as string,
-    modifiedAt: row["modified_at"] as number,
+    id: row.id as string,
+    title: row.title as string,
+    markdown: row.markdown as string,
+    modifiedAt: row.modified_at as number,
     notebook:
       notebookId && notebookName
         ? { id: notebookId, name: notebookName }
         : null,
-    archivedAt: (row["archived_at"] as number | null) ?? null,
-    deletedAt: (row["deleted_at"] as number | null) ?? null,
-    pinnedAt: (row["pinned_at"] as number | null) ?? null,
+    archivedAt: (row.archived_at as number | null) ?? null,
+    deletedAt: (row.deleted_at as number | null) ?? null,
+    pinnedAt: (row.pinned_at as number | null) ?? null,
     tags: tagRows.map((r) => r.tag),
   };
 }
@@ -380,7 +386,7 @@ export function searchNotes(db: DB, query: string): SearchResult[] {
   } else {
     const likeClauses = searchMode.patterns.map(
       () =>
-        "(notes_fts.title LIKE ? ESCAPE '\\' OR notes_fts.markdown LIKE ? ESCAPE '\\')",
+        String.raw`(notes_fts.title LIKE ? ESCAPE '\' OR notes_fts.markdown LIKE ? ESCAPE '\')`,
     );
     for (const pattern of searchMode.patterns) {
       values.push(pattern, pattern);
@@ -398,12 +404,12 @@ export function searchNotes(db: DB, query: string): SearchResult[] {
   const rows = db.prepare(sql).all(...values);
 
   return rows.slice(0, SEARCH_RESULTS_LIMIT).map((row) => {
-    const markdown = row["markdown"] as string;
-    const notebookId = row["notebook_id"] as string | null;
-    const notebookName = row["notebook_name"] as string | null;
+    const markdown = row.markdown as string;
+    const notebookId = row.notebook_id as string | null;
+    const notebookName = row.notebook_name as string | null;
     return {
-      id: row["id"] as string,
-      title: row["title"] as string,
+      id: row.id as string,
+      title: row.title as string,
       notebook:
         notebookId && notebookName
           ? { id: notebookId, name: notebookName }
@@ -411,7 +417,7 @@ export function searchNotes(db: DB, query: string): SearchResult[] {
       preview:
         searchSnippetFromMarkdown(markdown, searchTokens) ??
         previewFromMarkdown(markdown),
-      archivedAt: (row["archived_at"] as number | null) ?? null,
+      archivedAt: (row.archived_at as number | null) ?? null,
     };
   });
 }

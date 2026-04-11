@@ -117,7 +117,7 @@ describe("previewFromMarkdown", () => {
   });
 
   test("truncates to 140 characters", () => {
-    const long = "# Title\n\n" + "A".repeat(200);
+    const long = `# Title\n\n${"A".repeat(200)}`;
     const preview = previewFromMarkdown(long);
     expect([...preview].length).toBeLessThanOrEqual(140);
   });
