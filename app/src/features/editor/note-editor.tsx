@@ -481,7 +481,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
             click(event, view) {
-              if (!view.state.selection.main.empty) {
+              // Bail for any non-trivial selection (real drags).
+              // Small selections from slight mouse movement (< 4 chars)
+              // are treated as clicks and corrected. The list normalization
+              // filter also collapses accidental small selections in the
+              // marker area.
+              const sel = view.state.selection.main;
+              if (!sel.empty && sel.to - sel.from > 3) {
                 return false;
               }
 

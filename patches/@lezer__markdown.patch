@@ -1,8 +1,18 @@
 diff --git a/dist/index.cjs b/dist/index.cjs
-index c7a9a0635880e92239067e985e3d03a73c2f3281..857c9b6d90f77d54ff48ab1c57e01238e3791f4a 100644
+index c7a9a0635880e92239067e985e3d03a73c2f3281..c5038d1ea2fd21fb27f084d1b3cecbaf373a214e 100644
 --- a/dist/index.cjs
 +++ b/dist/index.cjs
-@@ -340,9 +340,7 @@ function isOrderedList(line, cx, breaking) {
+@@ -324,8 +324,7 @@ function inList(cx, type) {
+ }
+ function isBulletList(line, cx, breaking) {
+     return (line.next == 45 || line.next == 43 || line.next == 42 /* '-+*' */) &&
+-        (line.pos == line.text.length - 1 || space(line.text.charCodeAt(line.pos + 1))) &&
+-        (!breaking || inList(cx, Type.BulletList) || line.skipSpace(line.pos + 2) < line.text.length) ? 1 : -1;
++        (line.pos == line.text.length - 1 || space(line.text.charCodeAt(line.pos + 1))) ? 1 : -1;
+ }
+ function isOrderedList(line, cx, breaking) {
+     let pos = line.pos, next = line.next;
+@@ -340,9 +339,7 @@ function isOrderedList(line, cx, breaking) {
      }
      if (pos == line.pos || pos > line.pos + 9 ||
          (next != 46 && next != 41 /* '.)' */) ||
@@ -14,10 +24,20 @@ index c7a9a0635880e92239067e985e3d03a73c2f3281..857c9b6d90f77d54ff48ab1c57e01238
      return pos + 1 - line.pos;
  }
 diff --git a/dist/index.js b/dist/index.js
-index 07ce727452fe191aba6d5b3090c4585dd2135853..7374474e2db67da25f9e1089419a884a8a40516e 100644
+index 07ce727452fe191aba6d5b3090c4585dd2135853..265a619205d43a847cf940f526456c8c98b7b346 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -338,9 +338,7 @@ function isOrderedList(line, cx, breaking) {
+@@ -322,8 +322,7 @@ function inList(cx, type) {
+ }
+ function isBulletList(line, cx, breaking) {
+     return (line.next == 45 || line.next == 43 || line.next == 42 /* '-+*' */) &&
+-        (line.pos == line.text.length - 1 || space(line.text.charCodeAt(line.pos + 1))) &&
+-        (!breaking || inList(cx, Type.BulletList) || line.skipSpace(line.pos + 2) < line.text.length) ? 1 : -1;
++        (line.pos == line.text.length - 1 || space(line.text.charCodeAt(line.pos + 1))) ? 1 : -1;
+ }
+ function isOrderedList(line, cx, breaking) {
+     let pos = line.pos, next = line.next;
+@@ -338,9 +337,7 @@ function isOrderedList(line, cx, breaking) {
      }
      if (pos == line.pos || pos > line.pos + 9 ||
          (next != 46 && next != 41 /* '.)' */) ||
