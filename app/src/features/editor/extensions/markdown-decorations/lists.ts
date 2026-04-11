@@ -418,7 +418,10 @@ function getListIndentStep(lineText: string): number {
 function renumberOrderedLists(view: EditorView) {
   const changes = computeRenumberChangesFromText(view.state.doc);
   if (changes) {
-    view.dispatch({ changes });
+    view.dispatch({
+      changes,
+      annotations: Transaction.addToHistory.of(false),
+    });
   }
 }
 
@@ -820,12 +823,28 @@ function deleteAcrossListBoundaryInner(view: EditorView) {
     selection.head === itemForBackspace.contentFrom
   ) {
     // Remove the entire list prefix ("- [ ] "), turning the line
-    // into a plain paragraph.
+    // into a plain paragraph. Outdent children so they aren't orphaned.
+    const changes: { from: number; to: number }[] = [
+      { from: itemForBackspace.lineFrom, to: itemForBackspace.contentFrom },
+    ];
+
+    if (itemForBackspace.children.length > 0) {
+      const indentStep = BULLET_INDENT;
+      for (const child of itemForBackspace.children) {
+        const childRanges = collectItemLineRanges(view.state, child);
+        for (const range of childRanges) {
+          const l = view.state.doc.lineAt(range.from);
+          const spaces = /^( *)/.exec(l.text)?.[1].length ?? 0;
+          const rm = Math.min(indentStep, spaces);
+          if (rm > 0) {
+            changes.push({ from: l.from, to: l.from + rm });
+          }
+        }
+      }
+    }
+
     view.dispatch({
-      changes: {
-        from: itemForBackspace.lineFrom,
-        to: itemForBackspace.contentFrom,
-      },
+      changes,
       selection: EditorSelection.cursor(itemForBackspace.lineFrom),
       annotations: Transaction.userEvent.of("delete.backward"),
     });
@@ -912,9 +931,37 @@ function deleteAcrossListBoundaryInner(view: EditorView) {
 
   const item = getListItemForLine(view.state, selection.head);
   if (item && selection.head === item.contentFrom) {
-    // Task checkbox removal is handled above (before continuation
-    // checks). This branch handles plain bullet/number items.
-    return mergeWithPreviousListItem(view, item);
+    // Remove the list prefix, turning the line into plain text.
+    // Task checkbox removal is handled above (before continuation checks).
+    const changes: { from: number; to: number; insert?: string }[] = [
+      { from: item.lineFrom, to: item.contentFrom },
+    ];
+
+    // Outdent direct children by one level so they become top-level
+    // items instead of orphaned nested items.
+    if (item.children.length > 0) {
+      const indentStep = BULLET_MARKERS.has(item.marker)
+        ? BULLET_INDENT
+        : ORDERED_INDENT;
+      for (const child of item.children) {
+        const childRanges = collectItemLineRanges(view.state, child);
+        for (const range of childRanges) {
+          const l = view.state.doc.lineAt(range.from);
+          const spaces = /^( *)/.exec(l.text)?.[1].length ?? 0;
+          const rm = Math.min(indentStep, spaces);
+          if (rm > 0) {
+            changes.push({ from: l.from, to: l.from + rm });
+          }
+        }
+      }
+    }
+
+    view.dispatch({
+      changes,
+      selection: EditorSelection.cursor(item.lineFrom),
+      annotations: Transaction.userEvent.of("delete.backward"),
+    });
+    return true;
   }
 
   // Backspace at markerFrom (before the marker): outdent if nested,
@@ -965,54 +1012,6 @@ function deleteAcrossListBoundaryInner(view: EditorView) {
     head: selection.head,
   });
   return false;
-}
-
-/**
- * When backspacing at the content start of a list item, merge its
- * content into the previous item (or the previous line if there is no
- * previous list item). Children of the deleted item are adopted by the
- * previous item.
- */
-function mergeWithPreviousListItem(
-  view: EditorView,
-  item: ListItemInfo,
-): boolean {
-  const state = view.state;
-
-  // Find what's on the line above this item.
-  if (item.lineFrom === 0) {
-    return false; // first line of the document
-  }
-
-  const previousLine = state.doc.lineAt(item.lineFrom - 1);
-  const prevItem = getListItemForLine(state, previousLine.from);
-
-  if (!prevItem) {
-    // Previous line is not a list item — merge content into it,
-    // removing the marker.
-    const content = state.sliceDoc(item.contentFrom, item.lineTo);
-    view.dispatch({
-      changes: { from: previousLine.to, to: item.lineTo, insert: content },
-      selection: EditorSelection.cursor(previousLine.to),
-      annotations: Transaction.userEvent.of("delete.backward"),
-    });
-    return true;
-  }
-
-  // Both are list items. Merge this item's first-line content into
-  // the end of the previous item's marker line.
-  const content = state.sliceDoc(item.contentFrom, item.lineTo);
-  const cursorTarget = prevItem.lineTo;
-
-  // Build the change: delete from end of previous line to end of
-  // current item's marker line, and insert just the content.
-  view.dispatch({
-    changes: { from: prevItem.lineTo, to: item.lineTo, insert: content },
-    selection: EditorSelection.cursor(cursorTarget),
-    annotations: Transaction.userEvent.of("delete.backward"),
-  });
-
-  return true;
 }
 
 function backspaceRemoveEmptyContinuationPrefix(
@@ -1171,10 +1170,14 @@ function backspaceRemoveListPrefix(
     return null;
   }
 
-  // If the cursor is at contentFrom of a task item, the keymap handler
-  // already removed the checkbox. Don't also remove the whole prefix.
+  // If the cursor is at contentFrom or markerFrom, the keymap handler
+  // (deleteAcrossListBoundary) already handled the structural change.
+  // Don't also remove the prefix from this filter.
   const item = getListItemForLine(state, selection.head);
-  if (item?.task && selection.head === item.contentFrom) {
+  if (
+    item &&
+    (selection.head === item.contentFrom || selection.head === item.markerFrom)
+  ) {
     return null;
   }
 
