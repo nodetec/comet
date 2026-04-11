@@ -54,14 +54,8 @@ function useSidebarBorders(params: {
   availableTagTreeLength: number;
   noteFilter: NoteFilter;
   scrollContainerRef: RefObject<HTMLElement | null>;
-  footerSentinelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const {
-    availableTagTreeLength,
-    noteFilter,
-    scrollContainerRef,
-    footerSentinelRef,
-  } = params;
+  const { availableTagTreeLength, noteFilter, scrollContainerRef } = params;
   const [showHeaderBorder, setShowHeaderBorder] = useState(false);
   const [showFooterBorder, setShowFooterBorder] = useState(false);
 
@@ -70,13 +64,13 @@ function useSidebarBorders(params: {
     setShowHeaderBorder((scrollContainer?.scrollTop ?? 0) > 0);
   }, [availableTagTreeLength, noteFilter, scrollContainerRef]);
 
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    const footerSentinel = footerSentinelRef.current;
-    if (!scrollContainer || !footerSentinel) {
-      setShowFooterBorder(false);
-      return;
-    }
+  // Ref callback: set up IntersectionObserver when the sentinel mounts,
+  // clean up when it unmounts. The sentinel is a direct child of the
+  // scroll container, so node.parentElement gives us the observer root.
+  const footerSentinelRef = (node: HTMLDivElement | null) => {
+    if (!node) return;
+    const scrollContainer = node.parentElement;
+    if (!scrollContainer) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -88,19 +82,16 @@ function useSidebarBorders(params: {
       },
     );
 
-    observer.observe(footerSentinel);
+    observer.observe(node);
+    return () => observer.disconnect();
+  };
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [
-    availableTagTreeLength,
-    noteFilter,
-    scrollContainerRef,
+  return {
+    showHeaderBorder,
+    setShowHeaderBorder,
+    showFooterBorder,
     footerSentinelRef,
-  ]);
-
-  return { showHeaderBorder, setShowHeaderBorder, showFooterBorder };
+  };
 }
 
 function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
@@ -204,16 +195,18 @@ export function SidebarPane({
     string | null
   >(null);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
-  const footerSentinelRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const sidebarRowRefs = useRef(new Map<string, HTMLElement | null>());
-  const { showHeaderBorder, setShowHeaderBorder, showFooterBorder } =
-    useSidebarBorders({
-      availableTagTreeLength: availableTagTree.length,
-      noteFilter,
-      scrollContainerRef,
-      footerSentinelRef,
-    });
+  const {
+    showHeaderBorder,
+    setShowHeaderBorder,
+    showFooterBorder,
+    footerSentinelRef,
+  } = useSidebarBorders({
+    availableTagTreeLength: availableTagTree.length,
+    noteFilter,
+    scrollContainerRef,
+  });
 
   const normalizedRenameTarget = canonicalizeTagPath(renameInputValue.trim());
   const renameHasChanged =
