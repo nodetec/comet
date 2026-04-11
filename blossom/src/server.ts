@@ -467,12 +467,14 @@ export async function createBlossomServer(
           return json({ error: "missing manifest" }, 400);
         }
 
-        const manifestText =
-          typeof manifestValue === "string"
-            ? manifestValue
-            : manifestValue instanceof Blob
-              ? await manifestValue.text()
-              : null;
+        let manifestText: string | null;
+        if (typeof manifestValue === "string") {
+          manifestText = manifestValue;
+        } else if (manifestValue instanceof Blob) {
+          manifestText = await manifestValue.text();
+        } else {
+          manifestText = null;
+        }
         if (manifestText === null) {
           return json({ error: "invalid manifest" }, 400);
         }

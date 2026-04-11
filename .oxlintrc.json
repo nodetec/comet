@@ -52,7 +52,8 @@
     "no-shadow": "off",
     "no-await-in-loop": "off",
     "no-nested-ternary": "off",
-    "unicorn/prefer-add-event-listener": "off"
+    "unicorn/prefer-add-event-listener": "off",
+    "typescript/no-unnecessary-type-conversion": "off"
   },
   "ignorePatterns": [
     "dist/**",

@@ -104,7 +104,7 @@ export async function getOwnerCount(db: DB, sha256: string): Promise<number> {
     .from(blobOwners)
     .where(eq(blobOwners.sha256, sha256));
 
-  return rows[0]?.value ?? 0;
+  return Number(rows[0]?.value ?? 0);
 }
 
 export async function removeOwner(
@@ -138,7 +138,7 @@ export async function deleteBlob(db: DB, sha256: string): Promise<void> {
 
 export async function getBlobCount(db: DB): Promise<number> {
   const rows = await db.select({ value: count() }).from(blobs);
-  return rows[0]?.value ?? 0;
+  return Number(rows[0]?.value ?? 0);
 }
 
 export async function getBlobTotalSizeByPubkey(
@@ -151,7 +151,7 @@ export async function getBlobTotalSizeByPubkey(
     .innerJoin(blobOwners, eq(blobs.sha256, blobOwners.sha256))
     .where(eq(blobOwners.pubkey, pubkey));
 
-  return rows[0]?.value ?? 0;
+  return Number(rows[0]?.value ?? 0);
 }
 
 export async function getBlobTotalSizeByAccessKey(
@@ -164,7 +164,7 @@ export async function getBlobTotalSizeByAccessKey(
     .innerJoin(blobOwners, eq(blobs.sha256, blobOwners.sha256))
     .where(eq(blobOwners.accessKey, accessKey));
 
-  return rows[0]?.value ?? 0;
+  return Number(rows[0]?.value ?? 0);
 }
 
 export async function getAccessKeyPolicy(
