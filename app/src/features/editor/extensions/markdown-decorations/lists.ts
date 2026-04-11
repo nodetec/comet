@@ -600,10 +600,11 @@ function normalizeSelectionToListMarkers(state: EditorState) {
       }
 
       // Snap cursor inside the marker area (between markerFrom and
-      // contentFrom, exclusive) to contentFrom.
+      // contentFrom, exclusive) to markerFrom. This keeps the cursor
+      // before the marker when arrow keys land in the hidden zone.
       if (range.head > item.markerFrom && range.head < item.contentFrom) {
         changed = true;
-        return EditorSelection.cursor(item.contentFrom, 1);
+        return EditorSelection.cursor(item.markerFrom, -1);
       }
 
       // For task items, force assoc=1 at contentFrom so the caret
