@@ -409,147 +409,115 @@ function getListIndentStep(lineText: string): number {
   return BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
 }
 
-function getCaretRect(view: EditorView, position: number) {
-  return view.coordsAtPos(position, 1) ?? view.coordsAtPos(position, -1);
+/**
+ * Collect all document positions belonging to a list item and its
+ * descendants. Returns an array of {from, to} line ranges covering
+ * the item's own lines plus every nested child, grandchild, etc.
+ */
+function collectItemLineRanges(
+  state: EditorState,
+  item: ListItemInfo,
+): { from: number; to: number }[] {
+  const ranges: { from: number; to: number }[] = [];
+  // The ListItem node spans from the marker to the end of all children.
+  const startLine = state.doc.lineAt(item.node.from);
+  const endLine = state.doc.lineAt(item.node.to);
+  for (
+    let lineNum = startLine.number;
+    lineNum <= endLine.number;
+    lineNum += 1
+  ) {
+    const line = state.doc.line(lineNum);
+    ranges.push({ from: line.from, to: line.to });
+  }
+  return ranges;
 }
 
-function getVisualFragmentStarts(view: EditorView, from: number, to: number) {
-  const starts: number[] = [];
-  let previousTop: number | null = null;
-
-  for (let position = from; position <= to; position += 1) {
-    const rect = getCaretRect(view, position);
-    if (!rect) {
-      continue;
-    }
-
-    if (previousTop === null || Math.abs(rect.top - previousTop) > 0.5) {
-      starts.push(position);
-      previousTop = rect.top;
-    }
-  }
-
-  return starts;
-}
-
-function getVisualFragmentIndex(position: number, starts: readonly number[]) {
-  if (starts.length === 0) {
-    return -1;
-  }
-
-  for (let index = starts.length - 1; index >= 0; index -= 1) {
-    if (position >= starts[index]) {
-      return index;
-    }
-  }
-
-  return 0;
-}
-
-function indentListItemPreservingWrappedStart(view: EditorView) {
+function indentListItem(view: EditorView) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
     return indentMore(view);
   }
 
-  const line = view.state.doc.lineAt(selection.head);
-  if (!LIST_PREFIX_RE.test(line.text)) {
+  const item = getListItemForLine(view.state, selection.head);
+  if (!item) {
     return indentMore(view);
   }
 
-  const textStart = getListTextStart(line.text, line.from, line.to);
-  const starts = getVisualFragmentStarts(view, textStart, line.to);
-  const fragmentIndex = getVisualFragmentIndex(selection.head, starts);
-  const fragmentStart = fragmentIndex >= 0 ? starts[fragmentIndex] : null;
-
-  if (fragmentStart == null || selection.head !== fragmentStart) {
-    return indentMore(view);
+  // Can only indent if there's a previous sibling to nest under.
+  if (!item.prevSibling) {
+    return true; // consume the key but do nothing
   }
 
-  const indentStep = getListIndentStep(line.text);
+  const indentStep = BULLET_MARKERS.has(item.marker)
+    ? BULLET_INDENT
+    : ORDERED_INDENT;
   const indentStr = " ".repeat(indentStep);
+
+  // Indent all lines of this item and its descendants.
+  const lineRanges = collectItemLineRanges(view.state, item);
+  const changes = lineRanges.map((range) => ({
+    from: range.from,
+    insert: indentStr,
+  }));
+
   view.dispatch({
-    changes: { from: line.from, insert: indentStr },
+    changes,
     selection: EditorSelection.cursor(selection.head + indentStep),
   });
-
-  const nextLine = view.state.doc.lineAt(selection.head + indentStep);
-  const nextTextStart = getListTextStart(
-    nextLine.text,
-    nextLine.from,
-    nextLine.to,
-  );
-  const nextStarts = getVisualFragmentStarts(view, nextTextStart, nextLine.to);
-  const nextFragmentStart =
-    nextStarts[Math.min(fragmentIndex, nextStarts.length - 1)];
-
-  if (nextFragmentStart != null) {
-    view.dispatch({
-      selection: EditorSelection.cursor(nextFragmentStart, 1),
-    });
-  }
 
   return true;
 }
 
-function dedentListItemPreservingWrappedStart(view: EditorView) {
+function outdentListItem(view: EditorView) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
     return indentLess(view);
   }
 
-  const line = view.state.doc.lineAt(selection.head);
-  if (!LIST_PREFIX_RE.test(line.text)) {
+  const item = getListItemForLine(view.state, selection.head);
+  if (!item) {
     return indentLess(view);
   }
 
-  const indentStep = getListIndentStep(line.text);
-  let removableIndent = 0;
-  const leadingSpaces = /^( *)/.exec(line.text)?.[1].length ?? 0;
-  if (leadingSpaces >= indentStep) {
-    removableIndent = indentStep;
-  } else if (leadingSpaces > 0) {
-    removableIndent = leadingSpaces;
+  // Can only outdent if not already at top level.
+  if (item.depth === 0) {
+    return true; // consume the key but do nothing
   }
 
-  if (removableIndent === 0) {
+  const indentStep = BULLET_MARKERS.has(item.marker)
+    ? BULLET_INDENT
+    : ORDERED_INDENT;
+
+  // Figure out how many leading spaces we can remove.
+  const line = view.state.doc.lineAt(item.lineFrom);
+  const leadingSpaces = /^( *)/.exec(line.text)?.[1].length ?? 0;
+  const removable = Math.min(indentStep, leadingSpaces);
+  if (removable === 0) {
     return true;
   }
 
-  const textStart = getListTextStart(line.text, line.from, line.to);
-  const starts = getVisualFragmentStarts(view, textStart, line.to);
-  const fragmentIndex = getVisualFragmentIndex(selection.head, starts);
-  const fragmentStart = fragmentIndex >= 0 ? starts[fragmentIndex] : null;
+  // Outdent all lines of this item and its descendants.
+  const lineRanges = collectItemLineRanges(view.state, item);
+  const changes = lineRanges
+    .map((range) => {
+      const l = view.state.doc.lineAt(range.from);
+      const spaces = /^( *)/.exec(l.text)?.[1].length ?? 0;
+      const rm = Math.min(removable, spaces);
+      return rm > 0 ? { from: l.from, to: l.from + rm } : null;
+    })
+    .filter((c): c is { from: number; to: number } => c !== null);
 
-  if (fragmentStart == null || selection.head !== fragmentStart) {
-    return indentLess(view);
+  if (changes.length === 0) {
+    return true;
   }
 
   view.dispatch({
-    changes: { from: line.from, to: line.from + removableIndent },
+    changes,
     selection: EditorSelection.cursor(
-      Math.max(line.from, selection.head - removableIndent),
-      1,
+      Math.max(line.from, selection.head - removable),
     ),
   });
-
-  const nextLine = view.state.doc.lineAt(
-    Math.max(line.from, selection.head - removableIndent),
-  );
-  const nextTextStart = getListTextStart(
-    nextLine.text,
-    nextLine.from,
-    nextLine.to,
-  );
-  const nextStarts = getVisualFragmentStarts(view, nextTextStart, nextLine.to);
-  const nextFragmentStart =
-    nextStarts[Math.min(fragmentIndex, nextStarts.length - 1)];
-
-  if (nextFragmentStart != null) {
-    view.dispatch({
-      selection: EditorSelection.cursor(nextFragmentStart, 1),
-    });
-  }
 
   return true;
 }
@@ -789,6 +757,8 @@ export function deleteAcrossListBoundary(view: EditorView) {
     return deleteExpandedSelectionAcrossListMarkers(view);
   }
 
+  // --- Continuation line handling (existing behavior) ---
+
   const currentLine = view.state.doc.lineAt(selection.head);
   const continuationContext = getExplicitContinuationContextForLine(
     view.state,
@@ -863,11 +833,66 @@ export function deleteAcrossListBoundary(view: EditorView) {
     return true;
   }
 
+  // --- Structural merge: backspace at content start merges with previous item ---
+
+  const item = getListItemForLine(view.state, selection.head);
+  if (item && selection.head === item.contentFrom) {
+    return mergeWithPreviousListItem(view, item);
+  }
+
   logListDeleteDebug("deleteAcrossListBoundary fell through", {
     continuationRanges,
     head: selection.head,
   });
   return false;
+}
+
+/**
+ * When backspacing at the content start of a list item, merge its
+ * content into the previous item (or the previous line if there is no
+ * previous list item). Children of the deleted item are adopted by the
+ * previous item.
+ */
+function mergeWithPreviousListItem(
+  view: EditorView,
+  item: ListItemInfo,
+): boolean {
+  const state = view.state;
+
+  // Find what's on the line above this item.
+  if (item.lineFrom === 0) {
+    return false; // first line of the document
+  }
+
+  const previousLine = state.doc.lineAt(item.lineFrom - 1);
+  const prevItem = getListItemForLine(state, previousLine.from);
+
+  if (!prevItem) {
+    // Previous line is not a list item — merge content into it,
+    // removing the marker.
+    const content = state.sliceDoc(item.contentFrom, item.lineTo);
+    view.dispatch({
+      changes: { from: previousLine.to, to: item.lineTo, insert: content },
+      selection: EditorSelection.cursor(previousLine.to),
+      annotations: Transaction.userEvent.of("delete.backward"),
+    });
+    return true;
+  }
+
+  // Both are list items. Merge this item's first-line content into
+  // the end of the previous item's marker line.
+  const content = state.sliceDoc(item.contentFrom, item.lineTo);
+  const cursorTarget = prevItem.lineTo;
+
+  // Build the change: delete from end of previous line to end of
+  // current item's marker line, and insert just the content.
+  view.dispatch({
+    changes: { from: prevItem.lineTo, to: item.lineTo, insert: content },
+    selection: EditorSelection.cursor(cursorTarget),
+    annotations: Transaction.userEvent.of("delete.backward"),
+  });
+
+  return true;
 }
 
 function backspaceRemoveEmptyContinuationPrefix(
@@ -1521,8 +1546,8 @@ const listBreakKeymap = Prec.high(
 
 const listEditKeymap = keymap.of([
   { key: "Mod-t", run: insertTaskCheckbox },
-  { key: "Tab", run: indentListItemPreservingWrappedStart },
-  { key: "Shift-Tab", run: dedentListItemPreservingWrappedStart },
+  { key: "Tab", run: indentListItem },
+  { key: "Shift-Tab", run: outdentListItem },
 ]);
 
 export function lists(): Extension {
