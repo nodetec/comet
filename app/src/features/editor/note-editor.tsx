@@ -481,15 +481,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
             click(event, view) {
-              // Bail for multi-line selections (real drags). Same-line
-              // selections from slight mouse movement are corrected below.
+              // Bail for any non-trivial selection (real drags).
+              // Small selections from slight mouse movement (< 4 chars)
+              // are treated as clicks and corrected. The list normalization
+              // filter also collapses accidental small selections in the
+              // marker area.
               const sel = view.state.selection.main;
-              if (!sel.empty) {
-                const fromLine = view.state.doc.lineAt(sel.from);
-                const toLine = view.state.doc.lineAt(sel.to);
-                if (fromLine.number !== toLine.number) {
-                  return false;
-                }
+              if (!sel.empty && sel.to - sel.from > 3) {
+                return false;
               }
 
               const lineStart = getLeadingPaddingClickLineStart(view, event);
