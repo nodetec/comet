@@ -4,7 +4,7 @@ import type { SyntaxNodeRef } from "@lezer/common";
 export const BULLET_INDENT = 2;
 export const ORDERED_INDENT = 3;
 export const LIST_INDENT_STEP = "1.5rem";
-export const LIST_MARKER_WIDTH = "2.2rem";
+export const LIST_MARKER_WIDTH = "2.8rem";
 export const LIST_CHILD_BLOCK_OFFSET = LIST_MARKER_WIDTH;
 export const LIST_SOURCE_INDENT_CHAR_WIDTH = "0.25rem";
 export const BLOCKQUOTE_PREFIX_RE = /^(?:[ \t]{0,3}> ?)+/;

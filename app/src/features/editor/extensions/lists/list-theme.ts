@@ -46,12 +46,12 @@ export const listTheme = EditorView.theme({
     display: "inline-flex",
     fontSize: "1.45em",
     justifyContent: "center",
-    left: "50%",
+    left: "44%",
     lineHeight: "1",
     pointerEvents: "none",
     position: "absolute",
     top: "50%",
-    transform: "translate(-50%, -50%)",
+    transform: "translate(-50%, -60%)",
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-number-marker-source": {
@@ -73,9 +73,10 @@ export const listTheme = EditorView.theme({
     WebkitTextFillColor: "var(--primary)",
   },
   ".cm-md-task-marker-source": {
+    paddingLeft: "0.25rem",
     cursor: "text",
     display: "inline-flex",
-    justifyContent: "center",
+    justifyContent: "start",
     width: "var(--cm-md-list-marker-width)",
   },
   ".cm-md-task-empty-placeholder": {

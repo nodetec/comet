@@ -600,9 +600,16 @@ function normalizeSelectionToListMarkers(state: EditorState) {
       }
 
       // Snap cursor inside the marker area (between markerFrom and
-      // contentFrom, exclusive) to contentFrom. Both markerFrom and
-      // contentFrom are valid cursor positions and don't need snapping.
+      // contentFrom, exclusive) to contentFrom.
       if (range.head > item.markerFrom && range.head < item.contentFrom) {
+        changed = true;
+        return EditorSelection.cursor(item.contentFrom, 1);
+      }
+
+      // For task items, force assoc=1 at contentFrom so the caret
+      // leans into the text content, not the task widget (which has
+      // translateY that misaligns the caret).
+      if (item.task && range.head === item.contentFrom && range.assoc !== 1) {
         changed = true;
         return EditorSelection.cursor(item.contentFrom, 1);
       }
