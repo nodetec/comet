@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { errorMessage } from "@/shared/lib/utils";
 import {
@@ -28,15 +28,14 @@ import { usePublishState } from "@/features/publishing";
 
 import { useNoteQueries } from "@/features/notes-pane/hooks/use-note-queries";
 import { useNoteMutations } from "@/features/notes-pane/hooks/use-note-mutations";
-import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
 import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
 import { useConflictResolution } from "@/features/shell/hooks/use-conflict-resolution";
 import { useNoteHistoryDialog } from "@/features/shell/hooks/use-note-history-dialog";
 import { useNoteOperations } from "@/features/shell/hooks/use-note-operations";
+import { useShellEffects } from "@/features/shell/hooks/use-shell-effects";
 import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
 import { useViewNavigation } from "@/features/shell/hooks/use-view-navigation";
-import { useShellEventListeners } from "@/features/shell/hooks/use-shell-event-listeners";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export function useShellController() {
@@ -162,78 +161,6 @@ export function useShellController() {
 
   const { isPending: saveNotePending, mutate: mutateSaveNote } =
     saveNoteMutation;
-
-  // --- Sync listener ---
-  useSyncListener({
-    queryClient,
-    pendingSaveTimeoutRef,
-    isSavingRef,
-    bumpSyncEditorRevision,
-  });
-
-  // --- Active tag cleanup when available tags change ---
-  useEffect(() => {
-    if (!activeTagPath) {
-      return;
-    }
-
-    if (!availableTagPaths.includes(activeTagPath)) {
-      setActiveTagPath(null);
-      setTagViewActive(false);
-    }
-  }, [activeTagPath, availableTagPaths, setActiveTagPath, setTagViewActive]);
-
-  // --- Sync draft from loaded note ---
-  useEffect(() => {
-    if (!selectedNoteId) {
-      return;
-    }
-
-    if (noteQuery.isPlaceholderData) {
-      return;
-    }
-
-    if (noteQuery.data && noteQuery.data.id !== draftNoteId) {
-      setDraft(noteQuery.data.id, noteQuery.data.markdown, {
-        wikilinkResolutions: noteQuery.data.wikilinkResolutions,
-      });
-    }
-  }, [
-    draftNoteId,
-    noteQuery.data,
-    noteQuery.isPlaceholderData,
-    selectedNoteId,
-    setDraft,
-  ]);
-
-  // --- Hydrate initial selection ---
-  useEffect(() => {
-    if (
-      hasHydratedInitialSelection ||
-      createNoteMutation.isPending ||
-      isCreatingNoteTransition
-    ) {
-      return;
-    }
-
-    if (initialSelectedNoteId && !selectedNoteId) {
-      setSelectedNoteId(initialSelectedNoteId);
-      setHasHydratedInitialSelection(true);
-      return;
-    }
-
-    if (bootstrapQuery.isSuccess) {
-      setHasHydratedInitialSelection(true);
-    }
-  }, [
-    bootstrapQuery.isSuccess,
-    createNoteMutation.isPending,
-    hasHydratedInitialSelection,
-    initialSelectedNoteId,
-    isCreatingNoteTransition,
-    selectedNoteId,
-    setSelectedNoteId,
-  ]);
 
   const currentNote = selectedNoteId ? noteQuery.data : undefined;
   const currentNoteId = currentNote?.id ?? null;
@@ -387,57 +314,34 @@ export function useShellController() {
     createNoteMutation,
   });
 
-  // Keep latest handler references for stable callbacks
-  const currentHandlers = {
-    fetchNextPage: notesQuery.fetchNextPage,
-    flushCurrentDraft,
-    flushCurrentDraftAsync,
-    handleArchiveNote: noteOps.handleArchiveNote,
-    handleCopyNoteContent: noteOps.handleCopyNoteContent,
-    handleCreateNote: viewNav.handleCreateNote,
-    handleDuplicateNote: noteOps.handleDuplicateNote,
-    handleDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
-    handleEmptyTrash: noteOps.handleEmptyTrash,
-    handleExportNotes: noteOps.handleExportNotes,
-    handleExportTag: noteOps.handleExportTag,
-    handleRestoreFromTrash: noteOps.handleRestoreFromTrash,
-    handleRestoreNote: noteOps.handleRestoreNote,
-    handleDeleteTag: tagOps.handleDeleteTag,
-    handleSelectAll: viewNav.handleSelectAll,
-    handleSelectArchive: viewNav.handleSelectArchive,
-    handleSelectTrash: viewNav.handleSelectTrash,
-    handleTrashNote: noteOps.handleTrashNote,
-    handleRenameTag: tagOps.handleRenameTag,
-    handleSelectNote: viewNav.handleSelectNote,
-    handleSetHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
-    handleSetTagPinned: tagOps.handleSetTagPinned,
-    handleSelectToday: viewNav.handleSelectToday,
-    handleSelectTodo: viewNav.handleSelectTodo,
-    handleSelectPinned: viewNav.handleSelectPinned,
-    handleSelectUntagged: viewNav.handleSelectUntagged,
-    handleSetNotePinned: noteOps.handleSetNotePinned,
-    handleSetNoteReadonly: noteOps.handleSetNoteReadonly,
-    handleSelectTagPath: viewNav.handleSelectTagPath,
-    handleOpenNoteHistory: noteHistory.handleOpenNoteHistory,
-    handleSelectNoteHistorySnapshot:
-      noteHistory.handleSelectNoteHistorySnapshot,
-    handleRestoreSelectedNoteHistorySnapshot:
-      noteHistory.handleRestoreSelectedNoteHistorySnapshot,
-    handleResolveCurrentNoteConflict:
-      conflictResolution.handleResolveCurrentNoteConflict,
-    handleLoadConflictHead: conflictResolution.handleLoadConflictHead,
-  };
-  const latestRef = useRef(currentHandlers);
-  latestRef.current = currentHandlers;
-
-  // --- Event listeners ---
-  useShellEventListeners({
-    latestRef,
+  useShellEffects({
+    queryClient,
+    pendingSaveTimeoutRef,
+    isSavingRef,
+    bumpSyncEditorRevision,
     activeTagPath,
+    availableTagPaths,
+    selectedNoteId,
+    draftNoteId,
+    noteQueryData: noteQuery.data,
+    noteQueryIsPlaceholderData: noteQuery.isPlaceholderData,
+    bootstrapSuccess: bootstrapQuery.isSuccess,
+    initialSelectedNoteId,
+    hasHydratedInitialSelection,
+    isCreatingNoteTransition,
+    createNoteMutation,
+    setActiveTagPath,
+    setDraft,
+    setHasHydratedInitialSelection,
+    setSelectedNoteId,
     tagViewActive,
     noteFilter,
     isCreatingNote,
-    createNoteMutation,
+    setTagViewActive,
+    flushCurrentDraft,
+    flushCurrentDraftAsync,
+    handleSelectTagPath: viewNav.handleSelectTagPath,
+    handleSelectNote: viewNav.handleSelectNote,
   });
 
   // --- Props assembly ---
@@ -476,7 +380,7 @@ export function useShellController() {
     },
     onDuplicateNote() {
       if (currentNote) {
-        latestRef.current.handleDuplicateNote(currentNote.id);
+        noteOps.handleDuplicateNote(currentNote.id);
       }
     },
     onAutoFocusEditorHandled() {
@@ -490,7 +394,7 @@ export function useShellController() {
       }
 
       void (async () => {
-        await latestRef.current.flushCurrentDraftAsync();
+        await flushCurrentDraftAsync();
         setPublishDialogOpen(true);
       })().catch(() => {});
     },
@@ -500,18 +404,18 @@ export function useShellController() {
       }
 
       void (async () => {
-        await latestRef.current.flushCurrentDraftAsync();
+        await flushCurrentDraftAsync();
         setPublishShortNoteDialogOpen(true);
       })().catch(() => {});
     },
     onSetPinned(pinned: boolean) {
       if (currentNote) {
-        latestRef.current.handleSetNotePinned(currentNote.id, pinned);
+        noteOps.handleSetNotePinned(currentNote.id, pinned);
       }
     },
     onSetReadonly(readonly: boolean) {
       if (currentNote) {
-        latestRef.current.handleSetNoteReadonly(currentNote.id, readonly);
+        noteOps.handleSetNoteReadonly(currentNote.id, readonly);
       }
     },
     onChange(markdown: string) {
@@ -522,17 +426,17 @@ export function useShellController() {
       }
     },
     onLoadConflictHead(snapshotId: string, markdown: string | null) {
-      latestRef.current.handleLoadConflictHead(snapshotId, markdown);
+      conflictResolution.handleLoadConflictHead(snapshotId, markdown);
     },
     onSelectLinkedNote(noteId: string) {
-      latestRef.current.handleSelectNote(noteId);
+      viewNav.handleSelectNote(noteId);
     },
     onResolveConflict() {
       setChooseConflictNoteId(currentNote?.id ?? null);
       setChooseConflictDialogOpen(true);
     },
     onOpenHistory() {
-      latestRef.current.handleOpenNoteHistory();
+      noteHistory.handleOpenNoteHistory();
     },
   };
 
@@ -595,19 +499,13 @@ export function useShellController() {
       }
     },
     onKeepDeleted() {
-      void latestRef.current
-        .handleResolveCurrentNoteConflict("keep_deleted")
-        .catch(() => {});
+      void conflictResolution.handleResolveCurrentNoteConflict("keep_deleted");
     },
     onRestore() {
-      void latestRef.current
-        .handleResolveCurrentNoteConflict("restore")
-        .catch(() => {});
+      void conflictResolution.handleResolveCurrentNoteConflict("restore");
     },
     onMerge() {
-      void latestRef.current
-        .handleResolveCurrentNoteConflict("merge")
-        .catch(() => {});
+      void conflictResolution.handleResolveCurrentNoteConflict("merge");
     },
   };
 
@@ -625,10 +523,10 @@ export function useShellController() {
       }
     },
     onRestore() {
-      void latestRef.current.handleRestoreSelectedNoteHistorySnapshot();
+      void noteHistory.handleRestoreSelectedNoteHistorySnapshot();
     },
     onSelectSnapshot(snapshotId: string) {
-      latestRef.current.handleSelectNoteHistorySnapshot(snapshotId);
+      noteHistory.handleSelectNoteHistorySnapshot(snapshotId);
     },
   };
 
@@ -643,32 +541,23 @@ export function useShellController() {
     isMutatingNote,
     selectedNoteId: displayedSelectedNoteId,
     totalNoteCount,
-    onArchiveNote: (noteId: string) =>
-      latestRef.current.handleArchiveNote(noteId),
-    onCopyNoteContent: (noteId: string) =>
-      latestRef.current.handleCopyNoteContent(noteId),
-    onCreateNote: () => latestRef.current.handleCreateNote(),
-    onDeleteNotePermanently: (noteId: string) =>
-      latestRef.current.handleDeleteNotePermanently(noteId),
-    onDuplicateNote: (noteId: string) =>
-      latestRef.current.handleDuplicateNote(noteId),
-    onExportNotes: () => latestRef.current.handleExportNotes(),
+    onArchiveNote: noteOps.handleArchiveNote,
+    onCopyNoteContent: noteOps.handleCopyNoteContent,
+    onCreateNote: viewNav.handleCreateNote,
+    onDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
+    onDuplicateNote: noteOps.handleDuplicateNote,
+    onExportNotes: noteOps.handleExportNotes,
     onLoadMore() {
       if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
-        void latestRef.current.fetchNextPage();
+        void notesQuery.fetchNextPage();
       }
     },
-    onRestoreFromTrash: (noteId: string) =>
-      latestRef.current.handleRestoreFromTrash(noteId),
-    onRestoreNote: (noteId: string) =>
-      latestRef.current.handleRestoreNote(noteId),
-    onSelectNote: (noteId: string) =>
-      latestRef.current.handleSelectNote(noteId),
-    onSetNotePinned: (noteId: string, pinned: boolean) =>
-      latestRef.current.handleSetNotePinned(noteId, pinned),
-    onSetNoteReadonly: (noteId: string, readonly: boolean) =>
-      latestRef.current.handleSetNoteReadonly(noteId, readonly),
-    onTrashNote: (noteId: string) => latestRef.current.handleTrashNote(noteId),
+    onRestoreFromTrash: noteOps.handleRestoreFromTrash,
+    onRestoreNote: noteOps.handleRestoreNote,
+    onSelectNote: viewNav.handleSelectNote,
+    onSetNotePinned: noteOps.handleSetNotePinned,
+    onSetNoteReadonly: noteOps.handleSetNoteReadonly,
+    onTrashNote: noteOps.handleTrashNote,
   };
 
   const sidebarPaneProps = {
@@ -677,24 +566,20 @@ export function useShellController() {
     archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
     todoCount: todoCountQuery.data ?? 0,
     trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
-    onSelectAll: () => latestRef.current.handleSelectAll(),
-    onSelectToday: () => latestRef.current.handleSelectToday(),
-    onSelectTodo: () => latestRef.current.handleSelectTodo(),
-    onSelectPinned: () => latestRef.current.handleSelectPinned(),
-    onSelectUntagged: () => latestRef.current.handleSelectUntagged(),
-    onSelectArchive: () => latestRef.current.handleSelectArchive(),
-    onSelectTrash: () => latestRef.current.handleSelectTrash(),
-    onSelectTagPath: (tagPath: string) =>
-      latestRef.current.handleSelectTagPath(tagPath),
-    onDeleteTag: (path: string) => latestRef.current.handleDeleteTag(path),
-    onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
-    onExportTag: (path: string) => latestRef.current.handleExportTag(path),
-    onRenameTag: (fromPath: string, toPath: string) =>
-      latestRef.current.handleRenameTag(fromPath, toPath),
-    onSetTagPinned: (path: string, pinned: boolean) =>
-      latestRef.current.handleSetTagPinned(path, pinned),
-    onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
-      latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
+    onSelectAll: viewNav.handleSelectAll,
+    onSelectToday: viewNav.handleSelectToday,
+    onSelectTodo: viewNav.handleSelectTodo,
+    onSelectPinned: viewNav.handleSelectPinned,
+    onSelectUntagged: viewNav.handleSelectUntagged,
+    onSelectArchive: viewNav.handleSelectArchive,
+    onSelectTrash: viewNav.handleSelectTrash,
+    onSelectTagPath: viewNav.handleSelectTagPath,
+    onDeleteTag: tagOps.handleDeleteTag,
+    onEmptyTrash: noteOps.handleEmptyTrash,
+    onExportTag: noteOps.handleExportTag,
+    onRenameTag: tagOps.handleRenameTag,
+    onSetTagPinned: tagOps.handleSetTagPinned,
+    onSetTagHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
   };
 
   return {
