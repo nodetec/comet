@@ -255,6 +255,7 @@ export function NotesPane({
     lastHandledFocusNotesSearchRequestIdRef.current = focusNotesSearchRequestId;
     setFocusedPane("notes");
     setIsSearchOpen(true);
+    setIsSearchFocused(true);
     focusSearchInput();
   }, [focusNotesSearchRequestId, focusSearchInput, setFocusedPane]);
 
