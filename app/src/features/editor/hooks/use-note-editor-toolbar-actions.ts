@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { EditorSelection } from "@codemirror/state";
 import { type EditorView } from "@codemirror/view";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
@@ -67,78 +66,69 @@ export function useNoteEditorToolbarActions({
   readOnly,
   viewRef,
 }: UseNoteEditorToolbarActionsParams) {
-  const applyToolbarMutation = useCallback(
-    (
-      transform: (
-        markdown: string,
-        selection: SelectionSnapshot,
-      ) => {
-        markdown: string;
-        selection: SelectionSnapshot;
-      },
+  const applyToolbarMutation = (
+    transform: (
+      markdown: string,
+      selection: SelectionSnapshot,
     ) => {
-      const view = viewRef.current;
-      if (!view || readOnly) {
-        return false;
-      }
+      markdown: string;
+      selection: SelectionSnapshot;
+    },
+  ) => {
+    const view = viewRef.current;
+    if (!view || readOnly) {
+      return false;
+    }
 
-      const currentMarkdown = view.state.doc.toString();
-      const currentSelection = view.state.selection.main;
-      const next = transform(currentMarkdown, {
-        anchor: currentSelection.anchor,
-        head: currentSelection.head,
-      });
+    const currentMarkdown = view.state.doc.toString();
+    const currentSelection = view.state.selection.main;
+    const next = transform(currentMarkdown, {
+      anchor: currentSelection.anchor,
+      head: currentSelection.head,
+    });
 
-      if (
-        next.markdown === currentMarkdown &&
-        next.selection.anchor === currentSelection.anchor &&
-        next.selection.head === currentSelection.head
-      ) {
-        focusEditorViewWithoutScroll(view);
-        return false;
-      }
-
-      const change = getContiguousMarkdownChange(
-        currentMarkdown,
-        next.markdown,
-      );
-
-      view.dispatch({
-        changes: change,
-        selection: EditorSelection.range(
-          next.selection.anchor,
-          next.selection.head,
-        ),
-        scrollIntoView: false,
-      });
+    if (
+      next.markdown === currentMarkdown &&
+      next.selection.anchor === currentSelection.anchor &&
+      next.selection.head === currentSelection.head
+    ) {
       focusEditorViewWithoutScroll(view);
-      return true;
-    },
-    [readOnly, viewRef],
-  );
+      return false;
+    }
 
-  const handleToggleInlineFormat = useCallback(
-    (format: InlineFormat) => {
-      applyToolbarMutation((currentMarkdown, selection) =>
-        toggleInlineFormat(currentMarkdown, selection, format),
-      );
-    },
-    [applyToolbarMutation],
-  );
+    const change = getContiguousMarkdownChange(currentMarkdown, next.markdown);
 
-  const handleCycleBlockType = useCallback(() => {
+    view.dispatch({
+      changes: change,
+      selection: EditorSelection.range(
+        next.selection.anchor,
+        next.selection.head,
+      ),
+      scrollIntoView: false,
+    });
+    focusEditorViewWithoutScroll(view);
+    return true;
+  };
+
+  const handleToggleInlineFormat = (format: InlineFormat) => {
+    applyToolbarMutation((currentMarkdown, selection) =>
+      toggleInlineFormat(currentMarkdown, selection, format),
+    );
+  };
+
+  const handleCycleBlockType = () => {
     applyToolbarMutation(cycleBlockType);
-  }, [applyToolbarMutation]);
+  };
 
-  const handleInsertCodeBlock = useCallback(() => {
+  const handleInsertCodeBlock = () => {
     applyToolbarMutation(insertCodeBlock);
-  }, [applyToolbarMutation]);
+  };
 
-  const handleInsertTable = useCallback(() => {
+  const handleInsertTable = () => {
     applyToolbarMutation(insertMarkdownTable);
-  }, [applyToolbarMutation]);
+  };
 
-  const handleInsertImage = useCallback(async () => {
+  const handleInsertImage = async () => {
     if (readOnly) {
       return;
     }
@@ -165,7 +155,7 @@ export function useNoteEditorToolbarActions({
         src,
       }),
     );
-  }, [applyToolbarMutation, readOnly]);
+  };
 
   return {
     handleCycleBlockType,

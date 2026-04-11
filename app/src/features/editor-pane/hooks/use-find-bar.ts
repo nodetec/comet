@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -56,63 +55,57 @@ export function useFindBar({
     }
   }
 
-  const closeFind = useCallback(
-    (focusEditor: boolean) => {
-      setFocusedPane("editor");
-      setFindOpen(false);
-      setFindMatchCount(0);
-      setFindQuery("");
-      setActiveFindMatchIndex(0);
-      if (focusEditor) {
-        requestAnimationFrame(() => {
-          editorRef.current?.focus();
-        });
-      }
-    },
-    [setFocusedPane, editorRef],
-  );
+  const closeFind = (focusEditor: boolean) => {
+    setFocusedPane("editor");
+    setFindOpen(false);
+    setFindMatchCount(0);
+    setFindQuery("");
+    setActiveFindMatchIndex(0);
+    if (focusEditor) {
+      requestAnimationFrame(() => {
+        editorRef.current?.focus();
+      });
+    }
+  };
 
-  const focusFindInput = useCallback(() => {
+  const focusFindInput = () => {
     requestAnimationFrame(() => {
       findInputRef.current?.focus();
       findInputRef.current?.select();
     });
-  }, []);
+  };
 
-  const openFind = useCallback(() => {
+  const openFind = () => {
     setFocusedPane("editor");
     setFindOpen(true);
 
     if (findOpen) {
       focusFindInput();
     }
-  }, [findOpen, focusFindInput, setFocusedPane]);
+  };
 
-  const stepActiveFindMatch = useCallback(
-    (direction: 1 | -1) => {
-      if (activeEditorFindMatchCount === 0) return;
-      setActiveFindMatchIndex((prev) => {
-        const current =
-          activeEditorFindMatchCount === 0
-            ? 0
-            : Math.min(prev, activeEditorFindMatchCount - 1);
-        const next = current + direction;
-        if (next < 0) return activeEditorFindMatchCount - 1;
-        if (next >= activeEditorFindMatchCount) return 0;
-        return next;
-      });
-      setFindScrollRevision((r) => r + 1);
-    },
-    [activeEditorFindMatchCount],
-  );
+  const stepActiveFindMatch = (direction: 1 | -1) => {
+    if (activeEditorFindMatchCount === 0) return;
+    setActiveFindMatchIndex((prev) => {
+      const current =
+        activeEditorFindMatchCount === 0
+          ? 0
+          : Math.min(prev, activeEditorFindMatchCount - 1);
+      const next = current + direction;
+      if (next < 0) return activeEditorFindMatchCount - 1;
+      if (next >= activeEditorFindMatchCount) return 0;
+      return next;
+    });
+    setFindScrollRevision((r) => r + 1);
+  };
 
-  const ensureActiveFindMatch = useCallback(() => {
+  const ensureActiveFindMatch = () => {
     if (activeEditorFindMatchCount === 0 || findQuery.trim().length === 0) {
       return;
     }
 
     setFindScrollRevision((value) => value + 1);
-  }, [activeEditorFindMatchCount, findQuery]);
+  };
 
   useLayoutEffect(() => {
     if (!findOpen || !noteId) {

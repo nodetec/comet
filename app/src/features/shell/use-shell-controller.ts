@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { errorMessage } from "@/shared/lib/utils";
 import {
@@ -97,12 +97,12 @@ export function useShellController() {
   const noteSortField = sortPrefs.field;
   const noteSortDirection = sortPrefs.direction;
 
-  const bumpSyncEditorRevision = useCallback(
-    (_reason: string, _details: Record<string, unknown> = {}) => {
-      setSyncEditorRevision((value) => value + 1);
-    },
-    [],
-  );
+  const bumpSyncEditorRevision = (
+    _reason: string,
+    _details: Record<string, unknown> = {},
+  ) => {
+    setSyncEditorRevision((value) => value + 1);
+  };
 
   // --- Queries ---
   const {
@@ -387,7 +387,7 @@ export function useShellController() {
     createNoteMutation,
   });
 
-  // Keep latest handler references for stable memoized callbacks
+  // Keep latest handler references for stable callbacks
   const currentHandlers = {
     fetchNextPage: notesQuery.fetchNextPage,
     flushCurrentDraft,
@@ -441,127 +441,100 @@ export function useShellController() {
   });
 
   // --- Props assembly ---
-  const nextEditorPaneProps = useMemo(
-    () => ({
-      availableTagPaths,
-      archivedAt: currentNote?.archivedAt ?? null,
-      autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
-      backlinks: noteBacklinksQuery.data ?? [],
-      deletedAt: currentNote?.deletedAt ?? null,
-      markdown: currentEditorMarkdown,
-      modifiedAt: currentNote?.modifiedAt ?? 0,
-      noteConflict: currentNoteConflict ?? null,
-      noteId:
-        displayedSelectedNoteId || isCreatingNote
-          ? (currentNote?.id ?? null)
-          : null,
-      editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
-      pinnedAt: currentNote?.pinnedAt ?? null,
-      publishedAt: currentNote?.publishedAt ?? null,
-      publishedKind: currentNote?.publishedKind ?? null,
-      readonly: currentNote?.readonly ?? false,
-      selectedConflictSnapshotId,
-      searchQuery,
-      isDeletePublishedNotePending,
-      isResolveConflictPending,
-      onDeletePublishedNote() {
-        if (
-          !currentNote ||
-          isDeletePublishedNotePending ||
-          !currentNote.publishedAt
-        ) {
-          return;
-        }
+  const nextEditorPaneProps = {
+    availableTagPaths,
+    archivedAt: currentNote?.archivedAt ?? null,
+    autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
+    backlinks: noteBacklinksQuery.data ?? [],
+    deletedAt: currentNote?.deletedAt ?? null,
+    markdown: currentEditorMarkdown,
+    modifiedAt: currentNote?.modifiedAt ?? 0,
+    noteConflict: currentNoteConflict ?? null,
+    noteId:
+      displayedSelectedNoteId || isCreatingNote
+        ? (currentNote?.id ?? null)
+        : null,
+    editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
+    pinnedAt: currentNote?.pinnedAt ?? null,
+    publishedAt: currentNote?.publishedAt ?? null,
+    publishedKind: currentNote?.publishedKind ?? null,
+    readonly: currentNote?.readonly ?? false,
+    selectedConflictSnapshotId,
+    searchQuery,
+    isDeletePublishedNotePending,
+    isResolveConflictPending,
+    onDeletePublishedNote() {
+      if (
+        !currentNote ||
+        isDeletePublishedNotePending ||
+        !currentNote.publishedAt
+      ) {
+        return;
+      }
 
-        setDeletePublishDialogOpen(true);
-      },
-      onDuplicateNote() {
-        if (currentNote) {
-          latestRef.current.handleDuplicateNote(currentNote.id);
-        }
-      },
-      onAutoFocusEditorHandled() {
-        if (currentNoteId === pendingAutoFocusEditorNoteId) {
-          setPendingAutoFocusEditorNoteId(null);
-        }
-      },
-      onOpenPublishDialog() {
-        if (!currentNote || isPublishNotePending) {
-          return;
-        }
+      setDeletePublishDialogOpen(true);
+    },
+    onDuplicateNote() {
+      if (currentNote) {
+        latestRef.current.handleDuplicateNote(currentNote.id);
+      }
+    },
+    onAutoFocusEditorHandled() {
+      if (currentNoteId === pendingAutoFocusEditorNoteId) {
+        setPendingAutoFocusEditorNoteId(null);
+      }
+    },
+    onOpenPublishDialog() {
+      if (!currentNote || isPublishNotePending) {
+        return;
+      }
 
-        void (async () => {
-          await latestRef.current.flushCurrentDraftAsync();
-          setPublishDialogOpen(true);
-        })().catch(() => {});
-      },
-      onPublishShortNote() {
-        if (!currentNote || isPublishShortNotePending) {
-          return;
-        }
+      void (async () => {
+        await latestRef.current.flushCurrentDraftAsync();
+        setPublishDialogOpen(true);
+      })().catch(() => {});
+    },
+    onPublishShortNote() {
+      if (!currentNote || isPublishShortNotePending) {
+        return;
+      }
 
-        void (async () => {
-          await latestRef.current.flushCurrentDraftAsync();
-          setPublishShortNoteDialogOpen(true);
-        })().catch(() => {});
-      },
-      onSetPinned(pinned: boolean) {
-        if (currentNote) {
-          latestRef.current.handleSetNotePinned(currentNote.id, pinned);
-        }
-      },
-      onSetReadonly(readonly: boolean) {
-        if (currentNote) {
-          latestRef.current.handleSetNoteReadonly(currentNote.id, readonly);
-        }
-      },
-      onChange(markdown: string) {
-        if (currentNote && !currentNote.archivedAt && !currentNote.readonly) {
-          setDraft(currentNote.id, markdown, {
-            preserveWikilinkResolutions: true,
-          });
-        }
-      },
-      onLoadConflictHead(snapshotId: string, markdown: string | null) {
-        latestRef.current.handleLoadConflictHead(snapshotId, markdown);
-      },
-      onSelectLinkedNote(noteId: string) {
-        latestRef.current.handleSelectNote(noteId);
-      },
-      onResolveConflict() {
-        setChooseConflictNoteId(currentNote?.id ?? null);
-        setChooseConflictDialogOpen(true);
-      },
-      onOpenHistory() {
-        latestRef.current.handleOpenNoteHistory();
-      },
-    }),
-    [
-      availableTagPaths,
-      noteBacklinksQuery.data,
-      currentEditorMarkdown,
-      currentNoteConflict,
-      currentNote,
-      currentNoteId,
-      displayedSelectedNoteId,
-      isDeletePublishedNotePending,
-      isCreatingNote,
-      isPublishNotePending,
-      isPublishShortNotePending,
-      isResolveConflictPending,
-      pendingAutoFocusEditorNoteId,
-      searchQuery,
-      selectedConflictSnapshotId,
-      setChooseConflictNoteId,
-      setChooseConflictDialogOpen,
-      setDeletePublishDialogOpen,
-      setDraft,
-      setPendingAutoFocusEditorNoteId,
-      setPublishDialogOpen,
-      setPublishShortNoteDialogOpen,
-      syncEditorRevision,
-    ],
-  );
+      void (async () => {
+        await latestRef.current.flushCurrentDraftAsync();
+        setPublishShortNoteDialogOpen(true);
+      })().catch(() => {});
+    },
+    onSetPinned(pinned: boolean) {
+      if (currentNote) {
+        latestRef.current.handleSetNotePinned(currentNote.id, pinned);
+      }
+    },
+    onSetReadonly(readonly: boolean) {
+      if (currentNote) {
+        latestRef.current.handleSetNoteReadonly(currentNote.id, readonly);
+      }
+    },
+    onChange(markdown: string) {
+      if (currentNote && !currentNote.archivedAt && !currentNote.readonly) {
+        setDraft(currentNote.id, markdown, {
+          preserveWikilinkResolutions: true,
+        });
+      }
+    },
+    onLoadConflictHead(snapshotId: string, markdown: string | null) {
+      latestRef.current.handleLoadConflictHead(snapshotId, markdown);
+    },
+    onSelectLinkedNote(noteId: string) {
+      latestRef.current.handleSelectNote(noteId);
+    },
+    onResolveConflict() {
+      setChooseConflictNoteId(currentNote?.id ?? null);
+      setChooseConflictDialogOpen(true);
+    },
+    onOpenHistory() {
+      latestRef.current.handleOpenNoteHistory();
+    },
+  };
 
   // Freeze editor pane props while React Query is showing placeholder data
   // from the previous note, so the old note's content doesn't flash.
@@ -575,229 +548,154 @@ export function useShellController() {
     ? editorPanePropsRef.current
     : nextEditorPaneProps;
 
-  const publishDialogProps = useMemo(
-    () => ({
-      content: currentEditorMarkdown,
-      initialTitle: currentNote?.title ?? "",
-      initialTags: currentNote?.tags ?? [],
-      noteId: currentNote?.id ?? "",
-      open: publishDialogOpen,
-      pending: isPublishNotePending,
-      onOpenChange: setPublishDialogOpen,
-      onSubmit(input: PublishNoteInput) {
-        mutatePublishNote(input);
-      },
-    }),
-    [
-      currentEditorMarkdown,
-      currentNote?.id,
-      currentNote?.tags,
-      currentNote?.title,
-      isPublishNotePending,
-      mutatePublishNote,
-      publishDialogOpen,
-      setPublishDialogOpen,
-    ],
-  );
+  const publishDialogProps = {
+    content: currentEditorMarkdown,
+    initialTitle: currentNote?.title ?? "",
+    initialTags: currentNote?.tags ?? [],
+    noteId: currentNote?.id ?? "",
+    open: publishDialogOpen,
+    pending: isPublishNotePending,
+    onOpenChange: setPublishDialogOpen,
+    onSubmit(input: PublishNoteInput) {
+      mutatePublishNote(input);
+    },
+  };
 
-  const publishShortNoteDialogProps = useMemo(
-    () => ({
-      content: currentEditorMarkdown.replace(/^#\s+.*\n*/, "").trim(),
-      initialTags: currentNote?.tags ?? [],
-      noteId: currentNote?.id ?? "",
-      open: publishShortNoteDialogOpen,
-      pending: isPublishShortNotePending,
-      onOpenChange: setPublishShortNoteDialogOpen,
-      onSubmit(input: PublishShortNoteInput) {
-        mutatePublishShortNote(input);
-      },
-    }),
-    [
-      currentEditorMarkdown,
-      currentNote?.id,
-      currentNote?.tags,
-      isPublishShortNotePending,
-      mutatePublishShortNote,
-      publishShortNoteDialogOpen,
-      setPublishShortNoteDialogOpen,
-    ],
-  );
+  const publishShortNoteDialogProps = {
+    content: currentEditorMarkdown.replace(/^#\s+.*\n*/, "").trim(),
+    initialTags: currentNote?.tags ?? [],
+    noteId: currentNote?.id ?? "",
+    open: publishShortNoteDialogOpen,
+    pending: isPublishShortNotePending,
+    onOpenChange: setPublishShortNoteDialogOpen,
+    onSubmit(input: PublishShortNoteInput) {
+      mutatePublishShortNote(input);
+    },
+  };
 
-  const deletePublishDialogProps = useMemo(
-    () => ({
-      open: deletePublishDialogOpen,
-      pending: isDeletePublishedNotePending,
-      onOpenChange: setDeletePublishDialogOpen,
-      onConfirm() {
-        if (currentNoteId) {
-          mutateDeletePublishedNote(currentNoteId);
-        }
-      },
-    }),
-    [
-      currentNoteId,
-      deletePublishDialogOpen,
-      isDeletePublishedNotePending,
-      mutateDeletePublishedNote,
-      setDeletePublishDialogOpen,
-    ],
-  );
+  const deletePublishDialogProps = {
+    open: deletePublishDialogOpen,
+    pending: isDeletePublishedNotePending,
+    onOpenChange: setDeletePublishDialogOpen,
+    onConfirm() {
+      if (currentNoteId) {
+        mutateDeletePublishedNote(currentNoteId);
+      }
+    },
+  };
 
-  const chooseConflictDialogProps = useMemo(
-    () => ({
-      hasDeleteCandidate: currentNoteConflict?.hasDeleteCandidate ?? false,
-      open: chooseConflictDialogOpen,
-      pending: isResolveConflictPending,
-      onOpenChange(open: boolean) {
-        setChooseConflictDialogOpen(open);
-        if (!open) {
-          setChooseConflictNoteId(null);
-        }
-      },
-      onKeepDeleted() {
-        void latestRef.current
-          .handleResolveCurrentNoteConflict("keep_deleted")
-          .catch(() => {});
-      },
-      onRestore() {
-        void latestRef.current
-          .handleResolveCurrentNoteConflict("restore")
-          .catch(() => {});
-      },
-      onMerge() {
-        void latestRef.current
-          .handleResolveCurrentNoteConflict("merge")
-          .catch(() => {});
-      },
-    }),
-    [
-      currentNoteConflict?.hasDeleteCandidate,
-      chooseConflictDialogOpen,
-      isResolveConflictPending,
-      setChooseConflictNoteId,
-      setChooseConflictDialogOpen,
-    ],
-  );
+  const chooseConflictDialogProps = {
+    hasDeleteCandidate: currentNoteConflict?.hasDeleteCandidate ?? false,
+    open: chooseConflictDialogOpen,
+    pending: isResolveConflictPending,
+    onOpenChange(open: boolean) {
+      setChooseConflictDialogOpen(open);
+      if (!open) {
+        setChooseConflictNoteId(null);
+      }
+    },
+    onKeepDeleted() {
+      void latestRef.current
+        .handleResolveCurrentNoteConflict("keep_deleted")
+        .catch(() => {});
+    },
+    onRestore() {
+      void latestRef.current
+        .handleResolveCurrentNoteConflict("restore")
+        .catch(() => {});
+    },
+    onMerge() {
+      void latestRef.current
+        .handleResolveCurrentNoteConflict("merge")
+        .catch(() => {});
+    },
+  };
 
-  const noteHistoryDialogProps = useMemo(
-    () => ({
-      noteId: currentNoteId,
-      open: noteHistoryDialogOpen,
-      pending: isRestoreHistoryPending,
-      selectedSnapshotId: selectedHistorySnapshotId,
-      snapshots: currentNoteHistory?.snapshots ?? [],
-      hasConflict: isCurrentNoteConflicted,
-      onOpenChange(open: boolean) {
-        setNoteHistoryDialogOpen(open);
-        if (!open) {
-          setSelectedHistorySnapshotId(null);
-        }
-      },
-      onRestore() {
-        void latestRef.current.handleRestoreSelectedNoteHistorySnapshot();
-      },
-      onSelectSnapshot(snapshotId: string) {
-        latestRef.current.handleSelectNoteHistorySnapshot(snapshotId);
-      },
-    }),
-    [
-      currentNoteHistory?.snapshots,
-      currentNoteId,
-      isCurrentNoteConflicted,
-      isRestoreHistoryPending,
-      noteHistoryDialogOpen,
-      selectedHistorySnapshotId,
-      setNoteHistoryDialogOpen,
-      setSelectedHistorySnapshotId,
-    ],
-  );
+  const noteHistoryDialogProps = {
+    noteId: currentNoteId,
+    open: noteHistoryDialogOpen,
+    pending: isRestoreHistoryPending,
+    selectedSnapshotId: selectedHistorySnapshotId,
+    snapshots: currentNoteHistory?.snapshots ?? [],
+    hasConflict: isCurrentNoteConflicted,
+    onOpenChange(open: boolean) {
+      setNoteHistoryDialogOpen(open);
+      if (!open) {
+        setSelectedHistorySnapshotId(null);
+      }
+    },
+    onRestore() {
+      void latestRef.current.handleRestoreSelectedNoteHistorySnapshot();
+    },
+    onSelectSnapshot(snapshotId: string) {
+      latestRef.current.handleSelectNoteHistorySnapshot(snapshotId);
+    },
+  };
 
   const { isMutatingNote } = noteOps;
 
-  const notesPaneProps = useMemo(
-    () => ({
-      filteredNotes: currentNotes,
-      hasMoreNotes: notesQuery.hasNextPage,
-      isCreatingNote,
-      isLoadingMoreNotes: notesQuery.isFetchingNextPage,
-      isNotesPlaceholderData: notesQuery.isPlaceholderData,
-      isMutatingNote,
-      selectedNoteId: displayedSelectedNoteId,
-      totalNoteCount,
-      onArchiveNote: (noteId: string) =>
-        latestRef.current.handleArchiveNote(noteId),
-      onCopyNoteContent: (noteId: string) =>
-        latestRef.current.handleCopyNoteContent(noteId),
-      onCreateNote: () => latestRef.current.handleCreateNote(),
-      onDeleteNotePermanently: (noteId: string) =>
-        latestRef.current.handleDeleteNotePermanently(noteId),
-      onDuplicateNote: (noteId: string) =>
-        latestRef.current.handleDuplicateNote(noteId),
-      onExportNotes: () => latestRef.current.handleExportNotes(),
-      onLoadMore() {
-        if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
-          void latestRef.current.fetchNextPage();
-        }
-      },
-      onRestoreFromTrash: (noteId: string) =>
-        latestRef.current.handleRestoreFromTrash(noteId),
-      onRestoreNote: (noteId: string) =>
-        latestRef.current.handleRestoreNote(noteId),
-      onSelectNote: (noteId: string) =>
-        latestRef.current.handleSelectNote(noteId),
-      onSetNotePinned: (noteId: string, pinned: boolean) =>
-        latestRef.current.handleSetNotePinned(noteId, pinned),
-      onSetNoteReadonly: (noteId: string, readonly: boolean) =>
-        latestRef.current.handleSetNoteReadonly(noteId, readonly),
-      onTrashNote: (noteId: string) =>
-        latestRef.current.handleTrashNote(noteId),
-    }),
-    [
-      currentNotes,
-      displayedSelectedNoteId,
-      isCreatingNote,
-      isMutatingNote,
-      notesQuery.hasNextPage,
-      notesQuery.isFetchingNextPage,
-      notesQuery.isPlaceholderData,
-      totalNoteCount,
-    ],
-  );
+  const notesPaneProps = {
+    filteredNotes: currentNotes,
+    hasMoreNotes: notesQuery.hasNextPage,
+    isCreatingNote,
+    isLoadingMoreNotes: notesQuery.isFetchingNextPage,
+    isNotesPlaceholderData: notesQuery.isPlaceholderData,
+    isMutatingNote,
+    selectedNoteId: displayedSelectedNoteId,
+    totalNoteCount,
+    onArchiveNote: (noteId: string) =>
+      latestRef.current.handleArchiveNote(noteId),
+    onCopyNoteContent: (noteId: string) =>
+      latestRef.current.handleCopyNoteContent(noteId),
+    onCreateNote: () => latestRef.current.handleCreateNote(),
+    onDeleteNotePermanently: (noteId: string) =>
+      latestRef.current.handleDeleteNotePermanently(noteId),
+    onDuplicateNote: (noteId: string) =>
+      latestRef.current.handleDuplicateNote(noteId),
+    onExportNotes: () => latestRef.current.handleExportNotes(),
+    onLoadMore() {
+      if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
+        void latestRef.current.fetchNextPage();
+      }
+    },
+    onRestoreFromTrash: (noteId: string) =>
+      latestRef.current.handleRestoreFromTrash(noteId),
+    onRestoreNote: (noteId: string) =>
+      latestRef.current.handleRestoreNote(noteId),
+    onSelectNote: (noteId: string) =>
+      latestRef.current.handleSelectNote(noteId),
+    onSetNotePinned: (noteId: string, pinned: boolean) =>
+      latestRef.current.handleSetNotePinned(noteId, pinned),
+    onSetNoteReadonly: (noteId: string, readonly: boolean) =>
+      latestRef.current.handleSetNoteReadonly(noteId, readonly),
+    onTrashNote: (noteId: string) => latestRef.current.handleTrashNote(noteId),
+  };
 
-  const sidebarPaneProps = useMemo(
-    () => ({
-      availableTagPaths,
-      availableTagTree,
-      archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
-      todoCount: todoCountQuery.data ?? 0,
-      trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
-      onSelectAll: () => latestRef.current.handleSelectAll(),
-      onSelectToday: () => latestRef.current.handleSelectToday(),
-      onSelectTodo: () => latestRef.current.handleSelectTodo(),
-      onSelectPinned: () => latestRef.current.handleSelectPinned(),
-      onSelectUntagged: () => latestRef.current.handleSelectUntagged(),
-      onSelectArchive: () => latestRef.current.handleSelectArchive(),
-      onSelectTrash: () => latestRef.current.handleSelectTrash(),
-      onSelectTagPath: (tagPath: string) =>
-        latestRef.current.handleSelectTagPath(tagPath),
-      onDeleteTag: (path: string) => latestRef.current.handleDeleteTag(path),
-      onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
-      onExportTag: (path: string) => latestRef.current.handleExportTag(path),
-      onRenameTag: (fromPath: string, toPath: string) =>
-        latestRef.current.handleRenameTag(fromPath, toPath),
-      onSetTagPinned: (path: string, pinned: boolean) =>
-        latestRef.current.handleSetTagPinned(path, pinned),
-      onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
-        latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
-    }),
-    [
-      availableTagPaths,
-      availableTagTree,
-      bootstrapQuery.data?.archivedCount,
-      bootstrapQuery.data?.trashedCount,
-      todoCountQuery.data,
-    ],
-  );
+  const sidebarPaneProps = {
+    availableTagPaths,
+    availableTagTree,
+    archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
+    todoCount: todoCountQuery.data ?? 0,
+    trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
+    onSelectAll: () => latestRef.current.handleSelectAll(),
+    onSelectToday: () => latestRef.current.handleSelectToday(),
+    onSelectTodo: () => latestRef.current.handleSelectTodo(),
+    onSelectPinned: () => latestRef.current.handleSelectPinned(),
+    onSelectUntagged: () => latestRef.current.handleSelectUntagged(),
+    onSelectArchive: () => latestRef.current.handleSelectArchive(),
+    onSelectTrash: () => latestRef.current.handleSelectTrash(),
+    onSelectTagPath: (tagPath: string) =>
+      latestRef.current.handleSelectTagPath(tagPath),
+    onDeleteTag: (path: string) => latestRef.current.handleDeleteTag(path),
+    onEmptyTrash: () => latestRef.current.handleEmptyTrash(),
+    onExportTag: (path: string) => latestRef.current.handleExportTag(path),
+    onRenameTag: (fromPath: string, toPath: string) =>
+      latestRef.current.handleRenameTag(fromPath, toPath),
+    onSetTagPinned: (path: string, pinned: boolean) =>
+      latestRef.current.handleSetTagPinned(path, pinned),
+    onSetTagHideSubtagNotes: (path: string, hideSubtagNotes: boolean) =>
+      latestRef.current.handleSetHideSubtagNotes(path, hideSubtagNotes),
+  };
 
   return {
     bootstrapError: bootstrapQuery.isError

@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import {
   CloudAlert,
   CloudOff,
@@ -107,10 +107,7 @@ function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
   const expandedSidebarTagPaths = useExpandedSidebarTagPaths();
   const { setExpandedSidebarTagPaths } = useUIActions();
 
-  const expandedTagPaths = useMemo(
-    () => new Set(expandedSidebarTagPaths),
-    [expandedSidebarTagPaths],
-  );
+  const expandedTagPaths = new Set(expandedSidebarTagPaths);
 
   useEffect(() => {
     const nextExpandedTagPaths = expandedSidebarTagPaths.filter((path) =>
@@ -232,33 +229,18 @@ export function SidebarPane({
   const { setExpandedSidebarTagPaths } = useUIActions();
   useRenameInputFocus(renameDialogOpen, renameInputRef);
   const noteSectionHasActiveTag = activeTagPath !== null;
-  const sidebarNavigationItems = useMemo(
-    () =>
-      flattenVisibleSidebarNavigationItems({
-        archivedCount,
-        availableTagTree,
-        expandedTagPaths,
-        noteFilter,
-        notesChildrenOpen,
-        trashedCount,
-      }),
-    [
-      archivedCount,
-      availableTagTree,
-      expandedTagPaths,
-      noteFilter,
-      notesChildrenOpen,
-      trashedCount,
-    ],
-  );
-  const activeSidebarItemId = useMemo(
-    () =>
-      getActiveSidebarNavigationItemId({
-        activeTagPath,
-        noteFilter,
-      }),
-    [activeTagPath, noteFilter],
-  );
+  const sidebarNavigationItems = flattenVisibleSidebarNavigationItems({
+    archivedCount,
+    availableTagTree,
+    expandedTagPaths,
+    noteFilter,
+    notesChildrenOpen,
+    trashedCount,
+  });
+  const activeSidebarItemId = getActiveSidebarNavigationItemId({
+    activeTagPath,
+    noteFilter,
+  });
 
   // --- Focus tag path event ---
   useEffect(() => {

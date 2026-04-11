@@ -1,4 +1,4 @@
-import { memo, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { GitMergeConflict, Pin } from "lucide-react";
 import { motion } from "framer-motion";
@@ -44,7 +44,7 @@ export type NoteRowProps = {
   shouldSkipAnimation: boolean;
 };
 
-export const NoteRow = memo(function NoteRow({
+export function NoteRow({
   focusedPane,
   highlightWords,
   isJustCreated,
@@ -187,4 +187,4 @@ export const NoteRow = memo(function NoteRow({
       </div>
     </motion.div>
   );
-});
+}

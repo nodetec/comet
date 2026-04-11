@@ -1,4 +1,4 @@
-import { Fragment, memo } from "react";
+import { Fragment } from "react";
 
 import {
   HIGHLIGHT_CLASS_NAME,
@@ -6,7 +6,7 @@ import {
   findNextHighlightMatch,
 } from "@/features/notes-pane/ui/notes-pane-utils";
 
-export const HighlightedText = memo(function HighlightedText({
+export function HighlightedText({
   text,
   highlightWords,
 }: {
@@ -52,4 +52,4 @@ export const HighlightedText = memo(function HighlightedText({
     parts.push(<Fragment key={`text-${key++}`}>{text.slice(cursor)}</Fragment>);
   }
   return <>{parts}</>;
-});
+}

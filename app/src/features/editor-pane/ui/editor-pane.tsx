@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useRef,
@@ -192,9 +191,9 @@ export function EditorPane({
 
   const { showHeaderBorder, showHeaderTitle, scrollContainerCallbacks } =
     useEditorScrollHeader(noteId, scrollContainerRef);
-  const toolbarContainerRef = useCallback((node: HTMLDivElement | null) => {
+  const toolbarContainerRef = (node: HTMLDivElement | null) => {
     setToolbarContainer(node);
-  }, []);
+  };
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
   const editorContent = (() => {
     if (noteId === null) {
@@ -251,41 +250,23 @@ export function EditorPane({
     );
   })();
 
-  const openEditorMenu = useCallback(
-    async (position: LogicalPosition) => {
-      if (!noteId) return;
-      await buildEditorMenu(position, {
-        readonly: readonly || hasConflict,
-        isPublishedNote,
-        isDeletePublishedNotePending,
-        pinnedAt,
-        publishedAt,
-        onSetReadonly,
-        onDeletePublishedNote,
-        onPublishShortNote,
-        onOpenPublishDialog,
-        onSetPinned,
-        onDuplicateNote,
-        onOpenHistory,
-      });
-    },
-    [
-      isDeletePublishedNotePending,
+  const openEditorMenu = async (position: LogicalPosition) => {
+    if (!noteId) return;
+    await buildEditorMenu(position, {
+      readonly: readonly || hasConflict,
       isPublishedNote,
-      noteId,
-      onDeletePublishedNote,
-      onDuplicateNote,
-      onOpenPublishDialog,
-      onPublishShortNote,
-      onSetPinned,
-      onSetReadonly,
-      onOpenHistory,
+      isDeletePublishedNotePending,
       pinnedAt,
       publishedAt,
-      hasConflict,
-      readonly,
-    ],
-  );
+      onSetReadonly,
+      onDeletePublishedNote,
+      onPublishShortNote,
+      onOpenPublishDialog,
+      onSetPinned,
+      onDuplicateNote,
+      onOpenHistory,
+    });
+  };
 
   const handleOpenMenu = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import {
@@ -84,29 +83,17 @@ export function useNoteQueries(params: NoteQueryParams) {
     sortField === "modified_at" &&
     sortDirection === "newest";
 
-  const notesQueryInput = useMemo<NoteQueryInput>(
-    () => ({
-      activeTagPath: effectiveActiveTagPath,
-      limit: NOTE_PAGE_SIZE,
-      noteFilter: effectiveNoteFilter,
-      offset: 0,
-      searchQuery: normalizedQuery,
-      sortField,
-      sortDirection,
-    }),
-    [
-      effectiveActiveTagPath,
-      effectiveNoteFilter,
-      normalizedQuery,
-      sortField,
-      sortDirection,
-    ],
-  );
+  const notesQueryInput: NoteQueryInput = {
+    activeTagPath: effectiveActiveTagPath,
+    limit: NOTE_PAGE_SIZE,
+    noteFilter: effectiveNoteFilter,
+    offset: 0,
+    searchQuery: normalizedQuery,
+    sortField,
+    sortDirection,
+  };
 
-  const notesQueryKey = useMemo(
-    () => ["notes", notesQueryInput] as const,
-    [notesQueryInput],
-  );
+  const notesQueryKey = ["notes", notesQueryInput] as const;
 
   const notesQuery = useInfiniteQuery({
     queryKey: notesQueryKey,
@@ -128,10 +115,7 @@ export function useNoteQueries(params: NoteQueryParams) {
     enabled: bootstrapQuery.isSuccess,
   });
 
-  const currentNotes = useMemo(
-    () => flattenNotePages(notesQuery.data),
-    [notesQuery.data],
-  );
+  const currentNotes = flattenNotePages(notesQuery.data);
   const totalNoteCount = notesQuery.data?.pages[0]?.totalCount ?? 0;
 
   const contextualTagsQuery = useQuery({
@@ -142,10 +126,7 @@ export function useNoteQueries(params: NoteQueryParams) {
     queryKey: ["contextual-tags"],
   });
   const availableTagTree = contextualTagsQuery.data?.roots ?? EMPTY_TAG_TREE;
-  const availableTagPaths = useMemo(
-    () => flattenTagPaths(availableTagTree),
-    [availableTagTree],
-  );
+  const availableTagPaths = flattenTagPaths(availableTagTree);
 
   const noteQuery = useQuery({
     enabled: Boolean(selectedNoteId),

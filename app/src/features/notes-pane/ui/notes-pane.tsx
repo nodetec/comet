@@ -1,13 +1,6 @@
 import { ChevronDown, Hash, PenBoxIcon, Search, X } from "lucide-react";
 import { LayoutGroup } from "framer-motion";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useInView } from "react-intersection-observer";
 
 import { Button } from "@/shared/ui/button";
@@ -166,76 +159,61 @@ export function NotesPane({
   const { ref: loadMoreRef, inView } = useInView({
     rootMargin: "160px 0px",
   });
-  const searchWords = useMemo(
-    () => searchWordsFromQuery(searchQuery),
-    [searchQuery],
-  );
-  const highlightWords = useMemo(
-    () => normalizeHighlightWords(searchWords),
-    [searchWords],
-  );
-  const heading = useMemo(
-    () => notesHeading(noteFilter, activeTagPath),
-    [activeTagPath, noteFilter],
-  );
+  const searchWords = searchWordsFromQuery(searchQuery);
+  const highlightWords = normalizeHighlightWords(searchWords);
+  const heading = notesHeading(noteFilter, activeTagPath);
 
-  const applySearchQuery = useCallback(
-    (nextQuery: string) => {
-      onChangeSearch(nextQuery);
-    },
-    [onChangeSearch],
-  );
+  const applySearchQuery = (nextQuery: string) => {
+    onChangeSearch(nextQuery);
+  };
 
-  const focusSearchInput = useCallback(() => {
+  const focusSearchInput = () => {
     requestAnimationFrame(() => {
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
     });
-  }, []);
+  };
 
-  const closeSearchAndRestoreFocus = useCallback(
-    (options?: { clearQuery?: boolean }) => {
-      if (options?.clearQuery && searchQuery) {
-        applySearchQuery("");
-      }
+  const closeSearchAndRestoreFocus = (options?: { clearQuery?: boolean }) => {
+    if (options?.clearQuery && searchQuery) {
+      applySearchQuery("");
+    }
 
-      setIsSearchOpen(false);
-      setIsSearchFocused(false);
+    setIsSearchOpen(false);
+    setIsSearchFocused(false);
 
-      if (selectedNoteId) {
-        setFocusedPane("notes");
-        focusSelectedNoteRow(scrollContainerRef.current);
-        return;
-      }
+    if (selectedNoteId) {
+      setFocusedPane("notes");
+      focusSelectedNoteRow(scrollContainerRef.current);
+      return;
+    }
 
-      setFocusedPane("sidebar");
-    },
-    [applySearchQuery, searchQuery, selectedNoteId, setFocusedPane],
-  );
+    setFocusedPane("sidebar");
+  };
 
-  const handleMoveSelection = useCallback(
-    (currentNoteId: string, direction: NoteListNavigationDirection) => {
-      if (isMutatingNote) {
-        return;
-      }
+  const handleMoveSelection = (
+    currentNoteId: string,
+    direction: NoteListNavigationDirection,
+  ) => {
+    if (isMutatingNote) {
+      return;
+    }
 
-      const nextNoteId = getAdjacentNoteId(
-        filteredNotes,
-        currentNoteId,
-        direction,
-      );
-      if (!nextNoteId) {
-        return;
-      }
+    const nextNoteId = getAdjacentNoteId(
+      filteredNotes,
+      currentNoteId,
+      direction,
+    );
+    if (!nextNoteId) {
+      return;
+    }
 
-      noteRowRefs.current.get(nextNoteId)?.scrollIntoView({ block: "nearest" });
-      setIsSearchFocused(false);
-      onSelectNote(nextNoteId);
-    },
-    [filteredNotes, isMutatingNote, onSelectNote],
-  );
+    noteRowRefs.current.get(nextNoteId)?.scrollIntoView({ block: "nearest" });
+    setIsSearchFocused(false);
+    onSelectNote(nextNoteId);
+  };
 
-  const selectFirstVisibleNote = useCallback(() => {
+  const selectFirstVisibleNote = () => {
     const firstNoteId = filteredNotes[0]?.id;
     if (!firstNoteId) {
       return false;
@@ -243,7 +221,7 @@ export function NotesPane({
 
     onSelectNote(firstNoteId);
     return true;
-  }, [filteredNotes, onSelectNote]);
+  };
 
   useEffect(() => {
     if (searchQuery) {

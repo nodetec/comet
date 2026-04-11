@@ -20,6 +20,7 @@
       { "checksVoidReturn": { "attributes": false } }
     ],
 
+    "react/exhaustive-deps": "off",
     "react/react-in-jsx-scope": "off",
     "react/jsx-max-depth": "off",
     "react/jsx-props-no-spreading": "off",

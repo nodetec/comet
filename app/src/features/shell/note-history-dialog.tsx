@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { format } from "date-fns";
 import { History, RotateCcw, Trash2 } from "lucide-react";
 
@@ -41,7 +40,7 @@ export function NoteHistoryDialog({
   onRestore,
   onSelectSnapshot,
 }: NoteHistoryDialogProps) {
-  const selectedSnapshot = useMemo(() => {
+  const selectedSnapshot = (() => {
     if (!selectedSnapshotId) {
       return snapshots[0] ?? null;
     }
@@ -53,7 +52,7 @@ export function NoteHistoryDialog({
       snapshots[0] ??
       null
     );
-  }, [selectedSnapshotId, snapshots]);
+  })();
 
   const restoreDisabled =
     pending ||

@@ -1,8 +1,6 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -78,11 +76,11 @@ export function AccountSwitcherDialog({
   const hasSwitchTarget = accounts.some((account) => !account.isActive);
   const accountCount = accounts.length;
 
-  const focusSelectedRow = useCallback((index: number) => {
+  const focusSelectedRow = (index: number) => {
     window.requestAnimationFrame(() => {
       rowRefs.current[index]?.focus();
     });
-  }, []);
+  };
 
   useEffect(() => {
     if (!open) {
@@ -98,54 +96,44 @@ export function AccountSwitcherDialog({
     focusSelectedRow(nextIndex);
   }, [accountCount, accounts, focusSelectedRow, open]);
 
-  const handleDialogKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (accountCount === 0) {
-        return;
-      }
+  const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (accountCount === 0) {
+      return;
+    }
 
-      switch (event.key) {
-        case "ArrowDown": {
-          event.preventDefault();
-          const nextIndex = (selectedIndex + 1) % accountCount;
-          setSelectedIndex(nextIndex);
-          focusSelectedRow(nextIndex);
-          break;
-        }
-        case "ArrowUp": {
-          event.preventDefault();
-          const nextIndex = (selectedIndex - 1 + accountCount) % accountCount;
-          setSelectedIndex(nextIndex);
-          focusSelectedRow(nextIndex);
-          break;
-        }
-        case "Enter": {
-          if (
-            selectedAccount &&
-            !selectedAccount.isActive &&
-            !isSwitchAccountPending
-          ) {
-            event.preventDefault();
-            mutateSwitchAccount(selectedAccount.publicKey);
-          }
-          break;
-        }
-        default: {
-          break;
-        }
+    switch (event.key) {
+      case "ArrowDown": {
+        event.preventDefault();
+        const nextIndex = (selectedIndex + 1) % accountCount;
+        setSelectedIndex(nextIndex);
+        focusSelectedRow(nextIndex);
+        break;
       }
-    },
-    [
-      accountCount,
-      focusSelectedRow,
-      isSwitchAccountPending,
-      mutateSwitchAccount,
-      selectedAccount,
-      selectedIndex,
-    ],
-  );
+      case "ArrowUp": {
+        event.preventDefault();
+        const nextIndex = (selectedIndex - 1 + accountCount) % accountCount;
+        setSelectedIndex(nextIndex);
+        focusSelectedRow(nextIndex);
+        break;
+      }
+      case "Enter": {
+        if (
+          selectedAccount &&
+          !selectedAccount.isActive &&
+          !isSwitchAccountPending
+        ) {
+          event.preventDefault();
+          mutateSwitchAccount(selectedAccount.publicKey);
+        }
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  };
 
-  const content = useMemo(() => {
+  const content = (() => {
     if (isLoading) {
       return (
         <div className="text-muted-foreground py-8 text-center text-sm">
@@ -280,20 +268,7 @@ export function AccountSwitcherDialog({
         ) : null}
       </>
     );
-  }, [
-    accounts,
-    error,
-    hasSwitchTarget,
-    isError,
-    isLoading,
-    isSwitchAccountError,
-    isSwitchAccountPending,
-    mutateSwitchAccount,
-    onOpenChange,
-    selectedIndex,
-    switchAccountError,
-    switchingPublicKey,
-  ]);
+  })();
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange} modal>
