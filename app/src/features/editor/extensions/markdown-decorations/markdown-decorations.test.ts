@@ -158,7 +158,9 @@ describe("getSnappedPointerSelection", () => {
     );
 
     expect(selection?.main.empty).toBe(true);
-    expect(selection?.main.head).toBe(0);
+    // During drag (range selection), heading prefix snaps to contentStart
+    // (after the hidden `# ` prefix) so the cursor renders heading-sized.
+    expect(selection?.main.head).toBe(2);
   });
 });
 

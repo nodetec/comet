@@ -830,22 +830,6 @@ function findMarkerRangeAtPosition(
   return null;
 }
 
-function getCursorBoundary(
-  position: number,
-  _assoc: -1 | 0 | 1,
-  marker: MarkerRange,
-) {
-  if (position === marker.from || position === marker.to) {
-    return null;
-  }
-
-  if (position <= marker.from || position >= marker.to) {
-    return null;
-  }
-
-  return { assoc: 1 as const, position: marker.to };
-}
-
 /**
  * Find the list marker range on the line containing `pos` by iterating
  * only that line's syntax nodes instead of the entire tree.
@@ -902,31 +886,15 @@ function normalizeSelectionToListMarkers(state: EditorState) {
     const marker = getMarkerRangeOnLine(state, range.head);
     if (marker) {
       const line = state.doc.lineAt(marker.from);
-      // Snap cursor in the indent/spacer/marker area to the text start.
-      if (range.head >= line.from && range.head <= marker.to) {
+      // Allow the cursor at line.from (before the marker). Snap
+      // positions inside the marker/indent area to the text start.
+      if (range.head > line.from && range.head <= marker.to) {
         const targetAssoc = 1;
         if (range.head !== marker.to || range.assoc !== targetAssoc) {
           changed = true;
           return EditorSelection.cursor(marker.to, targetAssoc);
         }
         return range;
-      }
-
-      // Snap cursor inside the marker range to the boundary.
-      const boundary = getCursorBoundary(range.head, range.assoc, marker);
-      if (boundary) {
-        const normalized = EditorSelection.cursor(
-          boundary.position,
-          boundary.assoc,
-        );
-        if (
-          normalized.anchor !== range.anchor ||
-          normalized.head !== range.head ||
-          normalized.assoc !== range.assoc
-        ) {
-          changed = true;
-          return normalized;
-        }
       }
     }
 
