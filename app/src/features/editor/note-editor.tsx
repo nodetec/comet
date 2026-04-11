@@ -87,7 +87,6 @@ import {
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
 import { cn } from "@/shared/lib/utils";
-import { getListItemForLine } from "@/features/editor/extensions/lists/list-model";
 
 type NoteEditorProps = {
   availableTagPaths: string[];
@@ -473,24 +472,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 return true;
               }
 
-              // Handle leading-padding clicks in mousedown (not click)
-              // to prevent CM from placing an initial cursor that then
-              // gets corrected, causing visible jitter.
-              if (event.button === 0 && !event.shiftKey) {
-                const lineStart = getLeadingPaddingClickLineStart(view, event);
-                if (lineStart != null) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  focusEditorPreservingScroll(view);
-                  const listItem = getListItemForLine(view.state, lineStart);
-                  dispatchPointerCursorSelection(
-                    view,
-                    listItem ? listItem.markerFrom : lineStart,
-                  );
-                  return true;
-                }
-              }
-
               event.stopPropagation();
 
               if (!view.hasFocus) {
@@ -498,6 +479,40 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               }
 
               return false;
+            },
+            click(event, view) {
+              const lineStart = getLeadingPaddingClickLineStart(view, event);
+              if (lineStart == null) {
+                return false;
+              }
+
+              // Only bail for intentional drag selections that span
+              // multiple lines. A small same-line selection from slight
+              // mouse movement during a click should still be corrected
+              // (the list transaction filter collapses these).
+              const sel = view.state.selection.main;
+              if (!sel.empty) {
+                const fromLine = view.state.doc.lineAt(sel.from);
+                const toLine = view.state.doc.lineAt(sel.to);
+                if (fromLine.number !== toLine.number) {
+                  return false;
+                }
+              }
+
+              // For lines with hidden prefixes (lists, headings), CM's
+              // mousedown already places the cursor at the edge of the
+              // replace decoration. Skip the dispatch to avoid jitter
+              // from assoc changes.
+              if (sel.empty && sel.head !== lineStart) {
+                return true;
+              }
+
+              event.preventDefault();
+              event.stopPropagation();
+
+              focusEditorPreservingScroll(view);
+              dispatchPointerCursorSelection(view, lineStart);
+              return true;
             },
           }),
           EditorView.domEventHandlers({

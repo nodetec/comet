@@ -566,15 +566,39 @@ function buildContinuationPrefixRanges(
 function normalizeSelectionToListMarkers(state: EditorState) {
   let changed = false;
   const ranges = state.selection.ranges.map((range) => {
+    const item = getListItemForLine(state, range.head);
+
     if (!range.empty) {
+      // Collapse small selections entirely within the hidden indent +
+      // marker area. These are accidental selections from slight mouse
+      // movement during a click inside a replace decoration.
+      if (item) {
+        const selFrom = Math.min(range.anchor, range.head);
+        const selTo = Math.max(range.anchor, range.head);
+        if (selFrom >= item.lineFrom && selTo <= item.contentFrom) {
+          changed = true;
+          return EditorSelection.cursor(item.markerFrom, -1);
+        }
+      }
       return range;
     }
 
-    const item = getListItemForLine(state, range.head);
     if (item) {
-      // Allow the cursor at lineFrom (before the hidden indent) and
-      // markerFrom (before the marker). Snap positions between
-      // markerFrom and contentFrom to contentFrom.
+      // Snap cursor inside hidden indent (lineFrom..markerFrom) to
+      // markerFrom. These positions are inside a replace decoration
+      // and have no visual location.
+      if (
+        item.markerFrom > item.lineFrom &&
+        range.head >= item.lineFrom &&
+        range.head < item.markerFrom
+      ) {
+        changed = true;
+        return EditorSelection.cursor(item.markerFrom, -1);
+      }
+
+      // Snap cursor inside the marker area (after markerFrom, up to
+      // contentFrom) to contentFrom (text start). markerFrom itself
+      // is allowed (cursor before the marker).
       if (range.head > item.markerFrom && range.head <= item.contentFrom) {
         const targetAssoc = 1;
         if (range.head !== item.contentFrom || range.assoc !== targetAssoc) {
