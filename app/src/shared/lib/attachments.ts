@@ -52,7 +52,7 @@ export function resolveImageSrc(src: string): string {
 export function unresolveImageSrc(src: string): string {
   if (!cachedBasePath) return src;
 
-  const assetPrefix = convertFileSrc(cachedBasePath + "/");
+  const assetPrefix = convertFileSrc(`${cachedBasePath}/`);
   if (src.startsWith(assetPrefix)) {
     const filename = decodeURIComponent(src.slice(assetPrefix.length));
     return `${ATTACHMENT_PREFIX}${filename}`;

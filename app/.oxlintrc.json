@@ -4,10 +4,45 @@
   "categories": {
     "correctness": "error",
     "suspicious": "error",
-    "perf": "error"
+    "perf": "error",
+    "style": "error"
   },
   "options": {
     "typeAware": true
+  },
+  "rules": {
+    "no-magic-numbers": "off",
+    "func-style": "off",
+    "sort-keys": "off",
+    "no-ternary": "off",
+    "sort-imports": "off",
+    "max-statements": "off",
+    "id-length": "off",
+    "curly": "off",
+    "capitalized-comments": "off",
+    "no-continue": "off",
+    "max-params": "off",
+    "prefer-destructuring": "off",
+    "init-declarations": "off",
+    "no-implicit-coercion": "off",
+    "arrow-body-style": "off",
+    "no-duplicate-imports": "off",
+    "import/no-named-export": "off",
+    "import/group-exports": "off",
+    "import/consistent-type-specifier-style": "off",
+    "import/exports-last": "off",
+    "import/prefer-default-export": "off",
+    "import/first": "off",
+    "import/no-nodejs-modules": "off",
+    "import/no-namespace": "off",
+    "react/jsx-max-depth": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/jsx-handler-names": "off",
+    "typescript/consistent-type-definitions": "off",
+    "typescript/parameter-properties": "off",
+    "typescript/array-type": "off",
+    "typescript/consistent-type-imports": "off",
+    "typescript/prefer-readonly": "off"
   },
   "ignorePatterns": [
     "dist/**",
