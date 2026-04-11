@@ -47,6 +47,7 @@ import {
   computeRenumberChanges,
   computeRenumberChangesFromText,
   getListItemForLine,
+  getListItemWithStructure,
   getListItems,
   type ListItemInfo,
 } from "@/features/editor/extensions/lists/list-model";
@@ -458,7 +459,7 @@ function indentListItem(view: EditorView) {
     return indentMore(view);
   }
 
-  const item = getListItemForLine(view.state, selection.head);
+  const item = getListItemWithStructure(view.state, selection.head);
   if (!item) {
     return indentMore(view);
   }
@@ -839,13 +840,15 @@ function deleteAcrossListBoundaryInner(view: EditorView) {
   ) {
     // Remove the entire list prefix ("- [ ] "), turning the line
     // into a plain paragraph. Outdent children so they aren't orphaned.
+    // Use full model for children access.
+    const fullItem = getListItemWithStructure(view.state, selection.head);
     const changes: { from: number; to: number }[] = [
       { from: itemForBackspace.lineFrom, to: itemForBackspace.contentFrom },
     ];
 
-    if (itemForBackspace.children.length > 0) {
+    if (fullItem && fullItem.children.length > 0) {
       const indentStep = BULLET_INDENT;
-      for (const child of itemForBackspace.children) {
+      for (const child of fullItem.children) {
         const childRanges = collectItemLineRanges(view.state, child);
         for (const range of childRanges) {
           const l = view.state.doc.lineAt(range.from);
@@ -948,17 +951,19 @@ function deleteAcrossListBoundaryInner(view: EditorView) {
   if (item && selection.head === item.contentFrom) {
     // Remove the list prefix, turning the line into plain text.
     // Task checkbox removal is handled above (before continuation checks).
+    // Use full model for children access.
+    const fullItem = getListItemWithStructure(view.state, selection.head);
     const changes: { from: number; to: number; insert?: string }[] = [
       { from: item.lineFrom, to: item.contentFrom },
     ];
 
     // Outdent direct children by one level so they become top-level
     // items instead of orphaned nested items.
-    if (item.children.length > 0) {
+    if (fullItem && fullItem.children.length > 0) {
       const indentStep = BULLET_MARKERS.has(item.marker)
         ? BULLET_INDENT
         : ORDERED_INDENT;
-      for (const child of item.children) {
+      for (const child of fullItem.children) {
         const childRanges = collectItemLineRanges(view.state, child);
         for (const range of childRanges) {
           const l = view.state.doc.lineAt(range.from);

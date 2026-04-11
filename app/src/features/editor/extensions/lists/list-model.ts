@@ -270,6 +270,128 @@ function linkRelationships(items: ListItemInfo[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Fast line-local lookup — O(line_width) instead of O(doc_size).
+// Used by the normalization filter and input handler which run on
+// every transaction but only need the item at the cursor line.
+// Returns a partial ListItemInfo (no structural links).
+// ---------------------------------------------------------------------------
+
+/**
+ * Fast line-local lookup. Walks only the given line's syntax nodes
+ * to find a list marker, avoiding a full-document tree walk.
+ * Returns null if the line is not a list item.
+ */
+export function getListItemForLineFast(
+  state: EditorState,
+  pos: number,
+): ListItemInfo | null {
+  // If the full model is already cached for this state, use it.
+  if (cachedState === state) {
+    const line = state.doc.lineAt(pos);
+    return cachedByLineFrom.get(line.from) ?? null;
+  }
+
+  const tree = syntaxTree(state);
+  const line = state.doc.lineAt(pos);
+
+  // Walk only the line's range to find a ListMark.
+  let result: ListItemInfo | null = null;
+
+  tree.iterate({
+    from: line.from,
+    to: line.to,
+    enter(nodeRef) {
+      if (result) return false;
+
+      if (nodeRef.type.name !== "ListMark") {
+        return;
+      }
+
+      const listMark = nodeRef.node;
+      const markerText = state.sliceDoc(listMark.from, listMark.to);
+      const hasTrailingSpace =
+        state.sliceDoc(listMark.to, listMark.to + 1) === " ";
+      if (!hasTrailingSpace) {
+        return false;
+      }
+
+      // Verify this marker is on the target line.
+      if (state.doc.lineAt(listMark.from).from !== line.from) {
+        return false;
+      }
+
+      // Compute depth from ancestor list nodes.
+      let listDepth = 0;
+      for (
+        let ancestor = listMark.parent;
+        ancestor;
+        ancestor = ancestor.parent
+      ) {
+        if (
+          ancestor.type.name === "BulletList" ||
+          ancestor.type.name === "OrderedList"
+        ) {
+          listDepth += 1;
+        }
+      }
+      const indentLevel = Math.max(0, listDepth - 1);
+
+      const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
+      const sourceIndentChars = Math.max(
+        0,
+        listMark.from - line.from - quotePrefix.length,
+      );
+      const markerTo = listMark.to + 1;
+      const task = detectTask(state, markerText, markerTo);
+      const contentFrom = task ? Math.min(task.to + 1, line.to) : markerTo;
+
+      const markerPrefix = state.sliceDoc(line.from, listMark.from);
+      const continuationIndent = BULLET_MARKERS.has(markerText)
+        ? BULLET_INDENT
+        : ORDERED_INDENT;
+      const continuationPrefix = markerPrefix + " ".repeat(continuationIndent);
+      const indentStyle = `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET})`;
+
+      // Find the ListItem node for the node reference.
+      let listItemNode: SyntaxNode | null = null;
+      for (
+        let ancestor: SyntaxNode | null = listMark;
+        ancestor;
+        ancestor = ancestor.parent
+      ) {
+        if (ancestor.type.name === "ListItem") {
+          listItemNode = ancestor;
+          break;
+        }
+      }
+
+      result = {
+        node: listItemNode ?? listMark,
+        depth: indentLevel,
+        parentItem: null,
+        children: [],
+        prevSibling: null,
+        nextSibling: null,
+        lineFrom: line.from,
+        lineTo: line.to,
+        marker: markerText,
+        markerFrom: listMark.from,
+        markerTo,
+        contentFrom,
+        sourceIndentChars,
+        task,
+        indentLevel,
+        indentStyle,
+        continuationPrefix,
+      };
+      return false;
+    },
+  });
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Public API — cached lookups
 // ---------------------------------------------------------------------------
 
@@ -299,13 +421,30 @@ export function getListItemAtLine(
   return cachedByLineFrom.get(lineFrom) ?? null;
 }
 
-/** Find the ListItemInfo containing `pos` (marker line). */
+/**
+ * Find the ListItemInfo containing `pos` (marker line).
+ * Uses the fast line-local lookup — doesn't trigger a full model build.
+ * For structural data (parent/siblings/children), use getListItemWithStructure().
+ */
 export function getListItemForLine(
   state: EditorState,
   pos: number,
 ): ListItemInfo | null {
+  return getListItemForLineFast(state, pos);
+}
+
+/**
+ * Find the ListItemInfo with full structural links (parent, siblings,
+ * children). Triggers a full model build if not already cached.
+ * Use for operations that need tree relationships (indent/outdent/backspace).
+ */
+export function getListItemWithStructure(
+  state: EditorState,
+  pos: number,
+): ListItemInfo | null {
   const line = state.doc.lineAt(pos);
-  return getListItemAtLine(state, line.from);
+  getListItems(state); // ensure full model is built
+  return cachedByLineFrom.get(line.from) ?? null;
 }
 
 /**
