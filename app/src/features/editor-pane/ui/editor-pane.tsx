@@ -14,6 +14,7 @@ import {
   useShowEditorToolbar,
   useUIActions,
 } from "@/features/settings/store/use-ui-store";
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -30,10 +31,6 @@ import {
   NoteEditor,
   type NoteEditorHandle,
 } from "@/features/editor/note-editor";
-import {
-  type FocusEditorDetail,
-  FOCUS_EDITOR_EVENT,
-} from "@/shared/lib/pane-navigation";
 import { Button } from "@/shared/ui/button";
 import { PopoverPopup, PopoverRoot, PopoverTrigger } from "@/shared/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -126,6 +123,9 @@ export function EditorPane({
   const [toolbarContainer, setToolbarContainer] = useState<HTMLElement | null>(
     null,
   );
+  const focusEditorRequest = useShellCommandStore(
+    (state) => state.focusEditorRequest,
+  );
   const editorFontSize = useEditorFontSize();
   const notesPanelVisible = useNotesPanelVisible();
   const showToolbar = useShowEditorToolbar();
@@ -195,6 +195,7 @@ export function EditorPane({
     setToolbarContainer(node);
   };
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
+  const lastHandledFocusEditorRequestIdRef = useRef(0);
   const editorContent = (() => {
     if (noteId === null) {
       return null;
@@ -327,32 +328,37 @@ export function EditorPane({
       window.removeEventListener("keydown", handleGlobalHistoryKeyDown);
   }, []);
 
-  const handleFocusEditor = useEffectEvent((event: Event) => {
-    if (!noteId) {
-      return;
-    }
-
-    const customEvent = event as CustomEvent<FocusEditorDetail>;
-    const scrollTo = customEvent.detail?.scrollTo ?? "preserve";
-
-    setFocusedPane("editor");
-    requestAnimationFrame(() => {
-      if (scrollTo === "top") {
-        editorRef.current?.focusAtStart();
-        scrollContainerRef.current?.scrollTo({ top: 0 });
+  const handleFocusEditor = useEffectEvent(
+    (scrollTo: "preserve" | "top" = "preserve") => {
+      if (!noteId) {
         return;
       }
 
-      editorRef.current?.focus();
-    });
-  });
+      setFocusedPane("editor");
+      requestAnimationFrame(() => {
+        if (scrollTo === "top") {
+          editorRef.current?.focusAtStart();
+          scrollContainerRef.current?.scrollTo({ top: 0 });
+          return;
+        }
+
+        editorRef.current?.focus();
+      });
+    },
+  );
 
   useEffect(() => {
-    window.addEventListener(FOCUS_EDITOR_EVENT, handleFocusEditor);
-    return () => {
-      window.removeEventListener(FOCUS_EDITOR_EVENT, handleFocusEditor);
-    };
-  }, []);
+    if (
+      !focusEditorRequest ||
+      lastHandledFocusEditorRequestIdRef.current ===
+        focusEditorRequest.requestId
+    ) {
+      return;
+    }
+
+    lastHandledFocusEditorRequestIdRef.current = focusEditorRequest.requestId;
+    handleFocusEditor(focusEditorRequest.scrollTo);
+  }, [focusEditorRequest, handleFocusEditor]);
 
   const backlinksButton =
     backlinks.length > 0 ? (

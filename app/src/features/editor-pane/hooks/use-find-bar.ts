@@ -7,12 +7,12 @@ import {
 } from "react";
 
 import { type NoteEditorHandle } from "@/features/editor/note-editor";
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
 import { resolveActiveEditorSearch } from "@/shared/lib/search";
-import { OPEN_EDITOR_FIND_EVENT } from "@/features/editor-pane/lib/editor-pane-utils";
 
 export function useFindBar({
   noteId,
@@ -30,8 +30,12 @@ export function useFindBar({
   const [findQuery, setFindQuery] = useState("");
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
   const [findScrollRevision, setFindScrollRevision] = useState(0);
+  const editorFindRequestId = useShellCommandStore(
+    (state) => state.editorFindRequestId,
+  );
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const lastActiveNoteIdRef = useRef(noteId);
+  const lastHandledEditorFindRequestIdRef = useRef(0);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
 
   const activeEditorSearch = resolveActiveEditorSearch({
@@ -134,18 +138,24 @@ export function useFindBar({
     }
   });
 
-  const handleOpenEditorFind = useEffectEvent((_event: Event) => {
-    openFind();
-  });
-
   useEffect(() => {
     window.addEventListener("keydown", handleGlobalFindKeyDown);
-    window.addEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
     return () => {
       window.removeEventListener("keydown", handleGlobalFindKeyDown);
-      window.removeEventListener(OPEN_EDITOR_FIND_EVENT, handleOpenEditorFind);
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      editorFindRequestId === 0 ||
+      lastHandledEditorFindRequestIdRef.current === editorFindRequestId
+    ) {
+      return;
+    }
+
+    lastHandledEditorFindRequestIdRef.current = editorFindRequestId;
+    openFind();
+  }, [editorFindRequestId, openFind]);
 
   return {
     findOpen,

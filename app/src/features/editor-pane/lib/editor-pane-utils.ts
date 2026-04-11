@@ -1,8 +1,6 @@
 import { format } from "date-fns";
 import type { LogicalPosition } from "@tauri-apps/api/dpi";
 import { CheckMenuItem, Menu, Submenu } from "@tauri-apps/api/menu";
-
-export const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
 export const TOOLBAR_ENTER_ANIMATION = {
   damping: 28,
   mass: 0.8,

@@ -1,8 +1,9 @@
 import { type RefObject, useEffect } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 
+import { useAccountChangePreparation } from "@/features/shell/hooks/use-account-change-preparation";
+import { useShellCommandHandlers } from "@/features/shell/hooks/use-shell-command-handlers";
 import { useSyncListener } from "@/features/shell/hooks/use-sync-listener";
-import { useShellEventListeners } from "@/features/shell/hooks/use-shell-event-listeners";
 import type { LoadedNote, NoteFilter } from "@/shared/api/types";
 
 type CreateNoteMutation = {
@@ -60,6 +61,10 @@ export function useShellEffects(deps: ShellEffectsDeps) {
     pendingSaveTimeoutRef: deps.pendingSaveTimeoutRef,
     isSavingRef: deps.isSavingRef,
     bumpSyncEditorRevision: deps.bumpSyncEditorRevision,
+  });
+
+  useAccountChangePreparation({
+    flushCurrentDraftAsync: deps.flushCurrentDraftAsync,
   });
 
   useEffect(() => {
@@ -129,14 +134,13 @@ export function useShellEffects(deps: ShellEffectsDeps) {
     deps.setSelectedNoteId,
   ]);
 
-  useShellEventListeners({
+  useShellCommandHandlers({
     activeTagPath: deps.activeTagPath,
     tagViewActive: deps.tagViewActive,
     noteFilter: deps.noteFilter,
     isCreatingNote: deps.isCreatingNote,
     createNoteMutation: deps.createNoteMutation,
     flushCurrentDraft: deps.flushCurrentDraft,
-    flushCurrentDraftAsync: deps.flushCurrentDraftAsync,
     handleSelectTagPath: deps.handleSelectTagPath,
     handleSelectNote: deps.handleSelectNote,
   });

@@ -1,13 +1,5 @@
-export const FOCUS_TAG_PATH_EVENT = "comet:focus-tag-path";
-
-export type FocusTagPathDetail = {
-  tagPath: string;
-};
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 
 export function dispatchFocusTagPath(tagPath: string) {
-  window.dispatchEvent(
-    new CustomEvent<FocusTagPathDetail>(FOCUS_TAG_PATH_EVENT, {
-      detail: { tagPath },
-    }),
-  );
+  useShellCommandStore.getState().actions.requestFocusTagPath(tagPath);
 }

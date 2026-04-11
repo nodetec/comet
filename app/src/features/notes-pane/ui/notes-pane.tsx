@@ -23,11 +23,8 @@ import {
   useSearchQuery,
   useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
-import {
-  type FocusNotesPaneDetail,
-  FOCUS_NOTES_PANE_EVENT,
-} from "@/shared/lib/pane-navigation";
 import {
   type NoteSortDirection,
   type NoteSortField,
@@ -99,6 +96,12 @@ export function NotesPane({
   const noteFilter = tagViewActive ? "all" : storeNoteFilter;
   const searchQuery = useSearchQuery();
   const creatingNoteId = useCreatingSelectedNoteId();
+  const focusNotesPaneRequest = useShellCommandStore(
+    (state) => state.focusNotesPaneRequest,
+  );
+  const focusNotesSearchRequestId = useShellCommandStore(
+    (state) => state.focusNotesSearchRequestId,
+  );
   const { setFocusedPane, setSearchQuery: onChangeSearch } =
     useShellNavigationStore((state) => state.actions);
   const { setNoteSortPrefs } = useUIActions();
@@ -149,9 +152,11 @@ export function NotesPane({
 
   const shouldSkipAnimation = Date.now() < skipAnimationUntilRef.current;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingNotesPaneSelectionRef = useRef<
-    FocusNotesPaneDetail["selection"] | null
-  >(null);
+  const pendingNotesPaneSelectionRef = useRef<"first" | "selected" | null>(
+    null,
+  );
+  const lastHandledFocusNotesPaneRequestIdRef = useRef(0);
+  const lastHandledFocusNotesSearchRequestIdRef = useRef(0);
   const noteRowRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const shouldRestoreSelectedRowFocusRef = useRef(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -239,56 +244,63 @@ export function NotesPane({
   }, [isSearchOpen]);
 
   useEffect(() => {
-    const handleFocusSearch = () => {
-      setFocusedPane("notes");
-      setIsSearchOpen(true);
-      focusSearchInput();
-    };
-    window.addEventListener("comet:focus-search", handleFocusSearch);
-    return () =>
-      window.removeEventListener("comet:focus-search", handleFocusSearch);
-  }, [focusSearchInput, setFocusedPane]);
+    if (
+      focusNotesSearchRequestId === 0 ||
+      lastHandledFocusNotesSearchRequestIdRef.current ===
+        focusNotesSearchRequestId
+    ) {
+      return;
+    }
+
+    lastHandledFocusNotesSearchRequestIdRef.current = focusNotesSearchRequestId;
+    setFocusedPane("notes");
+    setIsSearchOpen(true);
+    focusSearchInput();
+  }, [focusNotesSearchRequestId, focusSearchInput, setFocusedPane]);
 
   useEffect(() => {
-    const handleFocusNotesPane = (event: Event) => {
-      const customEvent = event as CustomEvent<FocusNotesPaneDetail>;
-      let selection = customEvent.detail?.selection ?? "selected";
+    if (
+      !focusNotesPaneRequest ||
+      lastHandledFocusNotesPaneRequestIdRef.current ===
+        focusNotesPaneRequest.requestId
+    ) {
+      return;
+    }
 
-      // If the selected note isn't in the current filtered list, fall back
-      // to selecting the first visible note instead of focusing an empty
-      // scroll container.
-      if (
-        selection === "selected" &&
-        selectedNoteId &&
-        !filteredNotes.some((n) => n.id === selectedNoteId)
-      ) {
-        selection = "first";
-      }
+    lastHandledFocusNotesPaneRequestIdRef.current =
+      focusNotesPaneRequest.requestId;
+    let selection = focusNotesPaneRequest.selection ?? "selected";
 
-      if (selection === "first") {
-        if (isNotesPlaceholderData) {
-          pendingNotesPaneSelectionRef.current = "first";
-          return;
-        }
+    // If the selected note isn't in the current filtered list, fall back
+    // to selecting the first visible note instead of focusing an empty
+    // scroll container.
+    if (
+      selection === "selected" &&
+      selectedNoteId &&
+      !filteredNotes.some((n) => n.id === selectedNoteId)
+    ) {
+      selection = "first";
+    }
 
-        setIsSearchFocused(false);
-        setFocusedPane("notes");
-        selectFirstVisibleNote();
-        focusNotesPaneTarget(scrollContainerRef.current);
+    if (selection === "first") {
+      if (isNotesPlaceholderData) {
+        pendingNotesPaneSelectionRef.current = "first";
         return;
       }
 
-      pendingNotesPaneSelectionRef.current = "selected";
-      setFocusedPane("notes");
       setIsSearchFocused(false);
+      setFocusedPane("notes");
+      selectFirstVisibleNote();
       focusNotesPaneTarget(scrollContainerRef.current);
-    };
+      return;
+    }
 
-    window.addEventListener(FOCUS_NOTES_PANE_EVENT, handleFocusNotesPane);
-    return () => {
-      window.removeEventListener(FOCUS_NOTES_PANE_EVENT, handleFocusNotesPane);
-    };
+    pendingNotesPaneSelectionRef.current = "selected";
+    setFocusedPane("notes");
+    setIsSearchFocused(false);
+    focusNotesPaneTarget(scrollContainerRef.current);
   }, [
+    focusNotesPaneRequest,
     filteredNotes,
     isNotesPlaceholderData,
     selectFirstVisibleNote,

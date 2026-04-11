@@ -1,34 +1,16 @@
-export const FOCUS_NOTE_EVENT = "comet:focus-note";
-export const CREATE_NOTE_FROM_WIKILINK_EVENT =
-  "comet:create-note-from-wikilink";
+import {
+  type CreateNoteFromWikilinkDetail,
+  useShellCommandStore,
+} from "@/features/shell/store/use-shell-command-store";
 
-export type FocusNoteDetail = {
-  noteId: string;
-};
-
-export type CreateNoteFromWikilinkDetail = {
-  location: number;
-  sourceNoteId: string;
-  title: string;
-};
+export type { CreateNoteFromWikilinkDetail };
 
 export function dispatchFocusNote(noteId: string) {
-  window.dispatchEvent(
-    new CustomEvent<FocusNoteDetail>(FOCUS_NOTE_EVENT, {
-      detail: { noteId },
-    }),
-  );
+  useShellCommandStore.getState().actions.requestFocusNote(noteId);
 }
 
 export function dispatchCreateNoteFromWikilink(
   detail: CreateNoteFromWikilinkDetail,
 ) {
-  window.dispatchEvent(
-    new CustomEvent<CreateNoteFromWikilinkDetail>(
-      CREATE_NOTE_FROM_WIKILINK_EVENT,
-      {
-        detail,
-      },
-    ),
-  );
+  useShellCommandStore.getState().actions.requestCreateNoteFromWikilink(detail);
 }

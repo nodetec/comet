@@ -1,26 +1,15 @@
-export const FOCUS_NOTES_PANE_EVENT = "comet:focus-notes-pane";
-export const FOCUS_EDITOR_EVENT = "comet:focus-editor";
+import {
+  type FocusEditorDetail,
+  type FocusNotesPaneDetail,
+  useShellCommandStore,
+} from "@/features/shell/store/use-shell-command-store";
 
-export type FocusNotesPaneDetail = {
-  selection?: "first" | "selected";
-};
-
-export type FocusEditorDetail = {
-  scrollTo?: "preserve" | "top";
-};
+export type { FocusEditorDetail, FocusNotesPaneDetail };
 
 export function dispatchFocusNotesPane(detail?: FocusNotesPaneDetail) {
-  window.dispatchEvent(
-    new CustomEvent<FocusNotesPaneDetail>(FOCUS_NOTES_PANE_EVENT, {
-      detail,
-    }),
-  );
+  useShellCommandStore.getState().actions.requestFocusNotesPane(detail);
 }
 
 export function dispatchFocusEditor(detail?: FocusEditorDetail) {
-  window.dispatchEvent(
-    new CustomEvent<FocusEditorDetail>(FOCUS_EDITOR_EVENT, {
-      detail,
-    }),
-  );
+  useShellCommandStore.getState().actions.requestFocusEditor(detail);
 }

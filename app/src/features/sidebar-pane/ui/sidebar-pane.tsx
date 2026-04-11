@@ -27,11 +27,8 @@ import {
   useNoteFilter,
   useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
-import {
-  FOCUS_TAG_PATH_EVENT,
-  type FocusTagPathDetail,
-} from "@/shared/lib/tag-navigation";
 import {
   focusSidebarRow,
   ancestorSidebarTagPaths,
@@ -173,6 +170,9 @@ export function SidebarPane({
   const activeTagPath = tagViewActive ? storeActiveTagPath : null;
   const noteFilter = useNoteFilter();
   const focusedPane = useFocusedPane();
+  const focusTagPathRequest = useShellCommandStore(
+    (state) => state.focusTagPathRequest,
+  );
   const isFocused = focusedPane === "sidebar";
   const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
 
@@ -194,6 +194,7 @@ export function SidebarPane({
   const [pendingScrollTagPath, setPendingScrollTagPath] = useState<
     string | null
   >(null);
+  const lastHandledFocusTagPathRequestIdRef = useRef(0);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const sidebarRowRefs = useRef(new Map<string, HTMLElement | null>());
@@ -235,28 +236,33 @@ export function SidebarPane({
     noteFilter,
   });
 
-  // --- Focus tag path event ---
   useEffect(() => {
-    const handleFocusTagPath = (event: Event) => {
-      const customEvent = event as CustomEvent<FocusTagPathDetail>;
-      const tagPath = canonicalizeTagPath(customEvent.detail?.tagPath ?? "");
-      if (!tagPath || !availableTagPaths.includes(tagPath)) {
-        return;
-      }
+    if (
+      !focusTagPathRequest ||
+      lastHandledFocusTagPathRequestIdRef.current ===
+        focusTagPathRequest.requestId
+    ) {
+      return;
+    }
 
-      const nextExpanded = new Set(expandedSidebarTagPaths);
-      for (const ancestor of ancestorSidebarTagPaths(tagPath)) {
-        nextExpanded.add(ancestor);
-      }
-      setExpandedSidebarTagPaths([...nextExpanded]);
-      setPendingScrollTagPath(tagPath);
-    };
+    const tagPath = canonicalizeTagPath(focusTagPathRequest.tagPath);
+    if (!tagPath || !availableTagPaths.includes(tagPath)) {
+      return;
+    }
 
-    window.addEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
-    return () => {
-      window.removeEventListener(FOCUS_TAG_PATH_EVENT, handleFocusTagPath);
-    };
-  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
+    lastHandledFocusTagPathRequestIdRef.current = focusTagPathRequest.requestId;
+    const nextExpanded = new Set(expandedSidebarTagPaths);
+    for (const ancestor of ancestorSidebarTagPaths(tagPath)) {
+      nextExpanded.add(ancestor);
+    }
+    setExpandedSidebarTagPaths([...nextExpanded]);
+    setPendingScrollTagPath(tagPath);
+  }, [
+    availableTagPaths,
+    expandedSidebarTagPaths,
+    focusTagPathRequest,
+    setExpandedSidebarTagPaths,
+  ]);
 
   // --- Scroll to pending tag ---
   useEffect(() => {

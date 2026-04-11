@@ -7,9 +7,12 @@ import {
 } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  resetShellCommandState,
+  useShellCommandStore,
+} from "@/features/shell/store/use-shell-command-store";
 import { shellStore } from "@/features/shell/store/use-shell-store";
 import { WikiLinkGrammar } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
-import { CREATE_NOTE_FROM_WIKILINK_EVENT } from "@/shared/lib/note-navigation";
 
 const { invokeMock, openUrlMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -66,6 +69,7 @@ async function flush() {
 afterEach(() => {
   invokeMock.mockReset();
   openUrlMock.mockClear();
+  resetShellCommandState();
   shellStore.setState({
     draftMarkdown: "",
     draftNoteId: null,
@@ -450,8 +454,6 @@ describe("Editor link interactions", () => {
 
   it("dispatches create-note for unresolved wikilinks", async () => {
     invokeMock.mockResolvedValueOnce(null);
-    const eventHandler = vi.fn();
-    window.addEventListener(CREATE_NOTE_FROM_WIKILINK_EVENT, eventHandler);
 
     const { view } = createView("[[Target]]", false, "note-1");
     await flush();
@@ -480,14 +482,15 @@ describe("Editor link interactions", () => {
         title: "Target",
       },
     });
-    expect(eventHandler).toHaveBeenCalledTimes(1);
-    expect((eventHandler.mock.calls[0][0] as CustomEvent).detail).toEqual({
+    expect(
+      useShellCommandStore.getState().createNoteFromWikilinkRequest,
+    ).toEqual({
       location: 0,
+      requestId: 1,
       sourceNoteId: "note-1",
       title: "Target",
     });
 
-    window.removeEventListener(CREATE_NOTE_FROM_WIKILINK_EVENT, eventHandler);
     view.destroy();
   });
 });

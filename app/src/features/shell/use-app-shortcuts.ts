@@ -1,12 +1,9 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
+import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
 import { uiStore, useUIActions } from "@/features/settings/store/use-ui-store";
 import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
-import {
-  dispatchFocusEditor,
-  dispatchFocusNotesPane,
-} from "@/shared/lib/pane-navigation";
 import {
   getPaneFocusShortcut,
   isCommandPaletteShortcut,
@@ -17,7 +14,6 @@ import {
 } from "@/shared/lib/keyboard";
 
 const TAURI_EVENT_COMMAND_PALETTE = "menu-command-palette";
-const OPEN_EDITOR_FIND_EVENT = "comet:open-editor-find";
 const TAURI_EVENT_EDITOR_FIND = "menu-editor-find";
 const TAURI_EVENT_NEW_NOTE = "menu-new-note";
 const TAURI_EVENT_NOTES_SEARCH = "menu-notes-search";
@@ -32,6 +28,12 @@ export function useAppShortcuts({ onCreateNote }: UseAppShortcutsOptions) {
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
 
   const { setSettingsOpen, toggleSidebar, toggleFocusMode } = useUIActions();
+  const {
+    requestFocusEditor,
+    requestFocusNotesPane,
+    requestFocusNotesSearch,
+    requestOpenEditorFind,
+  } = useShellCommandStore((state) => state.actions);
   const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
 
   const openCommandPalette = useEffectEvent(() => {
@@ -39,21 +41,21 @@ export function useAppShortcuts({ onCreateNote }: UseAppShortcutsOptions) {
   });
 
   const focusNotesSearch = useEffectEvent(() => {
-    window.dispatchEvent(new CustomEvent("comet:focus-search"));
+    requestFocusNotesSearch();
   });
 
   const openEditorFind = useEffectEvent(() => {
-    window.dispatchEvent(new CustomEvent(OPEN_EDITOR_FIND_EVENT));
+    requestOpenEditorFind();
   });
 
   const focusPane = useEffectEvent((pane: "sidebar" | "notes" | "editor") => {
     if (pane === "editor") {
-      dispatchFocusEditor();
+      requestFocusEditor();
       return;
     }
 
     if (pane === "notes") {
-      dispatchFocusNotesPane();
+      requestFocusNotesPane();
       return;
     }
 
