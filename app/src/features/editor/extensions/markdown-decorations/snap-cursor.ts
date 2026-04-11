@@ -42,7 +42,14 @@ export function getSnappedCursorPosition(
   const cursorRanges = ignoreReveal ? [] : getCursorRanges(state);
 
   for (let n: SyntaxNode | null = node; n; n = n.parent) {
-    const snap = snapNodeSyntax(state, n, pos, cursorLines, cursorRanges);
+    const snap = snapNodeSyntax(
+      state,
+      n,
+      pos,
+      cursorLines,
+      cursorRanges,
+      ignoreReveal,
+    );
     if (snap != null) {
       return snap;
     }
@@ -86,9 +93,10 @@ function snapNodeSyntax(
   pos: number,
   cursorLines: ReturnType<typeof getCursorLineRanges>,
   cursorRanges: ReturnType<typeof getCursorRanges>,
+  isDrag = false,
 ): number | null {
   if (ATX_HEADING_NAMES.has(node.name)) {
-    return snapHeadingSyntax(state, node, pos, cursorLines);
+    return snapHeadingSyntax(state, node, pos, cursorLines, isDrag);
   }
 
   if (node.name === "Link") {
@@ -137,6 +145,7 @@ function snapHeadingSyntax(
   heading: SyntaxNode,
   pos: number,
   cursorLines: ReturnType<typeof getCursorLineRanges>,
+  isDrag = false,
 ): number | null {
   if (overlapsAny(heading.from, heading.to, cursorLines)) {
     return null;
@@ -155,7 +164,10 @@ function snapHeadingSyntax(
   // prefix is hidden.
   const contentStart = firstMark.to + 1;
   if (pos <= contentStart) {
-    return heading.from;
+    // During drag, snap to contentStart (inside the heading mark span)
+    // so coordsAtPos returns heading-sized height. The deferred rebuild
+    // after mouseup extends the selection to include the full prefix.
+    return isDrag ? contentStart : heading.from;
   }
 
   // Trailing closing mark (## Header ##)
