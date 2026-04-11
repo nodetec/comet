@@ -87,6 +87,7 @@ import {
   isNotesSearchShortcut,
 } from "@/shared/lib/keyboard";
 import { cn } from "@/shared/lib/utils";
+import { getListItemForLine } from "@/features/editor/extensions/lists/list-model";
 
 type NoteEditorProps = {
   availableTagPaths: string[];
@@ -472,6 +473,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
                 return true;
               }
 
+              // Handle leading-padding clicks in mousedown (not click)
+              // to prevent CM from placing an initial cursor that then
+              // gets corrected, causing visible jitter.
+              if (event.button === 0 && !event.shiftKey) {
+                const lineStart = getLeadingPaddingClickLineStart(view, event);
+                if (lineStart != null) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  focusEditorPreservingScroll(view);
+                  const listItem = getListItemForLine(view.state, lineStart);
+                  dispatchPointerCursorSelection(
+                    view,
+                    listItem ? listItem.markerFrom : lineStart,
+                  );
+                  return true;
+                }
+              }
+
               event.stopPropagation();
 
               if (!view.hasFocus) {
@@ -479,23 +498,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               }
 
               return false;
-            },
-            click(event, view) {
-              if (!view.state.selection.main.empty) {
-                return false;
-              }
-
-              const lineStart = getLeadingPaddingClickLineStart(view, event);
-              if (lineStart == null) {
-                return false;
-              }
-
-              event.preventDefault();
-              event.stopPropagation();
-
-              focusEditorPreservingScroll(view);
-              dispatchPointerCursorSelection(view, lineStart);
-              return true;
             },
           }),
           EditorView.domEventHandlers({

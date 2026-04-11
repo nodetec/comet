@@ -572,9 +572,10 @@ function normalizeSelectionToListMarkers(state: EditorState) {
 
     const item = getListItemForLine(state, range.head);
     if (item) {
-      // Allow the cursor at line.from (before the marker). Snap
-      // positions inside the marker/indent area to the text start.
-      if (range.head > item.lineFrom && range.head <= item.contentFrom) {
+      // Allow the cursor at lineFrom (before the hidden indent) and
+      // markerFrom (before the marker). Snap positions between
+      // markerFrom and contentFrom to contentFrom.
+      if (range.head > item.markerFrom && range.head <= item.contentFrom) {
         const targetAssoc = 1;
         if (range.head !== item.contentFrom || range.assoc !== targetAssoc) {
           changed = true;
@@ -1520,6 +1521,18 @@ function listMarkerInteractions(): Extension {
 }
 
 const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
+  // Typing at markerFrom (before the marker): jump to content start
+  // instead of inserting. Prevents accidentally adding indent spaces.
+  if (from === to) {
+    const item = getListItemForLine(view.state, from);
+    if (item && from <= item.markerFrom) {
+      view.dispatch({
+        selection: EditorSelection.cursor(item.contentFrom, 1),
+      });
+      return true;
+    }
+  }
+
   const shortcut = getTaskListShortcut(view.state, from, to, text);
   if (!shortcut) {
     return false;
