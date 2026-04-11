@@ -44,6 +44,8 @@ import {
 } from "@/features/editor/extensions/lists/list-widgets";
 import { listTheme } from "@/features/editor/extensions/lists/list-theme";
 import {
+  computeRenumberChanges,
+  computeRenumberChangesFromText,
   getListItemForLine,
   getListItems,
   type ListItemInfo,
@@ -412,6 +414,14 @@ function getListIndentStep(lineText: string): number {
   return BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
 }
 
+/** Renumber ordered list markers after a structural change. */
+function renumberOrderedLists(view: EditorView) {
+  const changes = computeRenumberChangesFromText(view.state.doc);
+  if (changes) {
+    view.dispatch({ changes });
+  }
+}
+
 /**
  * Collect all document positions belonging to a list item and its
  * descendants. Returns an array of {from, to} line ranges covering
@@ -459,15 +469,17 @@ function indentListItem(view: EditorView) {
 
   // Indent all lines of this item and its descendants.
   const lineRanges = collectItemLineRanges(view.state, item);
-  const changes = lineRanges.map((range) => ({
+  const indentChanges = lineRanges.map((range) => ({
     from: range.from,
     insert: indentStr,
   }));
 
   view.dispatch({
-    changes,
+    changes: indentChanges,
     selection: EditorSelection.cursor(selection.head + indentStep),
   });
+
+  renumberOrderedLists(view);
 
   return true;
 }
@@ -521,6 +533,8 @@ function outdentListItem(view: EditorView) {
       Math.max(line.from, selection.head - removable),
     ),
   });
+
+  renumberOrderedLists(view);
 
   return true;
 }
@@ -784,6 +798,14 @@ function deleteExpandedSelectionAcrossListMarkers(view: EditorView) {
 }
 
 export function deleteAcrossListBoundary(view: EditorView) {
+  const handled = deleteAcrossListBoundaryInner(view);
+  if (handled) {
+    renumberOrderedLists(view);
+  }
+  return handled;
+}
+
+function deleteAcrossListBoundaryInner(view: EditorView) {
   const selection = view.state.selection.main;
   if (!selection.empty) {
     return deleteExpandedSelectionAcrossListMarkers(view);
@@ -886,13 +908,56 @@ export function deleteAcrossListBoundary(view: EditorView) {
     return true;
   }
 
-  // --- Structural backspace at content start ---
+  // --- Structural backspace at content start or marker start ---
 
   const item = getListItemForLine(view.state, selection.head);
   if (item && selection.head === item.contentFrom) {
     // Task checkbox removal is handled above (before continuation
     // checks). This branch handles plain bullet/number items.
     return mergeWithPreviousListItem(view, item);
+  }
+
+  // Backspace at markerFrom (before the marker): outdent if nested,
+  // or remove the marker if top-level.
+  if (item && selection.head === item.markerFrom) {
+    if (item.depth > 0) {
+      // Outdent this item and descendants.
+      const indentStep = BULLET_MARKERS.has(item.marker)
+        ? BULLET_INDENT
+        : ORDERED_INDENT;
+      const line = view.state.doc.lineAt(item.lineFrom);
+      const leadingSpaces = /^( *)/.exec(line.text)?.[1].length ?? 0;
+      const removable = Math.min(indentStep, leadingSpaces);
+      if (removable > 0) {
+        const lineRanges = collectItemLineRanges(view.state, item);
+        const changes = lineRanges
+          .map((range) => {
+            const l = view.state.doc.lineAt(range.from);
+            const spaces = /^( *)/.exec(l.text)?.[1].length ?? 0;
+            const rm = Math.min(removable, spaces);
+            return rm > 0 ? { from: l.from, to: l.from + rm } : null;
+          })
+          .filter((c): c is { from: number; to: number } => c !== null);
+        if (changes.length > 0) {
+          view.dispatch({
+            changes,
+            selection: EditorSelection.cursor(
+              Math.max(line.from, selection.head - removable),
+            ),
+            annotations: Transaction.userEvent.of("delete.backward"),
+          });
+          return true;
+        }
+      }
+    } else {
+      // Top-level: remove the entire marker prefix.
+      view.dispatch({
+        changes: { from: item.lineFrom, to: item.contentFrom },
+        selection: EditorSelection.cursor(item.lineFrom),
+        annotations: Transaction.userEvent.of("delete.backward"),
+      });
+      return true;
+    }
   }
 
   logListDeleteDebug("deleteAcrossListBoundary fell through", {
@@ -1631,11 +1696,13 @@ const listBreakKeymap = Prec.high(
   ]),
 );
 
-const listEditKeymap = keymap.of([
-  { key: "Mod-t", run: insertTaskCheckbox },
-  { key: "Tab", run: indentListItem },
-  { key: "Shift-Tab", run: outdentListItem },
-]);
+const listEditKeymap = Prec.highest(
+  keymap.of([
+    { key: "Mod-t", run: insertTaskCheckbox },
+    { key: "Tab", run: indentListItem },
+    { key: "Shift-Tab", run: outdentListItem },
+  ]),
+);
 
 export function lists(): Extension {
   const decorationsDisabled = isListDecorationsDisabled();
@@ -1661,6 +1728,17 @@ export function lists(): Extension {
             const listPrefixRemoval = backspaceRemoveListPrefix(transaction);
             if (listPrefixRemoval) {
               return [listPrefixRemoval as TransactionSpec];
+            }
+
+            // Renumber misnumbered ordered list markers after doc changes.
+            if (transaction.docChanged) {
+              const renumberChanges = computeRenumberChanges(transaction.state);
+              if (renumberChanges) {
+                return [
+                  transaction,
+                  { changes: renumberChanges, sequential: true },
+                ];
+              }
             }
 
             const selection = normalizeSelectionToListMarkers(

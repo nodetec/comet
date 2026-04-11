@@ -322,5 +322,99 @@ export function getListItemAtPosition(
   return null;
 }
 
+/**
+ * Compute text changes needed to fix misnumbered ordered list markers.
+ * Walks all sibling groups and ensures sequential numbering (1., 2., 3., …).
+ * Returns null if no renumbering is needed.
+ */
+export function computeRenumberChanges(
+  state: EditorState,
+): { from: number; to: number; insert: string }[] | null {
+  const items = getListItems(state);
+  const changes: { from: number; to: number; insert: string }[] = [];
+  const visited = new Set<ListItemInfo>();
+
+  for (const item of items) {
+    if (visited.has(item)) continue;
+    if (BULLET_MARKERS.has(item.marker)) continue;
+
+    // Find the first sibling in this ordered group.
+    let first: ListItemInfo = item;
+    while (first.prevSibling && !BULLET_MARKERS.has(first.prevSibling.marker)) {
+      first = first.prevSibling;
+    }
+
+    // Walk the group and renumber.
+    let expected = 1;
+    let current: ListItemInfo | null = first;
+    while (current && !BULLET_MARKERS.has(current.marker)) {
+      visited.add(current);
+      const expectedMarker = `${expected}.`;
+      if (current.marker !== expectedMarker) {
+        changes.push({
+          from: current.markerFrom,
+          to: current.markerFrom + current.marker.length,
+          insert: expectedMarker,
+        });
+      }
+      expected++;
+      current = current.nextSibling;
+    }
+  }
+
+  return changes.length > 0 ? changes : null;
+}
+
+/**
+ * Text-based renumbering that works on raw document content (no syntax
+ * tree needed). Scans lines for ordered list markers at each indent
+ * level and ensures sequential numbering. This is used by indent/outdent
+ * handlers where the syntax tree may not yet reflect the changes.
+ */
+const ORDERED_MARKER_RE = /^(\s*)(\d+)(\.\s)/;
+
+export function computeRenumberChangesFromText(doc: {
+  line(n: number): { from: number; text: string };
+  lines: number;
+}): { from: number; to: number; insert: string }[] | null {
+  const changes: { from: number; to: number; insert: string }[] = [];
+  // Track the expected next number per indent level.
+  const counters = new Map<number, number>();
+
+  for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
+    const line = doc.line(lineNum);
+    const match = ORDERED_MARKER_RE.exec(line.text);
+    if (!match) {
+      // Non-ordered-list line resets counters at deeper indent levels.
+      continue;
+    }
+
+    const indent = match[1].length;
+    const currentNum = match[2];
+    // Reset counters for deeper indents when we encounter a new level.
+    for (const [level] of counters) {
+      if (level > indent) {
+        counters.delete(level);
+      }
+    }
+
+    const expected = counters.get(indent) ?? 1;
+    const expectedStr = String(expected);
+
+    if (currentNum !== expectedStr) {
+      const markerStart = line.from + indent;
+      changes.push({
+        from: markerStart,
+        to: markerStart + currentNum.length,
+        insert: expectedStr,
+      });
+    }
+
+    counters.set(indent, expected + 1);
+  }
+
+  return changes.length > 0 ? changes : null;
+}
+
 // Exported for testing.
 export { invalidateCache as _invalidateListModelCache };

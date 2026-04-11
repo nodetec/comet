@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, beforeEach } from "vitest";
 
 import {
+  computeRenumberChanges,
   getListItems,
   getListItemAtLine,
   getListItemForLine,
@@ -173,5 +174,41 @@ describe("list model", () => {
 
     expect(items[0].indentStyle).toContain("--cm-md-list-child-indent");
     expect(items[0].indentStyle).toContain("calc(");
+  });
+});
+
+describe("computeRenumberChanges", () => {
+  it("returns null for correctly numbered lists", () => {
+    const state = createState("1. first\n2. second\n3. third");
+    expect(computeRenumberChanges(state)).toBeNull();
+  });
+
+  it("fixes misnumbered items", () => {
+    const state = createState("1. first\n1. second\n1. third");
+    const changes = computeRenumberChanges(state);
+    expect(changes).not.toBeNull();
+    expect(changes).toHaveLength(2);
+    expect(changes![0].insert).toBe("2.");
+    expect(changes![1].insert).toBe("3.");
+  });
+
+  it("fixes gaps in numbering", () => {
+    const state = createState("1. first\n5. second\n9. third");
+    const changes = computeRenumberChanges(state);
+    expect(changes).not.toBeNull();
+    expect(changes).toHaveLength(2);
+    expect(changes![0].insert).toBe("2.");
+    expect(changes![1].insert).toBe("3.");
+  });
+
+  it("returns null for bullet lists", () => {
+    const state = createState("- first\n- second\n- third");
+    expect(computeRenumberChanges(state)).toBeNull();
+  });
+
+  it("does not renumber bullet items mixed with ordered", () => {
+    const state = createState("- bullet\n1. ordered\n2. ordered2");
+    const changes = computeRenumberChanges(state);
+    expect(changes).toBeNull();
   });
 });
