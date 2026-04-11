@@ -322,6 +322,17 @@ export function NotesPane({
       return;
     }
 
+    // Only respond to filteredNotes.length changes when there is a
+    // pending selection (initial data load). Without this guard,
+    // loading more notes via infinite scroll would scroll back to
+    // the selected note.
+    if (
+      !pendingNotesPaneSelectionRef.current &&
+      !shouldRestoreSelectedRowFocusRef.current
+    ) {
+      return;
+    }
+
     if (selectedNoteId || shouldRestoreSelectedRowFocusRef.current) {
       pendingNotesPaneSelectionRef.current = null;
       shouldRestoreSelectedRowFocusRef.current = false;
