@@ -8,7 +8,7 @@ import { EditorView } from "@codemirror/view";
 export { HighlightSyntax } from "@/features/editor/extensions/markdown-decorations/highlight-syntax";
 import { linkInteractions } from "@/features/editor/extensions/markdown-decorations/builders/links";
 import { tables } from "@/features/editor/extensions/markdown-decorations/builders/tables";
-import { lists } from "@/features/editor/extensions/markdown-decorations/lists";
+import { lists } from "@/features/editor/extensions/lists";
 import { markdownDecorationsPlugin } from "@/features/editor/extensions/markdown-decorations/plugin";
 import { getSnappedPointerSelection } from "@/features/editor/extensions/markdown-decorations/snap-cursor";
 import {
