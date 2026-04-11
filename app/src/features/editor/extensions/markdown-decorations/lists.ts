@@ -593,15 +593,26 @@ function normalizeSelectionToListMarkers(state: EditorState) {
     const item = getListItemForLine(state, range.head);
 
     if (!range.empty) {
-      // Collapse small selections entirely within the hidden indent +
-      // marker area. These are accidental selections from slight mouse
-      // movement during a click inside a replace decoration.
       if (item) {
         const selFrom = Math.min(range.anchor, range.head);
         const selTo = Math.max(range.anchor, range.head);
+        // Collapse small selections entirely within the hidden indent +
+        // marker area. These are accidental selections from slight mouse
+        // movement during a click inside a replace decoration.
         if (selFrom >= item.lineFrom && selTo <= item.contentFrom) {
           changed = true;
-          return EditorSelection.cursor(item.markerFrom, 1);
+          return EditorSelection.cursor(item.markerFrom, -1);
+        }
+        // For real drag selections, snap the head out of the marker/widget
+        // area to a consistent boundary. Prevents jitter from CM
+        // alternating between widget boundaries on each mouse move.
+        if (
+          range.head > item.lineFrom &&
+          range.head < item.contentFrom &&
+          range.head !== item.markerFrom
+        ) {
+          changed = true;
+          return EditorSelection.range(range.anchor, item.markerFrom);
         }
       }
       return range;
