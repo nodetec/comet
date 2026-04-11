@@ -57,10 +57,11 @@ Each feature follows this structure:
 ### Conventions
 
 - **Imports**: Always use `@/` path alias, never relative imports.
-- **Styling**: Tailwind v4 with CSS variables (oklch). Shadcn + CVA for component variants. Prettier auto-sorts Tailwind classes.
+- **Styling**: Tailwind v4 with CSS variables (oklch). Shadcn + CVA for component variants. Oxfmt auto-sorts Tailwind classes.
 - **State**: Zustand for app/UI state, React Query for server state. No Redux or Context for state management.
 - **Tauri IPC**: All backend calls go through typed `invoke()` wrappers in `shared/api/invoke.ts`.
 - **Naming**: Components `PascalCase` exports in `kebab-case.tsx` files, hooks `use-*.ts`, stores `use-*-store.ts`, utilities `lowercase.ts`.
 - **Testing**: Vitest, unit tests only (`*.test.ts`), colocated with implementation. Tests cover logic (search, markdown, etc.), not components.
 - **No routing**: Single-page desktop app. Navigation is store-driven (`selectedNoteId`, `activeNotebookId`).
 - **CodeMirror editor**: Extensions in `features/editor/extensions/`. Markdown-first with syntax highlighting, autocomplete, and inline images.
+- **Linting**: Oxlint (not ESLint). `@tanstack/eslint-plugin-query` rules are not yet available — revisit when oxlint JS plugins stabilize.

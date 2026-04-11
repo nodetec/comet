@@ -382,6 +382,7 @@ export function SyncDialog({
                 ) : (
                   logs.map((line, i) => (
                     <div
+                      // oxlint-disable-next-line react/no-array-index-key -- log lines are plain strings with no stable ID
                       key={i}
                       className="text-muted-foreground hover:text-foreground"
                     >

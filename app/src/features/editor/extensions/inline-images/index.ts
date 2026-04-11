@@ -3,6 +3,7 @@ import {
   type EditorState,
   type Extension,
   Prec,
+  RangeSetBuilder,
 } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
@@ -14,7 +15,6 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
 
 import { fetchBlob } from "@/shared/api/invoke";
 import type { BlobFetchStatus } from "@/shared/api/types";

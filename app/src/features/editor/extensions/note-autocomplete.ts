@@ -10,8 +10,12 @@ import {
   type CompletionContext,
 } from "@codemirror/autocomplete";
 import { EditorState, type Extension } from "@codemirror/state";
-import { keymap } from "@codemirror/view";
-import { ViewPlugin, type EditorView, type ViewUpdate } from "@codemirror/view";
+import {
+  keymap,
+  ViewPlugin,
+  type EditorView,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FileText, Hash } from "lucide-react";

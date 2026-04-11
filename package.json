@@ -62,8 +62,8 @@
   },
   "lint-staged": {
     "app/**/*.{ts,tsx}": [
-      "pnpm --filter @comet/app exec eslint --fix",
-      "prettier --write"
+      "pnpm --filter @comet/app exec oxlint --fix",
+      "pnpm --filter @comet/app exec oxfmt --write"
     ],
     "relay/**/*.{ts,tsx}": [
       "pnpm --filter @comet/relay exec eslint --fix",

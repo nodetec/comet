@@ -481,7 +481,7 @@ describe("Editor link interactions", () => {
       },
     });
     expect(eventHandler).toHaveBeenCalledTimes(1);
-    expect((eventHandler.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+    expect((eventHandler.mock.calls[0]![0] as CustomEvent).detail).toEqual({
       location: 0,
       sourceNoteId: "note-1",
       title: "Target",

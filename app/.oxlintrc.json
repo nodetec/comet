@@ -1,0 +1,89 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "unicorn", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "coverage/**",
+    "src-tauri/**",
+    "scripts/**"
+  ],
+  "overrides": [
+    {
+      "files": ["src/**/*.{ts,tsx}"],
+      "rules": {
+        "no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "caughtErrorsIgnorePattern": "^_",
+            "varsIgnorePattern": "^_"
+          }
+        ],
+        "react/only-export-components": [
+          "error",
+          { "allowConstantExport": true }
+        ],
+        "react/no-unsafe": "off",
+        "react/react-in-jsx-scope": "off",
+        "react/exhaustive-deps": "error",
+        "react/rules-of-hooks": "error",
+        "import/default": "off",
+        "import/no-named-as-default": "warn",
+        "import/no-named-as-default-member": "warn",
+        "import/no-duplicates": "warn",
+        "unicorn/no-null": "off",
+        "unicorn/no-array-callback-reference": "off",
+        "unicorn/prefer-global-this": "off",
+        "unicorn/prefer-import-meta-properties": "off",
+        "unicorn/prefer-string-replace-all": "off",
+        "unicorn/custom-error-definition": "off",
+        "unicorn/require-post-message-target-origin": "off",
+        "unbound-method": "off",
+        "no-unsafe-type-assertion": "off",
+        "no-unnecessary-type-assertion": "off",
+        "consistent-return": "off",
+        "no-shadow": "off",
+        "no-misused-spread": "off",
+        "no-unnecessary-type-arguments": "off",
+        "no-unneeded-ternary": "off",
+        "typescript/restrict-template-expressions": "off",
+        "import/no-unassigned-import": "off",
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "ignoreVoid": true,
+            "ignoreIIFE": true
+          }
+        ],
+        "typescript/no-misused-promises": [
+          "error",
+          {
+            "checksVoidReturn": {
+              "attributes": false
+            }
+          }
+        ]
+      },
+      "env": {
+        "es2026": true,
+        "browser": true,
+        "node": true
+      }
+    },
+    {
+      "files": ["src/components/editor/nodes/*.tsx", "src/components/ui/*.tsx"],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    }
+  ]
+}
