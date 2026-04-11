@@ -481,6 +481,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
             click(event, view) {
+              if (!view.state.selection.main.empty) {
+                return false;
+              }
+
               const lineStart = getLeadingPaddingClickLineStart(view, event);
               if (lineStart == null) {
                 return false;

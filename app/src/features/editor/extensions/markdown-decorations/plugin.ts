@@ -1,5 +1,6 @@
-import { RangeSetBuilder } from "@codemirror/state";
+import { EditorSelection, RangeSetBuilder } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
+import type { SyntaxNode } from "@lezer/common";
 import {
   type DecorationSet,
   Decoration,
@@ -212,6 +213,82 @@ function buildDecorations(
   };
 }
 
+/**
+ * After a mouse-drag with frozen decorations, the selection was mapped
+ * using the collapsed layout. Hidden syntax (the `[` of `[text](url)`,
+ * `[[`/`]]` of wikilinks) had zero visual width so the selection
+ * boundary landed just inside the visible content. Expand each range
+ * to include the hidden syntax at its edges before the deferred
+ * decoration rebuild reveals them.
+ */
+function expandSelectionOverHiddenSyntax(
+  view: EditorView,
+): EditorSelection | null {
+  const { state } = view;
+  const tree = syntaxTree(state);
+  let changed = false;
+
+  const ranges = state.selection.ranges.map((range) => {
+    if (range.empty) return range;
+
+    let { from, to } = range;
+
+    // Expand 'from' to include hidden opening syntax
+    for (
+      let n: SyntaxNode | null = tree.resolveInner(from, 1);
+      n;
+      n = n.parent
+    ) {
+      if (n.name === "Link") {
+        const marks = n.getChildren("LinkMark");
+        if (marks.length >= 2 && from > n.from && from <= marks[0].to) {
+          from = n.from;
+          changed = true;
+        }
+        break;
+      }
+      if (n.name === "WikiLink" && from > n.from && from <= n.from + 2) {
+        from = n.from;
+        changed = true;
+        break;
+      }
+    }
+
+    // Expand 'to' to include hidden closing syntax
+    for (
+      let n: SyntaxNode | null = tree.resolveInner(to, -1);
+      n;
+      n = n.parent
+    ) {
+      if (n.name === "Link") {
+        const marks = n.getChildren("LinkMark");
+        if (marks.length >= 2 && to < n.to && to >= marks[1].from) {
+          to = n.to;
+          changed = true;
+        }
+        break;
+      }
+      if (n.name === "WikiLink" && to < n.to && to >= n.to - 2) {
+        to = n.to;
+        changed = true;
+        break;
+      }
+    }
+
+    if (from !== range.from || to !== range.to) {
+      return range.anchor <= range.head
+        ? EditorSelection.range(from, to)
+        : EditorSelection.range(to, from);
+    }
+
+    return range;
+  });
+
+  return changed
+    ? EditorSelection.create(ranges, state.selection.mainIndex)
+    : null;
+}
+
 function queueDeferredSelectionRebuild(
   view: EditorView,
   pluginState: { pendingSelectionRebuild: boolean },
@@ -219,7 +296,8 @@ function queueDeferredSelectionRebuild(
   setTimeout(() => {
     requestAnimationFrame(() => {
       if (pluginState.pendingSelectionRebuild) {
-        view.dispatch({});
+        const adjusted = expandSelectionOverHiddenSyntax(view);
+        view.dispatch(adjusted ? { selection: adjusted } : {});
       }
     });
   }, 0);

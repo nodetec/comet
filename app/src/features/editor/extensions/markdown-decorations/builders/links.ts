@@ -655,34 +655,6 @@ async function openWikiLink(
 export function linkInteractions(noteId: string | null): Extension {
   return EditorView.domEventHandlers({
     mousedown(event, view) {
-      // When clicking to the right of a collapsed link, CM would place
-      // the cursor before the hidden closing syntax. Intercept and place it
-      // after the full link token instead.
-      if (event.button === 0 && !event.shiftKey) {
-        const contentRect = view.contentDOM.getBoundingClientRect();
-        if (
-          event.clientX >= contentRect.left &&
-          event.clientX <= contentRect.right
-        ) {
-          const pos = view.posAtCoords(
-            { x: event.clientX, y: event.clientY },
-            false,
-          );
-          if (pos != null) {
-            const linkEnd = getLinkEndAtCursor(view.state, pos);
-            if (linkEnd != null) {
-              event.preventDefault();
-              view.dispatch({
-                selection: EditorSelection.cursor(linkEnd),
-                scrollIntoView: false,
-              });
-              view.focus();
-              return true;
-            }
-          }
-        }
-      }
-
       if (!shouldOpenLink(event)) {
         return false;
       }
@@ -697,6 +669,37 @@ export function linkInteractions(noteId: string | null): Extension {
       return true;
     },
     click(event, view) {
+      // When clicking to the right of a collapsed link, CM would place
+      // the cursor before the hidden closing syntax. Correct it to after
+      // the full link token. Handled on click (not mousedown) so that
+      // drag-select starting at a link boundary still works.
+      if (
+        event.button === 0 &&
+        !event.shiftKey &&
+        view.state.selection.main.empty
+      ) {
+        const contentRect = view.contentDOM.getBoundingClientRect();
+        if (
+          event.clientX >= contentRect.left &&
+          event.clientX <= contentRect.right
+        ) {
+          const pos = view.posAtCoords(
+            { x: event.clientX, y: event.clientY },
+            false,
+          );
+          if (pos != null) {
+            const linkEnd = getLinkEndAtCursor(view.state, pos);
+            if (linkEnd != null) {
+              view.dispatch({
+                selection: EditorSelection.cursor(linkEnd),
+                scrollIntoView: false,
+              });
+              return true;
+            }
+          }
+        }
+      }
+
       if (!shouldOpenLink(event) || !view.state.selection.main.empty) {
         return false;
       }
