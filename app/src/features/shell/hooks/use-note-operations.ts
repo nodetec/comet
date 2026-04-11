@@ -5,9 +5,10 @@ import { toast } from "sonner";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { exportNotes, loadNote } from "@/shared/api/invoke";
-import type { LoadedNote, NoteFilter } from "@/shared/api/types";
+import type { LoadedNote, NoteSummary } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { matchesTagScope } from "@/features/shell/hooks/use-view-navigation";
+import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 
 type Mutation<TArg = string> = {
   isPending: boolean;
@@ -21,14 +22,8 @@ type VoidMutation = {
 
 export interface NoteOperationsDeps {
   draftControl: DraftControl;
-  selectedNoteId: string | null;
-  draftNoteId: string | null;
-  draftMarkdown: string;
   queryClient: QueryClient;
-  activeTagPath: string | null;
-  tagViewActive: boolean;
-  noteFilter: NoteFilter;
-  currentNote: LoadedNote | undefined;
+  currentNotes: NoteSummary[];
   archiveNoteMutation: Mutation;
   restoreNoteMutation: Mutation;
   trashNoteMutation: Mutation;
@@ -42,97 +37,114 @@ export interface NoteOperationsDeps {
 }
 
 export function useNoteOperations(deps: NoteOperationsDeps) {
+  const { discardPendingSave, flushCurrentDraftAsync } = deps.draftControl;
+  const archiveNotePending = deps.archiveNoteMutation.isPending;
+  const restoreNotePending = deps.restoreNoteMutation.isPending;
+  const trashNotePending = deps.trashNoteMutation.isPending;
+  const restoreFromTrashPending = deps.restoreFromTrashMutation.isPending;
+  const deleteNotePermanentlyPending =
+    deps.deleteNotePermanentlyMutation.isPending;
+  const duplicateNotePending = deps.duplicateNoteMutation.isPending;
+  const pinNotePending = deps.pinNoteMutation.isPending;
+  const unpinNotePending = deps.unpinNoteMutation.isPending;
+  const setNoteReadonlyPending = deps.setNoteReadonlyMutation.isPending;
+  const mutateArchiveNote = deps.archiveNoteMutation.mutateAsync;
+  const mutateRestoreNote = deps.restoreNoteMutation.mutateAsync;
+  const mutateTrashNote = deps.trashNoteMutation.mutateAsync;
+  const mutateRestoreFromTrash = deps.restoreFromTrashMutation.mutateAsync;
+  const mutateDeleteNotePermanently =
+    deps.deleteNotePermanentlyMutation.mutateAsync;
+  const mutateDuplicateNote = deps.duplicateNoteMutation.mutateAsync;
+  const mutatePinNote = deps.pinNoteMutation.mutateAsync;
+  const mutateUnpinNote = deps.unpinNoteMutation.mutateAsync;
+  const mutateSetNoteReadonly = deps.setNoteReadonlyMutation.mutateAsync;
+  const emptyTrash = deps.emptyTrashMutation.mutate;
+
   const isMutatingNote =
-    deps.archiveNoteMutation.isPending ||
-    deps.restoreNoteMutation.isPending ||
-    deps.deleteNotePermanentlyMutation.isPending ||
-    deps.pinNoteMutation.isPending ||
-    deps.unpinNoteMutation.isPending ||
-    deps.duplicateNoteMutation.isPending ||
-    deps.setNoteReadonlyMutation.isPending;
+    archiveNotePending ||
+    restoreNotePending ||
+    deleteNotePermanentlyPending ||
+    pinNotePending ||
+    unpinNotePending ||
+    duplicateNotePending ||
+    setNoteReadonlyPending;
 
   const handleArchiveNote = (noteId: string) => {
     void (async () => {
       if (
-        deps.archiveNoteMutation.isPending ||
-        deps.restoreNoteMutation.isPending ||
-        deps.deleteNotePermanentlyMutation.isPending
+        archiveNotePending ||
+        restoreNotePending ||
+        deleteNotePermanentlyPending
       ) {
         return;
       }
 
-      if (noteId === deps.selectedNoteId) {
-        await deps.draftControl.flushCurrentDraftAsync();
+      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+        await flushCurrentDraftAsync();
       }
 
-      await deps.archiveNoteMutation.mutateAsync(noteId);
+      await mutateArchiveNote(noteId);
     })().catch(() => {});
   };
 
   const handleRestoreNote = (noteId: string) => {
     void (async () => {
       if (
-        deps.archiveNoteMutation.isPending ||
-        deps.restoreNoteMutation.isPending ||
-        deps.deleteNotePermanentlyMutation.isPending
+        archiveNotePending ||
+        restoreNotePending ||
+        deleteNotePermanentlyPending
       ) {
         return;
       }
 
-      await deps.restoreNoteMutation.mutateAsync(noteId);
+      await mutateRestoreNote(noteId);
     })().catch(() => {});
   };
 
   const handleTrashNote = (noteId: string) => {
     void (async () => {
-      if (
-        deps.trashNoteMutation.isPending ||
-        deps.deleteNotePermanentlyMutation.isPending
-      ) {
+      if (trashNotePending || deleteNotePermanentlyPending) {
         return;
       }
 
-      if (noteId === deps.selectedNoteId) {
-        deps.draftControl.discardPendingSave();
+      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+        discardPendingSave();
       }
 
-      await deps.trashNoteMutation.mutateAsync(noteId);
+      await mutateTrashNote(noteId);
     })().catch(() => {});
   };
 
   const handleRestoreFromTrash = (noteId: string) => {
     void (async () => {
-      if (
-        deps.restoreFromTrashMutation.isPending ||
-        deps.deleteNotePermanentlyMutation.isPending
-      ) {
+      if (restoreFromTrashPending || deleteNotePermanentlyPending) {
         return;
       }
 
-      await deps.restoreFromTrashMutation.mutateAsync(noteId);
+      await mutateRestoreFromTrash(noteId);
     })().catch(() => {});
   };
 
   const handleDeleteNotePermanently = (noteId: string) => {
     void (async () => {
       if (
-        deps.trashNoteMutation.isPending ||
-        deps.restoreFromTrashMutation.isPending ||
-        deps.deleteNotePermanentlyMutation.isPending
+        trashNotePending ||
+        restoreFromTrashPending ||
+        deleteNotePermanentlyPending
       ) {
         return;
       }
 
-      if (noteId === deps.selectedNoteId) {
-        deps.draftControl.discardPendingSave();
+      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+        discardPendingSave();
       }
 
-      await deps.deleteNotePermanentlyMutation.mutateAsync(noteId);
+      await mutateDeleteNotePermanently(noteId);
     })().catch(() => {});
   };
 
   const handleEmptyTrash = () => {
-    deps.emptyTrashMutation.mutate();
+    emptyTrash();
   };
 
   const handleSetNotePinned = (noteId: string, pinned: boolean) => {
@@ -140,8 +152,8 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
       return;
     }
 
-    const mutation = pinned ? deps.pinNoteMutation : deps.unpinNoteMutation;
-    void mutation.mutateAsync(noteId).catch(() => {});
+    const mutateNotePinned = pinned ? mutatePinNote : mutateUnpinNote;
+    void mutateNotePinned(noteId).catch(() => {});
   };
 
   const handleSetNoteReadonly = (noteId: string, readonly: boolean) => {
@@ -150,11 +162,11 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     }
 
     void (async () => {
-      if (noteId === deps.selectedNoteId) {
-        await deps.draftControl.flushCurrentDraftAsync();
+      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+        await flushCurrentDraftAsync();
       }
 
-      await deps.setNoteReadonlyMutation.mutateAsync({
+      await mutateSetNoteReadonly({
         noteId,
         readonly,
       });
@@ -167,19 +179,21 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     }
 
     void (async () => {
-      if (noteId === deps.selectedNoteId) {
-        await deps.draftControl.flushCurrentDraftAsync();
+      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+        await flushCurrentDraftAsync();
       }
 
-      await deps.duplicateNoteMutation.mutateAsync(noteId);
+      await mutateDuplicateNote(noteId);
     })().catch(() => {});
   };
 
   const handleCopyNoteContent = (noteId: string) => {
     void (async () => {
       try {
-        if (noteId === deps.selectedNoteId && deps.draftNoteId === noteId) {
-          await writeText(deps.draftMarkdown);
+        const { draftMarkdown, draftNoteId } = useShellDraftStore.getState();
+        const { selectedNoteId } = useShellNavigationStore.getState();
+        if (noteId === selectedNoteId && draftNoteId === noteId) {
+          await writeText(draftMarkdown);
           return;
         }
 
@@ -197,27 +211,29 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
   const handleExportNotes = () => {
     void (async () => {
       try {
+        const { activeTagPath, noteFilter, tagViewActive } =
+          useShellNavigationStore.getState();
         const selected = await open({
           directory: true,
           title:
-            deps.tagViewActive && deps.activeTagPath
-              ? `Export ${deps.activeTagPath}`
+            tagViewActive && activeTagPath
+              ? `Export ${activeTagPath}`
               : "Export notes",
         });
         if (!selected) return;
-        await deps.draftControl.flushCurrentDraftAsync();
+        await flushCurrentDraftAsync();
 
         const count = await exportNotes(
-          deps.tagViewActive && deps.activeTagPath
+          tagViewActive && activeTagPath
             ? {
                 exportMode: "tag",
-                tagPath: deps.activeTagPath,
+                tagPath: activeTagPath,
                 preserveTags: true,
                 exportDir: selected,
               }
             : {
                 exportMode: "note_filter",
-                noteFilter: deps.noteFilter,
+                noteFilter,
                 preserveTags: true,
                 exportDir: selected,
               },
@@ -241,13 +257,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
         });
         if (!selected) return;
 
-        if (
-          deps.currentNote &&
-          deps.draftNoteId === deps.currentNote.id &&
-          matchesTagScope(deps.currentNote.tags, tagPath)
-        ) {
-          await deps.draftControl.flushCurrentDraftAsync();
-        }
+        await flushCurrentDraftAsync();
 
         const count = await exportNotes({
           exportMode: "tag",

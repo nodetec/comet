@@ -3,7 +3,6 @@ import { type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { toastErrorHandler } from "@/shared/lib/mutation-utils";
-import { shellStore } from "@/features/shell/store/use-shell-store";
 import {
   deleteTag,
   loadNote,
@@ -14,14 +13,11 @@ import {
 import type { LoadedNote, WikiLinkResolutionInput } from "@/shared/api/types";
 import { canonicalizeTagPath } from "@/features/editor/lib/tags";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
+import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 
 export interface TagOperationsDeps {
   draftControl: DraftControl;
-  currentNote: LoadedNote | undefined;
-  isCurrentNoteConflicted: boolean;
-  draftNoteId: string | null;
-  selectedNoteId: string | null;
-  activeTagPath: string | null;
   queryClient: QueryClient;
   invalidateNotes: () => Promise<void>;
   invalidateContextualTags: () => Promise<void>;
@@ -43,17 +39,40 @@ export interface TagOperationsDeps {
 
 export function useTagOperations(deps: TagOperationsDeps) {
   const [isTagMutationPending, setIsTagMutationPending] = useState(false);
+  const { flushCurrentDraftAsync } = deps.draftControl;
+
+  const getSelectedNoteContext = () => {
+    const { draftNoteId } = useShellDraftStore.getState();
+    const { selectedNoteId, activeTagPath } =
+      useShellNavigationStore.getState();
+    const noteId = selectedNoteId;
+    const currentNote = noteId
+      ? deps.queryClient.getQueryData<LoadedNote>(["note", noteId])
+      : undefined;
+    const currentNoteConflict = noteId
+      ? deps.queryClient.getQueryData<{ snapshotCount: number } | null>([
+          "note-conflict",
+          noteId,
+        ])
+      : undefined;
+
+    return {
+      activeTagPath,
+      currentNote,
+      draftNoteId,
+      isCurrentNoteConflicted: (currentNoteConflict?.snapshotCount ?? 0) > 1,
+      selectedNoteId: noteId,
+    };
+  };
 
   const syncSelectedNoteAfterTagRewrite = async (affectedNoteIds: string[]) => {
-    if (
-      !deps.selectedNoteId ||
-      !affectedNoteIds.includes(deps.selectedNoteId)
-    ) {
+    const { selectedNoteId } = useShellNavigationStore.getState();
+    if (!selectedNoteId || !affectedNoteIds.includes(selectedNoteId)) {
       await deps.queryClient.invalidateQueries({ queryKey: ["note"] });
       return;
     }
 
-    const refreshedNote = await loadNote(deps.selectedNoteId);
+    const refreshedNote = await loadNote(selectedNoteId);
     deps.queryClient.setQueryData(["note", refreshedNote.id], refreshedNote);
     deps.setDraft(refreshedNote.id, refreshedNote.markdown, {
       wikilinkResolutions: refreshedNote.wikilinkResolutions,
@@ -73,10 +92,16 @@ export function useTagOperations(deps: TagOperationsDeps) {
       setIsTagMutationPending(true);
 
       try {
+        const {
+          activeTagPath,
+          currentNote,
+          draftNoteId,
+          isCurrentNoteConflicted,
+        } = getSelectedNoteContext();
         if (
-          deps.currentNote &&
-          deps.isCurrentNoteConflicted &&
-          deps.currentNote.tags.includes(fromPath)
+          currentNote &&
+          isCurrentNoteConflicted &&
+          currentNote.tags.includes(fromPath)
         ) {
           toast.error(
             "Resolve the current note conflict before renaming this tag.",
@@ -88,17 +113,17 @@ export function useTagOperations(deps: TagOperationsDeps) {
         }
 
         if (
-          deps.currentNote &&
-          deps.draftNoteId === deps.currentNote.id &&
-          deps.currentNote.tags.includes(fromPath)
+          currentNote &&
+          draftNoteId === currentNote.id &&
+          currentNote.tags.includes(fromPath)
         ) {
-          await deps.draftControl.flushCurrentDraftAsync();
+          await flushCurrentDraftAsync();
         }
 
         const affectedNoteIds = await renameTag({ fromPath, toPath });
         const nextPath = canonicalizeTagPath(toPath) ?? toPath;
         deps.setActiveTagPath(
-          deps.activeTagPath === fromPath ? nextPath : deps.activeTagPath,
+          activeTagPath === fromPath ? nextPath : activeTagPath,
         );
 
         await Promise.all([
@@ -125,10 +150,16 @@ export function useTagOperations(deps: TagOperationsDeps) {
       setIsTagMutationPending(true);
 
       try {
+        const {
+          activeTagPath,
+          currentNote,
+          draftNoteId,
+          isCurrentNoteConflicted,
+        } = getSelectedNoteContext();
         if (
-          deps.currentNote &&
-          deps.isCurrentNoteConflicted &&
-          deps.currentNote.tags.includes(path)
+          currentNote &&
+          isCurrentNoteConflicted &&
+          currentNote.tags.includes(path)
         ) {
           toast.error(
             "Resolve the current note conflict before deleting this tag.",
@@ -140,16 +171,16 @@ export function useTagOperations(deps: TagOperationsDeps) {
         }
 
         if (
-          deps.currentNote &&
-          deps.draftNoteId === deps.currentNote.id &&
-          deps.currentNote.tags.includes(path)
+          currentNote &&
+          draftNoteId === currentNote.id &&
+          currentNote.tags.includes(path)
         ) {
-          await deps.draftControl.flushCurrentDraftAsync();
+          await flushCurrentDraftAsync();
         }
 
         const affectedNoteIds = await deleteTag({ path });
-        if (deps.activeTagPath === path) {
-          shellStore.getState().actions.clearActiveTagPath();
+        if (activeTagPath === path) {
+          useShellNavigationStore.getState().actions.clearActiveTagPath();
         }
 
         await Promise.all([

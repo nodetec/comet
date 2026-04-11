@@ -1,14 +1,16 @@
-import type { RefObject } from "react";
+import { type RefObject } from "react";
+import { type QueryClient } from "@tanstack/react-query";
 
-import type { LoadedNote, WikiLinkResolutionInput } from "@/shared/api/types";
+import type {
+  LoadedNote,
+  NoteConflictInfo,
+  WikiLinkResolutionInput,
+} from "@/shared/api/types";
+import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
+import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export interface DraftControlDeps {
-  currentNote: LoadedNote | undefined;
-  draftNoteId: string | null;
-  draftMarkdown: string;
-  draftWikilinkResolutions: WikiLinkResolutionInput[];
-  isCurrentNoteConflicted: boolean;
-  hasPendingWikilinkResolutionChanges: boolean;
+  queryClient: QueryClient;
   pendingSaveTimeoutRef: RefObject<number | null>;
   saveNoteMutation: {
     mutate: (input: {
@@ -25,25 +27,64 @@ export interface DraftControlDeps {
 }
 
 export function useDraftControl(deps: DraftControlDeps) {
-  const flushCurrentDraft = () => {
-    const {
-      currentNote,
+  const { mutate, mutateAsync } = deps.saveNoteMutation;
+
+  const getCurrentDraftState = () => {
+    const { draftMarkdown, draftNoteId, draftWikilinkResolutions } =
+      useShellDraftStore.getState();
+    if (!draftNoteId) {
+      return null;
+    }
+
+    const currentNote = deps.queryClient.getQueryData<LoadedNote>([
+      "note",
       draftNoteId,
+    ]);
+    if (!currentNote || draftNoteId !== currentNote.id) {
+      return null;
+    }
+
+    const noteConflict =
+      deps.queryClient.getQueryData<NoteConflictInfo | null>([
+        "note-conflict",
+        draftNoteId,
+      ]) ?? null;
+    const isCurrentNoteConflicted = (noteConflict?.snapshotCount ?? 0) > 1;
+    const hasPendingWikilinkResolutionChanges = !haveSameWikilinkResolutions(
+      draftWikilinkResolutions,
+      currentNote.wikilinkResolutions,
+    );
+
+    return {
+      currentNote,
       draftMarkdown,
       draftWikilinkResolutions,
-    } = deps;
+      hasPendingWikilinkResolutionChanges,
+      isCurrentNoteConflicted,
+    };
+  };
 
-    if (!currentNote || draftNoteId !== currentNote.id) {
+  const flushCurrentDraft = () => {
+    const draftState = getCurrentDraftState();
+    if (!draftState) {
       return;
     }
 
-    if (deps.isCurrentNoteConflicted) {
+    const {
+      currentNote,
+      draftMarkdown,
+      draftWikilinkResolutions,
+      hasPendingWikilinkResolutionChanges,
+      isCurrentNoteConflicted,
+    } = draftState;
+
+    if (isCurrentNoteConflicted) {
       return;
     }
 
     if (
       draftMarkdown === currentNote.markdown &&
-      !deps.hasPendingWikilinkResolutionChanges
+      !hasPendingWikilinkResolutionChanges
     ) {
       return;
     }
@@ -53,7 +94,7 @@ export function useDraftControl(deps: DraftControlDeps) {
       deps.pendingSaveTimeoutRef.current = null;
     }
 
-    deps.saveNoteMutation.mutate({
+    mutate({
       id: currentNote.id,
       markdown: draftMarkdown,
       wikilinkResolutions: draftWikilinkResolutions,
@@ -61,24 +102,26 @@ export function useDraftControl(deps: DraftControlDeps) {
   };
 
   const flushCurrentDraftAsync = async (): Promise<LoadedNote | undefined> => {
-    const {
-      currentNote,
-      draftNoteId,
-      draftMarkdown,
-      draftWikilinkResolutions,
-    } = deps;
-
-    if (!currentNote || draftNoteId !== currentNote.id) {
+    const draftState = getCurrentDraftState();
+    if (!draftState) {
       return undefined;
     }
 
-    if (deps.isCurrentNoteConflicted) {
+    const {
+      currentNote,
+      draftMarkdown,
+      draftWikilinkResolutions,
+      hasPendingWikilinkResolutionChanges,
+      isCurrentNoteConflicted,
+    } = draftState;
+
+    if (isCurrentNoteConflicted) {
       return undefined;
     }
 
     if (
       draftMarkdown === currentNote.markdown &&
-      !deps.hasPendingWikilinkResolutionChanges
+      !hasPendingWikilinkResolutionChanges
     ) {
       return undefined;
     }
@@ -88,7 +131,7 @@ export function useDraftControl(deps: DraftControlDeps) {
       deps.pendingSaveTimeoutRef.current = null;
     }
 
-    const response = await deps.saveNoteMutation.mutateAsync({
+    const response = await mutateAsync({
       id: currentNote.id,
       markdown: draftMarkdown,
       wikilinkResolutions: draftWikilinkResolutions,

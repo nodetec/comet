@@ -21,9 +21,9 @@ import {
   useFocusedPane,
   useNoteFilter,
   useSearchQuery,
-  useShellActions,
   useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 import {
   type FocusNotesPaneDetail,
   FOCUS_NOTES_PANE_EVENT,
@@ -99,7 +99,8 @@ export function NotesPane({
   const noteFilter = tagViewActive ? "all" : storeNoteFilter;
   const searchQuery = useSearchQuery();
   const creatingNoteId = useCreatingSelectedNoteId();
-  const { setSearchQuery: onChangeSearch } = useShellActions();
+  const { setFocusedPane, setSearchQuery: onChangeSearch } =
+    useShellNavigationStore((state) => state.actions);
   const { setNoteSortPrefs } = useUIActions();
 
   const sortViewKey = noteFilter;
@@ -113,7 +114,6 @@ export function NotesPane({
     setNoteSortPrefs(sortViewKey, { direction });
 
   const focusedPane = useFocusedPane();
-  const { setFocusedPane } = useShellActions();
   const sidebarVisible = useSidebarVisible();
   const isArchive = noteFilter === "archive";
   const isTrash = noteFilter === "trash";

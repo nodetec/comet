@@ -1,9 +1,7 @@
-import type { LoadedNote, NoteFilter } from "@/shared/api/types";
+import { type QueryClient } from "@tanstack/react-query";
+import type { LoadedNote } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import {
-  shellStore,
-  useShellActions,
-} from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 
 export function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
@@ -19,41 +17,44 @@ type CreateNoteMutation = {
 };
 
 export interface ViewNavigationDeps {
-  activeTagPath: string | null;
-  tagViewActive: boolean;
-  noteFilter: NoteFilter;
-  effectiveNoteFilter: NoteFilter;
-  selectedNoteId: string | null;
-  currentNote: LoadedNote | undefined;
-  isCreatingNote: boolean;
+  queryClient: QueryClient;
   draftControl: DraftControl;
   createNoteMutation: CreateNoteMutation;
 }
 
 export function useViewNavigation(deps: ViewNavigationDeps) {
-  const {
-    activeTagPath,
-    tagViewActive,
-    noteFilter,
-    effectiveNoteFilter,
-    selectedNoteId,
-    currentNote,
-    isCreatingNote,
-    draftControl,
-    createNoteMutation,
-  } = deps;
-
-  const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
+  const { draftControl, createNoteMutation, queryClient } = deps;
   const {
     navigateToFilter,
     navigateToDisposedFilter,
     navigateToTagPath,
     navigateToNote,
     prepareNoteCreation,
+    setFocusedPane,
     setNoteFilter,
-  } = useShellActions();
+  } = useShellNavigationStore((state) => state.actions);
+
+  const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
+  const createNotePending = createNoteMutation.isPending;
+  const mutateCreateNote = createNoteMutation.mutate;
+
+  const getCurrentNote = (): LoadedNote | undefined => {
+    const { selectedNoteId } = useShellNavigationStore.getState();
+    if (!selectedNoteId) {
+      return undefined;
+    }
+
+    return queryClient.getQueryData<LoadedNote>(["note", selectedNoteId]);
+  };
 
   const handleCreateNote = () => {
+    const {
+      activeTagPath,
+      isCreatingNoteTransition,
+      noteFilter,
+      tagViewActive,
+    } = useShellNavigationStore.getState();
+    const isCreatingNote = isCreatingNoteTransition || createNotePending;
     if (isCreatingNote) {
       return;
     }
@@ -61,6 +62,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     flushCurrentDraft();
     const tagsForNewNote =
       tagViewActive && activeTagPath ? [activeTagPath] : [];
+    const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
     if (
       !tagViewActive &&
       noteFilter !== "today" &&
@@ -71,30 +73,32 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
       setNoteFilter("all");
     }
     prepareNoteCreation();
-    createNoteMutation.mutate({
+    mutateCreateNote({
       tags: tagsForNewNote,
       markdown: effectiveNoteFilter === "todo" ? "- [ ] " : "# ",
     });
   };
 
   const handleSelectAll = () => {
-    withFlushedCurrentDraft(() => navigateToFilter("all", currentNote));
+    withFlushedCurrentDraft(() => navigateToFilter("all", getCurrentNote()));
   };
 
   const handleSelectToday = () => {
-    withFlushedCurrentDraft(() => navigateToFilter("today", currentNote));
+    withFlushedCurrentDraft(() => navigateToFilter("today", getCurrentNote()));
   };
 
   const handleSelectTodo = () => {
-    withFlushedCurrentDraft(() => navigateToFilter("todo", currentNote));
+    withFlushedCurrentDraft(() => navigateToFilter("todo", getCurrentNote()));
   };
 
   const handleSelectPinned = () => {
-    withFlushedCurrentDraft(() => navigateToFilter("pinned", currentNote));
+    withFlushedCurrentDraft(() => navigateToFilter("pinned", getCurrentNote()));
   };
 
   const handleSelectUntagged = () => {
-    withFlushedCurrentDraft(() => navigateToFilter("untagged", currentNote));
+    withFlushedCurrentDraft(() =>
+      navigateToFilter("untagged", getCurrentNote()),
+    );
   };
 
   const handleSelectArchive = () => {
@@ -106,18 +110,20 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
   };
 
   const handleSelectTagPath = (tagPath: string) => {
+    const { activeTagPath, tagViewActive } = useShellNavigationStore.getState();
     if (tagViewActive && activeTagPath === tagPath) {
       return;
     }
 
     withFlushedCurrentDraft((savedNote) => {
-      navigateToTagPath(tagPath, savedNote ?? currentNote);
+      navigateToTagPath(tagPath, savedNote ?? getCurrentNote());
     });
   };
 
   const handleSelectNote = (noteId: string) => {
+    const { selectedNoteId } = useShellNavigationStore.getState();
     if (noteId === selectedNoteId) {
-      shellStore.setState({ focusedPane: "notes" });
+      setFocusedPane("notes");
       return;
     }
 

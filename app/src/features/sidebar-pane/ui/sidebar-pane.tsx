@@ -25,9 +25,9 @@ import {
   useActiveTagPath,
   useFocusedPane,
   useNoteFilter,
-  useShellActions,
   useTagViewActive,
 } from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 import {
   FOCUS_TAG_PATH_EVENT,
   type FocusTagPathDetail,
@@ -174,7 +174,7 @@ export function SidebarPane({
   const noteFilter = useNoteFilter();
   const focusedPane = useFocusedPane();
   const isFocused = focusedPane === "sidebar";
-  const { setFocusedPane } = useShellActions();
+  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
 
   const withSidebarFocus = (fn: () => void) => () => {
     setFocusedPane("sidebar");

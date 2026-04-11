@@ -14,7 +14,7 @@ import {
   useShowEditorToolbar,
   useUIActions,
 } from "@/features/settings/store/use-ui-store";
-import { useShellActions } from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import {
@@ -132,7 +132,7 @@ export function EditorPane({
   const editorSpellCheck = useEditorSpellCheck();
   const editorVimMode = useEditorVimMode();
   const { setShowEditorToolbar: setShowToolbar } = useUIActions();
-  const { setFocusedPane } = useShellActions();
+  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.snapshotCount ?? 0) > 1;
   const viewableConflictSnapshots =

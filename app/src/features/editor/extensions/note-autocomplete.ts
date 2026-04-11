@@ -29,7 +29,7 @@ import {
   matchWikiLinkCompletionAtCursor,
   utf8ByteOffsetForText,
 } from "@/features/editor/lib/wikilinks";
-import { shellStore } from "@/features/shell/store/use-shell-store";
+import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
 import { searchNoteTitles } from "@/shared/api/invoke";
 
 const TAG_COMPLETION_TEXT_RE = /^[-/\p{L}\p{N}_]*$/u;
@@ -231,7 +231,7 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
                 console.debug(
                   "[wikilinks] autocomplete selected wikilink target",
                   {
-                    draftNoteId: shellStore.getState().draftNoteId,
+                    draftNoteId: useShellDraftStore.getState().draftNoteId,
                     occurrenceId,
                     location,
                     noteId,
@@ -239,7 +239,7 @@ function buildWikiLinkCompletionSource(noteId: string | null) {
                     title: result.title,
                   },
                 );
-                shellStore
+                useShellDraftStore
                   .getState()
                   .actions.upsertDraftWikilinkResolution(noteId, {
                     occurrenceId,

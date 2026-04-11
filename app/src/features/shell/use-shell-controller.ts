@@ -1,109 +1,57 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { errorMessage } from "@/shared/lib/utils";
-import {
-  useActiveTagPath,
-  useCreatingSelectedNoteId,
-  useDraftMarkdown,
-  useDraftNoteId,
-  useDraftWikilinkResolutions,
-  useIsCreatingNoteTransition,
-  useNoteFilter,
-  usePendingAutoFocusEditorNoteId,
-  useSearchQuery,
-  useSelectedNoteId,
-  useShellActions,
-  useTagViewActive,
-} from "@/features/shell/store/use-shell-store";
-import {
-  defaultNoteSortPrefs,
-  useNoteSortPrefs,
-} from "@/features/settings/store/use-ui-store";
 
-import {
-  type PublishNoteInput,
-  type PublishShortNoteInput,
-} from "@/shared/api/types";
 import { usePublishState } from "@/features/publishing";
-
-import { useNoteQueries } from "@/features/notes-pane/hooks/use-note-queries";
-import { useNoteMutations } from "@/features/notes-pane/hooks/use-note-mutations";
-import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
-import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
 import { useConflictResolution } from "@/features/shell/hooks/use-conflict-resolution";
+import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
+import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";
+import { useEditorPaneModel } from "@/features/shell/hooks/use-editor-pane-model";
 import { useNoteHistoryDialog } from "@/features/shell/hooks/use-note-history-dialog";
+import { useNotesPaneModel } from "@/features/shell/hooks/use-notes-pane-model";
 import { useNoteOperations } from "@/features/shell/hooks/use-note-operations";
+import { useShellData } from "@/features/shell/hooks/use-shell-data";
+import { useShellDerivedState } from "@/features/shell/hooks/use-shell-derived-state";
+import { useShellDialogModels } from "@/features/shell/hooks/use-shell-dialog-models";
 import { useShellEffects } from "@/features/shell/hooks/use-shell-effects";
+import { useShellStoreState } from "@/features/shell/hooks/use-shell-store-state";
+import { useSidebarPaneModel } from "@/features/shell/hooks/use-sidebar-pane-model";
 import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
 import { useViewNavigation } from "@/features/shell/hooks/use-view-navigation";
-import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
+import { errorMessage } from "@/shared/lib/utils";
 
 export function useShellController() {
   const [hasHydratedInitialSelection, setHasHydratedInitialSelection] =
     useState(false);
   const [syncEditorRevision, setSyncEditorRevision] = useState(0);
-
-  const publish = usePublishState();
-  const {
-    deletePublishDialogOpen,
-    deletePublishedNoteMutation,
-    publishDialogOpen,
-    publishNoteMutation,
-    publishShortNoteDialogOpen,
-    publishShortNoteMutation,
-    setDeletePublishDialogOpen,
-    setPublishDialogOpen,
-    setPublishShortNoteDialogOpen,
-  } = publish;
-  const {
-    isPending: isDeletePublishedNotePending,
-    mutate: mutateDeletePublishedNote,
-  } = deletePublishedNoteMutation;
-  const { isPending: isPublishNotePending, mutate: mutatePublishNote } =
-    publishNoteMutation;
-  const {
-    isPending: isPublishShortNotePending,
-    mutate: mutatePublishShortNote,
-  } = publishShortNoteMutation;
   const pendingSaveTimeoutRef = useRef<number | null>(null);
   const isSavingRef = useRef(false);
 
   const queryClient = useQueryClient();
-  const activeTagPath = useActiveTagPath();
-  const creatingSelectedNoteId = useCreatingSelectedNoteId();
-  const draftMarkdown = useDraftMarkdown();
-  const draftNoteId = useDraftNoteId();
-  const draftWikilinkResolutions = useDraftWikilinkResolutions();
-  const isCreatingNoteTransition = useIsCreatingNoteTransition();
-  const noteFilter = useNoteFilter();
-  const searchQuery = useSearchQuery();
-  const pendingAutoFocusEditorNoteId = usePendingAutoFocusEditorNoteId();
-  const selectedNoteId = useSelectedNoteId();
-  const tagViewActive = useTagViewActive();
-  const {
-    clearDraftWikilinkResolutions,
-    setActiveTagPath,
-    setDraft,
-    setNoteFilter,
-    setPendingAutoFocusEditorNoteId,
-    setSelectedNoteId,
-    setTagViewActive,
-  } = useShellActions();
+  const shellState = useShellStoreState();
 
-  const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
-  const allSortPrefs = useNoteSortPrefs();
-  const sortPrefs = allSortPrefs[effectiveNoteFilter] ?? defaultNoteSortPrefs;
-  const noteSortField = sortPrefs.field;
-  const noteSortDirection = sortPrefs.direction;
-
-  const bumpSyncEditorRevision = (
-    _reason: string,
-    _details: Record<string, unknown> = {},
-  ) => {
+  const bumpSyncEditorRevision = () => {
     setSyncEditorRevision((value) => value + 1);
   };
 
-  // --- Queries ---
+  const data = useShellData({
+    activeTagPath: shellState.activeTagPath,
+    clearDraftWikilinkResolutions: shellState.clearDraftWikilinkResolutions,
+    currentNotesSelectionId: shellState.selectedNoteId,
+    draftMarkdown: shellState.draftMarkdown,
+    draftNoteId: shellState.draftNoteId,
+    effectiveNoteFilter: shellState.effectiveNoteFilter,
+    isSavingRef,
+    noteFilter: shellState.noteFilter,
+    queryClient,
+    searchQuery: shellState.searchQuery,
+    setDraft: shellState.setDraft,
+    setNoteFilter: shellState.setNoteFilter,
+    setSelectedNoteId: shellState.setSelectedNoteId,
+    sortField: shellState.sortPrefs.field,
+    sortDirection: shellState.sortPrefs.direction,
+    tagViewActive: shellState.tagViewActive,
+  });
+
   const {
     bootstrapQuery,
     todoCountQuery,
@@ -118,18 +66,6 @@ export function useShellController() {
     totalNoteCount,
     activeNpub,
     initialSelectedNoteId,
-  } = useNoteQueries({
-    noteFilter,
-    activeTagPath,
-    tagViewActive,
-    searchQuery,
-    sortField: noteSortField,
-    sortDirection: noteSortDirection,
-    selectedNoteId,
-  });
-
-  // --- Mutations ---
-  const {
     createNoteMutation,
     saveNoteMutation,
     duplicateNoteMutation,
@@ -144,75 +80,52 @@ export function useShellController() {
     setNoteReadonlyMutation,
     invalidateNotes,
     invalidateContextualTags,
-  } = useNoteMutations({
-    queryClient,
-    currentNotes,
-    selectedNoteId,
-    draftNoteId,
-    draftMarkdown,
-    noteFilter: effectiveNoteFilter,
-    activeNpub,
-    isSavingRef,
-    clearDraftWikilinkResolutions,
-    setSelectedNoteId,
-    setDraft,
-    setNoteFilter,
-  });
-
+  } = data;
   const { isPending: saveNotePending, mutate: mutateSaveNote } =
     saveNoteMutation;
 
-  const currentNote = selectedNoteId ? noteQuery.data : undefined;
-  const currentNoteId = currentNote?.id ?? null;
-  const currentNoteConflict = selectedNoteId
-    ? noteConflictQuery.data
-    : undefined;
-  const currentNoteHistory = selectedNoteId ? noteHistoryQuery.data : undefined;
-  const isCurrentNoteConflicted = (currentNoteConflict?.snapshotCount ?? 0) > 1;
-  const hasPendingWikilinkResolutionChanges = currentNote
-    ? !haveSameWikilinkResolutions(
-        draftWikilinkResolutions,
-        currentNote.wikilinkResolutions,
-      )
-    : draftWikilinkResolutions.length > 0;
-  const readyToRevealWindow =
-    bootstrapQuery.isError ||
-    (bootstrapQuery.isSuccess &&
-      hasHydratedInitialSelection &&
-      (!selectedNoteId || currentNote?.id === selectedNoteId));
-  const isCreatingNote =
-    isCreatingNoteTransition || createNoteMutation.isPending;
-  const displayedSelectedNoteId = isCreatingNote
-    ? creatingSelectedNoteId
-    : selectedNoteId;
-  let currentEditorMarkdown = "";
-  if (currentNote) {
-    currentEditorMarkdown =
-      draftNoteId === currentNote.id ? draftMarkdown : currentNote.markdown;
-  }
-
-  // --- Draft control ---
-  const draftControl = useDraftControl({
+  const derivedState = useShellDerivedState({
+    bootstrapQuery,
+    createNotePending: createNoteMutation.isPending,
+    creatingSelectedNoteId: shellState.creatingSelectedNoteId,
+    currentNoteQueryData: noteQuery.data,
+    draftMarkdown: shellState.draftMarkdown,
+    draftNoteId: shellState.draftNoteId,
+    draftWikilinkResolutions: shellState.draftWikilinkResolutions,
+    hasHydratedInitialSelection,
+    isCreatingNoteTransition: shellState.isCreatingNoteTransition,
+    noteConflictQueryData: noteConflictQuery.data,
+    noteHistoryQueryData: noteHistoryQuery.data,
+    selectedNoteId: shellState.selectedNoteId,
+  });
+  const {
     currentNote,
-    draftNoteId,
-    draftMarkdown,
-    draftWikilinkResolutions,
-    isCurrentNoteConflicted,
+    currentNoteId,
+    currentNoteConflict,
+    currentNoteHistory,
+    currentEditorMarkdown,
+    displayedSelectedNoteId,
     hasPendingWikilinkResolutionChanges,
+    isCreatingNote,
+    isCurrentNoteConflicted,
+    readyToRevealWindow,
+  } = derivedState;
+
+  const draftControl = useDraftControl({
+    queryClient,
     pendingSaveTimeoutRef,
     saveNoteMutation,
   });
   const { flushCurrentDraft, flushCurrentDraftAsync } = draftControl;
 
-  // --- Draft persistence ---
   useDraftPersistence({
     activeNpub,
     bootstrapNpub: bootstrapQuery.data?.npub,
     bootstrapReady: bootstrapQuery.isSuccess,
     currentNote,
-    draftNoteId,
-    draftMarkdown,
-    draftWikilinkResolutions,
+    draftNoteId: shellState.draftNoteId,
+    draftMarkdown: shellState.draftMarkdown,
+    draftWikilinkResolutions: shellState.draftWikilinkResolutions,
     isCurrentNoteConflicted,
     saveNotePending,
     mutateSaveNote,
@@ -220,19 +133,41 @@ export function useShellController() {
     queryClient,
   });
 
-  // --- Conflict resolution ---
+  const publishState = usePublishState();
+  const {
+    deletePublishDialogOpen,
+    deletePublishedNoteMutation,
+    publishDialogOpen,
+    publishNoteMutation,
+    publishShortNoteDialogOpen,
+    publishShortNoteMutation,
+    setDeletePublishDialogOpen,
+    setPublishDialogOpen,
+    setPublishShortNoteDialogOpen,
+  } = publishState;
+  const {
+    isPending: isDeletePublishedNotePending,
+    mutate: mutateDeletePublishedNote,
+  } = deletePublishedNoteMutation;
+  const { isPending: isPublishNotePending, mutate: mutatePublishNote } =
+    publishNoteMutation;
+  const {
+    isPending: isPublishShortNotePending,
+    mutate: mutatePublishShortNote,
+  } = publishShortNoteMutation;
+
   const conflictResolution = useConflictResolution({
     currentNote,
     currentNoteConflict,
     isCurrentNoteConflicted,
-    draftNoteId,
-    draftMarkdown,
-    draftWikilinkResolutions,
+    draftNoteId: shellState.draftNoteId,
+    draftMarkdown: shellState.draftMarkdown,
+    draftWikilinkResolutions: shellState.draftWikilinkResolutions,
     hasPendingWikilinkResolutionChanges,
-    selectedNoteId,
+    selectedNoteId: shellState.selectedNoteId,
     pendingSaveTimeoutRef,
     queryClient,
-    setDraft,
+    setDraft: shellState.setDraft,
     bumpSyncEditorRevision,
   });
   const {
@@ -243,7 +178,6 @@ export function useShellController() {
     setChooseConflictNoteId,
   } = conflictResolution;
 
-  // --- Note history dialog ---
   const noteHistory = useNoteHistoryDialog({
     draftControl,
     currentNoteId,
@@ -251,7 +185,7 @@ export function useShellController() {
     isCurrentNoteConflicted,
     queryClient,
     saveNoteMutation,
-    setDraft,
+    setDraft: shellState.setDraft,
   });
   const {
     noteHistoryDialogOpen,
@@ -261,17 +195,10 @@ export function useShellController() {
     setUserHistorySnapshotId,
   } = noteHistory;
 
-  // --- Note operations ---
   const noteOps = useNoteOperations({
     draftControl,
-    selectedNoteId,
-    draftNoteId,
-    draftMarkdown,
     queryClient,
-    activeTagPath,
-    tagViewActive,
-    noteFilter: effectiveNoteFilter,
-    currentNote,
+    currentNotes,
     archiveNoteMutation,
     restoreNoteMutation,
     trashNoteMutation,
@@ -284,32 +211,19 @@ export function useShellController() {
     setNoteReadonlyMutation,
   });
 
-  // --- Tag operations ---
   const tagOps = useTagOperations({
     draftControl,
-    currentNote,
-    isCurrentNoteConflicted,
-    draftNoteId,
-    selectedNoteId,
-    activeTagPath,
     queryClient,
     invalidateNotes,
     invalidateContextualTags,
-    setDraft,
-    setActiveTagPath,
-    setTagViewActive,
+    setDraft: shellState.setDraft,
+    setActiveTagPath: shellState.setActiveTagPath,
+    setTagViewActive: shellState.setTagViewActive,
     bumpSyncEditorRevision,
   });
 
-  // --- View navigation ---
   const viewNav = useViewNavigation({
-    activeTagPath,
-    tagViewActive,
-    noteFilter,
-    effectiveNoteFilter,
-    selectedNoteId,
-    currentNote,
-    isCreatingNote,
+    queryClient,
     draftControl,
     createNoteMutation,
   });
@@ -319,268 +233,155 @@ export function useShellController() {
     pendingSaveTimeoutRef,
     isSavingRef,
     bumpSyncEditorRevision,
-    activeTagPath,
+    activeTagPath: shellState.activeTagPath,
     availableTagPaths,
-    selectedNoteId,
-    draftNoteId,
+    selectedNoteId: shellState.selectedNoteId,
+    draftNoteId: shellState.draftNoteId,
     noteQueryData: noteQuery.data,
     noteQueryIsPlaceholderData: noteQuery.isPlaceholderData,
     bootstrapSuccess: bootstrapQuery.isSuccess,
     initialSelectedNoteId,
     hasHydratedInitialSelection,
-    isCreatingNoteTransition,
+    isCreatingNoteTransition: shellState.isCreatingNoteTransition,
     createNoteMutation,
-    setActiveTagPath,
-    setDraft,
-    setHasHydratedInitialSelection,
-    setSelectedNoteId,
-    tagViewActive,
-    noteFilter,
+    noteFilter: shellState.noteFilter,
+    tagViewActive: shellState.tagViewActive,
     isCreatingNote,
-    setTagViewActive,
+    setActiveTagPath: shellState.setActiveTagPath,
+    setDraft: shellState.setDraft,
+    setHasHydratedInitialSelection,
+    setSelectedNoteId: shellState.setSelectedNoteId,
+    setTagViewActive: shellState.setTagViewActive,
     flushCurrentDraft,
     flushCurrentDraftAsync,
     handleSelectTagPath: viewNav.handleSelectTagPath,
     handleSelectNote: viewNav.handleSelectNote,
   });
 
-  // --- Props assembly ---
-  const nextEditorPaneProps = {
-    availableTagPaths,
-    archivedAt: currentNote?.archivedAt ?? null,
-    autoFocusEditor: currentNoteId === pendingAutoFocusEditorNoteId,
-    backlinks: noteBacklinksQuery.data ?? [],
-    deletedAt: currentNote?.deletedAt ?? null,
-    markdown: currentEditorMarkdown,
-    modifiedAt: currentNote?.modifiedAt ?? 0,
-    noteConflict: currentNoteConflict ?? null,
-    noteId:
-      displayedSelectedNoteId || isCreatingNote
-        ? (currentNote?.id ?? null)
-        : null,
-    editorKey: currentNote ? `${currentNote.id}-${syncEditorRevision}` : null,
-    pinnedAt: currentNote?.pinnedAt ?? null,
-    publishedAt: currentNote?.publishedAt ?? null,
-    publishedKind: currentNote?.publishedKind ?? null,
-    readonly: currentNote?.readonly ?? false,
-    selectedConflictSnapshotId,
-    searchQuery,
+  const {
+    publishDialogProps,
+    publishShortNoteDialogProps,
+    deletePublishDialogProps,
+    chooseConflictDialogProps,
+    noteHistoryDialogProps,
+  } = useShellDialogModels({
+    chooseConflictDialogOpen,
+    currentEditorMarkdown,
+    currentNote,
+    currentNoteConflict,
+    currentNoteHistory,
+    currentNoteId,
+    deletePublishDialogOpen,
+    isCurrentNoteConflicted,
     isDeletePublishedNotePending,
+    isPublishNotePending,
+    isPublishShortNotePending,
     isResolveConflictPending,
-    onDeletePublishedNote() {
-      if (
-        !currentNote ||
-        isDeletePublishedNotePending ||
-        !currentNote.publishedAt
-      ) {
-        return;
-      }
+    isRestoreHistoryPending,
+    mutateDeletePublishedNote,
+    mutatePublishNote,
+    mutatePublishShortNote,
+    noteHistoryDialogOpen,
+    publishDialogOpen,
+    publishShortNoteDialogOpen,
+    selectedHistorySnapshotId,
+    setChooseConflictDialogOpen,
+    setChooseConflictNoteId,
+    setDeletePublishDialogOpen,
+    setNoteHistoryDialogOpen,
+    setPublishDialogOpen,
+    setPublishShortNoteDialogOpen,
+    setUserHistorySnapshotId,
+    handleResolveCurrentNoteConflict:
+      conflictResolution.handleResolveCurrentNoteConflict,
+    handleRestoreSelectedNoteHistorySnapshot:
+      noteHistory.handleRestoreSelectedNoteHistorySnapshot,
+    handleSelectNoteHistorySnapshot:
+      noteHistory.handleSelectNoteHistorySnapshot,
+  });
 
-      setDeletePublishDialogOpen(true);
-    },
-    onDuplicateNote() {
-      if (currentNote) {
-        noteOps.handleDuplicateNote(currentNote.id);
-      }
-    },
-    onAutoFocusEditorHandled() {
-      if (currentNoteId === pendingAutoFocusEditorNoteId) {
-        setPendingAutoFocusEditorNoteId(null);
-      }
-    },
-    onOpenPublishDialog() {
-      if (!currentNote || isPublishNotePending) {
-        return;
-      }
+  const editorPaneProps = useEditorPaneModel({
+    availableTagPaths,
+    currentEditorMarkdown,
+    currentNote,
+    currentNoteConflict,
+    displayedSelectedNoteId,
+    isCreatingNote,
+    isDeletePublishedNotePending,
+    isPublishNotePending,
+    isPublishShortNotePending,
+    isResolveConflictPending,
+    noteBacklinks: noteBacklinksQuery.data,
+    noteQueryIsPlaceholderData: noteQuery.isPlaceholderData,
+    pendingAutoFocusEditorNoteId: shellState.pendingAutoFocusEditorNoteId,
+    searchQuery: shellState.searchQuery,
+    selectedConflictSnapshotId,
+    setChooseConflictDialogOpen,
+    setChooseConflictNoteId,
+    setDeletePublishDialogOpen,
+    setDraft: shellState.setDraft,
+    setPendingAutoFocusEditorNoteId: shellState.setPendingAutoFocusEditorNoteId,
+    setPublishDialogOpen,
+    setPublishShortNoteDialogOpen,
+    syncEditorRevision,
+    flushCurrentDraftAsync,
+    handleDuplicateNote: noteOps.handleDuplicateNote,
+    handleLoadConflictHead: conflictResolution.handleLoadConflictHead,
+    handleOpenNoteHistory: noteHistory.handleOpenNoteHistory,
+    handleSelectNote: viewNav.handleSelectNote,
+    handleSetNotePinned: noteOps.handleSetNotePinned,
+    handleSetNoteReadonly: noteOps.handleSetNoteReadonly,
+  });
 
-      void (async () => {
-        await flushCurrentDraftAsync();
-        setPublishDialogOpen(true);
-      })().catch(() => {});
-    },
-    onPublishShortNote() {
-      if (!currentNote || isPublishShortNotePending) {
-        return;
-      }
-
-      void (async () => {
-        await flushCurrentDraftAsync();
-        setPublishShortNoteDialogOpen(true);
-      })().catch(() => {});
-    },
-    onSetPinned(pinned: boolean) {
-      if (currentNote) {
-        noteOps.handleSetNotePinned(currentNote.id, pinned);
-      }
-    },
-    onSetReadonly(readonly: boolean) {
-      if (currentNote) {
-        noteOps.handleSetNoteReadonly(currentNote.id, readonly);
-      }
-    },
-    onChange(markdown: string) {
-      if (currentNote && !currentNote.archivedAt && !currentNote.readonly) {
-        setDraft(currentNote.id, markdown, {
-          preserveWikilinkResolutions: true,
-        });
-      }
-    },
-    onLoadConflictHead(snapshotId: string, markdown: string | null) {
-      conflictResolution.handleLoadConflictHead(snapshotId, markdown);
-    },
-    onSelectLinkedNote(noteId: string) {
-      viewNav.handleSelectNote(noteId);
-    },
-    onResolveConflict() {
-      setChooseConflictNoteId(currentNote?.id ?? null);
-      setChooseConflictDialogOpen(true);
-    },
-    onOpenHistory() {
-      noteHistory.handleOpenNoteHistory();
-    },
-  };
-
-  // Freeze editor pane props while React Query is showing placeholder data
-  // from the previous note, so the old note's content doesn't flash.
-  const holdPreviousEditorPane =
-    noteQuery.isPlaceholderData && selectedNoteId !== null;
-  const editorPanePropsRef = useRef(nextEditorPaneProps);
-  if (!holdPreviousEditorPane) {
-    editorPanePropsRef.current = nextEditorPaneProps;
-  }
-  const editorPaneProps = holdPreviousEditorPane
-    ? editorPanePropsRef.current
-    : nextEditorPaneProps;
-
-  const publishDialogProps = {
-    content: currentEditorMarkdown,
-    initialTitle: currentNote?.title ?? "",
-    initialTags: currentNote?.tags ?? [],
-    noteId: currentNote?.id ?? "",
-    open: publishDialogOpen,
-    pending: isPublishNotePending,
-    onOpenChange: setPublishDialogOpen,
-    onSubmit(input: PublishNoteInput) {
-      mutatePublishNote(input);
-    },
-  };
-
-  const publishShortNoteDialogProps = {
-    content: currentEditorMarkdown.replace(/^#\s+.*\n*/, "").trim(),
-    initialTags: currentNote?.tags ?? [],
-    noteId: currentNote?.id ?? "",
-    open: publishShortNoteDialogOpen,
-    pending: isPublishShortNotePending,
-    onOpenChange: setPublishShortNoteDialogOpen,
-    onSubmit(input: PublishShortNoteInput) {
-      mutatePublishShortNote(input);
-    },
-  };
-
-  const deletePublishDialogProps = {
-    open: deletePublishDialogOpen,
-    pending: isDeletePublishedNotePending,
-    onOpenChange: setDeletePublishDialogOpen,
-    onConfirm() {
-      if (currentNoteId) {
-        mutateDeletePublishedNote(currentNoteId);
-      }
-    },
-  };
-
-  const chooseConflictDialogProps = {
-    hasDeleteCandidate: currentNoteConflict?.hasDeleteCandidate ?? false,
-    open: chooseConflictDialogOpen,
-    pending: isResolveConflictPending,
-    onOpenChange(open: boolean) {
-      setChooseConflictDialogOpen(open);
-      if (!open) {
-        setChooseConflictNoteId(null);
-      }
-    },
-    onKeepDeleted() {
-      void conflictResolution.handleResolveCurrentNoteConflict("keep_deleted");
-    },
-    onRestore() {
-      void conflictResolution.handleResolveCurrentNoteConflict("restore");
-    },
-    onMerge() {
-      void conflictResolution.handleResolveCurrentNoteConflict("merge");
-    },
-  };
-
-  const noteHistoryDialogProps = {
-    noteId: currentNoteId,
-    open: noteHistoryDialogOpen,
-    pending: isRestoreHistoryPending,
-    selectedSnapshotId: selectedHistorySnapshotId,
-    snapshots: currentNoteHistory?.snapshots ?? [],
-    hasConflict: isCurrentNoteConflicted,
-    onOpenChange(open: boolean) {
-      setNoteHistoryDialogOpen(open);
-      if (!open) {
-        setUserHistorySnapshotId(null);
-      }
-    },
-    onRestore() {
-      void noteHistory.handleRestoreSelectedNoteHistorySnapshot();
-    },
-    onSelectSnapshot(snapshotId: string) {
-      noteHistory.handleSelectNoteHistorySnapshot(snapshotId);
-    },
-  };
-
-  const { isMutatingNote } = noteOps;
-
-  const notesPaneProps = {
-    filteredNotes: currentNotes,
+  const notesPaneProps = useNotesPaneModel({
+    currentNotes,
+    displayedSelectedNoteId,
     hasMoreNotes: notesQuery.hasNextPage,
     isCreatingNote,
     isLoadingMoreNotes: notesQuery.isFetchingNextPage,
+    isMutatingNote: noteOps.isMutatingNote,
     isNotesPlaceholderData: notesQuery.isPlaceholderData,
-    isMutatingNote,
-    selectedNoteId: displayedSelectedNoteId,
     totalNoteCount,
-    onArchiveNote: noteOps.handleArchiveNote,
-    onCopyNoteContent: noteOps.handleCopyNoteContent,
-    onCreateNote: viewNav.handleCreateNote,
-    onDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
-    onDuplicateNote: noteOps.handleDuplicateNote,
-    onExportNotes: noteOps.handleExportNotes,
-    onLoadMore() {
+    handleArchiveNote: noteOps.handleArchiveNote,
+    handleCopyNoteContent: noteOps.handleCopyNoteContent,
+    handleCreateNote: viewNav.handleCreateNote,
+    handleDeleteNotePermanently: noteOps.handleDeleteNotePermanently,
+    handleDuplicateNote: noteOps.handleDuplicateNote,
+    handleExportNotes: noteOps.handleExportNotes,
+    handleLoadMoreNotes() {
       if (notesQuery.hasNextPage && !notesQuery.isFetchingNextPage) {
         void notesQuery.fetchNextPage();
       }
     },
-    onRestoreFromTrash: noteOps.handleRestoreFromTrash,
-    onRestoreNote: noteOps.handleRestoreNote,
-    onSelectNote: viewNav.handleSelectNote,
-    onSetNotePinned: noteOps.handleSetNotePinned,
-    onSetNoteReadonly: noteOps.handleSetNoteReadonly,
-    onTrashNote: noteOps.handleTrashNote,
-  };
+    handleRestoreFromTrash: noteOps.handleRestoreFromTrash,
+    handleRestoreNote: noteOps.handleRestoreNote,
+    handleSelectNote: viewNav.handleSelectNote,
+    handleSetNotePinned: noteOps.handleSetNotePinned,
+    handleSetNoteReadonly: noteOps.handleSetNoteReadonly,
+    handleTrashNote: noteOps.handleTrashNote,
+  });
 
-  const sidebarPaneProps = {
+  const sidebarPaneProps = useSidebarPaneModel({
+    archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
     availableTagPaths,
     availableTagTree,
-    archivedCount: bootstrapQuery.data?.archivedCount ?? 0,
     todoCount: todoCountQuery.data ?? 0,
     trashedCount: bootstrapQuery.data?.trashedCount ?? 0,
-    onSelectAll: viewNav.handleSelectAll,
-    onSelectToday: viewNav.handleSelectToday,
-    onSelectTodo: viewNav.handleSelectTodo,
-    onSelectPinned: viewNav.handleSelectPinned,
-    onSelectUntagged: viewNav.handleSelectUntagged,
-    onSelectArchive: viewNav.handleSelectArchive,
-    onSelectTrash: viewNav.handleSelectTrash,
-    onSelectTagPath: viewNav.handleSelectTagPath,
-    onDeleteTag: tagOps.handleDeleteTag,
-    onEmptyTrash: noteOps.handleEmptyTrash,
-    onExportTag: noteOps.handleExportTag,
-    onRenameTag: tagOps.handleRenameTag,
-    onSetTagPinned: tagOps.handleSetTagPinned,
-    onSetTagHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
-  };
+    handleDeleteTag: tagOps.handleDeleteTag,
+    handleEmptyTrash: noteOps.handleEmptyTrash,
+    handleExportTag: noteOps.handleExportTag,
+    handleRenameTag: tagOps.handleRenameTag,
+    handleSelectAll: viewNav.handleSelectAll,
+    handleSelectArchive: viewNav.handleSelectArchive,
+    handleSelectPinned: viewNav.handleSelectPinned,
+    handleSelectTagPath: viewNav.handleSelectTagPath,
+    handleSelectToday: viewNav.handleSelectToday,
+    handleSelectTodo: viewNav.handleSelectTodo,
+    handleSelectTrash: viewNav.handleSelectTrash,
+    handleSelectUntagged: viewNav.handleSelectUntagged,
+    handleSetHideSubtagNotes: tagOps.handleSetHideSubtagNotes,
+    handleSetTagPinned: tagOps.handleSetTagPinned,
+  });
 
   return {
     bootstrapError: bootstrapQuery.isError

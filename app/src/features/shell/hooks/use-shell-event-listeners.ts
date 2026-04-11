@@ -13,7 +13,7 @@ import {
   type FocusNoteDetail,
 } from "@/shared/lib/note-navigation";
 import type { NoteFilter } from "@/shared/api/types";
-import { useShellActions } from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 
 export interface ShellEventListenerDeps {
   activeTagPath: string | null;
@@ -47,7 +47,7 @@ export function useShellEventListeners(deps: ShellEventListenerDeps) {
   } = deps;
 
   const { setNoteFilter, setFocusedPane, prepareNoteCreation } =
-    useShellActions();
+    useShellNavigationStore((state) => state.actions);
 
   const handlePrepareAccountChange = useEffectEvent(() => {
     void (async () => {

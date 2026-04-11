@@ -7,10 +7,7 @@ import {
   uiStore,
   useSidebarVisible,
 } from "@/features/settings/store/use-ui-store";
-import {
-  shellStore,
-  useShellActions,
-} from "@/features/shell/store/use-shell-store";
+import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
 import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,
@@ -65,7 +62,7 @@ export function NoteRow({
   const isActive = note.id === selectedNoteId;
   const cardPreview = noteCardPreview(note, searchWords);
   const sidebarVisible = useSidebarVisible();
-  const { setFocusedPane } = useShellActions();
+  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
 
   return (
     <motion.div
@@ -95,7 +92,7 @@ export function NoteRow({
         onClick={() => onSelectNote(note.id)}
         onContextMenu={(event) => onContextMenu(event, note)}
         onFocus={() => {
-          shellStore.getState().actions.setFocusedPane("notes");
+          setFocusedPane("notes");
         }}
         onKeyDown={(event) => {
           if (event.metaKey || event.ctrlKey || event.altKey) {
