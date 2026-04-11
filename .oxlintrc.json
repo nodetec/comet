@@ -17,6 +17,7 @@
       { "checksVoidReturn": { "attributes": false } }
     ],
 
+    "unicorn/number-literal-case": "off",
     "unicorn/no-null": "off",
     "unicorn/no-array-callback-reference": "off",
     "unicorn/prefer-global-this": "off",
