@@ -273,7 +273,6 @@ describe("List rendering", () => {
     expect(insertTaskCheckbox(view)).toBe(true);
     expect(view.state.doc.toString()).toBe("- [ ] ");
     expect(view.state.selection.main.head).toBe(6);
-    expect(view.state.selection.main.assoc).toBe(1);
 
     view.destroy();
   });
@@ -325,13 +324,15 @@ describe("List rendering", () => {
     expect(line?.getAttribute("style")).toContain("--cm-md-list-child-indent");
     expect(line?.textContent?.startsWith(" ")).toBe(false);
 
+    // Empty lines between continuation paragraphs should NOT get
+    // list-child styling (no lazy continuation support).
     const emptyChildLine = [...view.dom.querySelectorAll(".cm-line")].find(
       (element) =>
         element.classList.contains("cm-md-list-child") &&
         (element.textContent ?? "") === "",
     );
 
-    expect(emptyChildLine).toBeDefined();
+    expect(emptyChildLine).toBeUndefined();
 
     view.destroy();
   });

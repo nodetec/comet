@@ -72,13 +72,16 @@ function addListChildLineDecorations(
   from: number,
   to: number,
   markerLineStart: number,
+  expectedPrefix: string,
   indentStyle: string,
   decorationRanges: Range<Decoration>[],
 ) {
   let line = state.doc.lineAt(from);
 
   while (true) {
-    if (line.from !== markerLineStart) {
+    // Skip lines that don't have the expected continuation indent
+    // (lazy continuations parsed by lezer but not visually indented).
+    if (line.from !== markerLineStart && line.text.startsWith(expectedPrefix)) {
       decorationRanges.push(
         Decoration.line({
           attributes: {
@@ -596,16 +599,12 @@ function normalizeSelectionToListMarkers(state: EditorState) {
         return EditorSelection.cursor(item.markerFrom, -1);
       }
 
-      // Snap cursor inside the marker area (after markerFrom, up to
-      // contentFrom) to contentFrom (text start). markerFrom itself
-      // is allowed (cursor before the marker).
-      if (range.head > item.markerFrom && range.head <= item.contentFrom) {
-        const targetAssoc = 1;
-        if (range.head !== item.contentFrom || range.assoc !== targetAssoc) {
-          changed = true;
-          return EditorSelection.cursor(item.contentFrom, targetAssoc);
-        }
-        return range;
+      // Snap cursor inside the marker area (between markerFrom and
+      // contentFrom, exclusive) to contentFrom. Both markerFrom and
+      // contentFrom are valid cursor positions and don't need snapping.
+      if (range.head > item.markerFrom && range.head < item.contentFrom) {
+        changed = true;
+        return EditorSelection.cursor(item.contentFrom, 1);
       }
     }
 
@@ -782,6 +781,27 @@ export function deleteAcrossListBoundary(view: EditorView) {
     return deleteExpandedSelectionAcrossListMarkers(view);
   }
 
+  // --- Task checkbox removal: handle BEFORE continuation checks ---
+  // Must run first because the continuation check can misidentify
+  // a task item's content start as a continuation boundary.
+  const itemForBackspace = getListItemForLine(view.state, selection.head);
+  if (
+    itemForBackspace?.task &&
+    selection.head === itemForBackspace.contentFrom
+  ) {
+    // Remove the entire list prefix ("- [ ] "), turning the line
+    // into a plain paragraph.
+    view.dispatch({
+      changes: {
+        from: itemForBackspace.lineFrom,
+        to: itemForBackspace.contentFrom,
+      },
+      selection: EditorSelection.cursor(itemForBackspace.lineFrom),
+      annotations: Transaction.userEvent.of("delete.backward"),
+    });
+    return true;
+  }
+
   // --- Continuation line handling (existing behavior) ---
 
   const currentLine = view.state.doc.lineAt(selection.head);
@@ -858,10 +878,12 @@ export function deleteAcrossListBoundary(view: EditorView) {
     return true;
   }
 
-  // --- Structural merge: backspace at content start merges with previous item ---
+  // --- Structural backspace at content start ---
 
   const item = getListItemForLine(view.state, selection.head);
   if (item && selection.head === item.contentFrom) {
+    // Task checkbox removal is handled above (before continuation
+    // checks). This branch handles plain bullet/number items.
     return mergeWithPreviousListItem(view, item);
   }
 
@@ -1073,6 +1095,13 @@ function backspaceRemoveListPrefix(
 
   const textStart = getListTextStart(line.text, line.from, line.to);
   if (selection.head > textStart) {
+    return null;
+  }
+
+  // If the cursor is at contentFrom of a task item, the keymap handler
+  // already removed the checkbox. Don't also remove the whole prefix.
+  const item = getListItemForLine(state, selection.head);
+  if (item?.task && selection.head === item.contentFrom) {
     return null;
   }
 
@@ -1335,6 +1364,7 @@ function addListChildGapDecorations(
   previousChildLineEnd: number,
   childLineStart: number,
   markerLineStart: number,
+  expectedPrefix: string,
   indentStyle: string,
   decorationRanges: Range<Decoration>[],
 ) {
@@ -1347,6 +1377,7 @@ function addListChildGapDecorations(
     previousChildLineEnd + 1,
     childLineStart - 1,
     markerLineStart,
+    expectedPrefix,
     indentStyle,
     decorationRanges,
   );
@@ -1377,6 +1408,7 @@ function decorateListChildNode(
     previousChildLineEnd,
     childLineStart,
     markerLineStart,
+    expectedPrefix,
     indentStyle,
     decorationRanges,
   );
@@ -1396,6 +1428,7 @@ function decorateListChildNode(
       child.from,
       child.to,
       markerLineStart,
+      expectedPrefix,
       indentStyle,
       decorationRanges,
     );
@@ -1566,7 +1599,7 @@ const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
   return true;
 });
 
-const listNavigationKeymap = Prec.high(
+const listNavigationKeymap = Prec.highest(
   keymap.of([
     { key: "Backspace", run: deleteAcrossListBoundary },
     { key: "ArrowLeft", run: (view) => moveAcrossListBoundary("left", view) },
