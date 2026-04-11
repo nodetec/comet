@@ -164,10 +164,18 @@ function snapHeadingSyntax(
   // prefix is hidden.
   const contentStart = firstMark.to + 1;
   if (pos <= contentStart) {
-    // During drag, snap to contentStart (inside the heading mark span)
-    // so coordsAtPos returns heading-sized height. The deferred rebuild
-    // after mouseup extends the selection to include the full prefix.
-    return isDrag ? contentStart : heading.from;
+    if (!isDrag) {
+      return heading.from;
+    }
+    // During drag: if the heading prefix was already revealed (cursor
+    // was on this line before the drag started), snap to heading.from
+    // so the ## characters are included in the selection. Otherwise
+    // snap to contentStart (prefix is hidden, avoids caret size issues).
+    const actualCursorLines = getCursorLineRanges(state);
+    if (overlapsAny(heading.from, heading.to, actualCursorLines)) {
+      return heading.from;
+    }
+    return contentStart;
   }
 
   // Trailing closing mark (## Header ##)
