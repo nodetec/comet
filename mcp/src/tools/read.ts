@@ -274,12 +274,11 @@ export function listNotes(
   sql += whereClause;
 
   // Sort
-  const sortColumn =
-    sortField === "created_at"
-      ? "n.created_at"
-      : sortField === "title"
-        ? "n.title"
-        : "n.edited_at";
+  const sortColumnMap: Record<string, string> = {
+    created_at: "n.created_at",
+    title: "n.title",
+  };
+  const sortColumn = sortColumnMap[sortField] ?? "n.edited_at";
   let sortDir: string;
   if (sortField === "title") {
     sortDir = sortDirection === "newest" ? "ASC" : "DESC";
