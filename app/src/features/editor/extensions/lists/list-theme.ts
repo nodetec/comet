@@ -35,7 +35,7 @@ export const listTheme = EditorView.theme({
   ".cm-md-bullet-marker-source": {
     color: "transparent",
     display: "inline-block",
-    letterSpacing: "0.65rem",
+    letterSpacing: "0.65em",
     width: "var(--cm-md-list-marker-width)",
     WebkitTextFillColor: "transparent",
   },
@@ -46,7 +46,7 @@ export const listTheme = EditorView.theme({
     display: "inline-flex",
     fontSize: "1.45em",
     justifyContent: "center",
-    left: "44%",
+    left: "0.8em",
     lineHeight: "1",
     pointerEvents: "none",
     position: "absolute",
