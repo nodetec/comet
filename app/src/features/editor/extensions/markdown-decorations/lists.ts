@@ -14,7 +14,6 @@ import {
   EditorView,
   keymap,
   ViewPlugin,
-  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -26,139 +25,32 @@ import {
   isListSelectionNormalizationDisabled,
   logEditorDebug,
 } from "@/shared/lib/editor-debug";
-
-const BULLET_INDENT = 2;
-const ORDERED_INDENT = 3;
-const LIST_INDENT_STEP = "1.5rem";
-const LIST_MARKER_WIDTH = "2.2rem";
-const LIST_CHILD_BLOCK_OFFSET = LIST_MARKER_WIDTH;
-const LIST_SOURCE_INDENT_CHAR_WIDTH = "0.25rem";
-const BLOCKQUOTE_PREFIX_RE = /^(?:[ \t]{0,3}> ?)+/;
-const BULLET_MARKERS = new Set(["-", "*", "+"]);
-const LIST_PREFIX_RE = /^(\s*)([-*+]|\d+[.)]) (\[[ xX]\] )?/;
-const TASK_MARKERS = new Set(["[ ]", "[x]"]);
-
-type ListMarkerData = {
-  indentLevel: number;
-  lineStart: number;
-  sourceIndentChars: number;
-  marker: string;
-  markerEnd: number;
-  markerStart: number;
-};
-
-type MarkerRange = {
-  from: number;
-  to: number;
-};
-
-type HiddenPrefixRange = {
-  from: number;
-  to: number;
-};
-
-type TaskListShortcut = {
-  changes: {
-    from: number;
-    insert: string;
-    to: number;
-  };
-  selection: EditorSelection;
-};
-
-class TaskMarkerWidget extends WidgetType {
-  constructor(
-    private readonly checked: boolean,
-    private readonly taskStart: number,
-  ) {
-    super();
-  }
-
-  override eq(other: WidgetType): boolean {
-    return (
-      other instanceof TaskMarkerWidget &&
-      other.checked === this.checked &&
-      other.taskStart === this.taskStart
-    );
-  }
-
-  override ignoreEvent(): boolean {
-    return false;
-  }
-
-  override toDOM(): HTMLElement {
-    const marker = document.createElement("span");
-    marker.className = `cm-md-list-marker cm-md-task-marker-source ${this.checked ? "cm-md-task-marker-checked" : "cm-md-task-marker-unchecked"}`;
-    marker.dataset.taskStart = String(this.taskStart);
-    const checkbox = document.createElement("span");
-    checkbox.className = "cm-md-task-marker-box";
-    marker.append(checkbox);
-    return marker;
-  }
-}
-
-class EmptyTaskPlaceholderWidget extends WidgetType {
-  override eq(other: WidgetType): boolean {
-    return other instanceof EmptyTaskPlaceholderWidget;
-  }
-
-  override ignoreEvent(): boolean {
-    return true;
-  }
-
-  override toDOM(): HTMLElement {
-    const placeholder = document.createElement("span");
-    placeholder.className = "cm-md-task-empty-placeholder";
-    placeholder.setAttribute("aria-hidden", "true");
-    placeholder.textContent = "\u200B";
-    return placeholder;
-  }
-}
-
-type ListMarkerNodeRef = Pick<SyntaxNodeRef, "from" | "to" | "type" | "node">;
-type DocLine = ReturnType<EditorState["doc"]["lineAt"]>;
-
-export function getListMarkerData(
-  state: EditorState,
-  { from, to, type, node }: ListMarkerNodeRef,
-): ListMarkerData | null {
-  if (type.name !== "ListMark") {
-    return null;
-  }
-
-  const line = state.doc.lineAt(from);
-  const marker = state.sliceDoc(from, to);
-  const markerHasTrailingSpace = state.sliceDoc(to, to + 1) === " ";
-
-  if (!markerHasTrailingSpace) {
-    return null;
-  }
-
-  let listDepth = 0;
-  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
-    if (
-      ancestor.type.name === "BulletList" ||
-      ancestor.type.name === "OrderedList"
-    ) {
-      listDepth += 1;
-    }
-  }
-  const indentLevel = Math.max(0, listDepth - 1);
-  const quotePrefix = BLOCKQUOTE_PREFIX_RE.exec(line.text)?.[0] ?? "";
-  const sourceIndentChars = Math.max(0, from - line.from - quotePrefix.length);
-
-  return {
-    indentLevel,
-    lineStart: line.from,
-    sourceIndentChars,
-    marker,
-    markerEnd: to,
-    markerStart: from,
-  };
-}
+import {
+  BLOCKQUOTE_PREFIX_RE,
+  BULLET_INDENT,
+  BULLET_MARKERS,
+  LIST_PREFIX_RE,
+  ORDERED_INDENT,
+  TASK_MARKERS,
+  type DocLine,
+  type ExplicitContinuationContext,
+  type HiddenPrefixRange,
+  type MarkerRange,
+  type TaskListShortcut,
+} from "@/features/editor/extensions/lists/list-types";
+import {
+  EmptyTaskPlaceholderWidget,
+  TaskMarkerWidget,
+} from "@/features/editor/extensions/lists/list-widgets";
+import { listTheme } from "@/features/editor/extensions/lists/list-theme";
+import {
+  getListItemForLine,
+  getListItems,
+  type ListItemInfo,
+} from "@/features/editor/extensions/lists/list-model";
 
 function addListDecorations(
-  data: ListMarkerData,
+  item: ListItemInfo,
   lineClass: string,
   markerDecoration: Range<Decoration>,
   decorationRanges: Range<Decoration>[],
@@ -168,18 +60,11 @@ function addListDecorations(
     Decoration.line({
       attributes: {
         class: lineClass,
-        style: `--indent-level: ${data.indentLevel}`,
+        style: `--indent-level: ${item.indentLevel}`,
       },
-    }).range(data.lineStart),
+    }).range(item.lineFrom),
     markerDecoration,
   );
-}
-
-function buildListChildIndentStyle(
-  indentLevel: number,
-  sourceIndentChars: number,
-) {
-  return `--cm-md-list-child-indent: calc(${indentLevel} * ${LIST_INDENT_STEP} + ${LIST_CHILD_BLOCK_OFFSET} + ${sourceIndentChars} * ${LIST_SOURCE_INDENT_CHAR_WIDTH})`;
 }
 
 function addListChildLineDecorations(
@@ -247,52 +132,6 @@ function getListTextStart(lineText: string, lineFrom: number, lineTo: number) {
   return Math.min(lineTo, lineFrom + (match?.[0].length ?? 0));
 }
 
-function getListMarkerDataForLine(
-  state: EditorState,
-  lineFrom: number,
-  lineTo: number,
-): ListMarkerData | null {
-  let markerData: ListMarkerData | null = null;
-
-  syntaxTree(state).iterate({
-    from: lineFrom,
-    to: lineTo,
-    enter(node) {
-      const data = getListMarkerData(state, node);
-      if (!data || data.lineStart !== lineFrom) {
-        return;
-      }
-
-      markerData = data;
-      return false;
-    },
-  });
-
-  return markerData;
-}
-
-function getListContinuationIndent(marker: string) {
-  return BULLET_MARKERS.has(marker) ? BULLET_INDENT : ORDERED_INDENT;
-}
-
-function getExpectedContinuationPrefix(
-  state: EditorState,
-  markerData: ListMarkerData,
-) {
-  const markerPrefix = state.sliceDoc(
-    markerData.lineStart,
-    markerData.markerStart,
-  );
-  return (
-    markerPrefix + " ".repeat(getListContinuationIndent(markerData.marker))
-  );
-}
-
-type ExplicitContinuationContext = {
-  indentStyle: string;
-  prefix: string;
-};
-
 function summarizeTransactionChanges(transaction: Transaction) {
   const changes: { fromA: number; toA: number; insert: string }[] = [];
   transaction.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
@@ -317,54 +156,49 @@ function getParsedContinuationContextForLine(
   targetLineFrom: number,
 ): ExplicitContinuationContext | null {
   // Walk up from the target position to find an enclosing ListItem.
-  // This is O(depth) instead of a full-tree iteration.
   const tree = syntaxTree(state);
-  let listItem: SyntaxNode | null = null;
+  let listItemNode: SyntaxNode | null = null;
   for (
     let n: SyntaxNode | null = tree.resolveInner(targetLineFrom, 1);
     n;
     n = n.parent
   ) {
     if (n.type.name === "ListItem") {
-      listItem = n;
+      listItemNode = n;
       break;
     }
   }
 
-  if (!listItem) {
+  if (!listItemNode) {
     return null;
   }
 
-  const markerContext = getListItemMarkerContext(state, listItem);
-  if (!markerContext) {
+  // Look up the model for this ListItem's marker line.
+  const markerLine = state.doc.lineAt(listItemNode.from);
+  const item = getListItemForLine(state, markerLine.from);
+  if (!item) {
     return null;
   }
 
-  const { markerData, markerLineStart } = markerContext;
-  const expectedPrefix = getExpectedContinuationPrefix(state, markerData);
   const line = state.doc.lineAt(targetLineFrom);
-
-  if (line.from !== targetLineFrom || line.from === markerLineStart) {
+  if (line.from !== targetLineFrom || line.from === item.lineFrom) {
     return null;
   }
 
-  if (!line.text.startsWith(expectedPrefix)) {
+  if (!line.text.startsWith(item.continuationPrefix)) {
     return null;
   }
 
   // Verify the target line is inside a Paragraph child of this ListItem.
-  for (let child = listItem.firstChild; child; child = child.nextSibling) {
+  for (let child = listItemNode.firstChild; child; child = child.nextSibling) {
     if (
       child.type.name === "Paragraph" &&
       targetLineFrom >= child.from &&
       targetLineFrom <= child.to
     ) {
       return {
-        indentStyle: buildListChildIndentStyle(
-          markerData.indentLevel,
-          markerData.sourceIndentChars,
-        ),
-        prefix: expectedPrefix,
+        indentStyle: item.indentStyle,
+        prefix: item.continuationPrefix,
       };
     }
   }
@@ -389,18 +223,11 @@ function getExplicitContinuationContextForLine(
   const previousContext =
     getParsedContinuationContextForLine(state, previousLine.from) ??
     (() => {
-      const markerData = getListMarkerDataForLine(
-        state,
-        previousLine.from,
-        previousLine.to,
-      );
-      return markerData
+      const item = getListItemForLine(state, previousLine.from);
+      return item
         ? {
-            indentStyle: buildListChildIndentStyle(
-              markerData.indentLevel,
-              markerData.sourceIndentChars,
-            ),
-            prefix: getExpectedContinuationPrefix(state, markerData),
+            indentStyle: item.indentStyle,
+            prefix: item.continuationPrefix,
           }
         : null;
     })();
@@ -423,12 +250,12 @@ export function insertExplicitListContinuationBlock(view: EditorView) {
     return false;
   }
 
-  const markerData = getListMarkerDataForLine(view.state, line.from, line.to);
-  if (!markerData) {
+  const item = getListItemForLine(view.state, selection.head);
+  if (!item) {
     return false;
   }
 
-  const insert = `\n${getExpectedContinuationPrefix(view.state, markerData)}`;
+  const insert = `\n${item.continuationPrefix}`;
   const cursor = selection.head + insert.length;
 
   view.dispatch({
@@ -727,55 +554,6 @@ function dedentListItemPreservingWrappedStart(view: EditorView) {
   return true;
 }
 
-// Cache marker ranges per state to avoid multiple full-tree iterations
-// in the same update cycle (transaction filter + selection normalization
-// can both call this).
-let cachedMarkerState: EditorState | null = null;
-let cachedMarkerRanges: MarkerRange[] = [];
-
-function buildListMarkerRanges(state: EditorState): MarkerRange[] {
-  if (cachedMarkerState === state) {
-    return cachedMarkerRanges;
-  }
-
-  const ranges: MarkerRange[] = [];
-
-  syntaxTree(state).iterate({
-    enter(node) {
-      if (node.type.name === "Blockquote") {
-        return false;
-      }
-
-      const data = getListMarkerData(state, node);
-      if (!data) {
-        return;
-      }
-
-      if (BULLET_MARKERS.has(data.marker)) {
-        const taskStart = data.markerEnd + 1;
-        const taskEnd = taskStart + 3;
-        const task = state.sliceDoc(taskStart, taskEnd);
-        const taskHasTrailingSpace =
-          state.sliceDoc(taskEnd, taskEnd + 1) === " ";
-
-        if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
-          ranges.push({ from: data.markerStart, to: taskEnd + 1 });
-          return;
-        }
-
-        ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
-        return;
-      }
-
-      ranges.push({ from: data.markerStart, to: data.markerEnd + 1 });
-    },
-  });
-
-  cachedMarkerState = state;
-  cachedMarkerRanges = ranges;
-  return ranges;
-}
-
 function getHiddenContinuationPrefixRange(
   line: DocLine,
   expectedPrefix: string,
@@ -817,64 +595,6 @@ function buildContinuationPrefixRanges(
   return ranges;
 }
 
-function findMarkerRangeAtPosition(
-  state: EditorState,
-  position: number,
-): MarkerRange | null {
-  for (const marker of buildListMarkerRanges(state)) {
-    if (position >= marker.from && position <= marker.to) {
-      return marker;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Find the list marker range on the line containing `pos` by iterating
- * only that line's syntax nodes instead of the entire tree.
- */
-function getMarkerRangeOnLine(
-  state: EditorState,
-  pos: number,
-): MarkerRange | null {
-  const line = state.doc.lineAt(pos);
-  let result: MarkerRange | null = null;
-
-  syntaxTree(state).iterate({
-    from: line.from,
-    to: line.to,
-    enter(node) {
-      if (result) return false;
-      if (node.type.name === "Blockquote") return false;
-
-      const data = getListMarkerData(state, node);
-      if (!data) return;
-
-      if (BULLET_MARKERS.has(data.marker)) {
-        const taskStart = data.markerEnd + 1;
-        const taskEnd = taskStart + 3;
-        const task = state.sliceDoc(taskStart, taskEnd);
-        const taskHasTrailingSpace =
-          state.sliceDoc(taskEnd, taskEnd + 1) === " ";
-
-        if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
-          result = { from: data.markerStart, to: taskEnd + 1 };
-          return false;
-        }
-
-        result = { from: data.markerStart, to: data.markerEnd + 1 };
-        return false;
-      }
-
-      result = { from: data.markerStart, to: data.markerEnd + 1 };
-      return false;
-    },
-  });
-
-  return result;
-}
-
 function normalizeSelectionToListMarkers(state: EditorState) {
   let changed = false;
   const ranges = state.selection.ranges.map((range) => {
@@ -882,17 +602,15 @@ function normalizeSelectionToListMarkers(state: EditorState) {
       return range;
     }
 
-    // Find the marker on the cursor's line (cheap, line-local tree walk).
-    const marker = getMarkerRangeOnLine(state, range.head);
-    if (marker) {
-      const line = state.doc.lineAt(marker.from);
+    const item = getListItemForLine(state, range.head);
+    if (item) {
       // Allow the cursor at line.from (before the marker). Snap
       // positions inside the marker/indent area to the text start.
-      if (range.head > line.from && range.head <= marker.to) {
+      if (range.head > item.lineFrom && range.head <= item.contentFrom) {
         const targetAssoc = 1;
-        if (range.head !== marker.to || range.assoc !== targetAssoc) {
+        if (range.head !== item.contentFrom || range.assoc !== targetAssoc) {
           changed = true;
-          return EditorSelection.cursor(marker.to, targetAssoc);
+          return EditorSelection.cursor(item.contentFrom, targetAssoc);
         }
         return range;
       }
@@ -917,12 +635,13 @@ export function moveAcrossListBoundary(
     return false;
   }
 
-  const markerRanges = buildListMarkerRanges(view.state);
-  if (markerRanges.length === 0) {
+  const items = getListItems(view.state);
+  if (items.length === 0) {
     return false;
   }
 
-  for (const marker of markerRanges) {
+  for (const item of items) {
+    const marker: MarkerRange = { from: item.markerFrom, to: item.contentFrom };
     if (tryMoveAcrossMarkerRange(direction, view, selection.head, marker)) {
       return true;
     }
@@ -995,13 +714,15 @@ function expandSelectionRangeToOverlappingMarkers(
   let nextFrom = from;
   let nextTo = to;
 
-  for (const marker of buildListMarkerRanges(state)) {
-    if (nextFrom >= marker.to || nextTo <= marker.from) {
+  for (const item of getListItems(state)) {
+    const markerFrom = item.markerFrom;
+    const markerTo = item.contentFrom;
+    if (nextFrom >= markerTo || nextTo <= markerFrom) {
       continue;
     }
 
-    nextFrom = Math.min(nextFrom, marker.from);
-    nextTo = Math.max(nextTo, marker.to);
+    nextFrom = Math.min(nextFrom, markerFrom);
+    nextTo = Math.max(nextTo, markerTo);
   }
 
   const changed = nextFrom !== from || nextTo !== to;
@@ -1353,63 +1074,58 @@ function expandedVisibleRanges(
   return ranges;
 }
 
-function addMarkerDecorations(
-  state: EditorState,
-  data: ListMarkerData,
+function addMarkerDecorationsFromModel(
+  item: ListItemInfo,
   decorationRanges: Range<Decoration>[],
   atomicRanges: Range<Decoration>[],
 ) {
-  const isBullet = BULLET_MARKERS.has(data.marker);
+  const isBullet = BULLET_MARKERS.has(item.marker);
 
-  if (isBullet) {
-    const taskStart = data.markerEnd + 1;
-    const taskEnd = taskStart + 3;
-    const task = state.sliceDoc(taskStart, taskEnd);
-    const taskHasTrailingSpace = state.sliceDoc(taskEnd, taskEnd + 1) === " ";
+  if (isBullet && item.task) {
+    const { checked } = item.task;
+    const taskMarkerDecoration = Decoration.replace({
+      widget: new TaskMarkerWidget(checked, item.task.from),
+    });
+    decorationRanges.push(
+      Decoration.line({
+        attributes: {
+          class: `cm-md-list cm-md-task-list ${checked ? "cm-md-task-checked" : "cm-md-task-unchecked"}`,
+          style: `--indent-level: ${item.indentLevel}`,
+        },
+      }).range(item.lineFrom),
+      Decoration.replace({}).range(item.markerFrom, item.markerTo),
+      taskMarkerDecoration.range(item.task.from, item.task.to + 1),
+    );
+    atomicRanges.push(
+      taskMarkerDecoration.range(item.task.from, item.task.to + 1),
+    );
 
-    if (TASK_MARKERS.has(task) && taskHasTrailingSpace) {
-      const checked = task === "[x]";
-      const line = state.doc.lineAt(data.lineStart);
-      const taskMarkerDecoration = Decoration.replace({
-        widget: new TaskMarkerWidget(checked, taskStart),
-      });
+    if (item.task.to + 1 >= item.lineTo) {
       decorationRanges.push(
-        Decoration.line({
-          attributes: {
-            class: `cm-md-list cm-md-task-list ${checked ? "cm-md-task-checked" : "cm-md-task-unchecked"}`,
-            style: `--indent-level: ${data.indentLevel}`,
-          },
-        }).range(data.lineStart),
-        Decoration.replace({}).range(data.markerStart, data.markerEnd + 1),
-        taskMarkerDecoration.range(taskStart, taskEnd + 1),
+        Decoration.widget({
+          side: -1,
+          widget: new EmptyTaskPlaceholderWidget(),
+        }).range(item.lineTo),
       );
-      atomicRanges.push(taskMarkerDecoration.range(taskStart, taskEnd + 1));
-
-      if (taskEnd + 1 >= line.to) {
-        decorationRanges.push(
-          Decoration.widget({
-            side: -1,
-            widget: new EmptyTaskPlaceholderWidget(),
-          }).range(line.to),
-        );
-      }
-
-      if (checked && taskEnd + 1 < line.to) {
-        decorationRanges.push(
-          Decoration.mark({
-            class: "cm-md-task-content-checked",
-          }).range(taskEnd + 1, line.to),
-        );
-      }
-      return;
     }
 
+    if (checked && item.task.to + 1 < item.lineTo) {
+      decorationRanges.push(
+        Decoration.mark({
+          class: "cm-md-task-content-checked",
+        }).range(item.task.to + 1, item.lineTo),
+      );
+    }
+    return;
+  }
+
+  if (isBullet) {
     addListDecorations(
-      data,
+      item,
       "cm-md-list cm-md-bullet-list",
       Decoration.mark({
         class: "cm-md-list-marker cm-md-bullet-marker-source",
-      }).range(data.markerStart, data.markerEnd + 1),
+      }).range(item.markerFrom, item.markerTo),
       decorationRanges,
       atomicRanges,
     );
@@ -1417,14 +1133,14 @@ function addMarkerDecorations(
   }
 
   addListDecorations(
-    data,
+    item,
     "cm-md-list cm-md-number-list",
     Decoration.mark({
       class: "cm-md-list-marker cm-md-number-marker-source",
       attributes: {
-        style: `--display-number: "${data.marker} "`,
+        style: `--display-number: "${item.marker} "`,
       },
-    }).range(data.markerStart, data.markerEnd + 1),
+    }).range(item.markerFrom, item.markerTo),
     decorationRanges,
     atomicRanges,
   );
@@ -1438,59 +1154,38 @@ function buildAllListDecorations(
   const decorationRanges: Range<Decoration>[] = [];
   const atomicRanges: Range<Decoration>[] = [];
 
-  // ---- Pass 1: single tree iteration for markers + child blocks ----------
-  for (const range of visibleRanges) {
-    syntaxTree(state).iterate({
-      from: range.from,
-      to: range.to,
-      enter(node) {
-        // -- Marker decorations (bullets / numbers / tasks) --
-        const data = getListMarkerData(state, node);
-        if (data) {
-          addMarkerDecorations(state, data, decorationRanges, atomicRanges);
-          return;
-        }
+  // ---- Pass 1: iterate model items for markers + child blocks -------------
+  const items = getListItems(state);
+  for (const item of items) {
+    // Skip items outside visible ranges.
+    if (
+      !visibleRanges.some((r) => item.lineFrom <= r.to && item.lineTo >= r.from)
+    ) {
+      continue;
+    }
 
-        // -- Child-block decorations (continuation lines within ListItems) --
-        if (node.type.name !== "ListItem") {
-          return;
-        }
+    // -- Marker decorations (bullets / numbers / tasks) --
+    addMarkerDecorationsFromModel(item, decorationRanges, atomicRanges);
 
-        const markerContext = getListItemMarkerContext(state, node);
-        if (!markerContext) {
-          return;
-        }
+    // -- Child-block decorations (continuation lines within ListItems) --
+    let previousChildLineEnd = item.lineTo;
 
-        const { markerData, markerLineStart } = markerContext;
-        const indentStyle = buildListChildIndentStyle(
-          markerData.indentLevel,
-          markerData.sourceIndentChars,
-        );
-        const expectedPrefix = getExpectedContinuationPrefix(state, markerData);
-        let previousChildLineEnd = state.doc.lineAt(markerData.markerEnd).to;
+    for (let child = item.node.firstChild; child; child = child.nextSibling) {
+      if (isListContainerNode(child)) {
+        continue;
+      }
 
-        for (
-          let child = node.node.firstChild;
-          child;
-          child = child.nextSibling
-        ) {
-          if (isListContainerNode(child)) {
-            continue;
-          }
-
-          previousChildLineEnd = decorateListChildNode(
-            state,
-            child,
-            markerLineStart,
-            expectedPrefix,
-            indentStyle,
-            previousChildLineEnd,
-            decorationRanges,
-            atomicRanges,
-          );
-        }
-      },
-    });
+      previousChildLineEnd = decorateListChildNode(
+        state,
+        child,
+        item.lineFrom,
+        item.continuationPrefix,
+        item.indentStyle,
+        previousChildLineEnd,
+        decorationRanges,
+        atomicRanges,
+      );
+    }
   }
 
   // ---- Pass 2: line iteration for pending continuations ------------------
@@ -1531,34 +1226,6 @@ function buildAllListDecorations(
     Decoration.set(decorationRanges, true),
     Decoration.set(atomicRanges, true),
   ];
-}
-
-function getListItemMarkerContext(
-  state: EditorState,
-  node: SyntaxNodeRef,
-): { markerData: ListMarkerData; markerLineStart: number } | null {
-  for (let child = node.node.firstChild; child; child = child.nextSibling) {
-    if (child.type.name !== "ListMark") {
-      continue;
-    }
-
-    const markerData = getListMarkerData(state, {
-      from: child.from,
-      node: child,
-      to: child.to,
-      type: child.type,
-    });
-    if (!markerData) {
-      return null;
-    }
-
-    return {
-      markerData,
-      markerLineStart: state.doc.lineAt(child.from).from,
-    };
-  }
-
-  return null;
 }
 
 function isListContainerNode(node: SyntaxNodeRef["node"]) {
@@ -1794,13 +1461,15 @@ function listMarkerInteractions(): Extension {
           return false;
         }
 
-        const markerRange = findMarkerRangeAtPosition(
-          view.state,
-          view.posAtDOM(marker, 0),
-        );
-        if (!markerRange) {
+        const pos = view.posAtDOM(marker, 0);
+        const listItem = getListItemForLine(view.state, pos);
+        if (!listItem) {
           return false;
         }
+        const markerRange: MarkerRange = {
+          from: listItem.markerFrom,
+          to: listItem.contentFrom,
+        };
 
         const rect = marker.getBoundingClientRect();
         placeCaretAtListMarkerBoundary(
@@ -1815,131 +1484,6 @@ function listMarkerInteractions(): Extension {
     },
   });
 }
-
-const listTheme = EditorView.theme({
-  ".cm-md-list": {
-    "--cm-md-list-indent-step": LIST_INDENT_STEP,
-    "--cm-md-list-marker-width": LIST_MARKER_WIDTH,
-    paddingLeft:
-      "calc(var(--indent-level) * var(--cm-md-list-indent-step) + var(--cm-md-list-marker-width)) !important",
-    textIndent: "calc(var(--cm-md-list-marker-width) * -1)",
-  },
-  ".cm-md-list *": {
-    textIndent: "0",
-  },
-  ".cm-line.cm-md-list-child:not(.cm-md-codeblock):not(.cm-md-bq)": {
-    paddingLeft: "var(--cm-md-list-child-indent)",
-  },
-  ".cm-md-list-marker": {
-    alignItems: "center",
-    color: "var(--primary)",
-    display: "inline-flex",
-    justifyContent: "center",
-    lineHeight: "1",
-    minWidth: "var(--cm-md-list-marker-width)",
-    position: "relative",
-    textAlign: "center",
-    verticalAlign: "baseline",
-    whiteSpace: "pre",
-    zIndex: "0",
-  },
-  ".cm-md-bullet-marker-source": {
-    color: "transparent",
-    display: "inline-block",
-    letterSpacing: "0.65rem",
-    width: "var(--cm-md-list-marker-width)",
-    WebkitTextFillColor: "transparent",
-  },
-  ".cm-md-bullet-marker-source::before": {
-    alignItems: "center",
-    color: "var(--primary)",
-    content: '"•"',
-    display: "inline-flex",
-    fontSize: "1.45em",
-    justifyContent: "center",
-    left: "50%",
-    lineHeight: "1",
-    pointerEvents: "none",
-    position: "absolute",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
-    WebkitTextFillColor: "var(--primary)",
-  },
-  ".cm-md-number-marker-source": {
-    color: "transparent",
-    display: "inline-block",
-    width: "var(--cm-md-list-marker-width)",
-    WebkitTextFillColor: "transparent",
-  },
-  ".cm-md-number-marker-source::before": {
-    color: "var(--primary)",
-    content: "var(--display-number)",
-    fontVariantNumeric: "tabular-nums",
-    left: "50%",
-    lineHeight: "1",
-    pointerEvents: "none",
-    position: "absolute",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
-    WebkitTextFillColor: "var(--primary)",
-  },
-  ".cm-md-task-marker-source": {
-    cursor: "text",
-    display: "inline-flex",
-    justifyContent: "center",
-    width: "var(--cm-md-list-marker-width)",
-  },
-  ".cm-md-task-empty-placeholder": {
-    display: "inline",
-    font: "inherit",
-    lineHeight: "inherit",
-    opacity: "0",
-    pointerEvents: "none",
-    userSelect: "none",
-    verticalAlign: "baseline",
-  },
-  ".cm-md-task-marker-box": {
-    backgroundColor: "var(--background)",
-    border: "1px solid var(--editor-checkbox-border)",
-    borderRadius: "0.22em",
-    boxSizing: "border-box",
-    cursor: "pointer",
-    display: "inline-block",
-    height: "1.15em",
-    lineHeight: "1",
-    position: "relative",
-    transform: "translateY(0.24em)",
-    width: "1.15em",
-  },
-  ".cm-md-task-marker-checked .cm-md-task-marker-box": {
-    backgroundColor: "transparent",
-    borderColor: "var(--muted-foreground)",
-  },
-  ".cm-md-task-marker-checked .cm-md-task-marker-box::after": {
-    borderColor: "var(--muted-foreground)",
-    borderStyle: "solid",
-    borderWidth: "0 2px 2px 0",
-    boxSizing: "border-box",
-    content: '""',
-    height: "0.58em",
-    left: "50%",
-    pointerEvents: "none",
-    position: "absolute",
-    top: "50%",
-    transform: "translate(-50%, -64%) rotate(45deg)",
-    width: "0.34em",
-  },
-  ".cm-md-task-list.cm-md-task-checked": {
-    color: "var(--muted-foreground)",
-  },
-  ".cm-md-task-content-checked": {
-    textDecoration: "line-through",
-    textDecorationColor: "var(--muted-foreground)",
-  },
-  ".cm-md-task-list.cm-md-task-checked .cm-md-link": {
-    color: "var(--muted-foreground)",
-  },
-});
 
 const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
   const shortcut = getTaskListShortcut(view.state, from, to, text);
