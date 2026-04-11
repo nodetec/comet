@@ -1,6 +1,5 @@
 [build]
-builder = "DOCKERFILE"
-buildCommand = null
+buildCommand = nullbuilder = "DOCKERFILE"
 dockerfilePath = "/relay/Dockerfile"
 watchPatterns = [
   "relay/**",
