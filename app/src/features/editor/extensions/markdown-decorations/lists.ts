@@ -597,7 +597,7 @@ function normalizeSelectionToListMarkers(state: EditorState) {
         const selTo = Math.max(range.anchor, range.head);
         if (selFrom >= item.lineFrom && selTo <= item.contentFrom) {
           changed = true;
-          return EditorSelection.cursor(item.markerFrom, -1);
+          return EditorSelection.cursor(item.markerFrom, 1);
         }
       }
       return range;
@@ -613,7 +613,19 @@ function normalizeSelectionToListMarkers(state: EditorState) {
         range.head < item.markerFrom
       ) {
         changed = true;
-        return EditorSelection.cursor(item.markerFrom, -1);
+        return EditorSelection.cursor(item.markerFrom, 1);
+      }
+
+      // For nested items, ensure markerFrom always uses assoc=1 so
+      // there's only one visual cursor position before the marker
+      // (not two from different assoc values at the replace boundary).
+      if (
+        item.markerFrom > item.lineFrom &&
+        range.head === item.markerFrom &&
+        range.assoc !== 1
+      ) {
+        changed = true;
+        return EditorSelection.cursor(item.markerFrom, 1);
       }
 
       // Snap cursor inside the marker area (between markerFrom and
@@ -621,7 +633,7 @@ function normalizeSelectionToListMarkers(state: EditorState) {
       // before the marker when arrow keys land in the hidden zone.
       if (range.head > item.markerFrom && range.head < item.contentFrom) {
         changed = true;
-        return EditorSelection.cursor(item.markerFrom, -1);
+        return EditorSelection.cursor(item.markerFrom, 1);
       }
 
       // For task items, force assoc=1 at contentFrom so the caret
