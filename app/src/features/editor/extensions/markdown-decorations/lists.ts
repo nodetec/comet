@@ -436,8 +436,11 @@ function collectItemLineRanges(
 ): { from: number; to: number }[] {
   const ranges: { from: number; to: number }[] = [];
   // The ListItem node spans from the marker to the end of all children.
-  const startLine = state.doc.lineAt(item.node.from);
-  const endLine = state.doc.lineAt(item.node.to);
+  // Clamp to doc bounds in case the syntax tree is slightly stale.
+  const clampedFrom = Math.min(item.node.from, state.doc.length);
+  const clampedTo = Math.min(item.node.to, state.doc.length);
+  const startLine = state.doc.lineAt(clampedFrom);
+  const endLine = state.doc.lineAt(clampedTo);
   for (
     let lineNum = startLine.number;
     lineNum <= endLine.number;

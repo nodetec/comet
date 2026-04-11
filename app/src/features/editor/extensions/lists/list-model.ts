@@ -136,7 +136,9 @@ function buildListItems(state: EditorState): ListItemInfo[] {
 
       // Task detection.
       const task = detectTask(state, markerText, markerTo);
-      const contentFrom = task ? task.to + 1 : markerTo; // +1 for space after task
+      // +1 for the space after task marker. Clamp to line end for empty
+      // task items like "- [ ] " at end of document.
+      const contentFrom = task ? Math.min(task.to + 1, line.to) : markerTo;
 
       // Continuation prefix.
       const markerPrefix = state.sliceDoc(line.from, listMark.from);
@@ -371,38 +373,46 @@ export function computeRenumberChanges(
  * level and ensures sequential numbering. This is used by indent/outdent
  * handlers where the syntax tree may not yet reflect the changes.
  */
-const ORDERED_MARKER_RE = /^(\s*)(\d+)(\.\s)/;
+// Matches ordered list markers, optionally preceded by blockquote `> ` prefixes.
+const ORDERED_MARKER_RE = /^((?:[ \t]{0,3}> ?)*)(\s*)(\d+)(\.\s)/;
 
 export function computeRenumberChangesFromText(doc: {
   line(n: number): { from: number; text: string };
   lines: number;
 }): { from: number; to: number; insert: string }[] | null {
   const changes: { from: number; to: number; insert: string }[] = [];
-  // Track the expected next number per indent level.
-  const counters = new Map<number, number>();
+  // Track the expected next number per (quotePrefix + indent) key.
+  const counters = new Map<string, number>();
 
   for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
     const line = doc.line(lineNum);
     const match = ORDERED_MARKER_RE.exec(line.text);
     if (!match) {
-      // Non-ordered-list line resets counters at deeper indent levels.
       continue;
     }
 
-    const indent = match[1].length;
-    const currentNum = match[2];
-    // Reset counters for deeper indents when we encounter a new level.
-    for (const [level] of counters) {
-      if (level > indent) {
-        counters.delete(level);
+    const quotePrefix = match[1];
+    const indent = match[2].length;
+    const currentNum = match[3];
+    // Key by quote prefix + indent to handle blockquote-nested lists
+    // as separate numbering groups.
+    const key = `${quotePrefix}:${indent}`;
+
+    // Reset counters for deeper indents within the same quote context.
+    for (const [k] of counters) {
+      if (k.startsWith(`${quotePrefix}:`) && k !== key) {
+        const otherIndent = Number(k.split(":")[1]);
+        if (otherIndent > indent) {
+          counters.delete(k);
+        }
       }
     }
 
-    const expected = counters.get(indent) ?? 1;
+    const expected = counters.get(key) ?? 1;
     const expectedStr = String(expected);
 
     if (currentNum !== expectedStr) {
-      const markerStart = line.from + indent;
+      const markerStart = line.from + quotePrefix.length + indent;
       changes.push({
         from: markerStart,
         to: markerStart + currentNum.length,
@@ -410,7 +420,7 @@ export function computeRenumberChangesFromText(doc: {
       });
     }
 
-    counters.set(indent, expected + 1);
+    counters.set(key, expected + 1);
   }
 
   return changes.length > 0 ? changes : null;
