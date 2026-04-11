@@ -1666,11 +1666,18 @@ function listMarkerInteractions(): Extension {
 }
 
 const listInputHandler = EditorView.inputHandler.of((view, from, to, text) => {
-  // Typing at markerFrom (before the marker): jump to content start
-  // instead of inserting. Prevents accidentally adding indent spaces.
+  // Typing at markerFrom (before the marker) on the marker's own line:
+  // jump to content start instead of inserting. Prevents accidentally
+  // adding indent spaces. Only applies when cursor is on the same line
+  // as the marker — not on continuation lines within the same ListItem.
   if (from === to) {
     const item = getListItemForLine(view.state, from);
-    if (item && from <= item.markerFrom) {
+    if (
+      item &&
+      from >= item.lineFrom &&
+      from <= item.markerFrom &&
+      from <= item.lineTo
+    ) {
       view.dispatch({
         selection: EditorSelection.cursor(item.contentFrom, 1),
       });
