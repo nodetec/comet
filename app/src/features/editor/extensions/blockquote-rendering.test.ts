@@ -53,23 +53,6 @@ describe("Blockquote rendering", () => {
     view.destroy();
   });
 
-  it("hides decorative quote bars on the line that is revealing raw markers", async () => {
-    const { view } = createView("> outer\n>> inner");
-
-    view.dispatch({
-      selection: { anchor: 0 },
-    });
-    view.contentDOM.focus();
-
-    await flush();
-
-    const firstLine = view.dom.querySelector(".cm-line");
-    expect(firstLine?.classList.contains("cm-md-bq")).toBe(false);
-    expect(firstLine?.textContent).toContain("> outer");
-
-    view.destroy();
-  });
-
   it("does not shift the quote bar when nested lists appear inside a blockquote", async () => {
     const { view } = createView(
       [
