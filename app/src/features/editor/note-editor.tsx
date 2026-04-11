@@ -481,29 +481,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
               return false;
             },
             click(event, view) {
-              const lineStart = getLeadingPaddingClickLineStart(view, event);
-              if (lineStart == null) {
+              if (!view.state.selection.main.empty) {
                 return false;
               }
 
-              // Only bail for intentional drag selections that span
-              // multiple lines. A small same-line selection from slight
-              // mouse movement during a click should still be corrected
-              // (the list transaction filter collapses these).
-              const sel = view.state.selection.main;
-              if (!sel.empty) {
-                const fromLine = view.state.doc.lineAt(sel.from);
-                const toLine = view.state.doc.lineAt(sel.to);
-                if (fromLine.number !== toLine.number) {
-                  return false;
-                }
+              const lineStart = getLeadingPaddingClickLineStart(view, event);
+              if (lineStart == null) {
+                return false;
               }
 
               // For lines with hidden prefixes (lists, headings), CM's
               // mousedown already places the cursor at the edge of the
               // replace decoration. Skip the dispatch to avoid jitter
               // from assoc changes.
-              if (sel.empty && sel.head !== lineStart) {
+              if (view.state.selection.main.head !== lineStart) {
                 return true;
               }
 
