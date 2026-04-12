@@ -468,7 +468,6 @@ impl NoteService {
             Vec::new()
         };
         repo.refresh_wikilink_targets(&[previous_title, title.clone()])?;
-        repo.set_last_open_note_id(Some(&input.id))?;
 
         let record = repo.note_by_id(&input.id)?.ok_or(NoteError::NotFound)?;
         Ok((record, note_changed, affected_linked_note_ids))
