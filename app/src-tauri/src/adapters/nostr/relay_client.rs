@@ -216,6 +216,13 @@ impl SnapshotRelayConnection {
         }
     }
 
+    pub async fn send_ping(&mut self) -> Result<(), AppError> {
+        self.write
+            .send(Message::Ping(Default::default()))
+            .await
+            .map_err(|e| AppError::custom(format!("Failed to send websocket ping: {e}")))
+    }
+
     async fn send_json(&mut self, value: serde_json::Value) -> Result<(), AppError> {
         self.write
             .send(Message::from(value.to_string()))

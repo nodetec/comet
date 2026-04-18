@@ -18,6 +18,8 @@ use tokio::sync::{mpsc, watch, Mutex};
 use super::sync_manager::{set_state, sync_log};
 
 const BLOB_RETRY_INTERVAL: Duration = Duration::from_secs(30);
+const RELAY_INACTIVITY_TIMEOUT: Duration = Duration::from_secs(60);
+const PING_INTERVAL: Duration = Duration::from_secs(30);
 
 pub(super) async fn run_snapshot_sync_connection(
     app: &AppHandle,
@@ -100,6 +102,8 @@ pub(super) async fn run_snapshot_sync_connection(
     let debounce_duration = Duration::from_secs(2);
     let mut next_blob_retry_at = tokio::time::Instant::now() + BLOB_RETRY_INTERVAL;
     let mut connected = true;
+    let mut ping_interval = tokio::time::interval(PING_INTERVAL);
+    ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     loop {
         let next_note_wake = pending_pushes.values().min().copied();
@@ -123,9 +127,30 @@ pub(super) async fn run_snapshot_sync_connection(
                 continue;
             }
             _ = shutdown_rx.changed() => return Ok(()),
-            incoming = connection.recv_message() => {
-                handle_snapshot_incoming_message(app, incoming?, &keys, &relay_url, state, &mut connected).await?;
+            _ = ping_interval.tick() => {
+                if let Err(error) = connection.send_ping().await {
+                    sync_log(app, &format!("ping error: {error}"));
+                    return Err(error);
+                }
                 continue;
+            }
+            incoming = tokio::time::timeout(RELAY_INACTIVITY_TIMEOUT, connection.recv_message()) => {
+                match incoming {
+                    Ok(result) => {
+                        handle_snapshot_incoming_message(app, result?, &keys, &relay_url, state, &mut connected).await?;
+                        continue;
+                    }
+                    Err(_) => {
+                        sync_log(
+                            app,
+                            &format!(
+                                "no relay activity for {}s; reconnecting",
+                                RELAY_INACTIVITY_TIMEOUT.as_secs()
+                            ),
+                        );
+                        return Err(AppError::custom("Relay read timeout"));
+                    }
+                }
             }
         }
 
