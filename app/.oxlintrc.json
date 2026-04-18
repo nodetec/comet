@@ -61,7 +61,18 @@
     "no-await-in-loop": "off",
     "no-nested-ternary": "off",
     "unicorn/prefer-add-event-listener": "off",
-    "typescript/no-unnecessary-type-conversion": "off"
+    "typescript/no-unnecessary-type-conversion": "off",
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": ["@/features/*/*/**"],
+            "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+          }
+        ]
+      }
+    ]
   },
   "ignorePatterns": [
     "dist/**",
@@ -70,5 +81,153 @@
     "src-tauri/**",
     "scripts/**"
   ],
-  "overrides": []
+  "overrides": [
+    {
+      "files": ["src/features/command-palette/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/features/*/*/**",
+                  "!@/features/command-palette/**"
+                ],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/editor/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/editor/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/editor-pane/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/editor-pane/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/notes-pane/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/notes-pane/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/publishing/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/publishing/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/settings/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/settings/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/shell/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/shell/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/sidebar-pane/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/sidebar-pane/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/sync/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/*/*/**", "!@/features/sync/**"],
+                "message": "Cross-feature deep imports break feature boundaries. Import from the feature barrel (@/features/<feature>) instead."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }
