@@ -213,7 +213,9 @@ export function NotesPane({
       return;
     }
 
-    noteRowRefs.current.get(nextNoteId)?.scrollIntoView({ block: "nearest" });
+    const nextButton = noteRowRefs.current.get(nextNoteId);
+    nextButton?.scrollIntoView({ block: "nearest" });
+    nextButton?.focus({ preventScroll: true });
     setIsSearchFocused(false);
     onSelectNote(nextNoteId);
   };
