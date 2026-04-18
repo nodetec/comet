@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   resetShellCommandState,
   useShellCommandStore,
-} from "@/features/shell/store/use-shell-command-store";
-import { shellStore } from "@/features/shell/store/use-shell-store";
+} from "@/shared/stores/use-shell-command-store";
+import { shellStore } from "@/shared/stores/use-shell-store";
 import { WikiLinkGrammar } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
 
 const { invokeMock, openUrlMock } = vi.hoisted(() => ({

@@ -17,8 +17,8 @@ import { useShellData } from "@/features/shell/hooks/use-shell-data";
 import { useShellDerivedState } from "@/features/shell/hooks/use-shell-derived-state";
 import { useShellDialogModels } from "@/features/shell/hooks/use-shell-dialog-models";
 import { useShellEffects } from "@/features/shell/hooks/use-shell-effects";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import {
   useActiveTagPath,
   useCreatingSelectedNoteId,
@@ -31,7 +31,7 @@ import {
   useSearchQuery,
   useSelectedNoteId,
   useTagViewActive,
-} from "@/features/shell/store/use-shell-store";
+} from "@/shared/stores/use-shell-store";
 import { useSidebarPaneModel } from "@/features/shell/hooks/use-sidebar-pane-model";
 import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
 import { useViewNavigation } from "@/features/shell/hooks/use-view-navigation";

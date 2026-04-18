@@ -11,10 +11,10 @@ import {
   setTagPinned,
 } from "@/shared/api/invoke";
 import type { LoadedNote, WikiLinkResolutionInput } from "@/shared/api/types";
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 
 export interface TagOperationsDeps {
   draftControl: DraftControl;

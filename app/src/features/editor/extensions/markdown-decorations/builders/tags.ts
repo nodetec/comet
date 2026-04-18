@@ -1,6 +1,6 @@
 import { Decoration } from "@codemirror/view";
 
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
 import type {
   BuilderContext,
   DecorationEntry,

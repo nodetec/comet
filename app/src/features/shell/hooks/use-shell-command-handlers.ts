@@ -1,9 +1,9 @@
 import { useEffect, useEffectEvent, useRef } from "react";
 
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
-import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
+import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import type { NoteFilter } from "@/shared/api/types";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 
 export interface ShellCommandHandlerDeps {
   activeTagPath: string | null;

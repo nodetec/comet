@@ -18,8 +18,8 @@ import {
   useShowEditorToolbar,
   useUIActions,
 } from "@/features/settings/store/use-ui-store";
-import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import {

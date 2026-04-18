@@ -1,7 +1,7 @@
 import {
   type CreateNoteFromWikilinkDetail,
   useShellCommandStore,
-} from "@/features/shell/store/use-shell-command-store";
+} from "@/shared/stores/use-shell-command-store";
 
 export type { CreateNoteFromWikilinkDetail };
 

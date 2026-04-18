@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { FileText } from "lucide-react";
 
 import { searchNotes } from "@/shared/api/invoke";
-import { matchWikiLinkCompletionAtCursor } from "@/features/editor/lib/wikilinks";
+import { matchWikiLinkCompletionAtCursor } from "@/shared/lib/wikilinks";
 
 const WIKILINK_COMPLETION_TEXT_RE = /^[^[\]\n\r]*$/;
 const WIKILINK_COMPLETION_ICON_SVG = renderToStaticMarkup(

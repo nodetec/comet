@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { shellStore } from "@/features/shell/store/use-shell-store";
+import { shellStore } from "@/shared/stores/use-shell-store";
 
 describe("shellStore wikilink resolution reconciliation", () => {
   afterEach(() => {

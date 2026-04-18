@@ -7,8 +7,8 @@ import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { exportNotes, loadNote } from "@/shared/api/invoke";
 import type { LoadedNote, NoteSummary } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 
 type Mutation<TArg = string> = {
   isPending: boolean;

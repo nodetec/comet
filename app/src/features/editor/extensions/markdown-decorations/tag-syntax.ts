@@ -2,7 +2,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { Tag } from "@lezer/highlight";
 import type { MarkdownConfig } from "@lezer/markdown";
 
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
 
 const tags = {
   hashtag: Tag.define(),

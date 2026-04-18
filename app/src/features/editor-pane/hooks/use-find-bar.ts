@@ -7,7 +7,7 @@ import {
 } from "react";
 
 import { type NoteEditorHandle } from "@/features/editor/note-editor";
-import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
+import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,

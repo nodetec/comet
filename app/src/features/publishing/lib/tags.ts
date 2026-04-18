@@ -1,4 +1,4 @@
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
 
 function unwrapAuthoredTag(raw: string): string {
   let value = raw.trim();

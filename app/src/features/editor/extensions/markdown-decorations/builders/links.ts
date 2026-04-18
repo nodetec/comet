@@ -10,8 +10,8 @@ import { Decoration, EditorView } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 
 import { overlapsAny } from "@/features/editor/extensions/markdown-decorations/cursor";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { utf8ByteOffsetForText } from "@/features/editor/lib/wikilinks";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { utf8ByteOffsetForText } from "@/shared/lib/wikilinks";
 import type {
   BuilderContext,
   DecorationEntry,

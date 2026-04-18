@@ -8,7 +8,7 @@ import {
   type SidebarNavigationItem,
 } from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { dispatchFocusNotesPane } from "@/shared/lib/pane-navigation";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 
 function selectSidebarNavigationItem(params: {

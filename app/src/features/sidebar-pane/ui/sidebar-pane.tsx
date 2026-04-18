@@ -7,7 +7,7 @@ import {
   Settings2,
 } from "lucide-react";
 
-import { canonicalizeTagPath } from "@/features/editor/lib/tags";
+import { canonicalizeTagPath } from "@/shared/lib/tags";
 import {
   flattenVisibleSidebarNavigationItems,
   getActiveSidebarNavigationItemId,
@@ -26,9 +26,9 @@ import {
   useFocusedPane,
   useNoteFilter,
   useTagViewActive,
-} from "@/features/shell/store/use-shell-store";
-import { useShellCommandStore } from "@/features/shell/store/use-shell-command-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+} from "@/shared/stores/use-shell-store";
+import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import {
   focusSidebarRow,
   ancestorSidebarTagPaths,

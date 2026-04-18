@@ -4,8 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { getNoteConflict, loadNote } from "@/shared/api/invoke";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 
 export interface SyncListenerDeps {
   queryClient: QueryClient;

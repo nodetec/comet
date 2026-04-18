@@ -6,7 +6,7 @@ import {
   matchWikiLinkCompletionAtCursor,
   normalizeWikiLinkTitle,
   utf8ByteOffsetForText,
-} from "@/features/editor/lib/wikilinks";
+} from "@/shared/lib/wikilinks";
 
 describe("wikilink completion matching", () => {
   it("matches an open wikilink before closing brackets are present", () => {

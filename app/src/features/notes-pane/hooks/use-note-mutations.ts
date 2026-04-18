@@ -23,8 +23,8 @@ import {
   type NoteSummary,
   type WikiLinkResolutionInput,
 } from "@/shared/api/types";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 

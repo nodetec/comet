@@ -81,7 +81,7 @@ import {
 import { useNoteEditorSearchSync } from "@/features/editor/hooks/use-note-editor-search-sync";
 import { useNoteEditorToolbarActions } from "@/features/editor/hooks/use-note-editor-toolbar-actions";
 import { uiStore } from "@/features/settings/store/use-ui-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,

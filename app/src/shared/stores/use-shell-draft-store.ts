@@ -3,7 +3,7 @@ import { create } from "zustand";
 import {
   extractWikiLinkOccurrences,
   normalizeWikiLinkTitle,
-} from "@/features/editor/lib/wikilinks";
+} from "@/shared/lib/wikilinks";
 import type { WikiLinkResolutionInput } from "@/shared/api/types";
 
 function groupWikiLinkOccurrencesByTitle(markdown: string) {

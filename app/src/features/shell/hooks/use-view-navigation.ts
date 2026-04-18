@@ -1,7 +1,7 @@
 import { type QueryClient } from "@tanstack/react-query";
 import type { LoadedNote } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 
 export function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));

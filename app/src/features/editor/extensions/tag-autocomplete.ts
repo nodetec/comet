@@ -14,7 +14,7 @@ import { Hash } from "lucide-react";
 import {
   findTagCompletionOptions,
   matchTagCompletionAtCursor,
-} from "@/features/editor/lib/tags";
+} from "@/shared/lib/tags";
 
 const TAG_COMPLETION_TEXT_RE = /^[-/\p{L}\p{N}_]*$/u;
 const TAG_COMPLETION_ICON_SVG = renderToStaticMarkup(

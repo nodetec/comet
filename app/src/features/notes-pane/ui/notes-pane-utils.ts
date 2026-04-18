@@ -7,7 +7,7 @@ import {
   Submenu,
 } from "@tauri-apps/api/menu";
 
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import {
   type NoteFilter,
   type NoteSortDirection,

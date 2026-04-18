@@ -6,7 +6,7 @@ import type {
   NoteConflictInfo,
   WikiLinkResolutionInput,
 } from "@/shared/api/types";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export interface DraftControlDeps {

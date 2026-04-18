@@ -7,7 +7,7 @@ import {
   uiStore,
   useSidebarVisible,
 } from "@/features/settings/store/use-ui-store";
-import { useShellNavigationStore } from "@/features/shell/store/use-shell-navigation-store";
+import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,

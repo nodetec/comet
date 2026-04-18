@@ -23,13 +23,13 @@ import { FileText, Hash } from "lucide-react";
 import {
   findTagCompletionOptions,
   matchTagCompletionAtCursor,
-} from "@/features/editor/lib/tags";
+} from "@/shared/lib/tags";
 import {
   isRepresentableWikiLinkTitle,
   matchWikiLinkCompletionAtCursor,
   utf8ByteOffsetForText,
-} from "@/features/editor/lib/wikilinks";
-import { useShellDraftStore } from "@/features/shell/store/use-shell-draft-store";
+} from "@/shared/lib/wikilinks";
+import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
 import { searchNoteTitles } from "@/shared/api/invoke";
 
 const TAG_COMPLETION_TEXT_RE = /^[-/\p{L}\p{N}_]*$/u;
