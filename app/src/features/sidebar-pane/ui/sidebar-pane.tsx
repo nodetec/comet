@@ -96,20 +96,15 @@ function usePersistedExpandedTagPaths(availableTagPaths: string[]) {
   const expandedSidebarTagPaths = useExpandedSidebarTagPaths();
   const { setExpandedSidebarTagPaths } = useUIActions();
 
-  const expandedTagPaths = new Set(expandedSidebarTagPaths);
-
-  useEffect(() => {
-    const nextExpandedTagPaths = expandedSidebarTagPaths.filter((path) =>
-      availableTagPaths.includes(path),
-    );
-
-    if (nextExpandedTagPaths.length !== expandedSidebarTagPaths.length) {
-      setExpandedSidebarTagPaths(nextExpandedTagPaths);
-    }
-  }, [availableTagPaths, expandedSidebarTagPaths, setExpandedSidebarTagPaths]);
+  // Drop expanded paths that no longer exist (e.g. a tag was renamed or
+  // deleted). The store may keep stale entries across renders — they stay
+  // invisible, and any toggle writes back the filtered set.
+  const expandedTagPaths = new Set(
+    expandedSidebarTagPaths.filter((path) => availableTagPaths.includes(path)),
+  );
 
   const toggleExpandedTagPath = (path: string) => {
-    const next = new Set(expandedSidebarTagPaths);
+    const next = new Set(expandedTagPaths);
     if (next.has(path)) {
       next.delete(path);
     } else {
