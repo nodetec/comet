@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAdjacentNoteId,
   getNoteListNavigationDirectionForKey,
-} from "@/features/notes-pane/lib/note-list-navigation";
+} from "@/shared/lib/note-list-navigation";
 
 const notes = [{ id: "note-1" }, { id: "note-2" }, { id: "note-3" }];
 

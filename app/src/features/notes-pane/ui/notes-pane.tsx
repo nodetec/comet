@@ -8,13 +8,13 @@ import { searchWordsFromQuery } from "@/shared/lib/search";
 import {
   type NoteListNavigationDirection,
   getAdjacentNoteId,
-} from "@/features/notes-pane/lib/note-list-navigation";
+} from "@/shared/lib/note-list-navigation";
 import {
   defaultNoteSortPrefs,
   useNoteSortPrefs,
   useSidebarVisible,
   useUIActions,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 import {
   useActiveTagPath,
   useCreatingSelectedNoteId,

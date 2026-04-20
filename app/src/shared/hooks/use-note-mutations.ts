@@ -25,7 +25,7 @@ import {
 } from "@/shared/api/types";
 import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
 import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
-import { nextSelectedNoteIdAfterRemoval } from "@/features/shell/utils";
+import { nextSelectedNoteIdAfterRemoval } from "@/shared/lib/note-utils";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export interface NoteMutationDeps {

@@ -3,16 +3,13 @@ import { formatDistanceToNow } from "date-fns";
 import { GitMergeConflict, Pin } from "lucide-react";
 import { motion } from "framer-motion";
 
-import {
-  uiStore,
-  useSidebarVisible,
-} from "@/features/settings/store/use-ui-store";
+import { uiStore, useSidebarVisible } from "@/shared/stores/use-ui-store";
 import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,
   getNoteListNavigationDirectionForKey,
-} from "@/features/notes-pane/lib/note-list-navigation";
+} from "@/shared/lib/note-list-navigation";
 import { type NoteSummary } from "@/shared/api/types";
 
 import { HighlightedText } from "@/features/notes-pane/ui/highlighted-text";

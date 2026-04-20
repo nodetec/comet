@@ -8,7 +8,7 @@ import {
   useEditorVimMode,
   useShowEditorToolbar,
   useUIActions,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 
 import { SettingRow } from "./setting-row";
 

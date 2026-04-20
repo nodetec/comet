@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
 import { type NoteConflictInfo } from "@/shared/api/types";
-import { formatConflictHeadTimestamp } from "@/features/editor-pane/lib/editor-pane-utils";
+import { formatConflictHeadTimestamp } from "@/features/editor/lib/editor-pane-utils";
 
 type ViewableSnapshot = NoteConflictInfo["snapshots"][number];
 

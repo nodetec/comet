@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
-import { uiStore, useUIActions } from "@/features/settings/store/use-ui-store";
+import { uiStore, useUIActions } from "@/shared/stores/use-ui-store";
 import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import {
   getPaneFocusShortcut,

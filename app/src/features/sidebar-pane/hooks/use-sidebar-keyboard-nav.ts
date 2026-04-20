@@ -1,6 +1,6 @@
 import { type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { getNoteListNavigationDirectionForKey } from "@/features/notes-pane/lib/note-list-navigation";
+import { getNoteListNavigationDirectionForKey } from "@/shared/lib/note-list-navigation";
 import {
   getAdjacentSidebarNavigationItem,
   getSidebarCollapseAction,

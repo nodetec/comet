@@ -14,12 +14,12 @@ import {
 } from "@/features/sidebar-pane/lib/sidebar-navigation";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
-import { SyncDialog } from "@/features/sync";
+import { SyncDialog } from "@/shared/ui/sync-dialog";
 import {
   useExpandedSidebarTagPaths,
   useSidebarNotesChildrenOpen,
   useUIActions,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 import { type ContextualTagNode, type NoteFilter } from "@/shared/api/types";
 import {
   useActiveTagPath,

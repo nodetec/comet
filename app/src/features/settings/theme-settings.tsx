@@ -1,10 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getAppStatus, listThemes } from "@/shared/api/invoke";
-import {
-  useThemeName,
-  useUIActions,
-} from "@/features/settings/store/use-ui-store";
+import { useThemeName, useUIActions } from "@/shared/stores/use-ui-store";
 import { SYSTEM_THEME_ID } from "@/shared/theme/schema";
 
 import { SettingRow } from "./setting-row";

@@ -1,4 +1,4 @@
-import type { SettingsTab } from "@/features/settings/store/use-ui-store";
+import type { SettingsTab } from "@/shared/stores/use-ui-store";
 
 const REOPEN_SETTINGS_AFTER_ACCOUNT_CHANGE_KEY =
   "comet:reopen-settings-after-account-change";

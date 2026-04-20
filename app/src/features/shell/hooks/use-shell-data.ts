@@ -1,5 +1,5 @@
-import { useNoteMutations } from "@/features/notes-pane/hooks/use-note-mutations";
-import { useNoteQueries } from "@/features/notes-pane/hooks/use-note-queries";
+import { useNoteMutations } from "@/shared/hooks/use-note-mutations";
+import { useNoteQueries } from "@/shared/hooks/use-note-queries";
 import type { QueryClient } from "@tanstack/react-query";
 import type { RefObject } from "react";
 import type {

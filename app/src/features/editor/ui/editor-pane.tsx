@@ -17,7 +17,7 @@ import {
   useNotesPanelVisible,
   useShowEditorToolbar,
   useUIActions,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import cometLogo from "@/assets/comet.svg";
@@ -47,11 +47,11 @@ import {
   buildEditorMenu,
   firstLineH1Title,
   isEditableElement,
-} from "@/features/editor-pane/lib/editor-pane-utils";
-import { useEditorScrollHeader } from "@/features/editor-pane/hooks/use-editor-scroll-header";
-import { useFindBar } from "@/features/editor-pane/hooks/use-find-bar";
-import { EditorFindBar } from "@/features/editor-pane/ui/editor-find-bar";
-import { ConflictResolutionFooter } from "@/features/editor-pane/ui/conflict-resolution-footer";
+} from "@/features/editor/lib/editor-pane-utils";
+import { useEditorScrollHeader } from "@/features/editor/hooks/use-editor-scroll-header";
+import { useFindBar } from "@/features/editor/hooks/use-find-bar";
+import { EditorFindBar } from "@/features/editor/ui/editor-find-bar";
+import { ConflictResolutionFooter } from "@/features/editor/ui/conflict-resolution-footer";
 
 type EditorPaneProps = {
   availableTagPaths: string[];

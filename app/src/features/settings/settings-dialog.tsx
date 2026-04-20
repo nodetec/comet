@@ -21,7 +21,7 @@ import {
   useSettingsOpen,
   useSettingsTab,
   useUIActions,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 
 import { EditorSettings } from "./editor-settings";
 import { GeneralSettings } from "./general-settings";

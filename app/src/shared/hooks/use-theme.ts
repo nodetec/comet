@@ -2,10 +2,7 @@ import { useEffect } from "react";
 
 import { readTheme } from "@/shared/api/invoke";
 import type { ThemeAppearance, ThemeData } from "@/shared/api/types";
-import {
-  useThemeName,
-  useUIActions,
-} from "@/features/settings/store/use-ui-store";
+import { useThemeName, useUIActions } from "@/shared/stores/use-ui-store";
 import { THEME_COLOR_KEYS } from "@/shared/theme/schema";
 
 const CACHE_KEY = "comet-theme-cache";

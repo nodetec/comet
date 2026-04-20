@@ -5,7 +5,7 @@ import { usePublishState } from "@/features/publishing";
 import {
   defaultNoteSortPrefs,
   useNoteSortPrefs,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 import { useConflictResolution } from "@/features/shell/hooks/use-conflict-resolution";
 import { useDraftControl } from "@/features/shell/hooks/use-draft-control";
 import { useDraftPersistence } from "@/features/shell/hooks/use-draft-persistence";

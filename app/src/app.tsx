@@ -7,10 +7,10 @@ import { Toaster } from "@/shared/ui/sonner";
 import { AccountSwitcherDialog } from "@/features/settings/account-switcher-dialog";
 import { SettingsDialog } from "@/features/settings/settings-dialog";
 import { CommandPalette } from "@/features/command-palette";
-import { BootstrapError } from "@/features/shell/ui/bootstrap-error";
-import { ConflictResolutionDialog } from "@/features/shell/ui/conflict-resolution-dialog";
-import { DeletePublishDialog } from "@/features/shell/ui/delete-publish-dialog";
-import { EditorPane } from "@/features/editor-pane";
+import { BootstrapError } from "@/shared/ui/bootstrap-error";
+import { ConflictResolutionDialog } from "@/shared/ui/conflict-resolution-dialog";
+import { DeletePublishDialog } from "@/shared/ui/delete-publish-dialog";
+import { EditorPane } from "@/features/editor/ui/editor-pane";
 import { NoteHistoryDialog } from "@/features/shell/note-history-dialog";
 import { NotesPane } from "@/features/notes-pane";
 import { PublishDialog, PublishShortNoteDialog } from "@/features/publishing";
@@ -21,7 +21,7 @@ import { useShellController } from "@/features/shell/use-shell-controller";
 import {
   useNotesPanelVisible,
   useSidebarVisible,
-} from "@/features/settings/store/use-ui-store";
+} from "@/shared/stores/use-ui-store";
 
 const IS_MACOS = navigator.userAgent.includes("Mac");
 

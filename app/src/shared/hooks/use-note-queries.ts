@@ -18,7 +18,7 @@ import {
   type NoteSortDirection,
   type NoteSortField,
 } from "@/shared/api/types";
-import { flattenNotePages } from "@/features/shell/utils";
+import { flattenNotePages } from "@/shared/lib/note-utils";
 
 const EMPTY_TAG_TREE: ContextualTagNode[] = [];
 
