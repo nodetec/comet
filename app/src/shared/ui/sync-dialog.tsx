@@ -269,22 +269,27 @@ export function SyncDialog({
 
   const refreshInfo = () => invoke<SyncInfo>("get_sync_info").then(setInfo);
 
+  // While the dialog is open: fetch current info, then refresh whenever
+  // a sync-relevant Tauri event fires.
   useEffect(() => {
     if (!open) return;
-    void refreshInfo();
-  }, [open]);
 
-  // Refresh on sync status changes while dialog is open
-  useEffect(() => {
-    if (!open) return;
-    const unlisten = listen("sync-status", () => {
-      void refreshInfo();
-    });
+    void refreshInfo();
+    const onEvent = () => void refreshInfo();
+    const unlistens = Promise.all([
+      listen("sync-status", onEvent),
+      listen("sync-remote-change", onEvent),
+      listen("sync-progress", onEvent),
+    ]);
+
     return () => {
-      void unlisten.then((fn) => fn());
+      void unlistens.then((fns) => {
+        for (const fn of fns) fn();
+      });
     };
   }, [open]);
 
+  // Poll while an active sync state is in progress.
   useEffect(() => {
     if (!open || !info || !isActiveSyncState(info.state)) return;
     const timer = window.setInterval(() => {
@@ -292,26 +297,6 @@ export function SyncDialog({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [open, info]);
-
-  useEffect(() => {
-    if (!open) return;
-    const unlisten = listen("sync-remote-change", () => {
-      void refreshInfo();
-    });
-    return () => {
-      void unlisten.then((fn) => fn());
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const unlisten = listen("sync-progress", () => {
-      void refreshInfo();
-    });
-    return () => {
-      void unlisten.then((fn) => fn());
-    };
-  }, [open]);
 
   // Collect sync log events
   useEffect(() => {
