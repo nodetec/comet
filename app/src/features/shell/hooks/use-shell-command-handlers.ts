@@ -1,5 +1,4 @@
-import { useEffect, useEffectEvent, useRef } from "react";
-
+import { useCommandRequest } from "@/shared/hooks/use-command-request";
 import { canonicalizeTagPath } from "@/shared/lib/tags";
 import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import type { NoteFilter } from "@/shared/api/types";
@@ -45,12 +44,8 @@ export function useShellCommandHandlers(deps: ShellCommandHandlerDeps) {
   const focusTagPathRequest = useShellCommandStore(
     (state) => state.focusTagPathRequest,
   );
-  const lastHandledCreateNoteFromWikilinkRequestIdRef = useRef(0);
-  const lastHandledFocusNoteRequestIdRef = useRef(0);
-  const lastHandledFocusTagPathRequestIdRef = useRef(0);
-
-  const handleFocusTagPath = useEffectEvent((requestedTagPath: string) => {
-    const tagPath = canonicalizeTagPath(requestedTagPath);
+  useCommandRequest(focusTagPathRequest, (request) => {
+    const tagPath = canonicalizeTagPath(request.tagPath);
     if (!tagPath) {
       return;
     }
@@ -59,8 +54,8 @@ export function useShellCommandHandlers(deps: ShellCommandHandlerDeps) {
     handleSelectTagPath(tagPath);
   });
 
-  const handleFocusNote = useEffectEvent((requestedNoteId: string) => {
-    const noteId = requestedNoteId.trim();
+  useCommandRequest(focusNoteRequest, (request) => {
+    const noteId = request.noteId.trim();
     if (!noteId) {
       return;
     }
@@ -69,71 +64,30 @@ export function useShellCommandHandlers(deps: ShellCommandHandlerDeps) {
     handleSelectNote(noteId);
   });
 
-  const handleCreateNoteFromWikilink = useEffectEvent(
-    (request: { location: number; sourceNoteId: string; title: string }) => {
-      const title = request.title.trim();
-      if (!title || isCreatingNote) {
-        return;
-      }
-
-      flushCurrentDraft();
-      const tagsForNewNote =
-        tagViewActive && activeTagPath ? [activeTagPath] : [];
-      if (
-        !tagViewActive &&
-        noteFilter !== "today" &&
-        noteFilter !== "todo" &&
-        noteFilter !== "pinned" &&
-        noteFilter !== "untagged"
-      ) {
-        setNoteFilter("all");
-      }
-      setFocusedPane("notes");
-      prepareNoteCreation();
-      createNoteMutation.mutate({
-        autoFocusEditor: false,
-        tags: tagsForNewNote,
-        markdown: `# ${title}`,
-      });
-    },
-  );
-
-  useEffect(() => {
-    if (
-      !focusTagPathRequest ||
-      lastHandledFocusTagPathRequestIdRef.current ===
-        focusTagPathRequest.requestId
-    ) {
+  useCommandRequest(createNoteFromWikilinkRequest, (request) => {
+    const title = request.title.trim();
+    if (!title || isCreatingNote) {
       return;
     }
 
-    lastHandledFocusTagPathRequestIdRef.current = focusTagPathRequest.requestId;
-    handleFocusTagPath(focusTagPathRequest.tagPath);
-  }, [focusTagPathRequest, handleFocusTagPath]);
-
-  useEffect(() => {
+    flushCurrentDraft();
+    const tagsForNewNote =
+      tagViewActive && activeTagPath ? [activeTagPath] : [];
     if (
-      !focusNoteRequest ||
-      lastHandledFocusNoteRequestIdRef.current === focusNoteRequest.requestId
+      !tagViewActive &&
+      noteFilter !== "today" &&
+      noteFilter !== "todo" &&
+      noteFilter !== "pinned" &&
+      noteFilter !== "untagged"
     ) {
-      return;
+      setNoteFilter("all");
     }
-
-    lastHandledFocusNoteRequestIdRef.current = focusNoteRequest.requestId;
-    handleFocusNote(focusNoteRequest.noteId);
-  }, [focusNoteRequest, handleFocusNote]);
-
-  useEffect(() => {
-    if (
-      !createNoteFromWikilinkRequest ||
-      lastHandledCreateNoteFromWikilinkRequestIdRef.current ===
-        createNoteFromWikilinkRequest.requestId
-    ) {
-      return;
-    }
-
-    lastHandledCreateNoteFromWikilinkRequestIdRef.current =
-      createNoteFromWikilinkRequest.requestId;
-    handleCreateNoteFromWikilink(createNoteFromWikilinkRequest);
-  }, [createNoteFromWikilinkRequest, handleCreateNoteFromWikilink]);
+    setFocusedPane("notes");
+    prepareNoteCreation();
+    createNoteMutation.mutate({
+      autoFocusEditor: false,
+      tags: tagsForNewNote,
+      markdown: `# ${title}`,
+    });
+  });
 }

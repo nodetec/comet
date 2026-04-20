@@ -18,6 +18,7 @@ import {
   useShowEditorToolbar,
   useUIActions,
 } from "@/shared/stores/use-ui-store";
+import { useCommandRequest } from "@/shared/hooks/use-command-request";
 import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
 import cometLogo from "@/assets/comet.svg";
@@ -199,7 +200,6 @@ export function EditorPane({
     setToolbarContainer(node);
   };
   const editorLoadKey = noteId ? (editorKey ?? noteId) : null;
-  const lastHandledFocusEditorRequestIdRef = useRef(0);
 
   const openEditorMenu = async (position: LogicalPosition) => {
     if (!noteId) return;
@@ -278,37 +278,22 @@ export function EditorPane({
       window.removeEventListener("keydown", handleGlobalHistoryKeyDown);
   }, []);
 
-  const handleFocusEditor = useEffectEvent(
-    (scrollTo: "preserve" | "top" = "preserve") => {
-      if (!noteId) {
-        return;
-      }
-
-      setFocusedPane("editor");
-      requestAnimationFrame(() => {
-        if (scrollTo === "top") {
-          editorRef.current?.focusAtStart();
-          scrollContainerRef.current?.scrollTo({ top: 0 });
-          return;
-        }
-
-        editorRef.current?.focus();
-      });
-    },
-  );
-
-  useEffect(() => {
-    if (
-      !focusEditorRequest ||
-      lastHandledFocusEditorRequestIdRef.current ===
-        focusEditorRequest.requestId
-    ) {
+  useCommandRequest(focusEditorRequest, (request) => {
+    if (!noteId) {
       return;
     }
 
-    lastHandledFocusEditorRequestIdRef.current = focusEditorRequest.requestId;
-    handleFocusEditor(focusEditorRequest.scrollTo);
-  }, [focusEditorRequest, handleFocusEditor]);
+    setFocusedPane("editor");
+    requestAnimationFrame(() => {
+      if (request.scrollTo === "top") {
+        editorRef.current?.focusAtStart();
+        scrollContainerRef.current?.scrollTo({ top: 0 });
+        return;
+      }
+
+      editorRef.current?.focus();
+    });
+  });
 
   const headerActions =
     noteId !== null ? (

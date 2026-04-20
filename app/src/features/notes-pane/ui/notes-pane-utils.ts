@@ -117,6 +117,7 @@ export function handleNoteRowPointerDown(
 
   event.preventDefault();
   window.getSelection()?.removeAllRanges();
+  event.currentTarget.focus({ preventScroll: true });
 }
 
 export function focusSelectedNoteRow(root?: ParentNode | null) {

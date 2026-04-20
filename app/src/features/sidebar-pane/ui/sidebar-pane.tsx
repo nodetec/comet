@@ -7,6 +7,7 @@ import {
   Settings2,
 } from "lucide-react";
 
+import { useCommandRequest } from "@/shared/hooks/use-command-request";
 import { canonicalizeTagPath } from "@/shared/lib/tags";
 import {
   flattenVisibleSidebarNavigationItems,
@@ -194,7 +195,6 @@ export function SidebarPane({
   const [pendingScrollTagPath, setPendingScrollTagPath] = useState<
     string | null
   >(null);
-  const lastHandledFocusTagPathRequestIdRef = useRef(0);
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const sidebarRowRefs = useRef(new Map<string, HTMLElement | null>());
@@ -236,33 +236,23 @@ export function SidebarPane({
     noteFilter,
   });
 
-  useEffect(() => {
-    if (
-      !focusTagPathRequest ||
-      lastHandledFocusTagPathRequestIdRef.current ===
-        focusTagPathRequest.requestId
-    ) {
-      return;
-    }
-
-    const tagPath = canonicalizeTagPath(focusTagPathRequest.tagPath);
-    if (!tagPath || !availableTagPaths.includes(tagPath)) {
-      return;
-    }
-
-    lastHandledFocusTagPathRequestIdRef.current = focusTagPathRequest.requestId;
-    const nextExpanded = new Set(expandedSidebarTagPaths);
-    for (const ancestor of ancestorSidebarTagPaths(tagPath)) {
-      nextExpanded.add(ancestor);
-    }
-    setExpandedSidebarTagPaths([...nextExpanded]);
-    setPendingScrollTagPath(tagPath);
-  }, [
-    availableTagPaths,
-    expandedSidebarTagPaths,
+  useCommandRequest(
     focusTagPathRequest,
-    setExpandedSidebarTagPaths,
-  ]);
+    (request) => {
+      const tagPath = canonicalizeTagPath(request.tagPath);
+      if (!tagPath || !availableTagPaths.includes(tagPath)) {
+        return false;
+      }
+
+      const nextExpanded = new Set(expandedSidebarTagPaths);
+      for (const ancestor of ancestorSidebarTagPaths(tagPath)) {
+        nextExpanded.add(ancestor);
+      }
+      setExpandedSidebarTagPaths([...nextExpanded]);
+      setPendingScrollTagPath(tagPath);
+    },
+    [availableTagPaths],
+  );
 
   // --- Scroll to pending tag ---
   useEffect(() => {

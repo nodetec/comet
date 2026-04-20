@@ -4,6 +4,10 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useInView } from "react-intersection-observer";
 
 import { Button } from "@/shared/ui/button";
+import {
+  useCommandRequest,
+  useCommandRequestId,
+} from "@/shared/hooks/use-command-request";
 import { searchWordsFromQuery } from "@/shared/lib/search";
 import {
   type NoteListNavigationDirection,
@@ -155,10 +159,7 @@ export function NotesPane({
   const pendingNotesPaneSelectionRef = useRef<"first" | "selected" | null>(
     null,
   );
-  const lastHandledFocusNotesPaneRequestIdRef = useRef(0);
-  const lastHandledFocusNotesSearchRequestIdRef = useRef(0);
   const noteRowRefs = useRef(new Map<string, HTMLButtonElement | null>());
-  const shouldRestoreSelectedRowFocusRef = useRef(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const { ref: loadMoreRef, inView } = useInView({
@@ -245,34 +246,15 @@ export function NotesPane({
     searchInputRef.current?.select();
   }, [isSearchOpen]);
 
-  useEffect(() => {
-    if (
-      focusNotesSearchRequestId === 0 ||
-      lastHandledFocusNotesSearchRequestIdRef.current ===
-        focusNotesSearchRequestId
-    ) {
-      return;
-    }
-
-    lastHandledFocusNotesSearchRequestIdRef.current = focusNotesSearchRequestId;
+  useCommandRequestId(focusNotesSearchRequestId, () => {
     setFocusedPane("notes");
     setIsSearchOpen(true);
     setIsSearchFocused(true);
     focusSearchInput();
-  }, [focusNotesSearchRequestId, focusSearchInput, setFocusedPane]);
+  });
 
-  useEffect(() => {
-    if (
-      !focusNotesPaneRequest ||
-      lastHandledFocusNotesPaneRequestIdRef.current ===
-        focusNotesPaneRequest.requestId
-    ) {
-      return;
-    }
-
-    lastHandledFocusNotesPaneRequestIdRef.current =
-      focusNotesPaneRequest.requestId;
-    let selection = focusNotesPaneRequest.selection ?? "selected";
+  useCommandRequest(focusNotesPaneRequest, (request) => {
+    let selection = request.selection ?? "selected";
 
     // If the selected note isn't in the current filtered list, fall back
     // to selecting the first visible note instead of focusing an empty
@@ -302,14 +284,7 @@ export function NotesPane({
     setFocusedPane("notes");
     setIsSearchFocused(false);
     focusNotesPaneTarget(scrollContainerRef.current);
-  }, [
-    focusNotesPaneRequest,
-    filteredNotes,
-    isNotesPlaceholderData,
-    selectFirstVisibleNote,
-    selectedNoteId,
-    setFocusedPane,
-  ]);
+  });
 
   useEffect(() => {
     setShowHeaderBorder((scrollContainerRef.current?.scrollTop ?? 0) > 0);
@@ -320,29 +295,21 @@ export function NotesPane({
       return;
     }
 
-    if (pendingNotesPaneSelectionRef.current && isNotesPlaceholderData) {
+    if (!pendingNotesPaneSelectionRef.current) {
       return;
     }
 
-    // Only respond to filteredNotes.length changes when there is a
-    // pending selection (initial data load). Without this guard,
-    // loading more notes via infinite scroll would scroll back to
-    // the selected note.
-    if (
-      !pendingNotesPaneSelectionRef.current &&
-      !shouldRestoreSelectedRowFocusRef.current
-    ) {
+    if (isNotesPlaceholderData) {
       return;
     }
 
-    if (selectedNoteId || shouldRestoreSelectedRowFocusRef.current) {
+    if (selectedNoteId) {
       pendingNotesPaneSelectionRef.current = null;
-      shouldRestoreSelectedRowFocusRef.current = false;
       focusSelectedNoteRow(scrollContainerRef.current);
       return;
     }
 
-    if (pendingNotesPaneSelectionRef.current && selectFirstVisibleNote()) {
+    if (selectFirstVisibleNote()) {
       pendingNotesPaneSelectionRef.current = null;
       return;
     }
@@ -550,9 +517,6 @@ export function NotesPane({
                       selectedNoteId={selectedNoteId}
                       setSlideInNoteId={setSlideInNoteId}
                       shouldSkipAnimation={shouldSkipAnimation}
-                      setShouldRestoreSelectedRowFocus={() => {
-                        shouldRestoreSelectedRowFocusRef.current = true;
-                      }}
                     />
                   );
                 })}

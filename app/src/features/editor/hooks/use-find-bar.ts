@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { type NoteEditorHandle } from "@/features/editor/note-editor";
+import { useCommandRequestId } from "@/shared/hooks/use-command-request";
 import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
 import {
   isEditorFindShortcut,
@@ -35,7 +36,6 @@ export function useFindBar({
   );
   const findInputRef = useRef<HTMLInputElement | null>(null);
   const lastActiveNoteIdRef = useRef(noteId);
-  const lastHandledEditorFindRequestIdRef = useRef(0);
   const hasEditorFindQuery = findOpen && findQuery.trim().length > 0;
 
   const activeEditorSearch = resolveActiveEditorSearch({
@@ -145,17 +145,9 @@ export function useFindBar({
     };
   }, []);
 
-  useEffect(() => {
-    if (
-      editorFindRequestId === 0 ||
-      lastHandledEditorFindRequestIdRef.current === editorFindRequestId
-    ) {
-      return;
-    }
-
-    lastHandledEditorFindRequestIdRef.current = editorFindRequestId;
+  useCommandRequestId(editorFindRequestId, () => {
     openFind();
-  }, [editorFindRequestId, openFind]);
+  });
 
   return {
     findOpen,

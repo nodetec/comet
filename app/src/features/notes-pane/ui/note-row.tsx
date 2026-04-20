@@ -34,7 +34,6 @@ export type NoteRowProps = {
   searchWords: string[];
   selectedNoteId: string | null;
   setSlideInNoteId(noteId: string | null): void;
-  setShouldRestoreSelectedRowFocus(): void;
   shouldSkipAnimation: boolean;
 };
 
@@ -53,7 +52,6 @@ export function NoteRow({
   searchWords,
   selectedNoteId,
   setSlideInNoteId,
-  setShouldRestoreSelectedRowFocus,
   shouldSkipAnimation,
 }: NoteRowProps) {
   const isActive = note.id === selectedNoteId;
@@ -124,10 +122,7 @@ export function NoteRow({
             setFocusedPane("sidebar");
           }
         }}
-        onPointerDown={(event) => {
-          handleNoteRowPointerDown(event);
-          setShouldRestoreSelectedRowFocus();
-        }}
+        onPointerDown={handleNoteRowPointerDown}
         onMouseDown={(event) => {
           if (event.button === 2) {
             event.preventDefault();
