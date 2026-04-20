@@ -23,8 +23,8 @@ import {
   type NoteSummary,
   type WikiLinkResolutionInput,
 } from "@/shared/api/types";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import { nextSelectedNoteIdAfterRemoval } from "@/shared/lib/note-utils";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
@@ -72,7 +72,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     setCreatingSelectedNoteId,
     setPendingAutoFocusEditorNoteId,
     setIsCreatingNoteTransition,
-  } = useShellNavigationStore((state) => state.actions);
+  } = useNavigationStore((state) => state.actions);
 
   const invalidateNotes = async () => {
     await queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -147,7 +147,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
           draftMarkdown: liveDraftMarkdown,
           draftNoteId: liveDraftNoteId,
           draftWikilinkResolutions: liveDraftWikilinkResolutions,
-        } = useShellDraftStore.getState();
+        } = useDraftStore.getState();
         const shouldReconcileDraft =
           liveDraftNoteId === savedNote.id &&
           liveDraftMarkdown === context.submittedMarkdown &&
@@ -165,7 +165,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
 
       // Eagerly refresh affected notes so their cache has the rewritten wikilinks
       if (affectedLinkedNoteIds.length > 0) {
-        const { draftNoteId: liveDraftNoteId } = useShellDraftStore.getState();
+        const { draftNoteId: liveDraftNoteId } = useDraftStore.getState();
         const refreshResults = await Promise.allSettled(
           affectedLinkedNoteIds.map((id) => loadNote(id)),
         );
@@ -300,7 +300,7 @@ export function useNoteMutations(deps: NoteMutationDeps) {
     onSuccess: (_, noteId) => {
       queryClient.removeQueries({ exact: true, queryKey: ["note", noteId] });
 
-      if (useShellDraftStore.getState().draftNoteId === noteId) {
+      if (useDraftStore.getState().draftNoteId === noteId) {
         setDraft("", "");
         clearDraftWikilinkResolutions(noteId);
       }

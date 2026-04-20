@@ -8,10 +8,10 @@ import {
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  resetShellCommandState,
-  useShellCommandStore,
-} from "@/shared/stores/use-shell-command-store";
-import { shellStore } from "@/shared/stores/use-shell-store";
+  resetCommandState,
+  useCommandStore,
+} from "@/shared/stores/use-command-store";
+import { appStore } from "@/shared/stores/use-app-state";
 import { WikiLinkGrammar } from "@/features/editor/extensions/markdown-decorations/wikilink-syntax";
 
 const { invokeMock, openUrlMock } = vi.hoisted(() => ({
@@ -69,8 +69,8 @@ async function flush() {
 afterEach(() => {
   invokeMock.mockReset();
   openUrlMock.mockClear();
-  resetShellCommandState();
-  shellStore.setState({
+  resetCommandState();
+  appStore.setState({
     draftMarkdown: "",
     draftNoteId: null,
     draftWikilinkResolutions: [],
@@ -430,7 +430,7 @@ describe("Editor link interactions", () => {
   });
 
   it("prefers unsaved draft wikilink resolutions before backend lookup", () => {
-    shellStore.setState({
+    appStore.setState({
       draftMarkdown: "[[Target]]",
       draftNoteId: "note-1",
       draftWikilinkResolutions: [
@@ -482,9 +482,7 @@ describe("Editor link interactions", () => {
         title: "Target",
       },
     });
-    expect(
-      useShellCommandStore.getState().createNoteFromWikilinkRequest,
-    ).toEqual({
+    expect(useCommandStore.getState().createNoteFromWikilinkRequest).toEqual({
       location: 0,
       requestId: 1,
       sourceNoteId: "note-1",

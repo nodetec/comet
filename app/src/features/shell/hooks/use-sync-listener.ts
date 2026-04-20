@@ -4,8 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { getNoteConflict, loadNote } from "@/shared/api/invoke";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 
 export interface SyncListenerDeps {
   queryClient: QueryClient;
@@ -24,10 +24,10 @@ function handleFreshNote(
 ) {
   if (!freshNote) return;
   queryClient.setQueryData(["note", freshNote.id], freshNote);
-  const { draftMarkdown: currentDraft } = useShellDraftStore.getState();
+  const { draftMarkdown: currentDraft } = useDraftStore.getState();
 
   if (freshNote.markdown !== currentDraft) {
-    useShellDraftStore.getState().actions.setDraft("", "");
+    useDraftStore.getState().actions.setDraft("", "");
     bumpSyncEditorRevision("sync-remote-upsert", {
       draftLength: currentDraft.length,
       freshLength: freshNote.markdown.length,
@@ -84,8 +84,8 @@ export function useSyncListener(deps: SyncListenerDeps) {
               exact: true,
               queryKey: ["note", currentOpenNoteId],
             });
-            useShellDraftStore.getState().actions.setDraft("", "");
-            useShellNavigationStore.getState().actions.setSelectedNoteId(null);
+            useDraftStore.getState().actions.setDraft("", "");
+            useNavigationStore.getState().actions.setSelectedNoteId(null);
             bumpSyncEditorRevision(reason, {
               noteId: currentOpenNoteId,
             });
@@ -144,9 +144,9 @@ export function useSyncListener(deps: SyncListenerDeps) {
         }
       }
 
-      const { draftNoteId: currentDraftId } = useShellDraftStore.getState();
+      const { draftNoteId: currentDraftId } = useDraftStore.getState();
       const { selectedNoteId: currentSelectedId } =
-        useShellNavigationStore.getState();
+        useNavigationStore.getState();
       const currentOpenNoteId = currentDraftId ?? currentSelectedId;
       const hasPendingSave =
         Boolean(pendingSaveTimeoutRef.current) || isSavingRef.current;
@@ -156,8 +156,8 @@ export function useSyncListener(deps: SyncListenerDeps) {
           exact: true,
           queryKey: ["note", currentOpenNoteId],
         });
-        useShellDraftStore.getState().actions.setDraft("", "");
-        useShellNavigationStore.getState().actions.setSelectedNoteId(null);
+        useDraftStore.getState().actions.setDraft("", "");
+        useNavigationStore.getState().actions.setSelectedNoteId(null);
         bumpSyncEditorRevision("sync-remote-delete", {
           noteId: currentOpenNoteId,
         });

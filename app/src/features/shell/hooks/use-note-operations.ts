@@ -7,8 +7,8 @@ import { toastErrorHandler } from "@/shared/lib/mutation-utils";
 import { exportNotes, loadNote } from "@/shared/api/invoke";
 import type { LoadedNote, NoteSummary } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 
 type Mutation<TArg = string> = {
   isPending: boolean;
@@ -79,7 +79,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
         return;
       }
 
-      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+      if (noteId === useNavigationStore.getState().selectedNoteId) {
         await flushCurrentDraftAsync();
       }
 
@@ -107,7 +107,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
         return;
       }
 
-      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+      if (noteId === useNavigationStore.getState().selectedNoteId) {
         discardPendingSave();
       }
 
@@ -135,7 +135,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
         return;
       }
 
-      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+      if (noteId === useNavigationStore.getState().selectedNoteId) {
         discardPendingSave();
       }
 
@@ -162,7 +162,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     }
 
     void (async () => {
-      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+      if (noteId === useNavigationStore.getState().selectedNoteId) {
         await flushCurrentDraftAsync();
       }
 
@@ -179,7 +179,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     }
 
     void (async () => {
-      if (noteId === useShellNavigationStore.getState().selectedNoteId) {
+      if (noteId === useNavigationStore.getState().selectedNoteId) {
         await flushCurrentDraftAsync();
       }
 
@@ -190,8 +190,8 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
   const handleCopyNoteContent = (noteId: string) => {
     void (async () => {
       try {
-        const { draftMarkdown, draftNoteId } = useShellDraftStore.getState();
-        const { selectedNoteId } = useShellNavigationStore.getState();
+        const { draftMarkdown, draftNoteId } = useDraftStore.getState();
+        const { selectedNoteId } = useNavigationStore.getState();
         if (noteId === selectedNoteId && draftNoteId === noteId) {
           await writeText(draftMarkdown);
           return;
@@ -212,7 +212,7 @@ export function useNoteOperations(deps: NoteOperationsDeps) {
     void (async () => {
       try {
         const { activeTagPath, noteFilter, tagViewActive } =
-          useShellNavigationStore.getState();
+          useNavigationStore.getState();
         const selected = await open({
           directory: true,
           title:

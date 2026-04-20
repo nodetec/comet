@@ -17,8 +17,8 @@ import { useShellData } from "@/features/shell/hooks/use-shell-data";
 import { useShellDerivedState } from "@/features/shell/hooks/use-shell-derived-state";
 import { useShellDialogModels } from "@/features/shell/hooks/use-shell-dialog-models";
 import { useShellEffects } from "@/features/shell/hooks/use-shell-effects";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import {
   useActiveTagPath,
   useCreatingSelectedNoteId,
@@ -31,7 +31,7 @@ import {
   useSearchQuery,
   useSelectedNoteId,
   useTagViewActive,
-} from "@/shared/stores/use-shell-store";
+} from "@/shared/stores/use-app-state";
 import { useSidebarPaneModel } from "@/features/shell/hooks/use-sidebar-pane-model";
 import { useTagOperations } from "@/features/shell/hooks/use-tag-operations";
 import { useViewNavigation } from "@/features/shell/hooks/use-view-navigation";
@@ -56,7 +56,7 @@ export function useShellController() {
   const searchQuery = useSearchQuery();
   const selectedNoteId = useSelectedNoteId();
   const tagViewActive = useTagViewActive();
-  const { clearDraftWikilinkResolutions, setDraft } = useShellDraftStore(
+  const { clearDraftWikilinkResolutions, setDraft } = useDraftStore(
     (state) => state.actions,
   );
   const {
@@ -65,7 +65,7 @@ export function useShellController() {
     setPendingAutoFocusEditorNoteId,
     setSelectedNoteId,
     setTagViewActive,
-  } = useShellNavigationStore((state) => state.actions);
+  } = useNavigationStore((state) => state.actions);
   const effectiveNoteFilter = tagViewActive ? "all" : noteFilter;
   const allSortPrefs = useNoteSortPrefs();
   const sortPrefs = allSortPrefs[effectiveNoteFilter] ?? defaultNoteSortPrefs;

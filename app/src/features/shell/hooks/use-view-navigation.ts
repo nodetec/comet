@@ -1,7 +1,7 @@
 import { type QueryClient } from "@tanstack/react-query";
 import type { LoadedNote } from "@/shared/api/types";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 
 export function matchesTagScope(tags: string[], tagPath: string) {
   return tags.some((tag) => tag === tagPath || tag.startsWith(`${tagPath}/`));
@@ -32,14 +32,14 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
     prepareNoteCreation,
     setFocusedPane,
     setNoteFilter,
-  } = useShellNavigationStore((state) => state.actions);
+  } = useNavigationStore((state) => state.actions);
 
   const { flushCurrentDraft, withFlushedCurrentDraft } = draftControl;
   const createNotePending = createNoteMutation.isPending;
   const mutateCreateNote = createNoteMutation.mutate;
 
   const getCurrentNote = (): LoadedNote | undefined => {
-    const { selectedNoteId } = useShellNavigationStore.getState();
+    const { selectedNoteId } = useNavigationStore.getState();
     if (!selectedNoteId) {
       return undefined;
     }
@@ -53,7 +53,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
       isCreatingNoteTransition,
       noteFilter,
       tagViewActive,
-    } = useShellNavigationStore.getState();
+    } = useNavigationStore.getState();
     const isCreatingNote = isCreatingNoteTransition || createNotePending;
     if (isCreatingNote) {
       return;
@@ -110,7 +110,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
   };
 
   const handleSelectTagPath = (tagPath: string) => {
-    const { activeTagPath, tagViewActive } = useShellNavigationStore.getState();
+    const { activeTagPath, tagViewActive } = useNavigationStore.getState();
     if (tagViewActive && activeTagPath === tagPath) {
       return;
     }
@@ -121,7 +121,7 @@ export function useViewNavigation(deps: ViewNavigationDeps) {
   };
 
   const handleSelectNote = (noteId: string) => {
-    const { selectedNoteId } = useShellNavigationStore.getState();
+    const { selectedNoteId } = useNavigationStore.getState();
     if (noteId === selectedNoteId) {
       setFocusedPane("notes");
       return;

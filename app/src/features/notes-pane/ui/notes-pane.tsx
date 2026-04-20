@@ -26,9 +26,9 @@ import {
   useNoteFilter,
   useSearchQuery,
   useTagViewActive,
-} from "@/shared/stores/use-shell-store";
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+} from "@/shared/stores/use-app-state";
+import { useCommandStore } from "@/shared/stores/use-command-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import {
   type NoteSortDirection,
   type NoteSortField,
@@ -100,14 +100,15 @@ export function NotesPane({
   const noteFilter = tagViewActive ? "all" : storeNoteFilter;
   const searchQuery = useSearchQuery();
   const creatingNoteId = useCreatingSelectedNoteId();
-  const focusNotesPaneRequest = useShellCommandStore(
+  const focusNotesPaneRequest = useCommandStore(
     (state) => state.focusNotesPaneRequest,
   );
-  const focusNotesSearchRequestId = useShellCommandStore(
+  const focusNotesSearchRequestId = useCommandStore(
     (state) => state.focusNotesSearchRequestId,
   );
-  const { setFocusedPane, setSearchQuery: onChangeSearch } =
-    useShellNavigationStore((state) => state.actions);
+  const { setFocusedPane, setSearchQuery: onChangeSearch } = useNavigationStore(
+    (state) => state.actions,
+  );
   const { setNoteSortPrefs } = useUIActions();
 
   const sortViewKey = noteFilter;

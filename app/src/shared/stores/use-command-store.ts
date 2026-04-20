@@ -36,7 +36,7 @@ export type FocusEditorRequest = FocusEditorDetail & {
   requestId: number;
 };
 
-type ShellCommandActions = {
+type CommandActions = {
   requestCreateNoteFromWikilink(detail: CreateNoteFromWikilinkDetail): void;
   requestFocusEditor(detail?: FocusEditorDetail): void;
   requestFocusNote(noteId: string): void;
@@ -46,7 +46,7 @@ type ShellCommandActions = {
   requestOpenEditorFind(): void;
 };
 
-type ShellCommandDataState = {
+type CommandDataState = {
   createNoteFromWikilinkRequest: CreateNoteFromWikilinkRequest | null;
   editorFindRequestId: number;
   focusEditorRequest: FocusEditorRequest | null;
@@ -57,11 +57,11 @@ type ShellCommandDataState = {
   nextRequestId: number;
 };
 
-type ShellCommandState = ShellCommandDataState & {
-  actions: ShellCommandActions;
+type CommandState = CommandDataState & {
+  actions: CommandActions;
 };
 
-export const EMPTY_SHELL_COMMAND_STATE = {
+export const EMPTY_COMMAND_STATE = {
   createNoteFromWikilinkRequest: null,
   editorFindRequestId: 0,
   focusEditorRequest: null,
@@ -70,14 +70,14 @@ export const EMPTY_SHELL_COMMAND_STATE = {
   focusNotesSearchRequestId: 0,
   focusTagPathRequest: null,
   nextRequestId: 1,
-} satisfies ShellCommandDataState;
+} satisfies CommandDataState;
 
-export function resetShellCommandState() {
-  useShellCommandStore.setState(EMPTY_SHELL_COMMAND_STATE);
+export function resetCommandState() {
+  useCommandStore.setState(EMPTY_COMMAND_STATE);
 }
 
-const useShellCommandStore = create<ShellCommandState>((set) => ({
-  ...EMPTY_SHELL_COMMAND_STATE,
+const useCommandStore = create<CommandState>((set) => ({
+  ...EMPTY_COMMAND_STATE,
   actions: {
     requestCreateNoteFromWikilink: (detail) => {
       set((state) => ({
@@ -139,4 +139,4 @@ const useShellCommandStore = create<ShellCommandState>((set) => ({
   },
 }));
 
-export { useShellCommandStore };
+export { useCommandStore };

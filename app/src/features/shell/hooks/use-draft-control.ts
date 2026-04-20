@@ -6,7 +6,7 @@ import type {
   NoteConflictInfo,
   WikiLinkResolutionInput,
 } from "@/shared/api/types";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
 import { haveSameWikilinkResolutions } from "@/shared/lib/wikilink-resolutions";
 
 export interface DraftControlDeps {
@@ -31,7 +31,7 @@ export function useDraftControl(deps: DraftControlDeps) {
 
   const getCurrentDraftState = () => {
     const { draftMarkdown, draftNoteId, draftWikilinkResolutions } =
-      useShellDraftStore.getState();
+      useDraftStore.getState();
     if (!draftNoteId) {
       return null;
     }

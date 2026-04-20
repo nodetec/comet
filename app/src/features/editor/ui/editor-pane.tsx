@@ -19,8 +19,8 @@ import {
   useUIActions,
 } from "@/shared/stores/use-ui-store";
 import { useCommandRequest } from "@/shared/hooks/use-command-request";
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useCommandStore } from "@/shared/stores/use-command-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import cometLogo from "@/assets/comet.svg";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import {
@@ -128,7 +128,7 @@ export function EditorPane({
   const [toolbarContainer, setToolbarContainer] = useState<HTMLElement | null>(
     null,
   );
-  const focusEditorRequest = useShellCommandStore(
+  const focusEditorRequest = useCommandStore(
     (state) => state.focusEditorRequest,
   );
   const editorFontSize = useEditorFontSize();
@@ -137,7 +137,7 @@ export function EditorPane({
   const editorSpellCheck = useEditorSpellCheck();
   const editorVimMode = useEditorVimMode();
   const { setShowEditorToolbar: setShowToolbar } = useUIActions();
-  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
+  const { setFocusedPane } = useNavigationStore((state) => state.actions);
   const noteTitle = firstLineH1Title(markdown);
   const hasConflict = (noteConflict?.snapshotCount ?? 0) > 1;
   const viewableConflictSnapshots =

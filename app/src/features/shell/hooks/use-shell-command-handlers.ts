@@ -1,8 +1,8 @@
 import { useCommandRequest } from "@/shared/hooks/use-command-request";
 import { canonicalizeTagPath } from "@/shared/lib/tags";
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useCommandStore } from "@/shared/stores/use-command-store";
 import type { NoteFilter } from "@/shared/api/types";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 
 export interface ShellCommandHandlerDeps {
   activeTagPath: string | null;
@@ -34,14 +34,12 @@ export function useShellCommandHandlers(deps: ShellCommandHandlerDeps) {
   } = deps;
 
   const { setNoteFilter, setFocusedPane, prepareNoteCreation } =
-    useShellNavigationStore((state) => state.actions);
-  const createNoteFromWikilinkRequest = useShellCommandStore(
+    useNavigationStore((state) => state.actions);
+  const createNoteFromWikilinkRequest = useCommandStore(
     (state) => state.createNoteFromWikilinkRequest,
   );
-  const focusNoteRequest = useShellCommandStore(
-    (state) => state.focusNoteRequest,
-  );
-  const focusTagPathRequest = useShellCommandStore(
+  const focusNoteRequest = useCommandStore((state) => state.focusNoteRequest);
+  const focusTagPathRequest = useCommandStore(
     (state) => state.focusTagPathRequest,
   );
   useCommandRequest(focusTagPathRequest, (request) => {

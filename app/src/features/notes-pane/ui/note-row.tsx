@@ -4,7 +4,7 @@ import { GitMergeConflict, Pin } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { uiStore, useSidebarVisible } from "@/shared/stores/use-ui-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import { dispatchFocusEditor } from "@/shared/lib/pane-navigation";
 import {
   type NoteListNavigationDirection,
@@ -57,7 +57,7 @@ export function NoteRow({
   const isActive = note.id === selectedNoteId;
   const cardPreview = noteCardPreview(note, searchWords);
   const sidebarVisible = useSidebarVisible();
-  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
+  const { setFocusedPane } = useNavigationStore((state) => state.actions);
 
   return (
     <motion.div

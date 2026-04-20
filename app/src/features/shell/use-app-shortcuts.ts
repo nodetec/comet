@@ -1,9 +1,9 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useCommandStore } from "@/shared/stores/use-command-store";
 import { uiStore, useUIActions } from "@/shared/stores/use-ui-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import {
   getPaneFocusShortcut,
   isCommandPaletteShortcut,
@@ -33,8 +33,8 @@ export function useAppShortcuts({ onCreateNote }: UseAppShortcutsOptions) {
     requestFocusNotesPane,
     requestFocusNotesSearch,
     requestOpenEditorFind,
-  } = useShellCommandStore((state) => state.actions);
-  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
+  } = useCommandStore((state) => state.actions);
+  const { setFocusedPane } = useNavigationStore((state) => state.actions);
 
   const openCommandPalette = useEffectEvent(() => {
     setCommandPaletteOpen(true);

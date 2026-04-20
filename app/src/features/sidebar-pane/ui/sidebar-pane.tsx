@@ -27,9 +27,9 @@ import {
   useFocusedPane,
   useNoteFilter,
   useTagViewActive,
-} from "@/shared/stores/use-shell-store";
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+} from "@/shared/stores/use-app-state";
+import { useCommandStore } from "@/shared/stores/use-command-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import {
   focusSidebarRow,
   ancestorSidebarTagPaths,
@@ -171,11 +171,11 @@ export function SidebarPane({
   const activeTagPath = tagViewActive ? storeActiveTagPath : null;
   const noteFilter = useNoteFilter();
   const focusedPane = useFocusedPane();
-  const focusTagPathRequest = useShellCommandStore(
+  const focusTagPathRequest = useCommandStore(
     (state) => state.focusTagPathRequest,
   );
   const isFocused = focusedPane === "sidebar";
-  const { setFocusedPane } = useShellNavigationStore((state) => state.actions);
+  const { setFocusedPane } = useNavigationStore((state) => state.actions);
 
   const withSidebarFocus = (fn: () => void) => () => {
     setFocusedPane("sidebar");

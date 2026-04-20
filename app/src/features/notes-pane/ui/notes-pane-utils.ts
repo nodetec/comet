@@ -7,7 +7,7 @@ import {
   Submenu,
 } from "@tauri-apps/api/menu";
 
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 import {
   type NoteFilter,
   type NoteSortDirection,
@@ -123,7 +123,7 @@ export function handleNoteRowPointerDown(
 export function focusSelectedNoteRow(root?: ParentNode | null) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      if (useShellNavigationStore.getState().focusedPane !== "notes") {
+      if (useNavigationStore.getState().focusedPane !== "notes") {
         return;
       }
 
@@ -143,7 +143,7 @@ export function focusSelectedNoteRow(root?: ParentNode | null) {
 export function focusNotesPaneTarget(scrollContainer: HTMLDivElement | null) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      if (useShellNavigationStore.getState().focusedPane !== "notes") {
+      if (useNavigationStore.getState().focusedPane !== "notes") {
         return;
       }
 

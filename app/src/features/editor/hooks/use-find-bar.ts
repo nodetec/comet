@@ -8,7 +8,7 @@ import {
 
 import { type NoteEditorHandle } from "@/features/editor/note-editor";
 import { useCommandRequestId } from "@/shared/hooks/use-command-request";
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useCommandStore } from "@/shared/stores/use-command-store";
 import {
   isEditorFindShortcut,
   isNotesSearchShortcut,
@@ -31,7 +31,7 @@ export function useFindBar({
   const [findQuery, setFindQuery] = useState("");
   const [activeFindMatchIndex, setActiveFindMatchIndex] = useState(0);
   const [findScrollRevision, setFindScrollRevision] = useState(0);
-  const editorFindRequestId = useShellCommandStore(
+  const editorFindRequestId = useCommandStore(
     (state) => state.editorFindRequestId,
   );
   const findInputRef = useRef<HTMLInputElement | null>(null);

@@ -191,11 +191,11 @@ export const EMPTY_DRAFT_STATE = {
   "draftMarkdown" | "draftNoteId" | "draftWikilinkResolutions"
 >;
 
-export function resetShellDraftState() {
-  useShellDraftStore.setState(EMPTY_DRAFT_STATE);
+export function resetDraftState() {
+  useDraftStore.setState(EMPTY_DRAFT_STATE);
 }
 
-const useShellDraftStore = create<DraftState>((set) => ({
+const useDraftStore = create<DraftState>((set) => ({
   ...EMPTY_DRAFT_STATE,
   actions: {
     clearDraftWikilinkResolutions: (noteId) => {
@@ -274,4 +274,4 @@ const useShellDraftStore = create<DraftState>((set) => ({
   },
 }));
 
-export { useShellDraftStore };
+export { useDraftStore };

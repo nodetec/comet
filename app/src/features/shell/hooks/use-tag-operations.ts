@@ -13,8 +13,8 @@ import {
 import type { LoadedNote, WikiLinkResolutionInput } from "@/shared/api/types";
 import { canonicalizeTagPath } from "@/shared/lib/tags";
 import type { DraftControl } from "@/features/shell/hooks/use-draft-control";
-import { useShellDraftStore } from "@/shared/stores/use-shell-draft-store";
-import { useShellNavigationStore } from "@/shared/stores/use-shell-navigation-store";
+import { useDraftStore } from "@/shared/stores/use-draft-store";
+import { useNavigationStore } from "@/shared/stores/use-navigation-store";
 
 export interface TagOperationsDeps {
   draftControl: DraftControl;
@@ -42,9 +42,8 @@ export function useTagOperations(deps: TagOperationsDeps) {
   const { flushCurrentDraftAsync } = deps.draftControl;
 
   const getSelectedNoteContext = () => {
-    const { draftNoteId } = useShellDraftStore.getState();
-    const { selectedNoteId, activeTagPath } =
-      useShellNavigationStore.getState();
+    const { draftNoteId } = useDraftStore.getState();
+    const { selectedNoteId, activeTagPath } = useNavigationStore.getState();
     const noteId = selectedNoteId;
     const currentNote = noteId
       ? deps.queryClient.getQueryData<LoadedNote>(["note", noteId])
@@ -66,7 +65,7 @@ export function useTagOperations(deps: TagOperationsDeps) {
   };
 
   const syncSelectedNoteAfterTagRewrite = async (affectedNoteIds: string[]) => {
-    const { selectedNoteId } = useShellNavigationStore.getState();
+    const { selectedNoteId } = useNavigationStore.getState();
     if (!selectedNoteId || !affectedNoteIds.includes(selectedNoteId)) {
       await deps.queryClient.invalidateQueries({ queryKey: ["note"] });
       return;
@@ -180,7 +179,7 @@ export function useTagOperations(deps: TagOperationsDeps) {
 
         const affectedNoteIds = await deleteTag({ path });
         if (activeTagPath === path) {
-          useShellNavigationStore.getState().actions.clearActiveTagPath();
+          useNavigationStore.getState().actions.clearActiveTagPath();
         }
 
         await Promise.all([

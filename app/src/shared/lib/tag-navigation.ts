@@ -1,5 +1,5 @@
-import { useShellCommandStore } from "@/shared/stores/use-shell-command-store";
+import { useCommandStore } from "@/shared/stores/use-command-store";
 
 export function dispatchFocusTagPath(tagPath: string) {
-  useShellCommandStore.getState().actions.requestFocusTagPath(tagPath);
+  useCommandStore.getState().actions.requestFocusTagPath(tagPath);
 }

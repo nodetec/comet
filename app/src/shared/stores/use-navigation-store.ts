@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import type { NoteFilter } from "@/shared/api/types";
-import { resetShellDraftState } from "./use-shell-draft-store";
+import { resetDraftState } from "./use-draft-store";
 
 export type { NoteFilter } from "@/shared/api/types";
 
@@ -46,7 +46,7 @@ export type NavigationState = {
   actions: NavigationActions;
 };
 
-const useShellNavigationStore = create<NavigationState>((set) => ({
+const useNavigationStore = create<NavigationState>((set) => ({
   activeTagPath: null,
   creatingSelectedNoteId: null,
   focusedPane: "notes",
@@ -91,7 +91,7 @@ const useShellNavigationStore = create<NavigationState>((set) => ({
       const clearSelection =
         currentNote && (currentNote.archivedAt || currentNote.deletedAt);
       if (clearSelection) {
-        resetShellDraftState();
+        resetDraftState();
       }
       set({
         ...(clearSelection ? { selectedNoteId: null } : {}),
@@ -100,7 +100,7 @@ const useShellNavigationStore = create<NavigationState>((set) => ({
       });
     },
     navigateToDisposedFilter: (filter) => {
-      resetShellDraftState();
+      resetDraftState();
       set({
         selectedNoteId: null,
         tagViewActive: false,
@@ -120,7 +120,7 @@ const useShellNavigationStore = create<NavigationState>((set) => ({
           );
 
         if (outOfScope) {
-          resetShellDraftState();
+          resetDraftState();
         }
 
         return {
@@ -148,4 +148,4 @@ const useShellNavigationStore = create<NavigationState>((set) => ({
   },
 }));
 
-export { useShellNavigationStore };
+export { useNavigationStore };
